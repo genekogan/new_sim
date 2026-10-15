@@ -24,8 +24,7 @@ The world URL is the page's address without `?…` or `#…`. Hosted worlds may 
 world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than guessing the shape.
 `.eden-god.json` holds the token; never print it. `.eden-god.cache.json` is your mirror of the world
 (refreshed automatically when the world changes; used as is when the server is unreachable).
-`look` needs Google Chrome. If no Playwright package sits next to the CLI, the first look fetches
-`playwright-core` once through npx (no browser download; it drives your Chrome).
+`look --remote` (or `EDEN_GOD_LOOK=remote`) uses the world’s renderer; it also falls back there if local Chrome is missing or cannot start.
 
 ## The world in one page (the ontology)
 

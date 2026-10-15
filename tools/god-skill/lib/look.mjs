@@ -19,6 +19,7 @@ import { createServer } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPASS, compassKey } from './solver.mjs';
+import { withRemoteLook } from './remote-look.mjs'; // W2 remote look/fallback policy
 
 const GL_ARGS = process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--ignore-gpu-blocklist'];
 const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; };
@@ -101,7 +102,11 @@ async function ensureKeeper(worldUrl, cliPath) {
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+export async function shoot(args, runtime = {}) { // W2: small wrapper; local implementation remains W1's.
+  mkdirSync(dirname(resolve(args.out)), { recursive: true });
+  return withRemoteLook(args, runtime, () => shootLocal(args, runtime));
+}
+async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const t0 = now();

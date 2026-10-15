@@ -244,8 +244,8 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync4, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
-import { resolve as resolve2 } from "node:path";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync5, existsSync as existsSync5, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { resolve as resolve3 } from "node:path";
 
 // lib/mirror.mjs
 import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
@@ -1370,14 +1370,51 @@ function exportGenesis(snapshot3, { name } = {}) {
 
 // lib/look.mjs
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync3, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve as resolve2 } from "node:path";
 import { fileURLToPath } from "node:url";
 
+// lib/remote-look.mjs
+import { existsSync as existsSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { resolve } from "node:path";
+async function remoteLook(args, runtime = {}) {
+  const now = runtime.now ?? Date.now, t0 = now();
+  const token = (runtime.load ?? load)().token;
+  if (!token) throw Error("look: remote rendering needs a god token; run pair (or mint on a local dev world)");
+  const body = Object.fromEntries(["eye", "at", "hideRoofs", "cut", "span", "hour", "weather", "width", "height"].filter((k) => args[k] !== void 0).map((k) => [k, args[k]]));
+  const r = await (runtime.fetch ?? fetch)(`${args.worldUrl.replace(/\/$/, "")}/v1/god/look`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+    redirect: "error",
+    signal: AbortSignal.timeout(args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 9e4))
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw Error(`look: ${e.code ?? r.status}: ${e.message ?? "world renderer refused the screenshot"}${e.retry_after ? `; retry in ${e.retry_after}s` : ""}`);
+  }
+  const png = Buffer.from(await r.arrayBuffer());
+  if (!r.headers.get("content-type")?.startsWith("image/png") || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw Error("look: world renderer did not return a PNG");
+  writeFileSync2(resolve(args.out), png);
+  return { file: resolve(args.out), ms: now() - t0, via: "remote" };
+}
+async function withRemoteLook(args, runtime, local) {
+  if (args.remote || process.env.EDEN_GOD_LOOK === "remote") return remoteLook(args, runtime);
+  const candidates = process.platform === "darwin" ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"] : process.platform === "win32" ? [String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`, String.raw`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`] : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/chrome"];
+  if (runtime.pw === void 0 && !(runtime.chromeExists ?? (() => candidates.some(existsSync3)))()) return remoteLook(args, runtime);
+  const now = runtime.now ?? Date.now, started = now();
+  try {
+    return await local();
+  } catch (e) {
+    if (!/cannot start Chrome|no Playwright|browserType\.launch|executable doesn't exist|browser keeper did not start/i.test(String(e.message))) throw e;
+    return { ...await remoteLook(args, runtime), ms: now() - started };
+  }
+}
+
 // lib/chrome-lease.mjs
-import { mkdirSync, readFileSync as readFileSync3, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync, readFileSync as readFileSync3, rmSync, statSync, writeFileSync as writeFileSync3 } from "node:fs";
 var LEASE = "/tmp/eden-chrome-lease";
 var snapshot = (dir) => {
   const stat = statSync(dir);
@@ -1423,7 +1460,7 @@ async function chromeLease(holder = "unknown", { waitMs = 20 * 6e4, staleMs = 15
       await new Promise((r) => setTimeout(r, 3e3 + Math.random() * 2e3));
       continue;
     }
-    writeFileSync2(`${leaseDir}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+    writeFileSync3(`${leaseDir}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
     break;
   }
@@ -1464,9 +1501,9 @@ function findPlaywright() {
       return process.cwd();
     }
   })();
-  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, process.cwd(), here, resolve(here, "../.."), resolve(here, "../../.."), resolve(here, "../../../mars/viewer"), resolve(here, "../../mars/viewer"), resolve(here, "../mars/viewer")].filter(Boolean);
+  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, process.cwd(), here, resolve2(here, "../.."), resolve2(here, "../../.."), resolve2(here, "../../../mars/viewer"), resolve2(here, "../../mars/viewer"), resolve2(here, "../mars/viewer")].filter(Boolean);
   for (const b of bases) {
-    const pkg = existsSync3(resolve(b, "package.json")) ? resolve(b, "package.json") : resolve(b, "noop.js");
+    const pkg = existsSync4(resolve2(b, "package.json")) ? resolve2(b, "package.json") : resolve2(b, "noop.js");
     for (const name of ["playwright-core", "playwright", "@playwright/test"]) {
       try {
         const m = createRequire(pkg)(name);
@@ -1480,7 +1517,7 @@ function findPlaywright() {
     const r = spawnSync("npx", ["-y", "-p", "playwright-core@1", "-c", 'echo "$PATH"'], { encoding: "utf8", timeout: 3e5, stdio: ["ignore", "pipe", "pipe"] });
     const bin = (r.stdout ?? "").trim().split(":").find((d) => /[\\/]_npx[\\/][^\\/]+[\\/]node_modules[\\/]\.bin$/.test(d));
     if (bin) {
-      const base = resolve(bin, "../.."), m = createRequire(resolve(base, "noop.js"))("playwright-core");
+      const base = resolve2(bin, "../.."), m = createRequire(resolve2(base, "noop.js"))("playwright-core");
       if (m?.chromium) {
         process.env.EDEN_GOD_PLAYWRIGHT_FROM = base;
         return m;
@@ -1532,7 +1569,7 @@ async function keeper(worldUrl, port) {
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 6e5 });
-  writeFileSync3(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
+  writeFileSync4(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
   for (; ; ) {
     await new Promise((r) => setTimeout(r, 3e4));
     let last = 0;
@@ -1581,8 +1618,12 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shoot({ worldUrl, eye, at, out, hour, weather: weather2, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
-  mkdirSync2(dirname(resolve(out)), { recursive: true });
+async function shoot(args, runtime = {}) {
+  mkdirSync2(dirname(resolve2(args.out)), { recursive: true });
+  return withRemoteLook(args, runtime, () => shootLocal(args, runtime));
+}
+async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+  mkdirSync2(dirname(resolve2(out)), { recursive: true });
   const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const t0 = now();
   const overrides = { ...hour != null ? { hour } : {}, ...weather2 != null ? { weather: weather2 } : {} };
@@ -1590,9 +1631,9 @@ async function shoot({ worldUrl, eye, at, out, hour, weather: weather2, hideRoof
   if (!pw) {
     if (keep) throw new Error("look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works");
     const q2 = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
-    const r = (runtime.spawnSync ?? spawnSync)("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q2}`, resolve(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
+    const r = (runtime.spawnSync ?? spawnSync)("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q2}`, resolve2(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
-    return { file: resolve(out), ms: now() - t0, via: "npx playwright-core screenshot" };
+    return { file: resolve2(out), ms: now() - t0, via: "npx playwright-core screenshot" };
   }
   let page, browser, release = () => {
   };
@@ -1697,8 +1738,8 @@ async function shoot({ worldUrl, eye, at, out, hour, weather: weather2, hideRoof
       }
     }, frames);
     if (!data) throw new Error("look: no canvas on the page");
-    writeFileSync3(resolve(out), Buffer.from(data.split(",")[1], "base64"));
-    return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
+    writeFileSync4(resolve2(out), Buffer.from(data.split(",")[1], "base64"));
+    return { file: resolve2(out), ms: now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
   } finally {
     if (!keep) {
       await browser.close().catch(() => {
@@ -2966,7 +3007,7 @@ async function build2(sub = "show", args = [], f = {}) {
     const steps2 = f.steps.split(",").map((x) => x.trim());
     if (steps2.length > 24 || steps2.some((x) => !x || x.length > 60)) throw new Error("--steps needs 1..24 labels, each 1..60 characters");
     const massing = parseMassing(f.mass), site = await buildSite(f);
-    const brief = f.brief === void 0 ? void 0 : existsSync4(f.brief) ? readFileSync5(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync5(f.brief) ? readFileSync5(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     body = { id: arg, title: f.title, steps: steps2, site, massing, ...brief !== void 0 ? { brief } : {}, ...f.root ? { root: f.root } : {} };
   } else if (sub === "resume") {
@@ -3009,7 +3050,7 @@ async function build2(sub = "show", args = [], f = {}) {
   if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join("; ")}${r.notReverted ? `; undone edits: ${r.reverted?.join(", ") || "none"}; not undone edits: ${r.notReverted.join(", ")}` : ""}`;
   if (sub === "start" || sub === "resume") save({ build: BUILD_API.local(r), group: void 0, buildEchoWarned: void 0, buildPreviews: void 0 });
   if (sub === "claim") {
-    const file = claimFile(r.claim.id), previous = existsSync4(file) ? JSON.parse(readFileSync5(file, "utf8")) : null;
+    const file = claimFile(r.claim.id), previous = existsSync5(file) ? JSON.parse(readFileSync5(file, "utf8")) : null;
     if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + "\n");
     return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
   }
@@ -3165,8 +3206,8 @@ async function look(flags2 = {}, runtime = {}) {
     target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0));
   }
   const cam = camera({ target, span, from: flags2.from ?? "s", dist, tight, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
-  const out = resolve2(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...overrides, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  const out = resolve3(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, remote: !!flags2.remote, ...overrides, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
   let shot;
   if (!flags2.keep) shot = await (runtime.shoot ?? shoot)(args);
   else {
@@ -3182,8 +3223,8 @@ async function look(flags2 = {}, runtime = {}) {
 async function exportWorld(file, flags2 = {}) {
   const s = await snapshot2();
   const g = exportGenesis(s, flags2);
-  const out = resolve2(file ?? `${s.worldId}.genesis.json`);
-  writeFileSync4(out, JSON.stringify(g, null, 1));
+  const out = resolve3(file ?? `${s.worldId}.genesis.json`);
+  writeFileSync5(out, JSON.stringify(g, null, 1));
   const ops = g.batches.flatMap((b) => b.ops), things = ops.filter((op) => op.op === "place").length, defs2 = ops.filter((op) => op.op === "define").length;
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
@@ -3208,7 +3249,7 @@ var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   return out.join("\n");
 });
 async function define(json2) {
-  const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
+  const def = typeof json2 === "string" ? JSON.parse(existsSync5(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -3217,7 +3258,7 @@ async function define(json2) {
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function defineKit(json2, flags2 = {}) {
-  const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
+  const k = typeof json2 === "string" ? JSON.parse(existsSync5(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
   const picks = [...matches.filter((d) => usedIn(d).length), ...matches.filter((d) => !usedIn(d).length)].slice(0, 5);
@@ -3261,7 +3302,7 @@ async function examples(name) {
     const r = await fetch(`${load().world}/god/examples/${name}.${ext}`);
     if (!r.ok) throw new Error(`the world did not serve ${name}.${ext} (${r.status})`);
     const t = await r.text();
-    writeFileSync4(`examples/${name}.${ext}`, t);
+    writeFileSync5(`examples/${name}.${ext}`, t);
     if (ext === "log") out.push(t);
   }
   return `${out[0].trim()}
@@ -3296,7 +3337,7 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -3324,7 +3365,7 @@ var FLAGS = {
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`,
-  look: "at from dist inside floor keep out span height width h hide-roofs stop hour weather",
+  look: "at from dist inside floor keep remote out span height width h hide-roofs stop hour weather",
   defs: "tag all",
   where: "at offset",
   reach: "",
@@ -3375,7 +3416,7 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
-var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync5(r[0], "utf8") : r[0] : readFileSync5(0, "utf8");
+var readArg = (r) => r[0] !== void 0 ? existsSync5(r[0]) && !r[0].trim().startsWith("{") ? readFileSync5(r[0], "utf8") : r[0] : readFileSync5(0, "utf8");
 var COMMANDS = {
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
@@ -3464,7 +3505,7 @@ var COMMANDS = {
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> ([bounds] containment / [collider] hit) \xB7 reach <from> <to> \xB7 clear <x,z|ref> --size WxD \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
+look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'

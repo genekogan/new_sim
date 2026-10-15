@@ -1,0 +1,206 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { PassThrough } from 'node:stream';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import vm from 'node:vm';
+import { Hono, type Context } from 'hono';
+import { Db } from '../db.ts';
+import { ApiError } from '../souls.ts';
+import { GodMode } from './god.ts';
+import { mountGodRoutes } from './routes.ts';
+import { LOOK_LIMITS, LookQueue, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
+import { PipeCDP, renderLook } from './look-renderer.ts';
+import { readyExpression, captureExpression } from './look-page.ts';
+
+const shot = { eye: [0, 10, 20], at: [0, 0, 0] };
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64');
+const deferred = <T = void>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { resolve, promise }; };
+function fixture(t: { after(fn: () => void): void }, renderer?: LookRenderer) {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  const opts = { worldId: 'looks', ownerId: 'dev:owner', tick: () => 0, emit: () => {} };
+  const god = new GodMode(db, opts), other = new GodMode(db, { ...opts, worldId: 'other' });
+  const mint = (g: GodMode, label: string) => g.mintFor({ id: 'dev:owner', role: 'user' }, label);
+  const a = mint(god, 'a'), b = mint(god, 'b'), wrong = mint(other, 'wrong');
+  const app = new Hono(), renders: unknown[] = [];
+  const requireGod = (c: Context) => { if (!god.godIdentity(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''))) throw new ApiError(401, 'unauthorized', 'god token required'); };
+  mountLookRoutes(app, { requireGod, worldUrl: 'http://127.0.0.1:5368/w/looks', entities: () => god.model.entities.size, renderer: renderer ?? (async (...args) => { renders.push(args.slice(0, 3)); return png; }) });
+  app.onError((e, c) => e instanceof ApiError ? c.json({ code: e.code, message: e.message, ...e.extra }, e.status as 400) : c.json({ message: String(e) }, 500));
+  const request = (token?: string, body: unknown = shot, raw?: string) => app.request('/v1/god/look', { method: 'POST', headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json', 'x-forwarded-host': 'attacker.invalid' }, body: raw ?? JSON.stringify(body) });
+  return { god, a, b, wrong, request, renders };
+}
+
+test('look authenticates scoped tokens before parsing; per-token 20/min limits precede render', async t => {
+  const f = fixture(t);
+  for (const token of [undefined, 'invalid', f.wrong]) assert.equal((await f.request(token, {}, '{')).status, 401);
+  for (let i = 0; i < LOOK_LIMITS.perMinute; i++) {
+    const response = await f.request(f.a);
+    assert.equal(response.status, 200); assert.equal(response.headers.get('content-type'), 'image/png');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+  }
+  const limited = await f.request(f.a);
+  assert.equal(limited.status, 429); const data = await limited.json() as { code: string; retry_after: number };
+  assert.equal(data.code, 'rate-limited'); assert.ok(data.retry_after > 0);
+  assert.equal((await f.request(f.b)).status, 200); assert.equal(f.renders.length, 21);
+  assert.equal(f.god.model.editSeq, 0, 'a look never edits the world');
+  assert.equal((f.renders[0] as unknown[])[0], 'http://127.0.0.1:5368/w/looks', 'forwarded host cannot control renderer URL');
+});
+
+test('look rejects malformed/oversized/untrusted parameters and counts invalid requests', async t => {
+  const f = fixture(t);
+  const invalid = [null, {}, { ...shot, eye: [0, 1] }, { ...shot, at: [0, 10, 20] },
+    { ...shot, width: 1601 }, { ...shot, height: 1001 }, { ...shot, width: 0 }, { ...shot, width: 1.5 },
+    { ...shot, span: -1 }, { ...shot, hour: '24:00' }, { ...shot, weather: '../other' }, { ...shot, cut: '2' },
+    { ...shot, hideRoofs: 1 }, { ...shot, worldUrl: 'https://attacker.invalid' }, { ...shot, expect: 0 },
+  ];
+  for (const body of invalid) {
+    const r = await f.request(f.a, body); assert.equal(r.status, 400, JSON.stringify(body));
+    assert.equal((await r.json() as { code: string }).code, 'look.invalid');
+  }
+  assert.equal((await f.request(f.a, {}, '{')).status, 400);
+  assert.equal(f.renders.length, 0);
+  for (let i = invalid.length + 1; i < LOOK_LIMITS.perMinute; i++) await f.request(f.a, {});
+  assert.equal((await f.request(f.a)).status, 429);
+  assert.equal(lookSchema.safeParse({ ...shot, span: Infinity }).success, false);
+  assert.equal(lookSchema.safeParse({ ...shot, eye: [NaN, 1, 2] }).success, false);
+});
+
+test('look passes all supported camera/preview settings and server entity count to renderer', async t => {
+  const f = fixture(t), settings = { ...shot, hideRoofs: true, cut: 2, span: 20, hour: '21:30', weather: 'rain', width: 1600, height: 1000 };
+  assert.equal((await f.request(f.a, settings)).status, 200);
+  assert.deepEqual(f.renders[0], ['http://127.0.0.1:5368/w/looks', settings, f.god.model.entities.size]);
+});
+
+test('look propagates actionable host unavailability and is mounted behind normal god auth', async t => {
+  const f = fixture(t, async () => { throw new ApiError(503, 'look.unavailable', 'Install Google Chrome on the world host'); });
+  const r = await f.request(f.a); assert.equal(r.status, 503); assert.match((await r.json() as { message: string }).message, /Install Google Chrome/);
+  const app = new Hono();
+  mountGodRoutes(app, { god: f.god, worldName: 'Looks', requireUser: async () => { throw new Error('unused'); }, soulFromBearer: () => null, baseOf: () => 'https://attacker.invalid', limitIp: () => {} });
+  app.onError((e, c) => c.json({ code: (e as ApiError).code }, (e as ApiError).status as 400));
+  assert.equal((await app.request('/v1/god/look', { method: 'POST', body: JSON.stringify(shot) })).status, 401);
+  const unconfigured = await app.request('/v1/god/look', { method: 'POST', headers: { authorization: `Bearer ${f.a}` }, body: JSON.stringify(shot) });
+  assert.equal(unconfigured.status, 503); assert.equal((await unconfigured.json() as { code: string }).code, 'look.unavailable');
+});
+
+test('look queue serializes across tokens, bounds waiting work and recovers after render failure', async () => {
+  const queue = new LookQueue(1000, 1), started: number[] = [], gate = deferred();
+  let active = 0, high = 0;
+  const run = (n: number) => queue.run(async () => { started.push(n); high = Math.max(high, ++active); try { if (n === 1) { await gate.promise; throw new Error('failed first'); } return png; } finally { active--; } });
+  const first = assert.rejects(run(1), /failed first/), second = run(2);
+  await assert.rejects(run(3), (e: ApiError) => e.code === 'look.busy' && e.status === 429);
+  assert.deepEqual(started, [1]); gate.resolve(); await first; assert.deepEqual(await second, png);
+  assert.deepEqual(started, [1, 2]); assert.equal(high, 1);
+  assert.deepEqual(await run(4), png);
+});
+
+test('active timeout aborts renderer but retains serial slot until disposal; queued timeout never starts', async () => {
+  const queue = new LookQueue(30, 2), disposed = deferred(); let aborted = false, queuedStarted = false;
+  const first = queue.run(async signal => { await new Promise<void>(r => signal.addEventListener('abort', () => { aborted = true; r(); }, { once: true })); await disposed.promise; return png; });
+  const second = queue.run(async () => { queuedStarted = true; return png; });
+  await Promise.all([assert.rejects(first, (e: ApiError) => e.code === 'look.timeout'), assert.rejects(second, (e: ApiError) => e.code === 'look.timeout')]);
+  assert.equal(aborted, true); assert.equal(queuedStarted, false);
+  const third = queue.run(async () => png); disposed.resolve(); assert.deepEqual(await third, png);
+});
+
+test('disconnected queued requests are removed without rendering and release queue capacity', async () => {
+  const queue = new LookQueue(1000, 1), gate = deferred(), ac = new AbortController(); let called = false;
+  const first = queue.run(async () => { await gate.promise; return png; });
+  const cancelled = queue.run(async () => { called = true; return png; }, ac.signal);
+  ac.abort(); await assert.rejects(cancelled, (e: ApiError) => e.code === 'look.cancelled');
+  await assert.rejects(queue.run(async () => png, ac.signal), (e: ApiError) => e.code === 'look.cancelled');
+  const third = queue.run(async () => png); gate.resolve(); await first; await third; assert.equal(called, false);
+});
+
+test('CDP pipe correlates fragmented/coalesced replies, events and disconnect errors', async () => {
+  const input = new PassThrough(), output = new PassThrough(), cdp = new PipeCDP(input, output), events: string[] = [];
+  cdp.onEvent = method => events.push(method);
+  const a = cdp.send('Browser.getVersion'), b = cdp.send('Page.enable', {}, 'page');
+  const requests = input.read().toString().split('\0').filter(Boolean).map(JSON.parse);
+  assert.equal(requests[1].sessionId, 'page');
+  output.write('{"id":2,"result":{}'); output.write('}\0{"method":"Page.loaded","params":{}}\0{"id":1,"result":{"product":"Chrome"}}\0');
+  assert.deepEqual(await b, {}); assert.deepEqual(await a, { product: 'Chrome' }); assert.deepEqual(events, ['Page.loaded']);
+  const failed = cdp.send('missing'); output.write('{"id":3,"error":{"message":"unknown method"}}\0'); await assert.rejects(failed, /unknown method/);
+  const pending = cdp.send('pending'); cdp.close(new Error('disconnected')); await assert.rejects(pending, /disconnected/); await assert.rejects(cdp.send('after'), /disconnected/);
+});
+
+test('renderer refuses external configuration or a host without Chrome before opening any page', async () => {
+  const settings = lookSchema.parse(shot);
+  for (const url of ['https://example.invalid', 'http://localhost:5368', 'http://127.0.0.1:5368?url=other']) await assert.rejects(renderLook(url, settings, 0, new AbortController().signal), (e: ApiError) => e.code === 'look.unavailable');
+  const previous = process.env.GOD_LOOK_CHROME; process.env.GOD_LOOK_CHROME = '/does-not-exist/w2-chrome';
+  try { await assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 0, new AbortController().signal), (e: ApiError) => e.code === 'look.unavailable' && /Install Google Chrome/.test(e.message)); }
+  finally { if (previous === undefined) delete process.env.GOD_LOOK_CHROME; else process.env.GOD_LOOK_CHROME = previous; }
+});
+
+test('server page scripts require readiness/count/easing and preserve local span, roofs, clipping and camera checks', async () => {
+  class Vector {
+    values: number[] = [0, 0, 0];
+    set(...values: number[]) { this.values = values; }
+    toArray() { return this.values; }
+  }
+  const roof = { visible: true, name: 'roof' }, camera = { fov: 45, aspect: 1.6, near: 0.1, far: 10, position: new Vector(), lookAt() {}, updateProjectionMatrix() {} };
+  let drift = false, captured = 0;
+  const target = new Vector(), layer = { active: true, now: 4000, drawn: new Map([['house', { t0: 0, dur: 1 }]]) };
+  const canvas = { width: 1024, height: 640, style: {}, children: [], parentElement: null, toDataURL: () => { captured++; return 'data:image/png;base64,' + png.toString('base64'); } };
+  const context = vm.createContext({ window: { __shotReady: true, __simEntity: { camera, controls: { target, update() {} }, layer, scene: { fog: { near: 1, far: 10 }, traverse(fn: (o: unknown) => void) { fn(roof); } } } },
+    document: { title: 'ready', querySelector: () => canvas, querySelectorAll: () => [canvas] }, performance: { now: () => 4000 },
+    requestAnimationFrame: (fn: () => void) => fn(), setTimeout: (fn: () => void) => { if (drift) target.set(9, 9, 9); fn(); },
+  });
+  assert.equal(vm.runInContext(readyExpression(4), context).ready, false, 'server entity count guards early captures');
+  layer.now = 500; assert.equal(vm.runInContext(readyExpression(1), context).ready, false, 'wait until easing finishes'); layer.now = 4000;
+  assert.equal(vm.runInContext(readyExpression(1), context).ready, true);
+  const settings = lookSchema.parse({ ...shot, span: 40, hideRoofs: true, cut: 1 });
+  assert.match(await vm.runInContext(captureExpression(settings), context), /^data:image\/png/);
+  const required = 20 / Math.tan(Math.PI / 8) * 1.05;
+  assert.ok(Math.abs(Math.hypot(...camera.position.toArray()) - required) < 1e-8);
+  assert.ok(Math.abs(camera.far - required * 3) < 1e-8); assert.equal(roof.visible, true, 'roof visibility restored after capture');
+  drift = true; await assert.rejects(vm.runInContext(captureExpression(settings), context), /camera changed/); assert.equal(captured, 1);
+  drift = false; await assert.rejects(vm.runInContext(captureExpression(lookSchema.parse({ eye: [0, 0, 0.05], at: [0, 0, 0] })), context), /near clipping/);
+});
+
+test('renderer drives the full CDP pipe lifecycle and disposes its owned process/profile with a stub host', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'w2-cdp-host-')), executable = join(dir, 'chrome'), transcript = join(dir, 'requests.jsonl');
+  const previous = process.env.GOD_LOOK_CHROME;
+  t.after(() => { if (previous === undefined) delete process.env.GOD_LOOK_CHROME; else process.env.GOD_LOOK_CHROME = previous; rmSync(dir, { recursive: true, force: true }); });
+  // A real child and real fd 3/4 transport, with just the browser protocol stubbed.
+  const source = `#!${process.execPath}
+const fs = require('node:fs');
+fs.appendFileSync(${JSON.stringify(transcript)}, JSON.stringify({method: 'test.started', params: {pid: process.pid, profile: process.argv.find(a => a.startsWith('--user-data-dir=')).split('=').slice(1).join('=')}}) + '\\n');
+let buffer = '', evaluations = 0;
+const input = fs.createReadStream(null, {fd: 3});
+input.on('data', b => { buffer += b; for (;;) {
+  const end = buffer.indexOf('\\0'); if (end < 0) break;
+  const m = JSON.parse(buffer.slice(0, end)); buffer = buffer.slice(end + 1);
+  fs.appendFileSync(${JSON.stringify(transcript)}, JSON.stringify(m) + '\\n');
+  if (m.method === 'Runtime.evaluate' && ++evaluations === 1) { fs.writeSync(4, JSON.stringify({id: m.id, error: {message: 'Execution context was destroyed'}}) + '\\0'); continue; }
+  let result = {};
+  if (m.method === 'Target.createTarget') result = {targetId: 'world'};
+  if (m.method === 'Target.attachToTarget') result = {sessionId: 'world-page'};
+  if (m.method === 'Runtime.evaluate') result = {result: {value: m.params.expression.startsWith('(async') ? ${JSON.stringify('data:image/png;base64,' + png.toString('base64'))} : {ready: true, drawn: 1}}};
+  fs.writeSync(4, JSON.stringify({id: m.id, result}) + '\\0');
+  if (m.method === 'Fetch.enable') for (const [requestId, url] of [['own', 'http://127.0.0.1:5368/asset'], ['foreign', 'https://example.invalid/asset']]) fs.writeSync(4, JSON.stringify({method: 'Fetch.requestPaused', sessionId: 'world-page', params: {requestId, request: {url}}}) + '\\0');
+} });`;
+  writeFileSync(executable, source, { mode: 0o700 }); process.env.GOD_LOOK_CHROME = executable;
+  const settings = lookSchema.parse({ ...shot, width: 1, height: 1, hideRoofs: true, cut: 2, span: 10, hour: '21:00', weather: 'rain' });
+  const rendered = await renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(5000));
+  assert.deepEqual(rendered, png);
+  const messages = readFileSync(transcript, 'utf8').trim().split('\n').map(s => JSON.parse(s));
+  const owned = messages.find(m => m.method === 'test.started').params;
+  assert.equal(existsSync(owned.profile), false, 'temporary Chrome profile removed');
+  assert.throws(() => process.kill(owned.pid, 0), { code: 'ESRCH' }, 'owned Chrome process has exited');
+  assert.deepEqual(messages.find(m => m.method === 'Emulation.setDeviceMetricsOverride').params, { width: 1, height: 1, deviceScaleFactor: 1, mobile: false });
+  const navigation = new URL(messages.find(m => m.method === 'Page.navigate').params.url);
+  assert.equal(navigation.pathname, '/w/looks'); assert.equal(navigation.searchParams.get('eye'), '0,10,20');
+  for (const [key, value] of Object.entries({ shot: '1', hour: '21:00', weather: 'rain', hideRoofs: '1', cut: '2' })) assert.equal(navigation.searchParams.get(key), value);
+  assert.ok(messages.some(m => m.method === 'Page.addScriptToEvaluateOnNewDocument' && m.params.source.includes('preserveDrawingBuffer')));
+  assert.ok(messages.some(m => m.method === 'Fetch.continueRequest' && m.params.requestId === 'own'));
+  assert.ok(messages.some(m => m.method === 'Fetch.failRequest' && m.params.requestId === 'foreign'));
+  assert.ok(messages.filter(m => m.method === 'Runtime.evaluate').length >= 4);
+  // A stuck host still exits and loses its temporary profile at the request deadline.
+  writeFileSync(executable, source.replace("input.on('data', b => {", "input.on('data', b => { return;"), { mode: 0o700 });
+  await assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(300)), { name: 'TimeoutError' });
+  const timedOut = JSON.parse(readFileSync(transcript, 'utf8').trim().split('\n').at(-1)!);
+  assert.equal(timedOut.method, 'test.started');
+  assert.equal(existsSync(timedOut.params.profile), false); assert.throws(() => process.kill(timedOut.params.pid, 0), { code: 'ESRCH' });
+});

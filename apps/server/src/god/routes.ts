@@ -23,6 +23,7 @@ import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
+import { mountLookRoutes } from './look.ts'; // W2 remote looks
 
 export type GodDeps = {
   god: GodMode;
@@ -34,6 +35,7 @@ export type GodDeps = {
   baseOf: (c: Context) => string;
   limitIp: (c: Context, key: string, max: number, windowMs: number) => void;
   verifyUse?: VerifyUse;
+  lookWorldUrl?: string; // W2: configured loopback URL, never derived from request headers
 };
 
 const codeSchema = z.object({ code: z.string().min(4).max(12) });
@@ -64,6 +66,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountLandRoutes(app, { god: d.god, requireGod });
+  mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => d.god.model.entities.size }); // W2 remote looks
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });
   // LAYERS: GET /v1/world/layers, /v1/world/layers/me (Soul), /v1/god/layers, /v1/god/layers/zone-suggest?use=
   mountLayerRoutes(app, { god: d.god, layers: () => (d.god as unknown as { layers?: GodLayers }).layers, requireGod, soulFromBearer: d.soulFromBearer, categoryOf: (x) => vocab.categoryOf(x as never) });   // GOD-ENV: POST /v1/god/strike   // GOD-ENV: POST /v1/god/land (raise, mountain, valley, move, water, extend …)

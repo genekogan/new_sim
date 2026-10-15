@@ -1,0 +1,69 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { shoot } from './look.mjs';
+import { checkArgs, parseFlags } from '../cli.mjs';
+
+const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=', 'base64');
+function fixture(t) {
+  const dir = mkdtempSync(join(tmpdir(), 'remote-look-test-')), calls = [], previous = process.env.EDEN_GOD_LOOK;
+  delete process.env.EDEN_GOD_LOOK;
+  t.after(() => { rmSync(dir, { recursive: true, force: true }); if (previous === undefined) delete process.env.EDEN_GOD_LOOK; else process.env.EDEN_GOD_LOOK = previous; });
+  const args = { worldUrl: 'http://127.0.0.1:5368/w/looks', eye: [0, 10, 20], at: [0, 0, 0], out: join(dir, 'looks', 'same-name.png'), hideRoofs: true, cut: 1, span: 12, hour: '21:00', weather: 'rain', width: 1024, height: 640, expect: 40, cliPath: '/fixture/cli.mjs' };
+  const runtime = { load: () => ({ token: 'fixture-token' }), fetch: async (url, options) => { calls.push({ url, ...options }); return new Response(png, { headers: { 'content-type': 'image/png' } }); } };
+  return { args, runtime, calls };
+}
+
+test('look --remote and env use authenticated world PNG with unchanged output path and no local launch', async t => {
+  const f = fixture(t);
+  const { flags, rest } = parseFlags(['--remote']); checkArgs('look', flags, rest); assert.equal(flags.remote, true);
+  let launched = false;
+  const runtime = { ...f.runtime, pw: { chromium: { launch: () => { launched = true; throw Error('must not launch'); } } } };
+  for (const fromEnv of [false, true]) {
+    if (fromEnv) process.env.EDEN_GOD_LOOK = 'remote';
+    const result = await shoot({ ...f.args, remote: !fromEnv }, runtime);
+    assert.equal(result.file, f.args.out); assert.equal(result.via, 'remote'); assert.ok(result.ms >= 0);
+    assert.deepEqual(readFileSync(f.args.out), png);
+  }
+  assert.equal(launched, false); assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[0].url, f.args.worldUrl + '/v1/god/look');
+  assert.equal(f.calls[0].headers.authorization, 'Bearer fixture-token'); assert.equal(f.calls[0].redirect, 'error');
+  assert.deepEqual(JSON.parse(f.calls[0].body), Object.fromEntries(['eye', 'at', 'hideRoofs', 'cut', 'span', 'hour', 'weather', 'width', 'height'].map(k => [k, f.args[k]])));
+});
+
+test('Chrome launch failure falls back after releasing local lease', async t => {
+  const f = fixture(t); let released = 0, launched = 0;
+  const result = await shoot(f.args, { ...f.runtime, lease: async () => () => { released++; }, pw: { chromium: { launch: async () => { launched++; throw Error('browserType.launch: Target page, context or browser has been closed'); } } } });
+  assert.equal(launched, 1); assert.equal(released, 1); assert.equal(result.via, 'remote'); assert.equal(f.calls.length, 1);
+  assert.deepEqual(readFileSync(f.args.out), png);
+});
+
+test('missing Chrome goes remote before Playwright discovery/npx and does not need a lease', async t => {
+  const f = fixture(t); let leased = false, spawned = false;
+  const result = await shoot(f.args, { ...f.runtime, chromeExists: () => false, lease: async () => { leased = true; }, spawnSync: () => { spawned = true; throw Error('must not spawn npx'); } });
+  assert.equal(result.via, 'remote'); assert.equal(leased, false); assert.equal(spawned, false);
+});
+
+test('a sandbox npx/Playwright failure also falls back', async t => {
+  const f = fixture(t);
+  const result = await shoot(f.args, { ...f.runtime, pw: null, spawnSync: () => ({ status: 1, stderr: 'EPERM: cache not writable' }) });
+  assert.equal(result.via, 'remote'); assert.equal(f.calls.length, 1);
+});
+
+test('unrelated local rendering errors remain visible and do not trigger another render', async t => {
+  const f = fixture(t); let closed = false;
+  const browser = { newContext: async () => ({ addInitScript: async () => {}, newPage: async () => ({ goto: async () => {}, evaluate: async () => ({ ready: false, why: 'no entity world on this page' }) }) }), close: async () => { closed = true; } };
+  await assert.rejects(shoot(f.args, { ...f.runtime, lease: async () => () => {}, pw: { chromium: { launch: async () => browser } } }), /no entity layer/);
+  assert.equal(closed, true); assert.equal(f.calls.length, 0); assert.equal(existsSync(f.args.out), false);
+});
+
+test('remote refusal, malformed PNG and missing token do not write a screenshot', async t => {
+  const f = fixture(t);
+  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => Response.json({ code: 'look.unavailable', message: 'Install Google Chrome on world host' }, { status: 503 }) }), /look.unavailable.*Install Google Chrome/);
+  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => Response.json({ code: 'rate-limited', message: 'too many looks', retry_after: 5 }, { status: 429 }) }), /rate-limited.*retry in 5s/);
+  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => new Response('not a PNG', { headers: { 'content-type': 'image/png' } }) }), /did not return a PNG/);
+  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, load: () => ({}) }), /needs a god token/);
+  assert.equal(existsSync(f.args.out), false);
+});

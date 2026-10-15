@@ -921,7 +921,7 @@ export async function look(flags = {}, runtime = {}) {
   if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
   const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, remote: !!flags.remote /* W2 remote looks */, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
   if (!flags.keep) shot = await (runtime.shoot ?? shoot)(args);
   else {
@@ -1024,7 +1024,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1049,7 +1049,7 @@ const FLAGS = {
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
-  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop hour weather', defs: 'tag all', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
+  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather', defs: 'tag all', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
@@ -1099,7 +1099,7 @@ export const COMMANDS = {
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
-look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
+look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
