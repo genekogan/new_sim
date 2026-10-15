@@ -1,23 +1,23 @@
 #!/usr/bin/env node
-// Lane PERF probe: how smooth is a new world (entity layer) in real GPU Chrome, at laptop sizes and dpr 1/2.
-// Per size x dpr: time to the first entity frame, to "Live", to settled (triangle count stable for 3 s);
+// Speed lane probe: new worlds in real GPU Chrome, at desktop DPR 1/2 or CPU-throttled phone DPR 3.
+// Per size x DPR: time to first entity frame, "Live", and fully loaded/quiet settling;
 // then a still window and an orbit window (real mouse drag) with rAF frame times (fps, p50/p95/p99, stalls),
 // long tasks, renderer.render CPU (incl. shadow pass), sampled GPU time (EXT_disjoint_timer_query_webgl2),
 // renderer.info (draw calls, triangles, programs, geometries, textures), scene counts and JS heap. One screenshot
 // per configuration (after the still window). Chrome lease held for the whole run; machine load is recorded.
-//   node tools/god-skill/e2e/perf-probe.mjs <worldUrl> [--sizes 1352x800,1440x900] [--dprs 1,2] [--seconds 6]
+//   node tools/speed/probe.mjs <worldUrl> [--sizes 1440x900] [--dprs 1,2] [--seconds 6] [--mobile] [--cpu 4]
 //        [--label before] [--out dir] [--name admin] [--settle-max 120] [--mbps 60]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { loadavg } from 'node:os';
 import { resolve } from 'node:path';
 import { findPlaywright } from '../god-skill/lib/look.mjs';
-import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
+import { chromeLease } from '<team>/ops/chrome-lease.mjs';
 import { textureStorage } from './texture-storage.mjs';
 
 const args = process.argv.slice(2);
 const url = args.find((a) => !a.startsWith('--') && /^https?:/.test(a));
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
-if (!url) { console.error('usage: perf-probe.mjs <worldUrl> [--sizes WxH,..] [--dprs 1,2] [--seconds 6] [--label x] [--out dir]'); process.exit(2); }
+if (!url) { console.error('usage: probe.mjs <worldUrl> [--sizes WxH,..] [--dprs 1,2] [--mobile] [--cpu 4] [--seconds 6] [--label x] [--out dir]'); process.exit(2); }
 const sizes = opt('sizes', args.includes('--mobile') ? '390x844' : '1440x900').split(',').map((s) => s.split('x').map(Number));
 const dprs = opt('dprs', args.includes('--mobile') ? '3' : '1,2').split(',').map(Number);
 const seconds = Number(opt('seconds', '6')), settleMax = Number(opt('settle-max', '120'));
@@ -77,7 +77,7 @@ const mobile = args.includes('--mobile'), throttle = Number(opt('cpu', mobile ? 
 const target = new URL(url);
 if (!['localhost', '127.0.0.1'].includes(target.hostname) || Number(target.port) < 5890 || Number(target.port) > 5899) throw new Error('speed probe only accepts lane ports 5890–5899 on localhost');
 console.log('Waiting for speed Chrome lease');
-const release = await chromeLease('speed', { waitMs: Number(opt('lease-wait', '600000')), staleMs: Infinity });
+const release = await chromeLease('speed', { waitMs: Number(opt('lease-wait', '2700000')), staleMs: Infinity });
 console.log('Speed Chrome lease acquired');
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-precise-memory-info'] });
 const results = [];
@@ -107,7 +107,10 @@ try {
     const requestsFailed = [];
     page.on('response', r => { if (r.status() >= 400 && new URL(r.url()).hostname === target.hostname) requestsFailed.push({ url: r.url(), status: r.status() }); });
     page.on('requestfailed', r => requestsFailed.push({ url: r.url(), failure: r.failure()?.errorText }));
-    const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
+    let phase = 'load';
+    const errors = [], errorDetails = [], consoleErrors = [];
+    page.on('pageerror', (e) => { errors.push(String(e).slice(0, 300)); if(errorDetails.length<1000) errorDetails.push({phase,stack:e.stack??String(e)}); });
+    page.on('console', m => { if(m.type()==='error'&&consoleErrors.length<40) consoleErrors.push({phase,text:m.text()}); });
     console.log(`${tag} navigating ${url}`);
     const tNav = Date.now();
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });
@@ -132,13 +135,16 @@ try {
       const d = await page.evaluate(() => { const P = window.__perf; P.recording = false; return { frames: P.frames, render: P.render, gpu: P.gpu, longtasks: P.longtasks.filter((l) => l[0] >= P.lt0) }; });
       return summarize(d.frames, d.render, d.gpu, d.longtasks, ms);
     };
+    phase = 'still';
     const still = await window_('still', () => page.waitForTimeout(seconds * 1000));
     const stats = await page.evaluate(sceneStats);
+    stats.assets = await page.evaluate(() => { const w=window.__simEntity, stages=window.__assetStages??{}, shas=new Set(); const m=w.layer.model; if(m)for(const e of m.entities.values()){const d=m.resolvedDef(e.def);if(d?.make?.kind==='mesh'&&d.make.asset)shas.add(d.make.asset);} return {expected:shas.size,done:[...shas].filter(s=>stages[s]==='done').length,missing:[...shas].filter(s=>stages[s]!=='done')}; });
     stats.textureStorage = await page.evaluate(() => window.__textureStorage(window.__simEntity.scene));
     stats.gpuRenderer = await page.evaluate(() => { const gl = window.__simEntity.renderer.getContext(); const ext = gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
     if (/swiftshader|llvmpipe|software/i.test(stats.gpuRenderer)) throw new Error(`Hardware GPU required: ${stats.gpuRenderer}`);
     await page.screenshot({ path: resolve(out, `${tag}.png`) });
     const cx = Math.round(W * 0.5), cy = Math.round(H * 0.55);
+    phase = 'orbit';
     const orbit = await window_('orbit', async () => {
       const point = (k, steps) => ({x:cx - Math.min(200, W*.3) + Math.round(Math.min(400, W*.6)*Math.sin(k/steps*Math.PI)),y:cy+Math.round(30*Math.sin(k/9))});
       const steps = Math.round(seconds*30);
@@ -151,7 +157,9 @@ try {
     const ui = await page.evaluate(() => ({ viewport: [innerWidth, innerHeight], scrollWidth: document.documentElement.scrollWidth, buttons: [...document.querySelectorAll('button')].filter(e => e.getClientRects().length).map(e => { const r=e.getBoundingClientRect(); return {text:e.getAttribute('aria-label')||e.title||e.textContent?.slice(0,80), box:[r.x,r.y,r.width,r.height]}; }), bubbleRules: [...document.querySelectorAll('.dialogue-popup, .dialogue-popping')].filter(e=>e.getClientRects().length).map(e=>({text:e.textContent?.slice(0,120),font:getComputedStyle(e).fontSize,box:[e.getBoundingClientRect().width,e.getBoundingClientRect().height]})) }));
     const measuredNetwork = { cdpEncodedBytes: networkBytes, glbEncodedBytes: glbWireBytes, note: 'CDP loadingFinished transfer bytes through load/still/orbit; fresh context and cache disabled; excludes ongoing WebSocket stream' };
     let phoneControls = null, phoneInput = null, speechCheck = null;
+    try {
     if (mobile) {
+      phase = 'phone-controls';
       const control = page.getByRole('button', { name: 'Camera controls', exact: true });
       if (await control.count()) {
         await control.tap();
@@ -162,6 +170,7 @@ try {
       }
     }
     if (mobile) {
+      phase = 'phone-touch';
       const beforeTouch = await page.evaluate(() => window.__simEntity.camera.position.toArray());
       const ty = Math.round(H*.65), tx = Math.round(W*.45);
       await cdp.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{x:tx,y:ty}] });
@@ -176,23 +185,45 @@ try {
       const ownerHeaders = { authorization:'Bearer dev:admin' };
       const me = await (await ctx.request.get(base.href+'/v1/me',{headers:ownerHeaders})).json();
       const soul = me.souls?.find(s=>s.name==='Phone probe');
-      if(soul && await page.getByRole('button',{name:'Your Soul',exact:true}).count()) {
-        await page.getByRole('button',{name:'Your Soul',exact:true}).tap();
+      if(soul) {
+        phase = 'phone-explore';
+        const exploreHit = await page.evaluate(() => { const e=document.querySelector('.explore-open'), b=e.getBoundingClientRect(), hit=document.elementFromPoint(b.x+b.width/2,b.y+b.height/2); return {centerTappable:!!hit?.closest('.explore-open'),interceptor:hit?.closest('button')?.className??hit?.tagName}; });
+        phoneInput.explore = exploreHit;
+        if(exploreHit.centerTappable) await page.locator('.explore-open').tap({timeout:3000});
+        else await page.keyboard.press('Control+k');
+        await page.getByRole('searchbox',{name:'Search locations and Souls',exact:true}).fill('Phone probe');
+        await page.locator('.explore-soul').filter({hasText:'Phone probe'}).tap();
         const follow = page.locator('#soul-panel .soul-follow');
+        phase = 'phone-follow';
         if(await follow.count()) await follow.tap();
         const close = page.getByRole('button',{name:'Close panel',exact:true});
         if(await close.count()) await close.tap();
         await page.waitForTimeout(1200);
+        phase = 'phone-speech';
         const pair = await (await ctx.request.post(base.href+`/v1/souls/${soul.id}/pair`,{headers:ownerHeaders,data:{}})).json();
         const credential = await (await ctx.request.post(base.href+'/v1/agent/pair',{data:{code:pair.code,agent:'speed-phone-fixture'}})).json();
         const said = await ctx.request.post(base.href+'/v1/edge/say',{headers:{authorization:`Bearer ${credential.token}`},data:{text:'Hello from this phone. Can you read these two lines while walking through the world?'}});
-        await page.waitForTimeout(800);
+        const saidBody=await said.json();
+        const speechStart=Date.now();
+        let speechObserved=false;
+        // The slow fixture clock plays 30 ticks (~15 wall seconds) behind the server.
+        while(Date.now()-speechStart<30000) {
+          if(await page.locator('.dialogue-popup').count()) { speechObserved=true; break; }
+          await page.waitForTimeout(200);
+        }
         speechCheck = await page.evaluate(() => ({ bubbles:[...document.querySelectorAll('.dialogue-popup')].filter(e=>e.getClientRects().length&&!e.hidden).map(e=>{const b=e.getBoundingClientRect();return {text:e.textContent,font:getComputedStyle(e).fontSize,box:[b.x,b.y,b.width,b.height],clipped:e.scrollHeight>e.clientHeight};}) }));
         speechCheck.sayStatus = said.status();
+        speechCheck.tick = saidBody.said?.tick;
+        speechCheck.viewerTick = await page.locator('[data-viewer-tick]').getAttribute('data-viewer-tick');
+        speechCheck.observedAfterMs = speechObserved ? Date.now()-speechStart : null;
+        speechCheck.waitedMs = Date.now()-speechStart;
+        speechCheck.accessVia = phoneInput.explore.centerTappable ? 'Explore touch' : 'Explore keyboard shortcut; touch button blocked';
+        if(!speechCheck.bubbles.length) speechCheck.unverified='No visible live speech popup';
         await page.screenshot({path:resolve(out,`${tag}-speech.png`)});
       } else speechCheck = {unverified:'Start a fixture with one owned resident named Phone probe to test real speech.'};
     }
-    const r = { world: url, phoneControls, phoneInput, speechCheck, mobile, cpuThrottle: throttle, network: measuredNetwork, ui, label, size: `${W}x${H}`, dpr, load1m: +load0.toFixed(1), timing, load, still, orbit, stats, afterOrbitInfo: after.info, gpuExt: after.gpuExt, rendererInstalls: after.installs, settled: settledAt !== null, queue: await page.evaluate(() => window.__simLoadQueueStats?.()), requestsFailed, errors };
+    } catch (error) { speechCheck={...speechCheck,error:String(error).split('\n')[0]}; await page.screenshot({path:resolve(out,`${tag}-ui-error.png`)}); }
+    const r = { world: url, phoneControls, phoneInput, speechCheck, mobile, cpuThrottle: throttle, network: measuredNetwork, ui, label, size: `${W}x${H}`, dpr, load1m: +load0.toFixed(1), timing, load, still, orbit, stats, afterOrbitInfo: after.info, gpuExt: after.gpuExt, rendererInstalls: after.installs, settled: settledAt !== null && stats.assets.missing.length === 0, queue: await page.evaluate(() => window.__simLoadQueueStats?.()), requestsFailed, errors, errorDetails, consoleErrors };
     results.push(r);
     writeFileSync(resolve(out, 'report.json'), JSON.stringify(results, null, 1));
     console.log(`${tag} load ${r.load1m} | first ${timing.firstEntityFrameMs} live ${timing.liveMs} settled ${timing.settledMs} card ${timing.cardDoneMs} ms | load: max ${load.frameMax} >50:${load.over50} >100:${load.over100} lt ${load.longtaskMs}ms afterCard >50:${load.afterCard50} max ${load.afterCardMax} glb ${load.glbAtCard}/${load.glbAll} ${load.glbMBAtCard}/${load.glbMB}MB last ${load.lastGlbEndMs} | still ${still.fps} fps p50 ${still.frameP50} p95 ${still.frameP95} >50:${still.over50} cpu ${still.renderCpuP50}/${still.renderCpuP95} gpu ${still.gpuP50}/${still.gpuP95} | orbit ${orbit.fps} fps p95 ${orbit.frameP95} >50:${orbit.over50} gpu ${orbit.gpuP50}/${orbit.gpuP95} | draws ${stats.info?.calls} tris ${stats.info?.triangles} prog ${stats.programs} geo ${stats.geometries} tex ${stats.textures} meshes ${stats.visibleMeshes}/${stats.meshes} casters ${stats.casters} heap ${stats.heapMB} MB${errors.length ? ' errors ' + errors.length : ''}`);
