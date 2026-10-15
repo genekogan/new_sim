@@ -8,8 +8,11 @@ import type {WorldSpeechAnchor} from './WorldSpeechAnchors.ts';
 export type {WorldSpeechAnchor} from './WorldSpeechAnchors.ts';
 export type { CameraMove, ManualNavigation } from './WorldNavigation.ts';
 
+export type WorldViewContext = {camera:{position:[number,number,number];target:[number,number,number];fov:number};placeId:string|null};
 /** Additive presentation boundary v1. Commands never steer or pause the world. */
 export interface WorldViewerHandle {
+  /** Read public camera/place context only when feedback opens; no per-frame React updates. */
+  feedbackContext?(): WorldViewContext | null;
   setCameraMode(mode: WorldCameraMode): void;
   frameAll(): void;
   /** Select and frame the speakers together; presentation only. */
@@ -61,6 +64,7 @@ export const WORLD_VIEWER_CAPABILITIES = Object.freeze({
 
 /** A replaceable port keeps a published handle fresh across React renders. */
 export interface WorldViewerPort {
+  feedbackContext?(): WorldViewContext | null;
   setCameraMode(mode: WorldCameraMode): void;
   frameAll(): void;
   /** Select and frame the speakers together; presentation only. */
@@ -86,6 +90,7 @@ export interface WorldViewerPort {
 }
 export function createWorldViewerHandle(current: () => WorldViewerPort): WorldViewerHandle {
   return {
+    feedbackContext: () => current().feedbackContext?.() ?? null,
     setCameraMode: mode => { if (mode === 'broadcast' || mode === 'follow' || mode === 'manual') current().setCameraMode(mode); },
     frameAll: () => current().frameAll(),
     frameSouls: ids => current().frameSouls?.(ids) ?? false,

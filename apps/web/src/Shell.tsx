@@ -19,6 +19,8 @@ import {SoulAccount} from './SoulAccount.tsx';
 import { ArchPanel } from './Arch.tsx';
 import {LocalIntegrationNotice,LocalConnectionHelp,DebugPanel} from './LocalIntegration.tsx';
 import './world-chrome.css';
+import {createApiRequest} from './api-request.ts';
+import {VisitorWelcome} from './VisitorWelcome.tsx';
 import { LiveWorld } from './LiveWorld.tsx';
 import { SoulFocus } from './SoulFocus.tsx';
 import {approvedMe,authIdentity} from './auth-projection.ts';
@@ -76,6 +78,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   apiScopeReader.current=()=>{const me=approvedMe(auth,sim.me);return JSON.stringify([sim.privateAuthorityGeneration??0,cfg.worldId,auth.ready,auth.authed,authIdentity(auth),me?.userId,me?.role,me?.invited,me?.souls.slice().sort()]);};
   const readApiGeneration=useCallback(()=>{const current=apiScopeReader.current();if(lastApiScope.current!==current){lastApiScope.current=current;apiGeneration.current++;}return apiGeneration.current;},[]);
   const api = useMemo(() => makeApi(getToken,readApiGeneration), [getToken,readApiGeneration]);
+  const siteApi = useMemo(() => createApiRequest(getToken,{path:path=>path,session:readApiGeneration}),[getToken,readApiGeneration]);
   const privatePanelKey=JSON.stringify([cfg.worldId,sim.privateAuthorityGeneration??0,auth.authed,authIdentity(auth)]);
   useEffect(()=>()=>{apiGeneration.current++;},[]);
   const [tab, setTab] = useState<Tab>(() => hashTab().tab);
@@ -146,6 +149,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
       {!launcherWorld&&approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldName} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
+      <VisitorWelcome key={privatePanelKey} api={api} siteApi={siteApi} worldPath={worldPath} ownerId={currentMe?.userId??null} worldId={cfg.worldId} worldName={worldName} build={cfg.build} handle={viewerHandle} state={viewerState}/>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldName} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
       <header className={`world-hud${advanced ? '' : ' slim'}`}>
