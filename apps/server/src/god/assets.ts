@@ -400,8 +400,9 @@ type Searchable = { name: string; ref: string; description?: string; tags?: stri
 export type SearchHit<T> = { def: T; score: number; why: string[] };
 
 /**
- * Rank defs for a query. Per query word (and its singular and synonyms, synonyms at 0.7): an exact
- * name match (whole name minus `core-`) 100; a name token 40; a name prefix/substring 14; an exact tag
+ * Rank defs for a query. The whole query as the def's name, or as one of its phrase synonyms, 100. Per query
+ * word (and its singular and synonyms, synonyms at 0.7): an exact name match (whole name minus `core-`) 100 for a
+ * one-word query, 40 within a phrase; a name token 40; a name prefix/substring 14; an exact tag
  * 16, a tag prefix 6; a description word 4, a description substring 1. Every query word must match
  * something unless none of the defs matches all words (then any). Ties: shorter names first, core
  * kit defs (kit/2 creatures before pack meshes) before world defs.
@@ -428,13 +429,14 @@ export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { t
     const why: string[] = []; let score = 0, matched = 0;
     const syns = (def.synonyms ?? []).map((x) => x.toLowerCase().replace(/\s+/g, '-')), cat = vocab.categoryOf(def as never);
     if (name === whole || name === singular(whole) || name === `${singular(whole)}-pack`) { score += 100; why.push('name'); }
-    else if (qw.length > 1 && (syns.includes(whole) || syns.includes(singular(whole)))) { score += 80; matched = qw.length; why.push(`aka=${whole}`); }
+    // a def's own name for the whole phrase counts as its name (E2 #6: "canal boat" is the narrowboat, not the canal)
+    else if (qw.length > 1 && (syns.includes(whole) || syns.includes(singular(whole)))) { score += 100; matched = qw.length; why.push(`aka=${whole}`); }
     else if (qw.length > 1 && phraseCats.some((c) => vocab.within(cat, c))) { score += 20; matched = qw.length; why.push(`cat=${cat}`); }
     for (const vs of variants) {
       let best = 0, bestWhy = '';
       for (const [v, wgt] of vs) {
         const cand: [number, string][] = [];
-        if (name === v) cand.push([100, `name=${v}`]);
+        if (name === v) cand.push([qw.length > 1 ? 40 : 100, `name=${v}`]);   // in a phrase, one word naming a def is only part of it
         if (ntoks.includes(v)) cand.push([40, `name~${v}`]);
         else if (name.includes(v) && v.length >= 3) cand.push([14, `name*${v}`]);
         if (tags.includes(v)) cand.push([16, `tag=${v}`]); else if (tags.some((t) => t.startsWith(v) && v.length >= 4)) cand.push([6, `tag*${v}`]);
