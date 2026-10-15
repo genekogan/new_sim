@@ -32,7 +32,7 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   mkdir -p "$2" && tar xzf "$1" -C "$2" && cd "$2" || return 1
   # The invocation's committed harness tests both source refs with identical rules.
   tar xzf /in/harness.tgz -C "$2" || return 1
-  git init -q -b main && git add -A && git -c user.email=suite@local -c user.name=suite commit -qm "$(basename "$2")"
+  git init -q -b main && git add -A && git -c user.email=suite@local -c user.name=suite commit -qm "$(basename "$2")" || return 1
   if [ -f /in/historical-inputs.pack ]; then
     git index-pack --stdin < /in/historical-inputs.pack || return 1
   fi
@@ -50,11 +50,13 @@ node --version; nproc; grep MemTotal /proc/meminfo
 bash /work/head/tools/test-harness/one-validation.sh /out/suite --baseline "$BASE" --skip "$SKIP"
 rc=$?
 python - "$rc" <<'PY'
-import json, sys
+import json, sys, subprocess
 p = '/out/RUN-METADATA.json'
 with open(p) as f: data = json.load(f)
 data['suiteCompleted'] = sys.argv[1] == '0'
 data['suiteExit'] = int(sys.argv[1])
+data['nodeVersion'] = subprocess.check_output(['node', '--version'], text=True).strip()
+data['pnpmVersion'] = subprocess.check_output(['pnpm', '--version'], text=True).strip()
 with open(p, 'w') as f: json.dump(data, f, indent=2)
 PY
 """
