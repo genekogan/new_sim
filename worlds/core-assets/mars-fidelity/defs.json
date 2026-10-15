@@ -3,7 +3,7 @@
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 2,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): the brown glazing cloth has a sagged upper edge and fine gathered folds, fitted to drone f040/f117; original footprint retained.",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained. The brown glazing cloth has a sagged upper edge and fine gathered folds fitted to drone f040/f117; its original envelope is retained.",
   "tags": [
    "mars",
    "mars-campus",
@@ -18,7 +18,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7105e3cc4c94f6ff1dde852da1f081902a0430e5b68c0ddedcdfb75433abca45",
+   "asset": "431424efc6eb43f695da0790ee2bfc56afb9946a0425c0b545c99bf3b22058e9",
    "collide": "box",
    "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
   },
@@ -153,7 +153,7 @@
   "schema": "def/1",
   "name": "core-mars-chiba",
   "version": 2,
-  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 99 wall/solid colliders, 0 stairs. 64520 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): the three native upper-gallery photos display upright, with original source pixels, mounting positions and footprint retained.",
+  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 99 wall/solid colliders, 0 stairs. 64520 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 7 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
   "tags": [
    "mars",
    "mars-campus",
@@ -168,7 +168,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "99a67a05aa1f72d27fd40d78f4bd76ad3dbda9a588780244ea4a3c89c55c5415",
+   "asset": "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af",
    "collide": "box",
    "footprint": "81961faa571d8311fdb4689c50eeb6d325856ba8ef1b578b258d112c0a57dca0"
   },
@@ -192,6 +192,404 @@
    "place": {
     "kind": "building",
     "enclosed": false
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-kitchen",
+  "version": 2,
+  "description": "The Chiba kitchen and dining hall under the Chiba gallery, immediately west of Mimos main and as long as it (Gene's correction, true compass): the west bay is the working kitchen (perimeter counter along the west wall returning on the north with the twin sinks under the windows and on the south with the food-service window, the long stainless prep table in the middle, the commercial fridge, white fridge and chest freezer on its east side), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door on the south. 2 rooms, 16 wall/solid colliders, 1 stairs. 5877 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 3 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "building",
+   "kitchen",
+   "diner",
+   "dining",
+   "chiba"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "1dafb201c9733fe7f4c6bdad4ddca886121cafcc4890c98923c88693dbd65f92",
+   "collide": "box",
+   "footprint": "02b8be54e62818d1e124acd93a88f52b5cc2e1101c8c6627604bb3e04f73b1f6"
+  },
+  "size": {
+   "box": [
+    12.614,
+    3.291,
+    7.653
+   ],
+   "scale": [
+    1,
+    1
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ],
+  "slots": [
+   {
+    "id": "working-kitchen",
+    "kind": "room",
+    "p": [
+     -2.572,
+     0.53,
+     2.673
+    ],
+    "yaw": 0,
+    "floor": 1,
+    "polygon": [
+     [
+      -3.735,
+      -2.7995
+     ],
+     [
+      7.5,
+      -2.7995
+     ],
+     [
+      7.5,
+      1.1005
+     ],
+     [
+      -3.735,
+      1.1005
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Working kitchen (Chiba kitchen: counters, sinks, prep table)"
+   },
+   {
+    "id": "dining-hall",
+    "kind": "room",
+    "p": [
+     -0.672,
+     0.53,
+     -1.277
+    ],
+    "yaw": 0,
+    "floor": 1,
+    "polygon": [
+     [
+      -5.635,
+      -2.5495
+     ],
+     [
+      5.6,
+      -2.5495
+     ],
+     [
+      5.6,
+      1.1505
+     ],
+     [
+      -5.635,
+      1.1505
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Dining hall (diner: blue wall, bus seats)"
+   },
+   {
+    "id": "entrance",
+    "kind": "stand",
+    "p": [
+     6.428,
+     0,
+     -2.702
+    ],
+    "yaw": 0,
+    "accepts": {},
+    "capacity": 8,
+    "label": "Outside the blue diner door, at the foot of the diner steps"
+   }
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside",
+  "version": 2,
+  "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 106 wall/solid colliders, 0 stairs. 152802 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 3 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "building",
+   "compound",
+   "freeside",
+   "colab",
+   "workshop"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "bd352e4b046087331cd15faea416a277e69a3f71544131f938e23d6c35bf54bf",
+   "collide": "box",
+   "footprint": "af0278f8657efafae25834e2ad8f48ed795225646e96d1cb61877d804498c807"
+  },
+  "size": {
+   "box": [
+    22.339,
+    4.614,
+    33.691
+   ],
+   "scale": [
+    1,
+    1
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": false
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-showers",
+  "version": 2,
+  "description": "The two wooden shower bays offset diagonally north-east of Mimos main's north-east corner, touching at a corner, doors on the south (Gene's correction; no continuous rear structure). 2 rooms, 10 wall/solid colliders, 0 stairs. 192 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "building",
+   "shower",
+   "bath",
+   "mimos"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "198e9544236d7aed610174549e6951b00c1ca786d59df284b4ff0b4f2357bb1a",
+   "collide": "box",
+   "footprint": "9f72094b1009209bfbb949075e59a2f998324a56746c662bf2283af1f6320ac4"
+  },
+  "size": {
+   "box": [
+    4.88,
+    2.335,
+    4.88
+   ],
+   "scale": [
+    1,
+    1
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ],
+  "slots": [
+   {
+    "id": "shower-1",
+    "kind": "room",
+    "p": [
+     1.22,
+     0.07,
+     1.22
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      -1.22,
+      -1.22
+     ],
+     [
+      1.22,
+      -1.22
+     ],
+     [
+      1.22,
+      1.22
+     ],
+     [
+      -1.22,
+      1.22
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Shower bay 1 (south-west bay)"
+   },
+   {
+    "id": "shower-2",
+    "kind": "room",
+    "p": [
+     -1.22,
+     0.07,
+     -1.22
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      -1.22,
+      -1.22
+     ],
+     [
+      1.22,
+      -1.22
+     ],
+     [
+      1.22,
+      1.22
+     ],
+     [
+      -1.22,
+      1.22
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Shower bay 2 (north-east bay)"
+   }
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-toilet-1",
+  "version": 2,
+  "description": "A toilet on the Mars 2026 campus (3.972 × 1.374 m, 2.438 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 1 native recipe image node has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "site",
+   "toilet"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d093875d81ffa5e00ce5963b67d0a452f6234d4f2764b892fd757aaf1e9088e0",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.972,
+    2.438,
+    1.374
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-bookshelf-timber",
+  "version": 2,
+  "description": "tool library bookshelf timber from the Mars 2026 campus: a 3.065 × 0.94 m top at 1.895 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 1 native recipe image node has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "88b629b4224d12c783602ebd519d362b660e6befb0ff7250c3449f0ec2d996ff",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.065,
+    1.9,
+    0.94
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     1.895,
+     0
+    ],
+    "yaw": 0,
+    "height": 1.895,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 29
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 1.895
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [

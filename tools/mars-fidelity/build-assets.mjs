@@ -20,7 +20,46 @@ const check = process.argv.includes('--check');
 if (!check) mkdirSync(OUT, { recursive: true });
 const kit = JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler/src/core-kit/mars.json'), 'utf8'));
 const originals = JSON.parse(readFileSync(join(ROOT, 'worlds/core-assets/mars/index.part.json'), 'utf8')).assets;
-const PHOTO_NAMES = new Set(['Chiba gallery native c80 installation panel 0', 'Chiba gallery native c80 installation panel 1', 'auditorium upper gallery source portrait']);
+// Explicit recipe-loader inventory, verified against the read-only Mars recipe.
+// `fork-backdrop.mjs` strips Three maps before export and embeds their pixels
+// afterward, without baking Texture.flipY=true into UVs. Original CAD maps are
+// restored from their own glTF records and must not be flipped by this correction.
+const PHOTO_TARGETS = {
+  mimos: [
+    ['Mimos photographed burgundy floor rug', 'owner-derived-material-128', '/history/2026/home/mimos-rug.webp', 'details-2026-mimos-home.ts:16,46'],
+    ['Mimos main north plywood wall', 'owner-derived-material-201', '/modular/textures/kitchen-plywood-sample.jpg', 'details-2026-true-compass.ts:107,109; kit.ts:mat'],
+  ],
+  chiba: [
+    ['cad-3c1d436f145625016', 'c50158 plain upper plywood above lower pixel bank', '/history/2026/accuracy/stair-upper-native-plywood.webp', 'details-2026-facade.ts:123,124; selected native photo faces only'],
+    ['cad-d298c30b11df08016', 'c50158 native upper black abstract on plywood', '/history/2026/accuracy/stair-upper-abstract-native.webp', 'details-2026-facade.ts:115,117; UV V increases with world Y'],
+    ['cad-c04cdcf6976fce002_1', '2026 west upper wall · native t23 photograph', '/history/2026/review-20260929/chiba-west-upper-wall.webp', 'details-2026-facade.ts:24,37; UV V increases with world Y'],
+    ['Chiba native white black pixel fascia c50158', 'owner-derived-material-22', '/history/2026/accuracy/stair-white-pixel-motif.webp', 'details-2026-facade.ts:107'],
+    ['Chiba gallery native c80 installation panel 0', 'owner-derived-material-232', '/history/2026/accuracy/upper-native-black-paint.webp', 'details-2026-auditorium.ts:125'],
+    ['Chiba gallery native c80 installation panel 1', 'owner-derived-material-234', '/history/2026/accuracy/upper-native-green-paint.webp', 'details-2026-auditorium.ts:125'],
+    ['auditorium upper gallery source portrait', '2026 auditorium source portrait c33334', '/history/2026/auditorium-source-portrait.webp', 'details-2026-auditorium.ts:102'],
+  ],
+  kitchen: [
+    ['diner native blue wall plywood patch diner-large-wood-patch', 'owner-derived-material-78', '/history/2026/accuracy/diner-large-wood-patch.webp', 'details-2026-chiba.ts:329'],
+    ['diner native blue wall plywood patch diner-small-wood-patch', 'owner-derived-material-79', '/history/2026/accuracy/diner-small-wood-patch.webp', 'details-2026-chiba.ts:329'],
+    ['kitchen diner entry tread', 'owner-derived-material-201', '/modular/textures/kitchen-plywood-sample.jpg', 'details-2026-true-compass.ts:107,118; kit.ts:mat'],
+  ],
+  freeside: [
+    ['Freeside native LOTA BREAD sign c50121', 'owner-derived-material-323', '/history/2026/accuracy/freeside-native-bread-sign.webp', 'details-2026-compound.ts:85'],
+    ['CoLab native patterned left curtain c47830', 'owner-derived-material-383', '/history/2026/accuracy/colab-native-curtain.webp', 'details-2026-compound.ts:223'],
+    ['Freeside native north entry paint c22', 'owner-derived-material-394', '/history/2026/accuracy/freeside-native-entry-paint.webp', 'details-2026-compound.ts:257'],
+  ],
+  showers: [
+    ['Shower wooden floor slab', 'owner-derived-material-203', '/modular/textures/kitchen-plywood-sample.jpg', 'details-2026-showers.ts:15,19,24-29; kit.ts:mat; merged source plywood floor/wall group'],
+    ['Shower timber roof', 'owner-derived-material-203', '/modular/textures/kitchen-plywood-sample.jpg', 'details-2026-showers.ts:15,30; kit.ts:mat'],
+  ],
+  'toilet-1': [['toilet source native sanitation label', 'owner-derived-material-476', '/history/2026/accuracy/toilet-native-sign.webp', 'details-2026-ground-life.ts:46']],
+  'tool-library-bookshelf-timber': [['Tool library native book spines c73776', 'owner-derived-material-285', '/history/2026/accuracy/tool-library-books.webp', 'details-2026-tool-library.ts:13']],
+};
+const EXCEPTIONS = [
+  { asset: 'mimos', nodes: ['Mimos photographed cutout sign', 'Mimos photographed framed gallery', 'Mimos native Portuguese love posters c49417'], reason: 'Already geometrically V-corrected in shipped build.mjs WORLD_FIX. Retain their UVs/transforms exactly to avoid a double flip.' },
+  { nodes: 'all original CAD material maps', reason: 'Copied from original glTF with original UV convention; not recipe TextureLoader maps.' },
+  { asset: 'showers', nodes: 'non-recipe parity-added plywood maps', reason: 'Do not infer flipY from wood appearance or apply a global material/image flip. Only the two named source recipe slab/roof nodes are corrected.' },
+];
 const DRAPE_NAME = 'Mimos glazing brown drape';
 const inputHashes = {};
 const written = [];
@@ -33,11 +72,18 @@ const json = (path, data) => write(path, JSON.stringify(data, null, 1) + '\n');
 const arrHash = (a) => a ? sha(new Uint8Array(a.getArray().buffer, a.getArray().byteOffset, a.getArray().byteLength)) : null;
 // Compare decoded geometry, transforms and texture pixels before/after encoding.
 // All non-target geometry must remain byte-exact; meshopt is used losslessly here.
-function fingerprint(doc, excluded) {
-  return JSON.stringify(doc.getRoot().listNodes().filter((n) => n.getMesh() && !excluded.has(n.getName())).map((n) => ({
+function fingerprint(doc, uvNames) {
+  return JSON.stringify(doc.getRoot().listNodes().filter((n) => n.getMesh() && n.getName() !== DRAPE_NAME).map((n) => ({
     name: n.getName(), matrix: n.getWorldMatrix(), primitives: n.getMesh().listPrimitives().map((p) => ({
-      attrs: Object.fromEntries(p.listSemantics().map((s) => [s, arrHash(p.getAttribute(s))])), indices: arrHash(p.getIndices()), material: p.getMaterial()?.getName(),
+      attrs: Object.fromEntries(p.listSemantics().filter((s) => !(uvNames.has(n.getName()) && s === 'TEXCOORD_0')).map((s) => [s, arrHash(p.getAttribute(s))])), indices: arrHash(p.getIndices()), material: p.getMaterial()?.getName(),
     })),
+  })));
+}
+function materials(doc) {
+  const texture = (t) => t ? sha(t.getImage()) : null;
+  return JSON.stringify(doc.getRoot().listMaterials().map((m) => ({
+    name: m.getName(), color: m.getBaseColorFactor(), roughness: m.getRoughnessFactor(), metalness: m.getMetallicFactor(), emissive: m.getEmissiveFactor(), alpha: m.getAlphaMode(), cutoff: m.getAlphaCutoff(), doubleSided: m.getDoubleSided(), normalScale: m.getNormalScale(), occlusion: m.getOcclusionStrength(),
+    textures: [m.getBaseColorTexture(), m.getMetallicRoughnessTexture(), m.getEmissiveTexture(), m.getNormalTexture(), m.getOcclusionTexture()].map(texture),
   })));
 }
 function addDrape(doc) {
@@ -93,53 +139,77 @@ function addDrape(doc) {
   node.setMesh(mesh); oldMesh.dispose();
   return { name: DRAPE_NAME, segments: [nx, nz], triangles: I.length / 3, localEnvelope: { min: lo, max: hi }, reference: 'team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/pleats fitted, not surveyed' };
 }
-function fixPhotos(doc) {
+function fixPhotos(doc, targets) {
   const result = [];
-  for (const node of doc.getRoot().listNodes().filter((n) => PHOTO_NAMES.has(n.getName()))) {
+  const seenMeshes = new Set();
+  for (const [name, material, sourceImage, sourceCode] of targets) {
+    const matches = doc.getRoot().listNodes().filter((n) => n.getName() === name);
+    assert.equal(matches.length, 1, `exactly one source recipe node: ${name}`);
+    const node = matches[0];
     const mesh = node.getMesh();
+    assert(!seenMeshes.has(mesh), 'recipe targets must not share a mesh (would double-flip UVs)'); seenMeshes.add(mesh);
+    const beforeUV = [], afterUV = [];
     for (const p of mesh.listPrimitives()) {
+      assert.equal(p.getMaterial()?.getName(), material, `${name}: known recipe material`);
+      assert(p.getMaterial()?.getBaseColorTexture(), `${name}: recipe image exists`);
       const original = p.getAttribute('TEXCOORD_0'); assert(original, 'photo UVs');
       const values = [], uv = [];
-      for (let i = 0; i < original.getCount(); i++) { original.getElement(i, uv); values.push(uv[0], 1 - uv[1]); }
-      p.setAttribute('TEXCOORD_0', doc.createAccessor(`${node.getName()} upright UV`).setType('VEC2').setArray(new Float32Array(values)).setBuffer(doc.getRoot().listBuffers()[0]));
+      for (let i = 0; i < original.getCount(); i++) { original.getElement(i, uv); beforeUV.push([...uv]); values.push(uv[0], 1 - uv[1]); }
+      const fixed = new Float32Array(values); afterUV.push(...fixed);
+      p.setAttribute('TEXCOORD_0', doc.createAccessor(`${node.getName()} upright UV`).setType('VEC2').setArray(fixed).setBuffer(doc.getRoot().listBuffers()[0]));
     }
-    result.push({ name: node.getName(), correction: 'V = 1 - V; top of each native photo now maps to top of the mounted quad; U and geometry unchanged' });
+    result.push({ name, material, sourceImage, sourceCode, vertices: beforeUV.length, beforeUVHash: sha(JSON.stringify(beforeUV)), afterUVHash: sha(JSON.stringify(afterUV)), correction: 'V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged' });
   }
-  assert.equal(result.length, 3, 'the three known Chiba native-photo quads');
+  assert.equal(result.length, targets.length, 'every explicit recipe image target corrected');
   return result;
 }
 
-const assets = {}, defs = [], changes = [];
-for (const name of ['mimos', 'chiba']) {
+const assets = {}, defs = [], changes = [], inventory = [];
+for (const [name, targets] of Object.entries(PHOTO_TARGETS)) {
   const def = kit.find((d) => d.name === `core-mars-${name}` && d.version === 2); assert(def, 'shipped @2 def');
   const input = join(ROOT, `worlds/core-assets/mars/${name}.glb`), source = readFileSync(input), sourceSha = sha(source);
   assert.equal(sourceSha, def.make.asset, 'input must be the shipped content-addressed asset'); inputHashes[relative(ROOT, input)] = sourceSha;
-  const doc = await io.readBinary(source), excluded = name === 'mimos' ? new Set([DRAPE_NAME]) : PHOTO_NAMES;
-  const before = fingerprint(doc, excluded), textureHashes = doc.getRoot().listTextures().map((t) => sha(t.getImage()));
-  const changed = name === 'mimos' ? addDrape(doc) : fixPhotos(doc);
-  assert.equal(fingerprint(doc, excluded), before, 'untouched decoded geometry and transforms');
+  const doc = await io.readBinary(source), uvNames = new Set(targets.map(([n]) => n));
+  const targetMaterials = new Set(targets.map(([, material]) => material));
+  const recipeNodes = doc.getRoot().listNodes().filter((n) => n.getMesh()?.listPrimitives().some((p) => p.getMaterial()?.getBaseColorTexture() && (p.getMaterial().getName().startsWith('owner-derived-material-') || targetMaterials.has(p.getMaterial().getName())))).map((n) => n.getName());
+  const excepted = name === 'mimos' ? EXCEPTIONS[0].nodes : [];
+  assert.deepEqual([...recipeNodes].sort(), [...uvNames, ...excepted].sort(), `${name}: complete explicit source recipe image inventory`);
+  inventory.push({ name, sourceRecipeImageNodes: recipeNodes.length, correctedNodes: targets.length, excludedNodes: excepted });
+  const before = fingerprint(doc, uvNames), textureHashes = doc.getRoot().listTextures().map((t) => sha(t.getImage())), originalMaterials = materials(doc);
+  const changed = { ...(name === 'mimos' ? { drape: addDrape(doc) } : {}), photos: fixPhotos(doc, targets) };
+  assert.equal(fingerprint(doc, uvNames), before, 'all non-drape geometry/transforms and non-target UVs unchanged');
+  assert.equal(materials(doc), originalMaterials, 'all material properties unchanged');
   // The original meshes are already quantized. Re-encode losslessly, without a
   // global quantize/reorder/simplify that would change unrelated campus geometry.
   const compression = doc.getRoot().listExtensionsUsed().find((e) => e.extensionName === 'EXT_meshopt_compression') ?? doc.createExtension(ext.EXTMeshoptCompression);
   compression.setRequired(true).setEncoderOptions({ method: ext.EXTMeshoptCompression.EncoderMethod.QUANTIZE });
   const bytes = await io.writeBinary(doc), output = join(OUT, `${name}.glb`), hash = sha(bytes), facts = measureGlb(bytes), originalFacts = measureGlb(source);
+  assert.equal(sha(await io.writeBinary(doc)), hash, `${name}: deterministic lossless encoding`);
   const decoded = await io.readBinary(bytes);
-  assert.equal(fingerprint(decoded, excluded), before, 'encoded untouched geometry remains exact');
+  assert.equal(fingerprint(decoded, uvNames), before, 'encoded non-drape geometry and non-target UVs remain exact');
+  assert.equal(materials(decoded), originalMaterials, 'encoded material properties unchanged');
+  for (const photo of changed.photos) {
+    const node = decoded.getRoot().listNodes().find((n) => n.getName() === photo.name), values = [], uv = [];
+    for (const p of node.getMesh().listPrimitives()) for (let i = 0; i < p.getAttribute('TEXCOORD_0').getCount(); i++) { p.getAttribute('TEXCOORD_0').getElement(i, uv); values.push(...uv); }
+    assert.equal(sha(JSON.stringify(values)), photo.afterUVHash, `${photo.name}: exact corrected UVs after encoding`);
+  }
   assert.deepEqual(decoded.getRoot().listTextures().map((t) => sha(t.getImage())), textureHashes, 'native source image pixels unchanged');
   for (const key of ['min', 'max']) for (let i = 0; i < 3; i++) assert(Math.abs(facts[key][i] - originalFacts[key][i]) < 1e-5, `${name}: unchanged full mesh ${key}[${i}]`);
-  assert(facts.tris <= 80000 && facts.bytes <= 3000000 && facts.texPx <= 2048, 'default ingest budget');
+  assert.equal(facts.tris, originalFacts.tris + (name === 'mimos' ? changed.drape.triangles - 12 : 0), 'UV corrections add no geometry; only cloth triangles change');
+  const grandfathered = originalFacts.tris > 80000 || originalFacts.bytes > 3000000;
+  assert(facts.tris <= (grandfathered ? 200000 : 80000) && facts.bytes <= (grandfathered ? 6000000 : 3000000) && facts.texPx <= 2048, 'Mars world ingest budget; preserve only demonstrated grandfathered source assets');
   write(output, bytes);
   const { max, meshes, skins, ...indexFacts } = facts;
   assets[hash] = { ...originals[sourceSha], ...indexFacts, path: relative(ROOT, output), source: `${originals[sourceSha].source}; bounded cosmetic correction by tools/mars-fidelity/build-assets.mjs`, footprint: def.make.footprint };
   const updated = structuredClone(def); updated.make.asset = hash;
-  updated.description += name === 'mimos' ? ' Cosmetic correction (2026-10-15): the brown glazing cloth has a sagged upper edge and fine gathered folds, fitted to drone f040/f117; original footprint retained.' : ' Cosmetic correction (2026-10-15): the three native upper-gallery photos display upright, with original source pixels, mounting positions and footprint retained.';
+  updated.description += ` Cosmetic correction (2026-10-15): ${targets.length} native recipe image node${targets.length === 1 ? '' : 's'} has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.${name === 'mimos' ? ' The brown glazing cloth has a sagged upper edge and fine gathered folds fitted to drone f040/f117; its original envelope is retained.' : ''}`;
   defs.push(updated);
-  changes.push({ name, originalAsset: sourceSha, asset: hash, before: { tris: originalFacts.tris, bytes: originalFacts.bytes }, after: { tris: facts.tris, bytes: facts.bytes, box: facts.box, min: facts.min, max: facts.max }, changed });
+  changes.push({ name, originalAsset: sourceSha, asset: hash, affectedRecipeImageNodes: targets.length, grandfatheredSourceBudget: grandfathered, before: { tris: originalFacts.tris, bytes: originalFacts.bytes }, after: { tris: facts.tris, bytes: facts.bytes, box: facts.box, min: facts.min, max: facts.max }, changed });
 }
 const index = { schema: 'core-assets/1', note: 'Bounded Mars cosmetic variants; no original asset or footprint overwritten. Generated by tools/mars-fidelity/build-assets.mjs.', assets };
 json(join(ROOT, 'worlds/core-assets/mars-fidelity.index.json'), index);
 json(join(OUT, 'index.part.json'), { ...index, schema: 'core-assets-part/1' });
 json(join(OUT, 'defs.json'), defs);
-json(join(OUT, 'RECEIPT.json'), { schema: 'mars-fidelity-assets/1', inputs: inputHashes, changes, checks: ['exact input hashes', 'exact non-target geometry/transforms after encoding', 'exact native texture image bytes', 'full asset bounds within 0.00001m', 'footprint refs unchanged', 'default 80k triangle / 3MB / 2048px budgets'], note: 'defs.json contains cosmetic variant inputs for tools/mars-fidelity/patch.mjs. The patch derives world-local names; these inputs are not a public core-library redefinition batch.' });
+json(join(OUT, 'RECEIPT.json'), { schema: 'mars-fidelity-assets/1', inventory: { recipeTexturedNodes: inventory.reduce((n, i) => n + i.sourceRecipeImageNodes, 0), correctedImageNodes: changes.reduce((n, c) => n + c.affectedRecipeImageNodes, 0), excludedPreviouslyCorrectedNodes: 3, assetVariants: changes.length, clothNodes: 1, byAsset: inventory }, exceptions: EXCEPTIONS, inputs: inputHashes, changes, checks: ['exact input hashes', 'complete explicit source recipe image inventory', 'deterministic lossless encoding', 'exact all non-drape geometry/transforms after encoding', 'exact all non-target UVs including 3 already-corrected Mimos photos', 'exact material properties and native image bytes', 'full asset bounds within 0.00001m', 'footprint refs unchanged', 'UV changes add zero triangles', '80k triangles / 3MB default; unchanged-source Freeside grandfathered under Mars world 200k / 6MB; all textures <=2048px'], note: 'defs.json contains cosmetic variant inputs for tools/mars-fidelity/patch.mjs. The patch derives world-local names; these inputs are not a public core-library redefinition batch. Source recipe/code references are under the read-only <mars-campus-repo>/viewer/app/history/.' });
 for (const [path, hash] of Object.entries(inputHashes)) assert.equal(sha(readFileSync(join(ROOT, path))), hash, 'source asset unchanged');
-console.log(JSON.stringify({ checked: check, changes, written }, null, 2));
+console.log(JSON.stringify({ checked: check, imageNodes: changes.reduce((n, c) => n + c.affectedRecipeImageNodes, 0), changes: changes.map((c) => ({ name: c.name, asset: c.asset, photoNodes: c.affectedRecipeImageNodes, tris: c.after.tris, bytes: c.after.bytes, grandfathered: c.grandfatheredSourceBudget })), written }, null, 2));
