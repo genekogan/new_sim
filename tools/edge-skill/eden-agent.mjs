@@ -232,19 +232,34 @@ export async function observe(){
   here:{nearby:(st.nearby??[]).slice(0,12).map(n=>({who:n.who,distance:n.distance,doing:n.doing||undefined})),untrusted:true},
   happening:st.happening,canDo:c.canDo};
 }
-function summarise(caps){
- const avail=caps.filter(c=>c.available!==false);
- return {available:avail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
-  blocked:caps.filter(c=>c.available===false).slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code}))};
+function summarise(caps,filters={}){
+ const avail=caps.filter(c=>c.available!==false),blocked=caps.filter(c=>c.available===false);
+ // Search the full response first: an omitted compact-list entry is still an offered action.
+ const matches=c=>(!filters.verb||c.verb===filters.verb)&&(!filters.search||[c.id,c.verb,c.label].some(v=>String(v??'').toLowerCase().includes(filters.search)));
+ const matchingAvail=avail.filter(matches),matchingBlocked=blocked.filter(matches),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
+ return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
+  blocked:matchingBlocked.slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code})),
+  totals:{available:avail.length,blocked:blocked.length},matchingTotals:{available:matchingAvail.length,blocked:matchingBlocked.length},truncated,
+  ...(truncated.available||truncated.blocked?{hint:'Some offered capabilities are omitted from this compact list; absence is not a refusal. Use capabilities --search "<ID, verb or label>" or capabilities --verb "<exact verb>" to filter all offers before the display limit.'}:{})};
 }
-/** capabilities: everything legal now (ids to pass to act) plus what's blocked and why. */
-export async function capabilities(){
+function capabilityFilters(args){
+ const filters={},usage='usage: capabilities [--search "<ID, verb or label>"] [--verb "<exact verb>"]';
+ for(let i=0;i<args.length;i++){
+  const flag=args[i];if(!['--search','--verb'].includes(flag)||Object.hasOwn(filters,flag.slice(2)))throw Error(usage);
+  const value=args[++i];if(typeof value!=='string'||!value.trim()||value.startsWith('--'))throw Error(usage);
+  filters[flag.slice(2)]=flag==='--search'?value.trim().toLowerCase():value.trim();
+ }
+ return filters;
+}
+/** capabilities: a compact list of current offers; filters search all offers before display limits. */
+export async function capabilities(...args){
+ const filters=capabilityFilters(args);
  const s=load(),soul=need(s,'soul','Create one with create-soul.');
- if(await mode()==='edge')return {canDo:summarise(ok(await call(EDGE.capabilities),'capabilities').capabilities??[])};
+ if(await mode()==='edge')return {canDo:summarise(ok(await call(EDGE.capabilities),'capabilities').capabilities??[],filters)};
  const goals=(await call(OWNER.caps(soul),{as:'owner'})).data?.goals??[];
  const caps=goals.flatMap(g=>(g.bindings??[]).map(b=>({id:b.id,verb:g.id,label:b.aliases?.[0]??b.label,available:b.available,blocked:b.blockedCode?{code:b.blockedCode}:undefined})));
  if(goals.some(g=>g.id==='rest'))caps.push({id:'rest:self',verb:'rest',label:'rest',available:true});
- return {canDo:summarise(caps)};
+ return {canDo:summarise(caps,filters)};
 }
 export async function map(){if(await mode()==='edge')return ok(await call(EDGE.map),'map');const c=await capabilities();return {places:c.canDo.available.filter(x=>x.verb==='walk').map(x=>x.label),note:'full map arrives with eden-edge/1'};}
 export async function digest(){if(await mode()==='edge'){const r=await call(EDGE.digest);if(r.status===200)return {...r.data,...(r.data.digest==null?{note:'No steward world digest is published. For private conversation history use converse list, then converse turns <conversationId>.'}:{})};if(r.status===404)return {digest:null,note:'This world does not publish a digest yet.'};ok(r,'digest');}return {digest:null,note:'not offered by this world yet'};}
