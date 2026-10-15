@@ -2,7 +2,8 @@
 """Verify an old-worlds release dir byte-for-byte against the live laptop seals (runs on eden2 or the laptop).
 
 usage: verify-release.py RELEASE_DIR   (RELEASE_DIR may be the local assembly; paths in descriptors are rewritten to it)
-Checks: CONTENT-MANIFEST over input/ (every sealed source file), WEB-MANIFEST over input/apps/web/dist,
+Checks: kit bin/ + deploy/ files (RELEASE.json kitFiles) and, where installed, /etc/systemd/system/sim-old*.service;
+CONTENT-MANIFEST over input/ (every sealed source file), WEB-MANIFEST over input/apps/web/dist,
 OVERLAY-WEB-MANIFEST (the proxy's served frontend), STATIC-MANIFEST over mars-web/, the Soul CLI/skill/instructions
 pins from PLAN.json, the authored boundaries pin, descriptor sha256s in RELEASE.json, and that every path a
 descriptor names exists. Prints one JSON line; exit 1 on any difference.
@@ -34,6 +35,11 @@ for w, item in plan['worlds'].items():
     if d.get('authoredBoundariesSHA256') and fsha(loc(d['authoredBoundariesFile'])) != d['authoredBoundariesSHA256']: bad.append(f'{w}:boundaries')
     for k, v in d.items():
         if isinstance(v, str) and v.startswith('/') and k not in ('dataDir', 'accountRegistryPath') and not os.path.exists(loc(v)): bad.append(f'{w}:{k} missing')
+for path, h in rel.get('kitFiles', {}).items():
+    if not os.path.isfile(f'{R}/{path}') or fsha(f'{R}/{path}') != h: bad.append(f'kit:{path}')
+    if path.startswith('deploy/') and os.path.isdir('/etc/systemd/system') and os.path.exists(f"/etc/systemd/system/{path[7:]}") \
+       and fsha(f"/etc/systemd/system/{path[7:]}") != h: bad.append(f'installed unit differs: {path[7:]}')
+if not rel.get('kitFiles'): bad.append('RELEASE.json has no kitFiles')
 px = json.load(open(f'{R}/descriptors/proxy.json'))['artifactOverlay']
 if fsha(loc(px['webManifest'])) != px['webManifestSha256']: bad.append('proxy:webManifest')
 if fsha(loc(px['cliFile'])) != px['cliSha256']: bad.append('proxy:cli')

@@ -3,6 +3,8 @@
 
 usage: pack-release.py OUT_PARENT [--runtime DIR] [--proxy-json PATH] [--kit DIR]
   -> OUT_PARENT/so-<source8>-<overlay8>/  (prints its path)
+       pack-release.py --refresh-kit RELEASE_DIR [--kit DIR]
+  -> copies the kit's current bin/ + deploy/ files into an existing release and re-records their sha256 (kitFiles)
 
 Contents (paths inside are the eden2 release path /srv/sim-old/releases/<name>):
   CONTENT-MANIFEST.json  next to input/, where edge-server.mjs checks inputManifestSHA256
@@ -27,9 +29,19 @@ PROXY = opt('--proxy-json', '<team>/reviews/convergence-ops-1080cfa9-001/PROXY.j
 KIT = opt('--kit', os.path.dirname(os.path.abspath(__file__)))
 PLAN = '<team>/reviews/convergence-cutover-1080cfa9-001/PLAN.json'
 LIVE = '<team>/reviews/SIM-CONVERGENCE-RELEASE-1080CFA9.json'
-if len(argv) != 1: sys.exit(__doc__)
+BIN = ('run-world.mjs', 'port-map.mjs', 'parity.py', 'online-backup.py', 'compact-copy.py', 'verify-release.py', 'install-deps.sh', 'dbhash.py')
+UNITS = ('sim-old@.service', 'sim-old-proxy.service')
 sha = lambda b: hashlib.sha256(b).hexdigest()
 fsha = lambda p: sha(open(p, 'rb').read())
+def kit_files(out):
+    for f in BIN: shutil.copy2(f'{KIT}/{f}', f'{out}/bin/')
+    for f in UNITS: shutil.copy2(f'{KIT}/{f}', f'{out}/deploy/')
+    return {**{f'bin/{f}': fsha(f'{out}/bin/{f}') for f in BIN}, **{f'deploy/{f}': fsha(f'{out}/deploy/{f}') for f in UNITS}}
+REFRESH = opt('--refresh-kit', None)
+if REFRESH:
+    rel = json.load(open(f'{REFRESH}/RELEASE.json')); rel['kitFiles'] = kit_files(REFRESH)
+    open(f'{REFRESH}/RELEASE.json', 'w').write(json.dumps(rel, indent=2) + '\n'); print(REFRESH); sys.exit(0)
+if len(argv) != 1: sys.exit(__doc__)
 prep = json.load(open(f'{RT}/PREPARED.json')); proxy = json.load(open(PROXY))
 src = prep['source']; ov = proxy['artifactOverlay']['webManifestSha256']
 name = f'so-{src[:8]}-{ov[:8]}'
@@ -45,8 +57,6 @@ for m in ('CONTENT-MANIFEST.json', 'WEB-MANIFEST.json', 'STATIC-MANIFEST.json', 
 shutil.copy2(f'{RT}/CONTENT-MANIFEST.json', f'{out}/')  # edge-server.mjs reads <input>/../CONTENT-MANIFEST.json (inputManifestSHA256)
 for p in (proxy['artifactOverlay']['webManifest'], PROXY, PLAN, LIVE,
           json.load(open(PLAN))['qualification']['path']): shutil.copy2(p, f'{out}/manifests/')
-for f in ('run-world.mjs', 'port-map.mjs', 'parity.py', 'online-backup.py', 'compact-copy.py', 'verify-release.py', 'install-deps.sh'): shutil.copy2(f'{KIT}/{f}', f'{out}/bin/')
-for f in ('sim-old@.service', 'sim-old-proxy.service'): shutil.copy2(f'{KIT}/{f}', f'{out}/deploy/')
 
 def rebase(v, key):
     """Map one live laptop path to its eden2 release path; refuse anything unmapped."""
@@ -58,7 +68,7 @@ def rebase(v, key):
     if key == 'webManifest': return f'{REL}/manifests/{os.path.basename(v)}'
     raise SystemExit(f'unmapped laptop path in {key}: {v}')
 
-release = {'name': name, 'source': src, 'build': prep['build'], 'sourceManifestSHA256': prep['sourceManifestSHA256'],
+release = {'kitFiles': kit_files(out), 'name': name, 'source': src, 'build': prep['build'], 'sourceManifestSHA256': prep['sourceManifestSHA256'],
            'overlayWebManifestSHA256': ov, 'releasePath': REL, 'descriptors': {}}
 for w in ('eden', 'mars', 'littlemartians'):
     live_path = prep['descriptors'][w]['path']; raw = open(live_path, 'rb').read()
