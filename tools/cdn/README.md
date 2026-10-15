@@ -27,11 +27,53 @@ The public manifest is deliberately small and contains no local filesystem paths
 ```
 
 Licence checks accept exact SHA/bytes matches in `team/asset-scouting/SOURCES.csv` with CC0 or own-work records.
+Publishing always reads the canonical `DEFAULT_SOURCES` CSV, ignoring a plan's `sources` field. `--sources` is dry-run
+only; the function-level override exists for isolated tests. The upload receipt records its actual `sources` path and
+`sourcesSha256`, calculated from the same raw CSV bytes parsed for approval, so the policy snapshot is auditable.
 `approved-derivatives.json` additionally pins the 76 reviewed CC0 split models from `worlds/core-assets/index.json`
 to the source families in `tools/god-skill/scripts/import-packs.mjs` and exact CSV source-pack rows. Changed/missing source
-records, changed derivative bytes, unknown or restricted licences are excluded. This is a bounded list, not permission
-to publish future additions, Mars campus, private Mars derivatives or Little Martians art. New approvals require a reviewed
-hash/bytes record and source chain. Do not infer redistribution permission from an existing public origin URL.
+records, changed derivative bytes, unknown or restricted licences are excluded. This is a bounded shared CC0 list.
+World-specific art can instead qualify for delivery to its existing public world under the scoped authorization below;
+an existing URL alone does not establish its owner, rights constraints or permitted audience.
+
+## Excluded large assets and world-scoped publication
+
+The prepared manifest still contains 304 aliases for 76 CC0 models (3,337,244 unique bytes). It excludes these assets:
+
+| Asset | Local evidence and current hold |
+|---|---|
+| Mars campus | The read-only `.lane/mars-web/browser/campus.glb` is 70,772,556 bytes (67.49 MiB), SHA-256 `675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4`. There is no exact CC0/own-work CSV record. The corrected-campus references in `apps/web/src/mars-fork.ts` also need their own file identity and scoped authorization. |
+| Private Mars derivatives | `worlds/core-assets/mars/` and the Mars records in `worlds/core-assets/index.json` identify campus CAD and the 2026 photographic recipe as private to this project. These records do not grant a shared CC0 catalogue licence. |
+| Little Martians scans and derivatives | `worlds/littlemartians/characters/manifest.json` records Vanessa Rosa's ownership, no open licence, and project-limited terms for character/ceramic-head scans. The associated kin meshes and ceramic building derivatives in the core index retain those constraints. |
+
+The release owner's default permits assets already served publicly to a world to use CDN delivery **for that same world
+under a world-scoped path**. They must never enter the shared catalogue or receive shared `/assets/<sha>` aliases through
+this route. Existing reviewed world-owner/public-serving authorization can establish the basis within its recorded limits;
+it does not turn the art into CC0 or extend its audience or reuse rights.
+The authorization record may cite this release-owner default together with evidence of existing same-world public
+serving; it does not require a new open licence for that scoped delivery.
+
+Before such publication, retain a reviewed per-file provenance record containing all of the following:
+
+- The world ID, slug, deployment namespace (root or `/worlds`), exact world URL and permitted audience/scope. Record the
+  exact existing public **asset URL**, including any version query, and dated evidence that the identified bytes are
+  already served for that world. A source-code URL reference alone is not a live-serving verification.
+- The local public file/derivative path, complete SHA-256, byte count and MIME type; source/derivation records; the
+  recorded licence or rights status, rights holder, attribution requirements and any project, redistribution or reuse
+  constraints. Preserve these terms rather than replacing them with `CC0-1.0` or assuming `own-work`.
+- The reviewed world-owner/public-serving authorization reference and what it permits, plus the reviewer's identity and
+  UTC review date. The record must explain why CDN delivery remains within that authority and the existing audience.
+- The exact source-to-CDN mapping and a dedicated world-scoped immutable key, for example
+  `assets/worlds/<reviewed-scope-id>/<slug>/<sha-prefix>/<sha>.<ext>`. Bind the scope ID to that specific world and
+  namespace; a matching slug or byte hash in another world does not inherit authorization. A legacy shared source URL
+  such as `/browser/campus.glb?v=20260922b` needs a mapping restricted to its reviewed world page, not a global alias.
+
+That record enables a later bounded world-scoped publishing change. The current publisher/client support the shared
+CC0/own-work layout only; they do not implement these example scoped keys or permissions. This follow-up adds no approval,
+mapping, allowlist entry or upload for any excluded asset. The release owner must preserve scoped rights when implementing
+and verifying that path; it cannot silently fall through to the shared catalogue.
+
+## Upload and verification
 
 Gene installs the key by running this directly in his own terminal (both values are hidden):
 
@@ -44,6 +86,8 @@ either value, and does not place them in arguments, shell history or source. The
 `EDEN_ASSETS_CREDENTIALS` pointing to a current-user-owned regular single-link mode-0600 file containing exactly
 `R2_ACCESS_KEY_ID=...` and `R2_SECRET_ACCESS_KEY=...`. It never reads `~/.aws`, rclone config or credential env values.
 The account ID/endpoint and bucket are fixed public configuration in `publish.mjs`.
+Permissions are set through the still-open descriptor before writing. On write/flush/fsync failure or interruption,
+the installer removes only its own created inode; it preserves a replacement pathname and existing files/symlinks.
 The Oct 13 key expires Oct 20. If its one-time secret was lost or expired, the release owner needs a new 7-day Object
 Read & Write key scoped only to `eden-assets`; do not create duplicates merely because this lane never saw the key.
 
@@ -60,6 +104,11 @@ overwriting. A racing 412 is also verified. Every uploaded or skipped object is 
 endpoint and its bytes/SHA verified. Receipts include only object keys, hashes, counts and dispositions, never credentials
 or signed request headers. A partial run can be repeated safely. The publisher does not upload the mutable client manifest;
 release the reviewed `cdn-manifest.json` with the web app through the normal release path, after upload verification.
+Both upload `--receipt` and checker `--out` paths are reserved with exclusive creation before credentials/network work.
+An existing file or symlink stops the command without touching the earlier receipt. Use a fresh, dated filename for
+every attempt. Failed operations retain a labelled incomplete receipt because partial remote work may exist; rerunning
+with a new receipt path still safely verifies/skips immutable objects. Receipt contents are written through the reserved
+descriptor, and a replaced pathname cannot be reported as a saved receipt.
 
 One command after a fresh upload proves cache MISS then HIT/Age, app-origin CORS, MIME, immutable cache policy, ETag and
 decoded bytes/SHA on the three smallest uploaded objects:
@@ -78,7 +127,18 @@ Focused local verification (synthetic fixtures and mocked HTTP; no real credenti
 
 ```sh
 node --test <worktrees>/lane-cdn/tools/cdn/cdn.test.mjs
+python3 -B <worktrees>/lane-cdn/tools/cdn/install_key_test.py
 ```
+
+Verify the checked-in prepared manifest independently against actual repo files (no network or credentials):
+
+```sh
+node --test <worktrees>/lane-cdn/tools/cdn/manifest-integrity.test.mjs
+```
+
+This retains and checks all 304 aliases. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
+literal files under repo `worlds/`; canonical hash aliases resolve through the reviewed core index. Unknown, unsafe,
+unresolvable or symlinked paths fail, and every entry must match an independently computed file SHA-256 and byte count.
 
 Protocol references: [AWS SigV4 signed payloads](https://docs.aws.amazon.com/AmazonS3/latest/developerguide/sig-v4-header-based-auth.html),
 [R2 conditional PutObject](https://developers.cloudflare.com/r2/api/s3/extensions/),
@@ -93,6 +153,7 @@ hashed URL under `/assets/`, with the correct build prefix; both existing static
 manifest contains only approved CC0 entries; it is safe to ship with the switch off. Both root and `/worlds` builds use
 the same entry-point transport. Dynamic world asset routes only resolve to explicitly listed immutable hash aliases.
 There is no browser query/localStorage override. Unpublished, missing and invalid manifest entries stay on origin.
+The content-hashed manifest uses the browser's default cache mode, so repeat visits can reuse its immutable URL.
 
 CDN HTTP/CORS/network/body/timeout/hash errors retry the exact original URL and options. CDN requests omit origin
 credentials and referrers. Both GLB fetches and standalone ImageLoader textures are covered. Byte/hash verification
