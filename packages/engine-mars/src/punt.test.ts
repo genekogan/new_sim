@@ -11,20 +11,20 @@ import {carrierEntity,stepCarriers} from '../../../mars/viewer/engine/vehicles/c
 
 test('native pond punt carries two rowers at water level, turns, returns them to dry bank and restores exactly',async()=>{
   const factory=await connectedCommonsShoreFactory(),e=factory.create(factory.genesis('punt')) as MarsEngine,spec=e.puntCandidatesV1()[0];
-  const entities=e.world.entities as Record<string,any>;
+  const entities=()=>e.world.entities as Record<string,any>;
   assert.equal(spec.id,'eden-punt');assert.equal(e.previewCarrierV1(spec),null);assert.equal(e.installCarrierV1(spec),true);
   e.spawnHuman({id:'a',label:'A',soul:'a'});
   const a=e.perform({actor:'a',label:'Row a loop',steps:[{verb:'walk_to',params:{to:spec.bank!.door.filter((_,i)=>i!==1),standoff:0}},{verb:'mars:carrier_ride',params:{carrier:spec.id,throughReturn:true}}]});
   assert.ok(a.ok,JSON.stringify(a));
-  for(let i=0;i<2500&&entities.a.human!.carrier?.phase!=='seated';i++)e.step();
-  assert.equal(entities.a.human!.activity,'row');assert.ok(e.programOf('a'),'the loop programme stays open after boarding');
+  for(let i=0;i<2500&&entities().a.human!.carrier?.phase!=='seated';i++)e.step();
+  assert.equal(entities().a.human!.activity,'row');assert.ok(e.programOf('a'),'the loop programme stays open after boarding');
   e.spawnHuman({id:'b',label:'B',soul:'b'});
   const b=e.perform({actor:'b',label:'Row together',steps:[{verb:'walk_to',params:{to:spec.bank!.door.filter((_,i)=>i!==1),standoff:0}},{verb:'mars:carrier_ride',params:{carrier:spec.id,throughReturn:true}}]});
   assert.ok(b.ok,JSON.stringify(b));
   // Hold departure while the second resident reaches the plank (as an ordinary invitation does).
-  const boat=entities[spec.id] as any;boat.carrier.departAtTick=e.world.tick+2500;
-  for(let i=0;i<2500&&entities.b.human!.carrier?.phase!=='seated';i++)e.step();
-  assert.equal(entities.b.human!.activity,'row');
+  const boat=entities()[spec.id] as any;boat.carrier.departAtTick=e.world.tick+2500;
+  for(let i=0;i<2500&&entities().b.human!.carrier?.phase!=='seated';i++)e.step();
+  assert.equal(entities().b.human!.activity,'row');
   let restored:MarsEngine|undefined,turned=false,water=false;
   for(let i=0;i<4400&&(e.programOf('a')||e.programOf('b'));i++){
     e.step();
@@ -34,7 +34,7 @@ test('native pond punt carries two rowers at water level, turns, returns them to
     if(water&&!restored&&i%20===0)restored=factory.restore(e.snapshot()) as MarsEngine;
   }
   assert.ok(water&&turned);assert.equal(e.programOf('a'),null);assert.equal(e.programOf('b'),null);
-  for(const actor of ['a','b']){assert.equal(entities[actor].human!.carrier,undefined);assert.ok(entities[actor].pose.p[0]>-46);assert.equal(entities[actor].human!.shore?.depthMetres,0);}
+  for(const actor of ['a','b']){assert.equal(entities()[actor].human!.carrier,undefined);assert.ok(entities()[actor].pose.p[0]>-46);assert.equal(entities()[actor].human!.shore?.depthMetres,0);}
   assert.deepEqual(e.runtime.violations,[]);
 });
 
