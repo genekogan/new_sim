@@ -1,0 +1,653 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-10-15",
+  "note": "Bounded reviewed CC0 derivatives only. Output hashes pinned to current core index; source families crosslinked through import-packs.mjs record() to exact SOURCES.csv pack rows. Not an approval for other art, Mars campus or Little Martians.",
+  "indexSha256": "d579e39d8a65b745381816b50f77c56f58d3f49347708256a3ccc8aa75a929ba",
+  "importerSha256": "78db6799ac659f737b24e319d268de534ab0e92f011b9dd0a9ddf6b623d9eb42",
+  "sources": {
+    "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb": [
+      {
+        "path": "raw/packs/q-farmanimals.zip",
+        "sha256": "9ff42b7e2445eaf259e4734c08172637db92e4b59a6145909ac56d946152c39b",
+        "bytes": 6965696,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Farm%20Animals%20by%20%40Quaternius.zip"
+      },
+      {
+        "path": "raw/packs/q-animals2.zip",
+        "sha256": "6d8f6789d65dbdb352ebad98a4209f26b41b384e87d81bc05e9ca76139db1248",
+        "bytes": 2069972,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Animal%20Pack%20Vol.2%20by%20%40Quaternius.zip"
+      },
+      {
+        "path": "raw/packs/q-animals5.zip",
+        "sha256": "b3268015beed5d1e1d745e004a37ca2ec215e6ac1bf37541f91c1908c58a2e39",
+        "bytes": 787893,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Animals%20Pack%20by%20Quaternius.zip"
+      },
+      {
+        "path": "raw/packs/q-fish.zip",
+        "sha256": "c56a4bf3468e900ed9d881037334152dc203f93b656373347c8a7fc3dedb1855",
+        "bytes": 1024233,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Animated%20Fish%20Pack%20by%20%40Quaternius.zip"
+      }
+    ],
+    "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb": [
+      {
+        "path": "raw/packs/q-ultimatenature.zip",
+        "sha256": "92daf8b532f60ac0fb53371144d0f8e9ec2f82a2fa408effdf1a64cb8fbaee09",
+        "bytes": 22990249,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/ultimate_nature_pack_by_quaternius_1.zip"
+      },
+      {
+        "path": "raw/packs/kenney-nature-kit.zip",
+        "sha256": "fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d",
+        "bytes": 10537521,
+        "licence": "CC0-1.0",
+        "url": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip"
+      }
+    ],
+    "Quaternius Ultimate Crops (CC0), via eden-crops.glb": [
+      {
+        "path": "raw/packs/q-crops.zip",
+        "sha256": "48de7f1e092750a3832501e79d1463abeec8218c76090fc4b81fa8dfccacdb52",
+        "bytes": 13368975,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/nature_crops_pack_by_quaternius.zip"
+      }
+    ],
+    "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb": [
+      {
+        "path": "raw/packs/kenney-watercraft-kit.zip",
+        "sha256": "cd1470c1cf441c7f46d0944ae6d0d897242365dc97677c5079b3238965d659f3",
+        "bytes": 1870991,
+        "licence": "CC0-1.0",
+        "url": "https://kenney.nl/media/pages/assets/watercraft-kit/a335cfed49-1713519620/kenney_watercraft-pack.zip"
+      },
+      {
+        "path": "raw/packs/kenney-nature-kit.zip",
+        "sha256": "fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d",
+        "bytes": 10537521,
+        "licence": "CC0-1.0",
+        "url": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip"
+      },
+      {
+        "path": "raw/packs/q-ships.zip",
+        "sha256": "2ede2d53ac98bccef91671399298b0cd8404ef9bf2277dbbbb5de4636b6af15c",
+        "bytes": 3903830,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Ships%20by%20%40Quaternius.zip"
+      },
+      {
+        "path": "raw/packs/q-transport.zip",
+        "sha256": "09155a7491c54e1a3db13bcc4b65d4cfb97839472858604c4a4910c65b294339",
+        "bytes": 1411819,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/Public%20Transport_0.zip"
+      }
+    ],
+    "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb": [
+      {
+        "path": "raw/packs/q-food.zip",
+        "sha256": "133e8d0610936846ee667447cdca72c9d5ace3e35084bf905a1e1653100c755b",
+        "bytes": 12199424,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/ultimate_food_pack_by_quaternius.zip"
+      },
+      {
+        "path": "raw/packs/kenney-food-kit.zip",
+        "sha256": "cdad90853682499b94c9fda2f87678b24bfd8f3264e0ed323f6b6a27fd7c6f6f",
+        "bytes": 4606270,
+        "licence": "CC0-1.0",
+        "url": "https://kenney.nl/media/pages/assets/food-kit/83086fa91c-1719418518/kenney_food-kit.zip"
+      }
+    ],
+    "Quaternius Ultimate House Interior (CC0), via eden-interior.glb": [
+      {
+        "path": "raw/packs/q-interior.zip",
+        "sha256": "e59e14f0c2f57c6e5d3a057a77deeb7416c4fe3a6bdc5f27c8431f8a0bd7bbbb",
+        "bytes": 12780107,
+        "licence": "CC0-1.0",
+        "url": "https://opengameart.org/sites/default/files/ultimate_house_interior_pack_-_june_2020.zip"
+      }
+    ]
+  },
+  "derivatives": [
+    {
+      "sha256": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+      "bytes": 6604,
+      "path": "worlds/core-assets/packs/apple-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+      "bytes": 41536,
+      "path": "worlds/core-assets/packs/autumn-tree-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+      "bytes": 42428,
+      "path": "worlds/core-assets/packs/autumn-tree-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+      "bytes": 5704,
+      "path": "worlds/core-assets/packs/banana-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+      "bytes": 5176,
+      "path": "worlds/core-assets/packs/beet-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+      "bytes": 2564,
+      "path": "worlds/core-assets/packs/beet-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+      "bytes": 11024,
+      "path": "worlds/core-assets/packs/berries-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+      "bytes": 2992,
+      "path": "worlds/core-assets/packs/berries-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+      "bytes": 43152,
+      "path": "worlds/core-assets/packs/bicycle-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb"
+    },
+    {
+      "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+      "bytes": 19540,
+      "path": "worlds/core-assets/packs/bicycle-simple-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb"
+    },
+    {
+      "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+      "bytes": 26860,
+      "path": "worlds/core-assets/packs/birch-tree-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+      "bytes": 24224,
+      "path": "worlds/core-assets/packs/birch-tree-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+      "bytes": 26872,
+      "path": "worlds/core-assets/packs/birch-tree-autumn-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+      "bytes": 183264,
+      "path": "worlds/core-assets/packs/bird-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+      "bytes": 5148,
+      "path": "worlds/core-assets/packs/bread-loaf-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+      "bytes": 3836,
+      "path": "worlds/core-assets/packs/bush-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+      "bytes": 2600,
+      "path": "worlds/core-assets/packs/bush-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+      "bytes": 6772,
+      "path": "worlds/core-assets/packs/bush-3-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+      "bytes": 5956,
+      "path": "worlds/core-assets/packs/bush-4-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+      "bytes": 6472,
+      "path": "worlds/core-assets/packs/bush-5-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+      "bytes": 4732,
+      "path": "worlds/core-assets/packs/canoe-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb"
+    },
+    {
+      "sha256": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+      "bytes": 6828,
+      "path": "worlds/core-assets/packs/carrot-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+      "bytes": 3656,
+      "path": "worlds/core-assets/packs/carrot-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+      "bytes": 264704,
+      "path": "worlds/core-assets/packs/cat-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+      "bytes": 7960,
+      "path": "worlds/core-assets/packs/corn-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+      "bytes": 2380,
+      "path": "worlds/core-assets/packs/corn-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+      "bytes": 267528,
+      "path": "worlds/core-assets/packs/cow-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+      "bytes": 3200,
+      "path": "worlds/core-assets/packs/croissant-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+      "bytes": 4568,
+      "path": "worlds/core-assets/packs/cup-of-coffee-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+      "bytes": 5340,
+      "path": "worlds/core-assets/packs/cup-of-tea-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+      "bytes": 4820,
+      "path": "worlds/core-assets/packs/cutting-board-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+      "bytes": 3676,
+      "path": "worlds/core-assets/packs/dinghy-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb"
+    },
+    {
+      "sha256": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+      "bytes": 11280,
+      "path": "worlds/core-assets/packs/dinner-plate-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+      "bytes": 241060,
+      "path": "worlds/core-assets/packs/dog-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+      "bytes": 3116,
+      "path": "worlds/core-assets/packs/flowers-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+      "bytes": 1488,
+      "path": "worlds/core-assets/packs/flowers-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+      "bytes": 3608,
+      "path": "worlds/core-assets/packs/food-bowl-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+      "bytes": 223640,
+      "path": "worlds/core-assets/packs/fox-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+      "bytes": 5488,
+      "path": "worlds/core-assets/packs/glass-of-wine-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+      "bytes": 4064,
+      "path": "worlds/core-assets/packs/grass-short-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+      "bytes": 3236,
+      "path": "worlds/core-assets/packs/grass-tuft-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+      "bytes": 254596,
+      "path": "worlds/core-assets/packs/horse-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+      "bytes": 225944,
+      "path": "worlds/core-assets/packs/koi-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+      "bytes": 15696,
+      "path": "worlds/core-assets/packs/lettuce-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+      "bytes": 6664,
+      "path": "worlds/core-assets/packs/lettuce-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+      "bytes": 4908,
+      "path": "worlds/core-assets/packs/lilypad-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+      "bytes": 249220,
+      "path": "worlds/core-assets/packs/llama-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+      "bytes": 6956,
+      "path": "worlds/core-assets/packs/mossy-log-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+      "bytes": 2264,
+      "path": "worlds/core-assets/packs/mossy-rock-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+      "bytes": 2172,
+      "path": "worlds/core-assets/packs/mossy-rock-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+      "bytes": 3928,
+      "path": "worlds/core-assets/packs/mossy-stump-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+      "bytes": 1800,
+      "path": "worlds/core-assets/packs/mushroom-red-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+      "bytes": 1800,
+      "path": "worlds/core-assets/packs/mushroom-tan-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+      "bytes": 3412,
+      "path": "worlds/core-assets/packs/mushrooms-red-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+      "bytes": 3412,
+      "path": "worlds/core-assets/packs/mushrooms-tan-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+      "bytes": 41520,
+      "path": "worlds/core-assets/packs/oak-tree-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+      "bytes": 42416,
+      "path": "worlds/core-assets/packs/oak-tree-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+      "bytes": 23256,
+      "path": "worlds/core-assets/packs/oak-tree-3-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+      "bytes": 3940,
+      "path": "worlds/core-assets/packs/orange-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+      "bytes": 7984,
+      "path": "worlds/core-assets/packs/pie-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb"
+    },
+    {
+      "sha256": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+      "bytes": 237852,
+      "path": "worlds/core-assets/packs/pig-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+      "bytes": 245468,
+      "path": "worlds/core-assets/packs/pug-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+      "bytes": 21096,
+      "path": "worlds/core-assets/packs/pumpkin-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+      "bytes": 8064,
+      "path": "worlds/core-assets/packs/pumpkin-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+      "bytes": 3848,
+      "path": "worlds/core-assets/packs/round-carpet-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate House Interior (CC0), via eden-interior.glb"
+    },
+    {
+      "sha256": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+      "bytes": 6896,
+      "path": "worlds/core-assets/packs/rowboat-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb"
+    },
+    {
+      "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+      "bytes": 243232,
+      "path": "worlds/core-assets/packs/sheep-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
+    },
+    {
+      "sha256": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+      "bytes": 9948,
+      "path": "worlds/core-assets/packs/tomato-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+      "bytes": 3424,
+      "path": "worlds/core-assets/packs/tomato-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+      "bytes": 21176,
+      "path": "worlds/core-assets/packs/watermelon-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+      "bytes": 8072,
+      "path": "worlds/core-assets/packs/watermelon-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+      "bytes": 2092,
+      "path": "worlds/core-assets/packs/wheat-crop-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+      "bytes": 2100,
+      "path": "worlds/core-assets/packs/wheat-crop-young-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Crops (CC0), via eden-crops.glb"
+    },
+    {
+      "sha256": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+      "bytes": 5128,
+      "path": "worlds/core-assets/packs/wildflowers-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+      "bytes": 28288,
+      "path": "worlds/core-assets/packs/willow-tree-1-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    },
+    {
+      "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+      "bytes": 39576,
+      "path": "worlds/core-assets/packs/willow-tree-2-pack.glb",
+      "licence": "CC0-1.0",
+      "source": "Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb"
+    }
+  ]
+}
