@@ -160,6 +160,15 @@ export async function openLauncher(cfg = {}) {
       const refusal = checkAccountCreation(accountPolicy, { createdAt: account?.created_at, worlds });
       if (refusal) { const { status, ...body } = refusal; return [status, body]; }
     }
+    // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
+    const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
+    // The label is self-chosen text, so one person must not be able to wear another god's label on the homepage.
+    const verifiedOwner = op?.owner ?? creator;
+    if (godName && verifiedOwner) {
+      const key = godName.toLocaleLowerCase();
+      if (registry.worlds.some((w) => !w.fork && typeof w.godName === 'string' && w.godName.toLocaleLowerCase() === key && worldOwner(w.slug) !== verifiedOwner))
+        return [409, { ok: false, code: 'god-name-taken', message: `"${godName}" is already shown as the god of someone else's world; choose another name to show.` }];
+    }
     if (registry.worlds.length >= MAX_WORLDS) return [409, { ok: false, code: 'full', message: `this launcher holds at most ${MAX_WORLDS} worlds` }];
     const slug = slugFor(name, registry.slugs());
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
@@ -193,8 +202,6 @@ export async function openLauncher(cfg = {}) {
         return [r.status === 403 ? 403 : 401, { ok: false, code: 'signin-required', message: `the new world could not make you its god: ${d.message ?? r.status}; sign in again and retry` }];
       } else log(`created ${slug} unclaimed: the creator's dev sign-in was refused (${r.status})`);
     }
-    // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
-    const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
     if (owner && godName) registry.update(slug, { godName });
     log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${op ? `, owned by ${op.owner} (operator)` : owner ? ', claimed by its creator' : ''}`);
     await refreshStats(entry);

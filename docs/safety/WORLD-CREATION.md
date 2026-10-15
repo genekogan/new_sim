@@ -43,3 +43,20 @@ positive support requests, repeat creation bursts and sponsor concentration befo
 Before that step can protect both `/w/*` and `/worlds`, choose an explicit registry federation/link protocol
 and demonstrate two-person isolation across it. Today's registries remain separate. Upload moderation and
 priced actions are later work; this slice does not claim to solve them.
+
+## "god: <name>" is a label, not an identity (G1 walk: helloworld2 "god: geno")
+
+From code, the god panel opens in owner mode only when `/v1/god/status` answers `owner`, which requires the
+signed-in account to equal the world's stored owner (`god/routes.ts`, status handler). An `admin` role never
+yields `owner` there, and Clerk sign-ins are always created as `user` (`auth.ts`), so new `/worlds` worlds
+have no admin path to the panel. The homepage's "god: geno" is the free text typed into the new-world
+dialog (`godName`), stored only after the verified creator claimed the world. So Gene seeing the full panel
+on helloworld2 means his account is its owner and "geno" is his chosen label: an alias, not admin and not a
+hole. Not checked against live data; the regression test reproduces the shape with two accounts.
+
+The hole the walk did expose: anyone could put the same label on their own world. The launcher now refuses
+a `godName` (any case) already shown on a world owned by a different account: 409 `god-name-taken`, before
+anything is allocated; an owner may reuse their own label. Old-world forks are outside this check (they have
+no Godmode owner record). `tools/world-launcher/god-label.test.mjs` (ports 5883–5886) proves owner/visitor/
+anonymous status, refused mint/claim/welcome for the second account, no account id on the card, and the label
+refusal; it fails without the fix (`201 !== 409`).
