@@ -94,6 +94,9 @@ export const CREATION_LIMITS = Object.freeze({
   /** Mutation and terrain authoring request allowances per token. */
   actsPerMinute: 120,
   landEditsPerMinute: 30,
+  /** Shared clock/weather edits and deliberate lightning strikes, per token. */
+  envEditsPerMinute: 30,
+  strikesPerMinute: 30,
   /** Public geometry queries keep public access: anonymous callers use the IP limiter. */
   queriesPerMinute: 120,
   /** A god CLI issues one or two queries per command (B1 peaked at 42 commands a minute); per token. */

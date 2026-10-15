@@ -22,6 +22,10 @@ import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { viewerWeatherKind } from '../edge/eyes/sight.ts';
 import { ApiError } from '../souls.ts';
 import { recentStrikes } from './lightning.ts';
+import { CREATION_LIMITS } from '@sim/generators';
+import { godTokenLimiter } from './rate-limit.ts';
+import { syncWorldClock } from './world-clock.ts';
+import type { BuildBody } from './builds.ts';
 
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 export type EnvInput = {
@@ -56,10 +60,9 @@ export function parseHour(v: number | string): number {
 }
 
 /** The `world` op patch for an env request against the current state (pure; the op's own inverse undoes it). */
-export function envPatch(state: WorldState, env: EnvInput): { time?: Record<string, unknown>; weather?: Record<string, unknown> } {
+export function envPatch(state: WorldState, env: EnvInput, journalSeq: number): { time?: Record<string, unknown>; weather?: Record<string, unknown> } {
   const out: { time?: Record<string, unknown>; weather?: Record<string, unknown> } = {};
-  const t = state.time as WorldState['time'] & { set?: { hour: number; n: number } | null; paused?: boolean };
-  if (env.timeOfDay !== undefined) out.time = { ...out.time, set: { hour: round(parseHour(env.timeOfDay)), n: (t.set?.n ?? 0) + 1 } };
+  if (env.timeOfDay !== undefined) out.time = { ...out.time, set: { hour: round(parseHour(env.timeOfDay)), n: journalSeq } };
   if (env.timeScale !== undefined) {
     const s = Number(env.timeScale);
     if (!Number.isFinite(s) || s < 0 || s > 1440) throw new ApiError(400, 'invalid', 'timeScale is world hours per real hour: 0 (paused) … 1440; 24 = one world day per real hour');
@@ -89,7 +92,7 @@ export function envPatch(state: WorldState, env: EnvInput): { time?: Record<stri
 
 /** Apply an env request as one `world` op (in the ledger, undoable). */
 export function setEnv(god: GodMode, env: EnvInput, note = 'environment') {
-  const patch = envPatch(god.model.state, env);
+  const patch = envPatch(god.model.state, env, god.model.editSeq + 1);
   if (!patch.time && !patch.weather) throw new ApiError(400, 'invalid', 'give timeOfDay, timeScale and/or weather');
   return god.act({ ops: [{ op: 'world', state: patch }] }, note);
 }
@@ -115,6 +118,7 @@ export function envView(host: WorldHost, god: GodMode) {
     contract: 'world-env/1',
     time: { datetime, clock: datetime ? datetime.slice(11, 16) : null, paused, timeScale: paused ? 0 : round((24 * 3600 * 20) / dayTicks), dayTicks, set: t.set ?? null },
     weather: weatherNow(god.model.state, datetime),
+    undoNote: 'Undo restores environment settings; it does not rewind the world clock.',
     // GOD-ENV: the last lightning strike of the last minute (the storm's or the god's)
     ...(() => { const tick = host.engine.world.tick, l = recentStrikes(god, tick).pop(); return l ? { strike: { x: l.x, z: l.z, tick: l.tick, ago: Math.round((tick - l.tick) / 20), god: !!l.god } } : {}; })(),
     setter: 'POST /v1/god/env { timeOfDay?, timeScale?, weather?: { kind?, intensity?, wind?, fog?, clouds?, rain? } } (god token)',
@@ -127,13 +131,19 @@ export function installWorldEnv(host: WorldHost, god: GodMode, edge?: EdgeLedger
 }
 
 export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; requireGod: (c: Context) => void }) {
+  const limitGod = godTokenLimiter(d.requireGod);
   const noStore = { 'cache-control': 'no-store' };
   app.get('/v1/world/env', (c) => c.json(envView(d.host, d.god), 200, noStore));
   app.post('/v1/god/env', async (c) => {
-    d.requireGod(c);
+    limitGod(c, 'env', CREATION_LIMITS.envEditsPerMinute);
     let b: EnvInput & { note?: string };
     try { b = await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); }
     const r = setEnv(d.god, b, typeof b?.note === 'string' ? b.note : 'environment');
-    return c.json({ ...r, env: envView(d.host, d.god) }, 200, noStore);
+    const identity = d.god.godIdentity(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''));
+    const shared = r.accepted && identity && d.god.store.builds(true).some(row => (JSON.parse(row.body) as BuildBody).lead.tokenHash === identity.hash);
+    // onCommit queues the logged engine rules. Read the clock only after those rules have applied.
+    if (r.accepted) await syncWorldClock(d.god);
+    const warning = 'env.shared-clock: this changes the world\'s clock for everyone; for a picture use look --hour';
+    return c.json({ ...r, ...(shared ? { warnings: [...(r.accepted ? r.warnings : []), warning] } : {}), env: envView(d.host, d.god) }, 200, noStore);
   });
 }

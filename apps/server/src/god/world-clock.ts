@@ -43,23 +43,29 @@ export function envClockConfig(tick: number, want: { dayTicks: number; paused: b
   return { dayConfig: { origin, dayTicks, customs: [] as string[], anchor }, why };
 }
 
+const synchronizers = new WeakMap<GodMode, () => Promise<void>>();
+/** Wait for the logged clock configuration to reach the engine before reporting its applied time. */
+export async function syncWorldClock(god: GodMode): Promise<void> { await synchronizers.get(god)?.(); }
+
 export function installWorldClock(host: WorldHost, god: GodMode, log: (m: string) => void = () => {}) {
   const want = () => {
     const t = god.model.state.time as { dayTicks?: number; paused?: boolean; set?: { hour: number; n: number } | null } | undefined;
     const d = Number(t?.dayTicks);
     return { dayTicks: Number.isSafeInteger(d) && d >= 1200 && d <= 20_000_000 ? d : 72000, paused: t?.paused === true, set: t?.set ?? null };
   };
-  let pending = false;
-  const sync = () => {
-    if (pending) return;
+  let pending: Promise<void> | undefined;
+  const sync = (): Promise<void> => {
+    if (pending) return pending.then(sync);
     const l = host.living as (NonNullable<WorldHost['living']> & { anchor?: number }) | undefined, w = want();
     const dayTicks = w.paused ? PAUSED_DAY_TICKS : w.dayTicks, anchor = w.set?.n ?? l?.anchor ?? 0;
-    if (l && l.dayTicks === dayTicks && (l.anchor ?? 0) === anchor) return;
+    if (l && l.dayTicks === dayTicks && (l.anchor ?? 0) === anchor) return Promise.resolve();
     // a world that has never had time set keeps F3's original payload (byte-identical history for the earlier worlds)
     const payload = !w.paused && !w.set && !l?.anchor ? clockConfig(host.engine.world.tick, dayTicks, l) : envClockConfig(host.engine.world.tick, w, l);
-    pending = true;
-    host.enqueue('rules', 'world', payload).catch((e: Error) => log(`world clock: ${e.message}`)).finally(() => { pending = false; if (want().dayTicks !== w.dayTicks || want().paused !== w.paused || want().set?.n !== w.set?.n) sync(); });
+    pending = host.enqueue('rules', 'world', payload).then(() => {}).finally(() => { pending = undefined; });
+    return pending.then(sync);
   };
-  sync();
-  god.onCommit(() => sync());
+  synchronizers.set(god, sync);
+  const schedule = () => { void sync().catch((e: Error) => log(`world clock: ${e.message}`)); };
+  schedule();
+  god.onCommit(schedule);
 }

@@ -25,12 +25,14 @@ test('god-built places: map, exits, where, and a Soul not left closed in when th
   t.after(() => { f.brain.quiesce(); f.host.stop(); f.db.close(); });
   await settle(2);
   const r = god.act({ ops: [
+    { op: 'define', def: { schema: 'def/1', name: 'open-pavilion', make: { kind: 'gen', gen: 'building/1', args: { style: 'pavilion' } }, size: { box: [8, 4, 6] } } },
     { op: 'place', tmp: '$pl', def: coreRef('plaza'), name: 'plaza', shape: { area: [[-8, -25], [8, -25], [8, -11], [-8, -11]] } },
     { op: 'place', def: coreRef('fountain'), name: 'fountain', p: [0, -20] },
     { op: 'place', def: coreRef('bench'), name: 'plaza-bench', p: [0, -16.5] },
     { op: 'place', def: coreRef('roundhouse'), name: 'moss-cottage', p: [-16, 4] },
     { op: 'place', def: coreRef('pond'), name: 'pond', shape: { area: [[10, 6], [18, 6], [18, 14], [10, 14]] }, params: { depth: 0.3, level: 0, edge: 1 } },
     { op: 'place', def: coreRef('gazebo'), name: 'gazebo', p: [-4, 22] },
+    { op: 'place', def: 'open-pavilion@1', name: 'pavilion', p: [30, 25] },
     { op: 'place', def: coreRef('obelisk'), name: 'needle', p: [22, -14] },
   ] }, 'a village') as any;
   assert.equal(r.accepted, true, JSON.stringify(r));
@@ -47,6 +49,8 @@ test('god-built places: map, exits, where, and a Soul not left closed in when th
   assert.equal(p('g-moss-cottage.living').enclosed, true); assert.equal(p('g-moss-cottage.living').parent, 'g-moss-cottage'); assert.ok(p('g-moss-cottage.living').capacity >= 1);
   assert.equal(p('g-pond').kind, 'water'); assert.equal(p('g-pond').parent, 'g-pond.shore-bank');
   assert.equal(p('g-gazebo').kind, 'gazebo'); assert.equal(p('g-gazebo').capacity, 10);
+  assert.match(p('g-pavilion').description, /open-sided, with no front door/);
+  assert.doesNotMatch(p('g-pavilion').description, /front door is closed/);
   assert.equal(p('g-needle').kind, 'landmark');
   assert.equal(map.has('g-fountain'), false, 'a fountain inside the plaza is not a landmark of its own');
 

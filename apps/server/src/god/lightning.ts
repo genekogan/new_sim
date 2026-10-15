@@ -7,6 +7,8 @@ import { boundsOf, strikesBetween, SOUND_MPS, type Strike, type WorldState } fro
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { CREATION_LIMITS } from '@sim/generators';
+import { godTokenLimiter } from './rate-limit.ts';
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const DIRS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
@@ -62,8 +64,9 @@ export function installLightning(god: GodMode, edge: EdgeLedger | undefined, tic
 }
 
 export function mountLightningRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => void; tick: () => number }) {
+  const limitGod = godTokenLimiter(d.requireGod);
   app.post('/v1/god/strike', async (c) => {
-    d.requireGod(c);
+    limitGod(c, 'strike', CREATION_LIMITS.strikesPerMinute);
     let b: { at?: unknown } = {}; try { b = await c.req.json(); } catch { /* no body: anywhere */ }
     return c.json(strike(d.god, b?.at, d.tick()), 200, { 'cache-control': 'no-store' });
   });
