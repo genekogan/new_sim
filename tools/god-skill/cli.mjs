@@ -155,7 +155,7 @@ export async function verifyUse(target, flags = {}) {
   if (flags.json) return receipt;
   const lines = (receipt.uses ?? []).map(r => `${r.use}: ${r.ok ? 'OK' : 'FAILED'}${r.ok ? (r.use === 'sit' ? ` — ${r.seat}; ${r.occupant}; ${r.distanceToSlot} m from slot` : ` — ${r.room ?? target}${r.door ? ` via ${r.door}` : ''}`) : ` — ${r.reason?.code ?? 'verify.refused'}${r.reason?.engineCode ? ` (${r.reason.engineCode})` : ''}: ${r.reason?.message ?? 'unconfirmed'}`}`);
   if (!lines.length && receipt.reason) lines.push(`FAILED: ${receipt.reason.code}: ${receipt.reason.message}`);
-  lines.push(`probe ${receipt.probe?.removed ? 'removed' : receipt.probe?.removal === 'pending' ? 'removal pending (native retirement accepted)' : 'REMOVAL UNCONFIRMED'}; ${Math.round(receipt.ms ?? 0)} ms`);
+  lines.push(`probe ${receipt.probe?.created === false ? 'not created' : receipt.probe?.removed ? 'removed' : receipt.probe?.removal === 'pending' ? 'removal pending (native retirement accepted)' : 'REMOVAL UNCONFIRMED'}; ${Math.round(receipt.ms ?? 0)} ms`);
   if (receipt.timings) lines.push(`timings (ms): ${['birth', 'start', 'enter', 'sit', 'retire'].map(phase => `${phase} ${Math.round(receipt.timings[phase] ?? 0)}`).join('; ')}`);
   for (const result of receipt.uses ?? []) {
     if (result.proof) lines.push(`  ${result.use} proof: ${result.proof.kind} at ${result.proof.at.join(',')}; tick ${result.proof.tick}; ${Math.round(result.proof.ms)} ms`);

@@ -30,12 +30,15 @@ type Reach = {ok: true; length: number; legs: number; levels: number[]} | {ok: f
 type Proof = {kind: 'room' | 'footprint' | 'seat'; at: V2; tick: number; ms: number; room?: string; seat?: string};
 type UseResult = {use: Use; ok: boolean; door?: string; crossing?: {at: V2; distToDoor?: number}; proof?: Proof; room?: string; seat?: string; occupant?: string; distanceToSlot?: number; interiorRoute?: {from: Point; to: Point; reach: Reach; relocatedTo?: V2; finalApproach: 'physical'}; reason?: Reason};
 type Timings = Record<'birth' | 'start' | 'enter' | 'sit' | 'retire', number>;
-export type VerifyReceipt = {ok: boolean; target: string; uses: UseResult[]; probe: {removed: boolean; removal: 'done' | 'pending'; entityId?: string}; timings: Timings; ms: number; notes: string[]; reason?: Reason};
+type Stamp = {ms: number; tick: number};
+type ActionTiming = {capability: string; slot: string; requested: Stamp; accepted?: Stamp; programStarted?: Stamp; arrived?: Stamp; seated?: Stamp; phases: {phase: string; at: Stamp; position: V2}[]; predicateTrue?: Stamp};
+export type VerifyReceipt = {ok: boolean; target: string; uses: UseResult[]; probe: {created: boolean; removed: boolean; removal: 'done' | 'pending'; entityId?: string}; timings: Timings; actions?: ActionTiming[]; previousRemovalWaitMs?: number; ms: number; notes: string[]; reason?: Reason};
 type Description = {id: string; path: string; aabb: [number, number, number, number]; rooms: {id: string; floor: number; polygon: V2[]}[]; slots: {id: string; kind: string; p: [number, number, number]; capacity: number; used: number; occupants: string[]}[]};
 type Door = {id: string; at: V2; outward: V2; level: number};
 type Body = {pose: {p: [number, number, number]}; human?: {activity?: string; level?: number}};
-type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null; reachV1(from: Point, to: Point): Reach};
+type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null; reachV1(from: Point, to: Point): Reach; freeSeatSlotsV1(id: string, except?: string): {id: string; p: V2; level: number; approach?: V2}[]};
 const active = new WeakSet<WorldHost>();
+const pendingRemoval = new WeakMap<WorldHost, Promise<void>>();
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const dist = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 class Failure extends Error {
@@ -50,11 +53,18 @@ export class VerifyUse {
 
   async run(raw: unknown): Promise<VerifyReceipt> {
     const started = performance.now();
-    const receipt: VerifyReceipt = {ok: false, target: typeof (raw as Input)?.target === 'string' ? (raw as Input).target : '', uses: [], probe: {removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: []};
+    const receipt: VerifyReceipt = {ok: false, target: typeof (raw as Input)?.target === 'string' ? (raw as Input).target : '', uses: [], probe: {created: false, removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: []};
     const parsed = verifyUseSchema.safeParse(raw);
     const fail = (reason: Reason, uses: Use[] = []) => { receipt.reason = reason; receipt.uses = uses.map(use => ({use, ok: false, reason})); receipt.ms = round(performance.now() - started); return receipt; };
     if (!parsed.success) return fail({code: 'verify.refused', message: parsed.error.issues.map(i => i.message).join('; '), engineCode: 'invalid'});
     const input = parsed.data;
+    const removal = pendingRemoval.get(this.host);
+    if (removal) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const at = performance.now();
+      try { await Promise.race([removal, new Promise<void>(resolve => {timer = setTimeout(resolve, Math.min(3000, input.timeoutMs));})]); }
+      finally {clearTimeout(timer); receipt.previousRemovalWaitMs = round(performance.now() - at);}
+    }
     if (active.has(this.host) || [...this.host.minds.keys()].some(isVerificationProbe)) return fail({code: 'verify.busy', message: 'This world already has a verifier probe.'}, input.uses);
     active.add(this.host);
     let retired = false, probe: SoulRow | undefined, listener: WorldHost['listeners'][number] | undefined;
@@ -77,11 +87,11 @@ export class VerifyUse {
         : level === (bridge.nav.thing(receipt.target)?.level ?? 0) && this.within(p, footprint) ? receipt.target : undefined;
       const startAt = performance.now();
       let entry: ReturnType<VerifyUse['entry']>;
-      try { entry = this.entry(input, footprint, doors, bridge, engine, inside, !desc.rooms.length); }
+      try { entry = this.entry(input, footprint, doors, bridge, engine, inside, !desc.rooms.length, target); }
       finally { receipt.timings.start = round(performance.now() - startAt); }
       const created = await phase('birth', async () => {
         const born = this.souls.createVerificationProbe(); probe = born.soul;
-        receipt.probe = {removed: false, removal: 'pending', entityId: probe.entity_id};
+        receipt.probe = {created: true, removed: false, removal: 'pending', entityId: probe.entity_id};
         this.host.drainInputs(); await born.ready; return born;
       });
       probe = created.soul;
@@ -124,7 +134,9 @@ export class VerifyUse {
       };
       const takeSeat = async (seat: Entity, result: UseResult) => {
         if (confirmSeat(seat, result)) return;
-        await this.action(soul, `sit:${seat.id}`, deadline, () => confirmSeat(seat, result));
+        const slot = seat.id === target.id && entry.seatSlot ? entry.seatSlot : this.nativeSeats(seat.id, soul.entityId).sort((a, b) => dist(position(), a.p) - dist(position(), b.p))[0]?.id;
+        if (!slot) throw new Failure('verify.no-seat', 'No free native seat slot in the selected fixture.');
+        await this.action(soul, seat.id, slot, deadline, () => confirmSeat(seat, result), receipt, started);
       };
       const seatedProof = (seat: Entity) => {
         if (proof) return;
@@ -212,19 +224,22 @@ export class VerifyUse {
           receipt.probe.removed = !this.host.minds.has(probe.id) && !this.host.engine.world.entities[probe.entity_id] && !this.god.model.entities.has(probe.entity_id);
           receipt.probe.removal = receipt.probe.removed ? 'done' : 'pending';
           receipt.timings.retire = round(performance.now() - retireAt);
-          if (!receipt.probe.removed) receipt.notes.push('Native retirement accepted; removal pending normal engine ticks. The world remains verify.busy until cleanup is done.');
+          if (!receipt.probe.removed) receipt.notes.push('Native retirement accepted; removal pending normal engine ticks. The next call waits up to 3 s for cleanup.');
         } catch (e) { receipt.probe.removed = false; receipt.probe.removal = 'pending'; receipt.notes.push(`Probe cleanup failed: ${reasonOf(e).message}`); }
       }
       if (receipt.probe.removed) active.delete(this.host);
       else if (probe) {
         // A paused world may still owe native physical cleanup. Keep it busy
         // until the normal engine tick removes the retired probe.
+        let removed!: () => void;
+        pendingRemoval.set(this.host, new Promise<void>(resolve => {removed = resolve;}));
         const entityId = probe.entity_id, cleanup = {afterTick: () => {
           if (this.host.engine.world.entities[entityId]) return;
           engineBridges.get(this.god.model)?.bodyRetired({entityId});
           if (this.god.model.entities.has(entityId)) return;
           receipt.probe.removed = true; receipt.probe.removal = 'done';
-          active.delete(this.host); const i = this.host.listeners.indexOf(cleanup); if (i >= 0) this.host.listeners.splice(i, 1);
+          active.delete(this.host); pendingRemoval.delete(this.host); removed();
+          const i = this.host.listeners.indexOf(cleanup); if (i >= 0) this.host.listeners.splice(i, 1);
         }};
         this.host.listeners.push(cleanup);
       }
@@ -260,7 +275,10 @@ export class VerifyUse {
       return dist(p, [a[0] + t * dx, a[1] + t * dz]) >= 0.15;
     });
   }
-  private entry(input: Input, footprint: V2[], doors: Door[], bridge: EngineBridge, engine: Engine, inside: (p: V2, level: number) => string | undefined, allowSeat: boolean): {start: V2; goal?: Point} {
+  private nativeSeats(id: string, except?: string) {
+    return (this.host.engine as unknown as Engine).freeSeatSlotsV1(id, except);
+  }
+  private entry(input: Input, footprint: V2[], doors: Door[], bridge: EngineBridge, engine: Engine, inside: (p: V2, level: number) => string | undefined, allowSeat: boolean, target: Entity): {start: V2; goal?: Point; seatSlot?: string} {
     let from: V2 | undefined;
     if (input.from) {
       if (Array.isArray(input.from)) from = input.from;
@@ -272,6 +290,22 @@ export class VerifyUse {
       }
     }
     const origin = from ?? [0, 0] as V2;
+    // A room-less seat fixture can have no standing ground inside its native
+    // obstacle. Start outside beside the exact native approach, then walk and
+    // sit through its normal controller. Pin the slot: another slot may be
+    // nearer to this start while facing the opposite side of a large gazebo.
+    if (allowSeat && !from && !doors.length && (!input.seat || this.god.model.get(input.seat)?.id === target.id)) {
+      for (const slot of this.nativeSeats(target.id).sort((a, b) => dist(a.p, origin) - dist(b.p, origin))) {
+        if (slot.level !== 0) continue;
+        const approach = slot.approach;
+        if (!approach) continue;
+        const d = dist(approach, slot.p);
+        if (d < 0.05) continue;
+        const outside: V2 = [approach[0] + (approach[0] - slot.p[0]) / d * 0.8, approach[1] + (approach[1] - slot.p[1]) / d * 0.8];
+        const start = engine.standableNearV1(outside, 0, undefined, 0.4, 3);
+        if (start && !inPoly(start[0], start[1], footprint)) return {start, seatSlot: slot.id};
+      }
+    }
     const candidates: {at: V2; outward: V2}[] = doors.filter(d => d.level === 0);
     if (!candidates.length) {
       const centre: V2 = [footprint.reduce((s, p) => s + p[0], 0) / footprint.length, footprint.reduce((s, p) => s + p[1], 0) / footprint.length];
@@ -339,28 +373,47 @@ export class VerifyUse {
     return candidates[0].e;
   }
   private checkTime(deadline: number) { if (performance.now() >= deadline) throw new Failure('verify.timeout', 'Verification reached its real-time deadline.'); }
-  private async action(soul: EdgeSoul, capability: string, deadline: number, success?: () => boolean) {
+  private async action(soul: EdgeSoul, fixture: string, slot: string, deadline: number, success: () => boolean, receipt: VerifyReceipt, started: number) {
     this.checkTime(deadline);
-    // Wait on acceptance itself, rather than polling or spending idle ticks
-    // after an immediate refusal. Paused sequencers remain deadline bounded.
-    const pending = this.edge!.act(soul, {capability, ...(success ? {params: {seconds: 600}} : {})});
-    this.host.drainInputs();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const outcome = await Promise.race([pending, new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Failure('verify.timeout', 'Verification reached its real-time deadline.')), Math.max(1, deadline - performance.now()));
-    })]).finally(() => clearTimeout(timer));
-    if (!outcome?.accepted) throw new Failure('verify.refused', outcome?.reason ?? 'The edge action was refused.', outcome?.code);
-    for (;;) {
-      this.checkTime(deadline);
-      const receipt = this.edge!.receipt(soul.soulId, outcome.receipt.id)!;
-      if (receipt.phase === 'failed' || receipt.phase === 'replaced') throw new Failure('verify.refused', receipt.reason ?? 'The engine action failed.', receipt.code ?? receipt.phase);
-      if (success?.()) return;
-      if (receipt.phase === 'completed') {
-        if (!success) return;
-        throw new Failure('verify.refused', 'Sit finished without engine sit activity, the probe as occupant, and slot distance ≤0.6 m.', 'seat.unconfirmed');
+    const capability = `sit:${fixture}`;
+    const stamp = (): Stamp => ({ms: round(performance.now() - started), tick: this.host.engine.world.tick});
+    const timing: ActionTiming = {capability, slot, requested: stamp(), phases: []};
+    (receipt.actions ??= []).push(timing);
+    const listener: HostListener = {
+      onDecision: (e, r) => {if (e.payload.soulId === soul.soulId && e.payload.option === capability && r.programOk) timing.programStarted ??= stamp();},
+      afterTick: () => {
+        const rec = [...this.host.engine.runtime.records.values()].find(r => r.verb === 'sit' && (r.params as {actor?: string}).actor === soul.entityId);
+        if (rec?.phase && timing.phases.at(-1)?.phase !== rec.phase) {
+          const b = this.host.engine.world.entities[soul.entityId];
+          timing.phases.push({phase: rec.phase, at: stamp(), position: [round(b.pose.p[0]), round(b.pose.p[2])]});
+          if (['turn', 'sit-down', 'occupied'].includes(rec.phase)) timing.arrived ??= stamp();
+          if (rec.phase === 'occupied') timing.seated ??= stamp();
+        }
+      },
+    };
+    this.host.listeners.push(listener);
+    try {
+      // Wait on acceptance itself, rather than polling or spending idle ticks
+      // after an immediate refusal. Paused sequencers remain deadline bounded.
+      const pending = this.edge!.actVerificationSit(soul, fixture, slot);
+      this.host.drainInputs();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const outcome = await Promise.race([pending, new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Failure('verify.timeout', 'Verification reached its real-time deadline.')), Math.max(1, deadline - performance.now()));
+      })]).finally(() => clearTimeout(timer));
+      if (!outcome?.accepted) throw new Failure('verify.refused', outcome?.reason ?? 'The edge action was refused.', outcome?.code);
+      timing.accepted = stamp();
+      for (;;) {
+        this.checkTime(deadline);
+        const receipt = this.edge!.receipt(soul.soulId, outcome.receipt.id)!;
+        if (receipt.phase === 'failed' || receipt.phase === 'replaced') throw new Failure('verify.refused', receipt.reason ?? 'The engine action failed.', receipt.code ?? receipt.phase);
+        if (success()) {timing.predicateTrue = stamp(); return;}
+        if (receipt.phase === 'completed') {
+          throw new Failure('verify.refused', 'Sit finished without engine sit activity, the probe as occupant, and slot distance ≤0.6 m.', 'seat.unconfirmed');
+        }
+        await this.wait(deadline);
       }
-      await this.wait(deadline);
-    }
+    } finally {const i = this.host.listeners.indexOf(listener); if (i >= 0) this.host.listeners.splice(i, 1);}
   }
   private wait(deadline: number) {
     return new Promise<void>(resolve => {

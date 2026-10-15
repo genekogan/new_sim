@@ -106,7 +106,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/schema', (c) => c.json(godSchema(), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/verify-use', async (c) => {
     requireGod(c);
-    if (!d.verifyUse) return c.json({ok: false, target: '', uses: [], probe: {removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: [], reason: {code: 'verify.refused', engineCode: 'unavailable', message: 'Resident verification is unavailable in this world.'}}, 200, noStore);
+    if (!d.verifyUse) return c.json({ok: false, target: '', uses: [], probe: {created: false, removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: [], reason: {code: 'verify.refused', engineCode: 'unavailable', message: 'Resident verification is unavailable in this world.'}}, 200, noStore);
     const raw = await c.req.json().catch(() => null);
     return c.json(await d.verifyUse.run(raw), 200, noStore);
   });

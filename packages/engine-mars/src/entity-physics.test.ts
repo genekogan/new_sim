@@ -48,6 +48,20 @@ async function built() {
 }
 const run = (e: Engine, n: number, until?: () => boolean) => { for (let i = 0; i < n && !(until?.()); i++) e.step(); };
 
+test('free seat approach read preserves state and identifies an exact physically usable native slot', async () => {
+  const {e} = await built(), before = e.stateHash();
+  const slots = e.freeSeatSlotsV1('e_chair1', 'h_walker0001');
+  assert.equal(slots.length, 1); assert.ok(slots[0].id.startsWith('e_chair1#'));
+  assert.equal(slots[0].level, 1); assert.deepEqual(slots[0].p, [8, -1]); assert.ok(slots[0].approach);
+  assert.equal(e.stateHash(), before, 'approach query does not claim or move anything');
+  const started = e.perform({actor: 'h_walker0001', label: 'exact native seat', steps: [{verb: 'mars:sit', params: {slot: slots[0].id}}, {verb: 'rest', params: {seconds: 60}}]});
+  assert.equal(started.ok, true, JSON.stringify(started));
+  run(e, 2400, () => e.world.entities.h_walker0001.human?.activity === 'sit');
+  assert.equal(e.world.entities.h_walker0001.human?.activity, 'sit');
+  assert.deepEqual(e.freeSeatSlotsV1('e_chair1'), []); assert.deepEqual(e.freeSeatSlotsV1('missing'), []);
+  assert.deepEqual(e.runtime.violations, []);
+});
+
 test('world-edit: a Soul routes through the door, up the stairs, sits on the god chair upstairs', async () => {
   const { e } = await built();
   const reach = e.reachV1({ p: [10, 8] }, { p: [8.8, -1], level: 1 });

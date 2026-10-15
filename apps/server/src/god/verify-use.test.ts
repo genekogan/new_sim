@@ -15,11 +15,13 @@ import {mountGodRoutes} from './routes.ts';
 import {PROBE_OWNER, isVerificationProbe} from '../verification-probe.ts';
 import {installBirthLooks} from './birth-look.ts';
 import {seatProviders} from './query.ts';
+import {GroundHost} from './ground-host.ts';
 
-function world(t: TestContext) {
-  const w = fixture(':memory:', factory, {durableClockV1: true});
+function world(t: TestContext, options: {durableClockV1?: boolean; district?: boolean} = {}) {
+  const w = fixture(':memory:', factory, {durableClockV1: options.durableClockV1 ?? true});
   w.brain.quiesce();
-  const god = new GodMode(w.db, {worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}});
+  const god = new GodMode(w.db, {worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}, ...(options.district ? {genesis: JSON.parse(fs.readFileSync(new URL('../../../../worlds/templates/eden-district.json', import.meta.url), 'utf8'))} : {})});
+  if (options.district) new GroundHost(w.db, w.host, god);
   const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({host: w.host, god, edge, log() {}, worldClock: false, worldLore: false});
   const verify = new VerifyUse(w.host, w.souls, god, edge);
   const app = new Hono(), token = god.mintFor({id: 'owner', role: 'user'}, 'test');
@@ -209,19 +211,52 @@ test('far interior seat reports the engine route before relocation and walks the
   assert.ok(full.notes.some(n => /full physical walk.*slower/.test(n))); w.removed();
 });
 
-test('door-adjacent church and bespoke gazebo complete in seconds at normal 20 Hz', {timeout: 30_000}, async t => {
-  const w = world(t); await gazebo(w);
-  const built = w.god.act({ops: [{op: 'place', def: coreRef('church'), name: 'church', p: [-15, 0]}]});
+test('district church and gazebos finish within 10 s with the real tick loop and back-to-back requests', {timeout: 35_000}, async t => {
+  // Match main.ts's ordinary sequencer (no durable-clock extra draining) and
+  // enough authored destinations to expose the former multi-second bind cost.
+  const w = world(t, {durableClockV1: false, district: true}); await gazebo(w);
+  const built = w.god.act({ops: [
+    {op: 'place', def: coreRef('church'), name: 'church', p: [100, 19], r: -1.57},
+    {op: 'place', def: coreRef('gazebo'), name: 'library-gazebo', p: [69, 5]},
+  ]});
   assert.equal(built.accepted, true, JSON.stringify(built)); await w.settle();
-  const clock = setInterval(() => w.host.tickOnce(), 50); t.after(() => clearInterval(clock));
-  for (const target of ['gazebo', 'church']) {
-    const r = await w.verify.run({target, timeoutMs: 10_000});
-    t.diagnostic(JSON.stringify({target, ok: r.ok, ms: r.ms, timings: r.timings, uses: r.uses, removalAtReturn: r.probe.removal}));
+  // Exact-seat verification must not ask to bind other destinations at all.
+  t.mock.method(w.bridge.nav, 'capabilities', () => {throw Error('unrelated navigation discovery');});
+  t.mock.method(w.edge as any, 'binds', () => {throw Error('unrelated capability discovery');});
+  w.host.start();
+  let previous: any;
+  for (const target of ['church', 'library-gazebo', 'gazebo']) {
+    const response = await w.request({target, timeoutMs: 10_000}), r = await response.json() as any;
+    t.diagnostic(JSON.stringify({target, ok: r.ok, ms: r.ms, timings: r.timings, actions: r.actions, previousRemovalWaitMs: r.previousRemovalWaitMs}));
     assert.equal(r.ok, true, JSON.stringify(r)); assert.ok(r.ms <= 10_000); timings(r);
-    const until = performance.now() + 3000;
-    while (!r.probe.removed && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 10));
-    assert.equal(r.probe.removal, 'done'); w.removed();
+    assert.equal(r.probe.created, true);
+    const action = r.actions[0];
+    assert.ok(action.accepted.ms - action.requested.ms < 1000, 'selected-seat admission is prompt');
+    assert.ok(action.arrived.ms <= action.seated.ms && action.seated.ms <= action.predicateTrue.ms);
+    assert.ok(action.seated.tick > action.programStarted.tick, 'native physical ticks still occur');
+    assert.ok(r.uses[1].occupant && r.uses[1].distanceToSlot <= 0.6);
+    if (previous?.probe.removal === 'pending') assert.ok(r.previousRemovalWaitMs > 0 && r.previousRemovalWaitMs <= 3000);
+    const live = w.db.db.prepare('SELECT COUNT(*) AS n FROM souls WHERE owner=? AND retired_at IS NULL').get(PROBE_OWNER) as {n: number};
+    assert.equal(live.n, 0); // the just-returned probe has accepted retirement
+    previous = r;
   }
+  const until = performance.now() + 3000;
+  while (Object.keys(w.host.engine.world.entities).some(id => id.startsWith('h_vp')) && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 20));
+  w.removed(); assert.deepEqual(w.host.engine.runtime.violations, []);
+});
+
+test('exact-seat launch is server-probe-only and retains native slot refusal', async t => {
+  const w = world(t); await w.build();
+  const chair = w.god.model.get('house/chair')!;
+  const refused = await w.edge.actVerificationSit({soulId: 's_other', entityId: 'h_other', name: 'ordinary resident', owner: 'owner'}, chair.id, chair.id + '#seat');
+  assert.equal(refused.accepted, false); assert.equal((refused as any).code, 'soul.not-probe');
+  const created = w.souls.createVerificationProbe(); w.host.drainInputs(); await created.ready;
+  const soul = {soulId: created.soul.id, entityId: created.soul.entity_id, name: created.soul.name, owner: created.soul.owner};
+  const noSlot = await w.edge.actVerificationSit(soul, chair.id, chair.id + '#nonexistent');
+  assert.equal(noSlot.accepted, false); assert.equal((noSlot as any).code, 'slot.unknown');
+  const foreignSlot = await w.edge.actVerificationSit(soul, chair.id, 'another#seat');
+  assert.equal(foreignSlot.accepted, false); assert.equal((foreignSlot as any).code, 'slot.unknown');
+  const retired = w.souls.retire(created.soul); w.host.drainInputs(); await retired; await w.settle(); w.removed();
 });
 
 test('entry retains a proved ENGINE footprint position when the same walk finishes outside', async t => {
@@ -288,6 +323,7 @@ test('a sit label without the probe occupant cannot pass; paused native cleanup 
   const result = await pending;
   assert.equal(result.ok, false); assert.equal(result.uses[0].reason?.code, 'verify.timeout'); assert.equal(result.probe.removed, false);
   const busy = await w.verify.run({target: 'house'}); assert.equal(busy.reason?.code, 'verify.busy');
+  assert.equal(busy.probe.created, false); assert.ok(busy.previousRemovalWaitMs! >= 2900 && busy.previousRemovalWaitMs! < 3500);
   seatProviders.set(w.god.model, occupants);
   await w.settle(80); w.removed();
   const next = await w.verify.run({target: 'missing'}); assert.equal(next.reason?.code, 'verify.no-target');

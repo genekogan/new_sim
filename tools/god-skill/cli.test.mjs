@@ -41,6 +41,14 @@ test('verify-use prints phase timings, position proof, planned interior route an
   assert.match(output, /removal pending \(native retirement accepted\)/); assert.match(output, /full physical walk.*slower/);
 });
 
+test('verify-use refusal without a probe never claims removal', async t => {
+  fixture(t, {ok: false, uses: [{use: 'sit', ok: false, reason: {code: 'verify.busy', message: 'A verifier is still running.'}}], probe: {created: false, removed: true, removal: 'done'}, ms: 0});
+  const output = await verifyUse('chapel');
+  assert.match(output, /sit: FAILED.*verify.busy/);
+  assert.match(output, /probe not created; 0 ms/);
+  assert.doesNotMatch(output, /probe removed/);
+});
+
 test('verify-use validates options before contacting the server', async t => {
   const calls = fixture(t, {});
   await assert.rejects(verifyUse(), /usage: verify-use/);

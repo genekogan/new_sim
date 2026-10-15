@@ -27,6 +27,7 @@ import {holdingFact,receiptItemOp,confirmedTogetherEffects,confirmedObjectEffect
 import {resolveMailRecipient} from '../outcomes/recipients.ts';
 import {terminalSnapshot} from '../outcomes/providers.ts';
 import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
+import {isVerificationProbe, PROBE_OWNER} from '../../verification-probe.ts';
 import {tx,afterCommit} from '../comms/store.ts';
 
 type Resolved = {from: string; to: string; note: string};
@@ -459,6 +460,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   // ---------------------------------------------------------------- act
+  /** Server-only verification already resolved an exact free seat. Reuse normal
+   * launch/admission/receipts without discovering every unrelated capability.
+   * Native sit still plans, reserves, walks, turns and occupies this actual slot. */
+  actVerificationSit(soul: EdgeSoul, fixture: string, slot: string) {
+    const capability = `sit:${fixture}`;
+    const refuse = (code: string, reason: string) => ({accepted: false as const, capability, code, reason});
+    const row = this.db.soul(soul.soulId), mind = this.host.minds.get(soul.soulId);
+    if (!isVerificationProbe(soul.soulId) || soul.owner !== PROBE_OWNER || row?.owner !== PROBE_OWNER || row.retired_at !== null || row.entity_id !== soul.entityId || mind?.entityId !== soul.entityId)
+      return Promise.resolve(refuse('soul.not-probe', 'Exact-seat verification is reserved for the server verifier probe.'));
+    if (!slot.startsWith(fixture + '#')) return Promise.resolve(refuse('slot.unknown', 'The exact slot must belong to the requested fixture.'));
+    return this.launch(soul, capability, 'verifier probe: sit in exact seat slot', [
+      {verb: 'mars:sit', params: {slot}}, {verb: 'rest', params: {seconds: 600}},
+    ], undefined, {}, refuse);
+  }
+
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
     if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.capCache.clear(); return out;}

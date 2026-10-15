@@ -327,7 +327,7 @@ day is a Saturday.
   before judging the build: `look --keep` (a kept browser) has been seen to capture the default view
   instead of the requested one; if so, look again without `--keep` (`look --stop` closes the browser).
 - `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; optional ok/failed receipt
-  (about 15 s; one probe per world at a time).
+  (about 5–10 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
@@ -416,7 +416,7 @@ usually enough to check a use. For an extra, optional check there is `verify-use
 <place>] [--uses enter,sit]`: the server sends a temporary probe resident (it never thinks and is removed afterwards)
 that crosses the nearest door or footprint edge, sits on the nearest free seat, and answers with a receipt per use —
 ok, or what failed and why (`verify.no-seat`, `verify.timeout`, `verify.refused` with the engine's reason). It takes
-about 15 s (`--from` walks the whole way and takes longer); one probe per world at a time. If it fails while
+about 5–10 s (`--from` walks the whole way and takes longer); one probe per world at a time. If it fails while
 `describe` shows the use, say so in your report rather than rebuilding. Name any requested use that is only decorative.
 
 ## Submitting, previewing and recovering

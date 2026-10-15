@@ -12,7 +12,7 @@ import {commonsNewcomerResourcesV1} from './newcomer-resources.ts';
 import {newcomerResourcesPublicV1Schema,commonsNewcomerResourcesV1Schema,type CommonsNewcomerResourcesV1,type NewcomerResourcePlacementV1} from '@sim/engine-contract';
 import {existingGreenLandmarkV1} from './green-landmark.ts';
 import {existingGreenLandmarkTransitionV1Schema,type ExistingGreenLandmarkTransitionV1} from '@sim/engine-contract';
-import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
+import {fixtureSlots, isFree, seatApproach} from '../../../mars/viewer/engine/social/slots.ts';
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
@@ -1462,6 +1462,14 @@ export class MarsEngine implements Engine {
     const e=this.ents[id];if(!e)return [];const out:{slot:string;body:string}[]=[];
     for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat')continue;const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)out.push({slot:slot.id.slice(id.length+1),body:actor});}
     return out;
+  }
+  /** Pure world-edit read: actual free native seat slots and their controller's
+   * standing approaches. No claim, body movement or hypothetical action. */
+  freeSeatSlotsV1(id:string,except?:string):{id:string;p:[number,number];level:number;approach?:[number,number]}[]{
+    const e=this.ents[id];if(!e)return [];
+    return this.withFeasibilityRead(()=>fixtureSlots(this.rt,e)
+      .filter(slot=>slot.kind==='seat'&&isFree(this.rt.world,slot,new Set(except?[except]:[])))
+      .map(slot=>{const approach=seatApproach(this.rt,slot);return {id:slot.id,p:[...slot.p] as [number,number],level:slot.level,...(Array.isArray(approach)?{approach:[...approach] as [number,number]}:{})};}));
   }
   /** world-edit/1 read: whether a body of the default human profile can walk from one standing point to another
    *  (levels included, stairs and doors as the planner sees them), and how far. Pure read. */
