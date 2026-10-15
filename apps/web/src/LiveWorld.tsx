@@ -64,7 +64,7 @@ import { newWorld } from './world-kind.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
-import { GodWorldLiving, godTourViews } from './world-env.ts';
+import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
@@ -299,6 +299,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
+    const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
     const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));if(newWorld)scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
@@ -699,7 +700,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const ref = take.startTick + take.ticks;
           const clockOffset=(depictedTick-ref)*(dayTicks?86400/dayTicks:dt);
           const datetime = clock ? shiftIso(clock, clockOffset) : null;
-          light.update(clock?shiftIso(clock,clockOffset,true):null);
+          light.update(shotClockAt(clock?shiftIso(clock,clockOffset,true):null,shotHour));
+          entityLayer.sites.setWorldClock(datetime,dayTicks?86400/(dayTicks*dt):1);
           const godLit=!!godLiving&&entityLayer.active;light.setNightLighting(!!expansion||godLit);if(!godLit)setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
           brokenTake = null;
@@ -802,7 +804,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;
-      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null,...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
+      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}

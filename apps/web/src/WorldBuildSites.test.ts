@@ -38,6 +38,120 @@ function label(h: ReturnType<typeof harness>) { return group(h).children.find(o 
 function wheel(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Mesh && o !== faces(h) && o.material instanceof THREE.MeshBasicMaterial) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; }
 function sheen(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Mesh && o.material instanceof THREE.ShaderMaterial) as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>; }
 
+function compiled(material: THREE.Material, kind: 'basic' | 'sprite' = 'basic') {
+  const lib = THREE.ShaderLib[kind];
+  const shader = { vertexShader: lib.vertexShader, fragmentShader: lib.fragmentShader, uniforms: {} } as Parameters<THREE.Material['onBeforeCompile']>[0];
+  material.onBeforeCompile(shader, {} as THREE.WebGLRenderer); return shader;
+}
+
+test('contract narration fields survive full/singular/delta feeds; malformed optional shapes are ignored', () => {
+  const fields = { say: { text: 'shaping the nave', at: SERVER_NOW }, designing: ['nave'], note: { text: 'roof committed', at: SERVER_NOW }, reopensAt: SERVER_NOW + 30 * 60_000 };
+  assert.deepEqual(parseBuildFeed(start(site(fields)))?.records[0], site(fields));
+  assert.deepEqual(parseBuildFeed({ kind: 'world-diff', build: delta(2, fields), now: SERVER_NOW })?.records[0], delta(2, fields));
+  for (const bad of [{ say: { text: 'bad', at: NaN } }, { note: 'bad' }, { designing: ['nave', 1] }, { designing: Array(9).fill('nave') }, { reopensAt: Infinity }]) {
+    assert.equal(parseBuildFeed({ ...start(), site: { ...site(), ...bad } }), null);
+  }
+});
+
+for (const skew of [-600_000, 600_000]) test(`narration lasts exactly eight minutes and suppresses quiet with ${skew / 60_000} min clock skew`, () => {
+  const original = Date.now; Date.now = () => SERVER_NOW + skew;
+  const h = harness();
+  try {
+    h.sites.apply(start(site({ lastAt: SERVER_NOW - 4 * 60_000, pauseAfterMs: 30 * 60_000, say: { text: 'shaping the nave', at: SERVER_NOW }, designing: ['nave'] })));
+    const text = () => h.sites.inspect().sites[0].text;
+    assert.equal(text().split('\n')[1], 'designing: shaping the nave'); assert.doesNotMatch(text(), /quiet/);
+    const redraws = h.sites.stats.labelRedraws;
+    h.advance(8 * 60_000 - 1); assert.doesNotMatch(text(), /quiet/); assert.equal(h.sites.stats.labelRedraws, redraws);
+    h.advance(1); assert.doesNotMatch(text(), /designing:/); assert.match(text(), /quiet 12 min/);
+    assert.ok(Array.from(faces(h).geometry.getAttribute('buildDesigning').array).every(n => n === 0));
+  } finally { h.sites.dispose(); Date.now = original; }
+});
+
+test('step deltas replace narration/designing; unrelated deltas retain it and snapshots honor its original age', () => {
+  const h = harness(); h.sites.apply(start());
+  h.sites.apply(edge(delta(2, { say: { text: 'raising towers', at: SERVER_NOW }, designing: ['tower-b'] })));
+  assert.match(h.sites.inspect().sites[0].text, /\ndesigning: raising towers$/);
+  h.advance(1000); h.sites.apply(edge(delta(3), SERVER_NOW + 1000));
+  assert.match(h.sites.inspect().sites[0].text, /raising towers/);
+  h.sites.apply(edge(delta(4, { say: { text: 'finishing', at: SERVER_NOW + 1000 }, designing: [] }), SERVER_NOW + 1000));
+  assert.match(h.sites.inspect().sites[0].text, /finishing/);
+  assert.ok(Array.from(faces(h).geometry.getAttribute('buildDesigning').array).every(n => n === 0));
+  const redraws = h.sites.stats.labelRedraws; h.sites.apply(edge(delta(4, { say: { text: 'stale', at: SERVER_NOW } })));
+  assert.equal(h.sites.stats.labelRedraws, redraws);
+  h.sites.reset([site({ rev: 10, lastAt: SERVER_NOW - 9 * 60_000, pauseAfterMs: 30 * 60_000, say: { text: 'old snapshot', at: SERVER_NOW - 8 * 60_000 } })], 10, SERVER_NOW);
+  assert.doesNotMatch(h.sites.inspect().sites[0].text, /designing:/); assert.match(h.sites.inspect().sites[0].text, /quiet 9 min/);
+  h.sites.dispose();
+});
+
+test('named mass faces and edges pulse through one shared uniform with no new draws or frame buffer writes', () => {
+  const h = harness(); h.sites.apply(start(site({ say: { text: 'nave', at: SERVER_NOW }, designing: ['nave', 'unknown'] })));
+  const mesh = faces(h), lines = marker(h), faceSelected = mesh.geometry.getAttribute('buildDesigning'), edgeSelected = lines.geometry.getAttribute('buildDesigning');
+  assert.equal(faceSelected.getX(0), 1); assert.equal(faceSelected.getX(faceSelected.count - 1), 0);
+  assert.equal(edgeSelected.getX(0), 0); assert.equal(edgeSelected.getX(63), 0); assert.equal(edgeSelected.getX(64), 1); assert.equal(edgeSelected.getX(edgeSelected.count - 1), 0);
+  const a = compiled(mesh.material), b = compiled(lines.material);
+  assert.equal(a.uniforms.uBuildPulse, b.uniforms.uBuildPulse); assert.match(a.fragmentShader, /diffuseColor.a \*= mix/);
+  assert.match(a.vertexShader, /vBuildDesigning = buildDesigning/);
+  const initial = a.uniforms.uBuildPulse.value, version = (faceSelected as THREE.BufferAttribute).version, colors = mesh.geometry.getAttribute('color') as THREE.BufferAttribute, colorVersion = colors.version;
+  const objects = group(h).children.slice(), geometry = mesh.geometry, material = mesh.material;
+  for (let i = 0; i < 120; i++) h.advance(16);
+  assert.notEqual(a.uniforms.uBuildPulse.value, initial); assert.ok(a.uniforms.uBuildPulse.value >= 0.6 && a.uniforms.uBuildPulse.value <= 1);
+  assert.equal((faceSelected as THREE.BufferAttribute).version, version); assert.equal(colors.version, colorVersion);
+  assert.deepEqual(group(h).children, objects); assert.equal(mesh.geometry, geometry); assert.equal(mesh.material, material); assert.equal(h.sites.inspect().sites[0].draws, 3);
+  h.sites.apply(edge(delta(2, { designing: ['tower-b'] })));
+  assert.equal(faceSelected.getX(0), 0); assert.equal(faceSelected.getX(faceSelected.count - 1), 1);
+  h.sites.apply(edge(delta(3, { status: 'paused' })));
+  assert.ok(Array.from(faceSelected.array).every(n => n === 0));
+  h.sites.dispose();
+});
+
+test('batch captions fade for six seconds inside the existing label draw without repainting each frame or replaying on alive', () => {
+  const h = harness(); h.sites.apply(start(site({ say: { text: 'designing roof', at: SERVER_NOW }, note: { text: 'shell committed', at: SERVER_NOW } })));
+  const sprite = label(h), texture = sprite.material.map, canvas = texture!.image as HTMLCanvasElement;
+  assert.equal(canvas.height, 132); assert.equal(h.sites.inspect().sites[0].text.split('\n')[2], 'shell committed');
+  const shader = compiled(sprite.material, 'sprite'); assert.equal(shader.uniforms.uBuildCaptionTop.value, 1 / 3);
+  assert.match(shader.fragmentShader, /vMapUv.y < uBuildCaptionTop/);
+  const redraws = h.sites.stats.labelRedraws;
+  h.advance(4000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 1);
+  h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0.5); assert.equal(h.sites.stats.labelRedraws, redraws);
+  h.sites.apply(edge(delta(2), SERVER_NOW + 5000)); assert.equal(h.sites.stats.labelRedraws, redraws);
+  h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0); assert.doesNotMatch(h.sites.inspect().sites[0].text, /shell committed/);
+  assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.equal(sprite.material.map, texture); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
+  h.sites.apply(edge(delta(3, { note: { text: 'next batch', at: SERVER_NOW + 6000 } }), SERVER_NOW + 6000));
+  assert.match(h.sites.inspect().sites[0].text, /next batch$/); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 1);
+  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
+  h.sites.reset([site({ rev: 10, note: { text: 'stale caption', at: SERVER_NOW } })], 10, SERVER_NOW + 6000);
+  assert.doesNotMatch(h.sites.inspect().sites[0].text, /stale caption/); h.sites.dispose();
+});
+
+for (const skew of [-600_000, 600_000]) test(`paused closure uses world time and reopens exactly at reopensAt despite ${skew / 60_000} min skew`, () => {
+  const original = Date.now; Date.now = () => SERVER_NOW + skew;
+  const h = harness();
+  try {
+    h.sites.setWorldClock('2026-10-15T23:50:00', 24);
+    h.sites.apply(start(site({ status: 'paused', reopensAt: SERVER_NOW + 30 * 60_000 })));
+    assert.match(h.sites.inspect().sites[0].text, /open again Fri · 11:50 am/);
+    h.advance(5 * 60_000);
+    h.sites.apply(edge(delta(2, { status: 'paused', lastAt: SERVER_NOW + 5 * 60_000 }), SERVER_NOW + 5 * 60_000));
+    assert.match(h.sites.inspect().sites[0].text, /open again Fri · 11:50 am/);
+    h.advance(25 * 60_000 - 1); assert.match(h.sites.inspect().sites[0].text, /open again/);
+    h.advance(1); assert.match(h.sites.inspect().sites[0].text, /paused · open$/);
+    h.sites.apply(edge(delta(3, { status: 'paused', closed: true, reopensAt: SERVER_NOW + 31 * 60_000 }), SERVER_NOW + 30 * 60_000));
+    assert.match(h.sites.inspect().sites[0].text, /open again Fri · 12:14 pm/);
+    h.sites.apply(edge(delta(4, { status: 'paused', closed: false }), SERVER_NOW + 30 * 60_000));
+    assert.match(h.sites.inspect().sites[0].text, /paused · open$/);
+  } finally { h.sites.dispose(); Date.now = original; }
+});
+
+test('closure label acquires the real world clock after snapshot and follows shared clock/rate edits', () => {
+  const h = harness(); h.sites.apply(start(site({ status: 'paused', reopensAt: SERVER_NOW + 60_000 })));
+  assert.doesNotMatch(h.sites.inspect().sites[0].text, /open again/);
+  h.sites.setWorldClock('2026-10-15T12:00:00', 24); h.advance(0);
+  assert.match(h.sites.inspect().sites[0].text, /open again Thu · 12:24 pm/);
+  h.sites.setWorldClock('2026-10-15T18:00:00', 1); h.advance(0);
+  assert.match(h.sites.inspect().sites[0].text, /open again Thu · 6:01 pm/);
+  h.sites.dispose();
+});
+
 test('one adapter handles start/resume, deltas, multi-build diffs, snapshot/API rev, and the singular brief alias', () => {
   assert.equal(parseBuildFeed(start())?.records[0].id, 'church');
   assert.equal(parseBuildFeed(edge(delta(2)))?.records[0].rev, 2);

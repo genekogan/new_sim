@@ -7,6 +7,18 @@ import { paintOnlySources, setNightLightStrength, type NightSource } from './Wor
 
 type WorldStateLike = { weather?: { kind?: string; clouds?: number; rain?: number; wind?: number; fog?: number; intensity?: number } } | null | undefined;
 
+/** A picture's local time override, in minutes after midnight. Ordinary viewers ignore it. */
+export function parseShotHour(search: string): number | null {
+  const q = new URLSearchParams(search), hour = q.get('hour');
+  if (!q.has('shot') || !hour || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hour)) return null;
+  return Number(hour.slice(0, 2)) * 60 + Number(hour.slice(3));
+}
+/** Keep the world's calendar date; replace only the presentation time. The streamed clock is never edited. */
+export function shotClockAt(clock: string | null, hour: number | null): string | null {
+  if (hour === null || !clock || !Number.isInteger(hour) || hour < 0 || hour >= 1440 || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
+  return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;
+}
+
 /** The god's set weather, or null when the world follows the scheduled weather ('auto', the default). */
 export function setWeatherOf(state: WorldStateLike): SetWeather | null {
   const w = state?.weather;

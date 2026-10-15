@@ -1,14 +1,17 @@
 // Construction overlays own all of their GPU resources. Never pass these through disposeObject.
 import * as THREE from 'three';
 import type { Entity, OBB, WorldModel } from '@sim/world-compiler';
+import { clockMs } from './atmosphere/weather.ts';
+import { worldTimeText } from './world-clock.ts';
 
 export type Mass = { name?: string; at: [number, number]; size: [number, number]; h: number; yaw?: number; roof?: 'flat' | 'gable' | 'pyramid' };
 export type PublicSite = {
   id: string; title: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean;
   step: { n: number; label: string; of: number }; site: { at: [number, number]; size: [number, number]; yaw: number };
   massing: Mass[]; roots: string[]; claims: { part: string; status: 'held' | 'stale' | 'released' | 'done' | 'taken'; root?: string }[];
+  say?: { text: string; at: number }; designing?: string[]; note?: { text: string; at: number }; reopensAt?: number;
 };
-export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & {
+export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & Partial<Pick<PublicSite, 'say' | 'designing' | 'note' | 'reopensAt'>> & {
   closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[];
 };
 type SiteRecord = PublicSite | SiteDelta;
@@ -16,7 +19,11 @@ type Feed = { reset: boolean; records: SiteRecord[]; rev: number; now?: number }
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object';
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const revision = (v: unknown): v is number => finite(v) && Number.isSafeInteger(v) && v >= 0;
-const isSiteRecord = (v: unknown): v is SiteRecord => record(v) && typeof v.id === 'string' && revision(v.rev) && finite(v.lastAt) && ['active', 'paused', 'done', 'abandoned'].includes(String(v.status));
+const timedText = (v: unknown) => record(v) && typeof v.text === 'string' && finite(v.at);
+const isSiteRecord = (v: unknown): v is SiteRecord => record(v) && typeof v.id === 'string' && revision(v.rev) && finite(v.lastAt) && ['active', 'paused', 'done', 'abandoned'].includes(String(v.status))
+  && (v.say === undefined || timedText(v.say)) && (v.note === undefined || timedText(v.note))
+  && (v.designing === undefined || (Array.isArray(v.designing) && v.designing.length <= 8 && v.designing.every(n => typeof n === 'string')))
+  && (v.reopensAt === undefined || finite(v.reopensAt));
 const fullSite = (v: SiteRecord): v is PublicSite => 'site' in v && 'massing' in v && 'roots' in v;
 
 /** The only wire-shape adapter. Revision 2 uses builds[] on diffs, site/delta on world-build,
@@ -58,10 +65,12 @@ type View = {
   wheel: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null;
   sheen: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null;
   deadline: number; receivedAt: number; silence: number; pausedAt: number; paused: boolean; nextLabelAt: number;
+  sayUntil: number; noteUntil: number; reopenDeadline: number; designingActive: boolean;
+  captionAlpha: { value: number }; captionTop: { value: number };
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
 const MARKER_ALPHA = 0.95, FAINT_EDGE_ALPHA = 0.06, COVERAGE_GRID = 8; // 64 sampled columns per mass
-const MINUTE = 60_000, QUIET_MS = 3 * MINUTE;
+const MINUTE = 60_000, QUIET_MS = 3 * MINUTE, SAY_MS = 8 * MINUTE, NOTE_MS = 6000;
 const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
 const STYLES = ['ring', 'label', 'outline', 'sheen', 'wheel'] as const;
@@ -82,6 +91,10 @@ export class WorldBuildSites {
   private fetching: Promise<void> | null = null;
   private retryAt = 0;
   private time = { value: 0 };
+  private pulse = { value: 1 };
+  private worldMs = NaN;
+  private worldAt = 0;
+  private worldRate = 1;
   private activeSheen: THREE.ShaderMaterial | null = null;
   private pausedSheen: THREE.ShaderMaterial | null = null;
   private viewport = new THREE.Vector2();
@@ -162,6 +175,10 @@ export class WorldBuildSites {
     const b = old.data;
     b.rev = item.rev; b.status = item.status; b.lastAt = item.lastAt;
     if (item.closed !== undefined) b.closed = item.closed;
+    if (item.say !== undefined) b.say = { ...item.say };
+    if (item.note !== undefined) b.note = { ...item.note };
+    if (item.designing !== undefined) b.designing = [...item.designing];
+    if (item.reopensAt !== undefined) b.reopensAt = item.reopensAt;
     if (item.step) b.step = { ...item.step };
     if (item.claim) { const i = b.claims.findIndex(c => c.part === item.claim!.part); if (i < 0) b.claims.push({ ...item.claim }); else b.claims[i] = { ...item.claim }; }
     if (item.rootsAdded?.length || item.rootsRemoved?.length) {
@@ -219,8 +236,25 @@ export class WorldBuildSites {
   update(nowMs: number) {
     // No geometries, canvases, vectors or strings are allocated on ordinary frames.
     if (!this.styles.size) return;
+    this.pulse.value = 0.8 + 0.2 * Math.sin(nowMs / 450);
     if (this.styles.has('sheen')) this.time.value = nowMs / 1000;
-    for (const v of this.views.values()) if (nowMs >= v.nextLabelAt) this.refresh(v, nowMs);
+    for (const v of this.views.values()) {
+      v.captionAlpha.value = Math.max(0, Math.min(1, (v.noteUntil - nowMs) / 2000));
+      if (nowMs >= v.nextLabelAt) this.refresh(v, nowMs);
+    }
+  }
+
+  /** The real depicted world clock and its world-ms/real-ms rate; never the shot-hour clock. */
+  setWorldClock(iso: string | null, rate = 1) {
+    const now = this.clock();
+    const nextRate = finite(rate) && rate >= 0 ? rate : 1;
+    // The projection runs between clock samples. Ordinary frames do not parse dates or allocate strings.
+    if (iso && Number.isFinite(this.worldMs) && nextRate === this.worldRate && now - this.worldAt < 1000) return;
+    const ms = clockMs(iso);
+    const changed = (ms === null) !== !Number.isFinite(this.worldMs) || nextRate !== this.worldRate
+      || (ms !== null && Math.abs(ms - (this.worldMs + (now - this.worldAt) * this.worldRate)) > 1000);
+    this.worldMs = ms ?? NaN; this.worldAt = now; this.worldRate = nextRate;
+    if (changed) for (const v of this.views.values()) if (v.data.reopensAt !== undefined) v.nextLabelAt = 0;
   }
 
   hoverTarget(id: string) {
@@ -243,18 +277,25 @@ export class WorldBuildSites {
     if (previous) this.release(previous);
     const group = new THREE.Group(); group.name = `build-site:${data.id}`;
     const marker = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
+    installDesignPulse(marker.material, this.pulse);
     marker.renderOrder = 997;
     const mass = massGeometry(data, this.options.groundAt);
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
+    installDesignPulse(faces.material, this.pulse);
     faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0 };
+    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 } };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
     this.tag(v);
   }
   private tag(v: View) { v.group.traverse(o => { o.userData.buildSite = v.data.id; o.userData.entity = `build-site:${v.data.id}`; o.userData.cameraTransparent = true; }); }
   private setClock(v: View, now?: number) {
-    v.receivedAt = this.clock(); v.silence = Math.max(0, (now ?? Date.now()) - v.data.lastAt);
+    const serverNow = now ?? Date.now();
+    v.receivedAt = this.clock(); v.silence = Math.max(0, serverNow - v.data.lastAt);
+    v.sayUntil = v.data.say ? v.receivedAt + v.data.say.at + SAY_MS - serverNow : -Infinity;
+    v.noteUntil = v.data.note ? v.receivedAt + v.data.note.at + NOTE_MS - serverNow : -Infinity;
+    v.reopenDeadline = v.data.reopensAt === undefined ? Infinity : v.receivedAt + v.data.reopensAt - serverNow;
+    v.captionAlpha.value = Math.max(0, Math.min(1, (v.noteUntil - v.receivedAt) / 2000));
     v.deadline = v.receivedAt + v.data.pauseAfterMs - v.silence;
     v.paused = v.data.status === 'paused' || v.receivedAt >= v.deadline;
     v.pausedAt = v.data.status === 'paused' ? Math.min(v.receivedAt, v.deadline) : v.deadline;
@@ -264,25 +305,44 @@ export class WorldBuildSites {
     const paused = v.data.status === 'paused' || now >= v.deadline, changed = v.paused !== paused;
     v.paused = paused;
     const silence = v.silence + now - v.receivedAt;
-    const tail = paused ? (v.data.closed ? `paused ${Math.max(0, Math.floor((now - v.pausedAt) / MINUTE))} min` : 'paused · open') : silence >= QUIET_MS ? `quiet ${Math.floor(silence / MINUTE)} min` : '';
-    const b = v.data, text = `${b.title} · ${b.step.label} ${b.step.n}/${b.step.of}${tail ? ` · ${tail}` : ''}`;
+    const b = v.data, saying = !!b.say && now < v.sayUntil, caption = !!b.note?.text && now < v.noteUntil;
+    const closed = b.closed && now < v.reopenDeadline;
+    const reopening = paused && closed && Number.isFinite(v.reopenDeadline) && Number.isFinite(this.worldMs)
+      ? worldTimeText(new Date(this.worldMs + (v.reopenDeadline - this.worldAt) * this.worldRate).toISOString()) : '';
+    const tail = paused ? (closed ? `paused ${Math.max(0, Math.floor((now - v.pausedAt) / MINUTE))} min${reopening ? ` · open again ${reopening}` : ''}` : 'paused · open') : !saying && silence >= QUIET_MS ? `quiet ${Math.floor(silence / MINUTE)} min` : '';
+    const text = `${b.title} · ${b.step.label} ${b.step.n}/${b.step.of}${tail ? ` · ${tail}` : ''}${saying ? `\ndesigning: ${b.say!.text.replace(/[\u0000-\u001f\u007f]/g, ' ')}` : ''}${caption ? `\n${b.note!.text.replace(/[\u0000-\u001f\u007f]/g, ' ')}` : ''}`;
+    const designingActive = !paused && (!b.say || now < v.sayUntil), pulseChanged = v.designingActive !== designingActive;
+    v.designingActive = designingActive;
     if (this.styles.has('label') && text !== v.text) this.label(v, text);
+    v.captionTop.value = caption && v.canvas ? LABEL_HEIGHT_PX / v.canvas.height : 0;
     if (v.label) v.label.visible = this.styles.has('label');
     // Wake only at a deadline or a visible minute boundary, never once per animation frame.
-    v.nextLabelAt = paused ? (b.closed ? v.pausedAt + (Math.floor((now - v.pausedAt) / MINUTE) + 1) * MINUTE : Infinity) : Math.min(v.deadline, v.receivedAt + (silence < QUIET_MS ? QUIET_MS - v.silence : (Math.floor(silence / MINUTE) + 1) * MINUTE - v.silence));
-    if (changed) { this.tint(v); if (v.wheel && this.styles.has('wheel')) this.wheel(v); }
+    v.nextLabelAt = paused ? (closed ? v.pausedAt + (Math.floor((now - v.pausedAt) / MINUTE) + 1) * MINUTE : Infinity) : Math.min(v.deadline, v.receivedAt + (silence < QUIET_MS ? QUIET_MS - v.silence : (Math.floor(silence / MINUTE) + 1) * MINUTE - v.silence));
+    // A fresh narration suppresses quiet text until its exact expiry; captions and closure have independent clocks.
+    if (saying) v.nextLabelAt = Math.min(v.deadline > now ? v.deadline : Infinity, v.sayUntil, paused && closed ? v.nextLabelAt : Infinity);
+    if (caption) v.nextLabelAt = Math.min(v.nextLabelAt, v.noteUntil);
+    if (closed) v.nextLabelAt = Math.min(v.nextLabelAt, v.reopenDeadline);
+    if (changed || pulseChanged) this.tint(v);
+    if (changed && v.wheel && this.styles.has('wheel')) this.wheel(v);
     if (v.sheen) v.sheen.material = paused ? this.sheenMaterial(false) : this.sheenMaterial(true);
   }
   private label(v: View, text: string) {
     const canvas = v.canvas ?? this.options.createCanvas?.() ?? document.createElement('canvas');
     const ctx = canvas.getContext('2d'); if (!ctx) return;
-    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(ctx.measureText(text).width) + 28;
-    canvas.width = width; canvas.height = LABEL_HEIGHT_PX;
-    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, LABEL_HEIGHT_PX, 10); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(text, 14, 23);
+    const lines = text.split('\n');
+    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(Math.max(...lines.map(line => ctx.measureText(line).width))) + 28;
+    canvas.width = width; canvas.height = LABEL_HEIGHT_PX * lines.length;
+    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, canvas.height, 10); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; lines.forEach((line, i) => ctx.fillText(line, 14, 23 + i * LABEL_HEIGHT_PX));
     if (!v.label) {
       const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
       v.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
+      v.label.material.onBeforeCompile = shader => {
+        shader.uniforms.uBuildCaptionAlpha = v.captionAlpha; shader.uniforms.uBuildCaptionTop = v.captionTop;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uBuildCaptionAlpha;\nuniform float uBuildCaptionTop;')
+          .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n diffuseColor.a *= vMapUv.y < uBuildCaptionTop ? uBuildCaptionAlpha : 1.0;\n#endif');
+      };
+      v.label.material.customProgramCacheKey = () => 'build-caption-v1';
       // The bottom edge clears the tallest roof/root even when the screen-size floor enlarges the sprite.
       v.label.center.set(0.5, 0); v.label.frustumCulled = false;
       v.label.onBeforeRender = (renderer, _scene, camera) => {
@@ -290,14 +350,14 @@ export class WorldBuildSites {
         const depth = Math.max(0.01, -(view[2] * m[12] + view[6] * m[13] + view[10] * m[14] + view[14]));
         const height = renderer.getSize(this.viewport).y;
         const unitsPerPixel = 2 * (camera instanceof THREE.PerspectiveCamera ? depth : 1) / (Math.max(1, height) * camera.projectionMatrix.elements[5]);
-        const scale = Math.max(LABEL_WORLD_HEIGHT, LABEL_MIN_TEXT_PX * LABEL_HEIGHT_PX / LABEL_FONT_PX * unitsPerPixel);
-        sprite.scale.set(canvas.width / LABEL_HEIGHT_PX * scale, scale, 1);
+        const scale = Math.max(LABEL_WORLD_HEIGHT * canvas.height / LABEL_HEIGHT_PX, LABEL_MIN_TEXT_PX * canvas.height / LABEL_FONT_PX * unitsPerPixel);
+        sprite.scale.set(canvas.width / canvas.height * scale, scale, 1);
         sprite.updateMatrixWorld();
       };
       v.label.renderOrder = 998; v.group.add(v.label);
     }
     v.canvas = canvas; v.text = text; v.label.material.map!.needsUpdate = true;
-    v.label.scale.set(width / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, LABEL_WORLD_HEIGHT, 1);
+    v.label.scale.set(width / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, canvas.height / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, 1);
     const [x, z] = v.data.site.at;
     v.label.position.set(x, v.labelY, z);
     this.stats.labelRedraws++; this.tag(v);
@@ -350,6 +410,9 @@ export class WorldBuildSites {
       if (this.styles.size && alpha > 0 && range.count) v.faces.visible = true;
     }
     colors.needsUpdate = true;
+    // Selection attributes change only with site state/geometry. Each frame changes one shared alpha uniform.
+    designAttribute(v.marker.geometry, v.edgeRanges, v.data, v.designingActive);
+    designAttribute(v.faces.geometry, v.ranges, v.data, v.designingActive);
   }
 
   private refit(v: View) {
@@ -514,6 +577,29 @@ function massVolumes(site: PublicSite, groundAt: Options['groundAt'], pad = 0) {
     });
     return v;
   });
+}
+/** Patch existing face/edge materials; selected masses share the layer's one oscillating uniform. */
+function installDesignPulse(material: THREE.Material, pulse: { value: number }) {
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uBuildPulse = pulse;
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nattribute float buildDesigning;\nvarying float vBuildDesigning;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBuildDesigning = buildDesigning;');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uBuildPulse;\nvarying float vBuildDesigning;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.a *= mix(1.0, uBuildPulse, vBuildDesigning);');
+  };
+  material.customProgramCacheKey = () => 'build-design-pulse-v1';
+}
+function designAttribute(geometry: THREE.BufferGeometry, ranges: VertexRange[], site: PublicSite, active: boolean) {
+  const position = geometry.getAttribute('position'); if (!position) return; // marker is empty until its first refit
+  const count = position.count;
+  let selected = geometry.getAttribute('buildDesigning') as THREE.BufferAttribute | undefined;
+  if (!selected || selected.count !== count) { selected = new THREE.Float32BufferAttribute(new Float32Array(count), 1); geometry.setAttribute('buildDesigning', selected); }
+  (selected.array as Float32Array).fill(0);
+  if (active) for (let i = 0; i < ranges.length; i++) {
+    const name = site.massing[i]?.name;
+    if (name && site.designing?.includes(name)) (selected.array as Float32Array).fill(1, ranges[i].start, ranges[i].start + ranges[i].count);
+  }
+  selected.needsUpdate = true;
 }
 function massGeometry(site: PublicSite, groundAt: Options['groundAt']) {
   const points: number[] = [], colors: number[] = [], ranges: View['ranges'] = [];
