@@ -1,4 +1,5 @@
 import {nativeActivityContextV1} from './native-activity-context.ts';
+import {isVerificationProbe} from './verification-probe.ts';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {purposeEpisodesV1,episodeJournalV1,purposeExperienceContextV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
@@ -104,7 +105,7 @@ export class Brain {
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean; nativeActivityContextV1?:boolean; skipMind?: (mind: Mind) => boolean; nativeProgramAllowed?: (mind: Mind, steps: DecisionPayload['steps']) => boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
-    this.skipMind = services?.skipMind;
+    this.skipMind = m => isVerificationProbe(m.soulId) || !!services?.skipMind?.(m);
     this.nativeProgramAllowed = services?.nativeProgramAllowed;
     this.compilerCall = services?.compilerCall ?? callTool;this.injectedCompiler=!!services?.compilerCall;
     this.nativeActivityContext = services?.nativeActivityContextV1 === true;
@@ -238,6 +239,7 @@ export class Brain {
   }
 
   private onApplied(e: LogEvent) {
+    if (typeof e.payload?.soulId === 'string' && isVerificationProbe(e.payload.soulId)) return;
     if (this.intentV2Choices && e.kind === 'intent-v2') {
       const m = this.host.minds.get(e.payload.soulId);
       if (m) {
@@ -556,6 +558,7 @@ export class Brain {
 
   // ------------------------------------------------------------ web console: text → intent
   async translate(m: Mind, text: string): Promise<Translation & { via: string }> {
+    if(isVerificationProbe(m.soulId))return {ok:false,confidence:0,reason:'Verifier probes accept explicit engine actions only.',via:'unavailable'};
     if(this.quiescing)return {ok:false,confidence:0,reason:'Direction unavailable while the server is restarting.',via:'unavailable'};
     return this.track(()=>this.translateWork(m, text));
   }
@@ -644,7 +647,7 @@ export class Brain {
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
   async compile(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
-    if(this.quiescing)return null;
+    if(this.quiescing||isVerificationProbe(m.soulId))return null;
     return this.track(()=>this.compileWork(m, wish, align, guard, journal));
   }
   private async compileWork(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
@@ -798,7 +801,7 @@ export class Brain {
   private shotCandidates(): ShotCandidate[] {
     const eng = this.host.engine, w = eng.world;
     const c: ShotCandidate[] = [];
-    const humans = Object.values(w.entities).filter((e) => e.kind === 'human');
+    const humans = Object.values(w.entities).filter((e) => e.kind === 'human' && !isVerificationProbe(this.host.mindByEntity.get(e.id)?.soulId ?? ''));
     const atFire = humans.filter((e) => e.human!.on === 'campfire');
     if (atFire.length >= 2) c.push({ id: 'group:campfire', text: `Frame the ${atFire.length} souls gathered at the campfire`, why: 'A gathering is the liveliest thing to watch', notFor: 'when it has been on screen a long time', spec: { kind: 'frameGroup', subjects: atFire.map((e) => e.id), azimuth: 0.6, elevation: 0.35, padding: 1.4 } });
     const interesting = humans.map((e) => ({ e, m: this.host.mindByEntity.get(e.id) })).filter((x) => x.m).sort((a, b) => score(b.e) - score(a.e) || a.e.id.localeCompare(b.e.id)).slice(0, 5);
@@ -823,7 +826,7 @@ export class Brain {
     const held = this.camera ? heldWord((tick - this.shotSinceTick) / TPS) : '';
     const ctx: DirectorContext = {
       current: this.camera ? { id: this.shotId, text: this.camera.text, held } : null,
-      happening: [...this.host.minds.values()].slice(0, 12).map((m) => `${m.name}: ${m.doing}`),
+      happening: [...this.host.minds.values()].filter(m => !isVerificationProbe(m.soulId)).slice(0, 12).map((m) => `${m.name}: ${m.doing}`),
       candidates: tick - this.shotSinceTick < SHOT_COMMIT_TICKS ? [] : candidates, events,
     };
     try {
@@ -847,7 +850,7 @@ export class Brain {
 
   /** On-demand cinematic shot for one Soul (owner view). */
   async shotFor(m: Mind) {
-    if(this.quiescing)return null;
+    if(this.quiescing||isVerificationProbe(m.soulId))return null;
     return this.track(()=>this.shotForWork(m));
   }
   private async shotForWork(m: Mind) {

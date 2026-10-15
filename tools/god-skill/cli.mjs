@@ -134,6 +134,30 @@ export async function defs(q, flags = {}) {
 export async function schema(flags = {}) { const s = ok(await call('/v1/god/schema', { as: 'none' }), 'schema'); return flags.md ? schemaMarkdown(s) : s; }
 
 export async function query(q) { return ok(await call('/v1/god/query', { body: typeof q === 'string' ? JSON.parse(q) : q }), 'query'); }
+/** verify-use: a temporary server-side resident proves actual entry and seating. */
+export async function verifyUse(target, flags = {}) {
+  if (!target) throw new Error('usage: verify-use <target> [--seat <ref>] [--from <ref|x,z>] [--uses enter,sit] [--json]');
+  const body = { target };
+  if (flags.seat) body.seat = flags.seat;
+  if (flags.from !== undefined) {
+    const text = String(flags.from), parts = text.split(',').map(Number);
+    if (text.includes(',')) {
+      if (parts.length !== 2 || text.split(',').some(x => !x.trim()) || !parts.every(Number.isFinite)) throw new Error('--from takes a reference or x,z');
+      body.from = parts;
+    } else body.from = text;
+  }
+  if (flags.uses !== undefined) {
+    const uses = String(flags.uses).split(',');
+    if (!uses.length || uses.some(x => !['enter', 'sit'].includes(x)) || new Set(uses).size !== uses.length) throw new Error('--uses takes enter, sit, or enter,sit');
+    body.uses = uses;
+  }
+  const receipt = ok(await call('/v1/god/verify-use', { body, timeoutMs: 190_000 }), 'verify-use');
+  if (flags.json) return receipt;
+  const lines = (receipt.uses ?? []).map(r => `${r.use}: ${r.ok ? 'OK' : 'FAILED'}${r.ok ? (r.use === 'sit' ? ` — ${r.seat}; ${r.occupant}; ${r.distanceToSlot} m from slot` : ` — ${r.room ?? target}${r.door ? ` via ${r.door}` : ''}`) : ` — ${r.reason?.code ?? 'verify.refused'}${r.reason?.engineCode ? ` (${r.reason.engineCode})` : ''}: ${r.reason?.message ?? 'unconfirmed'}`}`);
+  if (!lines.length && receipt.reason) lines.push(`FAILED: ${receipt.reason.code}: ${receipt.reason.message}`);
+  lines.push(`probe ${receipt.probe?.removed ? 'removed' : 'REMOVAL UNCONFIRMED'}; ${Math.round(receipt.ms ?? 0)} ms`);
+  return lines.join('\n');
+}
 
 /** describe <ref>: rooms, doors, stairs, slots, occupants, constraints (satisfied or not), behaviours, ground, neighbours. */
 export async function describe(ref, flags = {}) {
@@ -657,6 +681,7 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
+  'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
@@ -665,7 +690,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -686,6 +711,7 @@ export function checkArgs(cmd, f, rest) {
 }
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = {
+  'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
   describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
@@ -703,7 +729,7 @@ export const COMMANDS = {
   help: () => HELP,
 };
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
-read:   map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]

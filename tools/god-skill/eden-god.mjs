@@ -1967,6 +1967,29 @@ async function schema(flags2 = {}) {
 async function query(q) {
   return ok(await call("/v1/god/query", { body: typeof q === "string" ? JSON.parse(q) : q }), "query");
 }
+async function verifyUse(target, flags2 = {}) {
+  if (!target) throw new Error("usage: verify-use <target> [--seat <ref>] [--from <ref|x,z>] [--uses enter,sit] [--json]");
+  const body = { target };
+  if (flags2.seat) body.seat = flags2.seat;
+  if (flags2.from !== void 0) {
+    const text = String(flags2.from), parts = text.split(",").map(Number);
+    if (text.includes(",")) {
+      if (parts.length !== 2 || text.split(",").some((x) => !x.trim()) || !parts.every(Number.isFinite)) throw new Error("--from takes a reference or x,z");
+      body.from = parts;
+    } else body.from = text;
+  }
+  if (flags2.uses !== void 0) {
+    const uses = String(flags2.uses).split(",");
+    if (!uses.length || uses.some((x) => !["enter", "sit"].includes(x)) || new Set(uses).size !== uses.length) throw new Error("--uses takes enter, sit, or enter,sit");
+    body.uses = uses;
+  }
+  const receipt = ok(await call("/v1/god/verify-use", { body, timeoutMs: 19e4 }), "verify-use");
+  if (flags2.json) return receipt;
+  const lines = (receipt.uses ?? []).map((r) => `${r.use}: ${r.ok ? "OK" : "FAILED"}${r.ok ? r.use === "sit" ? ` \u2014 ${r.seat}; ${r.occupant}; ${r.distanceToSlot} m from slot` : ` \u2014 ${r.room ?? target}${r.door ? ` via ${r.door}` : ""}` : ` \u2014 ${r.reason?.code ?? "verify.refused"}${r.reason?.engineCode ? ` (${r.reason.engineCode})` : ""}: ${r.reason?.message ?? "unconfirmed"}`}`);
+  if (!lines.length && receipt.reason) lines.push(`FAILED: ${receipt.reason.code}: ${receipt.reason.message}`);
+  lines.push(`probe ${receipt.probe?.removed ? "removed" : "REMOVAL UNCONFIRMED"}; ${Math.round(receipt.ms ?? 0)} ms`);
+  return lines.join("\n");
+}
 async function describe(ref, flags2 = {}) {
   if (!ref) throw new Error("usage: describe <path|flag:name>");
   {
@@ -2706,6 +2729,7 @@ function parseFlags(argv, bools = BOOL) {
 }
 var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
 var FLAGS = {
+  "verify-use": "seat from uses",
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`,
@@ -2738,7 +2762,7 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -2758,6 +2782,7 @@ function checkArgs(cmd, f, rest) {
 }
 var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync4(r[0], "utf8") : r[0] : readFileSync4(0, "utf8");
 var COMMANDS = {
+  "verify-use": (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity),
   pair: (r) => pair(r[0]),
   mint: (r) => mint(r[0]),
@@ -2838,7 +2863,7 @@ var COMMANDS = {
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
-read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
@@ -2959,6 +2984,7 @@ export {
   stream,
   terrain,
   undo,
+  verifyUse,
   view,
   where
 };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo } from './cli.mjs';
+import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
 import { view } from './lib/mirror.mjs';
 
 function fixture(t, data) {
@@ -14,6 +14,30 @@ function fixture(t, data) {
   t.after(() => { globalThis.fetch = originalFetch; process.chdir(cwd); rmSync(dir, { recursive: true, force: true }); });
   return calls;
 }
+
+test('verify-use posts typed options and returns the full JSON receipt', async t => {
+  const receipt = {ok: true, target: 'chapel', uses: [{use: 'enter', ok: true, room: 'nave'}], probe: {removed: true}, ms: 9, notes: []};
+  const calls = fixture(t, receipt);
+  assert.deepEqual(await COMMANDS['verify-use'](['chapel'], {from: '-2,3.5', seat: 'chapel/pew', uses: 'enter,sit', json: true}), receipt);
+  assert.equal(calls[0].url, 'https://world.invalid/v1/god/verify-use');
+  assert.deepEqual(JSON.parse(calls[0].body), {target: 'chapel', from: [-2, 3.5], seat: 'chapel/pew', uses: ['enter', 'sit']});
+  await verifyUse('chapel', {from: 'plaza', json: true}); assert.equal(JSON.parse(calls[1].body).from, 'plaza');
+  checkArgs('verify-use', {seat: 'pew', from: 'plaza', uses: 'sit', json: true}, ['chapel']);
+  assert.throws(() => checkArgs('verify-use', {}, ['chapel', 'extra']), /takes one word/);
+});
+
+test('verify-use prints each verdict, engine refusal, and cleanup state', async t => {
+  fixture(t, {ok: false, uses: [{use: 'enter', ok: true, room: 'nave', door: 'main-door'}, {use: 'sit', ok: false, reason: {code: 'verify.refused', engineCode: 'route.blocked', message: 'No passage.'}}], probe: {removed: true}, ms: 12});
+  const output = await verifyUse('chapel');
+  assert.match(output, /enter: OK.*nave via main-door/); assert.match(output, /sit: FAILED.*verify.refused.*route.blocked.*No passage/); assert.match(output, /probe removed; 12 ms/);
+});
+
+test('verify-use validates options before contacting the server', async t => {
+  const calls = fixture(t, {});
+  await assert.rejects(verifyUse(), /usage: verify-use/);
+  for (const flags of [{uses: 'fly'}, {uses: 'sit,sit'}, {from: '1,no'}, {from: '1,2,3'}, {from: ',2'}]) await assert.rejects(verifyUse('chapel', flags));
+  assert.equal(calls.length, 0);
+});
 
 test('repairable refusals show their op, field and concrete fix', () => {
   assert.equal(explainFailure({ op: 2, code: 'def.invalid', detail: 'profile has one point', field: 'make.args.shapes.0.profile', fix: 'lathe profile needs ≥2 points' }), 'def.invalid (op 2): profile has one point — field make.args.shapes.0.profile — fix: lathe profile needs ≥2 points');

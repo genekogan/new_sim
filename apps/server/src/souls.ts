@@ -2,6 +2,7 @@ import {afterCommit} from './edge/comms/store.ts';
 import type {WorldAccounts} from './accounts/service.ts';
 // Soul operations shared by the web API, the agent API and MCP.
 import { randomBytes } from 'node:crypto';
+import {PROBE_PREFIX, PROBE_OWNER, isVerificationProbe} from './verification-probe.ts';
 import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type EventKind, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
 import {mandateOf,explicitTrigger} from './mandate.ts';
 import {clockAt} from '@sim/brain';
@@ -83,6 +84,7 @@ export class Souls {
     return runner;
   }
   controlReady(soul:SoulRow):boolean{
+    if(isVerificationProbe(soul.id))return false;
     if(this.services?.controlReady && !this.services.controlReady(soul))return false;
     if(!this.lifecycle)return true;
     const current=this.db.soul(soul.id);
@@ -193,6 +195,16 @@ export class Souls {
   async retire(soul: SoulRow) {
     this.db.retireSoul(soul.id);
     await this.host.enqueue('retire', `soul:${soul.id}`, { soulId: soul.id, entityId: soul.entity_id });
+  }
+
+  /** Internal, unpaired, nonhuman verifier; ordinary journaled birth/retire.
+   * Return the row before awaiting admission so even a failed birth can retire. */
+  createVerificationProbe() {
+    const id = PROBE_PREFIX + randomBytes(12).toString('hex'), entityId = `h_${id.slice(2)}`;
+    const name = `verifier probe ${id.slice(-8)}`, description = 'Temporary explicit-action use verifier; never thinks or pairs.';
+    this.db.createSoul({ id, worldId: this.host.worldId, owner: PROBE_OWNER, entityId, name, description, native: false });
+    try { return { soul: this.db.soul(id)!, ready: this.host.enqueue('birth', `verify-use:${id}`, { soulId: id, entityId, name, description, owner: PROBE_OWNER } satisfies BirthPayload) }; }
+    catch (error) { this.db.retireSoul(id); throw error; }
   }
 
   // ------------------------------------------------------------ steering
@@ -540,7 +552,7 @@ export class Souls {
   soulFromToken(token: string | undefined): SoulRow | null {
     if (!token?.startsWith('sim_')) return null;
     const soul = this.agentCredential(token)?.row??null;
-    if (soul && soul.world_id !== this.host.worldId) return null;
+    if (soul && (isVerificationProbe(soul.id) || soul.world_id !== this.host.worldId)) return null;
     if(soul&&this.lifecycle){const owner=this.db.user(soul.owner);if(!owner||!this.invited(owner)||!this.controlReady(soul))return null;}
     if (soul) { const now = Date.now(); if (now - (this.lastTouch.get(soul.id) ?? 0) > 30_000) { this.lastTouch.set(soul.id, now); this.db.touchSoulToken(soul.id); } }
     return soul;

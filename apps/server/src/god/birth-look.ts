@@ -3,6 +3,7 @@
 // (so replay, snapshots and every viewer see the same body). Old worlds never install this: their Souls keep
 // today's three classic looks. Souls born before this ran keep theirs too; nothing is rewritten.
 import type {WorldHost} from '../world.ts';
+import {isVerificationProbe} from '../verification-probe.ts';
 import {appearanceFromSeed,lookBody,seedOf} from '../../../web/src/humanoid/look.ts';
 
 /** The default look of a body born in a new world: deterministic per entity id, varied across the kit. */
@@ -27,7 +28,7 @@ export function installBirthLooks(host: WorldHost, edge?: {invalidateBodies?(): 
       .finally(() => { p.inFlight = false; });
   };
   host.listeners.push({
-    onApplied(e) { if (e.kind === 'birth') { const p = e.payload as {soulId: string; entityId: string}; pending.set(p.soulId, {entityId: p.entityId, tries: 0, inFlight: false}); } },
+    onApplied(e) { if (e.kind === 'birth' && !isVerificationProbe(e.payload.soulId)) { const p = e.payload as {soulId: string; entityId: string}; pending.set(p.soulId, {entityId: p.entityId, tries: 0, inFlight: false}); } },
     afterTick() { for (const [soulId, p] of pending) if (!p.inFlight) assign(soulId, p); },
   });
 }

@@ -47,6 +47,8 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
 export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
 
+export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
+
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
   /** What the engine was last told, per entity (JSON of its part), and the physics state that produced. */
@@ -72,6 +74,7 @@ export class EngineBridge {
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, engine: this.host.engine as never, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
@@ -442,7 +445,7 @@ export class EngineBridge {
     if (!this.model.entities.has(p.entityId)) return;
     const ops: Op[] = [...(this.model.children.get(p.entityId) ?? [])].map((c) => ({ op: 'move', id: c, in: { parent: 'world' }, p: [r3(this.model.worldPose(this.model.entities.get(c)!).x), r3(this.model.worldPose(this.model.entities.get(c)!).z)], mode: 'nudge' } as Op));
     ops.push({ op: 'remove', id: p.entityId, cascade: true } as Op);
-    const r = this.engineAct(ops, 'retire: body removed');
+    const r = this.engineAct(ops, p.entityId.startsWith('h_verify_') ? `retire: verifier probe ${p.entityId} body removed` : 'retire: body removed');
     if (!r.accepted) this.log(`retire ${p.entityId}: ${JSON.stringify(r.failures).slice(0, 200)}`);
   }
 

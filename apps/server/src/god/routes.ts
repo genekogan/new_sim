@@ -19,6 +19,7 @@ import { vocab } from '@sim/world-compiler';
 import { schemaMarkdown } from '../../../../tools/god-skill/lib/schema-md.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type {VerifyUse} from './verify-use.ts';
 
 export type GodDeps = {
   god: GodMode;
@@ -29,6 +30,7 @@ export type GodDeps = {
   soulFromBearer: (c: Context) => { id: string; name: string } | null;
   baseOf: (c: Context) => string;
   limitIp: (c: Context, key: string, max: number, windowMs: number) => void;
+  verifyUse?: VerifyUse;
 };
 
 const codeSchema = z.object({ code: z.string().min(4).max(12) });
@@ -69,6 +71,10 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/god/SKILL.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
   app.get('/god/skill.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
   app.get('/god/eden-god.mjs', serveFile('eden-god.mjs', 'text/javascript; charset=utf-8'));
+  app.get('/god/kit-primitives.png', (c) => {
+    try { return c.body(new Uint8Array(readFileSync(resolve(skillDir, 'reference/kit-primitives.png'))), 200, { 'content-type': 'image/png', 'cache-control': 'no-cache' }); }
+    catch { throw new ApiError(404, 'not-found', 'kit-primitives.png is not available on this server'); }
+  });
   app.get('/god/SCHEMA.md', (c) => c.body(schemaMarkdown(godSchema()), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }));
   app.get('/god/examples/:file{[a-z0-9-]+\\.(mjs|log)}', (c) => { const f = c.req.param('file'); return serveFile(`examples/${f.endsWith('.mjs') ? '' : 'shots/'}${f}`, f.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'text/plain; charset=utf-8')(c); });
   app.get('/v1/god/status', async (c) => {
@@ -98,6 +104,12 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
 
   // ---- god
   app.get('/v1/god/schema', (c) => c.json(godSchema(), 200, { 'cache-control': 'public, max-age=60' }));
+  app.post('/v1/god/verify-use', async (c) => {
+    requireGod(c);
+    if (!d.verifyUse) return c.json({ok: false, target: '', uses: [], probe: {removed: true}, ms: 0, notes: [], reason: {code: 'verify.refused', engineCode: 'unavailable', message: 'Resident verification is unavailable in this world.'}}, 200, noStore);
+    const raw = await c.req.json().catch(() => null);
+    return c.json(await d.verifyUse.run(raw), 200, noStore);
+  });
   app.post('/v1/god/query', async (c) => c.json(runQuery(d.god.model, await body(c)), 200, noStore));
   app.post('/v1/god/preview', async (c) => { requireGod(c); return c.json(d.god.preview(await body(c)), 200, noStore); });
   app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
