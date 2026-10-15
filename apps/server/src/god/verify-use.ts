@@ -21,7 +21,7 @@ export const verifyUseSchema = z.object({
   uses: z.array(z.enum(['enter', 'sit'])).min(1).max(2).refine(a => new Set(a).size === a.length, 'uses must be unique').default(['enter', 'sit']),
   from: z.union([z.string().min(1).max(200), z.tuple([z.number().finite(), z.number().finite()])]).optional(),
   seat: z.string().min(1).max(200).optional(),
-  timeoutMs: z.number().int().min(1).max(180_000).default(90_000),
+  timeoutMs: z.number().int().min(1).max(180_000).default(150_000),
 }).strict();
 type Input = z.infer<typeof verifyUseSchema>;
 type Reason = {code: typeof verifyCodes[number]; message: string; engineCode?: string};
