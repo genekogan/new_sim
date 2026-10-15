@@ -537,7 +537,7 @@ export function parseMassing(text) {
     const [at, size, height, roof, ...extra] = fields;
     if (!size || !/^h.+/.test(height ?? '') || extra.length || (roof && !['flat', 'gable', 'pyramid'].includes(roof))) throw new Error('mass: use name x,z wxd h12 [flat|gable|pyramid]');
     const box = buildPair(size.replace(/[x×]/, ','), 'mass size'), h = num(height.slice(1));
-    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error('mass size must be positive; height is 0.5..120 m');
+    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error('mass size must be positive; wall/eave height h is 0.5..120 m');
     return { ...(name ? { name } : {}), at: buildPair(at, 'mass at'), size: box, h, ...(roof ? { roof } : {}) };
   });
   if (masses.length > 8) throw new Error('at most 8 massing volumes');
@@ -555,10 +555,18 @@ async function buildSite(f) {
   const p = numeric ? { x: x + dx, z: z + dz } : refPoint(view(await mirror()), f.at, f.offset);
   return { at: [p.x, p.z], size, yaw: f.yaw === undefined ? 0 : num(f.yaw) };
 }
+const buildOutline = (b) => [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join('×')} m, yaw ${b.site.yaw ?? 0}`, `steps: ${b.plan.steps.map((s, i) => `${i + 1} ${s}`).join('; ')}`];
+function buildStartReport(b) {
+  const masses = b.massing.map((m, i) => {
+    const roof = m.roof ?? 'flat', total = m.h + (roof === 'flat' ? 0 : Math.min(...m.size) / 2);
+    return `${m.name ?? i + 1} ${m.size.map(r2).join('×')} m, walls ${r2(m.h)} m + ${roof} roof ≈ ${r2(total)} m total`;
+  });
+  return [...buildOutline(b), `massing: ${masses.join('; ') || 'none'}`, `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join('\n');
+}
 function buildReport(r) {
   if (r.open) return [...r.open.map((b) => `${b.id}: ${b.status}, ${b.step?.n ?? 1}/${b.plan?.steps.length ?? '?'} ${b.step?.label ?? ''}`), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
   const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
-  const lines = [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join('×')} m, yaw ${b.site.yaw ?? 0}`, `steps: ${steps.map((s, i) => `${i + 1} ${s}`).join('; ')}`];
+  const lines = buildOutline(b);
   if (current) {
     lines.push(`step ${current.n}/${steps.length} ${current.label}${open ? ' IN PROGRESS' : ''}: ${current.batches} batches, last seq ${current.lastSeq ?? 'none'}${open ? ' — finish it first' : ''}`);
     for (const e of current.recent ?? []) lines.push(`  seq ${e.seq}: ${e.note ?? ''}`);
@@ -639,7 +647,7 @@ export async function build(sub = 'show', args = [], f = {}) {
   if (['release', 'done', 'abandon'].includes(sub)) save({ build: undefined, group: undefined, buildPreviews: undefined });
   invalidate();
   if (f.json) return r;
-  if (sub === 'start') return `${buildReport(r)}\nevery edit now carries build ${r.build.id}, step 1/${r.build.plan.steps.length} ${r.build.plan.steps[0]}`;
+  if (sub === 'start') return buildStartReport(r.build);
   if (sub === 'resume') return buildReport(r);
   return `${id}: ${sub === 'release' ? 'claim released' : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(', ') || 'none'}; not undone edits: ${r.build.abandoned.undo.notReverted.join(', ') || 'none'}` : ''}`;
 }
@@ -916,6 +924,7 @@ shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
 site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] · build [show [id]] · build resume <id> [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status

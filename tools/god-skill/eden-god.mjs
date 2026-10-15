@@ -65,8 +65,9 @@ function buildSuffix(echo, b = load().build) {
   if (!echo) return "";
   const step = echo.step ?? {}, of = b?.id === echo.id ? b.steps?.length : void 0;
   const n = `${step.n ?? b?.n ?? 1}${of ? "/" + of : ""}`;
-  const id = String(echo.id).slice(0, 8), room = Math.max(0, 24 - id.length - n.length - 4);
-  return `[${id} ${n}${room ? " " + String(step.label ?? b?.label ?? "").replace(/[^\x20-\x7e]/g, "?").slice(0, room) : ""}]`;
+  const short = (s, max) => s.length > max ? s.slice(0, max - 3) + "..." : s;
+  const id = short(String(echo.id), 24), label = short(String(step.label ?? b?.label ?? "").replace(/[^\x20-\x7e]/g, "?"), 12);
+  return `[${id} ${n}${label ? " " + label : ""}]`;
 }
 function buildHeader(b = load().build, server) {
   if (!b) return "";
@@ -2669,7 +2670,7 @@ function parseMassing(text) {
     const [at, size, height, roof, ...extra] = fields;
     if (!size || !/^h.+/.test(height ?? "") || extra.length || roof && !["flat", "gable", "pyramid"].includes(roof)) throw new Error("mass: use name x,z wxd h12 [flat|gable|pyramid]");
     const box = buildPair(size.replace(/[x×]/, ","), "mass size"), h = num(height.slice(1));
-    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error("mass size must be positive; height is 0.5..120 m");
+    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error("mass size must be positive; wall/eave height h is 0.5..120 m");
     return { ...name ? { name } : {}, at: buildPair(at, "mass at"), size: box, h, ...roof ? { roof } : {} };
   });
   if (masses.length > 8) throw new Error("at most 8 massing volumes");
@@ -2686,10 +2687,18 @@ async function buildSite(f) {
   const p = numeric ? { x: x + dx, z: z + dz } : refPoint(view(await mirror()), f.at, f.offset);
   return { at: [p.x, p.z], size, yaw: f.yaw === void 0 ? 0 : num(f.yaw) };
 }
+var buildOutline = (b) => [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join("\xD7")} m, yaw ${b.site.yaw ?? 0}`, `steps: ${b.plan.steps.map((s, i) => `${i + 1} ${s}`).join("; ")}`];
+function buildStartReport(b) {
+  const masses = b.massing.map((m, i) => {
+    const roof = m.roof ?? "flat", total = m.h + (roof === "flat" ? 0 : Math.min(...m.size) / 2);
+    return `${m.name ?? i + 1} ${m.size.map(r2).join("\xD7")} m, walls ${r2(m.h)} m + ${roof} roof \u2248 ${r2(total)} m total`;
+  });
+  return [...buildOutline(b), `massing: ${masses.join("; ") || "none"}`, `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join("\n");
+}
 function buildReport(r) {
   if (r.open) return [...r.open.map((b2) => `${b2.id}: ${b2.status}, ${b2.step?.n ?? 1}/${b2.plan?.steps.length ?? "?"} ${b2.step?.label ?? ""}`), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
   const b = r.build, steps2 = b.plan.steps, current = r.current ?? b.current, open = ["active", "paused"].includes(b.status);
-  const lines = [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join("\xD7")} m, yaw ${b.site.yaw ?? 0}`, `steps: ${steps2.map((s, i) => `${i + 1} ${s}`).join("; ")}`];
+  const lines = buildOutline(b);
   if (current) {
     lines.push(`step ${current.n}/${steps2.length} ${current.label}${open ? " IN PROGRESS" : ""}: ${current.batches} batches, last seq ${current.lastSeq ?? "none"}${open ? " \u2014 finish it first" : ""}`);
     for (const e of current.recent ?? []) lines.push(`  seq ${e.seq}: ${e.note ?? ""}`);
@@ -2780,8 +2789,7 @@ async function build2(sub = "show", args = [], f = {}) {
   if (["release", "done", "abandon"].includes(sub)) save({ build: void 0, group: void 0, buildPreviews: void 0 });
   invalidate();
   if (f.json) return r;
-  if (sub === "start") return `${buildReport(r)}
-every edit now carries build ${r.build.id}, step 1/${r.build.plan.steps.length} ${r.build.plan.steps[0]}`;
+  if (sub === "start") return buildStartReport(r.build);
   if (sub === "resume") return buildReport(r);
   return `${id}: ${sub === "release" ? "claim released" : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(", ") || "none"}; not undone edits: ${r.build.abandoned.undo.notReverted.join(", ") || "none"}` : ""}`;
 }
@@ -3214,6 +3222,7 @@ shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] \xB7 build step [label] \xB7 build [show [id]] \xB7 build resume <id> [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status

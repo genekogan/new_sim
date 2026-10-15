@@ -192,6 +192,45 @@ async function buildFixture(t, handler = () => null) {
 }
 const startFlags = () => ({ title: 'Black stone church', steps: steps.join(','), at: '0,0', size: '40,16', mass: 'nave 0,0 22x10 h12 gable; tower -13,0 6x6 h30 pyramid' });
 
+test('help defines mass h as wall/eave height and explains pitched and flat roof totals', () => {
+  const help = COMMANDS.help();
+  assert.match(help, /h = wall\/eave height, not total height/);
+  assert.match(help, /Gable\/pyramid roofs add half the shorter side; flat adds none/);
+  assert.match(help, /26x12 h15 gable = 15 m walls \+ 6 m roof = 21 m total/);
+});
+
+test('build start echoes every mass footprint, wall height and total including its roof', async t => {
+  const { calls } = await buildFixture(t);
+  const mass = 'nave 1,0 26x12 h15 gable; north-tower -11,-8 4x4 h28 pyramid; terrace 0,10 8x4 h2 flat; 0,12 3x1.5 h.5; canopy 0,-11 2.5x1.5 h1.25 gable';
+  const text = await build('start', ['black-church'], { ...startFlags(), size: '40,30', mass });
+  assert.match(text, /site \(0, 0\) 40×30 m, yaw 0/);
+  assert.match(text, /steps: 1 shell; 2 roof and tower; 3 openings; 4 interior; 5 furnish/);
+  for (const summary of [
+    'nave 26×12 m, walls 15 m + gable roof ≈ 21 m total',
+    'north-tower 4×4 m, walls 28 m + pyramid roof ≈ 30 m total',
+    'terrace 8×4 m, walls 2 m + flat roof ≈ 2 m total',
+    '4 3×1.5 m, walls 0.5 m + flat roof ≈ 0.5 m total',
+    'canopy 2.5×1.5 m, walls 1.25 m + gable roof ≈ 2 m total',
+  ]) assert.ok(text.includes(summary), summary);
+  assert.match(text, /every edit now carries build black-church, step 1\/5 shell$/);
+  assert.doesNotMatch(text, /no committed batches|inspect|finish it first|IN PROGRESS|roots:|claims:|next:|first:|local:|\d parts/);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body.massing, parseMassing(mass), 'reporting never changes submitted wall heights');
+});
+
+test('start without masses reports only the created site and plan; resume retains recovery guidance', async t => {
+  const { calls } = await buildFixture(t);
+  const text = await build('start', ['church'], { ...startFlags(), mass: undefined });
+  assert.match(text, /^church: Black stone church \(active\); site/);
+  assert.match(text, /massing: none/);
+  assert.equal(text.split('\n').length, 4);
+  assert.doesNotMatch(text, /no committed batches|inspect|finish it first|roots:|claims:|next:|local:/);
+  const resumed = await build('resume', ['church']);
+  assert.match(resumed, /step 1\/5 shell: no committed batches reported; inspect and finish it first/);
+  assert.match(resumed, /massing: nave 0 parts/);
+  assert.equal(calls.length, 2);
+});
+
 test('build start sends one request with massing; step makes none; next act injects current progress', async t => {
   const { calls } = await buildFixture(t);
   const flags = startFlags(), parsed = parseFlags(['start', 'church', '--steps', 'a,b']);
@@ -231,7 +270,7 @@ test('preview and dryrun carry build; sealed preview commit sends only preview/c
   assert.equal(calls[2].body.preview, 'sealed-preview');
 });
 
-test('direct layers acts inherit build/group and add a <=25 byte progress suffix', async t => {
+test('direct layers acts inherit build/group and add the short progress suffix', async t => {
   const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/interior' });
   const text = await COMMANDS.access(['pew', 'public'], {});
   assert.match(text, / \[church 1\/5 shell\]$/);
@@ -239,7 +278,21 @@ test('direct layers acts inherit build/group and add a <=25 byte progress suffix
   assert.equal(calls[0].body.group, 'church/interior');
   const suffix = buildSuffix(echo({ build: { id: 'church', step: 3, label: 'roof' } }), localBuild());
   assert.equal(Buffer.byteLength(' ' + suffix), 18);
-  assert.ok(Buffer.byteLength(' ' + buildSuffix({ id: 'a'.repeat(40), step: { n: 999, label: 'b'.repeat(60) } }, { id: 'a'.repeat(40), steps: Array(24) })) <= 25);
+});
+
+test('accepted edit suffix preserves black-church and ellipsizes ids only beyond 24 characters', async t => {
+  const { calls } = await buildFixture(t);
+  save({ build: { ...localBuild(), id: 'black-church' } });
+  assert.match(await COMMANDS.access(['pew', 'public'], {}), / \[black-church 1\/5 shell\]$/);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.build.id, 'black-church');
+  for (const length of [8, 12, 23, 24, 25, 40]) {
+    const id = 'a'.repeat(length), printed = length > 24 ? 'a'.repeat(21) + '...' : id;
+    assert.equal(buildSuffix({ id, step: { n: 3, label: 'roof' } }, { id, steps }), `[${printed} 3/5 roof]`);
+  }
+  const id = 'a'.repeat(40), suffix = buildSuffix({ id, step: { n: 999, label: 'b'.repeat(60) } }, { id, steps: Array(24) });
+  assert.equal(suffix, `[${'a'.repeat(21)}... 999/24 ${'b'.repeat(9)}...]`);
+  assert.equal(Buffer.byteLength(' ' + suffix), 47);
 });
 
 test('world/answer-only batches, imports, env/land/strike and --no-build skip injection', async t => {
@@ -467,6 +520,8 @@ test('downloadable bundle runs the build lifecycle and global bypass against onl
   });
   const start = await cli(['build', 'start', 'church', '--title', 'Church', '--steps', 'shell,roof,interior', '--at', '0,0', '--size', '40,16', '--mass', 'nave 0,0 22x10 h5 gable']);
   assert.match(start.stdout, /every edit now carries build church, step 1\/3 shell/);
+  assert.match(start.stdout, /nave 22×10 m, walls 5 m \+ gable roof ≈ 10 m total/);
+  assert.doesNotMatch(start.stdout, /no committed batches|inspect|finish it first|IN PROGRESS|roots:|claims:|next:|local:/);
   assert.equal(calls.length, 1);
   await cli(['build', 'step']); assert.equal(calls.length, 1);
   const batch = '{"ops":[{"op":"remove","id":"old"}]}';

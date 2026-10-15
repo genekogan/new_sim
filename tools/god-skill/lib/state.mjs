@@ -51,13 +51,15 @@ export function withBuildOptions(flags, run) {
     return out?.then ? out.then(finish) : finish(out);
   });
 }
-// <=24 ASCII bytes (plus one separating space/newline) even for long ids/labels.
+// Keep ids through 24 chars; longer ids and labels get an explicit ASCII ellipsis.
+// At most 47 ASCII bytes including the separating space/newline (999/24 steps).
 export function buildSuffix(echo, b = load().build) {
   if (!echo) return '';
   const step = echo.step ?? {}, of = b?.id === echo.id ? b.steps?.length : undefined;
   const n = `${step.n ?? b?.n ?? 1}${of ? '/' + of : ''}`;
-  const id = String(echo.id).slice(0, 8), room = Math.max(0, 24 - id.length - n.length - 4);
-  return `[${id} ${n}${room ? ' ' + String(step.label ?? b?.label ?? '').replace(/[^\x20-\x7e]/g, '?').slice(0, room) : ''}]`;
+  const short = (s, max) => s.length > max ? s.slice(0, max - 3) + '...' : s;
+  const id = short(String(echo.id), 24), label = short(String(step.label ?? b?.label ?? '').replace(/[^\x20-\x7e]/g, '?'), 12);
+  return `[${id} ${n}${label ? ' ' + label : ''}]`;
 }
 export function buildHeader(b = load().build, server) {
   if (!b) return '';

@@ -70,6 +70,7 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 ## The loop
 
 0. For anything bigger than one object, `build start`: site, title, 3–6 `--steps`, and `--mass` boxes for the main volumes (site-local metres).
+   **h = wall/eave height**, not total height; gable/pyramid roofs add half the shorter side (flat adds none).
 1. `map` — the whole world as structure: terrain, water, every root thing with pose and contents,
    flags, prayers. It is complete and exact; plan from it.
 2. `find <words>` / `defs <words>` — see what already exists and what it offers (see below).
@@ -494,7 +495,7 @@ world's constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
 ## Seven worked examples
 
-`examples` lists them; `examples <name>` prints its transcript (every command with the answer it got)
+`examples` lists recorded runs; `examples <name>` prints a transcript (every command with the answer it got)
 and saves `examples/<name>.log` and `.mjs` here (also served at `<world-url>/god/examples/<name>.log`).
 
 **1. A hamlet** (`hamlet.mjs`)
@@ -566,25 +567,21 @@ resolve                                          # every kept relation still hol
 look --at hill --from s
 ```
 
-**7. A church, massing first** (`church-massing.mjs`)
+**7. A market hall, massing first**
 ```
-build start church --title "Black stone church" --steps "shell,roof and tower,openings,interior,furnish" --at 0,0 --size 40,16 --mass "nave 0,0 22x10 h5 gable; tower -15,0 6x6 h30 pyramid"
+build start market-hall --title "Market hall and tower" --steps "hall,tower,stalls" --at 0,0 --size 40,18 --mass "hall 0,0 24x12 h5 gable; tower -17,0 6x6 h15 pyramid"
 look --at 0,0 --span 44               # massing is visible from start; tell the owner
-act shell.json                       # actual chapel walls, rooms and entrance
-look --at church --span 44            # inspect the first real step
+place hall --at 0,0 --name hall --param w=24 --param d=12 --param floorHeight=5 --param roof=gable --param roofPitch=45
+look --at hall --span 44              # inspect the first real step
 build step
-act roof-and-tower.json
+place tower --at -17,0 --name market-tower --param w=6 --param d=6 --param floors=3 --param floorHeight=5 --param roof=hip --param roofPitch=45
 build step
-act openings.json                    # remove + replacement belong in one batch
-build step
-act interior.json
-build step
-furnish church --style chapel --group interior
-describe church                      # default use check; verify-use is optional
-build done "nave, tower, furnished interior"
+place long-table --inside hall --count 3 --name stall
+describe hall                        # default use check; verify-use is optional
+build done "hall, tower, three stalls"
 ```
-The script supplies the batches. Massing is ≤8 site-local boxes, not grey entities to remove later.
-In a fresh folder, `build resume church` reports the unfinished `current` step, recent edits, roots,
+Massing is ≤8 site-local boxes, not grey entities to remove later. Remove + replacement belong in one batch.
+In a fresh folder, `build resume market-hall` reports the unfinished `current` step, recent edits, roots,
 massing part counts and `next`. Finish `current` before advancing.
-For help: `build claim east-aisle --root church/east-aisle`; give the helper its printed
+For help: `build claim stalls --root hall`; give the helper its printed
 `EDEN_GOD_CLAIM=c_…`. It keeps its own step file and ends with `build release --done`.
