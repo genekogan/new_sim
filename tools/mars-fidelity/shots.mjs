@@ -20,7 +20,7 @@ export const VIEWS={
 };
 const release=await chromeLease('mars');let browser;const rows=[];let failure;
 try{
- for(const dpr of flag('dpr',null)?[Number(flag('dpr'))]:[1,2])for(const dust of mode==='dust'?['clear','faint','heavy']:['clear']){
+ for(const dpr of flag('dpr',null)?[Number(flag('dpr'))]:[1,2])for(const dust of ['dust','review'].includes(mode)?['clear','faint','heavy']:['clear']){
   browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
   const ctx=await browser.newContext({viewport:{width:1280,height:800},deviceScaleFactor:dpr});
   const page=await ctx.newPage();page.setDefaultTimeout(60000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -34,13 +34,15 @@ try{
   await page.mouse.click(600,500);await page.keyboard.down('w');await page.waitForTimeout(500);await page.keyboard.up('w');
   const moved=await page.evaluate(p=>Math.hypot(...window.__simEntity.camera.position.toArray().map((v,i)=>v-p[i])),initial);
   if(moved<.2)throw Error('real W input did not move camera');
-  const views=mode==='dust'?{['dust-'+dust]:{eye:[15,3,5],at:[-5,2,-35]}}:flag('views',null)?JSON.parse(readFileSync(flag('views'),'utf8')):VIEWS;
+  const assetViews=flag('views',null)?JSON.parse(readFileSync(flag('views'),'utf8')):VIEWS;
+  const dustViews={['dust-'+dust]:{eye:[15,3,5],at:[-5,2,-35]}};
+  const views=mode==='review'?{...(dust==='clear'?assetViews:{}),...dustViews}:mode==='dust'?dustViews:assetViews;
   for(const [name,v]of Object.entries(views)){
    await page.evaluate(v=>{const w=window.__simEntity;w.controls.target.set(...v.at);w.camera.position.set(...v.eye);w.controls.update();window.__buildingView??={};window.__buildingView.hideRoofs=!!v.roofs;},v);
    await page.waitForTimeout(1400);
    const info=await page.evaluate(()=>({stats:window.__simEntity.stats(),dust:window.__simLiving?.atmosphere().dust,canvas:{width:document.querySelector('canvas').width,height:document.querySelector('canvas').height},gpu:(()=>{const gl=window.__simEntity.renderer.getContext(),ext=gl.getExtension('WEBGL_debug_renderer_info');return gl.getParameter(ext?ext.UNMASKED_RENDERER_WEBGL:gl.RENDERER);})()}));
    if(info.canvas.width!==1280*dpr)throw Error('wrong canvas DPR');
-   if(mode==='dust'&&(info.dust?.kind!==dust||Math.abs(info.dust?.intensity-({clear:0,faint:.035,heavy:.4}[dust]))>1e-6))throw Error('dust state mismatch '+JSON.stringify(info.dust));
+   if(name.startsWith('dust-')&&(info.dust?.kind!==dust||Math.abs(info.dust?.intensity-({clear:0,faint:.035,heavy:.4}[dust]))>1e-6))throw Error('dust state mismatch '+JSON.stringify(info.dust));
    if(errors.length)throw Error('browser errors '+errors.join('\n'));
    const file=join(out,`${phase}-${name}-dpr${dpr}.png`);await page.screenshot({path:file,timeout:30000});
    rows.push({name,phase,dpr,file,view:v,inputMoved:moved,...info,errors:[...errors]});console.log('shot',name,dpr);

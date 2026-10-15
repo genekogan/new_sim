@@ -88,7 +88,7 @@
   {
    "name": "mimos",
    "originalAsset": "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39",
-   "asset": "431424efc6eb43f695da0790ee2bfc56afb9946a0425c0b545c99bf3b22058e9",
+   "asset": "515ac21643c3e13e2cb68ac884723834b9ab0bf59a044392ae49b1d8fc11af7e",
    "affectedRecipeImageNodes": 2,
    "grandfatheredSourceBudget": false,
    "before": {
@@ -97,7 +97,7 @@
    },
    "after": {
     "tris": 7446,
-    "bytes": 326104,
+    "bytes": 326996,
     "box": [
      20.078,
      6.465,
@@ -122,7 +122,10 @@
       12
      ],
      "triangles": 3080,
-     "localEnvelope": {
+     "maxOutwardGatherDepthM": 0.09,
+     "fabricThicknessM": 0.003,
+     "material": "unchanged lit MeshStandard/PBR material, roughness 0.86; no unlit extension",
+     "sourceClothLocalEnvelope": {
       "min": [
        -1,
        -0.002685628833887753,
@@ -134,7 +137,20 @@
        0.1424604022339549
       ]
      },
-     "reference": "team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/pleats fitted, not surveyed"
+     "finalClothLocalEnvelope": {
+      "min": [
+       -1,
+       -0.002685628833887753,
+       -0.1424604022339549
+      ],
+      "max": [
+       1,
+       0.02312733560378558,
+       0.1424604022339549
+      ]
+     },
+     "retained": "exact whole-building bounds and footprint; cloth attachment corners; all non-cloth geometry",
+     "reference": "team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/diagonal gathers fitted, not surveyed"
     },
     "photos": [
      {

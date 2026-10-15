@@ -6,7 +6,7 @@ This is a world patch for **my-mars-college-2026-3**, rebuilt locally from the s
 
 The sofa clash in the October 11 MARSLAND report predates the October 12 true-compass correction. Both the October 15 public snapshot and the current template put the group in `mimos/main-south` at ground level. In Mimos-local metres the red sofa's box is x[.9415,1.8265], z[1.417,3.697]; the nearest rack starts at x2.1528, giving .3263m clearance. The table has .832m clearance along z; the recliner is clear too. The matched top view corroborates this. Retain these corrected positions; the available drone exterior views do not justify another interior furniture move.
 
-The brown cloth over the south-facing glazing now has a sagged upper edge and gathered folds, fitted to `team/lanes/marsland-frames/f_040.jpg` and `f_117.jpg`. Only the named cloth geometry changes; the other Mimos edits correct UVs. Its original envelope and building footprint remain exact. Mimos grows by 3,068 triangles (7,446 total); exact byte counts are in the asset receipt.
+The brown cloth over the south-facing glazing now has a sagged upper edge and diagonal gathered folds, fitted to `team/lanes/marsland-frames/f_040.jpg` and `f_117.jpg`. The folds billow outward by up to 9 cm and taper into the attachment edges, using the existing lit cloth material. Only the named cloth geometry changes; the other Mimos edits correct UVs. The whole building bounds and footprint remain exact. Mimos grows by 3,068 triangles (7,446 total); exact byte counts are in the asset receipt.
 
 Nineteen verified recipe photo surfaces now use V=1−V, matching their upright source image bytes and the original Three TextureLoader presentation. These cover Chiba's gallery/portrait/pixel/upper-wall photos, the kitchen's plywood/tread photos, Mimos's rug/wall, Freeside's LOTA BREAD sign/curtain/entry paint, shower plywood, sanitation labels and book spines. Source pixels, U, mounting geometry, CAD textures and footprints remain unchanged. The three Mimos sign/gallery/Portuguese-poster quads already corrected geometrically in October 12 are explicitly excluded. The asset receipt enumerates every changed node and verifies unchanged decoded geometry/transforms.
 
@@ -27,11 +27,11 @@ L1 ships Godmode first, as the tranche common rules require. Its public API corr
 The eight forward mesh entity IDs change. Old explicit references to those IDs may need to resolve the named path again. This is a normal authoring edit, not a rewrite of world or resident history. The original library definitions and all old assets remain untouched. The saved receipt and the exact public undo restore the original parents and child bindings.
 
 1. Merge `lane/mars-20261015` after the Godmode integration and deploy through the normal release procedure. Include the viewer, `worlds/core-assets/mars-fidelity.index.json` and its seven GLBs. Keep original assets and footprints available. No CDN credentials or new source-media export is needed.
-2. Use the existing paired god credential **by path**. Do not paste it into a command or report. Set `EDEN_GOD_TOKEN_FILE` in the operator environment to the existing CLI identity JSON path (or token file path). Pick an absolute receipt path outside Git. The receipt contains no credential.
+2. Use Node 22.20.0, the qualified runtime. Use the existing paired god credential **by path**. Do not paste it into a command or report. Set `EDEN_GOD_TOKEN_FILE` in the operator environment to the existing CLI identity JSON path (or token file path). Pick an absolute receipt path outside Git. The receipt contains no credential.
 3. From the qualified lane source, dry-run (the following URL is the intended live target; this lane did not write to it):
 
    ```sh
-   node <worktrees>/lane-mars/tools/mars-fidelity/patch.mjs --base https://sim.eden.art/worlds/w/my-mars-college-2026-3 --receipt /ABSOLUTE/PRIVATE-OPS/mars-fidelity.receipt.json
+   ~/.nvm/versions/node/v22.20.0/bin/node <worktrees>/lane-mars/tools/mars-fidelity/patch.mjs --base https://sim.eden.art/worlds/w/my-mars-college-2026-3 --receipt /ABSOLUTE/PRIVATE-OPS/mars-fidelity.receipt.json
    ```
 
    The script checks source definitions, instances and new asset availability, obtains actual IDs/poses and builds the child-preserving swap. If the source or occupied state changed, investigate the refusal. **Do not POST `apply.json`**: it contains local fixture IDs, versions and a fixed clientRef. Its reference metadata is descriptive, not an API-enforced guard. Use the guarded script for live execution.
@@ -45,7 +45,7 @@ If apply is interrupted or its result is uncertain, reuse the **same receipt** w
 Keep the viewer release and immutable assets while reverting world state; deleting files is unnecessary. Use the same base, token path and saved receipt, adding `--rollback --apply`:
 
 ```sh
-node <worktrees>/lane-mars/tools/mars-fidelity/patch.mjs --base https://sim.eden.art/worlds/w/my-mars-college-2026-3 --receipt /ABSOLUTE/PRIVATE-OPS/mars-fidelity.receipt.json --rollback --apply
+~/.nvm/versions/node/v22.20.0/bin/node <worktrees>/lane-mars/tools/mars-fidelity/patch.mjs --base https://sim.eden.art/worlds/w/my-mars-college-2026-3 --receipt /ABSOLUTE/PRIVATE-OPS/mars-fidelity.receipt.json --rollback --apply
 ```
 
 This uses the exact guarded public undo of the saved patch, restoring original parent IDs, child bindings, sky and weather while retaining history. It refuses a different world, intervening owner edits, or later changes to touched descendants. After such a refusal, review and adapt the inverse through the normal authoring interface. Apply and rollback need a quiet owner window: the public undo endpoint has no atomic revision parameter, so keep other authoring/agent activity paused through the final check and undo. Unused local definitions may remain after undo; they are not instantiated. Verify after reload/restart. Code rollback alone leaves accepted world patches in place, so retain both old and new immutable assets.

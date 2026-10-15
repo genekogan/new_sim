@@ -92,18 +92,24 @@ function addDrape(doc) {
   const node = nodes[0], oldMesh = node.getMesh(), old = oldMesh.listPrimitives()[0], pos = old.getAttribute('POSITION');
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity], v = [];
   for (let i = 0; i < pos.getCount(); i++) { pos.getElement(i, v); for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], v[j]); hi[j] = Math.max(hi[j], v[j]); } }
-  const P = [], N = [], I = [], nx = 64, nz = 12, xmid = (lo[0] + hi[0]) / 2, xhalf = (hi[0] - lo[0]) / 2, depth = hi[2] - lo[2], yhalf = (hi[1] - lo[1]) / 2;
+  const P = [], N = [], I = [], nx = 64, nz = 12, xmid = (lo[0] + hi[0]) / 2, xhalf = (hi[0] - lo[0]) / 2, depth = hi[2] - lo[2];
+  const normalScale = node.getScale()[1], gatherDepthM = .09, halfThicknessM = .0015;
+  assert(normalScale > 0, 'positive source drape scale');
+  assert(!old.getMaterial().getExtension('KHR_materials_unlit'), 'keep the existing lit cloth material');
   // f_040 / f_117 show a brown swag, attached high at the sides, with diagonal
-  // gathers and a lower centre. Keep the old slab's complete envelope: the two
-  // narrow side hems retain its original corners; the sheet hangs between them.
+  // gathers and a lower centre. Keep the whole building bounds and footprint,
+  // allowing the fabric to gather outward by 9 cm instead of constraining it to
+  // the old 2 cm slab. Narrow side hems retain the attachment corners.
   // Both broad surfaces are actual geometry, with no cloth simulation or shadows.
   const surface = (s, t, side) => {
     const gather = Math.max(0, 1 - s * s), top = lo[2] + depth * .30 * gather;
     const bottom = hi[2] - depth * .25 * (1 - gather);
     const z = top + (bottom - top) * t;
-    const pleat = Math.sin(2 * Math.PI * (9 * (s + 1) / 2 + .18 * (t - .5) * s));
-    // Smoothly gather into the held edges, and remain inside the original 2 cm thickness.
-    const y = yhalf * (.64 * side + .35 * pleat * Math.sin(Math.PI * t) * gather);
+    // Long diagonal gathers curve toward the held ends, as in f117. The folds
+    // billow to the outer side of the glazing rather than through the glass.
+    const pleat = Math.sin(2 * Math.PI * (3.3 * t + 1.10 * Math.sqrt(s * s + .03) + .28 * s * t));
+    const attachmentTaper = gather * Math.sin(Math.PI * t);
+    const y = (gatherDepthM * (.5 + .5 * pleat) * attachmentTaper + side * halfThicknessM) / normalScale;
     return [xmid + xhalf * s, y, z];
   };
   const dot = (a, b) => a.reduce((n, x, i) => n + x * b[i], 0);
@@ -123,8 +129,8 @@ function addDrape(doc) {
       I.push(...(side === 1 ? [a, c, b, b, c, d] : [a, b, c, b, d, c]));
     }
   }
-  // Thin side hems retain the four front/back attachment corners and the exact
-  // original AABB, without restoring a flat rectangular face across the cloth.
+  // Thin side hems retain the four front/back attachment corners, without
+  // restoring a flat rectangular face across the cloth.
   for (const sign of [-1, 1]) {
     const xs = sign < 0 ? [lo[0], lo[0] + (hi[0] - lo[0]) * .004] : [hi[0] - (hi[0] - lo[0]) * .004, hi[0]];
     for (const side of [1, -1]) {
@@ -137,7 +143,9 @@ function addDrape(doc) {
   const primitive = doc.createPrimitive().setMaterial(old.getMaterial()).setAttribute('POSITION', doc.createAccessor('Mars cloth positions').setType('VEC3').setArray(new Float32Array(P)).setBuffer(buffer)).setAttribute('NORMAL', doc.createAccessor('Mars cloth normals').setType('VEC3').setArray(new Float32Array(N)).setBuffer(buffer)).setIndices(doc.createAccessor('Mars cloth triangles').setType('SCALAR').setArray(new Uint16Array(I)).setBuffer(buffer));
   const mesh = doc.createMesh('Mimos brown gathered cloth').addPrimitive(primitive);
   node.setMesh(mesh); oldMesh.dispose();
-  return { name: DRAPE_NAME, segments: [nx, nz], triangles: I.length / 3, localEnvelope: { min: lo, max: hi }, reference: 'team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/pleats fitted, not surveyed' };
+  const clothMin = [Infinity, Infinity, Infinity], clothMax = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < P.length; i++) { const k = i % 3; clothMin[k] = Math.min(clothMin[k], P[i]); clothMax[k] = Math.max(clothMax[k], P[i]); }
+  return { name: DRAPE_NAME, segments: [nx, nz], triangles: I.length / 3, maxOutwardGatherDepthM: gatherDepthM, fabricThicknessM: 2 * halfThicknessM, material: 'unchanged lit MeshStandard/PBR material, roughness 0.86; no unlit extension', sourceClothLocalEnvelope: { min: lo, max: hi }, finalClothLocalEnvelope: { min: clothMin, max: clothMax }, retained: 'exact whole-building bounds and footprint; cloth attachment corners; all non-cloth geometry', reference: 'team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/diagonal gathers fitted, not surveyed' };
 }
 function fixPhotos(doc, targets) {
   const result = [];
@@ -202,7 +210,7 @@ for (const [name, targets] of Object.entries(PHOTO_TARGETS)) {
   const { max, meshes, skins, ...indexFacts } = facts;
   assets[hash] = { ...originals[sourceSha], ...indexFacts, path: relative(ROOT, output), source: `${originals[sourceSha].source}; bounded cosmetic correction by tools/mars-fidelity/build-assets.mjs`, footprint: def.make.footprint };
   const updated = structuredClone(def); updated.make.asset = hash;
-  updated.description += ` Cosmetic correction (2026-10-15): ${targets.length} native recipe image node${targets.length === 1 ? '' : 's'} has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.${name === 'mimos' ? ' The brown glazing cloth has a sagged upper edge and fine gathered folds fitted to drone f040/f117; its original envelope is retained.' : ''}`;
+  updated.description += ` Cosmetic correction (2026-10-15): ${targets.length} native recipe image node${targets.length === 1 ? '' : 's'} has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.${name === 'mimos' ? ' The brown glazing cloth has a sagged upper edge and diagonal gathers up to 9 cm outward, fitted to drone f040/f117; its whole-building envelope and physical footprint are retained.' : ''}`;
   defs.push(updated);
   changes.push({ name, originalAsset: sourceSha, asset: hash, affectedRecipeImageNodes: targets.length, grandfatheredSourceBudget: grandfathered, before: { tris: originalFacts.tris, bytes: originalFacts.bytes }, after: { tris: facts.tris, bytes: facts.bytes, box: facts.box, min: facts.min, max: facts.max }, changed });
 }

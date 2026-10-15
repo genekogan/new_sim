@@ -3,7 +3,7 @@
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 2,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained. The brown glazing cloth has a sagged upper edge and fine gathered folds fitted to drone f040/f117; its original envelope is retained.",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained. The brown glazing cloth has a sagged upper edge and diagonal gathers up to 9 cm outward, fitted to drone f040/f117; its whole-building envelope and physical footprint are retained.",
   "tags": [
    "mars",
    "mars-campus",
@@ -18,7 +18,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "431424efc6eb43f695da0790ee2bfc56afb9946a0425c0b545c99bf3b22058e9",
+   "asset": "515ac21643c3e13e2cb68ac884723834b9ab0bf59a044392ae49b1d8fc11af7e",
    "collide": "box",
    "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
   },
