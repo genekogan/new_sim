@@ -95,9 +95,22 @@ async function ensureKeeper(worldUrl, cliPath) {
   rmSync(KEEPER, { force: true });
   const port = await freePort();
   const child = spawn(process.execPath, [cliPath, 'look-keeper', worldUrl, String(port)], { detached: true, stdio: 'ignore', cwd: process.cwd(), env: process.env });
+  let failure;
+  child.once('error', e => { failure = e; });
+  child.once('exit', (code, signal) => { failure = new Error(`keeper exited (${signal ?? code})`); });
   child.unref();
-  for (let i = 0; i < 600; i++) { await new Promise((r) => setTimeout(r, 1000)); const kk = readKeeper(); if (kk?.pid === child.pid && await alive(port)) return kk; }
-  throw new Error('look: the browser keeper did not start in 10 minutes');
+  try {
+    for (let i = 0; i < 600; i++) {
+      await new Promise((r) => setTimeout(r, 1000));
+      if (failure) throw failure;
+      const kk = readKeeper(); if (kk?.pid === child.pid && await alive(port)) return kk;
+    }
+    throw new Error('browser keeper did not start in 10 minutes');
+  } catch (e) {
+    if (child.pid) try { process.kill(process.platform === 'win32' ? child.pid : -child.pid); } catch { /* already exited */ }
+    if (readKeeper()?.pid === child.pid) rmSync(KEEPER, { force: true });
+    throw e;
+  }
 }
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
@@ -113,7 +126,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = f
   const overrides = { ...(hour != null ? { hour } : {}), ...(weather != null ? { weather } : {}) };
   const pw = runtime.pw === undefined ? findPlaywright() : runtime.pw;
   if (!pw) {
-    if (keep) throw new Error('look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works');
+    if (keep) throw new Error('look: no Playwright found for --keep'); // W2b: use the same remote fallback as plain look.
     const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
     const r = (runtime.spawnSync ?? spawnSync)('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
@@ -122,8 +135,10 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = f
   let page, browser, release = () => {};
   const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
   if (keep) {
-    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
-    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
+    try { // W2b: keeper startup/connection failures use the world's renderer too.
+      const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
+      browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
+    } catch (e) { throw new Error(`look: cannot start Chrome keeper (${String(e.message).split('\n')[0]})`); }
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
     // A newly started (or older) keeper has only ?shot=1. Give the viewer its initial camera too,

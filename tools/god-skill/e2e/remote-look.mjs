@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// W2 acceptance: one disposable fake world on 5368, real remote CLI PNG vs local shoot, no paid/network services.
+// W2b acceptance: disposable Eden district on 5368 at hour 21, real remote CLI PNG vs local shoot.
 // Run with Node 22.20 and NODE_USE_SYSTEM_CA unset. Uses already-installed test tools; never downloads packages.
 import assert from 'node:assert/strict';
 import { spawn, execFile } from 'node:child_process';
@@ -16,10 +16,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const base = 'http://127.0.0.1:5368/w/remote-looks';
 const out = resolve(root, '.lane/remote-looks', new Date().toISOString().replace(/[:.]/g, '-'));
 mkdirSync(out, { recursive: true });
-const temp = mkdtempSync(join(tmpdir(), 'remote-looks-smoke-')), report = { base, out, checks: [], timings: {} };
+const template = resolve(root, 'worlds/templates/eden-district.json'), hour = '21:00';
+const temp = mkdtempSync(join(tmpdir(), 'remote-looks-smoke-')), report = { base, out, template, hour, checks: [], timings: {} };
 const exec = promisify(execFile), cliFile = resolve(root, 'tools/god-skill/eden-god.mjs');
 const env = { ...process.env, HOST: '127.0.0.1', PORT: '5368', WORLD_KEY: 'remote-looks', WORLD_ID: 'remote-looks-1', WORLD_OWNER_ID: 'dev:admin',
-  PUBLIC_URL: 'http://127.0.0.1:5368', DATA_DIR: join(temp, 'data'), ASSET_DIR: join(temp, 'assets'), ENGINE: 'mars', DEV_AUTH: '1', AUTH_PROVIDER: 'none',
+  PUBLIC_URL: 'http://127.0.0.1:5368', GENESIS_FILE: template, DATA_DIR: join(temp, 'data'), ASSET_DIR: join(temp, 'assets'), ENGINE: 'mars', DEV_AUTH: '1', AUTH_PROVIDER: 'none',
   SEED_NATIVES: '0', BRAIN_MODE: 'fake', MIND_DRIVER: 'edge', INVITE_REQUIRED: '0', ARCHIVE_TAKES: '0', TAKES_PERSIST: '0',
   MARS_WEB_DIR: resolve(root, '.lane/mars-web'), ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', TYPESAFE_API_KEY: '', EDEN_GOD_NO_NPX: '1' };
 delete env.NODE_USE_SYSTEM_CA;
@@ -42,20 +43,17 @@ try {
   assert.equal((await fetch(base + '/v1/god/look', { method: 'POST', body: '{}' })).status, 401); check('real route rejects unauthenticated look');
   await cli('register', base, 'dev:admin'); await cli('mint');
   const { token } = JSON.parse(readFileSync(join(temp, '.eden-god.json')));
-  const post = async (path, body) => {
-    const response = await fetch(base + path, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
-    assert.equal(response.status, 200); return response.json();
-  };
-  const built = await post('/v1/god/act', { ops: [
-    { op: 'place', def: 'core/cottage@1', name: 'house', p: [-5, -3] },
-    { op: 'place', def: 'core/bench@1', name: 'bench', p: [5, 3] },
-    { op: 'place', def: 'core/rock@1', name: 'rock', p: [8, -6] },
-  ] });
-  assert.equal(built.accepted, true, JSON.stringify(built)); check('static scene committed', { seq: built.seq });
+  const response = await fetch(base + '/v1/god/snapshot', { headers: { authorization: `Bearer ${token}` } });
+  assert.equal(response.status, 200);
+  const snapshot = await response.json();
+  assert.ok(snapshot.entities.length >= 150, 'the full Eden district, including furnished buildings, must be present');
+  report.entities = snapshot.entities.length;
+  check('heavy Eden district booted from genesis template', { entities: snapshot.entities.length, seq: snapshot.seq });
   const before = await (await fetch(base + '/v1/world/seq')).json();
-  const args = ['look', '--remote', '--at', '0,0', '--from', 's', '--dist', '32', '--hour', '13:00', '--weather', 'clear', '--width', '1024', '--h', '640', '--out', join(out, 'remote.png'), '--json'];
+  const args = ['look', '--remote', '--at', '20,10', '--from', 's', '--dist', '180', '--hour', '21', '--weather', 'clear', '--width', '1024', '--h', '640', '--out', join(out, 'remote.png'), '--json'];
   const remote = JSON.parse(await cli(...args));
-  assert.equal(remote.via, 'remote'); check('downloaded CLI --remote returns real PNG', { ms: remote.ms, eye: remote.eye, at: remote.at });
+  assert.equal(remote.via, 'remote'); assert.equal(remote.size, '1024x640');
+  check('downloaded CLI --remote returns full-resolution night PNG and actual size', { ms: remote.ms, eye: remote.eye, at: remote.at, size: remote.size });
   report.timings.remoteMs = remote.ms;
   const pw = findPlaywright(); assert.ok(pw, 'local comparison requires already-installed Playwright');
   // Same request/resource boundary for the local reference. The product's local shoot applies its ordinary camera logic.
@@ -65,7 +63,7 @@ try {
     browser.newContext = async options => { const context = await original(options); await context.route('**/*', route => new URL(route.request().url()).origin === 'http://127.0.0.1:5368' ? route.continue() : route.abort()); return context; };
     return browser;
   } } };
-  const local = await shoot({ worldUrl: base, eye: remote.eye, at: remote.at, out: join(out, 'local.png'), hour: '13:00', weather: 'clear', width: 1024, height: 640, expect: 3, timeoutMs: 60_000 }, { pw: guardedPw, lease: async () => () => {} });
+  const local = await shoot({ worldUrl: base, eye: remote.eye, at: remote.at, out: join(out, 'local.png'), hour, weather: 'clear', width: 1024, height: 640, expect: snapshot.entities.length, timeoutMs: 60_000 }, { pw: guardedPw, lease: async () => () => {} });
   assert.equal(local.via, 'chrome'); assert.equal(local.state.ready, true); check('local reference captured with identical camera', { ms: local.ms, frames: local.frames });
   report.timings.localMs = local.ms;
   const { PNG } = createRequire(resolve(root, 'mars/viewer/package.json'))('pngjs');

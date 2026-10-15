@@ -931,7 +931,7 @@ export async function look(flags = {}, runtime = {}) {
     shot = JSON.parse(child.stdout.trim().split('\n').pop());
   }
   if (flags.json) return { ...shot, eye: cam.eye, at: cam.at };
-  return `look: ${shot.file}\n  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(', ')}) toward (${cam.at.join(', ')}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ''}\n  Read the image file; then fix what looks wrong.`;
+  return `look: ${shot.file}\n  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(', ')}) toward (${cam.at.join(', ')}), ${Math.round(shot.ms / 100) / 10} s${shot.size ? `, ${shot.size} px` : '' /* W2b actual remote PNG size */}${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ''}\n  Read the image file; then fix what looks wrong.`;
 }
 
 // ---------------------------------------------------------------- export / import / define

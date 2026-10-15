@@ -1398,7 +1398,7 @@ async function remoteLook(args, runtime = {}) {
   const png = Buffer.from(await r.arrayBuffer());
   if (!r.headers.get("content-type")?.startsWith("image/png") || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw Error("look: world renderer did not return a PNG");
   writeFileSync2(resolve(args.out), png);
-  return { file: resolve(args.out), ms: now() - t0, via: "remote" };
+  return { file: resolve(args.out), ms: now() - t0, via: "remote", size: r.headers.get("x-look-size") ?? void 0 };
 }
 async function withRemoteLook(args, runtime, local) {
   if (args.remote || process.env.EDEN_GOD_LOOK === "remote") return remoteLook(args, runtime);
@@ -1601,13 +1601,30 @@ async function ensureKeeper(worldUrl, cliPath) {
   rmSync2(KEEPER, { force: true });
   const port = await freePort();
   const child = spawn(process.execPath, [cliPath, "look-keeper", worldUrl, String(port)], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
+  let failure;
+  child.once("error", (e) => {
+    failure = e;
+  });
+  child.once("exit", (code, signal) => {
+    failure = new Error(`keeper exited (${signal ?? code})`);
+  });
   child.unref();
-  for (let i = 0; i < 600; i++) {
-    await new Promise((r) => setTimeout(r, 1e3));
-    const kk = readKeeper();
-    if (kk?.pid === child.pid && await alive(port)) return kk;
+  try {
+    for (let i = 0; i < 600; i++) {
+      await new Promise((r) => setTimeout(r, 1e3));
+      if (failure) throw failure;
+      const kk = readKeeper();
+      if (kk?.pid === child.pid && await alive(port)) return kk;
+    }
+    throw new Error("browser keeper did not start in 10 minutes");
+  } catch (e) {
+    if (child.pid) try {
+      process.kill(process.platform === "win32" ? child.pid : -child.pid);
+    } catch {
+    }
+    if (readKeeper()?.pid === child.pid) rmSync2(KEEPER, { force: true });
+    throw e;
   }
-  throw new Error("look: the browser keeper did not start in 10 minutes");
 }
 function stopKeeper() {
   const k = readKeeper();
@@ -1629,7 +1646,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
   const overrides = { ...hour != null ? { hour } : {}, ...weather2 != null ? { weather: weather2 } : {} };
   const pw = runtime.pw === void 0 ? findPlaywright() : runtime.pw;
   if (!pw) {
-    if (keep) throw new Error("look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works");
+    if (keep) throw new Error("look: no Playwright found for --keep");
     const q2 = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
     const r = (runtime.spawnSync ?? spawnSync)("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q2}`, resolve2(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
@@ -1639,8 +1656,12 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
   };
   const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500", ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
   if (keep) {
-    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
-    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 6e4 });
+    try {
+      const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
+      browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 6e4 });
+    } catch (e) {
+      throw new Error(`look: cannot start Chrome keeper (${String(e.message).split("\n")[0]})`);
+    }
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
     const current = new URL(page.url()).searchParams;
@@ -3217,7 +3238,7 @@ async function look(flags2 = {}, runtime = {}) {
   }
   if (flags2.json) return { ...shot, eye: cam.eye, at: cam.at };
   return `look: ${shot.file}
-  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
+  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.size ? `, ${shot.size} px` : ""}${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
   Read the image file; then fix what looks wrong.`;
 }
 async function exportWorld(file, flags2 = {}) {

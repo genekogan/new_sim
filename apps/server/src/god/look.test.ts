@@ -11,7 +11,7 @@ import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
 import { LOOK_LIMITS, LookQueue, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
-import { PipeCDP, renderLook } from './look-renderer.ts';
+import { PipeCDP, renderLook, pngSize } from './look-renderer.ts';
 import { readyExpression, captureExpression } from './look-page.ts';
 
 const shot = { eye: [0, 10, 20], at: [0, 0, 0] };
@@ -71,6 +71,27 @@ test('look passes all supported camera/preview settings and server entity count 
   const f = fixture(t), settings = { ...shot, hideRoofs: true, cut: 2, span: 20, hour: '21:30', weather: 'rain', width: 1600, height: 1000 };
   assert.equal((await f.request(f.a, settings)).status, 200);
   assert.deepEqual(f.renders[0], ['http://127.0.0.1:5368/w/looks', settings, f.god.model.entities.size]);
+});
+
+test('look returns the actual PNG size even when it differs from the requested dimensions', async t => {
+  const f = fixture(t);
+  const response = await f.request(f.a, { ...shot, width: 1024, height: 640 });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('x-look-size'), '1x1');
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), png);
+  assert.equal(pngSize(png), '1x1');
+});
+
+test('look still refuses malformed, truncated or zero-size PNGs', async t => {
+  const zero = Buffer.from(png); zero.writeUInt32BE(0, 16);
+  const wrongChunk = Buffer.from(png); wrongChunk.write('IDAT', 12);
+  for (const invalid of [Buffer.from('not a PNG'), png.subarray(0, 24), zero, wrongChunk]) {
+    const f = fixture(t, async () => invalid);
+    const response = await f.request(f.a);
+    assert.equal(response.status, 503);
+    assert.equal((await response.json() as { code: string }).code, 'look.failed');
+    assert.equal(response.headers.get('x-look-size'), null);
+  }
 });
 
 test('look propagates actionable host unavailability and is mounted behind normal god auth', async t => {
@@ -182,14 +203,14 @@ input.on('data', b => { buffer += b; for (;;) {
   if (m.method === 'Fetch.enable') for (const [requestId, url] of [['own', 'http://127.0.0.1:5368/asset'], ['foreign', 'https://example.invalid/asset']]) fs.writeSync(4, JSON.stringify({method: 'Fetch.requestPaused', sessionId: 'world-page', params: {requestId, request: {url}}}) + '\\0');
 } });`;
   writeFileSync(executable, source, { mode: 0o700 }); process.env.GOD_LOOK_CHROME = executable;
-  const settings = lookSchema.parse({ ...shot, width: 1, height: 1, hideRoofs: true, cut: 2, span: 10, hour: '21:00', weather: 'rain' });
+  const settings = lookSchema.parse({ ...shot, width: 1024, height: 640, hideRoofs: true, cut: 2, span: 10, hour: '21:00', weather: 'rain' });
   const rendered = await renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(5000));
-  assert.deepEqual(rendered, png);
+  assert.deepEqual(rendered, png, 'a valid 1x1 PNG is returned even when the renderer requested 1024x640');
   const messages = readFileSync(transcript, 'utf8').trim().split('\n').map(s => JSON.parse(s));
   const owned = messages.find(m => m.method === 'test.started').params;
   assert.equal(existsSync(owned.profile), false, 'temporary Chrome profile removed');
   assert.throws(() => process.kill(owned.pid, 0), { code: 'ESRCH' }, 'owned Chrome process has exited');
-  assert.deepEqual(messages.find(m => m.method === 'Emulation.setDeviceMetricsOverride').params, { width: 1, height: 1, deviceScaleFactor: 1, mobile: false });
+  assert.deepEqual(messages.find(m => m.method === 'Emulation.setDeviceMetricsOverride').params, { width: 1024, height: 640, deviceScaleFactor: 1, mobile: false });
   const navigation = new URL(messages.find(m => m.method === 'Page.navigate').params.url);
   assert.equal(navigation.pathname, '/w/looks'); assert.equal(navigation.searchParams.get('eye'), '0,10,20');
   for (const [key, value] of Object.entries({ shot: '1', hour: '21:00', weather: 'rain', hideRoofs: '1', cut: '2' })) assert.equal(navigation.searchParams.get(key), value);
@@ -199,7 +220,12 @@ input.on('data', b => { buffer += b; for (;;) {
   assert.ok(messages.filter(m => m.method === 'Runtime.evaluate').length >= 4);
   // A stuck host still exits and loses its temporary profile at the request deadline.
   writeFileSync(executable, source.replace("input.on('data', b => {", "input.on('data', b => { return;"), { mode: 0o700 });
-  await assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(300)), { name: 'TimeoutError' });
+  const deadline = new AbortController();
+  const stopped = assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.any([deadline.signal, AbortSignal.timeout(5000)])), { name: 'TimeoutError' });
+  // Wait for the child handshake before firing the deadline: a fixed 300 ms also measured Node startup under load.
+  const until = Date.now() + 4000;
+  while (readFileSync(transcript, 'utf8').split('\n').filter(s => s.includes('test.started')).length < 2 && Date.now() < until) await new Promise(r => setTimeout(r, 10));
+  deadline.abort(new DOMException('test render deadline', 'TimeoutError')); await stopped;
   const timedOut = JSON.parse(readFileSync(transcript, 'utf8').trim().split('\n').at(-1)!);
   assert.equal(timedOut.method, 'test.started');
   assert.equal(existsSync(timedOut.params.profile), false); assert.throws(() => process.kill(timedOut.params.pid, 0), { code: 'ESRCH' });

@@ -3,7 +3,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../souls.ts';
 import { godTokenLimiter } from './rate-limit.ts';
-import { renderLook } from './look-renderer.ts';
+import { renderLook, pngSize } from './look-renderer.ts';
 
 export const LOOK_LIMITS = { perMinute: 20, queued: 4, timeoutMs: 60_000 } as const;
 const coord = z.number().finite().min(-1_000_000).max(1_000_000);
@@ -74,6 +74,6 @@ export function mountLookRoutes(app: Hono, d: {
     if (!d.worldUrl) throw new ApiError(503, 'look.unavailable', 'world renderer URL is not configured; set the server loopback URL when mounting god routes');
     const started = Date.now();
     const png = await queue.run(signal => (d.renderer ?? renderLook)(d.worldUrl!, parsed.data, d.entities(), signal), c.req.raw.signal);
-    return c.body(png as never, 200, { 'content-type': 'image/png', 'cache-control': 'no-store', 'x-look-ms': String(Date.now() - started) });
+    return c.body(png as never, 200, { 'content-type': 'image/png', 'cache-control': 'no-store', 'x-look-ms': String(Date.now() - started), 'x-look-size': pngSize(png) });
   });
 }

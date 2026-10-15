@@ -19,7 +19,7 @@ export async function remoteLook(args, runtime = {}) {
   const png = Buffer.from(await r.arrayBuffer());
   if (!r.headers.get('content-type')?.startsWith('image/png') || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw Error('look: world renderer did not return a PNG');
   writeFileSync(resolve(args.out), png);
-  return { file: resolve(args.out), ms: now() - t0, via: 'remote' };
+  return { file: resolve(args.out), ms: now() - t0, via: 'remote', size: r.headers.get('x-look-size') ?? undefined };
 }
 
 /** Keep all launch-fallback policy out of W1's local rendering implementation. */

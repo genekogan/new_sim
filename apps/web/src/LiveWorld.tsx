@@ -67,7 +67,7 @@ import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -232,8 +232,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       problem('This browser could not start 3D graphics, so the world view is unavailable here.');
       return () => abort.abort();
     }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    const adaptive=newWorld?new AdaptiveResolution(renderer,devicePixelRatio):null;if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // lane PERF: new worlds step the pixel ratio down on a slow GPU
+    const shotMode=new URLSearchParams(location.search).has('shot');
+    const adaptive=worldResolution(renderer,devicePixelRatio,newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-label', 'Live 3D view of the world');
@@ -298,7 +298,6 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
-    const shotMode=new URLSearchParams(location.search).has('shot');
     const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});

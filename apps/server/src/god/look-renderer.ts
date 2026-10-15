@@ -9,6 +9,15 @@ import type { Look } from './look.ts';
 import { preserveScript, readyExpression, captureExpression } from './look-page.ts';
 
 const unavailable = () => new ApiError(503, 'look.unavailable', 'Cannot start the world renderer. Install Google Chrome on the world host (or set GOD_LOOK_CHROME to its executable) and allow it to run headless.');
+/** Validate the PNG header, but report the canvas's actual size instead of refusing a useful picture. */
+export function pngSize(bytes: Uint8Array) {
+  const png = Buffer.from(bytes);
+  if (png.length < 33 || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+    png.readUInt32BE(8) !== 13 || png.toString('ascii', 12, 16) !== 'IHDR' || !png.readUInt32BE(16) || !png.readUInt32BE(20)) {
+    throw new ApiError(503, 'look.failed', 'World screenshot failed: canvas did not return a valid PNG. Retry the look; check the host viewer if it persists.');
+  }
+  return `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+}
 export function chromeExecutable() {
   if (process.env.GOD_LOOK_CHROME) return existsSync(process.env.GOD_LOOK_CHROME) ? process.env.GOD_LOOK_CHROME : null;
   return ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/opt/google/chrome/chrome', 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe'].find(existsSync) ?? null;
@@ -118,7 +127,7 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
     const data = await evaluate(captureExpression(shot));
     if (typeof data !== 'string' || !data.startsWith('data:image/png;base64,')) throw new Error('no PNG canvas on the page');
     const png = Buffer.from(data.split(',')[1], 'base64');
-    if (!png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || png.readUInt32BE(16) !== shot.width || png.readUInt32BE(20) !== shot.height) throw new Error('canvas returned unexpected PNG dimensions');
+    pngSize(png);
     return png;
   } catch (e) {
     if (signal.aborted) throw signal.reason;
