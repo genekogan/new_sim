@@ -192,6 +192,170 @@ async function buildFixture(t, handler = () => null) {
 }
 const startFlags = () => ({ title: 'Black stone church', steps: steps.join(','), at: '0,0', size: '40,16', mass: 'nave 0,0 22x10 h12 gable; tower -13,0 6x6 h30 pyramid' });
 
+// Exact parts/search shapes from the reuse server; no Sim service is contacted.
+const keptPart = (patch = {}) => ({ sha: 'a'.repeat(64), ref: 'gothic-buttress@1', from: [{ build: 'black-church', title: 'Black Gothic church', doneAt: Date.UTC(2026, 9, 15, 18) }], placedNow: 10, firstBy: 'builder#12345678', checks: { buildDone: true, kept: 10, buildUse: 'none-recorded', partUse: 'n/a' }, place: `place sha:${'a'.repeat(64)} …`, ...patch });
+const keptDef = (patch = {}) => ({ name: 'gothic-buttress', ref: 'gothic-buttress@1', hash: 'a'.repeat(64), form: 'point', layer: 'solid', size: { box: [2, 8, 2], scale: [0.5, 2] }, make: { kind: 'gen', gen: 'kit/2' }, tags: ['gothic', 'stone'], params: {}, slots: [], description: 'A stepped stone support.', usedIn: [{ build: 'black-church', placedNow: 10 }], ...patch });
+const compactPart = (patch = {}) => ({ ref: 'gothic-buttress@1', cat: 'prop', size: '2×8×2', make: 'kit/2', tris: 120, doc: 'A stepped stone support.', usedIn: [{ build: 'black-church', placedNow: 10 }], ...patch });
+const startWithParts = (c, parts) => ({ ok: true, build: serverBuild({ id: c.body.id, title: c.body.title, plan: { steps: c.body.steps }, site: c.body.site, massing: c.body.massing }), lease: 'l_1234abcd', parts });
+
+test('parts accepts free text and JSON; help explains pinned reuse', () => {
+  checkArgs('parts', {}, ['gothic', 'stone', 'supports']);
+  checkArgs('parts', { json: true }, []);
+  assert.throws(() => checkArgs('parts', { unknown: true }, []), /no option --unknown/);
+  assert.match(COMMANDS.help(), /parts \[words\] \[--json\].*place sha:<hash> --at …/);
+});
+
+test('parts searches once and prints provenance, standing, honest checks and full pinned hints', async t => {
+  const parts = [keptPart({ from: [...keptPart().from, { build: 'chapel', title: 'Small chapel', doneAt: Date.UTC(2026, 9, 16) }], checks: { buildDone: true, kept: 10, buildUse: [{ target: 'church/door', uses: 'enter', ok: true, editSeq: 24 }, { target: 'church/seat', uses: 'sit', ok: false, editSeq: 25 }], partUse: 'none-recorded' } }), keptPart({ sha: 'b'.repeat(64), ref: 'old-spire@1', placedNow: 0 })];
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/parts?') ? { parts } : null);
+  const output = await COMMANDS.parts(['stone', '&', 'gothic']);
+  assert.equal(output.split('\n').length, 2, 'one line per part');
+  assert.match(output, /gothic-buttress@1.*gothic buttress/);
+  assert.ok(output.includes('sha:' + 'a'.repeat(64)));
+  assert.match(output, /Black Gothic church \(done Oct 15\); Small chapel \(done Oct 16\)/);
+  assert.match(output, /10 standing.*checks: build done; 10 kept at done/);
+  assert.match(output, /enter at church\/door passed/);
+  assert.match(output, /sit at church\/seat FAILED/);
+  assert.match(output, /part-use: none recorded/);
+  assert.match(output.split('\n')[1], /no copies standing.*build-use: none recorded; part-use: n\/a/);
+  for (const part of parts) assert.ok(output.includes(`place sha:${part.sha} --at …`));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'GET');
+  assert.equal(new URL(calls[0].path, 'http://127.0.0.1').searchParams.get('q'), 'stone & gothic');
+});
+
+test('parts JSON preserves server evidence and empty lists have a useful message', async t => {
+  let response = { parts: [keptPart()] };
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/parts?') ? response : null);
+  assert.deepEqual(await COMMANDS.parts([], { json: true }), response);
+  assert.equal(calls[0].path, '/v1/god/parts?q=');
+  response = { parts: [] };
+  assert.equal(await COMMANDS.parts(), 'no parts from finished builds');
+  assert.equal(await COMMANDS.parts(['spire']), 'no parts from finished builds matching "spire"');
+  assert.deepEqual(await COMMANDS.parts([], { json: true }), { parts: [] });
+  assert.ok(calls.every(c => c.method === 'GET'));
+});
+
+test('build start shows at most eight server suggestions with the same hints in its single response', async t => {
+  const suggestions = Array.from({ length: 9 }, (_, i) => keptPart({ ref: `buttress-${i}@1`, sha: String(i).repeat(64) }));
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? startWithParts(c, suggestions) : null);
+  const output = await build('start', ['church'], startFlags());
+  assert.match(output, /parts from earlier builds you can reuse:\n/);
+  assert.equal(output.split('\n').filter(line => line.includes(' · sha:')).length, 8);
+  assert.ok(output.includes(`place sha:${suggestions[0].sha} --at …`));
+  assert.doesNotMatch(output, /buttress-8/);
+  assert.ok(output.indexOf('parts from earlier builds') < output.indexOf('every edit now carries'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(load().build.id, 'church');
+});
+
+test('build start JSON keeps raw suggestions and empty suggestions add no text', async t => {
+  let suggestions = [keptPart()];
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? startWithParts(c, suggestions) : null);
+  assert.deepEqual((await build('start', ['church'], { ...startFlags(), json: true })).parts, suggestions);
+  suggestions = [];
+  assert.doesNotMatch(await build('start', ['chapel'], startFlags()), /parts from earlier builds/);
+  assert.equal(calls.length, 2);
+});
+
+test('find badges the current search wire shape without another request and keeps filters', async t => {
+  const rows = [compactPart(), compactPart({ ref: 'core/bench@1', usedIn: undefined })];
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: rows } : null);
+  const text = await COMMANDS.find(['stone', 'support'], { category: 'prop', has: ['slot:sit', 'comp:light'], tag: 'gothic' });
+  assert.match(text, /gothic-buttress@1.*A stepped stone support.*used in: black-church \(done; 10 standing\)/);
+  assert.doesNotMatch(text.split('\n')[2], /used in/);
+  assert.equal(calls.length, 1);
+  const q = new URL(calls[0].path, 'http://127.0.0.1').searchParams;
+  assert.equal(q.get('q'), 'stone support');
+  assert.equal(q.get('compact'), '1');
+  assert.equal(q.get('limit'), '25');
+  assert.equal(q.get('category'), 'prop');
+  assert.deepEqual(q.getAll('has'), ['slot:sit', 'comp:light']);
+  assert.equal(q.get('tag'), 'gothic');
+  assert.deepEqual(await COMMANDS.find(['stone'], { json: true, all: true }), JSON.parse(JSON.stringify(rows)));
+  assert.equal(new URL(calls[1].path, 'http://127.0.0.1').searchParams.get('limit'), '500');
+});
+
+test('find shows supplied titles/dates, supports the used alias and preserves miss hints', async t => {
+  let defs = [compactPart({ usedIn: [{ build: 'black-church', title: 'Black Gothic church', doneAt: Date.UTC(2026, 9, 15) }] }), compactPart({ ref: 'spire@1', usedIn: undefined, used: [{ build: 'chapel', placedNow: 0 }] })];
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs, hint: 'define it here' } : null);
+  const text = await COMMANDS.find(['gothic']);
+  assert.match(text, /used in: Black Gothic church \(done Oct 15\)/);
+  assert.match(text, /used in: chapel \(done; 0 standing\)/);
+  defs = [];
+  assert.match(await COMMANDS.find(['spire']), /nothing matches "spire"\. define it here.*recommend/);
+  await assert.rejects(COMMANDS.find(), /find <words>/);
+  assert.equal(calls.length, 2, 'invalid empty searches stay local');
+});
+
+test('defs lists keep usedIn evidence in human and JSON output', async t => {
+  const row = keptDef();
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: [row] } : null);
+  assert.match(await COMMANDS.defs(['gothic', 'supports']), /used in: black-church \(done; 10 standing\)/);
+  const json = await COMMANDS.defs(['gothic', 'supports'], { json: true });
+  assert.deepEqual(json[0].usedIn, row.usedIn);
+  assert.equal(calls.length, 2);
+});
+
+test('defs exact details show the search badge and old server rows still work', async t => {
+  let row = keptDef({ usedIn: [{ build: 'black-church', title: 'Black Gothic church', doneAt: Date.UTC(2026, 9, 15) }] });
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: [row] } : c.path === '/v1/god/query' ? { bake: { rooms: [], slots: [] } } : null);
+  assert.match(await COMMANDS.defs(['gothic-buttress']), /used in: Black Gothic church \(done Oct 15\)/);
+  assert.deepEqual(await COMMANDS.defs(['gothic-buttress'], { json: true }), row);
+  row = keptDef({ usedIn: undefined });
+  assert.doesNotMatch(await COMMANDS.defs(['gothic', 'supports']), /used in/);
+  assert.equal(calls.filter(c => c.path.startsWith('/v1/god/defs?')).length, 3);
+});
+
+test('define-kit prints kept matches and pinned hints before its commit, searching name and tags', async t => {
+  const notices = [];
+  t.mock.method(console, 'error', text => notices.push(text));
+  const { calls } = await buildFixture(t, c => {
+    if (c.path.startsWith('/v1/god/defs?')) return { defs: [keptDef({ ref: 'unused@1', usedIn: undefined }), keptDef()] };
+    if (c.path === '/v1/god/act') {
+      assert.equal(notices.length, 1, 'the owner sees the match before the server receives a define');
+      assert.match(notices[0], /gothic-buttress@1.*used in: black-church.*place sha:a{64} --at ….*unused@1/);
+    }
+  });
+  const output = await COMMANDS['define-kit']([JSON.stringify({ name: 'new-buttress', tags: ['gothic', 'stone'], shapes: [{ kind: 'box', at: [0, 1, 0], size: [1, 2, 1] }] })]);
+  assert.match(output, /^defined new-buttress@1/);
+  assert.doesNotMatch(output, /similar defs/);
+  assert.equal(notices[0].split('\n').length, 1);
+  assert.equal(new URL(calls[0].path, 'http://127.0.0.1').searchParams.get('q'), 'new buttress gothic stone');
+  assert.equal(calls.length, 3, 'one search plus the existing schema lookup and define');
+  assert.equal(calls[1].path, '/v1/god/schema');
+  assert.equal(calls[2].body.ops[0].op, 'define');
+});
+
+test('define-kit dry runs return similarities without printing or writing; no-match writes stay quiet', async t => {
+  const notices = [];
+  t.mock.method(console, 'error', text => notices.push(text));
+  let matches = [keptDef()];
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: matches } : null);
+  const kit = JSON.stringify({ name: 'stone-support', shapes: [{ kind: 'box', at: [0, 1, 0], size: [1, 2, 1] }] });
+  const dry = await COMMANDS['define-kit']([kit], { dry: true, json: true });
+  assert.deepEqual(dry.similar, ['gothic-buttress@1']);
+  assert.equal(dry.def.name, 'stone-support');
+  assert.equal(calls.length, 1);
+  assert.deepEqual(notices, []);
+  matches = [];
+  assert.match(await COMMANDS['define-kit']([kit]), /^defined stone-support@1/);
+  assert.deepEqual(notices, []);
+  assert.equal(calls.length, 4, 'dry search, normal search, schema, define');
+});
+
+test('build done and show report the server reuse summary without another request', async t => {
+  const reuse = { newDefs: 3, placedFromParts: 2, fromBuilds: ['chapel'], kept: ['gothic-buttress@1'], recorded: false, code: 'parts.cap' };
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/builds/church') ? { ok: true, build: serverBuild({ status: 'done', reuse }), reuse } : null);
+  save({ build: { id: 'church', lease: 'l_1234abcd', n: 5, label: 'furnish', steps } });
+  const done = await build('done');
+  assert.match(done, /reuse: 3 new defs, 2 placed from parts; kept as parts: gothic-buttress@1; not fully recorded \(parts.cap\)/);
+  assert.equal(load().build, undefined);
+  assert.match(await build('show', ['church']), /reuse: 3 new defs, 2 placed from parts/);
+  assert.equal(calls.length, 2);
+});
+
 test('help defines mass h as wall/eave height and explains pitched and flat roof totals', () => {
   const help = COMMANDS.help();
   assert.match(help, /h = wall\/eave height, not total height/);
@@ -613,7 +777,7 @@ test('accepted remote edits never enter transport recovery when local state fina
 
 test('downloadable bundle runs the build lifecycle and global bypass against only the local stub', async t => {
   let open = [serverBuild({ status: 'paused', lead: { live: false } })];
-  const { calls, dir } = await buildFixture(t, c => c.path === '/v1/god/builds' && c.method === 'GET' ? { open, recent: [] } : c.path.startsWith('/v1/god/builds/missing') ? { httpStatus: 404, data: { error: 'not-found' } } : null);
+  const { calls, dir } = await buildFixture(t, c => c.path === '/v1/god/builds' ? c.method === 'GET' ? { open, recent: [] } : startWithParts(c, [keptPart()]) : c.path.startsWith('/v1/god/parts?') ? { parts: [keptPart()] } : c.path.startsWith('/v1/god/defs?') ? { defs: [compactPart()] } : c.path.startsWith('/v1/god/builds/missing') ? { httpStatus: 404, data: { error: 'not-found' } } : null);
   const executable = new URL('./eden-god.mjs', import.meta.url).pathname;
   const cli = args => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [executable, ...args], { cwd: dir, env: { ...process.env, EDEN_GOD_TRACE: '', EDEN_GOD_TIMING: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -623,6 +787,7 @@ test('downloadable bundle runs the build lifecycle and global bypass against onl
   const start = await cli(['build', 'start', 'church', '--title', 'Church', '--steps', 'shell,roof,interior', '--at', '0,0', '--size', '40,16', '--mass', 'nave 0,0 22x10 h5 gable']);
   assert.match(start.stdout, /every edit now carries build church, step 1\/3 shell/);
   assert.match(start.stdout, /nave 22×10 m, walls 5 m \+ gable roof ≈ 10 m total/);
+  assert.match(start.stdout, /parts from earlier builds you can reuse:\n.*place sha:a{64} --at …/);
   assert.doesNotMatch(start.stdout, /no committed batches|inspect|finish it first|IN PROGRESS|roots:|claims:|next:|local:/);
   assert.equal(calls.length, 1);
   await cli(['build', 'step']); assert.equal(calls.length, 1);
@@ -651,4 +816,9 @@ test('downloadable bundle runs the build lifecycle and global bypass against onl
   assert.match(choices.stdout, /market: Market hall \(active\); step 1\/5 shell/);
   assert.equal(calls.at(-1).method, 'GET');
   assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
+  const parts = await cli(['parts', 'gothic', 'stone']);
+  assert.match(parts.stdout, /gothic-buttress@1.*Black Gothic church \(done Oct 15\).*place sha:a{64} --at …/);
+  assert.equal(parts.stderr, '');
+  assert.deepEqual(JSON.parse((await cli(['parts', '--json'])).stdout), { parts: [keptPart()] });
+  assert.match((await cli(['find', 'gothic', 'stone'])).stdout, /used in: black-church \(done; 10 standing\)/);
 });

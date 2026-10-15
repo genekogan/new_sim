@@ -122,6 +122,11 @@ character. Say plainly what you approximated ("marble = pale stone colour; there
 
 - `defs <words>` (plain words work: `defs houses`, `defs street lamp`); a wrong name also tells you what
   the library has (`place house` → "the library has: core/cottage@1 …").
+- **Parts from finished builds.** `parts [words]` lists them, `build start` suggests them, and `find` badges
+  them `used in`. Check before authoring. Reuse with `place sha:<hash> --at …`: the hash pins the copy;
+  editing the original never changes it. A part counts only after its build is done and it is still standing.
+  Parts with no copies standing remain listed with provenance. Never redefine a part's name: that changes
+  copies placed by name; scale or recolour your pinned copy, or define a new name.
 - A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
   `--scale s` resizes a point thing within **its def's range**, which `defs` prints (`scale 0.3–6`;
   `fixed size` = no `--scale`: a lantern, a boat); outside it the server refuses `size.range`.

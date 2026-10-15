@@ -3,7 +3,7 @@
 // SOURCE of the downloadable single file eden-god.mjs (built by build.mjs: `node build.mjs`).
 // State: ./.eden-god.json (world URL + god token + current group; private), ./.eden-god.cache.json
 // (the world mirror). Commands print short human text; add --json for machine output.
-import { catalog, find, recommend, taxonomy } from './lib/catalog.mjs';
+import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withoutBuild } from './lib/state.mjs';
@@ -50,6 +50,52 @@ const fmtP = (p) => (p ? `(${p.map((v) => r2(v)).join(', ')})` : '');
 const dxdz = (x, what) => { const a = String(x).split(',').map(Number); if (a.length !== 2 || !a.every(Number.isFinite)) throw new Error(`${what} takes dx,dz (two numbers), got ${x}`); return a; };
 const yawWord = (y) => (typeof y === 'number' ? `facing ${compassOfYaw(y)}` : '');
 
+// Reuse wire shapes live here: parts rows have `from`; search rows have `usedIn` (also aliased `used`).
+const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+const doneDate = (at) => {
+  if (at === undefined || at === null) return '';
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+};
+const usedIn = (d) => d.usedIn ?? d.used ?? [];
+const useText = (u) => {
+  const b = typeof u.build === 'object' ? u.build : { id: u.build, title: u.title, doneAt: u.doneAt };
+  const date = doneDate(b.doneAt);
+  return `${oneLine(b.title || b.id)} (done${date ? ' ' + date : ''}${u.placedNow !== undefined ? `; ${u.placedNow} standing` : ''})`;
+};
+const usedBadge = (d) => usedIn(d).length ? ` · used in: ${usedIn(d).map(useText).join('; ')}` : '';
+const placePart = (p) => `place sha:${p.sha} --at …`;
+function partChecks(c) {
+  if (!c) return 'checks: none recorded';
+  const checks = [...(c.buildDone === true ? ['build done'] : []), ...(c.kept !== undefined ? [`${c.kept} kept at done`] : [])];
+  for (const [label, receipts] of [['build-use', c.buildUse], ['part-use', c.partUse]]) {
+    checks.push(`${label}: ${Array.isArray(receipts) && receipts.length ? receipts.map(r => `${oneLine(r.uses)} at ${oneLine(r.target)} ${r.ok === true ? 'passed' : 'FAILED'}`).join(', ') : receipts === 'n/a' ? 'n/a' : 'none recorded'}`);
+  }
+  return 'checks: ' + checks.join('; ');
+}
+function partLine(p) {
+  // The server's compact parts rows omit a description; their ref still names the kind of part.
+  const what = p.description || p.doc || p.ref.replace(/@\d+$/, '').replace(/[-_]/g, ' ');
+  return `${oneLine(p.ref)} · sha:${p.sha} — ${oneLine(what)} · used in: ${(p.from ?? []).map(useText).join('; ')} · ${p.placedNow === 0 ? 'no copies standing' : `${p.placedNow} standing`} · ${partChecks(p.checks)} · ${placePart(p)}`;
+}
+const searchDefs = async (q, flags = {}) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries({ q, ...flags })) for (const x of [].concat(v ?? [])) if (x !== '' && x !== undefined) qs.append(k, x);
+  return ok(await call(`/v1/god/defs?${qs}`), 'defs');
+};
+export async function parts(words = '', flags = {}) {
+  const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), 'parts');
+  return flags.json ? d : d.parts.length ? d.parts.map(partLine).join('\n') : `no parts from finished builds${words ? ` matching "${words}"` : ''}`;
+}
+// Keep the shared catalogue module unchanged: this CLI adds the reuse badge to its normal manifest lines.
+export async function find(words, flags = {}) {
+  if (!words && !flags.category && !flags.has) throw new Error('find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]');
+  const d = await searchDefs(words, { category: flags.category, has: flags.has, tag: flags.tag, compact: 1, limit: flags.all ? 500 : 25 });
+  if (flags.json) return d.defs;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  return [`${d.defs.length} match${words ? ` "${words}"` : ''}:`, ...d.defs.map(r => `${catalogLine(r)}${usedBadge(r)}${r.why?.length ? `  ‹${r.why.join(' ')}›` : ''}`)].join('\n');
+}
+
 /** map: the whole world as structure — extent, terrain, water, every root thing with pose and children, flags, prayers. */
 export async function map(opts = {}) {
   const m = await mirror(); const v = view(m); const s = m.snapshot;
@@ -92,7 +138,7 @@ const fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join('|')}
 /** defs <one def's name or full ref>: that def in full (params with ranges and defaults, size, slots, rooms). */
 async function defDetail(d, others) {
   const ref = d.ref.replace(/^core-/, 'core/');
-  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.form === 'point' ? `, ${scaleText(d)}` : ''}${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}`];
+  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.form === 'point' ? `, ${scaleText(d)}` : ''}${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}${usedBadge(d)}`];
   if (d.description) L.push(`  ${d.description}`);
   const ps = Object.entries(d.params ?? {});
   if (ps.length) { L.push(`  params (--param k=v):`); for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`); }
@@ -126,10 +172,10 @@ export async function defs(q, flags = {}) {
     const seen = new Set(r.defs.map((d) => d.ref));
     for (const syn of [...new Set(q.toLowerCase().split(/\s+/).filter(Boolean).flatMap(synonymsOf))]) for (const d of (await get(syn)).slice(0, 3)) if (!seen.has(d.ref)) { seen.add(d.ref); r.defs.push(d); }
   }
-  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
+  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description, ...(usedIn(d).length ? { usedIn: usedIn(d) } : {}) }));
   if (flags.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ''}". Try a broader word, or define one: define-kit (see SKILL.md).`;
-  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m${d.form === 'point' && d.scale ? `, ${d.scale[0] === d.scale[1] ? 'fixed size' : `scale ${d.scale[0]}–${d.scale[1]}`}` : ''})${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
+  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m${d.form === 'point' && d.scale ? `, ${d.scale[0] === d.scale[1] ? 'fixed size' : `scale ${d.scale[0]}–${d.scale[1]}`}` : ''})${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}${usedBadge(d)}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
 }
 
 export async function schema(flags = {}) { const s = ok(await call('/v1/god/schema', { as: 'none' }), 'schema'); return flags.md ? schemaMarkdown(s) : s; }
@@ -564,13 +610,14 @@ async function buildChoices(sub, reason, f, list) {
   const message = [reason, ...(r.open.length ? ['open builds:', ...r.open.map(buildListLine), `choose an id: build ${sub} <id>${sub === 'resume' ? ' [--take]' : ''}`] : ['no open builds; build start <id> to start one'])].join('\n');
   return f.json ? { ...r, ok: false, message } : message;
 }
-function buildStartReport(b) {
+function buildStartReport(b, suggestions = []) {
   const masses = b.massing.map((m, i) => {
     const roof = m.roof ?? 'flat', total = m.h + (roof === 'flat' ? 0 : Math.min(...m.size) / 2);
     return `${m.name ?? i + 1} ${m.size.map(r2).join('×')} m, walls ${r2(m.h)} m + ${roof} roof ≈ ${r2(total)} m total`;
   });
-  return [...buildOutline(b), `massing: ${masses.join('; ') || 'none'}`, `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join('\n');
+  return [...buildOutline(b), `massing: ${masses.join('; ') || 'none'}`, ...(suggestions.length ? ['parts from earlier builds you can reuse:', ...suggestions.slice(0, 8).map(partLine)] : []), `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join('\n');
 }
+const reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(', ') || 'none'}${r.recorded === false ? `; not fully recorded${r.code ? ' (' + r.code + ')' : ''}` : ''}` : '';
 function buildReport(r) {
   if (r.open) return [...r.open.map(buildListLine), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
   const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
@@ -586,6 +633,7 @@ function buildReport(r) {
   if (next && open) lines.push(`next: ${next.n}/${steps.length} ${next.label}`);
   const root = b.roots[0]; if (root) lines.push(`first: describe ${root.path ?? root.id ?? root}`);
   if (load().build?.id === b.id) lines.push(`local: ${buildHeader()}`);
+  const reuse = reuseReport(r.reuse ?? b.reuse); if (reuse) lines.push(reuse);
   return lines.join('\n');
 }
 export async function build(sub = 'show', args = [], f = {}) {
@@ -664,9 +712,9 @@ export async function build(sub = 'show', args = [], f = {}) {
   if (['release', 'done', 'abandon'].includes(sub)) save({ build: undefined, group: undefined, buildPreviews: undefined });
   invalidate();
   if (f.json) return r;
-  if (sub === 'start') return buildStartReport(r.build);
+  if (sub === 'start') return buildStartReport(r.build, r.parts);
   if (sub === 'resume') return buildReport(r);
-  return `${id}: ${sub === 'release' ? 'claim released' : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(', ') || 'none'}; not undone edits: ${r.build.abandoned.undo.notReverted.join(', ') || 'none'}` : ''}`;
+  return `${id}: ${sub === 'release' ? 'claim released' : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(', ') || 'none'}; not undone edits: ${r.build.abandoned.undo.notReverted.join(', ') || 'none'}` : ''}${sub === 'done' && (r.reuse ?? r.build.reuse) ? '\n' + reuseReport(r.reuse ?? r.build.reuse) : ''}`;
 }
 /** group <name>: label every following edit (until `group --off`); `undo --group <name>` reverts them all. */
 export async function group(name, flags = {}) {
@@ -807,15 +855,18 @@ export async function define(json) {
 export async function defineKit(json, flags = {}) {
   const k = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error('define-kit needs {name, shapes:[…]} (see SKILL.md, kit primitives in SCHEMA.md)');
-  // search before define: say what already exists
-  const similar = ok(await call(`/v1/god/defs?q=${encodeURIComponent(k.name.replace(/[-_.]/g, ' '))}`), 'defs').defs.slice(0, 5).map((d) => d.ref.replace(/^core-/, 'core/'));
+  // Search name and tags before the write, and surface kept parts before unused defs.
+  const matches = (await searchDefs([k.name.replace(/[-_.]/g, ' '), ...(k.tags ?? [])].join(' '))).defs;
+  const picks = [...matches.filter(d => usedIn(d).length), ...matches.filter(d => !usedIn(d).length)].slice(0, 5);
+  const similar = picks.map(d => d.ref.replace(/^core-/, 'core/'));
   const ext = (sh) => { const [x, y, z] = sh.at; const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)]; return [x - sz[0] / 2, y - (sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'sphere' || sh.kind === 'capsule' ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2]; };
   const e = k.shapes.map(ext);
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
   const def = { schema: 'def/1', name: k.name, version: k.version ?? 1, description: k.description ?? '', tags: k.tags ?? [], form: 'point', layer: k.layer ?? 'solid', make: { kind: 'gen', gen: 'kit/2', args: { shapes: k.shapes, ...(k.gait ? { gait: k.gait } : {}), ...(k.slots ? { slots: k.slots } : {}), ...(k.round !== undefined ? { round: k.round } : {}) } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...(k.components ? { components: k.components } : {}), ...(k.anchor ? { anchor: k.anchor } : {}), ...(k.state ? { state: k.state } : {}), ...(k.params ? { params: k.params } : {}) };
   if (flags.dry) return { def, similar };
+  if (picks.length) console.error(`similar defs already in the library: ${picks.map(d => oneLine(d.ref.replace(/^core-/, 'core/')) + usedBadge(d) + (usedIn(d).length && d.hash ? ' · ' + placePart({ sha: d.hash }) : '')).join('; ')} — prefer them when they fit`);
   const r = await define(def);
-  return `${r}${similar.length ? `\n  (similar defs already in the library: ${similar.join(', ')} — prefer them when they fit)` : ''}`;
+  return r;
 }
 
 // ---------------------------------------------------------------- furnish / gallery (other lanes' libs)
@@ -887,7 +938,7 @@ const FLAGS = {
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
-  catalog: 'category has tag page per', find: 'category has tag all', recommend: 'per', taxonomy: '',
+  catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
@@ -923,7 +974,7 @@ export const COMMANDS = {
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
-  catalog: (r, f) => catalog(f), find: (r, f) => find(r.join(' ') || undefined, f), recommend: (r, f) => recommend(r.join(' '), f), taxonomy: (r, f) => taxonomy(f),
+  catalog: (r, f) => catalog(f), find: (r, f) => find(r.join(' ') || undefined, f), parts: (r, f) => parts(r.join(' '), f), recommend: (r, f) => recommend(r.join(' '), f), taxonomy: (r, f) => taxonomy(f),
   sky: (r, f) => sky(f), weather: (r, f) => envWeather(f), time: (r, f) => envTime(r, f), strike: (r, f) => envStrike(f), land: (r, f) => envLand(r, f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
   flags, flag: (r, f) => flag(r.join(' '), f), prayers: (r, f) => prayers(f), answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
@@ -948,6 +999,7 @@ world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--r
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
+parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
 ${LAYERS_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
