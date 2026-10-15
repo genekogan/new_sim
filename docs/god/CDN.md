@@ -1,4 +1,49 @@
-# CDN plan for Sim blobs (lane BLOBS, 2026-10-11)
+# CDN publishing path (lane cdn, 2026-10-15)
+
+`assets.eden.art`, its R2 bucket, CORS and cache rule have been active since October 13. Publishing credentials have
+not been installed or used by this lane. No real uploads or live cache proof are claimed. The older plan below is
+historical; use [`tools/cdn/README.md`](../../tools/cdn/README.md) for the current runnable publisher and checker.
+
+The prepared path ports `db11f401`'s immutable metadata/checksum design to built-in S3 signing. Dry-run is the default;
+`--apply` is an explicit release-owner action. It requires only `EDEN_ASSETS_CREDENTIALS=/absolute/path/to/file`, refuses
+unsafe file permissions, HEADs before conditional PUT, refuses conflicting immutable keys and verifies every readback.
+No ambient AWS/rclone credentials are consulted. Gene's hidden-prompt installation command is:
+
+```sh
+python3 <worktrees>/lane-cdn/tools/cdn/install-key.py <private-secrets>/eden-assets-r2.env
+```
+
+The existing key expires October 20. If its one-time secret was lost or expired, Gene creates a replacement 7-day
+Object Read & Write key scoped only to `eden-assets`. Agents must not retrieve, display or install its values.
+
+The local inventory covers the three root worlds' public sources, the immutable release overlay and `/worlds` assets.
+Unknown/restricted assets remain explicit exclusions. A reviewed 76-model CC0 derivative allowlist is tied to the
+source-pack records in `team/asset-scouting/SOURCES.csv`; it permits 3,337,244 bytes. The measured campus is
+70,772,556 bytes (67.49 MiB) and is excluded pending explicit publication provenance. This work does not by itself
+move the large private Mars or Little Martians files to the CDN.
+
+The web switch is **off by default**. After upload and the public cache/hash checker pass, release the reviewed public
+manifest at `apps/web/src/cdn-manifest.json`, then build both root and `/worlds` web artifacts with
+`SIM_ASSETS_CDN_ENABLED=1`. `SIM_ASSETS_CDN_ORIGIN` defaults to `https://assets.eden.art`; only this origin and explicit
+loopback HTTP stand-ins are accepted. Vite emits the manifest as a hashed `/assets/cdn-manifest-*.json` file, so both
+existing static servers can serve it and immutable caching cannot retain a prior release's manifest. The same client
+entry point handles both builds. Content-hashed world asset
+routes resolve only to explicit approved hash aliases; mutable path/query aliases must match exactly. A missing or
+invalid manifest leaves the origin transport active.
+
+The client verifies CDN byte count and SHA before exposing data to loaders, then retries the exact original request
+on HTTP, CORS, connection, body, timeout or integrity failure. Standalone ImageLoader textures use the same transport.
+Caller cancellation is preserved; CDN requests omit origin credentials/headers and referrers. The CDN attempt is
+bounded to 12 seconds, including its body. Integrity checking buffers one asset before decoding, so large approved
+files would add transient memory and the arrival byte meter advances after verification. No new large-file speed or
+memory improvement is claimed. External-resource `.gltf` files remain on origin.
+
+Local proof uses only fake worlds on 5810–5812, real Chrome with the `cdn` lease and hardware rendering. The repeatable
+fixture checks successful CDN delivery, refused connections and same-size corrupt bytes for GLB and standalone PNG
+textures at DPR 1 and 2. Run instructions are in the publisher README. No server-core files changed, so the server-core
+Modal suite condition does not apply to this bounded deliverable.
+
+## Historical October 11 design
 
 Status: **plan only.** No account, bucket, DNS record or Cloudflare setting has been created. The steps that need
 Gene or the internet session are listed at the end, in order.

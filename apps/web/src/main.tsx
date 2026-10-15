@@ -2,6 +2,8 @@ import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-dis
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
 import {BASE} from './base-path.ts';
+import {installCdnAssets} from './cdn-assets.ts';
+import cdnManifestUrl from './cdn-manifest.json?url';
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {ClerkProvider,useAuth,useClerk,useUser} from '@clerk/clerk-react';
@@ -19,7 +21,7 @@ import {assetBytes,installAssetMeter} from './asset-bytes.ts';
 import initialAssets from './initial-assets.json';
 import {newWorld} from './world-kind.ts';
 import {forkInitialAssets} from './mars-fork.ts';
-installAssetMeter();if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{}));  // MARSLAND-FORK: the Mars fork's own campus
+if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{}));  // MARSLAND-FORK: the Mars fork's own campus
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
 // current-owner capability/readiness and server authority remain mandatory.
@@ -85,7 +87,10 @@ function WorldRoot() {
   return <Suspense fallback={<pre>connecting sign-in…</pre>}><PrivyAuth cfg={cfg} arrivalEnabled={arrivalEnabled}/></Suspense>;
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
+void installCdnAssets(cdnManifestUrl).finally(()=>{
+ installAssetMeter(); // meter the original asset URL, including its CDN attempt and origin fallback
+ createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
+});
 
 function WorldList(){
  const local=singleLocalPreview(location.hostname);
