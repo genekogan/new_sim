@@ -375,7 +375,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const shot=conversationFrame(members,camera,visualObstructionRoots(),(x,z)=>cameraGround.heightAt(scene,x,z)??0);
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
-      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active?[...depictedLocations,...godTourViews(entityLayer,entityLayer.groundAt).map(v=>({id:v.id,label:v.label,regionId:v.id,p:v.p,target:v.target,radius:8}))]:depictedLocations,  // R4-LIVE: Explore lists what the god built
+      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active?[...depictedLocations,...godTourViews(entityLayer,entityLayer.groundAt).map(v=>({id:v.id,label:v.label,regionId:v.id,p:v.p,target:v.target,radius:v.radius??8}))]:depictedLocations,  // R4-LIVE: Explore lists what the god built
       frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
       locationPreview:id=>{if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
       framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
@@ -421,7 +421,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     manager.onError=(url)=>downloads.finish(url,true);
     const originalStart=manager.itemStart.bind(manager);manager.itemStart=(url)=>{downloads.start(url);originalStart(url);};
     const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
-    const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
+    const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[]),...(entityLayer.active?[entityLayer.group]:[])]);  // E2 #7: a god world's landmarks are drawn by its entity layer
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
     setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });

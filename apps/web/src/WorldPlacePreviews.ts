@@ -12,16 +12,18 @@ export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,asp
  camera.position.copy(aim).addScaledVector(view,distance);camera.lookAt(aim);camera.updateMatrixWorld(true);return camera;
 }
 /** Transparent thumbnails of the actual authored mesh data, using the world's existing renderer.
- * Work runs only for visible Explore cards, caches at most24 images and never loads a second model. */
+ * Work runs only for visible Explore cards, caches at most24 images and never loads a second model. An empty capture
+ * (the place not drawn yet, e.g. a god world still streaming its things in) is not cached: the next opening retries. */
 export class WorldPlacePreviews{
  private images=new Map<string,string|null>();private pending=new Map<string,Promise<string|null>>();private closed=false;private revision=0;private tail:Promise<unknown>=Promise.resolve();
- constructor(private renderer:THREE.WebGLRenderer,private roots:()=>readonly THREE.Object3D[]){}
+ private renderer:THREE.WebGLRenderer;private roots:()=>readonly THREE.Object3D[];
+ constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[]){this.renderer=renderer;this.roots=roots;}
  capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,()=>this.render(id));}
  captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{return this.request(sceneKey+':'+location.id,()=>this.render(location.id,location));}
  invalidate(){this.revision++;this.images.clear();this.pending.clear();}
  private request(key:string,render:()=>string|null):Promise<string|null>{
   if(this.closed)return Promise.resolve(null);if(this.images.has(key))return Promise.resolve(this.images.get(key)!);const pending=this.pending.get(key);if(pending)return pending;const revision=this.revision;
-  const job=this.tail.then(()=>new Promise<void>(resolve=>setTimeout(resolve,0))).then(()=>this.closed||revision!==this.revision?null:render()).catch(()=>null).then(image=>{if(this.closed||revision!==this.revision)return null;this.pending.delete(key);this.images.set(key,image);if(this.images.size>24)this.images.delete(this.images.keys().next().value!);return image;});this.pending.set(key,job);this.tail=job;return job;
+  const job=this.tail.then(()=>new Promise<void>(resolve=>setTimeout(resolve,0))).then(()=>this.closed||revision!==this.revision?null:render()).catch(()=>null).then(image=>{if(this.closed||revision!==this.revision)return null;this.pending.delete(key);if(image)this.images.set(key,image);if(this.images.size>24)this.images.delete(this.images.keys().next().value!);return image;});this.pending.set(key,job);this.tail=job;return job;
  }
  private render(id:string,location?:WorldLocation):string|null{
   const view=location??worldPlaceView(id as WorldPlaceId);if(this.closed||!view)return null;

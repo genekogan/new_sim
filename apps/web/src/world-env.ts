@@ -27,7 +27,8 @@ export class CoverProbe {
   private last = 0;
   private covered = false;
   // a camera for sprites (labels) in the god's layer: three's Sprite.raycast needs one; label hits are skipped below
-  constructor(private roots: () => THREE.Object3D[]) { this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
+  private roots: () => THREE.Object3D[];
+  constructor(roots: () => THREE.Object3D[]) { this.roots = roots; this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
   test(x: number, y: number, z: number): boolean {
     const now = performance.now();
     if (now - this.last < 400 && this.at.distanceToSquared(_p.set(x, y, z)) < 1) return this.covered;
@@ -59,7 +60,9 @@ export class GodWorldLiving {
   private checkedAt = -Infinity;
   private readonly cover: CoverProbe;
   lights = 0;
-  constructor(private layer: LayerLike) {
+  private layer: LayerLike;
+  constructor(layer: LayerLike) {
+    this.layer = layer;
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
     this.cover = new CoverProbe(() => (this.layer.active ? [this.layer.group] : []));
   }
@@ -97,7 +100,9 @@ export class GodWorldLiving {
 }
 
 // ---------------------------------------------------------------- broadcast: a god world's establishing views
-type TourViewLike = { id: string; label: string; p: readonly [number, number, number]; target: readonly [number, number, number] };
+type TourViewLike = { id: string; label: string; p: readonly [number, number, number]; target: readonly [number, number, number];
+  /** Ground radius (m) around `target` that holds the whole landmark: Explore's picture of it slices this much. */
+  radius?: number };
 type ViewModel = {
   entities: Map<string, { id: string; name?: string; def: string; in: { parent: string }; shape?: { area?: [number, number][]; path?: [number, number][] } }>;
   resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown } } | undefined;
@@ -127,7 +132,7 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
     const dist = Math.max(10, Math.min(70, size * 1.9 + 6)), a = ((hashStr(e.id) % 360) / 360) * Math.PI * 2;
     const ex = cx + Math.cos(a) * dist, ez = cz + Math.sin(a) * dist, eg = groundAt(ex, ez) ?? g;
     const ty = g + Math.min(top, 8) * 0.45;
-    found.push({ size, v: { id: `god:${e.id}`, label: e.name.replace(/[-_]+/g, ' '), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez] } });
+    found.push({ size, v: { id: `god:${e.id}`, label: e.name.replace(/[-_]+/g, ' '), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) } });
   }
   const views = found.sort((a, b) => b.size - a.size).slice(0, 12).map((f) => f.v);
   viewsCache = { key, views };
