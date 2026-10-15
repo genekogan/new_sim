@@ -17,13 +17,13 @@ function fakeModel(): SiteModel & { boxes: Map<string, OBB[]> } {
   const entities = new Map<string, Entity>(), boxes = new Map<string, OBB[]>();
   return { entities, boxes, subtree(id) { const ids = [id]; for (let i = 0; i < ids.length; i++) for (const e of entities.values()) if (e.in.parent === ids[i]) ids.push(e.id); return ids; }, worldPose(e) { return { x: e.p?.[0] ?? 0, y: 0, z: e.p?.at(-1) ?? 0, yaw: 0, s: 1 }; }, footprintsOf(id) { return boxes.get(id) ?? []; } };
 }
+function fakeCanvas(paint = () => {}) {
+  const context = { font: '', fillStyle: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath() {}, roundRect() {}, fill() {}, fillText: paint };
+  return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
+}
 function harness(style = 'ring,label', more: { fetchBuilds?: () => Promise<unknown>; groundAt?: (x: number, z: number) => number | null } = {}) {
   const model = fakeModel(); let mono = 1000, canvases = 0, paints = 0;
-  const canvas = () => {
-    canvases++;
-    const context = { font: '', fillStyle: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath() {}, roundRect() {}, fill() {}, fillText() { paints++; } };
-    return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
-  };
+  const canvas = () => { canvases++; return fakeCanvas(() => { paints++; }); };
   const sites = new WorldBuildSites({ model: () => model, groundAt: () => 0, now: () => mono, createCanvas: canvas, search: `?sites=${style}`, ...more });
   return { sites, model, advance(ms: number) { mono += ms; sites.update(mono); }, now: () => mono, get canvases() { return canvases; }, get paints() { return paints; } };
 }
@@ -34,6 +34,9 @@ function diff(d: SiteDelta[], upserts: Entity[] = [], removes: string[] = []) { 
 function group(h: ReturnType<typeof harness>) { return h.sites.group.children[0] as THREE.Group; }
 function marker(h: ReturnType<typeof harness>) { return group(h).children[0] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>; }
 function faces(h: ReturnType<typeof harness>) { return group(h).children[1] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; }
+function label(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Sprite) as THREE.Sprite; }
+function wheel(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Mesh && o !== faces(h) && o.material instanceof THREE.MeshBasicMaterial) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; }
+function sheen(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Mesh && o.material instanceof THREE.ShaderMaterial) as THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial>; }
 
 test('one adapter handles start/resume, deltas, multi-build diffs, snapshot/API rev, and the singular brief alias', () => {
   assert.equal(parseBuildFeed(start())?.records[0].id, 'church');
@@ -127,6 +130,41 @@ test('one canvas and texture per site; ordinary frames and alive/claim updates d
   h.sites.dispose();
 });
 
+test('label clears the tallest roof, stays above ghosts, and follows real roots even when massing was declared', () => {
+  const h = harness(); h.sites.apply(start());
+  const sprite = label(h); faces(h).geometry.computeBoundingBox();
+  assert.ok(sprite.position.y > faces(h).geometry.boundingBox!.max.y + 0.7);
+  assert.equal(sprite.center.y, 0, 'screen-size growth must go upward from the content top');
+  assert.equal(sprite.material.depthTest, false); assert.ok(sprite.renderOrder > faces(h).renderOrder);
+  const root = entity('e_root'); h.model.entities.set(root.id, root);
+  h.model.boxes.set(root.id, [{ c: [103, 19], half: [2, 2], yaw: 0.3, y0: 2, y1: 31 }]);
+  const d = diff([delta(2, { rootsAdded: [root.id] })], [root]); h.sites.apply(d); h.sites.refitDiff(d);
+  assert.equal(label(h), sprite); assert.equal(sprite.position.y, 31.75); assert.equal(h.paints, 1);
+  h.model.entities.delete(root.id); h.model.boxes.delete(root.id);
+  const removed = diff([delta(3, { rootsRemoved: [root.id] })], [], [root.id]); h.sites.apply(removed); h.sites.refitDiff(removed);
+  assert.ok(Math.abs(sprite.position.y - 22.83) < 1e-5, 'last part removal restores the massing roof anchor');
+  h.sites.dispose();
+});
+
+test('label text has a 14 CSS px floor across camera distance, zoom, and viewport height without frame resource churn', () => {
+  const h = harness(); h.sites.apply(start()); const sprite = label(h), texture = sprite.material.map, scene = new THREE.Scene();
+  const geometries = group(h).children.map(o => (o as THREE.Mesh).geometry), material = sprite.material;
+  let height = 800, target: THREE.Vector2 | undefined;
+  const renderer = { getSize(v: THREE.Vector2) { if (target) assert.equal(v, target, 'reuses one scratch viewport'); target = v; return v.set(1352, height); } } as unknown as THREE.WebGLRenderer;
+  for (const camera of [new THREE.PerspectiveCamera(45, 1352 / 800, 0.1, 10000), new THREE.OrthographicCamera(-60, 60, 40, -40, 0.1, 10000)]) {
+    for (height of [400, 800, 1600]) for (const zoom of [0.5, 1, 2]) for (const distance of [2, 100, 1000]) {
+      camera.zoom = zoom; camera.updateProjectionMatrix(); camera.position.set(sprite.position.x, sprite.position.y, sprite.position.z + distance); camera.lookAt(sprite.position); camera.updateMatrixWorld(true);
+      sprite.updateMatrixWorld(true); sprite.onBeforeRender(renderer, scene, camera, sprite.geometry, sprite.material, null!);
+      const pixels = sprite.scale.y * camera.projectionMatrix.elements[5] * height / (2 * (camera instanceof THREE.PerspectiveCamera ? distance : 1)) * 28 / 44;
+      assert.ok(pixels >= 14 - 1e-6, `${distance}m / ${height}px / zoom ${zoom}: ${pixels}px text`);
+      assert.ok(sprite.scale.y >= 1.2); assert.equal(sprite.position.y, 22.83);
+    }
+  }
+  assert.equal(h.canvases, 1); assert.equal(h.paints, 1); assert.equal(sprite.material, material); assert.equal(sprite.material.map, texture);
+  group(h).children.forEach((o, i) => assert.equal((o as THREE.Mesh).geometry, geometries[i]));
+  h.sites.dispose();
+});
+
 test('explicit pause greys immediately and alive restores amber without editing any entity', () => {
   const h = harness(); h.sites.apply(start());
   const amber = marker(h).geometry.getAttribute('color').getX(0);
@@ -196,6 +234,70 @@ test('outline without massing uses footprint OBBs under empty prefab roots and i
   h.sites.dispose();
 });
 
+test('sheen fits padded mass/roof union at world coordinates and normalizes a single bottom-to-top sweep', () => {
+  const h = harness('ring,label,sheen');
+  h.sites.apply(start(site({ site: { at: [100, 19], size: [36, 18], yaw: 0 }, massing: [
+    { at: [0, 0], size: [24, 12], h: 5, roof: 'gable' },
+    { at: [-10, -4], size: [4, 4], h: 20, roof: 'pyramid' },
+    { at: [-10, 4], size: [4, 4], h: 20, roof: 'pyramid' },
+  ] })));
+  const sweep = sheen(h), pos = sweep.geometry.getAttribute('position'), heights = sweep.geometry.getAttribute('aHeight');
+  sweep.geometry.computeBoundingBox(); const bounds = sweep.geometry.boundingBox!;
+  assert.deepEqual(sweep.position.toArray(), [0, 0, 0]); assert.deepEqual(sweep.scale.toArray(), [1, 1, 1]);
+  for (const [value, expected] of [[bounds.min.x, 87.65], [bounds.max.x, 112.35], [bounds.min.z, 12.65], [bounds.max.z, 25.35], [bounds.min.y, -0.27], [bounds.max.y, 22.43]]) assert.ok(Math.abs(value - expected) < 1e-5);
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) > 12) assert.ok(pos.getX(i) <= 92.35 + 1e-5, 'no tall box wall floating over the nave');
+    assert.ok(Math.abs(heights.getX(i) - (pos.getY(i) - bounds.min.y) / (bounds.max.y - bounds.min.y)) < 1e-6);
+  }
+  assert.equal(sweep.material.depthWrite, false); assert.equal(sweep.material.side, THREE.FrontSide);
+  assert.equal(h.sites.inspect().sites[0].draws, 4);
+  const geometry = sweep.geometry; h.advance(1000); assert.equal(sweep.geometry, geometry);
+  h.sites.apply(edge(delta(2, { status: 'paused' }))); assert.equal(sweep.material.uniforms.uActive.value, 0);
+  assert.match(sweep.material.fragmentShader, /0\.006\+uActive\*band\*0\.055/);
+  h.sites.dispose();
+});
+
+test('sheen prefers rotated root OBBs once parts exist, and disposes replaced geometry', () => {
+  const h = harness('ring,label,outline,sheen'); h.sites.apply(start());
+  const sweep = sheen(h), old = sweep.geometry; let disposed = 0; old.addEventListener('dispose', () => disposed++);
+  const root = entity('e_root'), child = entity('e_child', root.id);
+  h.model.entities.set(root.id, root); h.model.entities.set(child.id, child);
+  h.model.boxes.set(child.id, [{ c: [140, 31], half: [4, 2], yaw: Math.PI / 2, y0: 3, y1: 12 }]);
+  const d = diff([delta(2, { rootsAdded: [root.id] })], [root, child]); h.sites.apply(d); h.sites.refitDiff(d);
+  sweep.geometry.computeBoundingBox(); const bounds = sweep.geometry.boundingBox!;
+  assert.equal(disposed, 1); assert.equal(sheen(h), sweep);
+  for (const [value, expected] of [[bounds.min.x, 137.65], [bounds.max.x, 142.35], [bounds.min.z, 26.65], [bounds.max.z, 35.35], [bounds.min.y, 2.65], [bounds.max.y, 12.35]]) assert.ok(Math.abs(value - expected) < 1e-5);
+  assert.equal(label(h).position.y, 12.75); h.sites.dispose();
+  const empty = harness('sheen'); empty.sites.apply(start(site({ massing: [] })));
+  assert.equal(sheen(empty).visible, false, 'no invented three-metre box when there is no content'); empty.sites.dispose();
+});
+
+test('progress wheel is a draped ribbon with an exact n/of arc, including zero, complete, and fractional segments', () => {
+  const groundAt = (x: number, z: number) => 0.1 * x + 0.02 * z;
+  const h = harness('ring,label,wheel', { groundAt }); h.sites.apply(start());
+  let rev = 1;
+  for (const [n, of] of [[0, 6], [2, 6], [6, 6], [1, 5]]) {
+    h.sites.apply(edge(delta(++rev, { step: { n, of, label: 'shell' } })));
+    const ring = wheel(h), pos = ring.geometry.getAttribute('position'), colors = ring.geometry.getAttribute('color');
+    const fraction = n / of, count = 96 + (Number.isInteger(fraction * 96) ? 0 : 1);
+    let bright = 0, dim = 0;
+    for (let i = 0; i < count * 6; i += 6) {
+      const angle = (j: number) => (Math.atan2(pos.getX(j) - 103, -(pos.getZ(j) - 19)) + Math.PI * 2) % (Math.PI * 2);
+      const a = angle(i), b = angle(i + 2), length = (b - a + Math.PI * 2) % (Math.PI * 2);
+      if (colors.getW(i) > 0.9) bright += length; else dim += length;
+      const inner = Math.hypot(pos.getX(i) - 103, pos.getZ(i) - 19), outer = Math.hypot(pos.getX(i + 1) - 103, pos.getZ(i + 1) - 19);
+      assert.ok(outer - inner > 0.25, 'visible ribbon width, independent of WebGL line width');
+    }
+    assert.ok(Math.abs(bright / (Math.PI * 2) - fraction) < 1e-6); assert.ok(Math.abs((bright + dim) / (Math.PI * 2) - 1) < 1e-6);
+    assert.ok(pos.count > count * 6, 'thick n/of digits in the same mesh');
+    for (let i = 0; i < pos.count; i++) assert.ok(Math.abs(pos.getY(i) - groundAt(pos.getX(i), pos.getZ(i)) - 0.14) < 2e-6);
+    assert.equal(ring.material.depthTest, false); assert.equal(ring.material.depthWrite, false); assert.equal(ring.material.forceSinglePass, true);
+  }
+  h.sites.apply(edge(delta(++rev, { status: 'paused' })));
+  assert.ok(Math.abs(wheel(h).geometry.getAttribute('color').getX(0) - new THREE.Color('#999fa8').r) < 1e-6);
+  h.sites.dispose();
+});
+
 test('marker is 32 terrain-draped segments, with no depth writes; all overlays carry buildSite hover identity', () => {
   const groundAt = (x: number, z: number) => x * 0.1 + z * 0.02;
   const h = harness('ring,label,sheen,wheel', { groundAt }); h.sites.apply(start(site({ massing: [] })));
@@ -206,26 +308,26 @@ test('marker is 32 terrain-draped segments, with no depth writes; all overlays c
   assert.equal(h.sites.hoverTarget('other'), null); h.sites.dispose();
 });
 
-test('terrain refresh moves ghosts/marker/label together without a new canvas; wheel includes n/of stroke digits', () => {
+test('terrain refresh moves ghosts/marker/label together without a new canvas; wheel includes n/of thick stroke digits', () => {
   let height = 0;
   const h = harness('ring,label,wheel', { groundAt: () => height }); h.sites.apply(start());
   const old = faces(h).geometry; let freed = 0; old.addEventListener('dispose', () => freed++);
   const sprite = group(h).children.find(o => o instanceof THREE.Sprite) as THREE.Sprite;
-  const wheel = group(h).children.find(o => o instanceof THREE.LineSegments && o !== marker(h)) as THREE.LineSegments;
-  assert.ok(wheel.geometry.getAttribute('position').count > 128 + 12, 'step digits share the wheel draw');
+  const ring = wheel(h);
+  assert.ok(ring.geometry.getAttribute('position').count > 96 * 6, 'step digits share the wheel draw');
   height = 7; h.sites.refreshAll(true); faces(h).geometry.computeBoundingBox();
-  assert.equal(freed, 1); assert.ok(Math.abs(faces(h).geometry.boundingBox!.min.y - 7.08) < 1e-5); assert.equal(sprite.position.y, 9.5);
+  assert.equal(freed, 1); assert.ok(Math.abs(faces(h).geometry.boundingBox!.min.y - 7.08) < 1e-5); assert.ok(Math.abs(sprite.position.y - 29.83) < 1e-5);
   assert.equal(h.canvases, 1); assert.equal(h.paints, 1); h.sites.dispose();
 });
 
 test('one runtime switch: default <=3 draws; outline adds zero, sheen/wheel add one each; off is zero', () => {
   const h = harness(); h.sites.apply(start()); assert.equal(h.sites.inspect().sites[0].draws, 3);
   h.sites.siteStyle('ring,label,outline'); assert.equal(h.sites.inspect().sites[0].draws, 3);
-  h.sites.siteStyle('ring,label,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
-  const sheen = group(h).children.find(o => o instanceof THREE.Mesh && o.material instanceof THREE.ShaderMaterial) as THREE.Mesh<THREE.BoxGeometry, THREE.ShaderMaterial>;
-  const wheel = group(h).children.find(o => o instanceof THREE.LineSegments && o !== marker(h)) as THREE.LineSegments;
-  const geometry = wheel.geometry; h.advance(16); assert.equal(wheel.geometry, geometry); assert.equal(sheen.material.uniforms.uTime.value, h.now() / 1000);
-  h.sites.apply(edge(delta(2, { status: 'paused' }))); assert.equal(sheen.material.uniforms.uActive.value, 0);
+  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
+  const sweep = sheen(h), ring = wheel(h), geometry = ring.geometry, sweepGeometry = sweep.geometry;
+  assert.equal(ring.material.forceSinglePass, true, 'transparent double-sided ribbon is one draw');
+  h.advance(16); assert.equal(ring.geometry, geometry); assert.equal(sweep.geometry, sweepGeometry); assert.equal(sweep.material.uniforms.uTime.value, h.now() / 1000);
+  h.sites.apply(edge(delta(2, { status: 'paused' }))); assert.equal(sweep.material.uniforms.uActive.value, 0);
   h.sites.siteStyle('off'); assert.equal(h.sites.group.visible, false); assert.equal(h.sites.inspect().sites[0].draws, 0); assert.equal(h.sites.hoverTarget('build-site:church'), null);
   h.sites.siteStyle('ring,label'); assert.equal(h.sites.group.visible, true); assert.equal(h.canvases, 1); assert.equal(h.sites.inspect().sites[0].draws, 3);
   h.sites.dispose();
@@ -286,5 +388,38 @@ test('real applyDiff holds pre-batch removals 1.5s and gives every upsert (inclu
   assert.equal(internals.drawn.get(root.id)!.dur, 1.2);
   layer.update(0, 2000); assert.equal(removed.obj.scale.x, 1); assert.equal(removed.obj.position.y, 0);
   layer.update(0, 3100); assert.equal(internals.drawn.has(old.id), false); assert.equal(added.obj.scale.x, 1);
+  layer.dispose();
+});
+
+test('real applyEdge draws root-subtree OBB outlines alongside declared massing, and moves the label/sheen with root bounds', async () => {
+  const { WorldEntityLayer } = await entityLayerFixture();
+  const layer = new WorldEntityLayer(p => p); layer.sites.siteStyle('ring,label,outline,sheen');
+  const model = new WorldModel({ constants: { ground: 'land' }, seed: 'offline-site-outline' });
+  model.defineDef({ schema: 'def/1', name: 'fixture', tags: ['site-test'], make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', size: [8, 6, 4], at: [0, 3, 0] }] } }, layer: 'solid', size: { box: [8, 6, 4] } }, 'god', 0);
+  const root: Entity = { ...entity('e_root', 'world', [103, 19]), r: 0.4 };
+  const internals = layer as unknown as { model: WorldModel; seq: number; now: number };
+  internals.model = model; internals.seq = 0; internals.now = 1000; layer.active = true;
+  // Replace only canvas painting; the real layer still consumes and indexes the root diff.
+  (layer.sites as unknown as { options: { createCanvas: () => HTMLCanvasElement } }).options.createCanvas = () => fakeCanvas();
+  layer.applyEdge([start()]);
+  const view = layer.sites.group.children[0] as THREE.Group, marker = view.children[0] as THREE.LineSegments;
+  const before = marker.geometry.getAttribute('position').count;
+  layer.applyEdge([diff([delta(2, { rootsAdded: [root.id] })], [root])]);
+  const boxes = model.footprintsOf(root.id); assert.ok(boxes.length > 0, 'fake root is indexed by applyDiff');
+  assert.equal(marker.geometry.getAttribute('position').count, before + 24 * boxes.length, 'OBB edges are added despite existing massing');
+  const pos = marker.geometry.getAttribute('position');
+  for (const box of boxes) {
+    const x = box.c[0] + box.half[0] * Math.cos(box.yaw) + box.half[1] * Math.sin(box.yaw);
+    const z = box.c[1] - box.half[0] * Math.sin(box.yaw) + box.half[1] * Math.cos(box.yaw);
+    assert.ok(Array.from({ length: pos.count - before }, (_, i) => before + i).some(i => Math.abs(pos.getX(i) - x) < 1e-5 && Math.abs(pos.getY(i) - box.y1) < 1e-5 && Math.abs(pos.getZ(i) - z) < 1e-5), 'rotated root top corner is in the marker draw');
+  }
+  const sweep = view.children.find(o => o instanceof THREE.Mesh && o.material instanceof THREE.ShaderMaterial) as THREE.Mesh;
+  sweep.geometry.computeBoundingBox(); assert.ok(Math.abs(sweep.geometry.boundingBox!.max.y - Math.max(...boxes.map(b => b.y1)) - 0.35) < 1e-5);
+  const sprite = view.children.find(o => o instanceof THREE.Sprite) as THREE.Sprite;
+  assert.equal(sprite.position.y, Math.max(...boxes.map(b => b.y1)) + 0.75);
+  assert.equal(layer.sites.inspect().sites[0].draws, 4); assert.equal(layer.stats.lastError, null);
+  layer.sites.siteStyle('ring,label'); assert.equal(marker.geometry.getAttribute('position').count, before);
+  assert.equal(layer.sites.inspect().sites[0].draws, 3);
+  layer.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(layer.sites.inspect().sites[0].draws, 5);
   layer.dispose();
 });

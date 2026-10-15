@@ -53,13 +53,14 @@ type View = {
   marker: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   faces: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; ranges: { start: number; count: number }[];
   parts: number[]; members: Map<string, Member>; reindex: boolean;
-  label: THREE.Sprite | null; canvas: HTMLCanvasElement | null; text: string;
-  wheel: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial> | null;
-  sheen: THREE.Mesh<THREE.BoxGeometry, THREE.ShaderMaterial> | null;
+  label: THREE.Sprite | null; canvas: HTMLCanvasElement | null; text: string; labelY: number;
+  wheel: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null;
+  sheen: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null;
   deadline: number; receivedAt: number; silence: number; pausedAt: number; paused: boolean; nextLabelAt: number;
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
 const MINUTE = 60_000, QUIET_MS = 3 * MINUTE;
+const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
 const STYLES = ['ring', 'label', 'outline', 'sheen', 'wheel'] as const;
 type Style = typeof STYLES[number];
@@ -81,6 +82,7 @@ export class WorldBuildSites {
   private time = { value: 0 };
   private activeSheen: THREE.ShaderMaterial | null = null;
   private pausedSheen: THREE.ShaderMaterial | null = null;
+  private viewport = new THREE.Vector2();
 
   constructor(options: Options) {
     this.options = options; this.clock = options.now ?? (() => performance.now());
@@ -243,7 +245,7 @@ export class WorldBuildSites {
     const mass = massGeometry(data, this.options.groundAt);
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
     faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, parts: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0 };
+    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, parts: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0 };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
     this.tag(v);
@@ -263,7 +265,7 @@ export class WorldBuildSites {
     const tail = paused ? (v.data.closed ? `paused ${Math.max(0, Math.floor((now - v.pausedAt) / MINUTE))} min` : 'paused · open') : silence >= QUIET_MS ? `quiet ${Math.floor(silence / MINUTE)} min` : '';
     const b = v.data, text = `${b.title} · ${b.step.label} ${b.step.n}/${b.step.of}${tail ? ` · ${tail}` : ''}`;
     if (this.styles.has('label') && text !== v.text) this.label(v, text);
-    if (v.label) { v.label.visible = this.styles.has('label'); const [x, z] = b.site.at; v.label.position.set(x, (this.options.groundAt(x, z) ?? 0) + 2.5, z); }
+    if (v.label) v.label.visible = this.styles.has('label');
     // Wake only at a deadline or a visible minute boundary, never once per animation frame.
     v.nextLabelAt = paused ? (b.closed ? v.pausedAt + (Math.floor((now - v.pausedAt) / MINUTE) + 1) * MINUTE : Infinity) : Math.min(v.deadline, v.receivedAt + (silence < QUIET_MS ? QUIET_MS - v.silence : (Math.floor(silence / MINUTE) + 1) * MINUTE - v.silence));
     if (changed) { this.tint(v); if (v.wheel && this.styles.has('wheel')) this.wheel(v); }
@@ -272,19 +274,30 @@ export class WorldBuildSites {
   private label(v: View, text: string) {
     const canvas = v.canvas ?? this.options.createCanvas?.() ?? document.createElement('canvas');
     const ctx = canvas.getContext('2d'); if (!ctx) return;
-    ctx.font = '600 28px system-ui, sans-serif'; const width = Math.ceil(ctx.measureText(text).width) + 28;
-    canvas.width = width; canvas.height = 44;
-    ctx.font = '600 28px system-ui, sans-serif'; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, 44, 10); ctx.fill();
+    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(ctx.measureText(text).width) + 28;
+    canvas.width = width; canvas.height = LABEL_HEIGHT_PX;
+    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, LABEL_HEIGHT_PX, 10); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.fillText(text, 14, 23);
     if (!v.label) {
       const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
       v.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
+      // The bottom edge clears the tallest roof/root even when the screen-size floor enlarges the sprite.
+      v.label.center.set(0.5, 0); v.label.frustumCulled = false;
+      v.label.onBeforeRender = (renderer, _scene, camera) => {
+        const sprite = v.label!, m = sprite.matrixWorld.elements, view = camera.matrixWorldInverse.elements;
+        const depth = Math.max(0.01, -(view[2] * m[12] + view[6] * m[13] + view[10] * m[14] + view[14]));
+        const height = renderer.getSize(this.viewport).y;
+        const unitsPerPixel = 2 * (camera instanceof THREE.PerspectiveCamera ? depth : 1) / (Math.max(1, height) * camera.projectionMatrix.elements[5]);
+        const scale = Math.max(LABEL_WORLD_HEIGHT, LABEL_MIN_TEXT_PX * LABEL_HEIGHT_PX / LABEL_FONT_PX * unitsPerPixel);
+        sprite.scale.set(canvas.width / LABEL_HEIGHT_PX * scale, scale, 1);
+        sprite.updateMatrixWorld();
+      };
       v.label.renderOrder = 998; v.group.add(v.label);
     }
     v.canvas = canvas; v.text = text; v.label.material.map!.needsUpdate = true;
-    v.label.scale.set(width / 44 * 1.2, 1.2, 1);
+    v.label.scale.set(width / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, LABEL_WORLD_HEIGHT, 1);
     const [x, z] = v.data.site.at;
-    v.label.position.set(x, (this.options.groundAt(x, z) ?? 0) + 2.5, z);
+    v.label.position.set(x, v.labelY, z);
     this.stats.labelRedraws++; this.tag(v);
   }
 
@@ -328,49 +341,75 @@ export class WorldBuildSites {
         lines.push(...corner(i / 8), ...corner((i + 1) / 8));
       }
     }
-    if (b.massing.length && this.styles.size) lines.push(...massGeometryEdges(b, this.options.groundAt));
+    const masses = massVolumes(b, this.options.groundAt);
+    if (this.styles.size) for (const mass of masses) for (const id of mass.edges) lines.push(...mass.vertices[id]);
     const boxes: OBB[] = [];
     const model = this.options.model();
-    if (!b.massing.length && model && (this.styles.has('outline') || this.styles.has('sheen'))) {
+    if (model) {
       const seen = new Set<string>();
       for (const root of v.roots) for (const id of model.subtree(root)) if (!seen.has(id)) { seen.add(id); boxes.push(...model.footprintsOf(id)); }
       if (this.styles.has('outline')) for (const box of boxes) lines.push(...obbEdges(box));
     }
+    // Prefer actual parts once they exist; an empty prefab root falls back to the massing.
+    let top = this.options.groundAt(...b.site.at) ?? 0;
+    if (boxes.length) for (const box of boxes) top = Math.max(top, box.y1);
+    else for (const volume of masses) for (const vertex of volume.vertices) top = Math.max(top, vertex[1]);
+    v.labelY = top + 0.75;
     replaceGeometry(v.marker, lineGeometry(lines)); v.marker.visible = lines.length > 0 && this.styles.size > 0;
     this.tint(v);
     if (this.styles.has('wheel')) this.wheel(v); else if (v.wheel) v.wheel.visible = false;
     if (this.styles.has('sheen')) {
-      if (!v.sheen) { v.sheen = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), this.sheenMaterial(!v.paused)); v.sheen.renderOrder = 996; v.group.add(v.sheen); }
-      const bounds = new THREE.Box3();
-      const points = b.massing.length ? massGeometryEdges(b, this.options.groundAt) : boxes.flatMap(obbEdges);
-      for (let i = 0; i < points.length; i += 3) bounds.expandByPoint(new THREE.Vector3(points[i], points[i + 1], points[i + 2]));
-      if (bounds.isEmpty()) { const [x, z] = b.site.at, y = this.options.groundAt(x, z) ?? 0; bounds.set(new THREE.Vector3(x - b.site.size[0] / 2, y, z - b.site.size[1] / 2), new THREE.Vector3(x + b.site.size[0] / 2, y + 3, z + b.site.size[1] / 2)); }
-      bounds.expandByScalar(0.35); bounds.getCenter(v.sheen.position); bounds.getSize(v.sheen.scale); v.sheen.visible = true;
+      // Merged padded volumes follow the rooflines; a tall tower must not make a giant
+      // rectangular band across the empty air over a low nave. Positions stay in world space.
+      const padded = boxes.length ? boxes.map(box => obbVolume(box, 0.35)) : massVolumes(b, this.options.groundAt, 0.35);
+      const geometry = sheenGeometry(padded);
+      if (!v.sheen) { v.sheen = new THREE.Mesh(geometry, this.sheenMaterial(!v.paused)); v.sheen.renderOrder = 996; v.group.add(v.sheen); }
+      else { v.sheen.geometry.dispose(); v.sheen.geometry = geometry; }
+      v.sheen.visible = padded.length > 0;
     } else if (v.sheen) v.sheen.visible = false;
-    if (v.label) { v.label.visible = this.styles.has('label'); const [x, z] = b.site.at; v.label.position.set(x, (this.options.groundAt(x, z) ?? 0) + 2.5, z); }
+    if (v.label) { v.label.visible = this.styles.has('label'); const [x, z] = b.site.at; v.label.position.set(x, v.labelY, z); }
     this.tag(v);
   }
   private wheel(v: View) {
-    const positions: number[] = [], colors: number[] = [], b = v.data, radius = Math.max(1.2, Math.min(...b.site.size) * 0.22), n = Math.max(1, Math.min(24, b.step.of)), fraction = Math.max(0, Math.min(1, b.step.n / Math.max(1, b.step.of)));
+    const positions: number[] = [], colors: number[] = [], b = v.data, radius = Math.max(1.5, Math.min(...b.site.size) * 0.24), fraction = Math.max(0, Math.min(1, b.step.n / Math.max(1, b.step.of)));
+    const width = Math.max(0.18, radius * 0.09);
     const c = v.paused ? PAUSED : ACTIVE;
-    const point = (a: number, r: number) => { const x = b.site.at[0] + Math.cos(a) * r, z = b.site.at[1] + Math.sin(a) * r; return [x, (this.options.groundAt(x, z) ?? 0) + 0.12, z]; };
-    for (let i = 0; i < 64; i++) { positions.push(...point(i / 64 * Math.PI * 2, radius), ...point((i + 1) / 64 * Math.PI * 2, radius)); const dim = i / 64 < fraction ? 1 : 0.25; for (let j = 0; j < 2; j++) colors.push(c.r * dim, c.g * dim, c.b * dim); }
-    for (let i = 0; i < n; i++) { positions.push(...point(i / n * Math.PI * 2, radius * 0.82), ...point(i / n * Math.PI * 2, radius * 1.1)); for (let j = 0; j < 2; j++) colors.push(c.r, c.g, c.b); }
-    // Stroke digits keep n/of legible even with the label candidate disabled, in the SAME draw.
+    const point = (a: number, r: number): [number, number] => [Math.sin(a) * r, -Math.cos(a) * r];
+    const quad = (a: number[], d: number[], e: number[], f: number[], alpha: number) => {
+      for (const [dx, dz] of [a, d, e, a, e, f]) {
+        const x = b.site.at[0] + dx, z = b.site.at[1] + dz;
+        positions.push(x, (this.options.groundAt(x, z) ?? 0) + 0.14, z); colors.push(c.r, c.g, c.b, alpha);
+      }
+    };
+    const arc = (from: number, to: number, alpha: number) => {
+      if (to <= from) return;
+      quad(point(from * Math.PI * 2, radius - width / 2), point(from * Math.PI * 2, radius + width / 2), point(to * Math.PI * 2, radius + width / 2), point(to * Math.PI * 2, radius - width / 2), alpha);
+    };
+    // A world-width ribbon stays visible in WebGL, where LineBasicMaterial is only one pixel.
+    // Split the boundary segment so the bright arc is exactly n/of, including 0 and complete.
+    for (let i = 0; i < 96; i++) {
+      arc(i / 96, Math.min((i + 1) / 96, fraction), 0.95);
+      arc(Math.max(i / 96, fraction), (i + 1) / 96, 0.24);
+    }
+    // Thick stroke digits share the progress-ring draw and ground-level label anchor.
     const text = `${b.step.n}/${b.step.of}`, scale = radius * 1.25 / (text.length * 0.75);
     for (let i = 0; i < text.length; i++) for (const [ax, az, bx, bz] of digitLines(text[i])) {
-      for (const [u, w] of [[ax, az], [bx, bz]]) { const x = b.site.at[0] + (i * 0.75 + u - text.length * 0.375) * scale, z = b.site.at[1] + (w - 0.5) * scale; positions.push(x, (this.options.groundAt(x, z) ?? 0) + 0.13, z); colors.push(c.r, c.g, c.b); }
+      const x0 = (i * 0.75 + ax - (text.length * 0.75 - 0.25) / 2) * scale, z0 = (az - 0.5) * scale;
+      const x1 = (i * 0.75 + bx - (text.length * 0.75 - 0.25) / 2) * scale, z1 = (bz - 0.5) * scale;
+      const length = Math.hypot(x1 - x0, z1 - z0), dx = -(z1 - z0) / length * width * 0.22, dz = (x1 - x0) / length * width * 0.22;
+      quad([x0 + dx, z0 + dz], [x0 - dx, z0 - dz], [x1 - dx, z1 - dz], [x1 + dx, z1 + dz], 0.95);
     }
-    const geometry = lineGeometry(positions); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    if (!v.wheel) { v.wheel = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })); v.wheel.renderOrder = 997; v.group.add(v.wheel); } else replaceGeometry(v.wheel, geometry);
+    const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
+    if (!v.wheel) { v.wheel = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, side: THREE.DoubleSide, forceSinglePass: true, depthTest: false, depthWrite: false, toneMapped: false })); v.wheel.renderOrder = 997; v.group.add(v.wheel); }
+    else { v.wheel.geometry.dispose(); v.wheel.geometry = geometry; }
     v.wheel.visible = true;
   }
   private sheenMaterial(active: boolean) {
     const old = active ? this.activeSheen : this.pausedSheen; if (old) return old;
     const material = new THREE.ShaderMaterial({
       uniforms: { uTime: this.time, uActive: { value: active ? 1 : 0 }, uColor: { value: active ? ACTIVE : PAUSED } },
-      vertexShader: 'varying float vHeight; void main(){vHeight=position.y+0.5;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader: 'uniform float uTime; uniform float uActive; uniform vec3 uColor; varying float vHeight; void main(){float band=1.0-smoothstep(0.035,0.10,abs(vHeight-fract(uTime*0.25)));gl_FragColor=vec4(uColor,0.035+uActive*band*0.28);}',
+      vertexShader: 'attribute float aHeight; varying float vHeight; void main(){vHeight=aHeight;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: 'uniform float uTime; uniform float uActive; uniform vec3 uColor; varying float vHeight; void main(){float band=1.0-smoothstep(0.025,0.075,abs(vHeight-fract(uTime*0.125)));gl_FragColor=vec4(uColor,0.006+uActive*band*0.055);}',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide, toneMapped: false,
     });
     if (active) this.activeSheen = material; else this.pausedSheen = material;
@@ -411,10 +450,14 @@ function volume(w: number, d: number, h: number, roof: Mass['roof']): Volume {
   } else triangles.push(4, 7, 6, 4, 6, 5);
   return { vertices, triangles, edges };
 }
-function massVolumes(site: PublicSite, groundAt: Options['groundAt']) {
+function massVolumes(site: PublicSite, groundAt: Options['groundAt'], pad = 0) {
   return site.massing.slice(0, 8).map(m => {
     const v = volume(m.size[0], m.size[1], m.h, m.roof), [cx, cz] = worldPoint(m.at[0], m.at[1], site.site.at, site.site.yaw), base = (groundAt(cx, cz) ?? 0) + 0.08;
-    v.vertices = v.vertices.map(([x, y, z]) => { const [sx, sz] = worldPoint(x, z, m.at, m.yaw ?? 0), [wx, wz] = worldPoint(sx, sz, site.site.at, site.site.yaw); return [wx, base + y, wz]; });
+    const height = Math.max(...v.vertices.map(vertex => vertex[1]));
+    v.vertices = v.vertices.map(([x, y, z]) => {
+      const [sx, sz] = worldPoint(x * (1 + 2 * pad / m.size[0]), z * (1 + 2 * pad / m.size[1]), m.at, m.yaw ?? 0), [wx, wz] = worldPoint(sx, sz, site.site.at, site.site.yaw);
+      return [wx, base + y * (1 + 2 * pad / height) - pad, wz];
+    });
     return v;
   });
 }
@@ -428,11 +471,21 @@ function massGeometry(site: PublicSite, groundAt: Options['groundAt']) {
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4));
   return { geometry, ranges };
 }
-function massGeometryEdges(site: PublicSite, groundAt: Options['groundAt']) { const points: number[] = []; for (const v of massVolumes(site, groundAt)) for (const id of v.edges) points.push(...v.vertices[id]); return points; }
-function obbEdges(box: OBB) {
-  const v = volume(box.half[0] * 2, box.half[1] * 2, box.y1 - box.y0, 'flat');
-  v.vertices = v.vertices.map(([x, y, z]) => { const [wx, wz] = worldPoint(x, z, box.c, box.yaw); return [wx, box.y0 + y, wz]; });
-  return v.edges.flatMap(id => v.vertices[id]);
+function obbVolume(box: OBB, pad = 0) {
+  const v = volume(box.half[0] * 2 + pad * 2, box.half[1] * 2 + pad * 2, box.y1 - box.y0 + pad * 2, 'flat');
+  v.vertices = v.vertices.map(([x, y, z]) => { const [wx, wz] = worldPoint(x, z, box.c, box.yaw); return [wx, box.y0 - pad + y, wz]; });
+  return v;
+}
+function obbEdges(box: OBB) { const v = obbVolume(box); return v.edges.flatMap(id => v.vertices[id]); }
+function sheenGeometry(volumes: Volume[]) {
+  const points: number[] = [], heights: number[] = [];
+  let low = Infinity, high = -Infinity;
+  for (const volume of volumes) for (const vertex of volume.vertices) { low = Math.min(low, vertex[1]); high = Math.max(high, vertex[1]); }
+  for (const volume of volumes) for (const id of volume.triangles) {
+    const vertex = volume.vertices[id]; points.push(...vertex); heights.push((vertex[1] - low) / Math.max(0.001, high - low));
+  }
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); geometry.setAttribute('aHeight', new THREE.Float32BufferAttribute(heights, 1));
+  return geometry;
 }
 const DIGIT_SEGMENTS = [[0, 0, 0.5, 0], [0.5, 0, 0.5, 0.5], [0.5, 0.5, 0.5, 1], [0, 1, 0.5, 1], [0, 0.5, 0, 1], [0, 0, 0, 0.5], [0, 0.5, 0.5, 0.5]];
 const DIGITS: Record<string, string> = { '0': '012345', '1': '12', '2': '01643', '3': '01236', '4': '1256', '5': '02563', '6': '023456', '7': '012', '8': '0123456', '9': '012356' };
