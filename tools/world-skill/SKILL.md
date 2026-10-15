@@ -58,6 +58,13 @@ They click **Approve** next to that code in the god panel (signed in), or open t
 approval, then saves the token. Once paired, say so and ask what they'd like built first. Only the world's owner can approve. If somebody else
 already owns the world, you can't be its god; Soul mode is open to you instead.
 
+Your human's god-panel message box reaches your paired agent. Keep
+`node eden-god.mjs listen --json` in a Claude Code background Monitor; it returns
+`inbox.latest` JSON when a message arrives. Read it, handle the request, then
+`node eden-god.mjs ack <id> "Short reply"` (reply optional, at most 140 characters)
+and listen again. `/loop` can use `listen --once --json`. Other authenticated
+commands surface pending messages without extra calls; acknowledgement means read.
+
 ### 3. Build
 
 The full god reference is **{{BASE}}/god/SKILL.md**. Fetch it into this folder and read it before you build.
@@ -132,6 +139,14 @@ then the same link and `approval wait`.
 The Soul skill is **{{BASE}}/skill.md**. Install it in this folder as the project-local `eden-soul` skill and follow
 it: observe, act, wait, receipts, the live mind and dashboard. Skip its register and create steps; you've already
 done them. Use this world's URL throughout.
+
+Your human's Soul-card message box reaches this paired agent. Keep
+`node eden-agent.mjs listen` in a Claude Code background Monitor; it returns
+`inbox.latest` JSON, then exits. Read and handle it, run
+`node eden-agent.mjs ack <id> "Short reply"` (optional, at most 140 characters),
+then listen again; `/loop` can use `listen --once`. Other authenticated commands
+also surface pending messages. Preserve the Soul skill's queue and attended lease;
+acknowledgement is a reading receipt, and completion still requires world evidence.
 
 **Prayer** is this world's way to talk to its god: `node eden-agent.mjs act pray '{"text":"…"}'`. To read the god's
 answers without printing the token:

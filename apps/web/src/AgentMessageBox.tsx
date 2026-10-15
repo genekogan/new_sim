@@ -50,7 +50,8 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
   onText(text: string): void; onSend(event: React.FormEvent): void; onCopy(): void;
 }) {
   const latest = inbox?.latest;
-  const receipt = latest ? `${latest.state === 'sent' ? 'Sent · waiting' : latest.state === 'delivered' ? 'Delivered' : 'Acknowledged'} · ${latest.text}${latest.reply ? ` · ${latest.reply}` : ''}` : '';
+  const state = latest?.state === 'sent' ? 'Sent · waiting' : latest?.state === 'delivered' ? 'Delivered' : 'Acknowledged';
+  const receipt = latest ? `${state} · ${latest.text}${latest.reply ? ` · ${latest.reply}` : ''}` : '';
   return <div className="agent-message" data-agent-message={kind}>
     <div className="agent-message-presence">
       <span>{inbox ? inbox.connected ? 'Your agent is connected' : 'Not running — this will wait' : 'Agent status unavailable'}</span>
@@ -60,7 +61,10 @@ export function AgentMessageBoxView({kind, inbox, prompt, text, sending = false,
       <input aria-label="Message your agent" placeholder="Message your agent…" value={text} onChange={e => onText(e.target.value)} maxLength={1000} disabled={sending} autoComplete="off"/>
       <button type="submit" disabled={sending || !text.trim()}>{sending ? 'Sending…' : 'Send'}</button>
     </form>
-    {latest && <p className="agent-message-receipt" role="status" title={receipt} data-message-state={latest.state}>{receipt}</p>}
+    {latest && <p className="agent-message-receipt" role="status" title={receipt} data-message-state={latest.state}>
+      <span className="agent-message-state">{state}</span><span aria-hidden="true"> · </span><span className="agent-message-text">{latest.text}</span>
+      {latest.reply && <><span aria-hidden="true"> · </span><span className="agent-message-reply">{latest.reply}</span></>}
+    </p>}
     {error && <p className="agent-message-error" role="alert">{error}</p>}
     {error.startsWith('Copy unavailable') && <input className="agent-message-prompt" aria-label="Agent start prompt" value={prompt} readOnly onFocus={e => e.target.select()}/>}
   </div>;

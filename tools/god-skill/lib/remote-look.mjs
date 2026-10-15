@@ -2,6 +2,7 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load } from './state.mjs';
+import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 
 export async function remoteLook(args, runtime = {}) {
   const now = runtime.now ?? Date.now, t0 = now();
@@ -12,8 +13,10 @@ export async function remoteLook(args, runtime = {}) {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body),
     redirect: 'error', signal: AbortSignal.timeout(args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 90_000)),
   });
+  noticeInboxHeader(r.headers);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
+    noticeOwnerInbox(e);
     throw Error(`look: ${e.code ?? r.status}: ${e.message ?? 'world renderer refused the screenshot'}${e.retry_after ? `; retry in ${e.retry_after}s` : ''}`);
   }
   const png = Buffer.from(await r.arrayBuffer());

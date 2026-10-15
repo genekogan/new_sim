@@ -26,6 +26,15 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 (refreshed automatically when the world changes; used as is when the server is unreachable).
 `look --remote` (or `EDEN_GOD_LOOK=remote`) uses the world’s renderer; it also falls back there if local Chrome is missing or cannot start.
 
+The owner's in-world message box reaches this folder's authenticated agent. Run
+`node eden-god.mjs listen --json` in a Claude Code background Monitor; it waits with
+long polls, then returns the received `inbox.latest` message as JSON. Handle it and
+run `node eden-god.mjs ack <id> "Short reply"` (optional reply, at most 140 characters),
+then start listening again. `/loop` can use `listen --once --json`; `--after <id>`
+waits for a newer message. Other authenticated commands also print pending owner
+messages on stderr, without another request. Delivery means received; acknowledge
+only after reading, and do not claim the requested work is complete before verifying it.
+
 ## The world in one page (the ontology)
 
 - **Frame.** Metres. **+x east, +z south, north is −z**, +y up; (0,0) is the centre; the world is a

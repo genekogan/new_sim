@@ -1,4 +1,5 @@
-/** SSE frames, not raw byte trickles, prove transport liveness. No model or logging. */
+import { noticeInboxHeader } from './client-inbox.mjs';
+/** SSE frames, not raw byte trickles, prove transport liveness. No model calls. */
 export async function readClientStream(url,{fetcher=fetch,headers={},signal,onMessage=()=>{},onFrame=()=>{},helloMs=5000,frameMs=35000,maxFrameBytes=262144}={}){
  const controller=new AbortController();let reader,hello=false,lastFrameAt=null,reason=null,buffer='',frameTimer;
  const stop=why=>{reason??=why;controller.abort();void reader?.cancel().catch(()=>{});};
@@ -7,6 +8,7 @@ export async function readClientStream(url,{fetcher=fetch,headers={},signal,onMe
  const framed=()=>{lastFrameAt=Date.now();clearTimeout(frameTimer);frameTimer=setTimeout(()=>stop('frame-timeout'),frameMs);onFrame({hello,lastFrameAt});};
  try{
   const response=await fetcher(url,{headers,signal:controller.signal});
+  if(new Headers(headers).has('authorization'))noticeInboxHeader(response.headers);
   if(response.status!==200||!response.body)return {status:response.status,reason:'unavailable',hello,lastFrameAt};
   reader=response.body.getReader();if(controller.signal.aborted)return {status:0,reason:reason??'aborted',hello,lastFrameAt};const decoder=new TextDecoder();
   for(;;){

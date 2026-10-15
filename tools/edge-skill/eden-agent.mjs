@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {ownerReplyWithLocalResults} from './client-owner-reply.mjs';
 import {clientHelp} from './client-help.mjs';
+import {clientListen,clientAck,noticeOwnerInbox,noticeInboxHeader} from './client-inbox.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
@@ -100,6 +101,7 @@ async function call(path,{body,method,as='soul',timeoutMs=90_000,signal,extraHea
  let r;try{r=await fetch(url,{method:method??(body?'POST':'GET'),headers,body:body?JSON.stringify(body):undefined,signal:signal&&AbortSignal.any?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs)});}
  catch(e){return {status:0,data:{error:{code:signal?.aborted?'aborted':'unreachable',message:String(e.message)}}};}
  const text=await r.text();let data;try{data=JSON.parse(text);}catch{data={raw:text.slice(0,200)};}
+ if(headers.authorization&&!path.startsWith('/v1/edge/inbox/')){noticeInboxHeader(r.headers);noticeOwnerInbox(data);}
  const bytes=Buffer.byteLength(text);telemetry?.({fetch:{path,status:r.status,bytes}});
  return {status:r.status,data,bytes,headers:{etag:r.headers.get('etag')}};
 }
@@ -502,7 +504,7 @@ async function callH(path,body,extra,method){
  assertLiveDispatch(IN_LIVE,leaseHeld,method??'POST');
  const s=load(),url=need(s,'world','Run: node eden-agent.mjs register <world-url>')+path,headers={'content-type':'application/json',...extra};if(s.token)headers.authorization=`Bearer ${s.token}`;
  let r;try{r=await fetch(url,{method,headers,body:JSON.stringify(body),signal:AbortSignal.timeout(60_000)});}catch(e){return {status:0,data:{error:{code:'unreachable',message:String(e.message)}}};}
- const text=await r.text();let data;try{data=JSON.parse(text);}catch{data={raw:text.slice(0,200)};}return {status:r.status,data};
+ const text=await r.text();let data;try{data=JSON.parse(text);}catch{data={raw:text.slice(0,200)};}if(headers.authorization){noticeInboxHeader(r.headers);noticeOwnerInbox(data);}return {status:r.status,data};
 }
 /** events [--follow] [--min N] [--kinds a,b] — EVENTS-v1: one line per pushed event (for a Monitor in an attended session).
  *  Without --follow: the digest since this folder's cursor. Never moves live's cursor. */
@@ -1102,7 +1104,7 @@ export async function body(cmd,...args){
  const form=new FormData();form.set('manifest',JSON.stringify(opts));form.set('model',new Blob([readFileSync(path)],{type:'model/gltf-binary'}),'body.glb');
  const state=load(),world=need(state,'world','Register this folder first'),token=need(state,'token','Pair your Soul first');
  const response=await fetch(world+'/v1/edge/body/uploads',{method:'POST',headers:{authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(90000)});
- const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error((data.error?.code??'body.unavailable')+': '+(data.error?.message??'Body upload refused'));return data.asset;
+ const data=await response.json().catch(()=>({}));noticeInboxHeader(response.headers);noticeOwnerInbox(data);if(!response.ok)throw new Error((data.error?.code??'body.unavailable')+': '+(data.error?.message??'Body upload refused'));return data.asset;
 }
 export async function profile(...args){return clientProfile(load().soul,args,{call});}
 export async function dashboard(...args){
@@ -1110,7 +1112,9 @@ export async function dashboard(...args){
  liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
-const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+export async function listen(...args){return clientListen(args,{call});}
+export async function ack(...args){return clientAck(args,{call});}
+const commands={listen,ack,body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}
