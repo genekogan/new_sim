@@ -26,11 +26,22 @@ export const RELATIONS = ['friend', 'neighbour', 'family', 'works-at', 'lives-at
 export const ACCESS = ['public', 'private'] as const;
 export const ZONE_USES = ['residential', 'commercial', 'park', 'farm', 'civic', 'industrial', 'wild'] as const;
 
+/** EVENTS: one thing of an event's set. `def` is a def ref (core/market-stall@1). */
+export const setPieceSchema = z.object({
+  def: z.string().regex(/^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0-9a-f]{16,64}|[a-z0-9][a-z0-9._-]*@\d+)$/, 'def must be a def ref (core/market-stall@1)'),
+  p: z.tuple([z.number().finite().min(-200).max(200), z.number().finite().min(-200).max(200)]),
+  r: z.number().finite().optional(),
+  state: z.record(z.string(), value).optional(),
+  params: z.record(z.string(), value).optional(),
+});
+export type SetPiece = z.infer<typeof setPieceSchema>;
 export const scheduleSchema = z.object({
   /** Opening hours: from–to (to may pass midnight), on `days` (default every day). */
   open: z.array(z.object({ from: HHMM, to: HHMM, days: z.array(day).min(1).max(7).optional() })).max(8).optional(),
-  /** Recurring events: a concert at 20:00 for 90 minutes on fridays. */
-  events: z.array(z.object({ name: z.string().regex(NAME), label: z.string().max(80).optional(), at: HHMM, minutes: z.number().int().min(5).max(1440).default(60), days: z.array(day).min(1).max(7).optional() })).max(16).optional(),
+  /** Recurring events: a concert at 20:00 for 90 minutes on fridays. `set` (EVENTS, 2026-10-15): the things that appear
+   *  for it (market stalls, a stage and its lights) at the event's start and are packed away at its end, placed in the
+   *  scheduled thing at `p` (metres from its centre, its own frame), yaw `r` (radians), with `state` (lights on). */
+  events: z.array(z.object({ name: z.string().regex(NAME), label: z.string().max(80).optional(), at: HHMM, minutes: z.number().int().min(5).max(1440).default(60), days: z.array(day).min(1).max(7).optional(), set: z.array(setPieceSchema).min(1).max(24).optional() })).max(16).optional(),
   /** States that follow the schedule: `field` is `is` while `when` holds, `else` (when given) otherwise. */
   follow: z.array(z.object({ field: z.string().regex(ID), when: z.enum(['open', 'event', 'dark']), is: value, else: value.optional() })).max(8).optional(),
 });
