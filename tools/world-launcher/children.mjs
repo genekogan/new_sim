@@ -34,8 +34,43 @@ export class ChildPool {
     this.o = o;
     this.kids = new Map();   // slug → state
     this.closing = false;
+    /** Handed over to a newer launcher (keeper.mjs): no world of this pool may start or restart again. */
+    this.fenced = false;
+    this.gate = null; this.inflight = new Set();
     mkdirSync(o.logDir, { recursive: true });
   }
+
+  // ---------- handover between launcher generations (keeper.mjs; lane C4 downtime)
+  /** A world still run by the previous launcher (its child, its port): proxied to as is until takeOver(). Never booted,
+   *  stopped, put to sleep or restarted by this pool while adopted, so its database has exactly one writer. */
+  adopt(world, { port, pid, script }) {
+    this.kids.set(world.slug, { slug: world.slug, world, restarts: 0, crashes: 0, status: 'running', port, child: null, adopted: { pid, script }, upSince: Date.now(), lastExit: null, ready: null, stopped: false, lastUsed: Date.now() });
+    this.savePids();
+  }
+  /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
+   *  then it boots here on the same data. Requests that arrive meanwhile wait on `ready` instead of failing. */
+  takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
+    const k = this.kids.get(slug);
+    if (!k?.adopted) return Promise.resolve(k?.port ?? null);
+    k.status = 'handover'; this.o.onChange?.(slug);
+    k.ready = (async () => {
+      try { await release(slug); }
+      catch (e) { k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
+      k.adopted = null; this.savePids();
+      if (this.closing || this.fenced) { k.status = 'stopped'; throw new Error(`world ${slug}: this launcher is closing`); }
+      return this.boot(k, timeoutMs);
+    })().finally(() => { k.ready = null; });
+    return k.ready;
+  }
+  /** Preparing a handover: hold every new boot at the gate (unpause() lets them go on; fence() refuses them). */
+  pause() { if (!this.gate) { let open; const p = new Promise((r) => { open = r; }); this.gate = { p, open }; } }
+  unpause() { const g = this.gate; this.gate = null; g?.open(); }
+  /** Boots already past the gate (spawned), settled: after pause() nothing new starts, so the running set is final. */
+  async settled() { await Promise.allSettled([...this.inflight]); }
+  /** After a handover: refuse every start and restart; children that exit stay stopped. */
+  fence() { this.fenced = true; for (const k of this.kids.values()) if (k.timer) { clearTimeout(k.timer); k.timer = null; } this.unpause(); }
+  /** The running children, for the next launcher to adopt. */
+  handoverList() { return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
 
   /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
   async reapOrphans() {
@@ -58,14 +93,14 @@ export class ChildPool {
   savePids() {
     if (!this.o.pidFile) return;
     const rec = {};
-    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script };
+    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script }; else if (k.adopted?.pid) rec[k.slug] = { pid: k.adopted.pid, port: k.port, script: k.adopted.script };
     const tmp = `${this.o.pidFile}.${process.pid}.tmp`;
     try { writeFileSync(tmp, JSON.stringify(rec, null, 2) + '\n'); renameSync(tmp, this.o.pidFile); } catch { /* best effort */ }
   }
   /** Put the least recently used idle world to sleep to free a port (it wakes on its next visit). */
   async evictIdle(except) {
     const idleMs = this.o.idleMs ?? 60_000, now = Date.now();
-    const victim = [...this.kids.values()].filter((k) => k.slug !== except && k.status === 'running' && now - (k.lastUsed ?? 0) > idleMs && !this.o.busy?.(k.slug)).sort((a, b) => (a.lastUsed ?? 0) - (b.lastUsed ?? 0))[0];
+    const victim = [...this.kids.values()].filter((k) => k.slug !== except && k.status === 'running' && !k.adopted && now - (k.lastUsed ?? 0) > idleMs && !this.o.busy?.(k.slug)).sort((a, b) => (a.lastUsed ?? 0) - (b.lastUsed ?? 0))[0];
     if (!victim) return null;
     await this.stop(victim.slug);
     victim.asleep = true;
@@ -75,10 +110,10 @@ export class ChildPool {
   status(slug) {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
-    return { status: k.asleep && k.status === 'stopped' ? 'asleep' : k.status, port: k.port, pid: k.child?.pid ?? null, restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
+    return { status: k.asleep && k.status === 'stopped' ? 'asleep' : k.status, port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
-  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.status === 'starting' || k.status === 'restarting')).map((k) => k.port).filter(Boolean)); }
+  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).map((k) => k.port).filter(Boolean)); }
   async pickPort(prefer, self) {
     const [lo, hi] = this.o.range, used = this.usedPorts(self);
     if (prefer && prefer >= lo && prefer <= hi && !used.has(prefer) && await portFree(prefer)) return prefer;
@@ -88,10 +123,13 @@ export class ChildPool {
 
   /** Start (or join the start of) a world; resolves with its port once /healthz answers. */
   ensure(world, { timeoutMs = 90_000 } = {}) {
+    if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
     if (k) k.lastUsed = Date.now();
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
+    // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here
+    if (k?.adopted) { const e = new Error(`world ${world.slug} could not be taken over from the previous launcher${k.lastError ? `: ${k.lastError}` : ''}`); e.code = 'handover-failed'; return Promise.reject(e); }
     k = k ?? { slug: world.slug, world, restarts: 0, crashes: 0, status: 'starting', port: null, child: null, upSince: null, lastExit: null, ready: null, stopped: false, lastUsed: Date.now() };
     k.world = world; k.stopped = false;
     if (k.timer) { clearTimeout(k.timer); k.timer = null; }  // someone is waiting: restart now, not after the backoff
@@ -101,7 +139,7 @@ export class ChildPool {
   }
 
   /** Live (or booting) children other than `except`. */
-  running(except) { return [...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.status === 'starting' || k.status === 'restarting')).length; }
+  running(except) { return [...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).length; }
   /** Make room for one more world under the running cap and the free-memory floor, sleeping idle worlds if needed. */
   async makeRoom(slug) {
     const { maxRunning = Infinity, minFreeMb = 0 } = this.o;
@@ -117,6 +155,13 @@ export class ChildPool {
   }
 
   async boot(k, timeoutMs) {
+    while (this.gate) await this.gate.p;
+    if (this.fenced) { k.status = 'stopped'; const e = new Error(`world ${k.slug} is served by a newer launcher`); e.code = 'handed-over'; throw e; }
+    const run = this.spawnAndWait(k, timeoutMs);
+    this.inflight.add(run); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
+    return run;
+  }
+  async spawnAndWait(k, timeoutMs) {
     k.status = 'starting'; this.o.onChange?.(k.slug);
     try { await this.makeRoom(k.slug); } catch (e) { k.status = 'failed'; this.o.onChange?.(k.slug); throw e; }
     let port;
@@ -152,7 +197,7 @@ export class ChildPool {
   onExit(k, child, code, signal) {
     if (k.child !== child) return;
     k.child = null; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
-    if (this.closing || k.stopped) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
+    if (this.closing || k.stopped || this.fenced) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
     if (k.status === 'starting') return;  // boot() reports it (to ensure()'s caller, or to the restart loop)
     this.scheduleRestart(k);
   }
@@ -163,7 +208,7 @@ export class ChildPool {
     k.status = 'restarting'; k.restarts++; k.upSince = null; k.nextTryAt = Date.now() + wait; this.o.onChange?.(k.slug);
     k.timer = setTimeout(() => {
       k.timer = null;
-      if (this.closing || k.stopped) return;
+      if (this.closing || k.stopped || this.fenced) return;
       k.ready = this.boot(k, 90_000).finally(() => { k.ready = null; });
       k.ready.catch((e) => { k.lastError = e.message; if (!this.closing && !k.stopped) this.scheduleRestart(k); });
     }, wait);
@@ -171,6 +216,7 @@ export class ChildPool {
 
   async stop(slug) {
     const k = this.kids.get(slug); if (!k) return;
+    if (k.adopted) return;   // the previous launcher's child: only it stops it (handover release)
     k.stopped = true; if (k.timer) clearTimeout(k.timer);
     const c = k.child; if (!c) { k.status = 'stopped'; return; }
     c.kill('SIGTERM');

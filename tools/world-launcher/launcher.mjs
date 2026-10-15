@@ -42,6 +42,10 @@
 // pinned copies in tools/world-launcher/soul/ (SOURCES.json: shas and provenance); --soul-cli / --soul-skill /
 // --soul-instructions override them.
 //
+// Under the keeper (keeper.mjs; deploy/sim-worlds@.service) the launcher is one *generation*: it does not listen; the
+// keeper passes it each connection, and on a release (systemctl reload) a newer generation adopts this one's running worlds
+// and takes them over one at a time (handover below), so the port never closes and no world has two writers.
+//
 // Local only: binds 127.0.0.1, edge minds (owners' agents think; the world pays for none), no credentials, no tunnels.
 import { execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
@@ -97,6 +101,9 @@ export async function openLauncher(cfg = {}) {
   const behindProxy = publicOrigin !== origin;
   const B = prod.base, wp = (slug) => `${B}/w/${slug}`;
   const registry = new Registry(dataDir);
+  /** Handover state (keeper.mjs): 'active' → 'preparing' → 'retired' (or back to 'active' when the next one fails). */
+  let phase = 'active', retiredTo = null, gate = null;
+  const adopting = Array.isArray(cfg.adopt) ? cfg.adopt : null;
   const createLimit = cfg.createLimit ?? Infinity, made = new Map();
   /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
   const live = new Map();
@@ -270,7 +277,7 @@ export async function openLauncher(cfg = {}) {
     if (!s.agentSeenAt && rest.startsWith('/v1/god/') && /^Bearer god_/i.test(auth) && !/Mozilla\//.test(ua)) { s.agentSeenAt = Date.now(); registry.update(slug, { agentSeenAt: s.agentSeenAt }); }
     return rest;
   }
-  function proxyHttp(req, res, targetPort, { tee, path } = {}) {
+  function proxyHttp(req, res, targetPort, { tee, path, retry } = {}) {
     // Behind Caddy (a public origin other than our own) keep the visitor's x-forwarded-for, so per-person limits in
     // the worlds see people, not the proxy; locally it is set to the connecting address as before.
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
@@ -279,11 +286,13 @@ export async function openLauncher(cfg = {}) {
       if (tee && (r.statusCode ?? 0) < 300) { const chunks = []; r.on('data', (c) => { if (chunks.length < 64) chunks.push(c); }); r.on('end', () => { try { tee(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not json */ } }); }
       r.pipe(res);
     });
-    up.on('error', () => { if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); else res.destroy(); });
+    // A world that was just handed over (or restarted) refused the connection before answering: a GET/HEAD is asked again
+    // once (the retry waits for the world to be back), so a page or poll in flight sees a short wait, not an error.
+    up.on('error', () => { if (!res.headersSent && retry) retry(); else if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); else res.destroy(); });
     req.on('aborted', () => up.destroy()); res.on('close', () => up.destroy());
-    req.pipe(up);
+    if (req.readableEnded) up.end(); else req.pipe(up);   // a retried GET: its (empty) body was already read
   }
-  async function toWorld(req, res, slug, url) {
+  async function toWorld(req, res, slug, url, retried = false) {
     const w = registry.get(slug);
     if (!w) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
@@ -291,14 +300,25 @@ export async function openLauncher(cfg = {}) {
     }
     let p;
     try { p = await pool.ensure(worldEnv(w)); }
-    catch (e) { json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return; }
-    const rest = observe(slug, req, url);
+    catch (e) {
+      if (e.code === 'handed-over' && retiredTo) { forward(req, res); return; }
+      json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return;
+    }
+    const rest = retried ? url.pathname : observe(slug, req, url);
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
-    proxyHttp(req, res, p, { tee });
+    const again = !retried && (req.method === 'GET' || req.method === 'HEAD') ? () => void toWorld(req, res, slug, url, true).catch(() => { if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); }) : undefined;
+    proxyHttp(req, res, p, { tee, retry: again });
   }
+  /** Retired (a newer launcher serves now): anything still arriving here, on a connection opened before the switch,
+   *  goes to the keeper's port, i.e. to the newer launcher; the connection closes after this response. */
+  function forward(req, res) { res.shouldKeepAlive = false; proxyHttp(req, res, port, { path: req.url }); }
 
   const sockets = new Set();
   const server = createServer(async (req, res) => {
+    const sock = req.socket; sock.simBusy = (sock.simBusy ?? 0) + 1; res.once('close', () => { sock.simBusy--; });
+    if (retiredTo) { forward(req, res); return; }
+    // while the next launcher is being prepared, creations and operator changes wait: they run here if it fails, there if not
+    if (gate && req.method === 'POST' && (req.url ?? '').startsWith(`${B}/__sim/`)) { await gate.p; if (retiredTo) { forward(req, res); return; } }
     let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
     // Under --base everything of ours is <base>/…; `path` is the part after the base. Outside the base only the
     // public static files a world page also asks for at the root (/modular, /mars-assets, …) are answered, the way
@@ -388,35 +408,97 @@ export async function openLauncher(cfg = {}) {
   });
   server.requestTimeout = 0; server.timeout = 0; server.keepAliveTimeout = 5_000;
   server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
-  server.on('upgrade', async (req, socket, head) => {
-    const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
-    const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
-    const w = slug && registry.get(slug);
-    if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
-    let p; try { p = await pool.ensure(worldEnv(w)); } catch { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
+  /** Pipe an upgrade to a port; `refused` (optional) runs instead when nothing answers there before the pipe starts. */
+  function pipeUpgrade(req, socket, head, p, refused) {
+    let piped = false;
     const up = connect(p, '127.0.0.1', () => {
+      piped = true;
       up.write(`${req.method} ${req.url} HTTP/${req.httpVersion}\r\n${Object.entries(req.headers).flatMap(([k, v]) => Array.isArray(v) ? v.map((x) => `${k}: ${x}`) : [`${k}: ${v}`]).join('\r\n')}\r\n\r\n`);
       if (head.length) up.write(head);
       socket.pipe(up).pipe(socket);
     });
-    up.on('error', () => socket.destroy()); socket.on('error', () => up.destroy()); socket.on('close', () => up.destroy()); up.on('close', () => socket.destroy());
+    up.on('error', () => { if (!piped && refused) { up.destroy(); refused(); } else socket.destroy(); });
+    socket.on('error', () => up.destroy()); socket.on('close', () => up.destroy()); up.on('close', () => { if (piped || !refused) socket.destroy(); });
+  }
+  server.on('upgrade', async (req, socket, head) => {
+    socket.simUpgraded = true;
+    if (retiredTo) { pipeUpgrade(req, socket, head, port); return; }
+    const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
+    const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
+    const w = slug && registry.get(slug);
+    if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
+    const attach = async (again) => {
+      let p; try { p = await pool.ensure(worldEnv(w)); }
+      catch (e) { if (e.code === 'handed-over' && retiredTo) pipeUpgrade(req, socket, head, port); else socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
+      // a world being handed over may refuse once (its old process just stopped): ask again, which waits for the new one
+      pipeUpgrade(req, socket, head, p, again ? () => void attach(false) : undefined);
+    };
+    await attach(true);
     live.set(slug, (live.get(slug) ?? 0) + 1);
     let gone = false;
     const left = () => { if (gone) return; gone = true; const n = (live.get(slug) ?? 1) - 1; if (n > 0) live.set(slug, n); else live.delete(slug); const k = pool.state(slug); if (k) k.lastUsed = Date.now(); };
     socket.once('end', left); socket.once('close', left);
   });
-  await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
-  for (const r of await pool.reapOrphans()) log(`stopped ${r.slug} (pid ${r.pid}) left running by an earlier launcher`);
+  // Under the keeper the port is the keeper's: connections arrive through accept() instead of listen().
+  if (cfg.listen !== false) await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
+  if (adopting) {
+    // a handover: these worlds still run under the previous launcher; proxy to them until takeOver() (no orphan reaping:
+    // every child in children.json is alive and owned by it)
+    for (const a of adopting) { const w = registry.get(a.slug); if (w && Number.isInteger(a.port) && Number.isInteger(a.pid)) pool.adopt(worldEnv(w), a); }
+    log(`adopted ${pool.kids.size} running world(s) from the previous launcher: ${[...pool.kids.keys()].join(', ') || 'none'}`);
+  } else for (const r of await pool.reapOrphans()) log(`stopped ${r.slug} (pid ${r.pid}) left running by an earlier launcher`);
   log(`${origin}${B}/  (data ${dataDir}, worlds ${registry.worlds.length}/${MAX_WORLDS}, running cap ${prod.maxRunning}, children ${range[0]}–${range[1]}, sign-in ${auth ? `Clerk for ${publicOrigin}` : 'dev names'}, build ${BUILD})`);
 
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
-  const eager = cfg.eager ?? 4;
+  const eager = adopting ? 0 : cfg.eager ?? 4;   // a handover wakes nothing until it has taken over (takeOverAll)
   for (const w of [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).slice(0, eager)) pool.ensure(worldEnv(w)).then((p) => log(`woke ${w.slug} on :${p}`), (e) => log(`could not wake ${w.slug}: ${e.message}`));
 
   let closed = false;
   return {
-    server, url: origin, registry, pool, dataDir, auth: auth?.public ?? { provider: 'dev' },
-    close: async () => { if (closed) return; closed = true; const done = new Promise((r) => server.close(r)); for (const s of sockets) s.destroy(); await pool.closeAll(); await done; },
+    server, url: origin, registry, pool, dataDir, auth: auth?.public ?? { provider: 'dev' }, build: BUILD,
+    /** Keeper: a connection accepted on the public port, passed to this launcher. */
+    accept(socket) { server.emit('connection', socket); socket.resume(); },
+    /** Keeper, step 1: finish creations, hold new boots and writes, report the running worlds for the next launcher. */
+    async prepareHandover() {
+      if (phase !== 'active') throw new Error(`cannot prepare a handover while ${phase}`);
+      phase = 'preparing'; let open; gate = { p: new Promise((r) => { open = r; }), open };
+      pool.pause();
+      await creating; await pool.settled();
+      registry.frozen = true; pool.savePids(); const pidFile = pool.o.pidFile; pool.o.pidFile = null; gate.pidFile = pidFile;
+      return pool.handoverList();
+    },
+    /** Keeper: the next launcher failed before it served anyone; carry on as before. */
+    resumeHandover() {
+      if (phase !== 'preparing') return;
+      phase = 'active'; registry.frozen = false; pool.o.pidFile = gate.pidFile; pool.savePids(); registry.save();
+      const g = gate; gate = null; pool.unpause(); g.open();
+      log('handover abandoned: serving on as before');
+    },
+    /** Keeper, step 3: the next launcher serves new connections; anything still arriving here is forwarded to it. No
+     *  world starts here again. Idle connections close now, busy ones after their response. */
+    retire() {
+      phase = 'retired'; retiredTo = port; pool.fence();
+      const g = gate; gate = null; g?.open();
+      server.keepAliveTimeout = 1;
+      for (const s of sockets) if (!s.simBusy && !s.simUpgraded) s.destroy();
+    },
+    /** Keeper, step 4 (on the old launcher): stop one world so the next one can boot it on the same data. */
+    async releaseWorld(slug) { if (phase !== 'retired') throw new Error('release before retire'); await pool.stop(slug); return pool.status(slug); },
+    /** Keeper, step 4 (on the new launcher): take every adopted world over, `concurrency` at a time; per-world results. */
+    async takeOverAll(release, { concurrency = 1 } = {}) {
+      const todo = [...pool.kids.values()].filter((k) => k.adopted).map((k) => k.slug), out = {};
+      const one = async (slug) => {
+        const t0 = performance.now();
+        try { const p = await pool.takeOver(slug, release); out[slug] = { ok: true, ms: Math.round(performance.now() - t0), port: p }; log(`took over ${slug} on :${p} in ${out[slug].ms} ms`); }
+        catch (e) { out[slug] = { ok: false, ms: Math.round(performance.now() - t0), error: e.message }; log(`could not take over ${slug}: ${e.message}`); }
+      };
+      const lanes = Array.from({ length: Math.max(1, concurrency) }, async () => { while (todo.length) await one(todo.shift()); });
+      await Promise.all(lanes);
+      return out;
+    },
+    /** Open (non-upgraded) requests still being answered here. */
+    busy() { let n = 0; for (const s of sockets) if (s.simBusy && !s.simUpgraded) n++; return n; },
+    close: async () => { if (closed) return; closed = true; const done = new Promise((r) => server.close(() => r())); for (const s of sockets) s.destroy(); await pool.closeAll(); await done; },
   };
 }
 
@@ -437,17 +519,49 @@ export function clerkAuth(envFile, dataDir, publicOrigin) {
   };
 }
 
+/**
+ * One generation under the keeper (keeper.mjs): connections and handover steps arrive as IPC messages.
+ *   conn (+ socket)  a connection on the public port          prepare → prepared {children}   resume
+ *   retire           the next generation serves now           release {id, slug} → released {id, ok}
+ *   take-over        adopt → own every world (asks release)   exit                            (keeper is gone: stop)
+ */
+function serveKeeper(l, stop) {
+  let n = 0; const waiting = new Map();
+  const ask = (m) => new Promise((yes, no) => { const id = ++n; waiting.set(id, { yes, no }); process.send({ ...m, id }); });
+  process.on('message', (m, handle) => {
+    if (!m || typeof m !== 'object') return;
+    if (m.t === 'conn') { if (handle) l.accept(handle); return; }
+    const reply = (p) => p.then((r) => process.send({ t: `${m.t}-done`, id: m.id, ok: true, ...r }), (e) => process.send({ t: `${m.t}-done`, id: m.id, ok: false, error: e.message }));
+    if (m.t === 'prepare') reply(l.prepareHandover().then((children) => ({ children })));
+    else if (m.t === 'resume') l.resumeHandover();
+    else if (m.t === 'retire') l.retire();
+    else if (m.t === 'release') reply(l.releaseWorld(m.slug).then((st) => ({ slug: m.slug, status: st.status })));
+    else if (m.t === 'release-done') { const w = waiting.get(m.id); waiting.delete(m.id); if (w) (m.ok ? w.yes() : w.no(new Error(m.error ?? 'the previous launcher could not stop it'))); }
+    else if (m.t === 'take-over') reply(l.takeOverAll((slug) => ask({ t: 'release', slug }), { concurrency: Number(process.env.SIM_HANDOVER_CONCURRENCY ?? 1) }).then((worlds) => ({ worlds })));
+    else if (m.t === 'exit') {
+      // the last forwarded responses finish (up to 10 s), then this generation is gone
+      const t0 = Date.now(); const done = () => (l.busy() === 0 || Date.now() - t0 > 10_000 ? stop('handed over') : setTimeout(done, 100)); done();
+    }
+  });
+  process.on('disconnect', () => stop('keeper gone'));
+  process.send({ t: 'ready', build: l.build, pid: process.pid });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2);
   const flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
   const range = flag('range')?.split('-').map(Number);
+  const underKeeper = process.env.SIM_KEEPER === '1' && typeof process.send === 'function';
   try {
     const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
-      marsWebDir: flag('mars-web'), webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions') });
+      marsWebDir: flag('mars-web'), webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
+      ...(underKeeper ? { listen: false, adopt: process.env.SIM_ADOPT ? JSON.parse(process.env.SIM_ADOPT) : null } : {}) });
     let stopping = false;
-    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (stopping) return; stopping = true; console.log(`[launcher] ${sig}: stopping worlds…`); void l.close().then(() => process.exit(0)); });
-  } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; }
+    const stop = (why) => { if (stopping) return; stopping = true; console.log(`[launcher] ${why}: stopping worlds…`); void l.close().then(() => process.exit(0)); };
+    for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => stop(sig));
+    if (underKeeper) serveKeeper(l, stop);
+  } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; if (underKeeper) process.disconnect?.(); }
 }
