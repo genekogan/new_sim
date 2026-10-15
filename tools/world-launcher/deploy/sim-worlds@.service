@@ -5,6 +5,9 @@
 #   settings /etc/sim-worlds/%i.conf                                  (SIM_WORLDS_ARGS: port, caps, origin; no secrets)
 #   auth     /etc/sim-worlds/production-auth.env (production only; placeholder path named in production.conf, provisioned
 #            by Codex/Gene; each world's node loads it by path; accounts registry <data>/accounts.sqlite, back it up)
+# The keeper (tools/world-launcher/keeper.mjs) holds the port and runs the launcher from the release the stage link
+# points at; `systemctl reload` hands the worlds over to a new release without closing the port (deploy/activate.sh).
+# A changed keeper, unit or settings file needs `systemctl restart` (all worlds blink); activate.sh decides.
 # Binds 127.0.0.1 only. Never touches /opt/eden3, the sim or mars users, Caddy or DNS.
 [Unit]
 Description=Sim world launcher (%i): new god-mode worlds, one Sim server per world
@@ -17,10 +20,11 @@ User=simworlds
 Group=simworlds
 WorkingDirectory=/srv/sim-worlds/%i
 EnvironmentFile=/etc/sim-worlds/%i.conf
-ExecStart=/usr/bin/node tools/world-launcher/launcher.mjs $SIM_WORLDS_ARGS
+ExecStart=/usr/bin/node tools/world-launcher/keeper.mjs --link /srv/sim-worlds/%i $SIM_WORLDS_ARGS
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=3
-# SIGTERM: the launcher stops every world (each saves a snapshot) before it exits.
+# SIGTERM: the keeper stops its launcher(s), which stop every world (each saves a snapshot), before it exits.
 KillMode=mixed
 TimeoutStopSec=40
 # The launcher and all its worlds share this cgroup; the per-instance drop-in sets the real budget.
