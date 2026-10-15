@@ -191,36 +191,132 @@ test('held removals use PRE-batch ancestry/roots, and post-batch added members r
   h.sites.dispose();
 });
 
-test('massing is merged at start/snapshot (gable and pyramid caps); per-mass alpha fades as parts arrive and returns on removal', () => {
+test('massing is merged at start/snapshot; per-mass coverage fades faces and restores them on removal', () => {
   const h = harness(); h.model.entities.set('e_root', entity('e_root'));
-  h.sites.reset([site({ roots: ['e_root'] })], 1, SERVER_NOW);
+  const masses = site().massing; masses[0] = { at: [0, 0], size: [16, 8], h: 10, roof: 'gable' };
+  h.sites.reset([site({ roots: ['e_root'], massing: masses })], 1, SERVER_NOW);
   const mesh = faces(h), geometry = mesh.geometry, colors = geometry.getAttribute('color');
   assert.equal(mesh.material.depthWrite, false); assert.equal(colors.itemSize, 4); assert.ok(Math.abs(colors.getW(0) - 0.35) < 1e-6);
   geometry.computeBoundingBox(); assert.ok(Math.abs(geometry.boundingBox!.max.y - 22.08) < 1e-4);
   assert.equal(h.sites.inspect().sites[0].draws, 3);
-  for (let i = 1; i <= 6; i++) {
-    const e = entity(`e_part${i}`, 'e_root'); h.model.entities.set(e.id, e); h.model.boxes.set(e.id, [{ c: [103, 19], half: [0.5, 0.5], yaw: 0, y0: 0, y1: 1 }]);
+  for (let i = 1; i <= 4; i++) {
+    const e = entity(`e_part${i}`, 'e_root'); h.model.entities.set(e.id, e); h.model.boxes.set(e.id, [{ c: [103, 11 + i * 4 - 2], half: [2, 4], yaw: -Math.PI / 2, y0: 0, y1: 14 }]);
     const d = diff([delta(i + 1)], [e]); h.sites.apply(d); h.sites.refitDiff(d);
-    assert.ok(Math.abs(colors.getW(0) - 0.35 * (1 - i / 6)) < 1e-6);
+    assert.equal(h.sites.inspect().sites[0].coverage[0], i / 4);
+    assert.ok(Math.abs(colors.getW(0) - 0.35 * Math.max(0, 1 - i / 4 / 0.6)) < 1e-6);
     assert.equal(faces(h).geometry, geometry);
   }
   assert.equal(mesh.visible, true, 'towers still have ghost faces');
-  assert.deepEqual(h.sites.inspect().sites[0].parts, [6, 0, 0]);
+  assert.deepEqual(h.sites.inspect().sites[0].parts, [4, 0, 0]);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [1, 0, 0]);
   assert.ok(marker(h).geometry.getAttribute('position').count > 64, 'massing edges persist after nave faces reach zero');
-  const removed = 'e_part6'; h.model.entities.delete(removed); h.model.boxes.delete(removed);
-  const d = diff([delta(8)], [], [removed]); h.sites.apply(d); h.sites.refitDiff(d); assert.ok(colors.getW(0) > 0);
+  const removed = ['e_part2', 'e_part3', 'e_part4']; for (const id of removed) { h.model.entities.delete(id); h.model.boxes.delete(id); }
+  const d = diff([delta(6)], [], removed); h.sites.apply(d); h.sites.refitDiff(d); assert.ok(colors.getW(0) > 0);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.25, 0, 0]);
   h.sites.dispose();
 });
 
-test('part centres respect the site and individual mass yaws; site-only alive messages do not recount geometry', () => {
+test('coverage respects site/mass/OBB yaws; frames, alive messages and unrelated diffs do not resample it', () => {
   const h = harness(); const root = entity('e_root'); h.model.entities.set(root.id, root);
-  h.model.boxes.set(root.id, [{ c: [103, 23], half: [0.2, 0.2], yaw: 0, y0: 0, y1: 1 }]);
+  h.model.boxes.set(root.id, [{ c: [103, 23], half: [1, 3], yaw: 0, y0: 0, y1: 3 }]);
   h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [4, 0], size: [2, 6], yaw: Math.PI / 2, h: 3 }] })));
   assert.deepEqual(h.sites.inspect().sites[0].parts, [1]);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [1]);
+  let reads = 0; const footprints = h.model.footprintsOf; h.model.footprintsOf = id => { reads++; return footprints(id); };
+  const faceGeometry = faces(h).geometry, markerGeometry = marker(h).geometry;
   h.model.boxes.set(root.id, [{ c: [120, 23], half: [0.2, 0.2], yaw: 0, y0: 0, y1: 1 }]);
   h.sites.apply(edge(delta(2))); assert.deepEqual(h.sites.inspect().sites[0].parts, [1]);
+  for (let i = 0; i < 100; i++) h.advance(16);
+  h.sites.refitDiff(diff([], [root]));
+  assert.equal(reads, 0); assert.equal(faces(h).geometry, faceGeometry); assert.equal(marker(h).geometry, markerGeometry);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [1]);
   const d = diff([delta(3)], [root]); h.sites.apply(d); h.sites.refitDiff(d); assert.deepEqual(h.sites.inspect().sites[0].parts, [0]);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0]);
   h.sites.dispose();
+});
+
+test('one real 31 m tower fills its 28 m pyramid mass while an empty mass survives later build steps', () => {
+  const h = harness(); const root = entity('e_tower'); h.model.entities.set(root.id, root);
+  h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [4, 4], h: 28, roof: 'pyramid' }, { at: [8, 0], size: [4, 4], h: 12 }] })));
+  h.model.boxes.set(root.id, [{ c: [103, 19], half: [2, 2], yaw: -Math.PI / 2, y0: 0, y1: 31 }]);
+  const d = diff([delta(2, { step: { n: 6, of: 6, label: 'details' } })], [root]); h.sites.apply(d); h.sites.refitDiff(d);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [1, 0]);
+  const colors = faces(h).geometry.getAttribute('color'), lines = marker(h).geometry.getAttribute('color');
+  assert.equal(colors.getW(0), 0); assert.ok(Math.abs(colors.getW(colors.count - 1) - 0.35) < 1e-6);
+  assert.equal(lines.itemSize, 4); assert.equal(marker(h).material.opacity, 1);
+  assert.ok(Math.abs(lines.getW(0) - 0.95) < 1e-6, 'plot marker stays bright');
+  assert.ok(Math.abs(lines.getW(64) - 0.06) < 1e-6, 'filled tower edges are faint in the same draw');
+  assert.ok(Math.abs(lines.getW(lines.count - 1) - 0.95) < 1e-6, 'empty plan stays bright');
+  const alphas = Array.from({ length: lines.count }, (_, i) => lines.getW(i));
+  h.sites.apply(edge(delta(3, { status: 'paused' })));
+  assert.deepEqual(Array.from({ length: lines.count }, (_, i) => lines.getW(i)), alphas, 'pause only changes the tint');
+  assert.equal(h.sites.inspect().sites[0].draws, 3); h.sites.dispose();
+});
+
+test('a low nave in a taller gabled plan retains only faint faces and an outline', () => {
+  const h = harness(); const root = entity('e_nave'); h.model.entities.set(root.id, root);
+  h.model.boxes.set(root.id, [{ c: [103, 19], half: [13, 6], yaw: -Math.PI / 2, y0: 0, y1: 9 }]);
+  h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [26, 12], h: 15, roof: 'gable' }] })));
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.5], 'roof volume contributes to the denominator');
+  assert.ok(Math.abs(faces(h).geometry.getAttribute('color').getW(0) - 0.05833333) < 1e-6);
+  assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(64) - 0.18515625) < 1e-6);
+  assert.equal(h.sites.inspect().sites[0].draws, 3); h.sites.dispose();
+});
+
+test('face fade ends at 60% and edge fade reaches a 0.06 outline at 80%, independent of part count', () => {
+  const h = harness(); const root = entity('e_root'); h.model.entities.set(root.id, root);
+  h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [8, 8], h: 10 }] })));
+  const cases = [[0.2, 0.23333333, 0.560625], [0.4, 0.11666667, 0.2825], [0.6, 0, 0.115625], [0.8, 0, 0.06], [1, 0, 0.06]];
+  for (let i = 0; i < cases.length; i++) {
+    const [coverage, faceAlpha, edgeAlpha] = cases[i];
+    h.model.boxes.set(root.id, [{ c: [103, 19], half: [4, 4], yaw: 0, y0: 0, y1: coverage * 10 }]);
+    const d = diff([delta(i + 2)], [root]); h.sites.apply(d); h.sites.refitDiff(d);
+    assert.ok(Math.abs(h.sites.inspect().sites[0].coverage[0] - coverage) < 1e-12);
+    assert.ok(Math.abs(faces(h).geometry.getAttribute('color').getW(0) - faceAlpha) < 1e-6);
+    assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(64) - edgeAlpha) < 1e-6);
+    assert.equal(faces(h).visible, coverage < 0.6); assert.equal(h.sites.inspect().sites[0].draws, coverage < 0.6 ? 3 : 2);
+  }
+  h.sites.dispose();
+});
+
+test('coverage unions overlapping/nested subtree OBBs and clips footprints/heights without bridging vertical gaps', () => {
+  const h = harness(); const root = entity('e_prefab'), child = entity('e_member', root.id), unrelated = entity('e_elsewhere');
+  for (const e of [root, child, unrelated]) h.model.entities.set(e.id, e);
+  const box = { c: [-6, 0] as [number, number], half: [6, 4] as [number, number], yaw: 0 };
+  h.model.boxes.set(root.id, [{ ...box, y0: -2, y1: 4 }]);
+  h.model.boxes.set(child.id, [{ ...box, y0: 2, y1: 6 }, { ...box, y0: 2, y1: 6 }, { ...box, y0: 8, y1: 12 }, { ...box, c: [6, 0], y0: 10, y1: 20 }]);
+  h.model.boxes.set(unrelated.id, [{ c: [0, 0], half: [4, 4], yaw: 0, y0: 0, y1: 10 }]);
+  h.sites.apply(start(site({ site: { at: [0, 0], size: [26, 14], yaw: 0 }, roots: [root.id, child.id], massing: [{ at: [0, 0], size: [8, 8], h: 10 }] })));
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.4], 'half the base × 8/10 height; duplicate roots/OBBs and unrelated geometry add nothing');
+  const d = diff([delta(2, { rootsRemoved: [root.id, child.id] })]); h.sites.apply(d); h.sites.refitDiff(d);
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0]); h.sites.dispose();
+});
+
+test('rotated OBB footprint coverage is sampled within the mass base at nonzero terrain height', () => {
+  const h = harness('ring,label', { groundAt: () => 7 }); const root = entity('e_root'); h.model.entities.set(root.id, root);
+  // A 45° square diamond intersects 40 of the 64 cell centres in an 8×8 base.
+  h.model.boxes.set(root.id, [{ c: [103, 19], half: [2 * Math.SQRT2, 2 * Math.SQRT2], yaw: Math.PI / 4, y0: 5, y1: 17 }]);
+  h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [8, 8], h: 10 }] })));
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.625]); h.sites.dispose();
+});
+
+test('repeated coverage changes reuse faces/materials, dispose replaced marker geometry and release hidden faces once', () => {
+  const h = harness(); const root = entity('e_root'); h.model.entities.set(root.id, root);
+  h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [4, 4], h: 10 }] })));
+  const geometry = faces(h).geometry, material = faces(h).material, lineMaterial = marker(h).material;
+  const sprite = label(h), resources = [geometry, material, lineMaterial, sprite.material, sprite.material.map!];
+  const counts = resources.map(() => 0); resources.forEach((r, i) => r.addEventListener('dispose', () => counts[i]++));
+  for (let i = 0; i < 10; i++) {
+    const old = marker(h).geometry; let released = 0; old.addEventListener('dispose', () => released++);
+    h.model.boxes.set(root.id, [{ c: [103, 19], half: [2, 2], yaw: 0, y0: 0, y1: i % 2 ? 10 : 2 }]);
+    const d = diff([delta(i + 2)], [root]); h.sites.apply(d); h.sites.refitDiff(d);
+    assert.equal(released, 1); assert.equal(faces(h).geometry, geometry); assert.equal(faces(h).material, material); assert.equal(marker(h).material, lineMaterial);
+    assert.ok(h.sites.inspect().sites[0].draws <= 3);
+  }
+  assert.equal(faces(h).visible, false); assert.deepEqual(counts, resources.map(() => 0));
+  const last = marker(h).geometry; let lastReleased = 0; last.addEventListener('dispose', () => lastReleased++);
+  h.sites.apply(edge(delta(12, { status: 'done' }))); h.sites.dispose(); h.sites.dispose();
+  assert.deepEqual(counts, resources.map(() => 1)); assert.equal(lastReleased, 1);
 });
 
 test('outline without massing uses footprint OBBs under empty prefab roots and instanced children', () => {

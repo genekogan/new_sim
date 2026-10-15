@@ -47,18 +47,20 @@ type Options = {
   model: () => SiteModel | null; groundAt: (x: number, z: number) => number | null;
   fetchBuilds?: () => Promise<unknown>; now?: () => number; createCanvas?: () => HTMLCanvasElement; search?: string;
 };
-type Member = { root: string; mask: number };
+type VertexRange = { start: number; count: number };
+type Member = { root: string; mask: number; boxes: OBB[] };
 type View = {
   data: PublicSite; roots: Set<string>; group: THREE.Group;
   marker: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
-  faces: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; ranges: { start: number; count: number }[];
-  parts: number[]; members: Map<string, Member>; reindex: boolean;
+  faces: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; ranges: VertexRange[]; edgeRanges: VertexRange[];
+  parts: number[]; coverage: number[]; members: Map<string, Member>; reindex: boolean;
   label: THREE.Sprite | null; canvas: HTMLCanvasElement | null; text: string; labelY: number;
   wheel: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> | null;
   sheen: THREE.Mesh<THREE.BufferGeometry, THREE.ShaderMaterial> | null;
   deadline: number; receivedAt: number; silence: number; pausedAt: number; paused: boolean; nextLabelAt: number;
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
+const MARKER_ALPHA = 0.95, FAINT_EDGE_ALPHA = 0.06, COVERAGE_GRID = 8; // 64 sampled columns per mass
 const MINUTE = 60_000, QUIET_MS = 3 * MINUTE;
 const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
@@ -228,7 +230,7 @@ export class WorldBuildSites {
     return { kind: 'place' as const, id, name: `Under construction: ${b.title}`, detail: `${b.step.label} ${b.step.n}/${b.step.of}`, point: new THREE.Vector3(x, this.options.groundAt(x, z) ?? 0, z) };
   }
   inspect() {
-    return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length })) };
+    return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], coverage: [...v.coverage], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length })) };
   }
 
   private put(data: PublicSite, now?: number) {
@@ -240,12 +242,12 @@ export class WorldBuildSites {
     }
     if (previous) this.release(previous);
     const group = new THREE.Group(); group.name = `build-site:${data.id}`;
-    const marker = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false, toneMapped: false }));
+    const marker = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false, toneMapped: false }));
     marker.renderOrder = 997;
     const mass = massGeometry(data, this.options.groundAt);
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
     faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, parts: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0 };
+    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0 };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
     this.tag(v);
@@ -320,17 +322,34 @@ export class WorldBuildSites {
       const [sx, sz] = localPoint(x, z, v.data.site.at, v.data.site.yaw);
       let mask = 0;
       for (let k = 0; k < v.data.massing.length; k++) { const m = v.data.massing[k], [mx, mz] = localPoint(sx, sz, m.at, m.yaw ?? 0); if (Math.abs(mx) <= m.size[0] / 2 && Math.abs(mz) <= m.size[1] / 2) { mask |= 1 << k; v.parts[k]++; } }
-      v.members.set(id, { root, mask });
+      v.members.set(id, { root, mask, boxes });
     }
+    // Count remains diagnostic only. Union the cached physical OBBs, including members
+    // whose centres are outside a mass but whose footprints overlap it.
+    const boxes = [...v.members.values()].flatMap(member => member.boxes);
+    for (let k = 0; k < v.coverage.length; k++) v.coverage[k] = massCoverage(v.data, v.data.massing[k], boxes, this.options.groundAt);
     v.reindex = false; this.tint(v);
   }
   private tint(v: View) {
     const c = v.paused ? PAUSED : ACTIVE;
-    const lines = v.marker.geometry.getAttribute('color'); if (lines) { for (let k = 0; k < lines.count; k++) lines.setXYZ(k, c.r, c.g, c.b); lines.needsUpdate = true; }
+    const lines = v.marker.geometry.getAttribute('color');
+    if (lines) {
+      for (let k = 0; k < lines.count; k++) lines.setXYZW(k, c.r, c.g, c.b, MARKER_ALPHA);
+      for (let i = 0; i < v.edgeRanges.length; i++) {
+        const range = v.edgeRanges[i], remaining = Math.max(0, 1 - v.coverage[i] / 0.8);
+        const alpha = FAINT_EDGE_ALPHA + (MARKER_ALPHA - FAINT_EDGE_ALPHA) * remaining * remaining;
+        for (let k = range.start; k < range.start + range.count; k++) lines.setW(k, alpha);
+      }
+      lines.needsUpdate = true;
+    }
     const colors = v.faces.geometry.getAttribute('color');
-    for (let i = 0; i < v.ranges.length; i++) { const range = v.ranges[i], alpha = 0.35 * Math.max(0, 1 - v.parts[i] / 6); for (let k = range.start; k < range.start + range.count; k++) colors.setXYZW(k, c.r, c.g, c.b, alpha); }
+    v.faces.visible = false;
+    for (let i = 0; i < v.ranges.length; i++) {
+      const range = v.ranges[i], alpha = 0.35 * Math.max(0, 1 - v.coverage[i] / 0.6);
+      for (let k = range.start; k < range.start + range.count; k++) colors.setXYZW(k, c.r, c.g, c.b, alpha);
+      if (this.styles.size && alpha > 0 && range.count) v.faces.visible = true;
+    }
     colors.needsUpdate = true;
-    v.faces.visible = this.styles.size > 0 && v.parts.some((n, i) => n < 6 && v.ranges[i].count > 0);
   }
 
   private refit(v: View) {
@@ -342,7 +361,12 @@ export class WorldBuildSites {
       }
     }
     const masses = massVolumes(b, this.options.groundAt);
-    if (this.styles.size) for (const mass of masses) for (const id of mass.edges) lines.push(...mass.vertices[id]);
+    v.edgeRanges = [];
+    if (this.styles.size) for (const mass of masses) {
+      const start = lines.length / 3;
+      for (const id of mass.edges) lines.push(...mass.vertices[id]);
+      v.edgeRanges.push({ start, count: lines.length / 3 - start });
+    }
     const boxes: OBB[] = [];
     const model = this.options.model();
     if (model) {
@@ -434,8 +458,38 @@ export class WorldBuildSites {
 
 function worldPoint(x: number, z: number, at: [number, number], yaw: number): [number, number] { const c = Math.cos(yaw), s = Math.sin(yaw); return [at[0] + x * c + z * s, at[1] - x * s + z * c]; }
 function localPoint(x: number, z: number, at: [number, number], yaw: number): [number, number] { return worldPoint(x - at[0], z - at[1], [0, 0], -yaw); }
-function lineGeometry(points: number[]) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(points.length), 3)); return g; }
+function lineGeometry(points: number[]) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(points.length / 3 * 4), 4)); return g; }
 function replaceGeometry(obj: THREE.LineSegments, geometry: THREE.BufferGeometry) { obj.geometry.dispose(); obj.geometry = geometry; }
+/** 8×8 footprint samples, with exact vertical interval unions at each sample. The
+ * column tops follow the declared roof; overlapping/nested OBBs never count twice.
+ * Called on snapshots/shape or terrain refreshes and the site's diffs, never frames. */
+function massCoverage(site: PublicSite, mass: Mass, boxes: OBB[], groundAt: Options['groundAt']): number {
+  const centre = worldPoint(...mass.at, site.site.at, site.site.yaw), yaw = site.site.yaw + (mass.yaw ?? 0);
+  // Coverage uses physical ground, excluding the ghost geometry's 8 cm z-fight lift.
+  const base = groundAt(...centre) ?? 0, [w, d] = mass.size, rise = Math.min(w, d) * 0.5;
+  const candidates = boxes.flatMap(box => {
+    const [x, z] = localPoint(...box.c, centre, yaw), c = Math.cos(box.yaw - yaw), s = Math.sin(box.yaw - yaw);
+    const y0 = Math.max(0, box.y0 - base), y1 = Math.min(mass.h + (mass.roof === 'gable' || mass.roof === 'pyramid' ? rise : 0), box.y1 - base);
+    const dx = Math.abs(c) * box.half[0] + Math.abs(s) * box.half[1], dz = Math.abs(s) * box.half[0] + Math.abs(c) * box.half[1];
+    return y1 <= y0 || Math.abs(x) - dx >= w / 2 || Math.abs(z) - dz >= d / 2 ? [] : [{ x, z, c, s, half: box.half, y0, y1 }];
+  }).sort((a, b) => a.y0 - b.y0);
+  if (!candidates.length) return 0;
+  let filled = 0, total = 0;
+  for (let iz = 0; iz < COVERAGE_GRID; iz++) for (let ix = 0; ix < COVERAGE_GRID; ix++) {
+    const x = ((ix + 0.5) / COVERAGE_GRID - 0.5) * w, z = ((iz + 0.5) / COVERAGE_GRID - 0.5) * d;
+    const roof = mass.roof === 'gable' ? 1 - (w >= d ? Math.abs(z) * 2 / d : Math.abs(x) * 2 / w) : mass.roof === 'pyramid' ? 1 - Math.max(Math.abs(x) * 2 / w, Math.abs(z) * 2 / d) : 0;
+    const top = mass.h + roof * rise; total += top;
+    let high = 0;
+    for (const box of candidates) {
+      if (box.y0 >= top) break;
+      const dx = x - box.x, dz = z - box.z;
+      if (Math.abs(dx * box.c - dz * box.s) > box.half[0] || Math.abs(dx * box.s + dz * box.c) > box.half[1]) continue;
+      const end = Math.min(top, box.y1);
+      filled += Math.max(0, end - Math.max(high, box.y0)); high = Math.max(high, end);
+    }
+  }
+  return Math.min(1, filled / total);
+}
 type Volume = { vertices: number[][]; triangles: number[]; edges: number[] };
 function volume(w: number, d: number, h: number, roof: Mass['roof']): Volume {
   const x = w / 2, z = d / 2;
