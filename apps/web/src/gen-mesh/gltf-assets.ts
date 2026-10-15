@@ -51,6 +51,14 @@ export function loadAsset(sha: string): Promise<GLTF> {
   return entry.p;
 }
 export function assetFailed(sha: string) { return failed.has(sha); }
+/** W1: shot readiness includes parsing, texture upload and attached GLBs, without a fixed delay. */
+export async function whenAssetsSettled() {
+  for (;;) {
+    const pending = [...cache.values()].filter(e => !e.settled).map(e => e.p);
+    if (!pending.length) return;
+    await Promise.allSettled(pending);
+  }
+}
 
 /** Once per loaded file: shadows, and the vertex-coloured CC0 packs get a matte look (glTF defaults metalness to 1). */
 function prepare(g: GLTF) {

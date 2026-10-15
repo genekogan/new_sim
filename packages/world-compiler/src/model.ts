@@ -407,7 +407,8 @@ export class WorldModel {
     const w = new WorldModel({ constants: s.constants, seed: s.seed, state: s.state, assets });
     w.library = library ?? null;
     w.seq = s.seq; w.editSeq = s.editSeq;
-    for (const d of s.defs) { w.defs.set('sha:' + d.hash, d); w.defs.set(d.ref, d); if (d.ref.startsWith('core-')) w.defs.set('core/' + d.ref.slice(5), d); }
+    // W1: an explicit ref map is authoritative, including retired refs absent from it.
+    for (const d of s.defs) { w.defs.set('sha:' + d.hash, d); if (s.defRefs === undefined) { w.defs.set(d.ref, d); if (d.ref.startsWith('core-')) w.defs.set('core/' + d.ref.slice(5), d); } }
     for (const [ref, hash] of Object.entries(s.defRefs ?? {})) { const d = w.def('sha:' + hash); if (d) w.defs.set(ref, d); }
     w.terrain = new Terrain(s.ground);
     for (const e of s.entities) w.insert(e);

@@ -200,6 +200,14 @@ export class WorldStore {
     return (this.db.db.prepare('SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? ORDER BY seq DESC LIMIT ?').all(this.worldId, limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
+  /** W1: include undone edits and removed entities; cleanup means never placed, not absent now. */
+  placedDefRefs(): string[] {
+    const rows = this.db.db.prepare(`SELECT DISTINCT json_extract(j.value, '$.def') AS ref
+      FROM world_edits_v1 e, json_each(e.ops) j WHERE e.world_id=? AND json_extract(j.value, '$.op')='place'
+      UNION SELECT DISTINCT json_extract(j.value, '$.entity.def') AS ref
+      FROM world_edits_v1 e, json_each(e.inverse) j WHERE e.world_id=? AND json_extract(j.value, '$.op')='restore'`).all(this.worldId, this.worldId) as { ref: string }[];
+    return rows.map(r => r.ref).filter(Boolean);
+  }
   /** The edit `undo` would revert: newest not-undone edit or redo. */
   undoable(): EditRow | null { return this.stackHead(['edit', 'redo']); }
   /** The undo `redo` would revert: newest not-undone undo. */

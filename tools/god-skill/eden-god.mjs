@@ -1615,7 +1615,10 @@ import { fileURLToPath } from "node:url";
 // lib/remote-look.mjs
 import { existsSync as existsSync4, writeFileSync as writeFileSync3 } from "node:fs";
 import { resolve as resolve3 } from "node:path";
+var needsLocalBrowser = (args) => !!args.views || args.frames > 1 || !!args.studio;
+var localBrowserError = () => Error("look: sheets (--views/--site), motion frames and kit workbench require local Playwright and Google Chrome; the remote renderer supports single views only");
 async function remoteLook(args, runtime = {}) {
+  if (needsLocalBrowser(args)) throw localBrowserError();
   runtime.signal?.throwIfAborted();
   const now = runtime.now ?? Date.now, t0 = now();
   const token = (runtime.load ?? load)().token;
@@ -1850,17 +1853,79 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+function waitForShot({ expect = 0, timeoutMs = 6e5 } = {}) {
+  return new Promise((resolve6, reject) => {
+    let raf, timer, stable = 0, last = -1;
+    const cleanup = () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("sim-shot-ready", tick);
+    };
+    const tick = () => {
+      cancelAnimationFrame(raf);
+      if (document.title === "no-entity-world") {
+        cleanup();
+        reject(Error("look: this world has no entity layer"));
+        return;
+      }
+      const w = window.__simEntity, drawn = w?.layer?.drawn, now = w?.layer?.now ?? performance.now();
+      const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1e3 < d.dur).length : 0;
+      const ready = !!window.__shotReady && !!w?.layer?.active && (!expect || (drawn?.size ?? 0) >= Math.floor(expect * 0.6)) && easing === 0;
+      stable = ready && drawn?.size === last ? stable + 1 : 0;
+      last = drawn?.size ?? -1;
+      if (ready && stable >= 2) {
+        cleanup();
+        resolve6({ ready, drawn: drawn?.size ?? 0, want: expect, easing, shotReady: true });
+      } else raf = requestAnimationFrame(tick);
+    };
+    timer = setTimeout(() => {
+      cleanup();
+      reject(Error("look: viewer did not initialize and settle before timeout"));
+    }, timeoutMs);
+    window.addEventListener("sim-shot-ready", tick, { once: true });
+    tick();
+  });
+}
+async function composeSheet({ cells, width = 1024, height = 640, cols = 2, strip = false }) {
+  const label = 34, columns = strip ? cells.length : Math.min(cols, cells.length), rows = Math.ceil(cells.length / columns);
+  const canvas = document.createElement("canvas");
+  canvas.width = columns * width;
+  canvas.height = rows * (height + label);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw Error("look: cannot compose the sheet");
+  ctx.fillStyle = "#f3eee3";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const [i, cell] of cells.entries()) {
+    const img = new Image();
+    img.src = cell.data;
+    await img.decode();
+    const x = i % columns * width, y = Math.floor(i / columns) * (height + label);
+    ctx.drawImage(img, x, y, width, height);
+    ctx.fillStyle = "#2c2924";
+    ctx.font = "16px sans-serif";
+    ctx.fillText(cell.label, x + 12, y + height + 23, width - 24);
+  }
+  return canvas.toDataURL("image/png");
+}
+function validateShot({ views, frames: frameCount = 1, every = 250, width = 1024, height = 640, studio }) {
+  const count = views?.length ?? 1;
+  if (!Number.isInteger(frameCount) || frameCount < 1 || frameCount > 16 || !Number.isFinite(every) || every < 16 || every > 6e4) throw Error("look: frames must be 1..16 and every must be 16..60000 ms");
+  if (views && frameCount > 1) throw Error("look: choose views or motion frames per sheet");
+  if (!Number.isInteger(count) || count < 1 || count > 8) throw Error("look: use 1..8 views");
+  if (![width, height].every((n) => Number.isInteger(n) && n >= 64 && n <= 4096) || width * height * (studio ? 4 : Math.max(count, frameCount)) > 32e6) throw Error("look: sheet exceeds the 32 megapixel limit (dimensions 64..4096)");
+}
+async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS), settleMs, cliPath, keep = false, width = 1024, height = 640, views, frames: frameCount = 1, every = 250, studio }, runtime = {}) {
+  const sequence = views ?? [{ eye, at }], sheet = !!views || frameCount > 1;
+  settleMs ??= sheet ? 0 : 800;
   mkdirSync2(dirname(resolve4(out)), { recursive: true });
-  const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const t0 = now();
+  const now = runtime.now ?? Date.now, t0 = now();
   const overrides = { ...hour != null ? { hour } : {}, ...weather2 != null ? { weather: weather2 } : {} };
   const pw = runtime.pw === void 0 ? findPlaywright({ timeoutMs }) : runtime.pw;
   if (now() - t0 >= timeoutMs) throw Object.assign(new Error("look.timeout: Playwright discovery exceeded deadline"), { code: "look.timeout" });
   if (!pw) {
-    if (keep) throw new Error("look: no Playwright found for --keep");
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
-    const r = (runtime.spawnSync ?? spawnSync2)("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q}`, resolve4(out)], { stdio: "pipe", encoding: "utf8", timeout: Math.max(1, timeoutMs - (now() - t0)), killSignal: "SIGKILL" });
+    if (keep || sheet || studio) throw new Error("look: no Playwright found; sheets, motion frames and workbench need local Playwright and Google Chrome (--keep can fall back for a single view)");
+    const q2 = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
+    const r = (runtime.spawnSync ?? spawnSync2)("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q2}`, resolve4(out)], { stdio: "pipe", encoding: "utf8", timeout: Math.max(1, timeoutMs - (now() - t0)), killSignal: "SIGKILL" });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve4(out), ms: now() - t0, via: "npx playwright-core screenshot" };
   }
@@ -1874,12 +1939,13 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
     } catch {
     }
     release();
-    if (browser && !keep) void browser.close().catch(() => {
+    if (browser && (!keep || studio)) void browser.close().catch(() => {
     });
   };
+  const first = sequence[0];
+  const q = new URLSearchParams({ shot: "1", ...!studio ? { eye: first.eye.join(","), at: first.at.join(","), settle: "1500" } : {}, ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
   try {
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500", ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {}, ...overrides });
-    if (keep) {
+    if (keep && !studio) {
       try {
         const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1], runtime);
         runtime.signal?.throwIfAborted();
@@ -1888,9 +1954,10 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
         throw new Error(`look: cannot start Chrome keeper (${String(e.message).split("\n")[0]})`);
       }
       page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
-      if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
+      if (!page) throw Error("look: the keeper has no world tab; run `look --stop` and look again");
       const current = new URL(page.url()).searchParams;
       if (!current.has("eye") || !current.has("at") || ["hour", "weather"].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
+      await page.setViewportSize?.({ width, height });
     } else {
       const unlock = await (runtime.lease ?? chromeLease2)("eden-god look");
       let unlocked = false;
@@ -1905,8 +1972,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
         throw new Error("look.timeout: lease wait exceeded deadline");
       }
       browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: GL_ARGS }).catch((e) => {
-        release();
-        throw new Error(`look: cannot start Chrome (${String(e.message).split("\n")[0]}); install Google Chrome`);
+        throw Error(`look: cannot start Chrome (${String(e.message).split("\n")[0]}); install Google Chrome`);
       });
       if (cancelled) {
         void browser.close().catch(() => {
@@ -1916,104 +1982,111 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
       const ctx = await browser.newContext({ viewport: { width, height } });
       await ctx.addInitScript(PRESERVE);
       page = await ctx.newPage();
-      await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
+      await page.goto(`${worldUrl}${studio ? "/god/workbench" : ""}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
     }
-    const deadline = now() + timeoutMs;
-    let state = null, stable = 0, lastDrawn = -1;
-    while (now() < deadline) {
+    if (studio) {
+      await page.waitForFunction(() => !!window.workbench, null, { timeout: timeoutMs, polling: "raf" });
+      const result = await page.evaluate(async (payload) => window.workbench.render(payload), { ...studio, hour, width, height });
       runtime.signal?.throwIfAborted();
-      state = await page.evaluate((want) => {
-        const w = window.__simEntity;
-        if (!w?.layer?.active) return { ready: false, why: document.title === "no-entity-world" ? "no entity world on this page" : "loading the viewer" };
-        const drawn = w.layer.drawn;
-        const now2 = w.layer.now ?? performance.now();
-        const easing = drawn ? [...drawn.values()].filter((d) => (now2 - d.t0) / 1e3 < d.dur).length : 0;
-        return { ready: !!window.__shotReady && (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
-      }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
-      if (state.ready && state.drawn === lastDrawn) stable++;
-      else stable = 0;
-      lastDrawn = state.drawn ?? -1;
-      if (state.ready && stable >= 2) break;
-      if (state.why === "no entity world on this page") throw new Error("look: this world has no entity layer");
-      await wait(1e3);
+      writeFileSync4(resolve4(out), Buffer.from(result.data.split(",")[1], "base64"));
+      return { file: resolve4(out), ms: now() - t0, via: "studio", ...result, data: void 0 };
     }
-    if (!state?.ready || stable < 2) throw new Error(`look: viewer did not initialize and settle before timeout (${JSON.stringify(state)})`);
-    const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
-      const w = window.__simEntity;
-      let e = e0;
-      if (fitSpan > 0 && w.camera.fov) {
-        const v = w.camera.fov * Math.PI / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
-        const need2 = fitSpan / 2 / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
-        if (len < need2) e = d.map((c, i) => a[i] + c / len * need2);
-      }
-      const eyeDistance = Math.hypot(...e.map((c, i) => c - a[i]));
-      if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error("Requested look camera is within the viewer near clipping plane");
-      window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
-      w.controls.target.set(a[0], a[1], a[2]);
-      w.camera.position.set(e[0], e[1], e[2]);
-      w.camera.lookAt(w.controls.target);
-      w.controls.update?.();
-      const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
-      if (w.camera.far < dist * 3) {
-        w.camera.far = dist * 3;
-        w.camera.updateProjectionMatrix?.();
-      }
-      const fog = w.scene.fog;
-      if (fog && "far" in fog && fog.far < dist * 2.5) {
-        fog.near = Math.max(fog.near ?? 0, dist * 0.8);
-        fog.far = dist * 2.5;
-      }
-      if (fog && "density" in fog) fog.density = Math.min(fog.density, 0.6 / Math.max(1, dist));
-      const hidden = [];
-      if (roofs) w.scene.traverse((o) => {
-        if (o.visible && (/roof/i.test(o.name ?? "") || o.userData?.role === "roof")) {
-          o.visible = false;
-          hidden.push(o);
+    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs }) : page.evaluate(waitForShot, { expect, timeoutMs }));
+    runtime.signal?.throwIfAborted();
+    if (!state?.ready) throw Error(`look: ${state?.why === "no entity world on this page" ? "this world has no entity layer" : "viewer did not initialize and settle before timeout"}`);
+    const cells = [], receipts = [];
+    let capturedAt = 0, cameraFrames;
+    for (let i = 0; i < (frameCount > 1 ? frameCount : sequence.length); i++) {
+      runtime.signal?.throwIfAborted();
+      const view2 = sequence[frameCount > 1 ? 0 : i];
+      if (frameCount > 1 && i > 0) await page.waitForTimeout(Math.max(0, capturedAt + i * every - now()));
+      const frames = frameCount > 1 && i > 0 ? cameraFrames : await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
+        const w = window.__simEntity;
+        let e = e0;
+        if (fitSpan > 0 && w.camera.fov) {
+          const v = w.camera.fov * Math.PI / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
+          const need2 = fitSpan / 2 / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
+          if (len < need2) e = d.map((c, i2) => a[i2] + c / len * need2);
         }
-      });
-      window.__lookRestore = () => {
-        for (const o of hidden) o.visible = true;
-      };
-      const canvas = document.querySelector("canvas");
-      if (canvas) {
-        const keep2 = /* @__PURE__ */ new Set();
-        for (let n2 = canvas; n2; n2 = n2.parentElement) keep2.add(n2);
-        for (const n2 of keep2) for (const c of n2.children ?? []) if (!keep2.has(c)) c.style.visibility = "hidden";
-      }
-      let n = 0;
-      const t = performance.now();
-      const tick = () => {
-        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a });
-        else requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }), [eye, at, hideRoofs, cut, span]);
-    await page.waitForTimeout(settleMs);
-    const data = await page.evaluate(({ eye: eye2, at: at2 }) => {
-      try {
-        const w = window.__simEntity, close = (v, want) => v?.toArray().every((c2, i) => Number.isFinite(c2) && Math.abs(c2 - want[i]) <= 1e-4);
-        if (!window.__shotReady || !close(w?.camera?.position, eye2) || !close(w?.controls?.target, at2)) throw Error("look: requested camera changed before capture; retry the shot");
-        const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-        return c ? c.toDataURL("image/png") : null;
-      } finally {
-        window.__lookRestore?.();
-      }
-    }, frames);
-    if (!data) throw new Error("look: no canvas on the page");
+        const eyeDistance = Math.hypot(...e.map((c, i2) => c - a[i2]));
+        if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error("Requested look camera is within the viewer near clipping plane");
+        window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
+        w.controls.target.set(a[0], a[1], a[2]);
+        w.camera.position.set(e[0], e[1], e[2]);
+        w.camera.lookAt(w.controls.target);
+        w.controls.update?.();
+        const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
+        if (w.camera.far < dist * 3) {
+          w.camera.far = dist * 3;
+          w.camera.updateProjectionMatrix?.();
+        }
+        const fog = w.scene.fog;
+        if (fog && "far" in fog && fog.far < dist * 2.5) {
+          fog.near = Math.max(fog.near ?? 0, dist * 0.8);
+          fog.far = dist * 2.5;
+        }
+        if (fog && "density" in fog) fog.density = Math.min(fog.density, 0.6 / Math.max(1, dist));
+        const hidden = [];
+        if (roofs) w.scene.traverse((o) => {
+          if (o.visible && (/roof/i.test(o.name ?? "") || o.userData?.role === "roof")) {
+            o.visible = false;
+            hidden.push(o);
+          }
+        });
+        window.__lookRestore = () => {
+          for (const o of hidden) o.visible = true;
+        };
+        const canvas = document.querySelector("canvas");
+        if (canvas) {
+          const keep2 = /* @__PURE__ */ new Set();
+          for (let n2 = canvas; n2; n2 = n2.parentElement) keep2.add(n2);
+          for (const n2 of keep2) for (const c of n2.children ?? []) if (!keep2.has(c)) c.style.visibility = "hidden";
+        }
+        let n = 0;
+        const t = performance.now();
+        const tick = () => {
+          if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a });
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }), [view2.eye, view2.at, view2.hideRoofs ?? hideRoofs, view2.cut === void 0 ? cut : view2.cut, view2.span ?? span]);
+      cameraFrames = frames;
+      if (settleMs && (frameCount === 1 || i === 0)) await page.waitForTimeout(settleMs);
+      const data2 = await page.evaluate(({ eye: eye2, at: at2, restore }) => {
+        try {
+          const w = window.__simEntity, close = (v, want) => v?.toArray().every((c2, i2) => Number.isFinite(c2) && Math.abs(c2 - want[i2]) <= 1e-4);
+          if (!window.__shotReady || !close(w?.camera?.position, eye2) || !close(w?.controls?.target, at2)) throw Error("look: requested camera changed before capture; retry the shot");
+          const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+          return c ? c.toDataURL("image/png") : null;
+        } catch (e) {
+          restore = true;
+          throw e;
+        } finally {
+          if (restore) window.__lookRestore?.();
+        }
+      }, { ...frames, restore: frameCount === 1 || i === frameCount - 1 });
+      if (!data2) throw Error("look: no canvas on the page");
+      const timestamp = now();
+      if (i === 0) capturedAt = timestamp;
+      receipts.push({ ...frames, ...sheet ? { ms: timestamp - capturedAt } : {}, label: view2.label ?? `${i + 1}` });
+      cells.push({ data: data2, label: frameCount > 1 ? `Frame ${i + 1} \xB7 +${timestamp - capturedAt} ms` : view2.label ?? `View ${i + 1}` });
+    }
+    const data = sheet ? await page.evaluate(composeSheet, { cells, width, height, strip: frameCount > 1 }) : cells[0].data;
     runtime.signal?.throwIfAborted();
     writeFileSync4(resolve4(out), Buffer.from(data.split(",")[1], "base64"));
-    return { file: resolve4(out), ms: now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
+    return { file: resolve4(out), ms: now() - t0, state, frames: sheet ? receipts : receipts[0], cells: cells.length, via: keep ? "keeper" : "chrome" };
   } finally {
-    if (!keep) {
-      release();
-      if (browser) void browser.close().catch(() => {
-      });
-    }
+    release();
+    if (keep && page && !runtime.signal?.aborted) await page.evaluate(() => window.__lookRestore?.()).catch(() => {
+    });
+    if ((!keep || studio) && browser) await browser.close().catch(() => {
+    });
   }
 }
 var LOOK_DEFAULT_MS = 12e4;
 var LOOK_MAX_MS = 6e5;
 async function shoot(options, runtime = {}) {
+  validateShot(options);
   const requested = options.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS);
   const ms = Number.isFinite(requested) ? Math.min(LOOK_MAX_MS, Math.max(1, requested)) : LOOK_DEFAULT_MS;
   const abort = new AbortController(), scoped = { ...runtime, signal: abort.signal, cleanup: void 0 };
@@ -2039,6 +2112,25 @@ async function shoot(options, runtime = {}) {
     clearTimeout(timer);
     if (runtime.cleanup === cleanup) runtime.cleanup = previousCleanup;
   }
+}
+
+// lib/kit.mjs
+function kitDefinition(k) {
+  if (k?.schema === "def/1") return k;
+  if (!k?.name || !Array.isArray(k.shapes)) throw Error("kit needs {name, shapes:[\u2026]} or a def/1 definition");
+  if (!k.box && k.shapes.some((s) => s.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s[key] !== void 0) || JSON.stringify(s).includes("$"))) throw Error("define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry");
+  const ext = (sh) => {
+    const [x, y, z] = sh.at;
+    const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)];
+    return [x - sz[0] / 2, y - (["box", "rbox", "sphere", "capsule"].includes(sh.kind) ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2];
+  };
+  const e = k.box ? [] : k.shapes.map(ext);
+  const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, Math.round(v * 100) / 100));
+  const args = { shapes: k.shapes };
+  for (const key of ["v", "footprint", "gait", "slots", "round"]) if (k[key] !== void 0) args[key] = k[key];
+  const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args }, size: { box, scale: k.scale ?? [0.5, 2] } };
+  for (const key of ["components", "anchor", "state", "params"]) if (k[key] !== void 0) def[key] = k[key];
+  return def;
 }
 
 // cli.mjs
@@ -2535,6 +2627,16 @@ async function defDetail(d, others) {
   return L.join("\n");
 }
 async function defs(q, flags2 = {}) {
+  if (flags2.remove && !flags2.unused) throw Error("defs --remove requires --unused");
+  if (flags2.unused) {
+    if (q || flags2.tag) throw Error("defs --unused does not take a search or tag filter");
+    const r3 = ok(await call(`/v1/god/defs/unused${flags2.remove ? "/remove" : ""}`, flags2.remove ? { body: {} } : {}), "defs --unused");
+    if (flags2.remove) {
+      invalidate();
+      return flags2.json ? r3 : `removed ${r3.removed.length} never-placed trial defs (seq ${r3.seq})${r3.remaining ? `; ${r3.remaining} remain` : ""}; undo restores them`;
+    }
+    return flags2.json ? r3.defs : `${r3.defs.length} never-placed trial defs${r3.defs.length ? ":\n" + r3.defs.map((d) => "- " + d.ref).join("\n") : ""}`;
+  }
   if (q && !/\s/.test(q.trim())) {
     const name = q.trim().toLowerCase().replace(/^core[/-]/, "").replace(/@\d+$/, "");
     const qs2 = new URLSearchParams({ q: name.replace(/-/g, " ") });
@@ -2762,6 +2864,7 @@ var HINTS = {
   "slot.outside": "the point is not inside that room; use --inside <house>/<room> or a world point inside it",
   "size.range": "that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead",
   "float.no-water": "there is no water there; use --float --at <lake|pond|river>",
+  "def.in-use": "cleanup only removes never-placed trials without dependent definitions; keep this def",
   "def.unknown": "no such def; `defs <word>` searches the library",
   "params.invalid": "`defs <name>` shows params with ranges",
   "state.invalid": "unknown or bad state field; `describe` shows the state",
@@ -3538,38 +3641,108 @@ function lookOverrides(flags2 = {}) {
   }
   return out;
 }
+function lookViews(spec, base = {}) {
+  if (typeof spec !== "string" || !spec.trim()) throw Error("look --views takes semicolon-separated views");
+  const rows = spec.split(";").map((s) => s.trim());
+  if (rows.some((s) => !s) || rows.length > 8) throw Error("look --views takes 1..8 nonempty views");
+  return rows.map((label) => {
+    const tokens = label.split(/\s+/), first = tokens[0].startsWith("--") ? void 0 : tokens.shift();
+    const { flags: flags2, rest } = parseFlags(tokens, boolsFor("look"));
+    checkArgs("look", flags2, rest);
+    if (Object.keys(flags2).some((k) => !["at", "from", "dist", "span", "height", "inside", "floor", "hide-roofs"].includes(k))) throw Error("view specs take only camera options");
+    if (first && first !== "inside" && !["above", "top"].includes(first) && !compassKey(first)) throw Error(`unknown look view ${first}`);
+    return { ...base, ...flags2, ...first === "inside" ? { inside: true } : first ? { from: first } : {}, label };
+  });
+}
+async function kitLook(json2, flags2 = {}, runtime = {}) {
+  return withLookDeadline(runtime, (signal) => kitLookInner(json2, flags2, runtime, signal));
+}
+async function kitLookInner(json2, flags2, runtime, signal) {
+  const overrides = lookOverrides(flags2), def = kitDefinition(typeof json2 === "string" ? JSON.parse(json2) : json2);
+  const admitted = ok(await call("/v1/god/kit/render", { body: { def, ...flags2.beside ? { beside: normDef(flags2.beside) } : {} } }), "kit look");
+  signal.throwIfAborted();
+  if (!admitted.accepted) throw Error(`kit look refused: ${admitted.failures.map(explainFailure).join("; ")}`);
+  const shot = await (runtime.shoot ?? ((args) => shoot(args, runtime)))({
+    timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()),
+    worldUrl: load().world,
+    studio: admitted,
+    out: resolve5(flags2.out ?? "looks/kit-workbench.png"),
+    ...overrides,
+    ...flags2.width ? { width: num(flags2.width) } : {},
+    ...flags2.h ? { height: num(flags2.h) } : {}
+  });
+  return flags2.json ? shot : `kit look: ${shot.file} \xB7 front, side, top, \xBE \xB7 ${Math.round(shot.ms) / 1e3} s
+${(shot.warnings ?? []).join("\n")}${shot.warnings?.length ? "\n" : ""}  No world edit. Read the sheet before define-kit.`;
+}
 async function look(flags2 = {}, runtime = {}) {
-  const ms = Math.min(LOOK_MAX_MS, runtime.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS)), abort = new AbortController();
+  return withLookDeadline(runtime, (signal) => lookInner(flags2, runtime, signal));
+}
+async function withLookDeadline(runtime, run) {
+  const requested = runtime.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS);
+  const ms = Number.isFinite(requested) ? Math.min(LOOK_MAX_MS, Math.max(1, requested)) : LOOK_DEFAULT_MS, abort = new AbortController();
   runtime.deadlineAt = Date.now() + ms;
+  const timeout = Object.assign(new Error(`look.timeout: exceeded ${ms} ms; run doctor --fix`), { code: "look.timeout" });
   let timer;
+  const expired = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      abort.abort(timeout);
+      runtime.cleanup?.();
+      reject(timeout);
+    }, ms);
+  });
   try {
-    return await withDeadline(Date.now() + ms, abort.signal, () => Promise.race([
-      lookInner(flags2, runtime),
-      new Promise((_, reject) => {
-        timer = setTimeout(() => {
-          abort.abort();
-          runtime.cleanup?.();
-          reject(Object.assign(new Error(`look.timeout: exceeded ${ms} ms; run doctor --fix`), { code: "look.timeout" }));
-        }, ms);
-      })
-    ]));
+    return await withDeadline(runtime.deadlineAt, abort.signal, () => Promise.race([expired, run(abort.signal)]));
   } finally {
     clearTimeout(timer);
   }
 }
-async function lookInner(flags2 = {}, runtime = {}) {
+async function lookInner(flags2 = {}, runtime = {}, signal) {
   if (flags2.stop) return stopKeeper();
-  const overrides = lookOverrides(flags2);
+  const overrides = lookOverrides(flags2), count = flags2.frames === void 0 ? 1 : num(flags2.frames), every = flags2.every === void 0 ? 250 : num(flags2.every);
+  if (!Number.isInteger(count) || count < 1 || count > 16 || every < 16 || every > 6e4) throw Error("look --frames takes 1..16; --every takes 16..60000 ms");
+  if (flags2.every !== void 0 && flags2.frames === void 0) throw Error("look --every requires --frames");
+  if (flags2.frames !== void 0 && (flags2.views || flags2.site)) throw Error("choose --frames or --views/--site");
   const m = await (runtime.mirror ?? mirror)();
   const v = view(m);
-  const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags2);
-  if (target[1] === 0 || flags2.at === void 0 || !Number.isFinite(target[1])) {
-    const g = (await query({ points: [[target[0], target[2]]] })).points[0];
-    target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0));
+  let base = { ...flags2 };
+  if (flags2.site) {
+    const current = load().build;
+    if (!current?.id) throw Error("look --site needs a current build; use build resume <id>");
+    const b = ok(await call(`/v1/god/builds/${encodeURIComponent(current.id)}`), "look --site").build;
+    base = { ...base, at: b.site.at.join(","), span: flags2.span ?? String(Math.max(...b.site.size) * 1.15) };
   }
-  const cam = camera({ target, span, from: flags2.from ?? "s", dist, tight, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
+  const specs = flags2.views || flags2.site ? lookViews(flags2.views ?? "sw;w;above;inside", base) : [base];
+  const views = [], ground = /* @__PURE__ */ new Map();
+  for (const spec of specs) {
+    const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, spec);
+    if (target[1] === 0 || spec.at === void 0 || !Number.isFinite(target[1])) {
+      const key = `${target[0]},${target[2]}`;
+      if (!ground.has(key)) ground.set(key, (await query({ points: [[target[0], target[2]]] })).points[0]);
+      const g = ground.get(key);
+      target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0));
+    }
+    const cam2 = camera({ target, span, from: spec.from ?? "s", dist, tight, inside: !!spec.inside, height: spec.height ? num(spec.height) : void 0 });
+    views.push({ ...cam2, hideRoofs: !!(spec.inside || spec["hide-roofs"] || spec.floor !== void 0), cut: spec.floor !== void 0 ? num(spec.floor) : null, span: fitSpan, label: spec.label ?? cam2.from });
+  }
+  const cam = views[0];
+  signal.throwIfAborted();
   const out = resolve5(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, remote: !!flags2.remote, ...overrides, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  const args = {
+    timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()),
+    remote: !!flags2.remote,
+    worldUrl: load().world,
+    ...cam,
+    out,
+    expect: m.snapshot.entities.length,
+    cliPath: SELF,
+    keep: !!flags2.keep,
+    ...overrides,
+    ...flags2.views || flags2.site ? { views } : {},
+    frames: count,
+    every,
+    ...flags2.width ? { width: num(flags2.width) } : {},
+    ...flags2.h ? { height: num(flags2.h) } : {}
+  };
   let shot;
   if (!flags2.keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
   else {
@@ -3626,14 +3799,7 @@ async function defineKit(json2, flags2 = {}) {
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
   const picks = [...matches.filter((d) => usedIn(d).length), ...matches.filter((d) => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map((d) => d.ref.replace(/^core-/, "core/"));
-  const ext = (sh) => {
-    const [x, y, z] = sh.at;
-    const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)];
-    return [x - sz[0] / 2, y - (sh.kind === "box" || sh.kind === "rbox" || sh.kind === "sphere" || sh.kind === "capsule" ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2];
-  };
-  const e = k.box ? [] : k.shapes.map(ext);
-  const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
-  const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args: { shapes: k.shapes, ...k.v !== void 0 ? { v: k.v } : {}, ...k.footprint !== void 0 ? { footprint: k.footprint } : {}, ...k.gait ? { gait: k.gait } : {}, ...k.slots ? { slots: k.slots } : {}, ...k.round !== void 0 ? { round: k.round } : {} } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...k.components ? { components: k.components } : {}, ...k.anchor ? { anchor: k.anchor } : {}, ...k.state ? { state: k.state } : {}, ...k.params ? { params: k.params } : {} };
+  const def = kitDefinition(k);
   if (flags2.dry) return { def, similar };
   if (picks.length) console.error(`similar defs already in the library: ${picks.map((d) => oneLine(d.ref.replace(/^core-/, "core/")) + usedBadge(d) + (usedIn(d).length && d.hash ? " \xB7 " + placePart({ sha: d.hash }) : "")).join("; ")} \u2014 prefer them when they fit`);
   const r = await define(def);
@@ -3700,7 +3866,7 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["fix", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["fix", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -3729,8 +3895,9 @@ var FLAGS = {
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`,
-  look: "at from dist inside floor keep remote out span height width h hide-roofs stop hour weather",
-  defs: "tag all",
+  look: "at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every",
+  kit: "hour weather beside out width h",
+  defs: "tag all unused remove",
   where: "at offset",
   reach: "",
   clear: "size",
@@ -3761,8 +3928,8 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { doctor: 0, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
+var POS = { doctor: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
   for (const [k, v] of Object.entries(f)) {
@@ -3783,6 +3950,10 @@ function checkArgs(cmd, f, rest) {
 var readArg = (r) => r[0] !== void 0 ? existsSync6(r[0]) && !r[0].trim().startsWith("{") ? readFileSync6(r[0], "utf8") : r[0] : readFileSync6(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
+  kit: (r, f) => {
+    if (r[0] !== "look" || !r[1]) throw Error("usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]");
+    return kitLook(readArg(r.slice(1)), f);
+  },
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity),
@@ -3871,7 +4042,8 @@ for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f =
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> ([bounds] containment / [collider] hit) \xB7 reach <from> <to> \xB7 clear <x,z|ref> --size WxD \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
+look:   --views "sw;w --dist 30;inside" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).
+look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. Sheets, frame strips and kit workbench require local Playwright and Google Chrome. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
@@ -3973,9 +4145,11 @@ export {
   group,
   history,
   importWorld,
+  kitLook,
   look,
   lookFrame,
   lookOverrides,
+  lookViews,
   map,
   mint,
   mirror,

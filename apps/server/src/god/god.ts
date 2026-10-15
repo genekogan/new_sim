@@ -18,6 +18,7 @@ import { submissionSchema, type Expectations } from './submission.ts';
 import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
 import { Parts } from './parts.ts';
 import { buildReceipt } from './build-integrity.ts';
+import { definitionUseClosure } from './unused-defs.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -214,10 +215,21 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
 
   // ---------- edits ----------
 
+  // W1: history is durable even after undo/removal; compiler checks live dependencies too.
+  private retirementFailure(ops: readonly Op[]): Failure | null {
+    if (!ops.some(op => op.op === 'undefine')) return null;
+    const used = definitionUseClosure(this.model, this.store.placedDefRefs());
+    for (const [i, op] of ops.entries()) if (op.op === 'undefine') {
+      const ref = this.model.def(op.ref)?.ref;
+      if (ref && used.has(ref)) return { op: i, code: 'def.in-use', field: 'ref', detail: `${ref} has been placed before; cleanup only retires never-placed trials.` };
+    }
+    return null;
+  }
   dryrun(batch: unknown) {
     this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false as const, failures: [inputFailure] };
     const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
+    const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
     const admission = this.builds.admit(parsed.data.build ?? this.caller.build, parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
     const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
@@ -250,6 +262,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       if ((input.ops && hashOf(input.ops) !== hashOf(preview.ops.ops)) || (input.group !== undefined && input.group !== preview.ops.group) || (input.note !== undefined && input.note !== preview.ops.note) || (input.build !== undefined && hashOf(input.build) !== hashOf(preview.build ?? null))) return { accepted: false, failures: [{ op: -1, code: 'schema', field: 'preview', detail: 'The submitted operations or batch metadata differ from the sealed preview.', fix: 'Commit with {preview, clientRef}, or create a new preview for the changed batch.' }] };
       normalized = { ...preview.ops, clientRef: input.clientRef };
     } else normalized = batchSchema.parse(input);
+    const retirement = this.retirementFailure(normalized.ops); if (retirement) return { accepted: false, failures: [retirement] };
     const field = preview ? preview.build : input.build ?? this.caller.build;
     const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
     if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
@@ -427,6 +440,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { id: null, accepted: false as const, failures: [inputFailure] };
     const parsed = previewBatchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
+    const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { id: null, accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
     const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };

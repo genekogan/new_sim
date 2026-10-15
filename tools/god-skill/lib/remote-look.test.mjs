@@ -50,6 +50,20 @@ test('missing Chrome goes remote before Playwright discovery/npx and does not ne
   assert.equal(result.via, 'remote'); assert.equal(leased, false); assert.equal(spawned, false);
 });
 
+test('sheets, frame strips and workbench clearly require local Chrome instead of returning one remote view', async t => {
+  const f = fixture(t);
+  const modes = [{ views: [{ eye: f.args.eye, at: f.args.at }] }, { frames: 3, every: 250 }, { studio: { accepted: true, defs: [] } }];
+  for (const mode of modes) {
+    await assert.rejects(shoot({ ...f.args, ...mode, remote: true }, f.runtime), /require local Playwright and Google Chrome.*single views only/);
+    await assert.rejects(shoot({ ...f.args, ...mode }, { ...f.runtime, chromeExists: () => false }), /require local Playwright and Google Chrome/);
+    await assert.rejects(shoot({ ...f.args, ...mode, keep: true }, { ...f.runtime, pw: null }), /require local Playwright and Google Chrome/);
+    await assert.rejects(shoot({ ...f.args, ...mode }, { ...f.runtime, lease: async () => () => {}, pw: { chromium: { launch: async () => { throw Error('cannot start Chrome'); } } } }), /require local Playwright and Google Chrome/);
+  }
+  process.env.EDEN_GOD_LOOK = 'remote';
+  await assert.rejects(shoot({ ...f.args, frames: 2 }, f.runtime), /require local Playwright and Google Chrome/);
+  assert.equal(f.calls.length, 0); assert.equal(existsSync(f.args.out), false);
+});
+
 test('a sandbox npx/Playwright failure also falls back', async t => {
   const f = fixture(t);
   const result = await shoot(f.args, { ...f.runtime, pw: null, spawnSync: () => ({ status: 1, stderr: 'EPERM: cache not writable' }) });

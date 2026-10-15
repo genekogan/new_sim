@@ -130,16 +130,60 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
 }
 export function stopKeeper() { const k = readKeeper(); if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
-/** Take the picture. Returns { file, ms, state, via }. */
-async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+/** Event-driven viewer startup, followed by render-frame settlement (no fixed minimum delay). */
+export function waitForShot({ expect = 0, timeoutMs = 600_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let raf, timer, stable = 0, last = -1;
+    const cleanup = () => { clearTimeout(timer); cancelAnimationFrame(raf); window.removeEventListener('sim-shot-ready', tick); };
+    const tick = () => {
+      cancelAnimationFrame(raf);
+      if (document.title === 'no-entity-world') { cleanup(); reject(Error('look: this world has no entity layer')); return; }
+      const w = window.__simEntity, drawn = w?.layer?.drawn, now = w?.layer?.now ?? performance.now();
+      const easing = drawn ? [...drawn.values()].filter(d => (now - d.t0) / 1000 < d.dur).length : 0;
+      const ready = !!window.__shotReady && !!w?.layer?.active && (!expect || (drawn?.size ?? 0) >= Math.floor(expect * .6)) && easing === 0;
+      stable = ready && drawn?.size === last ? stable + 1 : 0; last = drawn?.size ?? -1;
+      if (ready && stable >= 2) { cleanup(); resolve({ ready, drawn: drawn?.size ?? 0, want: expect, easing, shotReady: true }); }
+      else raf = requestAnimationFrame(tick);
+    };
+    timer = setTimeout(() => { cleanup(); reject(Error('look: viewer did not initialize and settle before timeout')); }, timeoutMs);
+    window.addEventListener('sim-shot-ready', tick, { once: true });
+    tick();
+  });
+}
+
+/** Browser-side composition keeps the downloadable CLI dependency-free. */
+export async function composeSheet({ cells, width = 1024, height = 640, cols = 2, strip = false }) {
+  const label = 34, columns = strip ? cells.length : Math.min(cols, cells.length), rows = Math.ceil(cells.length / columns);
+  const canvas = document.createElement('canvas'); canvas.width = columns * width; canvas.height = rows * (height + label);
+  const ctx = canvas.getContext('2d'); if (!ctx) throw Error('look: cannot compose the sheet');
+  ctx.fillStyle = '#f3eee3'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  for (const [i, cell] of cells.entries()) {
+    const img = new Image(); img.src = cell.data; await img.decode();
+    const x = (i % columns) * width, y = Math.floor(i / columns) * (height + label);
+    ctx.drawImage(img, x, y, width, height); ctx.fillStyle = '#2c2924'; ctx.font = '16px sans-serif'; ctx.fillText(cell.label, x + 12, y + height + 23, width - 24);
+  }
+  return canvas.toDataURL('image/png');
+}
+
+function validateShot({ views, frames: frameCount = 1, every = 250, width = 1024, height = 640, studio }) {
+  const count = views?.length ?? 1;
+  if (!Number.isInteger(frameCount) || frameCount < 1 || frameCount > 16 || !Number.isFinite(every) || every < 16 || every > 60_000) throw Error('look: frames must be 1..16 and every must be 16..60000 ms');
+  if (views && frameCount > 1) throw Error('look: choose views or motion frames per sheet');
+  if (!Number.isInteger(count) || count < 1 || count > 8) throw Error('look: use 1..8 views');
+  if (![width, height].every(n => Number.isInteger(n) && n >= 64 && n <= 4096) || width * height * (studio ? 4 : Math.max(count, frameCount)) > 32_000_000) throw Error('look: sheet exceeds the 32 megapixel limit (dimensions 64..4096)');
+}
+
+/** Take one picture or a labelled sheet with one browser/page and one readiness wait. */
+async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS), settleMs, cliPath, keep = false, width = 1024, height = 640, views, frames: frameCount = 1, every = 250, studio }, runtime = {}) {
+  const sequence = views ?? [{ eye, at }], sheet = !!views || frameCount > 1;
+  settleMs ??= sheet ? 0 : 800;
   mkdirSync(dirname(resolve(out)), { recursive: true });
-  const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-  const t0 = now();
+  const now = runtime.now ?? Date.now, t0 = now();
   const overrides = { ...(hour != null ? { hour } : {}), ...(weather != null ? { weather } : {}) };
   const pw = runtime.pw === undefined ? findPlaywright({ timeoutMs }) : runtime.pw;
   if (now() - t0 >= timeoutMs) throw Object.assign(new Error('look.timeout: Playwright discovery exceeded deadline'), { code: 'look.timeout' });
   if (!pw) {
-    if (keep) throw new Error('look: no Playwright found for --keep'); // W2b: use the same remote fallback as plain look.
+    if (keep || sheet || studio) throw new Error('look: no Playwright found; sheets, motion frames and workbench need local Playwright and Google Chrome (--keep can fall back for a single view)');
     const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
     const r = (runtime.spawnSync ?? spawnSync)('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: Math.max(1, timeoutMs - (now() - t0)), killSignal: 'SIGKILL' });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
@@ -150,98 +194,105 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = f
   runtime.cleanup = () => {
     cancelled = true;
     if (runtime.keeperChild?.pid) try { process.kill(process.platform === 'win32' ? runtime.keeperChild.pid : -runtime.keeperChild.pid, 'SIGKILL'); } catch { /* already exited */ }
-    release(); if (browser && !keep) void browser.close().catch(() => {});
+    release(); if (browser && (!keep || studio)) void browser.close().catch(() => {});
   };
+  const first = sequence[0];
+  const q = new URLSearchParams({ shot: '1', ...(!studio ? { eye: first.eye.join(','), at: first.at.join(','), settle: '1500' } : {}), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
   try {
-  const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
-  if (keep) {
-    try { // W2b: keeper startup/connection failures use the world's renderer too.
-      const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1], runtime);
-      runtime.signal?.throwIfAborted();
-      browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 25_000 });
-    } catch (e) { throw new Error(`look: cannot start Chrome keeper (${String(e.message).split('\n')[0]})`); }
-    page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
-    if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
-    // A newly started (or older) keeper has only ?shot=1. Give the viewer its initial camera too,
-    // so its own delayed arrival framing cannot overwrite the first requested shot. Hour/weather
-    // overrides are read at page load, so reload when either changes (including removal).
-    const current = new URL(page.url()).searchParams;
-    if (!current.has('eye') || !current.has('at') || ['hour', 'weather'].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
-  } else {
-    const unlock = await (runtime.lease ?? chromeLease)('eden-god look');
-    let unlocked = false; release = () => { if (!unlocked) { unlocked = true; unlock(); } };
-    if (cancelled) { release(); throw new Error('look.timeout: lease wait exceeded deadline'); }
-    browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch((e) => { release(); throw new Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });
-    if (cancelled) { void browser.close().catch(() => {}); throw new Error('look.timeout: browser launch exceeded deadline'); }
-    const ctx = await browser.newContext({ viewport: { width, height } });
-    await ctx.addInitScript(PRESERVE);
-    page = await ctx.newPage();
-    await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
-  }
-  const deadline = now() + timeoutMs;
-  let state = null, stable = 0, lastDrawn = -1;
-  while (now() < deadline) {
-    runtime.signal?.throwIfAborted();
-    state = await page.evaluate((want) => {
-      const w = window.__simEntity; if (!w?.layer?.active) return { ready: false, why: document.title === 'no-entity-world' ? 'no entity world on this page' : 'loading the viewer' };
-      const drawn = w.layer.drawn; const now = w.layer.now ?? performance.now();
-      const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1000 < d.dur).length : 0;
-      // terrain-only entities (hills, lakes) are not drawn as things: most of `want` is enough
-      return { ready: !!window.__shotReady && (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
-    }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
-    if (state.ready && state.drawn === lastDrawn) stable++; else stable = 0;
-    lastDrawn = state.drawn ?? -1;
-    if (state.ready && stable >= 2) break;
-    if (state.why === 'no entity world on this page') throw new Error('look: this world has no entity layer');
-    await wait(1000);
-  }
-  if (!state?.ready || stable < 2) throw new Error(`look: viewer did not initialize and settle before timeout (${JSON.stringify(state)})`);
-  const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
-    const w = window.__simEntity;
-    // back the camera off until `fitSpan` metres fit the frame at this camera's real field of view
-    let e = e0;
-    if (fitSpan > 0 && w.camera.fov) {
-      const v = (w.camera.fov * Math.PI) / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
-      const need = (fitSpan / 2) / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
-      if (len < need) e = d.map((c, i) => a[i] + (c / len) * need);
+    if (keep && !studio) {
+      try {
+        const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1], runtime);
+        runtime.signal?.throwIfAborted();
+        browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 25_000 });
+      } catch (e) { throw new Error(`look: cannot start Chrome keeper (${String(e.message).split('\n')[0]})`); }
+      page = browser.contexts().flatMap(c => c.pages()).find(p => p.url().startsWith(worldUrl));
+      if (!page) throw Error('look: the keeper has no world tab; run `look --stop` and look again');
+      const current = new URL(page.url()).searchParams;
+      if (!current.has('eye') || !current.has('at') || ['hour', 'weather'].some(key => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
+      await page.setViewportSize?.({ width, height });
+    } else {
+      const unlock = await (runtime.lease ?? chromeLease)('eden-god look');
+      let unlocked = false; release = () => { if (!unlocked) { unlocked = true; unlock(); } };
+      if (cancelled) { release(); throw new Error('look.timeout: lease wait exceeded deadline'); }
+      browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch(e => { throw Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });
+      if (cancelled) { void browser.close().catch(() => {}); throw new Error('look.timeout: browser launch exceeded deadline'); }
+      const ctx = await browser.newContext({ viewport: { width, height } });
+      await ctx.addInitScript(PRESERVE); page = await ctx.newPage();
+      await page.goto(`${worldUrl}${studio ? '/god/workbench' : ''}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
     }
-    const eyeDistance = Math.hypot(...e.map((c, i) => c - a[i]));
-    if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error('Requested look camera is within the viewer near clipping plane');
-    // L2's interior view: roofs (and the storeys above `cut`) off for every building
-    window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
-    w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
-    // a world-scale look (the camera a kilometre out) must not be cut by the play camera's far plane or fog
-    const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
-    if (w.camera.far < dist * 3) { w.camera.far = dist * 3; w.camera.updateProjectionMatrix?.(); }
-    const fog = w.scene.fog; if (fog && 'far' in fog && fog.far < dist * 2.5) { fog.near = Math.max(fog.near ?? 0, dist * 0.8); fog.far = dist * 2.5; }
-    if (fog && 'density' in fog) fog.density = Math.min(fog.density, 0.6 / Math.max(1, dist));
-    const hidden = [];
-    if (roofs) w.scene.traverse((o) => { if (o.visible && (/roof/i.test(o.name ?? '') || o.userData?.role === 'roof')) { o.visible = false; hidden.push(o); } });
-    window.__lookRestore = () => { for (const o of hidden) o.visible = true; };
-    const canvas = document.querySelector('canvas');
-    if (canvas) { const keep = new Set(); for (let n = canvas; n; n = n.parentElement) keep.add(n); for (const n of keep) for (const c of n.children ?? []) if (!keep.has(c)) c.style.visibility = 'hidden'; }
-    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
-  }), [eye, at, hideRoofs, cut, span]);
-  await page.waitForTimeout(settleMs);
-  const data = await page.evaluate(({ eye, at }) => {
-    try {
-      const w = window.__simEntity, close = (v, want) => v?.toArray().every((c, i) => Number.isFinite(c) && Math.abs(c - want[i]) <= 1e-4);
-      if (!window.__shotReady || !close(w?.camera?.position, eye) || !close(w?.controls?.target, at)) throw Error('look: requested camera changed before capture; retry the shot');
-      const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-      return c ? c.toDataURL('image/png') : null;
-    } finally { window.__lookRestore?.(); }
-  }, frames);
-  if (!data) throw new Error('look: no canvas on the page');
-  runtime.signal?.throwIfAborted();
-  writeFileSync(resolve(out), Buffer.from(data.split(',')[1], 'base64'));
-  return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? 'keeper' : 'chrome' };
-  } finally { if (!keep) { release(); if (browser) void browser.close().catch(() => {}); } }
+    if (studio) {
+      await page.waitForFunction(() => !!window.workbench, null, { timeout: timeoutMs, polling: 'raf' });
+      const result = await page.evaluate(async payload => window.workbench.render(payload), { ...studio, hour, width, height });
+      runtime.signal?.throwIfAborted();
+      writeFileSync(resolve(out), Buffer.from(result.data.split(',')[1], 'base64'));
+      return { file: resolve(out), ms: now() - t0, via: 'studio', ...result, data: undefined };
+    }
+    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs }) : page.evaluate(waitForShot, { expect, timeoutMs }));
+    runtime.signal?.throwIfAborted();
+    if (!state?.ready) throw Error(`look: ${state?.why === 'no entity world on this page' ? 'this world has no entity layer' : 'viewer did not initialize and settle before timeout'}`);
+    const cells = [], receipts = []; let capturedAt = 0, cameraFrames;
+    for (let i = 0; i < (frameCount > 1 ? frameCount : sequence.length); i++) {
+      runtime.signal?.throwIfAborted();
+      const view = sequence[frameCount > 1 ? 0 : i];
+      if (frameCount > 1 && i > 0) await page.waitForTimeout(Math.max(0, capturedAt + i * every - now()));
+      const frames = frameCount > 1 && i > 0 ? cameraFrames : await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
+        const w = window.__simEntity;
+        // back the camera off until `fitSpan` metres fit the frame at this camera's real field of view
+        let e = e0;
+        if (fitSpan > 0 && w.camera.fov) {
+          const v = (w.camera.fov * Math.PI) / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
+          const need = (fitSpan / 2) / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
+          if (len < need) e = d.map((c, i) => a[i] + (c / len) * need);
+        }
+        const eyeDistance = Math.hypot(...e.map((c, i) => c - a[i]));
+        if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error('Requested look camera is within the viewer near clipping plane');
+        // L2's interior view: roofs (and the storeys above `cut`) off for every building
+        window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
+        w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
+        // a world-scale look (the camera a kilometre out) must not be cut by the play camera's far plane or fog
+        const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
+        if (w.camera.far < dist * 3) { w.camera.far = dist * 3; w.camera.updateProjectionMatrix?.(); }
+        const fog = w.scene.fog; if (fog && 'far' in fog && fog.far < dist * 2.5) { fog.near = Math.max(fog.near ?? 0, dist * 0.8); fog.far = dist * 2.5; }
+        if (fog && 'density' in fog) fog.density = Math.min(fog.density, 0.6 / Math.max(1, dist));
+        const hidden = [];
+        if (roofs) w.scene.traverse((o) => { if (o.visible && (/roof/i.test(o.name ?? '') || o.userData?.role === 'roof')) { o.visible = false; hidden.push(o); } });
+        window.__lookRestore = () => { for (const o of hidden) o.visible = true; };
+        const canvas = document.querySelector('canvas');
+        if (canvas) { const keep = new Set(); for (let n = canvas; n; n = n.parentElement) keep.add(n); for (const n of keep) for (const c of n.children ?? []) if (!keep.has(c)) c.style.visibility = 'hidden'; }
+        let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+      }), [view.eye, view.at, view.hideRoofs ?? hideRoofs, view.cut === undefined ? cut : view.cut, view.span ?? span]);
+      cameraFrames = frames;
+      if (settleMs && (frameCount === 1 || i === 0)) await page.waitForTimeout(settleMs);
+      const data = await page.evaluate(({ eye, at, restore }) => {
+        try {
+          const w = window.__simEntity, close = (v, want) => v?.toArray().every((c, i) => Number.isFinite(c) && Math.abs(c - want[i]) <= 1e-4);
+          if (!window.__shotReady || !close(w?.camera?.position, eye) || !close(w?.controls?.target, at)) throw Error('look: requested camera changed before capture; retry the shot');
+          const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+          return c ? c.toDataURL('image/png') : null;
+        } catch (e) { restore = true; throw e; }
+        finally { if (restore) window.__lookRestore?.(); }
+      }, { ...frames, restore: frameCount === 1 || i === frameCount - 1 });
+      if (!data) throw Error('look: no canvas on the page');
+      const timestamp = now(); if (i === 0) capturedAt = timestamp;
+      receipts.push({ ...frames, ...(sheet ? { ms: timestamp - capturedAt } : {}), label: view.label ?? `${i + 1}` });
+      cells.push({ data, label: frameCount > 1 ? `Frame ${i + 1} · +${timestamp - capturedAt} ms` : view.label ?? `View ${i + 1}` });
+    }
+    const data = sheet ? await page.evaluate(composeSheet, { cells, width, height, strip: frameCount > 1 }) : cells[0].data;
+    runtime.signal?.throwIfAborted();
+    writeFileSync(resolve(out), Buffer.from(data.split(',')[1], 'base64'));
+    return { file: resolve(out), ms: now() - t0, state, frames: sheet ? receipts : receipts[0], cells: cells.length, via: keep ? 'keeper' : 'chrome' };
+  } finally {
+    release();
+    if (keep && page && !runtime.signal?.aborted) await page.evaluate(() => window.__lookRestore?.()).catch(() => {});
+    if ((!keep || studio) && browser) await browser.close().catch(() => {});
+  }
 }
 
 // One wall-clock deadline includes lease, keeper, navigation, settling and capture. A first look on a busy machine
 // (Chrome start, world download, software GL) has taken 40 s: default 120 s, at most 10 min (EDEN_GOD_LOOK_TIMEOUT_MS).
 export const LOOK_DEFAULT_MS = 120_000, LOOK_MAX_MS = 600_000;
 export async function shoot(options, runtime = {}) {
+  validateShot(options);
   const requested = options.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS);
   const ms = Number.isFinite(requested) ? Math.min(LOOK_MAX_MS, Math.max(1, requested)) : LOOK_DEFAULT_MS;
   const abort = new AbortController(), scoped = { ...runtime, signal: abort.signal, cleanup: undefined };

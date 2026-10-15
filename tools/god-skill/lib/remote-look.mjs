@@ -3,7 +3,11 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load } from './state.mjs';
 
+const needsLocalBrowser = args => !!args.views || args.frames > 1 || !!args.studio;
+const localBrowserError = () => Error('look: sheets (--views/--site), motion frames and kit workbench require local Playwright and Google Chrome; the remote renderer supports single views only');
+
 export async function remoteLook(args, runtime = {}) {
+  if (needsLocalBrowser(args)) throw localBrowserError();
   runtime.signal?.throwIfAborted();
   const now = runtime.now ?? Date.now, t0 = now();
   const token = (runtime.load ?? load)().token;

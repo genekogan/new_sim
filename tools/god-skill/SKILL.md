@@ -607,4 +607,6 @@ Massing is ≤8 site-local boxes, not grey entities to remove later. Remove + re
 In a fresh folder, `build resume market-hall` reports the unfinished `current` step, recent edits, roots,
 massing part counts and `next`. Finish `current` before advancing.
 
-Locks: `doctor` lists Chrome, keeper, state, build, claim and verifier holders; `doctor --fix` breaks stale ownership. Saved steps survive recovery. A look has a 30 s deadline. Use `doctor --local` offline.
+Locks: `doctor` lists Chrome, keeper, state, build, claim and verifier holders; `doctor --fix` breaks stale ownership. Saved steps survive recovery. Looks share one 120 s wall-clock deadline (EDEN_GOD_LOOK_TIMEOUT_MS, maximum 600 s). Use `doctor --local` offline.
+
+Preview kits with `kit look defs/x.kit.json [--hour 21] [--beside core/church@1]`: a world-free front/side/top/¾ sheet with colliders, seats and a 1.8 m figure. Iterate before `define-kit`; target ≤2 defines per final kit. `defs --unused [--remove]` lists/retires never-placed trials (undoable). `look --views "sw;w --dist 30;inside"` or `--site` makes one labelled sheet after one readiness wait; `look --frames 4 --every 250` makes a timed strip. Sheets, strips and workbench require local Playwright and Chrome; remote mode says so.
