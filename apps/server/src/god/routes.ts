@@ -125,7 +125,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); return c.json(d.god.builds.start(await body(c), requireGod(c)), 200, noStore); });
   app.get('/v1/god/builds', (c) => { requireGod(c); return c.json(d.god.builds.list(), 200, noStore); });
   app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); return c.json(result, 200, noStore); });
-  app.post('/v1/god/builds/:id/pause', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.pause(c.req.param('id'), await optionalBody(c)), 200, noStore); });
+  app.post('/v1/god/builds/:id/pause', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.pause(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id))), 200, noStore); });

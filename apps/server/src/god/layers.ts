@@ -23,6 +23,7 @@ import { hashOf } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
 import type { Objects } from '../edge/comms/objects/framework.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
+import { inSite, type Site } from './builds.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -65,6 +66,7 @@ export type LayersHost = {
   placeOf?(e: Entity): { id: string; name: string } | null;
   building?: (id: string) => { id: string; title: string; step: string } | null;
   buildingActive?: () => boolean;
+  closingSites?: () => { id: string; site: Site }[];
   log(m: string): void;
 };
 
@@ -214,6 +216,22 @@ export class GodLayers {
     const b = this.h.building?.(id);
     return b ? { code: 'site.under-construction', reason: `${this.m.pathOf(id)} is under construction (${b.title}: ${b.step}); come back when it is finished.` } : null;
   }
+  /** Raw intents and offered plans share the same construction boundary, including coordinate destinations. */
+  constructionRefusal(soul: EdgeSoul, steps: { verb: string; params: Record<string, unknown> }[], target?: string, sites = this.h.closingSites?.() ?? []): Refusal | null {
+    if (isVerificationProbe(soul.soulId)) return null;
+    const member = target ? this.buildingRefusal(target, soul) : null; if (member) return member;
+    for (const step of steps) {
+      if (step.verb !== 'walk_to' && step.verb !== 'mars:walk_to') continue;
+      const p = step.params, to = p.to;
+      const entity = typeof to === 'string' ? this.m.get(to)?.id ?? to : undefined;
+      const blocked = entity ? this.buildingRefusal(entity, soul) : null; if (blocked) return blocked;
+      const pose = entity ? this.h.engine.world.entities[entity]?.pose.p : undefined;
+      const at: Vec2 | undefined = Array.isArray(to) ? [Number(to[0]), Number(to[1])] : pose ? [pose[0], pose[2]] : typeof p.x === 'number' && typeof p.z === 'number' ? [p.x, p.z] : undefined;
+      const site = at && sites.find(s => inSite(s.site, at, .5));
+      if (site) return { code: 'site.under-construction', reason: `${site.id} is under construction; come back when it is finished.` };
+    }
+    return null;
+  }
   /** "yours" / "Ana's" / "the bakers'" / "public" for a viewer. */
   ownerWord(id: string, soul?: { soulId: string; name: string }): string | null {
     const o = this.ownership(id); if (!o) return null;
@@ -234,8 +252,12 @@ export class GodLayers {
   // ---------- Soul capabilities and acts ----------
 
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, here: Vec2 | null) {
+    const sites = this.h.closingSites?.() ?? [];
     // ownership on the bridge's own caps: seats, hands and surfaces of private things
     for (const c of caps) {
+      const target = c.target && this.m.entities.has(c.target.id) ? c.target.id : undefined;
+      const construction = this.constructionRefusal(soul, plans.get(c.id)?.steps ?? [], target, sites);
+      if (construction) { c.available = false; c.blocked = construction; plans.delete(c.id); continue; }
       // a walk into a private building or room of someone else's (walk:ana-house, walk:ana-house/living)
       if (['walk', 'hang-out', 'stroll'].includes(c.verb) && /^(walk|hang-out|stroll):/.test(c.id)) {
         const ref = c.id.slice(c.id.indexOf(':') + 1), e = this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined);

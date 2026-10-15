@@ -48,6 +48,8 @@ export function specOf(input: IntentInput): Record<string, unknown> {
 
 export class Intents {
   readonly L: EdgeLedger;
+  /** Optional world closure for raw approach plans, which do not pass through offered capabilities. */
+  planRefusal?: (soul: EdgeSoul, steps: Steps, target?: string) => {code: string; reason: string} | null;
   /** auto-face per Soul ('*') or per conversation; default on. Memory only (a restart turns it back on). */
   private autoFace = new Map<string, boolean>();
   /** A Soul's own look/turn holds its head until this tick; auto-face does not override it meanwhile. */
@@ -154,7 +156,7 @@ export class Intents {
     const named = str(s.target);
     if (named && s.nearest === undefined && s.near === undefined) {
       const seat = all.find(x => x.id === named || x.capability === named) ?? all.find(x => x.name.toLowerCase() === named.toLowerCase());
-      if (seat) {if (free && !seat.free) return no('slot.none-free', `${seat.name} is taken.`, all.filter(x => x.free).slice(0, 3).map(x => ({id: x.capability!, label: x.name}))); return {ok: true, kind: 'capability', capability: seat.capability!, ...(params ? {params} : {}), chosen: here(seat)};}
+      if (seat) {const cap = this.L.coreA.binds(P.soul).caps.find(c => c.id === seat.capability); if (cap?.blocked?.code === 'site.under-construction' && !cap.available) return no(cap.blocked.code, cap.blocked.reason); if (free && !seat.free) return no('slot.none-free', `${seat.name} is taken.`, all.filter(x => x.free).slice(0, 3).map(x => ({id: x.capability!, label: x.name}))); return {ok: true, kind: 'capability', capability: seat.capability!, ...(params ? {params} : {}), chosen: here(seat)};}
       return {ok: true, kind: 'capability', capability: `sit:${named}`, ...(params ? {params} : {}), chosen: {asked: named}};
     }
     if (s.nearest !== undefined && s.nearest !== 'seat' && s.nearest !== 'chair' && s.nearest !== 'bench') return no('capability.params', 'nearest must be "seat" (or chair/bench).');
@@ -220,6 +222,7 @@ export class Intents {
     if (t.kind === 'place') return this.go(P, {place: t.id}, 'go');
     const h = P.w.entities[P.soul.entityId]?.human, seated = !!h && (h.activity === 'sit' || h.baseActivity === 'sit');
     const steps: Steps = [...(seated ? [{verb: 'stand', params: {}}] : []), {verb: 'walk_to', params: {to: t.entityId ?? [t.at[0], t.at[1]], standoff: distance}}];
+    const blocked = this.planRefusal?.(P.soul, steps, t.entityId ?? t.id); if (blocked) return no(blocked.code, blocked.reason);
     return {ok: true, kind: 'plan', capability: `approach:${t.id}`, label: `Approach ${t.name}`, steps, chosen: {target: t.id, name: t.name, kind: t.kind, standoff: distance, distFromYou: t.distance, ...this.eta(P, t.at)}};
   }
 

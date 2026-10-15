@@ -268,9 +268,11 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (!result.accepted) return result;
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
     const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity);
+    if (updates.failures) return { accepted: false, failures: updates.failures };
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
     if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
-    const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
+    // SQL fills in the real revision. Reserve its widest safe integer representation before admission.
+    const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8') + (updates.echo ? String(Number.MAX_SAFE_INTEGER).length - 1 : 0);
     if (normalized.clientRef !== undefined && bytes > GOD_EDIT_OUTCOME_BYTES) return { accepted: false, failures: [{ op: -1, code: 'request.budget', field: 'result', detail: `Accepted result would require ${bytes} bytes; receipt limit is ${GOD_EDIT_OUTCOME_BYTES}.`, measured: bytes, limit: GOD_EDIT_OUTCOME_BYTES, fix: 'Submit a smaller batch using a fresh clientRef.' }] };
     const { ops, group, clientRef } = normalized;
     const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
@@ -298,13 +300,14 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.builds.sweep();
     const field = this.caller.build;
     // Undo keeps the journal's original group. Only a supplied build needs admission; ordinary undo remains legal.
-    const admission = this.builds.admit(field, field ? { group: target.grp ?? undefined } : {}, this.caller.identity);
+    const admission = this.builds.admit(field, {}, this.caller.identity);
     if (admission.failures) return { accepted: false, failures: admission.failures };
     const tick = this.opts.tick();
     const next = this.model.fork();
     const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
-    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined);
+    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true);
+    if (updates.failures) return { accepted: false, failures: updates.failures };
     r.result.warnings.push(...roots.warnings, ...updates.warnings);
     if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
     const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes });
@@ -326,6 +329,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const r = applyBatch(next, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
     const roots = this.builds.rootsDelta(this.model, next, r.diff!, 'engine'), updates = this.builds.writes({ warnings: [] }, roots, r.result.seq, this.now());
+    if (updates.failures) return { accepted: false, failures: updates.failures };
     const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes });
     if (refused) return refused;
     Object.assign(this.model, next);

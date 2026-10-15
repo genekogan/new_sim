@@ -78,7 +78,7 @@ export class EngineBridge {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, engine: this.host.engine as never, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), log: (m) => this.log(m) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
@@ -733,6 +733,7 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
+    L.intents.planRefusal = (soul, steps, target) => this.layers.constructionRefusal(soul, steps, target);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
@@ -840,8 +841,8 @@ export class EngineBridge {
         if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
       }
     }
-    this.sitHere(caps, plans, here);
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
+    this.sitHere(caps, plans, here);
   }
   /** SOULFIX: which storey of its building a thing upstairs stands on ("floor 1" = the first floor above the ground),
    *  from the building's own floor height (engine level ids are not storeys). */
@@ -869,13 +870,14 @@ export class EngineBridge {
   /** F1: the ledger lists `sit:here` before the world profile adds god-built seats, so it says "no free seat within
    *  30 m" beside free benches. Point it at the nearest free god-built seat instead (the same plan as its sit:<id>). */
   private sitHere(caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>, here: Vec2) {
-    const i = caps.findIndex((c) => c.id === 'sit:here'); if (i < 0 || caps[i].target) return;
+    const i = caps.findIndex((c) => c.id === 'sit:here'); if (i < 0 || caps[i].target && caps[i].available) return;
     const ents = this.engine.world.entities;
     const best = caps.filter((c) => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && ents[c.target.id]?.tags?.includes('entity-world') && plans.has(c.id))
       .map((c) => ({ c, d: Math.hypot(ents[c.target!.id].pose.p[0] - here[0], ents[c.target!.id].pose.p[2] - here[1]) })).filter((x) => x.d <= 30).sort((a, b) => a.d - b.d || (a.c.id < b.c.id ? -1 : 1))[0];
     if (!best) return;
     const plan = plans.get(best.c.id)!;
-    caps[i] = { ...caps[i], label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true };
+    const { blocked: _blocked, ...hereCap } = caps[i];
+    caps[i] = { ...hereCap, label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true };
     plans.set('sit:here', { label: 'Sit down', steps: structuredClone(plan.steps), seconds: true });
   }
 }

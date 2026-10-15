@@ -5,6 +5,7 @@
 import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity, type Accepted, type Result } from '@sim/world-compiler';
 import { CREATION_LIMITS as L } from '@sim/generators';
+import { buildBodyFailure, buildFailure } from './builds.ts';
 
 export const GOD_EDIT_RECEIPTS = L.requestReceipts;
 export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
@@ -14,6 +15,12 @@ export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'aba
 export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number };
 type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[] };
 class StaleBuild extends Error {}
+class BuildLimit extends Error {
+  readonly failure: NonNullable<ReturnType<typeof buildBodyFailure>>;
+  constructor(failure: NonNullable<ReturnType<typeof buildBodyFailure>>) { super(failure.detail); this.failure = failure; }
+}
+const buildLimitResult = (failure: NonNullable<ReturnType<typeof buildBodyFailure>>) => ({ accepted: false as const, failures: [failure] });
+const buildConstraint = (e: unknown) => ((e as { code?: string }).code === 'SQLITE_CONSTRAINT_CHECK' || (e as { errcode?: number }).errcode === 275) && /body|god_builds_v1/.test(String(e));
 const staleBuild = (): Result => ({ accepted: false, failures: [{ op: -1, code: 'revision.stale', field: 'build', detail: 'The durable build changed while this edit was planned.', fix: 'Read the build and re-plan the edit.' }] });
 
 export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine' };
@@ -41,6 +48,8 @@ export function ensureWorldSchema(db: Db) {
   if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
   db.db.exec(`
     CREATE INDEX IF NOT EXISTS world_edits_v1_grp ON world_edits_v1(world_id,grp);
+    CREATE INDEX IF NOT EXISTS world_edits_v1_grp_seq ON world_edits_v1(world_id,grp,seq);
+    CREATE INDEX IF NOT EXISTS world_edits_v1_stack ON world_edits_v1(world_id,kind,seq) WHERE undone=0;
     CREATE TABLE IF NOT EXISTS god_builds_v1 (
       world_id TEXT NOT NULL, id TEXT NOT NULL CHECK(length(id)<=40),
       status TEXT NOT NULL CHECK(status IN ('active','paused','done','abandoned')),
@@ -91,6 +100,7 @@ export class WorldStore {
       if (request) { const replay = this.retry(request.clientRef, request.requestHash); if (replay) return replay; }
       if (this.meta()?.editSeq !== edit.seq - 1) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', detail: 'The durable world changed while this owner planned. Reload the world before submitting another edit.', field: 'editSeq', fix: 'Reload the current world and re-plan the edit.' }] } as Result;
       for (const b of edit.builds ?? []) if ((this.db.db.prepare('SELECT rev FROM god_builds_v1 WHERE world_id=? AND id=?').get(this.worldId, b.id) as { rev: number } | undefined)?.rev !== b.expectRev) return staleBuild();
+      for (const b of edit.builds ?? []) { const failure = buildBodyFailure(b.body, false); if (failure) return buildLimitResult(failure); }
       const journal = this.journalBudgetFailure(edit, diff); if (journal) return journal;
       for (const d of diff.defs) this.writeDef(d);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
@@ -103,7 +113,7 @@ export class WorldStore {
       if (edit.kind === 'undo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       if (edit.kind === 'redo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       // a fresh edit clears the redo stack: pending undos can no longer be redone
-      if (edit.kind === 'edit') this.db.db.prepare("UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND kind='undo' AND undone=0").run(this.worldId);
+      if (edit.kind === 'edit') this.db.db.prepare("UPDATE world_edits_v1 INDEXED BY world_edits_v1_stack SET undone=1 WHERE world_id=? AND kind='undo' AND undone=0").run(this.worldId);
       for (const a of diff.answers) this.db.db.prepare('UPDATE god_prayers_v1 SET answer=?,answered_at=? WHERE world_id=? AND id=?').run(a.text, edit.at, this.worldId, a.prayer);
       for (const b of edit.builds ?? []) {
         this.updateBuild(b);
@@ -115,7 +125,7 @@ export class WorldStore {
         this.db.db.prepare('DELETE FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref IN (SELECT client_ref FROM god_edit_receipts_v1 WHERE world_id=? ORDER BY seq DESC LIMIT -1 OFFSET ?)').run(this.worldId, this.worldId, GOD_EDIT_RECEIPTS);
       }
       return null;
-    }); } catch (e) { if (e instanceof StaleBuild) return staleBuild(); throw e; }
+    }); } catch (e) { if (e instanceof StaleBuild) return staleBuild(); if (e instanceof BuildLimit) return buildLimitResult(e.failure); if (buildConstraint(e)) return buildLimitResult(buildFailure('build.limit', 'Build body exceeds the durable body bound.')); throw e; }
   }
   /** Durable aggregate avoids rescanning the append-only journal on each construction edit. */
   private journalBudgetFailure(edit: CommitEdit, diff: Diff): Result | null {
@@ -148,11 +158,13 @@ export class WorldStore {
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
   /** The edit `undo` would revert: newest not-undone edit or redo. */
-  undoable(): EditRow | null { return this.stackHead("kind IN ('edit','redo')"); }
+  undoable(): EditRow | null { return this.stackHead(['edit', 'redo']); }
   /** The undo `redo` would revert: newest not-undone undo. */
-  redoable(): EditRow | null { return this.stackHead("kind='undo'"); }
-  private stackHead(predicate: string): EditRow | null {
-    const r = this.db.db.prepare(`SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind FROM world_edits_v1 WHERE world_id=? AND undone=0 AND ${predicate} ORDER BY seq DESC LIMIT 1`).get(this.worldId) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
+  redoable(): EditRow | null { return this.stackHead(['undo']); }
+  private stackHead(kinds: EditRow['kind'][]): EditRow | null {
+    const seqs = kinds.map(kind => (this.db.db.prepare('SELECT seq FROM world_edits_v1 INDEXED BY world_edits_v1_stack WHERE world_id=? AND undone=0 AND kind=? ORDER BY seq DESC LIMIT 1').get(this.worldId, kind) as { seq: number } | undefined)?.seq ?? -1);
+    const seq = Math.max(...seqs); if (seq < 0) return null;
+    const r = this.db.db.prepare('SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind FROM world_edits_v1 WHERE world_id=? AND seq=?').get(this.worldId, seq) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
     return r ? { ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) } : null;
   }
   /** Snapshot the complete group stack before undo starts; newly journaled undos cannot hide older group edits. */
@@ -162,26 +174,50 @@ export class WorldStore {
   }
 
   /** Exact group and descendants, with an index range that cannot adopt a neighbouring id. */
+  private groupQuery(group: string, columns: string, filter: string, limit: number, params: number[] = []) {
+    const select = `SELECT ${columns} FROM world_edits_v1 INDEXED BY world_edits_v1_grp_seq WHERE world_id=? AND `;
+    return {
+      sql: `SELECT * FROM (${select}grp=? ${filter} ORDER BY seq DESC LIMIT ?) UNION ALL SELECT * FROM (${select}grp>=? AND grp<? ${filter} ORDER BY seq DESC LIMIT ?) ORDER BY seq DESC LIMIT ?`,
+      args: [this.worldId, group, ...params, limit, this.worldId, group + '/', group + '0', ...params, limit, limit],
+    };
+  }
   groupEditsUnder(group: string, journal = false, limit = 200): EditRow[] {
-    const rows = this.db.db.prepare(`SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind FROM world_edits_v1 WHERE world_id=? AND (grp=? OR (grp>=? AND grp<?)) ${journal ? '' : "AND undone=0 AND kind IN ('edit','redo')"} ORDER BY seq DESC LIMIT ?`).all(this.worldId, group, group + '/', group + '0', limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[];
+    const q = this.groupQuery(group, 'seq,by,at,note,grp,ops,inverse,undone,undo_of,kind', journal ? '' : "AND undone=0 AND kind IN ('edit','redo')", limit);
+    const rows = this.db.db.prepare(q.sql).all(...q.args) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[];
     return rows.map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
-  hasGroupUnder(id: string): boolean { return !!this.db.db.prepare('SELECT 1 FROM world_edits_v1 WHERE world_id=? AND (grp=? OR (grp>=? AND grp<?)) LIMIT 1').get(this.worldId, id, id + '/', id + '0'); }
+  buildRecent(group: string, firstSeq: number, lastSeq: number): { seq: number; note: string | null; at: number }[] {
+    const q = this.groupQuery(group, 'seq,note,at', "AND seq BETWEEN ? AND ? AND kind IN ('edit','redo')", 5, [firstSeq, lastSeq]);
+    return this.db.db.prepare(q.sql).all(...q.args) as { seq: number; note: string | null; at: number }[];
+  }
+  /** One bounded status query; never select inverse blobs, even for the journal summary. */
+  buildJournal(group: string, step?: { firstSeq: number; lastSeq: number }) {
+    const journal = this.groupQuery(group, 'seq,kind,grp,note,at,ops', '', 200);
+    const recent = this.groupQuery(group, 'seq,kind,grp,note,at', "AND seq BETWEEN ? AND ? AND kind IN ('edit','redo')", step ? 5 : 0, [step?.firstSeq ?? 0, step?.lastSeq ?? 0]);
+    const rows = this.db.db.prepare(`SELECT *,0 AS recent FROM (${journal.sql}) UNION ALL SELECT *, '[]' AS ops,1 AS recent FROM (${recent.sql})`).all(...journal.args, ...recent.args) as { seq: number; kind: EditRow['kind']; grp: string | null; note: string | null; at: number; ops: string; recent: number }[];
+    return {
+      journal: rows.filter(r => !r.recent).map(({ seq, kind, grp, note, at, ops }) => { const parsed = JSON.parse(ops) as Op[]; return { seq, kind, grp, note, at, ops: { count: parsed.length, kinds: [...new Set(parsed.map(o => o.op))] } }; }),
+      recent: rows.filter(r => r.recent).map(({ seq, note, at }) => ({ seq, note, at })),
+    };
+  }
+  hasGroupUnder(id: string): boolean { return !!this.db.db.prepare('SELECT 1 FROM world_edits_v1 INDEXED BY world_edits_v1_grp_seq WHERE world_id=? AND grp=? UNION ALL SELECT 1 FROM world_edits_v1 INDEXED BY world_edits_v1_grp_seq WHERE world_id=? AND grp>=? AND grp<? LIMIT 1').get(this.worldId, id, this.worldId, id + '/', id + '0'); }
   builds(openOnly = false): BuildRow[] { return this.db.db.prepare(`SELECT id,status,rev,created_at,last_at,body FROM god_builds_v1 WHERE world_id=? ${openOnly ? "AND status IN ('active','paused')" : ''} ORDER BY rev DESC`).all(this.worldId) as BuildRow[]; }
   build(id: string): BuildRow | null { return this.db.db.prepare('SELECT id,status,rev,created_at,last_at,body FROM god_builds_v1 WHERE world_id=? AND id=?').get(this.worldId, id) as BuildRow ?? null; }
   buildsRev(): number { return (this.db.db.prepare('SELECT COALESCE(MAX(rev),0) AS rev FROM god_builds_v1 WHERE world_id=?').get(this.worldId) as { rev: number }).rev; }
-  insertBuild(id: string, at: number, body: string): BuildRow | null {
-    return this.tx(() => {
+  insertBuild(id: string, at: number, body: string) {
+    const failure = buildBodyFailure(body); if (failure) return buildLimitResult(failure);
+    try { return this.tx(() => {
       if (this.build(id) || this.hasGroupUnder(id)) return null;
       this.db.db.prepare("INSERT INTO god_builds_v1(world_id,id,status,rev,created_at,last_at,body) SELECT ?,?,'active',COALESCE(MAX(rev),0)+1,?,?,? FROM god_builds_v1 WHERE world_id=?").run(this.worldId, id, at, at, body, this.worldId);
       return this.build(id)!;
-    });
+    }); } catch (e) { if (buildConstraint(e)) return buildLimitResult(buildFailure('build.limit', 'Build body exceeds the durable body bound.')); throw e; }
   }
   saveBuild(b: BuildWrite): Result | null {
     try { return this.tx(() => { this.updateBuild(b); this.pruneBuilds(); return null; }); }
-    catch (e) { if (e instanceof StaleBuild) return staleBuild(); throw e; }
+    catch (e) { if (e instanceof StaleBuild) return staleBuild(); if (e instanceof BuildLimit) return buildLimitResult(e.failure); if (buildConstraint(e)) return buildLimitResult(buildFailure('build.limit', 'Build body exceeds the durable body bound.')); throw e; }
   }
   private updateBuild(b: BuildWrite) {
+    const failure = buildBodyFailure(b.body, false); if (failure) throw new BuildLimit(failure);
     const r = this.db.db.prepare('UPDATE god_builds_v1 SET status=?,rev=(SELECT COALESCE(MAX(rev),0)+1 FROM god_builds_v1 WHERE world_id=?),last_at=?,body=? WHERE world_id=? AND id=? AND rev=? RETURNING rev').get(b.status, this.worldId, b.lastAt, b.body, this.worldId, b.id, b.expectRev) as { rev: number } | undefined;
     if (!r) throw new StaleBuild();
     b.rev = r.rev;

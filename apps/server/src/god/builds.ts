@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldModel, type OBB } from '@sim/world-compiler';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
 
-export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, startPerMinute: 6, editsPerMinute: 120 } as const;
+export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
 export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete'] as const;
 const fixes: Record<typeof buildCodes[number], string> = {
   'build.unknown': '`build` lists open builds; use `build start <id>`.',
@@ -22,6 +22,11 @@ const fixes: Record<typeof buildCodes[number], string> = {
   'build.undo-incomplete': 'The build stays open; see notReverted.',
 };
 export const buildFailure = (code: typeof buildCodes[number], detail: string, field = 'build', extra: Partial<Failure> = {}): Failure => ({ op: -1, code, detail, field, fix: fixes[code], ...extra });
+/** Leave room for lazy pause/closure markers on all author-controlled writes. */
+export function buildBodyFailure(body: string, reserve = true): Failure | undefined {
+  const measured = Buffer.byteLength(body), limit = BUILD_LIMITS.bodyBytes - (reserve ? BUILD_LIMITS.transitionBytes : 0);
+  if (measured > limit) return buildFailure('build.limit', `Build body requires ${measured} bytes; limit is ${limit}.`, 'build', { measured, limit, fix: 'Shorten the note, summary or step labels, or finish this build and start a new one.' });
+}
 const fail = (code: typeof buildCodes[number], detail: string, field?: string, extra?: Partial<Failure>) => ({ ok: false as const, failures: [buildFailure(code, detail, field, extra)] });
 const schemaFailure = (error: z.ZodError) => ({ ok: false as const, failures: error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the build shapes in GET /v1/god/schema.' })) });
 const pair = z.tuple([z.number().finite(), z.number().finite()]);
@@ -56,7 +61,7 @@ export type BuildBody = {
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
 export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale'; root?: string }[] };
 export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
-export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group: string; step: { n: number; label: string }; claim?: string };
+export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group?: string; step: { n: number; label: string }; claim?: string };
 export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted';
 export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: Exclude<BuildEventKind, 'step'>; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
@@ -83,28 +88,31 @@ const box = (site: Site): OBB => ({ c: site.at, half: [site.size[0] / 2, site.si
 const meets = (m: WorldModel, id: string, site: Site): boolean => { const fs = m.footprintsOf(id); if (fs.length) return fs.some(f => obbOverlap(f, box(site))); const p = m.worldPose(m.entities.get(id)!); return inSite(site, [p.x, p.z]); };
 
 /** Every committed diff, including undo/redo. The input rows and bodies are never mutated. */
-export function rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field: BuildField | undefined, rows: readonly Row[]): RootsDelta {
+export function rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field: BuildField | undefined, rows: readonly Row[], rootIndex: ReadonlyMap<string, string> = new Map(rows.filter(open).flatMap(r => r.body.roots.map(id => [id, r.id] as const)))): RootsDelta {
   const changes = new Map<string, RootChange>(), warnings: string[] = [], removed = new Set(diff.removes);
   const sites = rows.filter(open).sort((a, b) => a.id.localeCompare(b.id));
   const roots = new Map(sites.map(r => [r.id, new Set(r.body.roots.filter(id => !removed.has(id)))]));
+  const addedOwners = new Map<string, string>();
   for (const r of sites) { const gone = r.body.roots.filter(id => removed.has(id)); if (gone.length) changes.set(r.id, { added: [], removed: gone }); }
   if (kind === 'engine') return { changes, warnings };
   // Upserts need not be ordered parent-first (notably inverse ops), so process by depth.
   const tops = diff.upserts.filter(e => !before.entities.has(e.id) && (e.in.parent === 'world' || before.entities.has(e.in.parent)) && !after.resolvedDef(e.def)?.components.body).sort((a, b) => after.ancestors(a.id).size - after.ancestors(b.id).size);
   for (const e of tops) {
     const ancestors = after.ancestors(e.id);
-    if ([...roots.values()].some(ids => [...ancestors].some(id => ids.has(id)))) continue;
+    if ([...ancestors].some(id => addedOwners.has(id) || !removed.has(id) && rootIndex.has(id))) continue;
     const candidates = [...sites.filter(r => r.id === field?.id), ...sites.filter(r => r.id !== field?.id)];
     const owner = candidates.find(r => meets(after, e.id, r.body.site));
     if (!owner) { if (field) warnings.push(`${after.pathOf(e.id)} is outside site ${field.id}: not part of the build (residents can use it)`); continue; }
     const ids = roots.get(owner.id)!;
     if (ids.size >= BUILD_LIMITS.roots) { warnings.push(`${owner.id}: group the parts under one container (\`place … --in church\`); root limit ${BUILD_LIMITS.roots}`); continue; }
-    ids.add(e.id); const change = changes.get(owner.id) ?? { added: [], removed: [] }; change.added.push(e.id); changes.set(owner.id, change);
+    ids.add(e.id); addedOwners.set(e.id, owner.id); const change = changes.get(owner.id) ?? { added: [], removed: [] }; change.added.push(e.id); changes.set(owner.id, change);
   }
-  if (field) { const r = sites.find(r => r.id === field.id); if (r) for (const e of diff.upserts) if (r.body.roots.includes(e.id) && !meets(after, e.id, r.body.site)) warnings.push(`${after.pathOf(e.id)} moved outside site ${r.id}: still part of the build`); }
-  if (!field) for (const r of sites) {
-    const touched = [...diff.removes, ...diff.upserts.map(e => e.id)].some(id => r.body.roots.includes(id) || [...before.ancestors(id), ...after.ancestors(id)].some(a => r.body.roots.includes(a)));
-    if (touched) warnings.push(`edited ${r.id} (under construction) outside its build; progress not recorded`);
+  if (field) { const r = sites.find(r => r.id === field.id); if (r) for (const e of diff.upserts) if (rootIndex.get(e.id) === r.id && !meets(after, e.id, r.body.site)) warnings.push(`${after.pathOf(e.id)} moved outside site ${r.id}: still part of the build`); }
+  if (!field) {
+    const touched = new Set<string>([...diff.removes, ...diff.upserts.map(e => e.id)]), builds = new Set<string>();
+    for (const id of [...touched]) { for (const a of before.ancestors(id)) touched.add(a); for (const a of after.ancestors(id)) touched.add(a); }
+    for (const id of touched) { const owner = rootIndex.get(id); if (owner) builds.add(owner); }
+    for (const id of [...builds].sort()) warnings.push(`edited ${id} (under construction) outside its build; progress not recorded`);
   }
   return { changes, warnings };
 }
@@ -150,22 +158,31 @@ export class GodBuilds {
   }
   closingSites(now = this.host.now()): { site: Site; roots: string[]; id: string }[] { return [...this.rows.values()].filter(r => this.isClosing(r, now)).map(r => ({ id: r.id, site: r.body.site, roots: [...r.body.roots] })); }
   private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { root: c.root } : {}) })) }; }
-  private view(r: Row, now: number): GodBuildView {
+  private view(r: Row, now: number, recent?: { seq: number; note: string | null; at: number }[]): GodBuildView {
     const b = structuredClone(r.body), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
-    const step = [...b.steps].reverse().find(s => s.n === b.step.n && !s.claim), journal = this.store.groupEditsUnder(r.id, true);
-    const current = step ? { ...step, recent: journal.filter(e => e.seq >= step.firstSeq && e.seq <= step.lastSeq && (e.kind === 'edit' || e.kind === 'redo')).slice(0, 5).map(e => ({ seq: e.seq, note: e.note, at: e.at })) } : null;
+    const step = [...b.steps].reverse().find(s => s.n === b.step.n && !s.claim);
+    const current = step ? { ...step, recent: recent ?? this.store.buildRecent(r.id, step.firstSeq, step.lastSeq) } : null;
     const model = this.host.model();
-    const massing = b.massing.map(m => { const ms: Site = { at: m.at, size: m.size, yaw: m.yaw ?? 0 }; let parts = 0; for (const root of b.roots) for (const id of model.entities.has(root) ? model.subtree(root) : []) { const fs = model.footprintsOf(id), e = model.entities.get(id)!; const wp = model.worldPose(e); const p: [number, number] = fs.length ? [fs.reduce((a, f) => a + f.c[0], 0) / fs.length, fs.reduce((a, f) => a + f.c[1], 0) / fs.length] : [wp.x, wp.z]; if (inSite(ms, siteLocal(b.site, p))) parts++; } return { ...m, parts }; });
+    const massing = b.massing.map(m => ({ ...m, parts: 0 })), boxes = massing.map(m => ({ at: m.at, size: m.size, yaw: m.yaw ?? 0 }));
+    if (massing.length) for (const root of b.roots) for (const id of model.entities.has(root) ? model.subtree(root) : []) {
+      const fs = model.footprintsOf(id), wp = fs.length ? null : model.worldPose(model.entities.get(id)!);
+      const p = siteLocal(b.site, fs.length ? [fs.reduce((a, f) => a + f.c[0], 0) / fs.length, fs.reduce((a, f) => a + f.c[1], 0) / fs.length] : [wp!.x, wp!.z]);
+      boxes.forEach((ms, i) => { if (inSite(ms, p)) massing[i].parts++; });
+    }
     return { ...b, status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
   }
   publicList(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), builds: [...this.rows.values()].map(r => this.public(r, now)) }; }
   list(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), open: [...this.rows.values()].map(r => this.view(r, now)), recent: this.store.builds().filter(r => !open(r)).slice(0, 20).map(r => { const b = decode(r); return { id: r.id, title: b.body.title, status: r.status, rev: r.rev, step: b.body.step, lastAt: r.last_at }; }) }; }
   summaries(now = this.host.now()) { this.sweep(now); return [...this.rows.values()].map(r => ({ id: r.id, status: effective(r, now, this.pauseMs), step: structuredClone(r.body.step) })); }
-  status(id: string) { const now = this.host.now(); this.sweep(now); const r = this.row(id); return r ? { ok: true as const, build: this.view(r, now), journal: this.store.groupEditsUnder(id, true).map(({ seq, kind, grp, note, at, ops }) => ({ seq, kind, grp, note, at, ops: { count: ops.length, kinds: [...new Set(ops.map(o => o.op))] } })) } : null; }
+  status(id: string) {
+    const now = this.host.now(); this.sweep(now); const r = this.row(id); if (!r) return null;
+    const step = [...r.body.steps].reverse().find(s => s.n === r.body.step.n && !s.claim), { journal, recent } = this.store.buildJournal(id, step);
+    return { ok: true as const, build: this.view(r, now, recent), journal };
+  }
   start(raw: unknown, caller: Identity) {
     const now = this.host.now(); this.sweep(now); const p = buildStartSchema.safeParse(raw); if (!p.success) return schemaFailure(p.error);
     const input = p.data, startHash = hashOf(input), prior = this.row(input.id);
-    if (prior) return prior.body.startHash === startHash && prior.body.lead.tokenHash === caller.hash ? { ok: true as const, build: this.view(prior, now), lease: prior.body.lead.lease, replayed: true } : fail('build.exists', `${input.id} already exists.`);
+    if (prior) return !open(prior) ? fail('build.closed', input.id) : prior.body.startHash === startHash && prior.body.lead.tokenHash === caller.hash ? { ok: true as const, build: this.view(prior, now), lease: prior.body.lead.lease, replayed: true } : fail('build.exists', `${input.id} already exists.`);
     if (this.store.hasGroupUnder(input.id)) return fail('build.exists', `${input.id} is already a journal group.`);
     if (this.rows.size >= BUILD_LIMITS.open) return fail('build.limit', 'At most 8 builds may be open.');
     const model = this.host.model(), [x0, z0, x1, z1] = model.ground().extent, [x, z] = input.site.at;
@@ -176,15 +193,23 @@ export class GodBuilds {
     if (input.root && !root) return { ok: false as const, failures: [{ op: -1, code: 'entity.unknown', entity: input.root, detail: `Unknown root ${input.root}.`, fix: 'Use an existing entity id or path.' }] };
     if (root && this.rootIndex.has(root.id)) return fail('build.site', 'Root already belongs to an open build.', 'root');
     const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief ? { brief: input.brief } : {}) }, site: input.site, massing: input.massing, roots: root ? [root.id] : [], lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
-    const inserted = this.store.insertBuild(input.id, now, JSON.stringify(body)); if (!inserted) return fail('build.exists', `${input.id} already exists.`);
-    const row = decode(inserted); this.rows.set(row.id, row); this.index(); this.announce(row, 'started', { added: row.body.roots, removed: [] });
-    return { ok: true as const, build: this.view(row, now), lease: body.lead.lease };
+    const encoded = JSON.stringify(body), failure = buildBodyFailure(encoded); if (failure) return { ok: false as const, failures: [failure] };
+    const inserted = this.store.insertBuild(input.id, now, encoded); if (!inserted) return fail('build.exists', `${input.id} already exists.`);
+    if ('accepted' in inserted) return { ok: false as const, failures: inserted.failures };
+    const row = decode(inserted); this.rows.set(row.id, row); this.index(); const build = this.view(row, now); this.announce(row, 'started', { added: row.body.roots, removed: [] }, false, build);
+    return { ok: true as const, build, lease: body.lead.lease };
   }
-  private save(row: Row, body: BuildBody, status: Row['status'], at: number, kind: BuildEventKind) {
+  private save(row: Row, body: BuildBody, status: Row['status'], at: number, kind: BuildEventKind, transition = false) {
     const w: BuildWrite = { id: row.id, expectRev: row.rev, status, lastAt: at, body: JSON.stringify(body) };
+    const failure = buildBodyFailure(w.body, !transition); if (failure) return { ok: false as const, failures: [failure] };
     const refused = this.store.saveBuild(w); if (refused && !refused.accepted) return { ok: false as const, failures: refused.failures };
-    const next: Row = { ...row, body, status, rev: w.rev!, last_at: at }; this.install(next); this.announce(next, kind, { added: [], removed: [] });
-    return { ok: true as const, build: this.view(next, this.host.now()) };
+    const next: Row = { ...row, body, status, rev: w.rev!, last_at: at }; this.install(next);
+    return { ok: true as const, row: next, kind };
+  }
+  private savedView(result: ReturnType<GodBuilds['save']>) {
+    if (!result.ok) return result;
+    const build = this.view(result.row, this.host.now()); this.announce(result.row, result.kind, { added: [], removed: [] }, false, build);
+    return { ok: true as const, build };
   }
   private install(row: Row, roots?: RootChange) {
     if (open(row)) {
@@ -199,15 +224,26 @@ export class GodBuilds {
     const now = this.host.now(), b = row.body;
     return { id: row.id, rev: row.rev, status: effective(row, now, this.pauseMs), lastAt: row.last_at, closed: this.isClosing(row, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, ...(roots.added.length ? { rootsAdded: [...roots.added] } : {}), ...(roots.removed.length ? { rootsRemoved: [...roots.removed] } : {}) };
   }
-  private announce(row: Row, kind: BuildEventKind, roots: RootChange, inEdit = false) {
+  private announce(row: Row, kind: BuildEventKind, roots: RootChange, inEdit = false, view?: GodBuildView) {
     const delta = this.delta(row, roots), full = kind === 'started' || kind === 'resumed';
     if (!inEdit) this.host.emit({ type: 'edge', kind: 'world-build', event: kind as WorldBuildMessage['event'], rev: row.rev, now: this.host.now(), ...(full ? { site: this.public(row, this.host.now()) } : { delta }) });
-    this.host.notice({ kind, id: row.id, rev: row.rev, now: this.host.now(), delta, ...(full ? { view: this.view(row, this.host.now()) } : {}) });
+    this.host.notice({ kind, id: row.id, rev: row.rev, now: this.host.now(), delta, ...(full ? { view: view ?? this.view(row, this.host.now()) } : {}) });
   }
   sweep(now = this.host.now()) {
     for (let row of [...this.rows.values()]) {
-      if (row.status === 'active' && effective(row, now, this.pauseMs) === 'paused') { const body = structuredClone(row.body); body.paused = { from: row.last_at + this.pauseMs, seenAt: now }; this.save(row, body, 'paused', row.last_at, 'paused'); row = this.rows.get(row.id)!; }
-      if (row && row.status === 'paused' && now - row.last_at > this.closureMs && row.body.closureLiftedAt === undefined) { const body = structuredClone(row.body); body.closureLiftedAt = now; this.save(row, body, 'paused', row.last_at, 'closure-lifted'); }
+      // Legacy rows may not have reserved marker space. One refused transition must not wedge public reads.
+      try {
+        if (row.status === 'active' && effective(row, now, this.pauseMs) === 'paused') {
+          const body = structuredClone(row.body); body.paused = { from: row.last_at + this.pauseMs, seenAt: now };
+          const saved = this.save(row, body, 'paused', row.last_at, 'paused', true);
+          if (saved.ok) { row = saved.row; this.announce(row, 'paused', { added: [], removed: [] }); }
+        }
+        if (effective(row, now, this.pauseMs) === 'paused' && now - row.last_at > this.closureMs && row.body.closureLiftedAt === undefined) {
+          const body = structuredClone(row.body); body.closureLiftedAt = now;
+          const saved = this.save(row, body, row.status, row.last_at, 'closure-lifted', true);
+          if (saved.ok) this.announce(saved.row, 'closure-lifted', { added: [], removed: [] });
+        }
+      } catch { /* A malformed legacy row cannot stop the other sites or public routes. */ }
     }
   }
   touch(hash: string, now = this.host.now()) {
@@ -215,32 +251,39 @@ export class GodBuilds {
     for (const row of this.rows.values()) if (row.body.lead.tokenHash === hash && now - row.last_at > this.pauseMs / 4) {
       const body = structuredClone(row.body), paused = effective(row, now, this.pauseMs) === 'paused';
       if (paused) body.pauses++; delete body.paused; delete body.closureLiftedAt;
-      this.save(row, body, 'active', now, paused ? 'resumed' : 'alive');
+      const saved = this.save(row, body, 'active', now, paused ? 'resumed' : 'alive');
+      if (saved.ok) this.announce(saved.row, saved.kind, { added: [], removed: [] });
     }
   }
-  pause(id: string, raw: unknown) {
+  pause(id: string, raw: unknown, caller?: Identity) {
     this.sweep(); const p = buildActionSchemas.pause.safeParse(raw); if (!p.success) return schemaFailure(p.error); const row = this.row(id); if (!row) return fail('build.unknown', id);
-    if (!open(row)) return fail('build.closed', id); if (row.status === 'paused') return { ok: true as const, build: this.view(row, this.host.now()), replayed: true };
+    if (!open(row)) return fail('build.closed', id);
+    if (caller?.hash !== row.body.lead.tokenHash && p.data.lease !== row.body.lead.lease) return fail('build.lease', `${id} is led by ${row.body.lead.label}.`);
+    if (row.status === 'paused') return { ok: true as const, build: this.view(row, this.host.now()), replayed: true };
     const body = structuredClone(row.body); body.paused = { from: this.host.now(), seenAt: this.host.now(), explicit: true, ...p.data };
     // Never persist a submitted lease in the pause note.
     delete (body.paused as Record<string, unknown>).lease;
-    return this.save(row, body, 'paused', row.last_at, 'paused');
+    return this.savedView(this.save(row, body, 'paused', row.last_at, 'paused'));
   }
   resume(id: string, raw: unknown, caller: Identity) {
     const now = this.host.now(); this.sweep(now); const p = buildActionSchemas.resume.safeParse(raw); if (!p.success) return schemaFailure(p.error); const row = this.row(id); if (!row) return fail('build.unknown', id); if (!open(row)) return fail('build.closed', id);
     const replayed = p.data.lease === row.body.lead.lease || caller.hash === row.body.lead.tokenHash;
-    if (!replayed && effective(row, now, this.pauseMs) === 'active' && now - row.last_at <= this.pauseMs && !p.data.take) return fail('build.leased', `${row.body.lead.label} leads ${id}; quietFor=${now - row.last_at}ms, staleIn=${this.pauseMs - (now - row.last_at)}ms.`, 'build', { measured: { label: row.body.lead.label, quietFor: now - row.last_at, staleIn: this.pauseMs - (now - row.last_at) } });
+    if (!replayed && !row.body.paused?.explicit && now - row.last_at <= this.pauseMs && !p.data.take) return fail('build.leased', `${row.body.lead.label} leads ${id}; quietFor=${now - row.last_at}ms, staleIn=${this.pauseMs - (now - row.last_at)}ms.`, 'build', { measured: { label: row.body.lead.label, quietFor: now - row.last_at, staleIn: this.pauseMs - (now - row.last_at) } });
+    if (replayed && row.status === 'active' && row.last_at === now) {
+      const build = this.view(row, now); return { ok: true as const, build, lease: row.body.lead.lease, current: build.current, next: build.next, massing: build.massing, replayed: true };
+    }
     const body = structuredClone(row.body); if (effective(row, now, this.pauseMs) === 'paused') body.pauses++;
     if (!replayed) body.lead = { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now };
     if (!body.agents.some(a => a.hash8 === caller.hash.slice(0, 8))) body.agents = [...body.agents, { label: caller.label, hash8: caller.hash.slice(0, 8), at: now }].slice(-8);
-    delete body.paused; delete body.closureLiftedAt; const r = this.save(row, body, 'active', now, 'resumed');
+    const resumed = !replayed || effective(row, now, this.pauseMs) === 'paused';
+    delete body.paused; delete body.closureLiftedAt; const r = this.savedView(this.save(row, body, 'active', now, resumed ? 'resumed' : 'alive'));
     if (!r.ok) return r; return { ...r, lease: body.lead.lease, current: r.build.current, next: r.build.next, massing: r.build.massing, ...(replayed ? { replayed: true } : {}) };
   }
   done(id: string, raw: unknown, caller: Identity) {
     const now = this.host.now(); this.sweep(now); const p = buildActionSchemas.done.safeParse(raw); if (!p.success) return schemaFailure(p.error); const row = this.row(id); if (!row) return fail('build.unknown', id);
     if (row.status === 'done') return { ok: true as const, build: this.view(row, now), replayed: true }; if (!open(row)) return fail('build.closed', id);
     if (!p.data.force && this.liveClaims(row, now).length) return fail('build.claims-open', id);
-    const body = structuredClone(row.body); body.done = { at: now, byLabel: caller.label, ...(p.data.summary ? { summary: p.data.summary } : {}) }; return this.save(row, body, 'done', row.last_at, 'done');
+    const body = structuredClone(row.body); body.done = { at: now, byLabel: caller.label, ...(p.data.summary ? { summary: p.data.summary } : {}) }; return this.savedView(this.save(row, body, 'done', row.last_at, 'done'));
   }
   abandon(id: string, raw: unknown, undo: () => { accepted: boolean; reverted: number[]; notReverted: number[]; failures?: Failure[] }) {
     const now = this.host.now(); this.sweep(now); const p = buildActionSchemas.abandon.safeParse(raw); if (!p.success) return schemaFailure(p.error); let row = this.row(id); if (!row) return fail('build.unknown', id);
@@ -248,7 +291,7 @@ export class GodBuilds {
     if (!p.data.force && this.liveClaims(row, now).length) return fail('build.claims-open', id);
     const reverted = p.data.undo ? undo() : undefined;
     if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo stopped before all build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
-    row = this.row(id)!; const body = structuredClone(row.body); body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.save(row, body, 'abandoned', row.last_at, 'abandoned');
+    row = this.row(id)!; const body = structuredClone(row.body); body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
   }
   private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && now - c.lastAt <= this.pauseMs); }
   admit(field: BuildField | undefined, batch: Pick<Batch, 'group'>, _caller?: Identity): Admission {
@@ -262,19 +305,22 @@ export class GodBuilds {
     if (row.body.claims.some(c => c.status === 'held' && group === `${row.id}/${c.part}`)) return { warnings, failures: [buildFailure('build.group', `${group} belongs to a held claim.`)] };
     return { row, field, group, warnings };
   }
-  rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field?: BuildField) { return rootsDelta(before, after, diff, kind, field, [...this.rows.values()]); }
-  writes(admission: Admission, roots: RootsDelta, seq: number, at: number, caller?: Identity, group?: string): { writes: PlannedWrite[]; echo?: BuildEcho; warnings: string[] } {
+  rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field?: BuildField) { return rootsDelta(before, after, diff, kind, field, [...this.rows.values()], this.rootIndex); }
+  writes(admission: Admission, roots: RootsDelta, seq: number, at: number, caller?: Identity, group?: string, revert = false): { writes: PlannedWrite[]; echo?: BuildEcho; warnings: string[]; failures?: Failure[] } {
     const ids = new Set(roots.changes.keys()); if (admission.row) ids.add(admission.row.id);
     // Undo/redo refresh liveness for the group they actually reverted, without advancing progress.
     if (group) for (const r of this.rows.values()) if (group === r.id || group.startsWith(r.id + '/')) ids.add(r.id);
     const writes: PlannedWrite[] = [], warnings: string[] = []; let echo: BuildEcho | undefined;
     for (const id of [...ids].sort()) {
       const row = this.rows.get(id)!, field = admission.row?.id === id ? admission.field : undefined, change = roots.changes.get(id) ?? { added: [], removed: [] };
-      const body = advance(row.body, field, [], change, seq, at, caller, this.pauseMs), wasPaused = effective(row, at, this.pauseMs) === 'paused';
+      const body = advance(row.body, revert ? undefined : field, [], change, seq, at, caller, this.pauseMs), wasPaused = effective(row, at, this.pauseMs) === 'paused';
       let status = row.status, kind: BuildEventKind = 'step';
-      if (field) { status = body.done ? 'done' : 'active'; if (wasPaused) { body.pauses++; kind = 'resumed'; } if (body.done) kind = 'done'; if (field.done && !body.done) warnings.push(`${id} stays open: ${this.liveClaims(row, at).length} live claims (${this.liveClaims(row, at).map(c => c.part).join(', ')}); release them or build done --force`); }
-      const w: PlannedWrite = { id, expectRev: row.rev, status, lastAt: field || group && (group === id || group.startsWith(id + '/')) ? at : row.last_at, body: JSON.stringify(body), next: body, before: row, roots: change, kind, ...(field ? { echo: true } : {}) };
-      writes.push(w); if (field) echo = { id, status, rev: 0, group: admission.group!, step: { n: body.step.n, label: body.step.label } };
+      const groupLead = !!group && (group === id || group.startsWith(id + '/')) && caller?.hash === row.body.lead.tokenHash;
+      const refresh = !!field || groupLead;
+      if (refresh) { delete body.paused; delete body.closureLiftedAt; status = !revert && body.done ? 'done' : 'active'; if (wasPaused) { body.pauses++; kind = 'resumed'; } if (status === 'done') kind = 'done'; if (!revert && field?.done && !body.done) warnings.push(`${id} stays open: ${this.liveClaims(row, at).length} live claims (${this.liveClaims(row, at).map(c => c.part).join(', ')}); release them or build done --force`); }
+      const encoded = JSON.stringify(body), failure = buildBodyFailure(encoded); if (failure) return { writes: [], warnings, failures: [failure] };
+      const w: PlannedWrite = { id, expectRev: row.rev, status, lastAt: refresh ? at : row.last_at, body: encoded, next: body, before: row, roots: change, kind, ...(field ? { echo: true } : {}) };
+      writes.push(w); if (field) echo = { id, status, rev: 0, group: revert ? group : admission.group!, step: { n: body.step.n, label: body.step.label } };
     }
     return { writes, echo, warnings };
   }

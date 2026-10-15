@@ -287,3 +287,225 @@ test('bench: commitBatch 300 five-place batches with/without build plus 300 undo
   }
   console.log('BUILD_BENCH ' + JSON.stringify(summary));
 });
+
+// C1b adversarial-review regressions. Numbers match evidence/review-c1.json confirmed[].
+test('C1b #1: undo/redo validate the lease but never advance steps, batches or done', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  const build = f.field(s.lease, { step: 1 });
+  assertAccepted(f.god.act({ ops: [f.place('one')], build }));
+  const progress = body(f);
+  for (const action of ['undo', 'redo', 'undo'] as const) {
+    const result = (await f.req(`/v1/god/${action}`, { build: { ...build, step: 3, label: 'not built', done: true } })).data;
+    assertAccepted(result); assert.equal(result.build.group, f.god.store.edits()[0].grp);
+    const b = body(f); assert.deepEqual(b.step, progress.step); assert.deepEqual(b.steps, progress.steps);
+    assert.equal(b.lastEditAt, progress.lastEditAt); assert.equal(b.done, undefined); assert.equal(f.god.store.build('church')!.status, 'active');
+  }
+  assert.equal(code((await f.req('/v1/god/redo', { build: { ...build, lease: 'l_00000000' } })).data), 'build.lease');
+  assert.equal(code((await f.req('/v1/god/redo', { build: { id: 'church', claim: 'c_00000000' } })).data), 'build.claim-unknown');
+});
+
+test('C1b #2: receipt admission reserves the real SQL revision width and stays atomic', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start(), build = f.field(s.lease);
+  for (let i = 0; i < 12; i++) assertAccepted(f.god.act({ ops: [f.place(`p${i}`, i * 4 - 30)], build }));
+  let spare = 0;
+  f.god.finalizeAct = r => {
+    if (!r.accepted) return r;
+    const echo = { id: 'church', status: 'active', rev: 0, group: 'church', step: { n: 1, label: 'shell' } };
+    const base = Buffer.byteLength(JSON.stringify({ ...r, warnings: [...r.warnings, ''], build: echo }));
+    r.warnings.push('x'.repeat(GOD_EDIT_OUTCOME_BYTES - base - spare)); return r;
+  };
+  const before = f.god.store.build('church'), seq = f.god.model.editSeq;
+  const refused = f.god.act({ ops: [f.place('edge', 25)], build, clientRef: 'edge' }); assert.equal(code(refused), 'request.budget');
+  assert.deepEqual(f.god.store.build('church'), before); assert.equal(f.god.model.editSeq, seq); assert.equal(f.god.store.receipt('edge'), null); assert.equal(f.god.model.get('edge'), undefined);
+  spare = 15;
+  const accepted: any = f.god.act({ ops: [f.place('safe', 25)], build, clientRef: 'safe' }); assertAccepted(accepted);
+  assert.ok(accepted.build.rev >= 10); assert.ok(Buffer.byteLength(JSON.stringify(f.god.store.receipt('safe')!.result)) <= GOD_EDIT_OUTCOME_BYTES);
+});
+
+test('C1b #3: a lead group-only revert clears pause markers and emits the next closure lift', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  assertAccepted(f.god.act({ ops: [f.place('one')], build: f.field(s.lease) }));
+  f.advance(501); f.god.builds.sweep(); assert.ok(body(f).closureLiftedAt); assert.equal(f.god.builds.hasClosure(), false);
+  const caller = f.god.godIdentity(f.token)!;
+  assertAccepted(f.god.as({ identity: caller }, () => f.god.undo()));
+  assert.equal(f.god.store.build('church')!.status, 'active'); assert.equal(body(f).paused, undefined); assert.equal(body(f).closureLiftedAt, undefined);
+  assert.equal(f.god.builds.hasClosure(), true); f.advance(501); f.god.builds.sweep();
+  const lifts = f.emitted.filter((m): m is WorldBuildMessage => m.kind === 'world-build' && m.event === 'closure-lifted'); assert.equal(lifts.length, 2);
+  assert.ok(lifts[1].rev > lifts[0].rev); assert.equal(f.god.builds.publicList().builds[0].closed, false);
+});
+
+test('C1b #4: superseded leads cannot pause a live lease or enable an unrequested takeover', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  const next = (await f.req('/v1/god/builds/church/resume', { take: true }, f.other)).data;
+  const third = f.god.mintFor({ id: 'owner', role: 'user' }, 'third');
+  for (const auth of [f.token, third]) {
+    const result = (await f.req('/v1/god/builds/church/pause', { lease: s.lease, note: 'stale stop' }, auth)).data;
+    assert.equal(code(result), 'build.lease'); assert.equal(f.god.store.build('church')!.status, 'active');
+  }
+  assert.equal(code((await f.req('/v1/god/builds/church/resume', {}, third)).data), 'build.leased');
+  assertAccepted((await f.req('/v1/god/act', { ops: [f.place('still-lead')], build: f.field(next.lease) }, f.other)).data);
+  assert.equal((await f.req('/v1/god/builds/church/pause', { lease: next.lease }, third)).data.ok, true, 'current lease authorizes a deliberate handoff');
+  assert.equal((await f.req('/v1/god/builds/church/resume', {}, third)).data.ok, true);
+});
+
+test('C1b #5: non-lead field-less reverts and abandon undo never revive a quiet lead', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  for (let i = 0; i < 2; i++) assertAccepted(f.god.act({ ops: [f.place(`part-${i}`, i * 4)], build: f.field(s.lease) }));
+  f.advance(501); f.god.builds.sweep(); const before = f.god.store.build('church')!, lifted = body(f).closureLiftedAt;
+  for (const action of ['undo', 'redo'] as const) {
+    assertAccepted((await f.req(`/v1/god/${action}`, {}, f.other)).data);
+    assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(body(f).closureLiftedAt, lifted);
+    assert.equal(f.god.builds.publicList().builds[0].closed, false);
+  }
+  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'busy' } : null };
+  assert.equal(code((await f.req('/v1/god/builds/church/abandon', { undo: true }, f.other)).data), 'build.undo-incomplete');
+  assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(f.god.builds.hasClosure(), false);
+  assert.equal((await f.req('/v1/god/builds/church/resume', {}, f.other)).data.ok, true);
+});
+
+test('C1b #6: HTTP resume emits once for a transition and replays only refresh alive', async t => {
+  const f = fixture(); t.after(() => f.db.close()); await f.start(); f.advance(51);
+  const resumed = () => f.emitted.filter(m => m.kind === 'world-build' && m.event === 'resumed').length;
+  const first = (await f.req('/v1/god/builds/church/resume', {})).data; assert.equal(first.ok, true); assert.equal(resumed(), 1); assert.equal(body(f).pauses, 1);
+  const rev = f.god.store.build('church')!.rev;
+  assert.equal((await f.req('/v1/god/builds/church/resume', {})).data.replayed, true); assert.equal(resumed(), 1); assert.equal(f.god.store.build('church')!.rev, rev);
+  f.advance(1); assert.equal((await f.req('/v1/god/builds/church/resume', {})).data.ok, true); assert.equal(resumed(), 1); assert.equal(body(f).pauses, 1);
+  assert.equal((f.emitted.at(-1) as WorldBuildMessage).event, 'alive');
+});
+
+test('C1b #7: reverts of unrelated, ungrouped and grouped edits report the actual journal group', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start(), build = f.field(s.lease, { step: 9, done: true });
+  assertAccepted(f.god.act({ ops: [f.place('tracked')], build: f.field(s.lease) })); const before = body(f);
+  for (const group of ['misc', undefined]) {
+    assertAccepted(f.god.act({ ops: [f.place(group ?? 'ungrouped', group ? 100 : 110)], ...(group ? { group } : {}) }));
+    for (const action of ['undo', 'redo'] as const) {
+      const result = (await f.req(`/v1/god/${action}`, { build })).data; assertAccepted(result);
+      assert.equal(result.build.group, group); assert.equal(f.god.store.edits()[0].grp, group ?? null); assert.ok(!result.warnings.some((w: string) => /mapped/.test(w)));
+      assert.deepEqual(body(f).steps, before.steps); assert.deepEqual(body(f).step, before.step); assert.equal(body(f).done, undefined);
+    }
+  }
+  const undone = f.god.as({ identity: f.god.godIdentity(f.token)!, build }, () => f.god.undoGroup('church')); assert.equal(undone.accepted, true);
+  assert.deepEqual(body(f).steps, before.steps); assert.equal(f.god.store.build('church')!.status, 'active');
+});
+
+test('C1b #8: identical start replay refuses both done and abandoned records', async t => {
+  for (const close of ['done', 'abandon']) {
+    const f = fixture(); t.after(() => f.db.close()); await f.start(); await f.req(`/v1/god/builds/church/${close}`, {});
+    const replay = await f.start(); assert.equal(replay.ok, false); assert.equal(code(replay), 'build.closed'); assert.equal(replay.lease, undefined);
+  }
+});
+
+test('C1b #13: every build body write is bounded, leaves transition space and cannot wedge public sweeps', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const hugeStart = f.god.builds.start({ id: 'huge', title: 'Huge', steps: ['a'], site: { at: [100, 0], size: [10, 10] } }, { hash: 'a'.repeat(64), label: 'x'.repeat(65_536) });
+  assert.equal(code(hugeStart), 'build.limit'); assert.equal(f.god.store.build('huge'), null);
+  const s = await f.start(), row = f.god.store.build('church')!;
+  const seed = (bytes: number) => {
+    const b = body(f); b.plan.brief = ''; b.plan.brief = 'x'.repeat(bytes - Buffer.byteLength(JSON.stringify(b)));
+    const encoded = JSON.stringify(b); assert.equal(Buffer.byteLength(encoded), bytes);
+    f.db.db.prepare('UPDATE god_builds_v1 SET body=? WHERE world_id=? AND id=?').run(encoded, f.god.store.worldId, 'church');
+    (f.god.builds as any).rows.get('church').body = b;
+  };
+  seed(65_250);
+  for (const [action, data] of [['pause', { note: 'x'.repeat(1000) }], ['done', { summary: 'x'.repeat(1000) }]] as const) {
+    const out = await f.req(`/v1/god/builds/church/${action}`, data); assert.equal(out.status, 200); assert.equal(code(out.data), 'build.limit');
+    assert.equal(out.data.failures[0].field, 'build'); assert.ok(out.data.failures[0].measured > out.data.failures[0].limit);
+  }
+  const before = f.god.store.build('church');
+  const act = (await f.req('/v1/god/act', { ops: [f.place('overflow')], build: f.field(s.lease, { step: 2, label: '\u0001'.repeat(60) }), clientRef: 'overflow' })).data;
+  assert.equal(code(act), 'build.limit'); assert.deepEqual(f.god.store.build('church'), before); assert.equal(f.god.model.get('overflow'), undefined); assert.equal(f.god.store.receipt('overflow'), null);
+  // Store-level defenses cover direct saves and a caller bypassing the planner's size guard.
+  const write = { id: 'church', expectRev: row.rev, status: row.status, lastAt: row.last_at, body: JSON.stringify({ padding: 'x'.repeat(65_536) }) };
+  assert.equal(code(f.god.store.saveBuild(write)), 'build.limit');
+  assert.equal(code(f.god.store.saveBuild({ ...write, body: '{' })), 'build.limit', 'SQLite CHECK fallback is a refusal');
+  assert.equal(code(f.god.store.insertBuild('invalid', f.now(), '{')), 'build.limit');
+  seed(60_000); const writes = f.god.builds.writes.bind(f.god.builds);
+  for (const encoded of [write.body, '{']) {
+    f.god.builds.writes = (...args) => { const planned = writes(...args); for (const w of planned.writes) w.body = encoded; return planned; };
+    assert.equal(code(f.god.act({ ops: [f.place('store-overflow')], build: f.field(s.lease) })), 'build.limit');
+    assert.equal(f.god.model.get('store-overflow'), undefined);
+  }
+  f.god.builds.writes = writes;
+  // Simulate a pre-fix durable row without reserved space. It cannot prevent other rows transitioning.
+  seed(65_530); const other = await f.start({ id: 'other', site: { at: [100, 0], size: [10, 10] }, massing: [] }); assert.equal(other.ok, true);
+  f.advance(501);
+  for (const path of ['/v1/world/snapshot', '/v1/world/builds', '/v1/world/seq']) { const out = await f.req(path, undefined, null); assert.equal(out.status, 200, path); }
+  assert.ok(JSON.parse(f.god.store.build('other')!.body).closureLiftedAt);
+  assert.ok(f.god.store.build('church')!.body.length <= 65_536);
+  // A healthy row near the admission bound has enough room for both persisted lazy markers.
+  seed(65_260); f.god.builds.sweep(); assert.equal(f.god.store.build('church')!.status, 'paused'); assert.ok(body(f).closureLiftedAt);
+});
+
+function journalReads(f: ReturnType<typeof fixture>, work: () => void) {
+  const db = f.db.db as any, prepare = db.prepare.bind(db), reads: { sql: string; args: any[] }[] = [];
+  db.prepare = (sql: string) => new Proxy(prepare(sql), { get(target, key) {
+    const value = Reflect.get(target, key); if (typeof value !== 'function') return value;
+    return (...args: any[]) => { if ((key === 'all' || key === 'get') && /^SELECT/.test(sql) && sql.includes('world_edits_v1')) reads.push({ sql, args }); return value.apply(target, args); };
+  } });
+  try { work(); } finally { db.prepare = prepare; }
+  return reads;
+}
+function indexedReads(f: ReturnType<typeof fixture>, reads: ReturnType<typeof journalReads>, index: string) {
+  assert.ok(reads.length > 0);
+  for (const q of reads) {
+    const plan = f.db.db.prepare('EXPLAIN QUERY PLAN ' + q.sql).all(...q.args) as { detail: string }[];
+    assert.ok(plan.some(p => p.detail.includes(index)), JSON.stringify(plan));
+    assert.ok(!plan.some(p => /SCAN world_edits_v1/.test(p.detail)), JSON.stringify(plan));
+  }
+}
+
+test('C1b #14: group views use index seeks and small projections; status reads its journal once', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  assertAccepted(f.god.act({ ops: [f.place('one')], build: f.field(s.lease), note: 'first' }));
+  const insert = f.db.db.prepare("INSERT INTO world_edits_v1(world_id,seq,by,at,note,grp,ops,inverse,kind) VALUES(?,?,'god',0,?,?,?,?,'engine')");
+  f.db.db.exec('BEGIN'); for (let i = 2; i <= 1000; i++) insert.run(f.god.store.worldId, i, 'noise', i < 250 ? 'church/interior' : 'church-neighbour', '[]', 'not parsed'); f.db.db.exec('COMMIT');
+  f.db.db.prepare("UPDATE world_edits_v1 SET inverse='not parsed' WHERE world_id=? AND seq=1").run(f.god.store.worldId);
+  f.god.store.groupEditsUnder = () => { throw Error('views must not parse complete edit/inverse rows'); };
+  let view: any;
+  const list = journalReads(f, () => { view = f.god.builds.list().open[0]; }); indexedReads(f, list, 'world_edits_v1_grp_seq');
+  assert.equal(view.current.recent[0].note, 'first'); assert.ok(list.every(q => !/\bops\b|\binverse\b/.test(q.sql)));
+  let status: any;
+  const reads = journalReads(f, () => { status = f.god.builds.status('church'); }); indexedReads(f, reads, 'world_edits_v1_grp_seq'); assert.equal(reads.length, 1);
+  assert.equal(status.journal.length, 200); assert.ok(status.journal.every((e: any) => e.grp.startsWith('church/'))); assert.equal(status.build.current.recent[0].seq, 1, 'current notes survive >200 newer undo/engine rows');
+  assert.ok(!/\binverse\b/.test(reads[0].sql)); assert.deepEqual(status.journal[0].ops, { count: 0, kinds: [] });
+  const range = journalReads(f, () => { f.god.store.buildRecent('church', 1, 1000); f.god.store.hasGroupUnder('missing'); }); indexedReads(f, range, 'world_edits_v1_grp_seq');
+});
+
+test('C1b #15: touch and sweep skip unused views; route transitions share one view and massing one point pass', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const builds = f.god.builds as any, view = builds.view.bind(builds); let views = 0;
+  builds.view = (...args: any[]) => { views++; return view(...args); };
+  const s = await f.start({ massing: Array.from({ length: 8 }, (_, i) => ({ name: `m${i}`, at: [0, 0], size: [20, 20], h: 4 })) }); assert.equal(views, 1);
+  assertAccepted(f.god.act({ ops: [f.place('one')], build: f.field(s.lease) })); views = 0;
+  f.advance(14); f.god.builds.touch(f.god.godIdentity(f.token)!.hash); assert.equal(views, 0, 'alive write discards no view');
+  f.advance(501); f.god.builds.sweep(); assert.equal(views, 0, 'pause and closure lift discard no view');
+  const model = f.god.model, footprints = model.footprintsOf.bind(model); let points = 0;
+  model.footprintsOf = (...args) => { points++; return footprints(...args); };
+  const resumed = f.god.builds.resume('church', {}, f.god.godIdentity(f.token)!); assert.equal(resumed.ok, true); assert.equal(views, 1); assert.equal(points, 1);
+  assert.ok(resumed.ok && resumed.build.massing.every(m => m.parts === 1));
+});
+
+test('C1b #16: untracked root warnings use the root index for changed ids and ancestors once per build', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  assertAccepted(f.god.act({ ops: [f.place('root'), { ...f.place('child'), in: { parent: 'root' }, p: [0, 0] }], build: f.field(s.lease) }));
+  const row = (f.god.builds as any).rows.get('church'); row.body.roots.includes = () => { throw Error('linear root lookup'); };
+  const index = f.god.builds.rootIndex, get = index.get.bind(index); let lookups = 0;
+  index.get = id => { lookups++; return get(id); };
+  const result = f.god.act({ ops: [{ op: 'set', id: 'root/child', name: 'renamed' }] }); assertAccepted(result);
+  assert.equal(result.accepted && result.warnings.filter(w => w.includes('progress not recorded')).length, 1);
+  assert.ok(lookups <= 4, `bounded ancestor lookups: ${lookups}`);
+});
+
+test('C1b #17: empty and mixed undo stacks seek the partial index instead of scanning history', t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const insert = f.db.db.prepare("INSERT INTO world_edits_v1(world_id,seq,by,at,grp,ops,inverse,undone,kind) VALUES(?,?,'god',0,'noise','[]','[]',?,?)");
+  f.db.db.exec('BEGIN'); for (let i = 1; i <= 2000; i++) insert.run(f.god.store.worldId, i, 1, i % 3 ? 'edit' : 'undo'); insert.run(f.god.store.worldId, 2001, 0, 'engine'); f.db.db.exec('COMMIT');
+  let reads = journalReads(f, () => { assert.equal(f.god.store.undoable(), null); assert.equal(f.god.store.redoable(), null); }); indexedReads(f, reads, 'world_edits_v1_stack');
+  for (const [seq, kind] of [[2002, 'edit'], [2003, 'redo'], [2004, 'undo']] as const) insert.run(f.god.store.worldId, seq, 0, kind);
+  assert.equal(f.god.store.undoable()!.seq, 2003); assert.equal(f.god.store.redoable()!.seq, 2004);
+  const clear = "UPDATE world_edits_v1 INDEXED BY world_edits_v1_stack SET undone=1 WHERE world_id=? AND kind='undo' AND undone=0";
+  const plan = f.db.db.prepare('EXPLAIN QUERY PLAN ' + clear).all(f.god.store.worldId) as { detail: string }[]; assert.ok(plan.some(p => p.detail.includes('world_edits_v1_stack')));
+  f.db.db.prepare(clear).run(f.god.store.worldId); assert.equal(f.god.store.redoable(), null);
+  f.db.db.prepare("UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND kind IN ('edit','redo')").run(f.god.store.worldId);
+  reads = journalReads(f, () => { assert.equal(f.god.store.undoable(), null); }); indexedReads(f, reads, 'world_edits_v1_stack');
+});
