@@ -80,6 +80,22 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
 
+## Done means done (the stopping rule)
+
+The owner is waiting; a fast, honest, complete answer beats an endlessly polished one.
+
+1. **List what was asked** before you build: each named thing, each material or colour, each use ("walk in", "sit").
+   That list is your definition of done; nothing else is.
+2. **Show a first look early**: as soon as the main form stands, `look` and tell the owner.
+3. **Verify the uses with the world, not by inspection**: `verify-use <thing> [--seat <seat>] [--from <place>]`
+   sends a temporary probe resident to walk in and sit, and returns a receipt (ok, or what failed and why). `describe`
+   and `where` only show bounding boxes; they cannot tell you whether a body fits through a door.
+4. **Stop when every listed item exists and `verify-use` is ok** for every asked-for use. Report then. Put further
+   ideas (night lighting tweaks, extra furniture, colour variations) in your report as offers instead of doing them.
+5. **Never wait for the world clock** (a service, nightfall, residents arriving): it runs in real time. To see night
+   lighting, `time 21:00`, look, then set the time back; to prove use, run `verify-use`.
+6. If something asked for cannot be done here, say so and stop; do not substitute silently.
+
 ## Choosing how to make something
 
 Match the request, not a habit. Every route below is ordinary, editable, undoable god content.
@@ -309,6 +325,8 @@ day is a Saturday.
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
   before judging the build: `look --keep` (a kept browser) has been seen to capture the default view
   instead of the requested one; if so, look again without `--keep` (`look --stop` closes the browser).
+- `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; ok/failed receipt
+  (about 10–60 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
@@ -329,16 +347,28 @@ define-kit '{"name":"birdbath","tags":["garden","prop"],"shapes":[
   {"kind":"lathe","at":[0,0.8,0],"profile":[[0,0],[0.45,0.05],[0.5,0.15],[0.1,0.1]],"material":"stone"}]}'
 place birdbath@1 --near garden
 ```
-The def's frame: metres, y = 0 is the ground it stands on, +y up, its front faces +z. For box, rbox, cyl,
-cone, capsule, sphere, wedge, arch, ring and torus, **`at` is the shape's centre**: a 1 m box standing on
-the ground is `"at":[0,0.5,0]` (at y 0 it is half buried). lathe (profile `[[radius, y], …]` revolved, ≥ 2
-points), extrude (polygon `[[x, z], …]` raised `h`) and sweep (radius `r` along a 3-D path) are drawn from
-`at` upward/outward. Each shape also takes `size` or `r`/`h` (`r2` = top radius of a cyl, tube of a
-torus), `yaw`/`pitch`/`roll`, `scale`, `segments` (≤ 16), `material` or `color`, optional `tint` (a palette
-key the instance can recolour), `when` (show only for a param/state value), `collide`, `role` (creature
-parts and doors/lids/flames animate by role) and `gait` on the kit. `describe` prints the placed bounds
-(`y -0.5…0.5` means half below ground). To change a kit you already placed, define it again under the
-same name and version: every placed copy updates, the server re-checks each one (and refuses, naming the copy,
+**See every primitive before you design: open `<world>/god/kit-primitives.png`** (one render of each primitive at
+yaw/pitch/roll 0 with its axes: red = +x east, blue = +z front/south, white dot = `at`). The def's frame: metres,
+y = 0 is the ground it stands on, +y up, front faces +z.
+
+| primitive | at yaw/pitch/roll 0 |
+|---|---|
+| box, rbox | centred on `at`; `size` = [x, y, z]; rbox edges rounded (`round` 0.04; `0` halves the triangles) |
+| cyl, cone, capsule | axis +y, centred; cyl `r` bottom / `r2` top; cone tip up; capsule `h` + 2·`r` tall |
+| sphere | centred |
+| wedge | a ramp: low edge at the front (+z), tall face at the back (−z); `size` = [width x, height y, depth z] |
+| arch | stands in the x–y plane, opening along z (walk through it front to back); legs reach `at.y − h/2` |
+| ring / torus | ring lies flat (x–z); torus stands upright in x–y facing ±z |
+| lathe | profile `[[radius, y], …]` (≥ 2 points) revolved about +y, measured up from `at` |
+| extrude | top-view polygon `[[x, z], …]` raised from `at.y` by `h`; **`"pitch": -1.5708` stands it upright** (its +z becomes +y: a lancet panel); `+1.5708` sends it into the ground |
+| sweep | a tube of radius `r` along a 3-D `path`, relative to `at` |
+
+So a 1 m box standing on the ground is `"at":[0,0.5,0]` (at y 0 it is half buried). Each shape also takes `yaw`/`pitch`/
+`roll`, `scale`, `segments` (≤ 16), `material` or `color`, optional `tint` (a palette key the instance can recolour),
+`when` (show only for a param/state value), `collide`, `role` (creature parts and doors/lids/flames animate by role) and
+`gait` on the kit. Rotated shapes get a conservative (larger) collider box: give decorative tilted parts
+`"collide": false`. `describe` prints the placed bounds (`y -0.5…0.5` means half below ground). To change a
+kit you already placed, define it again under the same name and version: every placed copy updates, the server re-checks each one (and refuses, naming the copy,
 if it no longer fits), and `undo` restores the previous version. A new `"version": 2` keeps the old copies as they
 are; use it when only new copies should change.
 
@@ -380,9 +410,12 @@ Souls act on **declared affordances**, not on appearance. What exists today:
 Honest limits: **lying in a bed is not reliable today** (a Soul may lie beside the mattress); Souls do
 **not ride** anything that moves (a ferris wheel, a cart, an animated platform is scenery to them); nobody
 climbs onto roofs, kit tops or slopes without a floor or slot; a kit's look (a "bench" made of boxes)
-offers nothing unless it declares the slot. `describe` and reachability are good signs, not proof: the
-proof is a Soul doing it. When you report a build, say which uses you checked and how, and name any
-requested use that is only decorative.
+offers nothing unless it declares the slot. `describe` and reachability are good signs, not proof. **Proof is
+`verify-use <thing> [--seat <seat>] [--from <place>] [--uses enter,sit]`**: the server sends a temporary probe
+resident (it never thinks and is removed afterwards) to walk in from `--from` (default: just outside the main door)
+and sit, and answers with a receipt per use — ok, or what failed and why (`verify.no-seat`, `verify.timeout`,
+`verify.refused` with the engine's reason). When you report a build, quote the receipt, and name any requested use
+that is only decorative.
 
 ## Submitting, previewing and recovering
 
