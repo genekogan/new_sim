@@ -20,10 +20,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Context, Hono } from 'hono';
-import type { Baked, LocalOBB, Link, Opening, Room, Slot, Surface, Vec2, Vec3 } from '@sim/generators';
+import type { Baked, Vec2, Vec3 } from '@sim/generators';
 import type { AssetInfo, AssetLookup, StoredDef } from '@sim/world-compiler';
 import { vocab } from '@sim/world-compiler';
-import { CREATION_LIMITS as L } from '@sim/generators';
+import { CREATION_LIMITS as L, assertFootprint, footprintToBaked, type LmFootprint } from '@sim/generators';
 import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -235,117 +235,10 @@ export async function validateGlb(buf: Uint8Array, json?: GltfJson): Promise<str
 
 // ---------------------------------------------------------------- footprints
 
-type LmFootprint = {
-  schema: 'lm-building-footprint/1'; id?: string; name?: string;
-  bounds?: { min: Vec3; max: Vec3 };
-  levels?: { id: number; y: number; label?: string }[];
-  rooms?: { id: string; label?: string; level: number; y0: number; y1: number; clearHeight?: number; polygon: Vec2[] }[];
-  terraces?: { id: string; level: number; y: number; polygon: Vec2[]; hole?: Vec2[] }[];
-  obstacles?: { id: string; kind: string; obb: { c: Vec2; half: Vec2; yaw: number }; y0: number; y1: number }[];
-  portals?: { id: string; kind: 'door' | 'window' | 'shaft'; level: number; center: Vec3; normal?: Vec3; width?: number; diameter?: number; y0: number; y1: number }[];
-  links?: { id: string; kind: string; width: number; from: { level: number; y: number }; to: { level: number; y: number }; path: Vec3[] }[];
-};
+// XP5: the pure converter is shared with kit/2; asset imports retain this public export.
+export { footprintToBaked } from '@sim/generators';
 
-const centroid = (poly: Vec2[]): Vec2 => { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [x / poly.length, z / poly.length]; };
-/** Reduce a polygon to ≤ max points (slot schema limit) by even subsampling; rooms keep their exact polygon. */
-const thin = (poly: Vec2[], max = 64): Vec2[] => (poly.length <= max ? poly : Array.from({ length: max }, (_, i) => poly[Math.floor((i * poly.length) / max)]));
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
-
-/** Check source values before arithmetic can coerce null/strings into numbers. */
-function assertFootprint(value: unknown): asserts value is LmFootprint {
-  const object = (v: unknown, field: string): Record<string, unknown> => {
-    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(`${field} must be an object`);
-    return v as Record<string, unknown>;
-  };
-  const number = (v: unknown, field: string): number => {
-    if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`${field} must be a finite number`);
-    return v;
-  };
-  const positive = (v: unknown, field: string) => { if (!(number(v, field) > 0)) throw new Error(`${field} must be greater than 0`); };
-  const text = (v: unknown, field: string) => { if (typeof v !== 'string' || !v.length) throw new Error(`${field} must be a nonempty string`); };
-  const vector = (v: unknown, length: number, field: string): number[] => {
-    if (!Array.isArray(v) || v.length !== length) throw new Error(`${field} must have exactly ${length} numeric coordinates`);
-    v.forEach((n, i) => number(n, `${field}.${i}`)); return v;
-  };
-  const points = (v: unknown, length: number, min: number, field: string) => {
-    if (!Array.isArray(v) || v.length < min) throw new Error(`${field} needs at least ${min} points`);
-    v.forEach((p, i) => vector(p, length, `${field}.${i}`));
-  };
-  const fp = object(value, 'footprint');
-  if (fp.schema !== 'lm-building-footprint/1') throw new Error('footprint schema must be lm-building-footprint/1');
-  for (const key of ['id', 'name']) if (fp[key] !== undefined) text(fp[key], `footprint.${key}`);
-  if (fp.bounds !== undefined) {
-    const bounds = object(fp.bounds, 'bounds'), min = vector(bounds.min, 3, 'bounds.min'), max = vector(bounds.max, 3, 'bounds.max');
-    if (min.some((n, i) => n > max[i])) throw new Error('bounds.max must be ≥ bounds.min');
-  }
-  for (const key of ['levels', 'rooms', 'terraces', 'obstacles', 'portals', 'links']) {
-    const entries = fp[key];
-    if (entries === undefined) continue;
-    if (!Array.isArray(entries)) throw new Error(`${key} must be an array`);
-    for (const [i, raw] of entries.entries()) {
-      const field = `${key}.${i}`, entry = object(raw, field);
-      if (key === 'levels') number(entry.id, `${field}.id`); else text(entry.id, `${field}.id`);
-      if (entry.label !== undefined) text(entry.label, `${field}.label`);
-      if (['rooms', 'terraces', 'portals'].includes(key)) number(entry.level, `${field}.level`);
-      if (key === 'levels' || key === 'terraces') number(entry.y, `${field}.y`);
-      if (['rooms', 'obstacles', 'portals'].includes(key)) {
-        const y0 = number(entry.y0, `${field}.y0`), y1 = number(entry.y1, `${field}.y1`);
-        if (!(y1 > y0)) throw new Error(`${field}.y1 must exceed y0`);
-      }
-      if (key === 'rooms' || key === 'terraces') points(entry.polygon, 2, 3, `${field}.polygon`);
-      if (key === 'rooms' && entry.clearHeight !== undefined) positive(entry.clearHeight, `${field}.clearHeight`);
-      if (key === 'terraces' && entry.hole !== undefined) points(entry.hole, 2, 3, `${field}.hole`);
-      if (key === 'obstacles') {
-        const obb = object(entry.obb, `${field}.obb`); text(entry.kind, `${field}.kind`);
-        vector(obb.c, 2, `${field}.obb.c`); vector(obb.half, 2, `${field}.obb.half`).forEach((n, j) => positive(n, `${field}.obb.half.${j}`)); number(obb.yaw, `${field}.obb.yaw`);
-      }
-      if (key === 'portals') {
-        if (!['door', 'window', 'shaft'].includes(entry.kind as string)) throw new Error(`${field}.kind must be door, window or shaft`);
-        vector(entry.center, 3, `${field}.center`); if (entry.normal !== undefined) vector(entry.normal, 3, `${field}.normal`);
-        for (const dimension of ['width', 'diameter']) if (entry[dimension] !== undefined) positive(entry[dimension], `${field}.${dimension}`);
-      }
-      if (key === 'links') {
-        text(entry.kind, `${field}.kind`); positive(entry.width, `${field}.width`); points(entry.path, 3, 2, `${field}.path`);
-        for (const end of ['from', 'to']) { const endpoint = object(entry[end], `${field}.${end}`); number(endpoint.level, `${field}.${end}.level`); number(endpoint.y, `${field}.${end}.y`); }
-      }
-    }
-  }
-}
-
-/**
- * `lm-building-footprint/1` → Baked physics in the def frame (metres, +y up, front +z, origin at the base centre).
- * Obstacle yaws are negated: the engine's rot2 turns counter-clockwise from above, the compiler's OBBs clockwise.
- * `k` scales every length (a def that states a different height than the asset).
- */
-export function footprintToBaked(fp: LmFootprint, k = 1): FootprintBaked {
-  assertFootprint(fp);
-  if (!(Number.isFinite(k) && k > 0)) throw new Error('footprint scale must be positive and finite');
-  const finite = (value: unknown, path: string): void => {
-    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(`${path} must be finite`);
-    if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) finite(child, `${path}.${key}`);
-  };
-  finite(fp, 'footprint');
-  const s2 = (p: Vec2): Vec2 => [r4(p[0] * k), r4(p[1] * k)];
-  const colliders: LocalOBB[] = (fp.obstacles ?? []).map((o) => ({ c: s2(o.obb.c), half: s2(o.obb.half), yaw: -o.obb.yaw, y0: r4(o.y0 * k), y1: r4(o.y1 * k), tag: o.id }));
-  const rooms: Room[] = (fp.rooms ?? []).map((r) => { const poly = r.polygon.map(s2); return { id: r.id.toLowerCase().replace(/[^a-z0-9._-]+/g, '-'), name: r.label ?? r.id, floor: r.level, y: r4(r.y0 * k), polygon: poly, origin: centroid(poly).map(r4) as Vec2, yaw: 0, height: r4((r.y1 - r.y0) * k) }; });
-  const surfaces: Surface[] = [
-    ...rooms.map((r) => ({ level: r.floor, y: r.y, polygon: r.polygon, tag: r.id })),
-    ...(fp.terraces ?? []).map((t) => ({ level: t.level, y: r4(t.y * k), polygon: t.polygon.map(s2), tag: t.id })),
-  ];
-  const openings: Opening[] = (fp.portals ?? []).filter((p) => p.kind !== 'shaft').map((p) => {
-    const floorY = fp.levels?.find((l) => l.id === p.level)?.y ?? 0, n = p.normal ?? [0, 0, 1];
-    return { id: p.id, kind: p.kind as 'door' | 'window', at: s2([p.center[0], p.center[2]]), yaw: r4(Math.atan2(n[0], n[2])), width: r4((p.width ?? 1) * k), height: r4((p.y1 - p.y0) * k), sill: r4(Math.max(0, p.y0 - floorY) * k), level: p.level, state: 'always' as const };
-  });
-  const links: Link[] = (fp.links ?? []).map((l) => ({ id: l.id, kind: (['stairs', 'ramp', 'ladder', 'float'].includes(l.kind) ? l.kind : 'float') as Link['kind'], from: l.from.level, to: l.to.level, path: l.path.map((p) => s2([p[0], p[2]])), width: r4(l.width * k), y0: r4(l.from.y * k), y1: r4(l.to.y * k) }));
-  const slots: Slot[] = rooms.map((r) => ({ id: r.id, kind: 'room', p: [r.origin[0], r.y, r.origin[1]], yaw: 0, floor: r.floor, polygon: thin(r.polygon.map(([x, z]) => [r4(x - r.origin[0]), r4(z - r.origin[1])] as Vec2)), height: r.height, accepts: {}, capacity: 64, label: r.name }));
-  const b = fp.bounds ?? { min: [0, 0, 0], max: [0, 0, 0] };
-  const box: Vec3 = [r4((b.max[0] - b.min[0]) * k), r4((b.max[1] - b.min[1]) * k), r4((b.max[2] - b.min[2]) * k)];
-  if (box.some(v => !Number.isFinite(v) || v < 0)) throw new Error('footprint bounds must be finite with max ≥ min');
-  if (colliders.some(c => c.half.some(v => !Number.isFinite(v) || v <= 0) || !(c.y1 > c.y0))) throw new Error('footprint obstacles need positive half sizes and y1 > y0');
-  finite({ colliders, rooms, surfaces, openings, links, slots }, 'footprint');
-  const shafts = (fp.portals ?? []).filter((p) => p.kind === 'shaft').length;
-  return { box, colliders, surfaces, openings, links, rooms, slots, notes: [`footprint ${fp.id ?? ''}: ${rooms.length} rooms, ${openings.length} openings, ${links.length} links (${shafts} shafts, float-only), ${colliders.length} wall/solid colliders`] };
-}
 
 /** The same footprint at `k` times the size (an import that states a different height than the model's own). */
 export function scaleFootprint(fp: LmFootprint, k: number): LmFootprint {

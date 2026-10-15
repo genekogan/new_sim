@@ -203,6 +203,8 @@ export function assignNearest(w: WorldState, actors: string[], slots: Slot[]): {
 export const APPROACH_GAPS = [0.35, 0.4, 0.45, 0.5] as const;
 /** Side approaches of a god-built seat (a boat's), tried after front and back: the gap may span a little water. */
 export const SIDE_GAPS = [0.35, 0.5, 0.7, 0.9] as const;
+/** XP5: include the clearance of a diagonal integral bench's conservative yaw box. */
+const SLOT_APPROACH_GAPS = [0.35, 0.5, 0.75, 1.5] as const;
 /** Clearance an approach point needs: the body radius plus 2 cm, so the walk goal never snaps. */
 export const APPROACH_CLEARANCE = HUMAN_RADIUS + 0.02;
 
@@ -243,12 +245,13 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   const g = sp?.levelAt(s.level, c);
   const local = rot2(sub2(s.p, c), -e.pose.yaw);
   const half: Vec2 = [d.size[0] / 2, d.size[2] / 2];
+  const gaps = d.seatApproach === 'slot' ? SLOT_APPROACH_GAPS : APPROACH_GAPS; // XP5 opt-in hook; older fixtures retain their exact path.
   const tried: { p: Vec2; cl: number }[] = [];
   for (const side of [1, -1]) {
     const yawL = s.yaw - e.pose.yaw + (side < 0 ? Math.PI : 0);
     const u: Vec2 = [dcos(yawL), dsin(yawL)];
-    const edge = edgeDistance(local, u, half);
-    for (const gap of APPROACH_GAPS) {
+    const edge = d.seatApproach === 'slot' ? 0 : edgeDistance(local, u, half);
+    for (const gap of gaps) {
       const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
       const cl = g ? clearanceAt(g, p) : Infinity;
       if (cl >= APPROACH_CLEARANCE) return p;
@@ -260,7 +263,7 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   if (e.tags?.includes('entity-world')) for (const side of [1, -1]) {
     const yawL = s.yaw - e.pose.yaw + side * Math.PI / 2;
     const u: Vec2 = [dcos(yawL), dsin(yawL)];
-    const edge = edgeDistance(local, u, half);
+    const edge = d.seatApproach === 'slot' ? 0 : edgeDistance(local, u, half);
     for (const gap of SIDE_GAPS) {
       const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
       if ((g ? clearanceAt(g, p) : Infinity) >= APPROACH_CLEARANCE) return p;
@@ -277,7 +280,7 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   const bf = blocker(front.p), bb = blocker(back.p);
   return {
     code: 'slot.unreachable',
-    message: `${s.id} cannot be sat on: no standing room ${APPROACH_GAPS[0]}–${APPROACH_GAPS[APPROACH_GAPS.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${APPROACH_CLEARANCE.toFixed(2)} m`,
+    message: `${s.id} cannot be sat on: no standing room ${gaps[0]}–${gaps[gaps.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${APPROACH_CLEARANCE.toFixed(2)} m`,
     subjects: [s.id, s.owner, ...new Set([bf, bb].filter((x): x is string => !!x))],
     at: [front.p[0], 0, front.p[1]],
   };

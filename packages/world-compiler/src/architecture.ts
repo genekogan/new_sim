@@ -46,10 +46,11 @@ function approach(w: WorldModel, e: Entity, baked: Baked, door: Opening) {
 function blocked(w: WorldModel, e: Entity, baked: Baked, door: Opening, index: RouteIndex): boolean {
   const {at, yaw, half, depth, radius, corridor} = approach(w, e, baked, door);
   const polys: Vec2[][] = [];
+  const def = w.resolvedDef(e.def), ownKit = def?.make.kind === 'gen' && def.make.gen === 'kit/2' && !!def.make.args?.footprint; // XP5 hook
   // Surface generators can carry solid rails/posts too (the engine bridge collides with them),
   // although the compiler's placement-overlap hash indexes only the solid layer.
   for (const id of new Set([...w.near([corridor]), ...index.surfaces.near([corridor])])) {
-    if (id === e.id) continue; // the building's own split walls and lintels are already design-checked
+    if (id === e.id && !ownKit) continue; // XP5: combine a kit's posts/walls with new external obstructions.
     const other = w.entities.get(id);
     if (other && w.resolvedDef(other.def)?.components.body) continue; // residents are transient, not construction
     const surface = other && w.resolvedDef(other.def)?.layer === 'surface';

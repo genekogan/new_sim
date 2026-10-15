@@ -2,7 +2,7 @@
 // terrain. Pure data + lookups; no I/O. The server persists it; the god skill
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
-import { CREATION_LIMITS, GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
+import { CREATION_LIMITS, GENERATORS, mergeKitSlots, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
@@ -222,7 +222,7 @@ export class WorldModel {
       baked = { box: def.size.box, colliders: [], slots: [], tris: 0 };
     }
     // Def-declared slots and components win over generator output.
-    if (def.slots.length) baked = { ...baked, slots: def.slots };
+    if (def.slots.length) baked = { ...baked, slots: m.kind === 'gen' && m.gen === 'kit/2' && m.args?.footprint ? mergeKitSlots(baked.slots, def.slots) : def.slots }; // XP5: retain room frames beside authored seats.
     if (def.components.landform) baked = { ...baked, landform: def.components.landform };
     if (def.components.water) baked = { ...baked, water: def.components.water };
     // VOCAB-MECH: the stretch convention (params sx/sy/sz, when the def declares them) scales the physics with the picture

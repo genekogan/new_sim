@@ -8,6 +8,7 @@ import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
 import { CREATION_LIMITS } from './creation-limits.ts';
 // K2 hook: authored programs share one expansion path with the viewer.
 import { expandKitProgram, withKitPrograms } from './kit-program.ts';
+import { kitFootprint, kitFootprintSchema } from './kit-footprint.ts'; // XP5 hook
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep', 'loft'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -167,6 +168,7 @@ export const plainKitArgs = z.object({
   /** Contract 1 (default) retains the shipped look. Contract 2 opts into arc, glow levels, finishes and outlines. */
   v: z.union([z.literal(1), z.literal(2)]).default(1),
   shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitExpandedShapes),
+  footprint: kitFootprintSchema.optional(), // XP5: authored metadata survives program expansion.
   slots: z.array(slotSchema).max(64).optional(),
   /** Override the computed bounds (rarely needed). */
   box: v3.optional(),
@@ -334,8 +336,8 @@ export function kitPhysics(input: unknown, params: Record<string, unknown> = {})
   if (!Number.isFinite(x0)) { x0 = y0 = z0 = -0.5; x1 = y1 = z1 = 0.5; }
   const box: Vec3 = args.box ?? [Math.max(0.01, x1 - x0), Math.max(0.01, y1 - Math.min(0, y0)), Math.max(0.01, z1 - z0)];
   // merge colliders into one when there are many small ones (keeps the spatial index lean)
-  const merged = !tilted && colliders.length > CREATION_LIMITS.uprightKitMergeThreshold ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: args.v === 2 ? y0 : Math.max(0, y0), y1 }] : colliders;
-  return { box, colliders: merged, slots: args.slots ?? [], tris };
+  const merged = !args.footprint && !tilted && colliders.length > CREATION_LIMITS.uprightKitMergeThreshold ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: args.v === 2 ? y0 : Math.max(0, y0), y1 }] : colliders;
+  return kitFootprint(args.footprint, { box, colliders: merged, slots: args.slots ?? [], tris }, { min: [x0, 0, z0], max: [x1, y1, z1] }); // XP5 hook
 }
 
 export const kitGen: Generator = {
