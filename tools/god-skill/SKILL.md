@@ -364,6 +364,11 @@ place birdbath@1 --near garden
 yaw/pitch/roll 0 with its axes: red = +x east, blue = +z front/south, white dot = `at`). The def's frame: metres,
 y = 0 is the ground it stands on, +y up, front faces +z.
 
+Kit programs add `repeat`, `radial`, `mirror`, `from`/`to`, `arch.pointed`, `outline:"lancet"` and numeric `$params` arithmetic. Use declared numeric defaults and `box:[w,h,d]` with `define-kit`. Limits: 96 authored entries, 512 expanded shapes, 80k tris. Snippets and field details: `<world>/god/examples/kit-helpers.mjs` (`limb`/`mirror` too).
+```json
+{"kind":"box","at":[0,"$height/2",0],"size":[1,"$height",1],"repeat":{"n":3,"step":[2,0,0]}}
+```
+
 | primitive | at yaw/pitch/roll 0 |
 |---|---|
 | box, rbox | centred on `at`; `size` = [x, y, z]; rbox edges rounded (`round` 0.04; `0` halves the triangles) |

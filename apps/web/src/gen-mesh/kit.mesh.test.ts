@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
-import { kitArgs, kitPhysics, KIT_PRIMITIVES, type KitArgs } from '@sim/generators';
+import { kitArgs, kitPhysics, KIT_PRIMITIVES, type KitProgramArgs } from '@sim/generators';
 import { buildKit } from './kit.mesh.ts';
 import { MaterialLib } from './materials.ts';
 import { animate } from './motion.ts';
@@ -13,10 +13,10 @@ import examples from '../../../../tools/god-skill/scripts/gallery-language-examp
 const square = [[-2, -2], [2, -2], [2, 2], [-2, 2]];
 const hole = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
 const shapes = (s: Record<string, unknown>[], v = 2, extra = {}) => kitArgs.parse({ v, round: 0, shapes: s.map(sh => ({ at: [0, 0, 0], ...sh })), ...extra });
-const draw = (a: KitArgs, params: Record<string, unknown> = {}) => buildKit(a, { materials: new MaterialLib(), tint: (key, fallback) => key === 'test' ? '#00ff00' : fallback, params, state: {} });
+const draw = (a: KitProgramArgs, params: Record<string, unknown> = {}) => buildKit(a, { materials: new MaterialLib(), tint: (key, fallback) => key === 'test' ? '#00ff00' : fallback, params, state: {} });
 const meshes = (o: THREE.Object3D) => { const m: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[] = []; o.traverse(n => { if ((n as THREE.Mesh).isMesh) m.push(n as never); }); return m; };
 const tris = (o: THREE.Object3D) => meshes(o).reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.attributes.position.count) / 3, 0);
-function signature(a: KitArgs, params = {}) {
+function signature(a: KitProgramArgs, params = {}) {
   const o = draw(a, params), hash = createHash('sha256'); o.updateMatrixWorld(true);
   o.traverse(n => { hash.update(JSON.stringify({ name: n.name, matrix: n.matrixWorld.elements, gait: n.userData.gait })); });
   for (const m of meshes(o)) {
@@ -128,6 +128,8 @@ test('seeded field fuzz: each geometry field changes the mesh for its supported 
     const base = shapesForKind({ kind, polygon: square, top: hole, ...(kind === 'sweep' ? { profile: hole } : {}), segments: 6 });
     const next = { ...base, [field]: value, at: [seed % 3, 0, 0] };
     if (kind === 'sweep' && field === 'profile') next.profile = square;
+    // K2 adds polygonal arches; their polygon replaces the round arch's segment control.
+    if (kind === 'arch' && field === 'polygon') { delete base.segments; delete next.segments; }
     const parsed = kitArgs.safeParse({ v: 2, round: 0, shapes: [next] });
     if (!parsed.success) { assert.ok(parsed.error.issues.some(i => i.path.at(-1) === field && /fix:/.test(i.message)), `${kind}.${field}: ${parsed.error}`); continue; }
     assert.notEqual(signature(shapes([{ ...base, at: next.at }])), signature(parsed.data), `${kind}.${field}`);

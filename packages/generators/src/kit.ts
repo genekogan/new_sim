@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { materialEnum, num, slotSchema, v2, v3 } from './fields.ts';
 import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
 import { CREATION_LIMITS } from './creation-limits.ts';
+// K2 hook: authored programs share one expansion path with the viewer.
+import { expandKitProgram, withKitPrograms } from './kit-program.ts';
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep', 'loft'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -86,6 +88,8 @@ const outlinesCross = (a: Point2[], b: Point2[]) => a.some((p, i) => b.some((q, 
 /** An upper bound on rendered triangles, including caps, holes, bevels and path subdivisions. */
 export function kitShapeTriangles(sh: KitShape, round: number, v = 1): number {
   const seg = sh.segments ?? 10, r = sh.round ?? (v === 2 && sh.kind === 'rbox' ? Math.max(round, 0.06) : round);
+  // K2's pointed ribbon is a polygonal extrusion in either viewer contract.
+  if (sh.kind === 'arch' && sh.polygon) return sh.polygon.length * 4 - 4;
   if (v === 1) return sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
   switch (sh.kind) {
     case 'box': return r > 0.005 ? 44 : 12;
@@ -119,7 +123,7 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
       box: ['size', 'round'], rbox: ['size', 'round', 'segments'], wedge: ['size', 'round'],
       cyl: ['r', 'r2', 'h', 'segments', 'arc'], cone: ['r', 'h', 'segments', 'arc'], capsule: ['r', 'h', 'segments'],
       sphere: ['r', 'segments', 'arc'], ring: ['r', 'r2', 'segments', 'arc'], torus: ['r', 'r2', 'segments', 'arc'],
-      arch: ['size', 'segments', 'arc'], lathe: ['profile', 'segments', 'arc'], extrude: ['polygon', 'holes', 'h', 'round'],
+      arch: sh.polygon ? ['size', 'polygon'] : ['size', 'segments', 'arc'], lathe: ['profile', 'segments', 'arc'], extrude: ['polygon', 'holes', 'h', 'round'],
       loft: ['polygon', 'top', 'h'], sweep: ['path', ...(sh.profile ? ['profile'] : ['r', 'segments'])],
     };
     for (const field of ['size', 'r', 'r2', 'h', 'round', 'segments', 'profile', 'polygon', 'holes', 'top', 'path', 'arc'] as const) if (sh[field] !== undefined && !fields[sh.kind].includes(field)) issue(i, field, `has no effect on ${sh.kind}`, `remove ${field} or choose a primitive that uses it`);
@@ -130,7 +134,7 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
     if (sh.when !== undefined && !sh.when.split('&').every(t => /^!?\s*@?[A-Za-z][\w-]*(?:\s*(?:!=|=|>=|<=|>|<)\s*[^&\s].*)?$/.test(t.trim()))) issue(i, 'when', 'condition is not understood', 'use key, !key, @key, key=value or a numeric comparison; join terms with &');
     if ((sh.kind === 'ring' || sh.kind === 'torus') && sh.r2 === 0) issue(i, 'r2', 'tube radius must be positive', 'use a positive tube radius');
     if (sh.size?.some(n => n <= 0)) issue(i, 'size', 'dimensions must be positive', 'use positive dimensions');
-    if (sh.scale?.some(n => n <= 0)) issue(i, 'scale', 'components must be positive', 'use positive scale components');
+    if (sh.scale?.some(n => n === 0)) issue(i, 'scale', 'components must be nonzero', 'use nonzero scale components; negative components reflect the primitive');
     if (sh.arc && sh.arc > (sh.kind === 'arch' ? Math.PI : Math.PI * 2)) issue(i, 'arc', 'exceeds one sweep', `use radians in (0, ${sh.kind === 'arch' ? 'π' : '2π'}]`);
     if ((sh.kind === 'capsule' && sh.segments && (sh.segments < 6 || sh.segments > 10)) || (sh.kind === 'sweep' && !sh.profile && sh.segments && (sh.segments < 5 || sh.segments > 8))) issue(i, 'segments', 'would be clamped by this primitive', `use ${sh.kind === 'capsule' ? '6–10' : '5–8'} segments`);
     if (sh.kind === 'lathe' && sh.profile?.some(p => p[0] < 0)) issue(i, 'profile', 'lathe radius cannot be negative', 'use nonnegative profile radii');
@@ -159,10 +163,10 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
   }
 }
 
-export const kitArgs = z.object({
+export const plainKitArgs = z.object({
   /** Contract 1 (default) retains the shipped look. Contract 2 opts into arc, glow levels, finishes and outlines. */
   v: z.union([z.literal(1), z.literal(2)]).default(1),
-  shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitShapes),
+  shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitExpandedShapes),
   slots: z.array(slotSchema).max(64).optional(),
   /** Override the computed bounds (rarely needed). */
   box: v3.optional(),
@@ -171,7 +175,9 @@ export const kitArgs = z.object({
   /** Creature gait the viewer animates from roles: quadruped-walk, biped-waddle, bird-fly, fish-swim, none. */
   gait: z.enum(['none', 'quadruped-walk', 'biped-waddle', 'bird-fly', 'fish-swim', 'hover']).default('none'),
 }).superRefine(validateKit);
-export type KitArgs = z.infer<typeof kitArgs>;
+export type KitArgs = z.infer<typeof plainKitArgs>;
+// Authored programs retain their instructions until bake/mesh resolve instance params.
+export const kitArgs = withKitPrograms(plainKitArgs);
 
 // Admission follows the viewer bundled with the server; baking retained definitions is independent
 // so a rollback can still inspect its data. Offline compilers/studios use this source's renderer.
@@ -187,7 +193,8 @@ const admissionArgs = kitArgs.superRefine((args, ctx) => {
 
 /** Axis-aligned extent of a shape in its own frame (before yaw/pitch/roll), half sizes. */
 function halfOf(sh: KitShape): Vec3 {
-  const sc = sh.scale ?? [1, 1, 1];
+  // K2: a reflected primitive has signed scale, but bounds use positive half extents.
+  const sc = (sh.scale ?? [1, 1, 1]).map(Math.abs);
   let hx = 0.5, hy = 0.5, hz = 0.5;
   switch (sh.kind) {
     case 'box': case 'rbox': case 'wedge': case 'arch': { const [w, h, d] = sh.size ?? [1, 1, 1]; hx = w / 2; hy = h / 2; hz = d / 2; break; }
@@ -202,6 +209,15 @@ function halfOf(sh: KitShape): Vec3 {
 }
 /** Centre offset for shapes whose geometry is not centred on `at` (lathe/extrude/sweep are authored in absolute coordinates relative to `at`). */
 function centreOf(sh: KitShape): Vec3 {
+  // K2: reflection scales the geometry's local centre as well as its extents.
+  // Preserve existing positive-scale kit bakes; only newly reflected geometry takes this path.
+  if (sh.scale?.some(v => v < 0)) {
+    const c = centreOf({ ...sh, scale: undefined }), p = sh.pitch ?? 0, y = sh.yaw ?? 0, r = sh.roll ?? 0;
+    let [x, u, z] = c.map((v, i) => (v - sh.at[i]) * sh.scale![i]);
+    [x, u] = [x * Math.cos(r) - u * Math.sin(r), x * Math.sin(r) + u * Math.cos(r)];
+    [u, z] = [u * Math.cos(p) - z * Math.sin(p), u * Math.sin(p) + z * Math.cos(p)];
+    return [sh.at[0] + x * Math.cos(y) + z * Math.sin(y), sh.at[1] + u, sh.at[2] - x * Math.sin(y) + z * Math.cos(y)];
+  }
   if (sh.kind === 'lathe') { const ys = (sh.profile ?? [[0.5, 0], [0.5, 1]]).map((p) => p[1]); return [sh.at[0], sh.at[1] + (Math.max(...ys) + Math.min(...ys)) / 2, sh.at[2]]; }
   if (sh.kind === 'extrude') { const poly = sh.polygon ?? [[0, 0]]; const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]); return [sh.at[0] + (Math.max(...xs) + Math.min(...xs)) / 2, sh.at[1] + (sh.h ?? 0.2) / 2, sh.at[2] + (Math.max(...zs) + Math.min(...zs)) / 2]; }
   if (sh.kind === 'sweep') { const pts = sh.path ?? [[0, 0, 0]]; const m = (k: number) => (Math.max(...pts.map((p) => p[k])) + Math.min(...pts.map((p) => p[k]))) / 2; return [sh.at[0] + m(0), sh.at[1] + m(1), sh.at[2] + m(2)]; }
@@ -236,7 +252,7 @@ function localBounds(sh: KitShape, round: number): { c: Vec3; h: Vec3 } {
     c = lo.map((v, k) => (v + hi[k]) / 2) as Vec3; h = lo.map((v, k) => (hi[k] - v) / 2) as Vec3;
   }
   const scale = sh.scale ?? [1, 1, 1];
-  return { c: c.map((v, k) => v * scale[k]) as Vec3, h: h.map((v, k) => v * scale[k]) as Vec3 };
+  return { c: c.map((v, k) => v * scale[k]) as Vec3, h: h.map((v, k) => v * Math.abs(scale[k])) as Vec3 };
 }
 function rotateLocal([x, y, z]: Vec3, sh: KitShape): Vec3 {
   const roll = sh.roll ?? 0, pitch = sh.pitch ?? 0, yaw = sh.yaw ?? 0;
@@ -294,7 +310,8 @@ export function kitWhen(when: string | undefined, params: Record<string, unknown
   });
 }
 
-export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}): Baked {
+export function kitPhysics(input: unknown, params: Record<string, unknown> = {}): Baked {
+  const args = expandKitProgram(input, params);
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const colliders: LocalOBB[] = [];
   let tilted = false;
@@ -326,5 +343,5 @@ export const kitGen: Generator = {
   doc: 'Rounded primitives including lathe, extrude, loft and sweep. args.v defaults to legacy 1; v:2 enables arcs, four glow levels, metal finish, extrude holes, loft polygon/top at y=0/h, and upright transported sweep profiles. Instance params recolour tints.',
   params: {},
   args: admissionArgs,
-  physics({ args, params }) { return kitPhysics(kitArgs.parse(args), params); },
+  physics({ args, params }) { return kitPhysics(args, params); },
 };

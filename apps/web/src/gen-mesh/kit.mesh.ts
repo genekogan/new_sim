@@ -3,7 +3,7 @@
 // Geometry is cached per (def hash, palette) so many instances share one BufferGeometry.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { kitArgs, kitWhen, type KitArgs, type KitShape } from '@sim/generators';
+import { expandKitProgram, kitArgs, kitWhen, type KitArgs, type KitProgramArgs, type KitShape } from '@sim/generators';
 import { registerMesh, type MeshCtx } from './registry.ts';
 
 const cache = new Map<string, THREE.Object3D>();
@@ -36,6 +36,11 @@ function primitive(sh: KitShape, round: number, v: number): THREE.BufferGeometry
     }
     case 'arch': {
       const [w, h, d] = sh.size ?? [2, 2, 0.3]; const t = Math.min(w, h) * 0.18, rIn = w / 2 - t, spring = h - w / 2;
+      // K2: the shared expander supplies a pointed ribbon in the ordinary arch frame.
+      if (sh.polygon) {
+        const s = new THREE.Shape(sh.polygon.map(([x, y]) => new THREE.Vector2(x, y)));
+        const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false }); g.translate(0, -h / 2, -d / 2); return g;
+      }
       const arc = v === 2 ? sh.arc ?? Math.PI : Math.PI, start = Math.PI / 2 + arc / 2, end = Math.PI / 2 - arc / 2, x = arc === Math.PI ? 1 : Math.sin(arc / 2), y = arc === Math.PI ? 0 : Math.cos(arc / 2);
       const s = new THREE.Shape(); s.moveTo(-w / 2 * x, 0); s.lineTo(-w / 2 * x, spring + w / 2 * y); s.absarc(0, spring, w / 2, start, end, true); s.lineTo(w / 2 * x, 0); s.lineTo(rIn * x, 0); s.lineTo(rIn * x, spring + rIn * y); s.absarc(0, spring, rIn, end, start, false); s.lineTo(-rIn * x, 0); s.closePath();
       const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: false, curveSegments: Math.max(6, seg) }); g.translate(0, -h / 2, -d / 2); return g;
@@ -100,6 +105,14 @@ function placed(sh: KitShape, round: number, v: number, color: THREE.Color, offs
     new THREE.Vector3(...(sh.scale ?? [1, 1, 1])),
   );
   g.applyMatrix4(m);
+  // K2: reflected geometry is baked into vertices; retain outward face winding.
+  if (m.determinant() < 0) for (const attribute of Object.values(g.attributes)) {
+    const a = attribute as THREE.BufferAttribute;
+    for (let i = 0; i < a.count; i += 3) for (let k = 0; k < a.itemSize; k++) {
+      const j = (i + 1) * a.itemSize + k, l = (i + 2) * a.itemSize + k;
+      const v = a.array[j]; a.array[j] = a.array[l]; a.array[l] = v;
+    }
+  }
   if (!g.attributes.normal) g.computeVertexNormals();
   const n = g.attributes.position.count, cols = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { cols[i * 3] = color.r; cols[i * 3 + 1] = color.g; cols[i * 3 + 2] = color.b; }
@@ -123,10 +136,12 @@ const glowLevel = (value: number | undefined) => value ? Math.min(4, Math.ceil(v
 const classOf = (sh: KitShape, v: number) => v === 2 ? `${sh.material ?? 'paint'}:${glowLevel(sh.glow ?? (sh.material === 'emissive' ? 1 : 0))}` : (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
 
 /** VOCAB-MECH: which `when` shapes are on for these params/state (a cache key part; '' when the kit has none). */
-export function kitWhenKey(args: KitArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
+export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
   return args.shapes.some((s) => s.when) ? args.shapes.map((s) => (s.when ? (kitWhen(s.when, params, state ?? {}) ? '1' : '0') : '')).join('') : '';
 }
-export function buildKit(args: KitArgs, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown> }): THREE.Group {
+export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown> }): THREE.Group {
+  // K2 hook: the same expansion runs before physics and before mesh construction.
+  const args = expandKitProgram(input, ctx.params);
   const root = new THREE.Group();
   const byClass = new Map<string, THREE.BufferGeometry[]>();
   const byRole = new Map<string, KitShape[]>();
@@ -167,12 +182,17 @@ registerMesh({
   gen: 'kit/2',
   build(ctx) {
     const parsed = kitArgs.safeParse(ctx.args); if (!parsed.success) return null;
-    const key = ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))) + ':' + kitWhenKey(parsed.data, ctx.params, ctx.entity.state);
+    const key = kitCacheKey(ctx, parsed.data);
     let proto = cache.get(key);
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {} }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
     return obj;
   },
-  instanceKey(ctx) { const a = kitArgs.safeParse(ctx.args); return ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))) + (a.success ? ':' + kitWhenKey(a.data, ctx.params, ctx.entity.state) : ''); },
+  instanceKey(ctx) { const a = kitArgs.safeParse(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },
 });
+
+// K2: $params can change geometry; both prototype and instance identity include numeric values.
+function kitCacheKey(ctx: MeshCtx, args: KitProgramArgs): string {
+  return ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'number' || typeof v === 'string' && /^#/.test(v)).sort(([a], [b]) => a.localeCompare(b)))) + ':' + kitWhenKey(args, ctx.params, ctx.entity.state);
+}

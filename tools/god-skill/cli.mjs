@@ -969,12 +969,14 @@ export async function define(json) {
 export async function defineKit(json, flags = {}) {
   const k = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error('define-kit needs {name, shapes:[…]} (see SKILL.md, kit primitives in SCHEMA.md)');
+  // K2 hook: authored programs are expanded on the server; never guess their bounds from one seed shape.
+  if (!k.box && k.shapes.some(s => s.kind === 'arch.pointed' || ['repeat', 'radial', 'mirror', 'from', 'to', 'outline'].some(key => s[key] !== undefined) || JSON.stringify(s).includes('$'))) throw new Error('define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry');
   // Search name and tags before the write, and surface kept parts before unused defs.
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, ' '), ...(k.tags ?? [])].join(' '))).defs;
   const picks = [...matches.filter(d => usedIn(d).length), ...matches.filter(d => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map(d => d.ref.replace(/^core-/, 'core/'));
   const ext = (sh) => { const [x, y, z] = sh.at; const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)]; return [x - sz[0] / 2, y - (sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'sphere' || sh.kind === 'capsule' ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2]; };
-  const e = k.shapes.map(ext);
+  const e = k.box ? [] : k.shapes.map(ext); // K2: endpoint shapes have no authored at.
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
   const def = { schema: 'def/1', name: k.name, version: k.version ?? 1, description: k.description ?? '', tags: k.tags ?? [], form: 'point', layer: k.layer ?? 'solid', make: { kind: 'gen', gen: 'kit/2', args: { shapes: k.shapes, ...(k.v !== undefined ? { v: k.v } : {}), ...(k.gait ? { gait: k.gait } : {}), ...(k.slots ? { slots: k.slots } : {}), ...(k.round !== undefined ? { round: k.round } : {}) } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...(k.components ? { components: k.components } : {}), ...(k.anchor ? { anchor: k.anchor } : {}), ...(k.state ? { state: k.state } : {}), ...(k.params ? { params: k.params } : {}) };
   if (flags.dry) return { def, similar };
