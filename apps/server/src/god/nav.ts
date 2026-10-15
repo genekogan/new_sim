@@ -272,7 +272,7 @@ export class GodNav {
       // The same bounded search at every yaw: a world-axis lattice changed which furnished pockets were tried
       // when the building turned. Sample and order in its own frame, then transform exactly as its room/slots.
       const frame = t.roomFrame;
-      const cand = frame ? roomSamples(frame.poly, frame.at).map(([x, z]): Vec2 => {
+      const cand = frame ? roomSamples(frame.poly, frame.at, 0.6 / frame.scale).map(([x, z]): Vec2 => {
         const c = Math.cos(frame.yaw), s = Math.sin(frame.yaw);
         return [r3(frame.origin[0] + (x * c + z * s) * frame.scale), r3(frame.origin[1] + (-x * s + z * c) * frame.scale)];
       }) : roomSamples(t.poly, t.at);
@@ -365,9 +365,9 @@ export class GodNav {
 
 function polyDist(poly: Vec2[], p: Vec2) { return inPoly(p[0], p[1], poly) ? 0 : nearestOn(poly, p, true).d; }
 
-function roomSamples(poly: Vec2[], at: Vec2): Vec2[] {
+function roomSamples(poly: Vec2[], at: Vec2, step = 0.6): Vec2[] {
   const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]), candidates: Vec2[] = [];
-  for (let x = Math.min(...xs) + 0.3; x < Math.max(...xs); x += 0.6) for (let z = Math.min(...zs) + 0.3; z < Math.max(...zs); z += 0.6)
+  for (let x = Math.min(...xs) + step / 2; x < Math.max(...xs); x += step) for (let z = Math.min(...zs) + step / 2; z < Math.max(...zs); z += step)
     if (inPoly(x, z, poly)) candidates.push([x, z]);
   return candidates.sort((a, b) => Math.hypot(a[0] - at[0], a[1] - at[1]) - Math.hypot(b[0] - at[0], b[1] - at[1]));
 }

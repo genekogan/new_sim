@@ -4,7 +4,7 @@ import { GodNav, type NavHost } from './nav.ts';
 
 type Vec2 = [number, number];
 /** Target-selection unit fixture: exact local standing space and reachability, independent of raster resolution. */
-function house(degrees: number, offCentre = false) {
+function house(degrees: number, offCentre = false, pocket?: Vec2) {
   const yaw = degrees * Math.PI / 180, c = Math.cos(yaw), s = Math.sin(yaw), origin: Vec2 = [13.17, -7.23];
   const world = ([x, z]: Vec2): Vec2 => [origin[0] + x * c + z * s, origin[1] - x * s + z * c];
   const local = ([x, z]: Vec2): Vec2 => [(x - origin[0]) * c - (z - origin[1]) * s, (x - origin[0]) * s + (z - origin[1]) * c];
@@ -27,7 +27,10 @@ function house(degrees: number, offCentre = false) {
       // opening normal; a radial approach is in the side wall. Outside the front wall is ordinary open ground.
       return !offCentre || z >= 4 || (x >= 2.6 && x <= 3.4) ? at : null;
     },
-    reachV1: (_from: unknown, to: { p: Vec2 }) => { attempts.push(local(to.p)); return { ok: false }; },
+    reachV1: (_from: unknown, to: { p: Vec2 }) => {
+      const p = local(to.p); attempts.push(p);
+      return { ok: !!pocket && Math.hypot(p[0] - pocket[0], p[1] - pocket[1]) < 0.04 };
+    },
   }, levelAt: () => 0, engineOwned: () => false } as unknown as NavHost);
   return { nav, world, local, attempts };
 }
@@ -42,6 +45,17 @@ test('off-centre entrances use the opening normal at every building yaw', () => 
     assert.ok(Math.abs(p[0] - 3) < 0.02 && Math.abs(p[1] - 3) < 0.02, `${degrees}: inside along the door normal, got ${p}`);
     const approach = local(building.stands![0]);
     assert.ok(Math.abs(approach[0] - 3) < 0.002 && Math.abs(approach[1] - 5.2) < 0.002, `${degrees}: approach is normal to the opening`);
+  }
+});
+
+test('a reachable furnished-room pocket stays offered after the building turns', () => {
+  for (const degrees of [0, 30, 37, 45, 60, 82]) {
+    const pocket: Vec2 = [-0.1, 0.3];
+    const { nav, world, local } = house(degrees, false, pocket);
+    const goal = nav.goal(nav.thing('house/living')!, world([0, 8]));
+    assert.ok(goal, `${degrees}: the reachable pocket is found`);
+    const p = local(goal.p);
+    assert.ok(Math.hypot(p[0] - pocket[0], p[1] - pocket[1]) < 0.04, `${degrees}: goal stays in the reachable pocket`);
   }
 });
 
