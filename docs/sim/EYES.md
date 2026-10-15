@@ -12,6 +12,9 @@ when its origin or path belongs to another world. Unset or `EDGE_EYES=off` start
 The launcher's `--auth-env` file is read by the child by path; do not copy its contents into
 source, reports, or an agent workspace. An environment setting on the launcher alone is
 not inherited by its children. This document authorizes no operator change.
+A launcher-wide `EDGE_EYES=world` enables every child using that environment file.
+For a single-world trial, use that child's exact viewer URL instead; the existing URL
+guard refuses the setting in all other children before starting a worker.
 
 Install this release's pinned Playwright Chromium and its Linux libraries before enabling:
 `cd mars/viewer && pnpm exec playwright install --with-deps chromium`. Linux `auto` goes
