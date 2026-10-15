@@ -104,11 +104,15 @@ export function mountModeration(app: Hono, d: ModerationDeps): ModerationStore {
     c.res.headers.set('x-moderation-version', store.version());
     const hidden = store.hidden();
     if (!hidden.length || c.res.status !== 200) return;
-    const snap = await c.res.clone().json().catch(() => null);
+    // the catalog's compress() sits between this middleware and the route: decode, filter, encode again
+    const enc = c.res.headers.get('content-encoding');
+    if (enc && enc !== 'gzip' && enc !== 'deflate') return;
+    const body = c.res.clone().body;
+    const snap = body ? await new Response(enc ? body.pipeThrough(new DecompressionStream(enc as 'gzip')) : body).json().catch(() => null) : null;
     if (!snap || snap.contract !== 'world/1') return;
-    const filtered = withoutHidden(snap, new Set(hidden));
+    const filtered = JSON.stringify(withoutHidden(snap, new Set(hidden)));
     const headers = new Headers(c.res.headers); headers.delete('content-length');
-    c.res = new Response(JSON.stringify(filtered), { status: 200, headers });
+    c.res = new Response(enc ? new Response(filtered).body!.pipeThrough(new CompressionStream(enc as 'gzip')) : filtered, { status: 200, headers });
   });
   app.use('/v1/world/seq', async (c, next) => {
     await next();

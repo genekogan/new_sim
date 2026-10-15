@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { deflateSync } from 'node:zlib';
+import { deflateSync, gunzipSync } from 'node:zlib';
 import { Hono, type Context } from 'hono';
 import { Db } from './db.ts';
 import { ApiError } from './souls.ts';
@@ -195,7 +195,7 @@ function godWorld(t: { after(f: () => void): void }) {
     const text = await r.text(); let data: any = null; try { data = JSON.parse(text); } catch { /* binary */ }
     return { status: r.status, data, headers: r.headers };
   };
-  return { god, store, req, dir };
+  return { god, store, req, dir, app };
 }
 const uploadForm = (bytes: Uint8Array, name: string) => { const f = new FormData(); f.set('file', new Blob([bytes], { type: 'model/gltf-binary' }), `${name}.glb`); f.set('name', name); f.set('height', '1'); f.set('define', '1'); return f; };
 
@@ -221,6 +221,11 @@ test('Godmode world: upload is gated and stripped, the creator hides it everywhe
   const after = await w.req('/v1/world/snapshot', { as: 'anon' });
   assert.deepEqual(after.data.entities.map((e: { name: string }) => e.name), ['crate']); assert.notEqual(after.headers.get('x-moderation-version'), v0);
   assert.ok(!JSON.stringify(after.data).includes(sha), 'the hidden file is not even named to visitors');
+  // browsers ask for gzip, which the catalog's compress() applies after the route: still filtered
+  const gz = await w.app.request('/v1/world/snapshot', { headers: { 'accept-encoding': 'gzip' } });
+  assert.equal(gz.headers.get('content-encoding'), 'gzip');
+  const unzipped = JSON.parse(gunzipSync(Buffer.from(await gz.arrayBuffer())).toString('utf8'));
+  assert.deepEqual(unzipped.entities.map((e: { name: string }) => e.name), ['crate']);
   assert.equal((await w.req(`/assets/${sha}.glb`, { as: 'anon' })).status, 404);
   const seq = await w.req('/v1/world/seq', { as: 'anon' }); assert.deepEqual(seq.data.moderation.hidden, [sha]); assert.equal(typeof seq.data.seq, 'number');
   assert.deepEqual((await w.req('/v1/moderation', { as: 'anon' })).data.hidden, [sha]);
