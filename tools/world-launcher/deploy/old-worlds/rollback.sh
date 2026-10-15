@@ -34,6 +34,7 @@ UNITS=${RB_UNITS-sim-old-proxy sim-old@eden sim-old@mars sim-old@littlemartians}
 ACC=${RB_ACC:-<team>/runtime/production-accounts/accounts.sqlite}; PROD_DESC=$H/rollback/descriptors-1080cfa9; DESC=${RB_DESC:-$PROD_DESC}
 LPORTS=${RB_LPORTS:-eden:4950,mars:4963,littlemartians:4964}; HUNG_WAIT=${RB_HUNG_WAIT:-120}; PUBLIC=${RB_PUBLIC:-1}
 LOGD=${RB_LOG_DIR:-$H/logs}; LOG=$LOGD/rollback-$NOW.log; TEST=${RB_LAPTOP_ROOT:-}
+RECEIPTS=${RB_RECEIPTS:-<team>/reviews/convergence-cutover-1080cfa9-001/run}   # convergence runner CLOSURE.json root
 if [ -z "$TEST" ] && env | grep -q '^RB_'; then   # KIT-REVIEW-2 #1: the real rollback never obeys test overrides
   echo "REFUSED: RB_* variables are set ($(env | grep '^RB_' | cut -d= -f1 | tr '\n' ' ')) but RB_LAPTOP_ROOT is not: this would be the real rollback."
   echo "Run it from a clean shell: env | grep '^RB_' must print nothing."; exit 2; fi
@@ -42,7 +43,7 @@ if [ -n "$TEST" ]; then
   case "$E2" in local|*.invalid) ;; *) echo "test mode needs RB_E2=local (or an unresolvable *.invalid host)"; exit 2;; esac
   case "${RB_CADDY_VALIDATE:-}:${RB_CADDY_RELOAD:-}" in true:true|true:false|false:true|false:false) ;; *) echo "test mode needs RB_CADDY_VALIDATE and RB_CADDY_RELOAD set to true/false stand-ins"; exit 2;; esac
   [ "$(uname)" = Linux ] || { echo "test mode runs only on eden2 (never on the laptop)"; exit 2; }
-  for v in "$TEST" "$RDATA" "$CADDY" "$ACC" "$DESC" "$LOGD"; do case "$v" in /srv/sim-old-rbtest/*) ;; *) echo "test mode: $v is outside /srv/sim-old-rbtest"; exit 2;; esac; done
+  for v in "$TEST" "$RDATA" "$CADDY" "$ACC" "$DESC" "$LOGD" "$RECEIPTS"; do case "$v" in /srv/sim-old-rbtest/*) ;; *) echo "test mode: $v is outside /srv/sim-old-rbtest"; exit 2;; esac; done
   [ -n "${RB_LPORTS:-}" ] || { echo "test mode needs RB_LPORTS"; exit 2; }
   case "$LPORTS" in *49[0-9][0-9]*|*466[0-9]*|*4670*) echo "test mode: RB_LPORTS must not name live ports"; exit 2;; esac
 fi
@@ -78,6 +79,9 @@ if [ "$E2" = local ]; then e2() { bash -c "$*"; }; RSRC=; else e2() { ssh -o Bat
 jget() { python3 -c 'import json,sys
 try: d=json.loads(sys.argv[1]); v=d[sys.argv[2]]; assert v is not None; print(v)
 except Exception: sys.exit(1)' "$1" "$2"; }
+receipt_names() { python3 -c 'import json,sys
+try: d=json.load(open(sys.argv[1])); sys.exit(0 if d.get("closedPID")==int(sys.argv[2]) and d.get("normalClosed") is True else 1)
+except Exception: sys.exit(1)' "$RECEIPTS/$1/CLOSURE.json" $2; }
 st() { eval "echo \${ST_$1:-}"; }; setst() { eval "ST_$1=$2"; }
 mkdir -p "$LOGD"; say "rollback for cutover $TS (log $LOG)${TEST:+ TEST MODE root $TEST}"
 
@@ -88,7 +92,8 @@ for w in $WORLDS; do
   lp=$(lockpid $w)
   if [ -n "$(listener $w)" ]; then setst $w SERVED; say "$w: :$(lport $w) still served by pid $(listener $w | tr '\n' ' ')-> left alone"
   elif [ -n "${wp// /}" ] && [ -n "$lp" ] && echo " $wp" | grep -q " $lp "; then setst $w HUNG; eval "LP_$w=$lp"; say "$w: writer $lp (holds the lock) alive but not listening (hung close)"
-  elif [ -n "${wp// /}" ]; then setst $w FAILED; say "STOP-NOTE $w: writer(s) $wp alive, not listening, not holding the lock; check by hand (never signalled)"
+  elif [ "$(echo $wp | wc -w | tr -d ' ')" = 1 ] && [ -z "$lp" ] && receipt_names $w $wp; then setst $w HUNG; eval "LP_$w=$(echo $wp)"; say "$w: writer $wp closed normally (CLOSURE.json, lock released) but lingers"
+  elif [ -n "${wp// /}" ]; then setst $w FAILED; say "STOP-NOTE $w: writer(s) $wp alive, not listening, not holding the lock, no closure receipt; check by hand (never signalled)"
   elif [ -n "$lp" ]; then setst $w FAILED; say "STOP-NOTE $w: lock names live pid $lp that is not a writer for this world; check by hand (never signalled)"
   else setst $w CLOSED; say "$w: closed"; fi
 done
@@ -117,7 +122,10 @@ else say "eden2 units: none configured (test mode)"; fi
 # HUNG writers: wait, then SIGKILL (the world is already down; its close stopped the clock)
 # KIT-REVIEW-2 #3: only the PID named in the world's lock is ever signalled, and never once the world is listening again.
 for w in $WORLDS; do [ "$(st $w)" = HUNG ] || continue; x=$(eval "echo \$LP_$w")
-  for i in $(seq 1 $HUNG_WAIT); do [ -n "$(listener $w)" ] && break; alive $x || break; sleep 1; done
+  # close-writer.sh: returns as soon as x exits, or kills x once it is a closed-but-lingering convergence runner (receipt names it,
+  # lock released, port closed), or reports "listening" the moment the world is served again (then x is never signalled).
+  guard_signal $x; r=$(bash $KITBIN/close-writer.sh --no-term $w $x $(lport $w) "$(ddir $w)" $RECEIPTS $HUNG_WAIT); rc=$?; say "$w: writer $x: $r"
+  if [ $rc = 0 ]; then continue; fi
   if [ -n "$(listener $w)" ]; then setst $w SERVED; say "$w: started listening during the wait (pid $(listener $w | tr '\n' ' ')) -> left alone, not signalled"; continue; fi
   if alive $x; then
     [ "$(lockpid $w)" = "$x" ] && echo " $(writers $w | tr '\n' ' ') " | grep -q " $x " && [ -z "$(listener $w)" ] || { setst $w FAILED; say "STOP-NOTE $w: $x no longer the lock-holding, non-listening writer; not signalled"; continue; }
@@ -137,6 +145,11 @@ pull() { # $1 world|accounts  $2 laptop dst  $3 eden2 src  $4 expected-json  $5 
   local keep=$(dirname "$dst")/pre-rollback-$NOW; mkdir -p "$keep"
   for f in "$dst" "$dst-wal" "$dst-shm"; do [ -e "$f" ] && mv "$f" "$keep/"; done   # same names: the WAL stays paired with its DB
   mv "$inc" "$dst" && e2 "rm -f $RDATA/rollback-$w.db"; say "$w: eden2 history copied back (originals kept in $keep/)"; }
+if [ $SERVED = 1 ]; then for w in $WORLDS; do [ "$(st $w)" = SERVED ] || continue
+  b=$(e2 "python3 $RBIN/parity.py $RDATA/$w/sim.db $(wid $w)" 2>/dev/null); bm=$(jget "$b" maxSeq) || { say "WARN $w: served on the laptop; eden2 history unreadable, not compared"; continue; }
+  a2=$(python3 $KITBIN/parity.py "$(ddir $w)/sim.db" $(wid $w) $bm 2>/dev/null)
+  if [ "$(jget "$a2" maxSeq 2>/dev/null)" -ge "$bm" ] 2>/dev/null && [ "$(jget "$a2" prefixSHA256)" = "$(jget "$b" prefixSHA256)" ]; then say "$w: served on the laptop and its history contains eden2's events"
+  else say "WARN $w: left alone because a laptop writer serves it, but eden2 holds event history the laptop lacks (eden2 maxSeq $bm); reconcile by hand"; fi; done; fi
 if [ $SERVED = 0 ]; then say "eden2 never served the public (no 4670, no SERVED marker): laptop data is authoritative, nothing copied back"
 else
   for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac

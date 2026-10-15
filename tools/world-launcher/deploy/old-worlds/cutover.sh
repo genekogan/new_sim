@@ -14,6 +14,7 @@ H=<team>/runtime/sim-old-cloud; E2=root@eden2; TS=$(date -u +%Y%m%d-%H%M%S); LOG
 GO=""; [ "${1:-}" = "--go" ] && GO="${2:?--go needs a name}"
 RUNNER=<team>/reviews/convergence-world-run.mjs
 ACC=<team>/runtime/production-accounts/accounts.sqlite
+RECEIPTS=<team>/reviews/convergence-cutover-1080cfa9-001/run   # convergence runner's CLOSURE.json root
 REL=so-1080cfa9-63acd353; BUILD=local-convergence-1080cfa9ffc5; CLI_SHA=40cc21a6815f56c17a4fa70595e9ed756671ab9b38f4d766648dd5d1e94083f0
 WORLDS="eden mars littlemartians"
 port() { case $1 in eden) echo 4950;; mars) echo 4963;; littlemartians) echo 4964;; esac; }
@@ -46,6 +47,9 @@ ssh $E2 "set -e; test -f /etc/systemd/system/sim-old@.service; test -f /etc/syst
   free=\$(df --output=avail -BG /srv | tail -1 | tr -dc 0-9); [ \"\$free\" -ge 8 ] || { echo \"eden2 disk \${free}G < 8G\"; exit 1; }
   mem=\$(awk '/MemAvailable/{print int(\$2/1024)}' /proc/meminfo); [ \"\$mem\" -ge 2500 ] || { echo \"eden2 MemAvailable \${mem}M\"; exit 1; }
   echo \"eden2 ok: release $REL verified, disk \${free}G free, MemAvailable \${mem}M; sim-old units: \$(systemctl is-active sim-old@eden sim-old@mars sim-old@littlemartians sim-old-proxy | tr '\n' ' ')enabled: \$(systemctl is-enabled sim-old@eden sim-old-proxy 2>/dev/null | tr '\n' ' ')\"" | tee -a "$LOG" || die "eden2 preflight failed"
+HELPERS="parity.py compact-copy.py online-backup.py dbhash.py"
+lh=$(cd $H/bin && shasum -a 256 $HELPERS | awk '{print $1" "$2}'); rh=$(ssh $E2 "cd /srv/sim-old/current/bin && sha256sum $HELPERS" | awk '{print $1" "$2}')
+[ "$lh" = "$rh" ] && say "helpers identical on laptop and eden2 ($HELPERS)" || die "eden2 helper scripts differ from the laptop run copies (refresh with pack-release.py --refresh-kit)"
 for w in $WORLDS; do say "laptop $w now $(python3 $H/bin/parity.py "$(ddir $w)/sim.db" $(wid $w))"; done
 [ -n "$GO" ] || { say "preflight PASS (no --go: nothing changed)"; exit 0; }
 
@@ -62,8 +66,10 @@ set -E; trap 'say "STOP: unexpected error (line $LINENO) after the freeze began;
 # 2. FREEZE: normal close (SIGTERM -> the runner closes the server: clock stops, snapshot saved, CLOSURE.json), no force kill
 say "FREEZE: closing laptop writers"
 for w in $WORLDS; do p=$(writer $w); [ "$(/usr/sbin/lsof -nP -iTCP:$(port $w) -sTCP:LISTEN -t)" = "$p" ] || die "$w identity changed"
-  kill -TERM $p; for i in $(seq 1 600); do kill -0 $p 2>/dev/null || break; sleep 0.2; done
-  kill -0 $p 2>/dev/null && die "$w writer $p did not exit in 120 s (no force kill; investigate, then rollback.sh $TS)"
+  # SIGTERM; done when the process exits, or (convergence runner, which never exits) when its CLOSURE.json names it, its lock is
+  # released and the port is closed: only then is the lingering, already-closed process SIGKILLed. Nothing else is ever forced.
+  r=$(bash $H/bin/close-writer.sh --term $w $p $(port $w) "$(ddir $w)" $RECEIPTS 120) || die "$w writer $p: $r (no force kill; investigate, then rollback.sh $TS)"
+  say "$w writer $p: $r"
   [ -z "$(/usr/sbin/lsof -nP -iTCP:$(port $w) -sTCP:LISTEN -t)" ] || die "$w port still listening"
   for l in edge-server.lock world-server.lock; do [ ! -e "$(ddir $w)/$l" ] || die "$w lock $l remains (rollback.sh $TS)"; done
   say "closed $w ($p)"; done

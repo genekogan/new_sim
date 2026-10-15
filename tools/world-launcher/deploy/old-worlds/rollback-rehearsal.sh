@@ -10,7 +10,7 @@ set -uo pipefail
 RT=/srv/sim-old-rbtest; K=$RT/kit; L=$RT/laptop; WORLDS="eden mars littlemartians"; FAILS=0
 export RB_E2=local RB_KITBIN=$K RB_NODE=/usr/bin/node RB_ENV=/etc/sim-old/clerk-public.env RB_RDATA=$RT/data RB_CADDY=$RT/sim.caddy \
   RB_CADDY_VALIDATE=true RB_CADDY_RELOAD=true RB_UNITS= RB_LAPTOP_ROOT=$L RB_ACC=$L/accounts/accounts.sqlite RB_DESC=$RT/desc \
-  RB_LPORTS=eden:4680,mars:4682,littlemartians:4681 RB_PORT_MAP=4958:4680,4966:4682,4965:4681 RB_HUNG_WAIT=8 RB_PUBLIC=0 RB_LOG_DIR=$RT/logs
+  RB_LPORTS=eden:4680,mars:4682,littlemartians:4681 RB_PORT_MAP=4958:4680,4966:4682,4965:4681 RB_HUNG_WAIT=8 RB_PUBLIC=0 RB_LOG_DIR=$RT/logs RB_RECEIPTS=$RT/receipts
 own() { # pid -> 0 if it is one of ours: recorded in .pids, args name the scratch tree, cwd inside laptop/
   [ -n "${1:-}" ] || return 1; grep -q "^$1 " $L/.pids 2>/dev/null && case "$(ps -o command= -p $1)" in *"$RT/desc/"*) true;; *) false;; esac && case "$(readlink /proc/$1/cwd)/" in "$L"/*) true;; *) false;; esac; }
 stop_test() { [ -f $L/.pids ] || return 0
@@ -18,7 +18,7 @@ stop_test() { [ -f $L/.pids ] || return 0
   for i in $(seq 1 20); do left=; for p in $(awk '{print $1}' $L/.pids); do kill -0 $p 2>/dev/null && own $p && left=1; done; [ -z "$left" ] && return 0; sleep 1; done
   for p in $(awk '{print $1}' $L/.pids); do kill -0 $p 2>/dev/null && own $p && kill -KILL $p; done; }
 reset() { # $1 = catch-all port in the simulated sim.caddy (4670: eden2 served the public; 4505: never switched)
-  stop_test; rm -rf $L $RT/data $RT/desc $RT/logs $RT/sim.caddy*; mkdir -p $L/accounts $RT/data/accounts $RT/desc $RT/logs; : > $L/.pids
+  stop_test; rm -rf $L $RT/data $RT/desc $RT/logs $RT/receipts $RT/sim.caddy*; mkdir -p $L/accounts $RT/data/accounts $RT/desc $RT/logs $RT/receipts; : > $L/.pids
   for w in $WORLDS; do mkdir -p $L/$w $RT/data/$w; cp $RT/fixtures/$w/sim.db $L/$w/; cp $RT/fixtures/$w/sim.db $RT/data/$w/; done
   cp $RT/fixtures/accounts/accounts.sqlite $L/accounts/; cp $RT/fixtures/accounts/accounts.sqlite $RT/data/accounts/
   python3 - <<'EOF'
@@ -132,6 +132,19 @@ S11() { scenario S11 "#6 a restarted writer that never becomes ready is a STOP-N
   ok "mars NOT READY -> STOP-NOTE, FAILED, exit 1" 'has "STOP-NOTE mars: writer NOT READY" && has "mars=FAILED" && [ $RC = 1 ]'
   ok "eden/LM still restarted" 'listening 4680 && listening 4681'; done_s S11; }
 
+start_standin() { # $1 world $2 port: convergence-like runner that never exits after its normal close
+  (cd $L || exit 1; nohup /usr/bin/node $K/standin-runner.mjs run-world.mjs $RT/desc/$1.json $2 $L/$1 $RT/receipts $1 > /dev/null 2>&1 < /dev/null & echo "$! $1 standin" >> $L/.pids)
+  for i in $(seq 1 20); do listening $2 && break; sleep 0.5; done; awk -v w=$1 '$2==w && $3=="standin"{print $1}' $L/.pids | tail -1; }
+S12() { scenario S12 "final review: Eden's runner never exits after its normal close (stand-in on eden2)"; reset 4505
+  sp=$(start_standin eden 4680); r=$(bash $K/close-writer.sh --term eden $sp 4680 $L/eden $RT/receipts 30); rc=$?
+  ok "cutover path: SIGTERM -> receipt + lock released + port closed -> lingering PID killed, 'closed-lingering'" '[ $rc = 0 ] && [ "$r" = closed-lingering ] && ! kill -0 $sp 2>/dev/null && ! listening 4680 && [ ! -e $L/eden/edge-server.lock ]'
+  start_hung mars; hp=$(awk '$2=="mars" && $3=="hung"{print $1}' $L/.pids | tail -1); r=$(bash $K/close-writer.sh --term mars $hp 4682 $L/mars $RT/receipts 4); rc=$?
+  ok "no receipt (truly hung) -> 'still-open', never killed" '[ $rc = 1 ] && case "$r" in still-open*) true;; *) false;; esac && kill -0 $hp'
+  stop_test; reset 4505; sp=$(start_standin eden 4680); kill -TERM $sp; sleep 2
+  run S12
+  ok "rollback path: lingering closed writer detected by its receipt, killed, eden restarted; exit 0" 'has "closed normally (CLOSURE.json, lock released) but lingers" && has "writer $sp: closed-lingering" && ! kill -0 $sp 2>/dev/null && has "eden=STARTED" && listening 4680 && [ $RC = 0 ]'
+  done_s S12; }
+
 for p in 4680 4681 4682; do listening $p && { echo "port $p busy; abort"; exit 2; }; done
-for s in ${@:-S0 S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 S11}; do $s; done
+for s in ${@:-S0 S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 S11 S12}; do $s; done
 stop_test; echo "rehearsal done: $FAILS failing scenario(s)"; [ $FAILS = 0 ]
