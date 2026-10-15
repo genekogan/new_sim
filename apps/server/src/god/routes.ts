@@ -22,6 +22,8 @@ import { resolve } from 'node:path';
 import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
 import { CREATION_LIMITS } from '@sim/generators';
+import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
+import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
 
 export type GodDeps = {
@@ -50,6 +52,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     const cached = identities.get(c); if (cached) return cached;
     const identity = d.god.godIdentity(bearer(c));
     if (!identity) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start');
+    identity.holder = parseHolder(c.req.header('x-eden-god-holder'));
     identities.set(c, identity); d.god.builds.touch(identity.hash, d.god.now()); return identity;
   };
   const tokenLimit = godTokenLimiter(requireGod);
@@ -123,6 +126,9 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
 
   // ---- god
   app.get('/v1/god/parts', (c) => { limitGod(c, 'parts', CREATION_LIMITS.godQueriesPerMinute); return c.json({ parts: d.god.parts.list(c.req.query('q') ?? '', Number(c.req.query('limit') ?? 50)) }, 200, noStore); });
+  const doctorIdentity = (c: Context) => { const identity = d.god.godIdentity(bearer(c)); if (!identity) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); return identity; };
+  app.get('/v1/god/doctor', c => c.json(serverDoctor(d.god.builds, d.verifyUse, doctorIdentity(c)), 200, noStore));
+  app.post('/v1/god/doctor', async c => { const who = doctorIdentity(c); const input = z.object({ fix: z.literal(true) }).strict().parse(await body(c)); return c.json(serverDoctor(d.god.builds, d.verifyUse, who, input.fix), 200, noStore); });
   app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); const r = d.god.builds.start(await body(c), requireGod(c)); return c.json(r.ok ? { ...r, parts: d.god.parts.suggest(r.build), build: { ...r.build, reuse: d.god.parts.reuseOf(r.build.id) } } : r, 200, noStore); });
   app.get('/v1/god/builds', (c) => { requireGod(c); return c.json(d.god.builds.list(), 200, noStore); });
   app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); const reuse = d.god.parts.reuseOf(result.build.id); return c.json({ ...result, reuse, build: { ...result.build, reuse } }, 200, noStore); });

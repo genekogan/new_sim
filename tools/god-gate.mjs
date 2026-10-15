@@ -16,6 +16,7 @@ const test = paths => ['--test', '--test-reporter=tap', '--test-concurrency=1', 
 const suites = [
   ['god', test(files('apps/server/src/god', '.test.ts'))],
   ['world-compiler', test([...files('packages/world-compiler/src', '.test.ts'), ...files('packages/world-compiler/src/core-kit', '.test.ts')])],
+  // Catalog discovery includes EF4 conformance.test.ts (all defs, endpoints/enums/scales, seeded K=2).
   ['catalog', test(files('packages/catalog/src', '.test.ts'))],
   ['generators', test(files('packages/generators/src', '.test.ts'))],
   ['CLI-lib', test([...files('tools/god-skill', '.test.mjs'), ...files('tools/god-skill/lib', '.test.mjs')])],

@@ -3,14 +3,16 @@
 // SOURCE of the downloadable single file eden-god.mjs (built by build.mjs: `node build.mjs`).
 // State: ./.eden-god.json (world URL + god token + current group; private), ./.eden-god.cache.json
 // (the world mirror). Commands print short human text; add --json for machine output.
+import { acquireLock } from './lib/locks.mjs';
+import { doctor } from './lib/doctor.mjs';
 import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withoutBuild } from './lib/state.mjs';
+import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
-import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
+import { camera, shoot, keeper, stopKeeper, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { return process.argv[1]; } })();
@@ -804,9 +806,12 @@ export async function build(sub = 'show', args = [], f = {}) {
   if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}${r.notReverted ? `; undone edits: ${r.reverted?.join(', ') || 'none'}; not undone edits: ${r.notReverted.join(', ')}` : ''}`;
   if (sub === 'start' || sub === 'resume') save({ build: BUILD_API.local(r), group: undefined, buildEchoWarned: undefined, buildPreviews: undefined });
   if (sub === 'claim') {
-    const file = claimFile(r.claim.id), previous = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
-    // A replay returns the same claim. Never reset an active helper's local step.
-    if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + '\n');
+    const file = claimFile(r.claim.id), release = acquireLock(`${file}.lock`, { label: 'claim state creation' });
+    try {
+      const previous = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+      // A replay never resets an active helper's local step.
+      if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + '\n');
+    } finally { release(); }
     return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
   }
   if (['release', 'done', 'abandon'].includes(sub)) save({ build: undefined, group: undefined, buildPreviews: undefined });
@@ -914,19 +919,28 @@ export function lookOverrides(flags = {}) {
   return out;
 }
 export async function look(flags = {}, runtime = {}) {
+  const ms = Math.min(LOOK_MAX_MS, runtime.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS)), abort = new AbortController();
+  runtime.deadlineAt = Date.now() + ms;
+  let timer;
+  try { return await withDeadline(Date.now() + ms, abort.signal, () => Promise.race([
+    lookInner(flags, runtime),
+    new Promise((_, reject) => { timer = setTimeout(() => { abort.abort(); runtime.cleanup?.(); reject(Object.assign(new Error(`look.timeout: exceeded ${ms} ms; run doctor --fix`), { code: 'look.timeout' })); }, ms); }),
+  ])); } finally { clearTimeout(timer); }
+}
+async function lookInner(flags = {}, runtime = {}) {
   if (flags.stop) return stopKeeper();
   const overrides = lookOverrides(flags);
-  const m = await mirror(); const v = view(m);
+  const m = await (runtime.mirror ?? mirror)(); const v = view(m);
   const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags);
   if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
   const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
-  if (!flags.keep) shot = await (runtime.shoot ?? shoot)(args);
+  if (!flags.keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
   else {
     // a kept browser: the shot runs in a child process so its browser connection does not keep this one alive
-    const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
+    const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, timeout: Math.max(1, runtime.deadlineAt - Date.now()), killSignal: 'SIGKILL', maxBuffer: 1 << 24 });
     if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || '').trim().slice(0, 500)}`);
     shot = JSON.parse(child.stdout.trim().split('\n').pop());
   }
@@ -1024,7 +1038,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['fix', 'local', 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1046,6 +1060,7 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
+  doctor: 'fix local',
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -1056,7 +1071,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { doctor: 0, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -1077,7 +1092,7 @@ export function checkArgs(cmd, f, rest) {
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
 }
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
-export const COMMANDS = {
+export const COMMANDS = { doctor: (r, f) => doctor(f),
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
@@ -1096,8 +1111,9 @@ export const COMMANDS = {
   give: (r) => give(r[0], r[1]), pay: (r) => pay(r[0], r[1], r[2]), zone: (r, f) => zone(r[0], r[1], f), 'zone-suggest': (r) => zoneSuggest(r[0]), relate: (r, f) => relate(r[0], r[1], r[2], f), layers: (r, f) => layers(f),
   help: () => HELP,
 };
-for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
+for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
+locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
 look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]

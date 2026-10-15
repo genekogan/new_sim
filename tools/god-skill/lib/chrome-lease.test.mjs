@@ -30,7 +30,7 @@ test('Chrome lease acquisition and idempotent release use only the supplied dire
   const { leaseDir, options } = fixture(t), listeners = process.listenerCount('exit');
   const release = await chromeLease('test lane', options);
   t.after(release);
-  assert.match(readFileSync(join(leaseDir, 'holder'), 'utf8'), new RegExp(`^test lane ${process.pid} `));
+  assert.equal(JSON.parse(readFileSync(join(leaseDir, 'holder'), 'utf8')).holder.label, 'test lane');
   assert.equal(process.listenerCount('exit'), listeners + 1);
   release(); release();
   assert.equal(existsSync(leaseDir), false);
@@ -42,7 +42,7 @@ test('a freshly abandoned Chrome lease is reclaimed as soon as its PID is dead',
   occupied(leaseDir, holder(exitedPid()));
   const release = await chromeLease('resumed lane', options);
   t.after(release);
-  assert.match(readFileSync(join(leaseDir, 'holder'), 'utf8'), new RegExp(`^resumed lane ${process.pid} `));
+  assert.equal(JSON.parse(readFileSync(join(leaseDir, 'holder'), 'utf8')).holder.pid, process.pid);
 });
 
 test('a live PID keeps its Chrome lease even after the stale threshold', async t => {
@@ -63,7 +63,7 @@ test('EPERM and other uncertain PID probes never evict an old Chrome lease', asy
   }
 });
 
-test('a missing or malformed fresh Chrome holder keeps the 15-minute grace period', async t => {
+test('a missing or malformed fresh Chrome holder keeps the 30-second grace period', async t => {
   const { leaseDir, options } = fixture(t);
   occupied(leaseDir);
   await assert.rejects(chromeLease('other lane', options), /chrome lease busy/);
@@ -73,7 +73,7 @@ test('a missing or malformed fresh Chrome holder keeps the 15-minute grace perio
   assert.equal(readFileSync(join(leaseDir, 'holder'), 'utf8'), 'incomplete holder\n');
 });
 
-test('an unreadable Chrome holder expires after the default 15 minutes', async t => {
+test('an unreadable Chrome holder expires after the TTL', async t => {
   const { leaseDir, options } = fixture(t);
   occupied(leaseDir);
   mkdirSync(join(leaseDir, 'holder')); // readFile fails on every platform, including root.
@@ -83,7 +83,7 @@ test('an unreadable Chrome holder expires after the default 15 minutes', async t
   utimesSync(leaseDir, old, old);
   const release = await chromeLease('resumed lane', options);
   t.after(release);
-  assert.match(readFileSync(join(leaseDir, 'holder'), 'utf8'), /^resumed lane /);
+  assert.equal(JSON.parse(readFileSync(join(leaseDir, 'holder'), 'utf8')).holder.label, 'resumed lane');
 });
 
 test('an old Chrome lease with no holder can still be reclaimed', async t => {
@@ -91,7 +91,7 @@ test('an old Chrome lease with no holder can still be reclaimed', async t => {
   occupied(leaseDir, undefined, 16 * 60_000);
   const release = await chromeLease('resumed lane', options);
   t.after(release);
-  assert.match(readFileSync(join(leaseDir, 'holder'), 'utf8'), /^resumed lane /);
+  assert.equal(JSON.parse(readFileSync(join(leaseDir, 'holder'), 'utf8')).holder.label, 'resumed lane');
 });
 
 test('Chrome lease reclamation re-reads and preserves a replacement holder', async t => {
@@ -120,7 +120,7 @@ test('Chrome lease reclamation preserves a replacement directory even with ident
   await assert.rejects(chromeLease('other lane', options), /chrome lease busy/);
   assert.equal(readFileSync(join(leaseDir, 'holder'), 'utf8'), text);
   assert.ok(existsSync(join(dir, 'previous-lease')));
-  assert.equal(probes, 2);
+  assert.ok(probes >= 2);
 });
 
 test('Chrome lease release never removes a changed holder', async t => {

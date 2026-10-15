@@ -1,5 +1,6 @@
 // Authoritative, temporary resident probes. No HTTP, model, clock acceleration,
 // invitation or owner credential is involved in verification.
+import { holder, lockStatus } from '../../../../tools/god-skill/lib/locks.mjs';
 import {z} from 'zod';
 import type {Entity} from '@sim/world-compiler';
 import type {WorldHost, HostListener} from '../world.ts';
@@ -38,6 +39,7 @@ type Door = {id: string; at: V2; outward: V2; level: number};
 type Body = {pose: {p: [number, number, number]}; human?: {activity?: string; level?: number}};
 type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null; reachV1(from: Point, to: Point): Reach; freeSeatSlotsV1(id: string, except?: string): {id: string; p: V2; level: number; approach?: V2}[]};
 const active = new WeakSet<WorldHost>();
+const lockAt = new WeakMap<WorldHost, number>();
 const pendingRemoval = new WeakMap<WorldHost, Promise<void>>();
 const bootSwept = new WeakSet<WorldHost>();
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -64,7 +66,7 @@ export class VerifyUse {
     }
     const probes = [...rows.values()].filter(s => s.owner === PROBE_OWNER && isVerificationProbe(s.id));
     if (!probes.length) return;
-    active.add(host);
+    active.add(host); lockAt.set(host, Date.now());
     let done!: () => void, accepted = false;
     pendingRemoval.set(host, new Promise<void>(resolve => {done = resolve;}));
     const check = () => {
@@ -87,6 +89,9 @@ export class VerifyUse {
     });
   }
 
+  lockInfo() {
+    return { kind: 'verify-probe', present: active.has(this.host), ...lockStatus(holder('Sim verifier'), lockAt.get(this.host) ?? Date.now(), 180_000), pendingRemoval: pendingRemoval.has(this.host), break: 'native retirement; restart sweeps crashed probes before admitting another' };
+  }
   async run(raw: unknown): Promise<VerifyReceipt> {
     const started = performance.now();
     const receipt: VerifyReceipt = {ok: false, target: typeof (raw as Input)?.target === 'string' ? (raw as Input).target : '', uses: [], probe: {created: false, removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: []};
@@ -101,8 +106,8 @@ export class VerifyUse {
       try { await Promise.race([removal, new Promise<void>(resolve => {timer = setTimeout(resolve, Math.min(3000, input.timeoutMs));})]); }
       finally {clearTimeout(timer); receipt.previousRemovalWaitMs = round(performance.now() - at);}
     }
-    if (active.has(this.host) || [...this.host.minds.keys()].some(isVerificationProbe)) return fail({code: 'verify.busy', message: 'This world already has a verifier probe.'}, input.uses);
-    active.add(this.host);
+    if (active.has(this.host) || [...this.host.minds.keys()].some(isVerificationProbe)) return fail({code: 'verify.busy', message: `This world already has a verifier probe, held by pid=${process.pid} host=${holder().host} start=${holder().start}; run doctor.`}, input.uses);
+    active.add(this.host); lockAt.set(this.host, Date.now());
     let retired = false, probe: SoulRow | undefined, listener: WorldHost['listeners'][number] | undefined;
     const deadline = started + input.timeoutMs;
     const phase = async <T>(name: keyof Timings, work: () => Promise<T>): Promise<T> => {

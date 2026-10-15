@@ -586,3 +586,5 @@ build done "hall, tower, three stalls"
 Massing is ≤8 site-local boxes, not grey entities to remove later. Remove + replacement belong in one batch.
 In a fresh folder, `build resume market-hall` reports the unfinished `current` step, recent edits, roots,
 massing part counts and `next`. Finish `current` before advancing.
+
+Locks: `doctor` lists Chrome, keeper, state, build, claim and verifier holders; `doctor --fix` breaks stale ownership. Saved steps survive recovery. A look has a 30 s deadline. Use `doctor --local` offline.

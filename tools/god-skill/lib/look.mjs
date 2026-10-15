@@ -22,13 +22,15 @@ import { COMPASS, compassKey } from './solver.mjs';
 
 const GL_ARGS = process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--ignore-gpu-blocklist'];
 const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; };
+import { acquireLock, holder, liveness, lockStatus, parseHolder } from './locks.mjs';
+import { atomicWrite } from './state.mjs';
 import { chromeLease as lease } from './chrome-lease.mjs';
 /** One headless Chrome at a time on a shared machine (the lanes' lease); EDEN_GOD_NO_LEASE=1 skips it. */
 export const chromeLease = (holder = 'eden-god', o) => (process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {}) : lease(holder, o));
 const KEEPER = '.eden-god.look.json';
 const IDLE_MS = 20 * 60_000;
 
-export function findPlaywright() {
+export function findPlaywright({ timeoutMs = 60_000 } = {}) { // first fetch of playwright-core (~10 MB) on a fresh or busy machine
   const here = (() => { try { return dirname(fileURLToPath(import.meta.url)); } catch { return process.cwd(); } })();
   const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, process.cwd(), here, resolve(here, '../..'), resolve(here, '../../..'), resolve(here, '../../../mars/viewer'), resolve(here, '../../mars/viewer'), resolve(here, '../mars/viewer')].filter(Boolean);
   for (const b of bases) {
@@ -41,7 +43,7 @@ export function findPlaywright() {
   // Google Chrome draws). The folder is remembered in the environment, so the keeper and shot children skip this.
   if (process.env.EDEN_GOD_NO_NPX) return null;
   try {
-    const r = spawnSync('npx', ['-y', '-p', 'playwright-core@1', '-c', 'echo "$PATH"'], { encoding: 'utf8', timeout: 300_000, stdio: ['ignore', 'pipe', 'pipe'] });
+    const r = spawnSync('npx', ['-y', '-p', 'playwright-core@1', '-c', 'echo "$PATH"'], { encoding: 'utf8', timeout: Math.max(1, Math.min(60_000, timeoutMs)), killSignal: 'SIGKILL', stdio: ['ignore', 'pipe', 'pipe'] });
     const bin = (r.stdout ?? '').trim().split(':').find((d) => /[\\/]_npx[\\/][^\\/]+[\\/]node_modules[\\/]\.bin$/.test(d));
     if (bin) {
       const base = resolve(bin, '../..'), m = createRequire(resolve(base, 'noop.js'))('playwright-core');
@@ -66,59 +68,76 @@ export function camera({ target, span, from = 's', dist, inside = false, height,
 
 const freePort = () => new Promise((res, rej) => { const s = createServer(); s.unref(); s.on('error', rej); s.listen(Number(process.env.EDEN_GOD_LOOK_PORT ?? 0), '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
 const alive = async (port) => { try { const r = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(3000) }); return r.ok; } catch { return false; } };
-const readKeeper = () => { try { return JSON.parse(readFileSync(KEEPER, 'utf8')); } catch { return null; } };
+export const readKeeper = () => { try { return JSON.parse(readFileSync(KEEPER, 'utf8')); } catch { return null; } };
 
 /** The keeper process body (`eden-god.mjs look-keeper <worldUrl> <port>`): one Chrome, one tab on the world, until idle. */
 export async function keeper(worldUrl, port) {
+  const release = acquireLock(`${KEEPER}.lock`, { label: 'look keeper' });
+  let browser;
+  try {
   const pw = findPlaywright(); if (!pw) throw new Error('no Playwright package found');
-  const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
+  browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
   // keep the WebGL drawing buffer so the canvas can be read back at any time (page.screenshot stalls on a slow software compositor)
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
-  await page.goto(`${worldUrl}?shot=1`, { waitUntil: 'commit', timeout: 600_000 });
-  writeFileSync(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
+  await page.goto(`${worldUrl}?shot=1`, { waitUntil: 'commit', timeout: 25_000 });
+  const identity = holder('look keeper');
+  const write = () => atomicWrite(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 30_000 }));
+  write();
+  let lastUse = statSync(KEEPER).mtimeMs;
+  process.once('exit', () => { try { if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync(KEEPER, { force: true }); } finally { release(); } });
   for (;;) {
-    await new Promise((r) => setTimeout(r, 30_000));
+    await new Promise((r) => setTimeout(r, 5000));
     let last = 0; try { last = statSync(KEEPER).mtimeMs; } catch { break; }
-    if (Date.now() - last > IDLE_MS || readKeeper()?.pid !== process.pid) break;
+    if (last !== lastUse) lastUse = last;
+    if (Date.now() - lastUse > IDLE_MS || readKeeper()?.pid !== process.pid) break;
+    // Refresh liveness without changing the idle-use timestamp.
+    write(); utimesSync(KEEPER, new Date(lastUse), new Date(lastUse));
   }
-  await browser.close().catch(() => {});
+  } finally { if (browser) await browser.close().catch(() => {}); release(); }
   process.exit(0);
 }
 
-async function ensureKeeper(worldUrl, cliPath) {
+async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
   const k = readKeeper();
-  if (k && k.world === worldUrl && await alive(k.port)) { const now = new Date(); try { utimesSync(KEEPER, now, now); } catch { /* fine */ } return k; }
-  if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ }
+  if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && k.world === worldUrl && await alive(k.port)) { const now = new Date(); try { utimesSync(KEEPER, now, now); } catch { /* fine */ } return k; }
+  if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && liveness(parseHolder(k.holder)) !== 'alive') throw Object.assign(new Error('lock.busy: look keeper identity is uncertain; run doctor after its 30 s TTL'), { code: 'lock.busy' });
+  if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ }
   rmSync(KEEPER, { force: true });
   const port = await freePort();
   const child = spawn(process.execPath, [cliPath, 'look-keeper', worldUrl, String(port)], { detached: true, stdio: 'ignore', cwd: process.cwd(), env: process.env });
   child.unref();
-  for (let i = 0; i < 600; i++) { await new Promise((r) => setTimeout(r, 1000)); const kk = readKeeper(); if (kk?.pid === child.pid && await alive(port)) return kk; }
-  throw new Error('look: the browser keeper did not start in 10 minutes');
+  runtime.keeperChild = child;
+  for (let i = 0; i < 24; i++) { await new Promise((r) => setTimeout(r, 1000)); const kk = readKeeper(); if (kk && kk.world === worldUrl && !lockStatus(parseHolder(kk.holder), kk.heartbeatAt ?? 0).stale && await alive(kk.port)) { runtime.keeperChild = null; return kk; } }
+  child.kill('SIGKILL');
+  throw new Error('look.timeout: the browser keeper did not start within 25 s; run doctor --fix');
 }
-export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
+export function stopKeeper() { const k = readKeeper(); if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+async function shootInner({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const t0 = now();
   const overrides = { ...(hour != null ? { hour } : {}), ...(weather != null ? { weather } : {}) };
-  const pw = runtime.pw === undefined ? findPlaywright() : runtime.pw;
+  const pw = runtime.pw === undefined ? findPlaywright({ timeoutMs }) : runtime.pw;
+  if (now() - t0 >= timeoutMs) throw Object.assign(new Error('look.timeout: Playwright discovery exceeded deadline'), { code: 'look.timeout' });
   if (!pw) {
     if (keep) throw new Error('look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works');
     const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
-    const r = (runtime.spawnSync ?? spawnSync)('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
+    const r = (runtime.spawnSync ?? spawnSync)('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: Math.max(1, timeoutMs - (now() - t0)), killSignal: 'SIGKILL' });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: now() - t0, via: 'npx playwright-core screenshot' };
   }
   let page, browser, release = () => {};
+  let cancelled = false;
+  runtime.cleanup = () => { cancelled = true; runtime.keeperChild?.kill('SIGKILL'); release(); if (browser && !keep) void browser.close().catch(() => {}); };
+  try {
   const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
   if (keep) {
-    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
-    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
+    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1], runtime);
+    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 25_000 });
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
     // A newly started (or older) keeper has only ?shot=1. Give the viewer its initial camera too,
@@ -127,14 +146,16 @@ export async function shoot({ worldUrl, eye, at, out, hour, weather, hideRoofs =
     const current = new URL(page.url()).searchParams;
     if (!current.has('eye') || !current.has('at') || ['hour', 'weather'].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
   } else {
-    release = await (runtime.lease ?? chromeLease)('eden-god look');
+    const unlock = await (runtime.lease ?? chromeLease)('eden-god look');
+    let unlocked = false; release = () => { if (!unlocked) { unlocked = true; unlock(); } };
+    if (cancelled) { release(); throw new Error('look.timeout: lease wait exceeded deadline'); }
     browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch((e) => { release(); throw new Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });
+    if (cancelled) { void browser.close().catch(() => {}); throw new Error('look.timeout: browser launch exceeded deadline'); }
     const ctx = await browser.newContext({ viewport: { width, height } });
     await ctx.addInitScript(PRESERVE);
     page = await ctx.newPage();
     await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
   }
-  try {
   const deadline = now() + timeoutMs;
   let state = null, stable = 0, lastDrawn = -1;
   while (now() < deadline) {
@@ -190,5 +211,15 @@ export async function shoot({ worldUrl, eye, at, out, hour, weather, hideRoofs =
   if (!data) throw new Error('look: no canvas on the page');
   writeFileSync(resolve(out), Buffer.from(data.split(',')[1], 'base64'));
   return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? 'keeper' : 'chrome' };
-  } finally { if (!keep) { await browser.close().catch(() => {}); release(); } }
+  } finally { if (!keep) { release(); if (browser) void browser.close().catch(() => {}); } }
+}
+
+// One wall-clock deadline includes lease, keeper, navigation, settling and capture. A first look on a busy machine
+// (Chrome start, world download, software GL) has taken 40 s: default 120 s, at most 10 min (EDEN_GOD_LOOK_TIMEOUT_MS).
+export const LOOK_DEFAULT_MS = 120_000, LOOK_MAX_MS = 600_000;
+export async function shoot(options, runtime = {}) {
+  const ms = Math.min(LOOK_MAX_MS, Math.max(1, options.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? LOOK_DEFAULT_MS)));
+  let timer;
+  try { return await Promise.race([shootInner({ ...options, timeoutMs: ms }, runtime), new Promise((_, reject) => { timer = setTimeout(() => { runtime.cleanup?.(); reject(Object.assign(new Error(`look.timeout: exceeded ${ms} ms; run doctor --fix`), { code: 'look.timeout' })); }, ms); })]); }
+  finally { clearTimeout(timer); }
 }
