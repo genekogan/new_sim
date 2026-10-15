@@ -20,6 +20,11 @@ export type EyesOptions = {
 type Frame = {key: string; img: string; tick: number; alt: string; heading: unknown; gaze: unknown; seen: unknown; at: number; expires: number; ms: number; frameTick: number | null};
 const num = (v: string | undefined, d: number) => {const n = Number(v); return v !== undefined && v !== '' && Number.isFinite(n) ? n : d;};
 const envNum = (k: string, d: number) => num(process.env[k], d);
+/** Explicit `world` opt-in derives this child's exact path, including a launcher's /worlds prefix. */
+export function eyesViewerUrl(setting: string | undefined, cfg: {worldPath: string; publicUrl: string}): string | undefined {
+  if (!setting || setting === 'off') return undefined;
+  return setting === 'world' ? new URL(cfg.worldPath.replace(/\/$/, '') + '/', cfg.publicUrl).href : setting;
+}
 /** A inherited manager-wide viewer URL must never draw a different world's scene. */
 export function eyesViewerProblem(viewerUrl:string,cfg:{worldPath:string;publicUrl:string}):string|null{
   try{const viewer=new URL(viewerUrl),selected=new URL(cfg.publicUrl),path=cfg.worldPath.replace(/\/$/,'');
@@ -40,10 +45,12 @@ export function parseViewQuery(q: (k: string) => string | undefined): ViewReques
 
 export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options: EyesOptions = {}) {
   const now = options.now ?? Date.now;
-  const viewerUrl=process.env.EDGE_EYES,problem=viewerUrl?eyesViewerProblem(viewerUrl,deps.souls.cfg):null;
+  const viewerUrl=eyesViewerUrl(process.env.EDGE_EYES,deps.souls.cfg),problem=viewerUrl?eyesViewerProblem(viewerUrl,deps.souls.cfg):null;
   const refused:EyesRenderer={status:()=>({...NO_RENDERER.status(),detail:problem}),render:()=>Promise.reject(new EyesUnavailable(problem!)),close(){}};
   const renderer: EyesRenderer = options.renderer ?? (problem?refused:viewerUrl ? new EyesWorker({viewerUrl, timeoutMs: envNum('EDGE_EYES_TIMEOUT_SECONDS', 90) * 1000}) : NO_RENDERER);
-  const soulMs = (options.soulSeconds ?? envNum('EDGE_EYES_SOUL_SECONDS', 30)) * 1000, globalPerMinute = options.globalPerMinute ?? envNum('EDGE_EYES_GLOBAL_PER_MINUTE', 12);
+  // Operators may tighten these budgets, never exceed the published 30 s / 12 per minute bounds.
+  const soulMs = Math.max(30, options.soulSeconds ?? envNum('EDGE_EYES_SOUL_SECONDS', 30)) * 1000,
+    globalPerMinute = Math.max(1, Math.min(12, Math.floor(options.globalPerMinute ?? envNum('EDGE_EYES_GLOBAL_PER_MINUTE', 12))));
   const bucketTicks = Math.max(1, Math.round((options.bucketSeconds ?? envNum('EDGE_EYES_BUCKET_SECONDS', 10)) * TPS));
   const urlMs = (options.urlSeconds ?? envNum('EDGE_EYES_URL_SECONDS', 600)) * 1000, quality = options.quality ?? envNum('EDGE_EYES_QUALITY', 0.7);
   const frames = new Map<string, Frame>(), images = new Map<string, {jpeg: Buffer; expires: number}>(), lastRender = new Map<string, number>(), recent: number[] = [];
@@ -96,7 +103,7 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
       let out;
       try {out = await renderer.render({...plan.render, quality});}
       catch (error) {
-        if (error instanceof EyesUnavailable) {lastRender.delete(s.soulId); return fail(c, 503, 'eyes.unavailable', `No picture right now (${error.reason}); the caption below describes the same view.`, {...base, url: null});}
+        if (error instanceof EyesUnavailable) {if(lastRender.get(s.soulId)===t)lastRender.delete(s.soulId); return fail(c, 503, 'eyes.unavailable', `No picture right now (${error.reason}); the caption below describes the same view.`, {...base, url: null});}
         throw error;
       }
       const img = randomBytes(16).toString('hex'), expires = now() + urlMs;

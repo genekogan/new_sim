@@ -144,3 +144,18 @@ test('eyes route: privacy, cache, per-Soul and global limits, 503 caption fallba
   // expiry: after the URL lifetime the picture is gone
   clock += 11 * 60_000; assert.equal((await app.request(first.body.url)).status, 404);
 });
+
+test('a slow failed capture never refunds a newer capture by the same Soul', async t => {
+  const w=await edenNavWorld(1,{nav:false});t.after(()=>{w.f.host.stop();w.f.db.close();});
+  let clock=1_000_000,rejectOld!: (error:Error)=>void,markStarted!:()=>void;
+  const started=new Promise<void>(resolve=>markStarted=resolve),fake=new FakeRenderer();
+  const render=fake.render.bind(fake);let first=true;
+  fake.render=job=>{if(first){first=false;markStarted();return new Promise((_,reject)=>rejectOld=reject);}return render(job);};
+  const app=new Hono();mountEdgeEyes(app,{host:w.f.host,db:w.f.db,souls:w.f.souls,ledger:w.ledger,soul:()=>w.souls[0]}, {renderer:fake,now:()=>clock});
+  const old=app.request('/v1/edge/view');await started;
+  clock+=31_000;assert.equal((await app.request('/v1/edge/view?size=small')).status,200);
+  rejectOld(new EyesUnavailable('old render failed'));assert.equal((await old).status,503);
+  // The small frame is cached, so use a different size to require a new capture.
+  const retry=await app.request('/v1/edge/view?w=640&h=400');assert.equal(retry.status,429);
+  assert.equal((await retry.json()).error.code,'eyes.rate-limited');assert.equal(fake.jobs.length,1);
+});
