@@ -231,10 +231,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (ev.kind === 'step') return;
     const r = this.rows("program_id=? AND phase IN ('waiting','started')", ev.id)[0]; if (!r) return;
     if (ev.kind === 'completed') {
-<<<<<<< ours
       const unsupported = this.nativeUseRefusal?.(r.capability);
       if (unsupported) { this.update(r.receipt_id, {phase: 'failed', code: unsupported.code, reason: unsupported.reason}); return; }
-=======
       const stand=r.detail?(JSON.parse(r.detail) as {standReleaseV1?:StandReleaseV1}).standReleaseV1:undefined;
       if(stand){
         const row=this.db.soul(r.soul_id),mind=this.host.minds.get(r.soul_id),live=new Set(this.host.engine.runtime.liveIds());
@@ -244,7 +242,6 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if(!identity||!released||!this.host.engine.standingSupportProblemV1||support){this.update(r.receipt_id,{phase:'failed',code:!identity?'stand.identity-changed':support?.code??'stand.not-released',reason:!identity?'The original Soul/body binding changed before standing.':support?.message??'The original seat claim was not released on admitted standing support.'});return;}
         this.setDetail(r.receipt_id,{standWitnessV1:{actor:stand.actor,released:stand.seats,tick:this.host.engine.world.tick,position:[...this.body(stand.actor)!.pose.p]}});
       }
->>>>>>> theirs
       // together/1: a follow walks on leg after leg under the same receipt until it is stopped or its target is gone
       const m = this.host.minds.get(r.soul_id);
       if (m && this.together.continueFollow(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
