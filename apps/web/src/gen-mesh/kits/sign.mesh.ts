@@ -7,10 +7,16 @@ import { kitArgs } from '@sim/generators';
 import { buildKit } from '../kit.mesh.ts';
 import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
+import { apiPath } from '../../world-path.ts';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean };
 const texCache = new Map<string, THREE.Texture>();
 const loader = typeof document !== 'undefined' ? new THREE.TextureLoader() : null;
+
+/** Only content-addressed assets served by this world's route can become sign media. */
+export function signMediaPath(media: unknown): string | null {
+  return typeof media === 'string' && /^\/assets\/[0-9a-f]{64}\.(png|jpg)$/.test(media) ? apiPath(media) : null;
+}
 
 function textTexture(lines: string[], f: Face): THREE.Texture {
   const key = JSON.stringify([lines, f.w, f.h, f.bg, f.ink, f.font]);
@@ -48,8 +54,8 @@ registerMesh({
     for (const f of faces) {
       let map: THREE.Texture;
       if (f.media) {
-        const url = typeof st.media === 'string' ? st.media : '';
-        if (url && loader && /^(https?:|\/|data:image)/.test(url)) { map = texCache.get(url) ?? loader.load(url); map.colorSpace = THREE.SRGBColorSpace; texCache.set(url, map); }
+        const url = signMediaPath(st.media);
+        if (url && loader) { map = texCache.get(url) ?? loader.load(url); map.colorSpace = THREE.SRGBColorSpace; texCache.set(url, map); }
         else if (text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
         else map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
       } else map = textTexture((f.line !== undefined ? [text[f.line] ?? ''] : text).slice(0, 6), f);

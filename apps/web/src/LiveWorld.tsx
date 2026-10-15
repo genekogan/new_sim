@@ -64,7 +64,7 @@ import { newWorld } from './world-kind.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
-import { GodWorldLiving, godTourViews } from './world-env.ts';
+import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
@@ -299,6 +299,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
+    const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
     const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));if(newWorld)scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
@@ -317,7 +318,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
       const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
     };
-    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,get controls(){return controls;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
+    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,applyEdge:(msg:Parameters<WorldEntityLayer['applyEdge']>[0][number]|Parameters<WorldEntityLayer['applyEdge']>[0])=>entityLayer.applyEdge(Array.isArray(msg)?msg:[msg]),siteStyle:(style:string)=>entityLayer.sites.siteStyle(style),siteStats:()=>entityLayer.sites.inspect(),camera,get controls(){return controls;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -699,7 +700,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const ref = take.startTick + take.ticks;
           const clockOffset=(depictedTick-ref)*(dayTicks?86400/dayTicks:dt);
           const datetime = clock ? shiftIso(clock, clockOffset) : null;
-          light.update(clock?shiftIso(clock,clockOffset,true):null);
+          light.update(shotClockAt(clock?shiftIso(clock,clockOffset,true):null,shotHour));
+          entityLayer.sites.setWorldClock(datetime,dayTicks?86400/(dayTicks*dt):1);
           const godLit=!!godLiving&&entityLayer.active;light.setNightLighting(!!expansion||godLit);if(!godLit)setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
           brokenTake = null;
@@ -802,7 +804,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;
-      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null,...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
+      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
@@ -899,7 +901,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     // click (not drag) to select a Soul, a thing, or a kin
     const inspectHover=(t:HoverTarget)=>{if(t.kind==='soul'){setPlaceCard(null);context.current.setThing(null);context.current.onSelect(t.id);}else if(t.kind==='object'){setPlaceCard(null);context.current.onSelect(null);context.current.setThing(t.id);}else setPlaceCard(t);};
-    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul)return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>drawnTick.current!==null&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
+    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[entityLayer.sites.group,floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const site=entityLayer.sites.hoverTarget(id);if(site)return site;const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul)return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>(entityLayer.active||drawnTick.current!==null)&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
     const onDown = (e: PointerEvent) => { groupSelection.clear(); orbitPivot.cancel(); down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; };
     const onMove = (e: PointerEvent) => {
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) context.current.setCameraMode(cameraModeAfterGesture(context.current.cameraMode));
@@ -951,7 +953,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       labels.clear();
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
-      edgeItems.dispose();entityLayer.dispose();
+      edgeItems.dispose();entityLayer.dispose();const entityDebug=window as unknown as {__simEntity?:{layer:WorldEntityLayer}};if(entityDebug.__simEntity?.layer===entityLayer)delete entityDebug.__simEntity;
       initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();

@@ -17,8 +17,9 @@ import { assetUrl } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
 import { planEager } from './gen-mesh/lazy-assets.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
+import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 
-type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number> };
+type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
@@ -43,6 +44,7 @@ export class WorldEntityLayer {
   private materials = new Map<string, THREE.Material>();
   readonly lib = new MaterialLib();
   readonly instancer = new EntityInstancer();
+  readonly sites: WorldBuildSites;
   get entityCount() { return this.model?.entities.size ?? 0; }
   private horizon: THREE.Mesh | null = null;
   /** MARSLAND-FAR: entities whose def is tagged `horizon` (core/far-land@1, core/panorama@1) replace the green ring. */
@@ -55,8 +57,13 @@ export class WorldEntityLayer {
   private readonly api: (p: string) => string;
   constructor(api: (p: string) => string) {
     this.api = api;
+    this.sites = new WorldBuildSites({ model: () => this.model, groundAt: this.groundAt, fetchBuilds: async () => {
+      const r = await fetch(this.api('/v1/world/builds'), { signal: this.signal ?? undefined, cache: 'no-store' });
+      if (!r.ok) throw Error(`Build snapshot: ${r.status}`);
+      return r.json();
+    } });
     this.group.name = 'entity-world';
-    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup, this.instancer.group);
+    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup, this.instancer.group, this.sites.group);
   }
 
   private signal: AbortSignal | null = null;
@@ -68,10 +75,12 @@ export class WorldEntityLayer {
     this.resyncing = true;
     try {
       const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return;
-      const snap: Snapshot = await r.json(); if (snap.contract !== 'world/1') return;
+      const snap: Snapshot = await r.json(); if (this.signal.aborted || snap.contract !== 'world/1') return;
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
       this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
       this.seq = snap.seq;
+      this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
+      this.sites.refreshAll(JSON.stringify(snap.ground) !== prevGround);
       if (JSON.stringify(snap.ground) !== prevGround) { this.rebuildTerrain(); this.rebuildWater(); this.buildHorizon(); }
       const keep = new Set(snap.entities.map((e) => e.id));
       for (const id of [...this.drawn.keys()]) if (!keep.has(id)) this.undraw(id);
@@ -93,6 +102,7 @@ export class WorldEntityLayer {
     const eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
     this.seq = snap.seq;
+    this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
     this.active = true;
     this.rebuildTerrain();
     this.rebuildWater();
@@ -102,9 +112,10 @@ export class WorldEntityLayer {
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
-  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown }[]) {
+  applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
     if (!this.model) return;
     for (const m of msgs) {
+      if (m.kind === 'world-build') { if (typeof m.rev === 'number' && m.rev > this.sites.maxRev) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
@@ -115,26 +126,31 @@ export class WorldEntityLayer {
     if (!this.model) return;
     {
       this.seq = d.seq;
+      const held = this.sites.heldRemovals(d, this.model);
+      this.sites.apply(d);
       for (const def of [...(d.defs ?? []), ...d.diff.defs]) { this.model.defs.set('sha:' + def.hash, def); this.model.defs.set(def.ref, def); if (def.ref.startsWith('core-')) this.model.defs.set('core/' + def.ref.slice(5), def); }
-      for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id); }
+      for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id, held.has(id) ? SITE_REFINEMENT.removalDelaySeconds : 0); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
       if ((d.diff as { constants?: WorldModel['constants'] }).constants) this.model.constants = (d.diff as { constants?: WorldModel['constants'] }).constants!;   // GOD-ENV: the world grew
       if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = sameBase(this.model.ground(), d.ground) ? this.model.terrain.retile(d.ground, d.diff.tiles) : new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
       if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
+      if (d.ground) this.sites.refreshAll(true); else this.sites.refitDiff(d);
       for (const e of d.diff.upserts) this.draw(e, true);
       // children ride with a moved parent: refresh their targets without easing
-      for (const e of d.diff.upserts) for (const cid of this.model.subtree(e.id).slice(1)) { const c = this.model.entities.get(cid); if (c) this.draw(c, false); }
+      const upserted = new Set(d.diff.upserts.map(e => e.id));
+      for (const e of d.diff.upserts) for (const cid of this.model.subtree(e.id).slice(1)) { const c = this.model.entities.get(cid); if (c && !upserted.has(cid)) this.draw(c, false); }
     }
   }
 
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
+    this.sites.update(nowMs);
     if (this.horizon) this.horizon.visible = this.horizonBy.size === 0;
     if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
-      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number } | null) => { if (j && j.seq !== this.seq) void this.resync(); }).catch(() => {});
+      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; builds?: number } | null) => { if (!this.signal?.aborted && j) { if (j.seq !== this.seq) void this.resync(); else this.sites.checkRevision(j.builds); } }).catch(() => {});
     }
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)
@@ -224,6 +240,7 @@ export class WorldEntityLayer {
   };
 
   dispose() {
+    this.sites.dispose();
     this.instancer.dispose();
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
@@ -348,11 +365,12 @@ export class WorldEntityLayer {
     const isWorld = !!builder?.world;
     const wp = m.worldPose(e);
     const target = isWorld ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(wp.x, wp.y, wp.z);
+    const refinement = ease && !isWorld ? this.sites.refinement(e, m) : null;
     if (existing && existing.defHash === defHash && !existing.removing && !force) {
       if (isWorld) return;
       existing.obj.rotation.set(0, wp.yaw, 0); applyTilt(existing.obj, e);
-      existing.from = { p: ease ? existing.obj.position.clone() : target.clone(), s: ease ? existing.obj.scale.x : wp.s };
-      existing.to = { p: target, s: wp.s }; existing.t0 = this.now; existing.dur = ease ? EASE_IN_S : 0.001; existing.settled = false;
+      existing.from = refinement ? { p: target.clone(), s: wp.s * refinement.scale } : { p: ease ? existing.obj.position.clone() : target.clone(), s: ease ? existing.obj.scale.x : wp.s };
+      existing.to = { p: target, s: wp.s }; existing.t0 = this.now; existing.dur = ease ? refinement?.seconds ?? EASE_IN_S : 0.001; existing.settled = false;
       return;
     }
     let built = this.build(e, def);
@@ -363,17 +381,17 @@ export class WorldEntityLayer {
     if (instKey) { this.instancer.ensure(instKey, built); built = new THREE.Object3D(); }
     if (!isWorld) { built.rotation.set(0, wp.yaw, 0); applyTilt(built, e); }
     const fresh = !existing;
-    const from = fresh && ease ? { p: target.clone().add(new THREE.Vector3(0, DROP_M, 0)), s: wp.s * 0.2 } : { p: target.clone(), s: wp.s };
+    const from = refinement ? { p: target.clone(), s: wp.s * refinement.scale } : fresh && ease ? { p: target.clone().add(new THREE.Vector3(0, DROP_M, 0)), s: wp.s * 0.2 } : { p: target.clone(), s: wp.s };
     built.position.copy(from.p); built.scale.setScalar(from.s);
     if (!instKey) this.thingsGroup.add(built);
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
-    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
+    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
-  private undraw(id: string) {
+  private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
-    d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
+    d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now + delaySeconds * 1000; d.dur = EASE_OUT_S;
   }
   /** One Object3D for an entity, from its def's mesh half (gen-mesh registry). Null when it has no picture (landforms, prefab roots, bodies). */
   private build(e: Entity, def: StoredDef): THREE.Object3D | null {
@@ -396,16 +414,6 @@ export class WorldEntityLayer {
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 
-function labelSprite(text: string): THREE.Sprite {
-  const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')!;
-  ctx.font = '600 28px system-ui, sans-serif'; const w = Math.ceil(ctx.measureText(text).width) + 28;
-  canvas.width = w; canvas.height = 44; const c2 = canvas.getContext('2d')!;
-  c2.fillStyle = 'rgba(20,20,20,0.75)'; c2.beginPath(); c2.roundRect(0, 0, w, 44, 10); c2.fill();
-  c2.font = '600 28px system-ui, sans-serif'; c2.fillStyle = '#fff'; c2.textBaseline = 'middle'; c2.fillText(text, 14, 23);
-  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.scale.set(w / 44 * 1.2, 1.2, 1); sprite.renderOrder = 10; return sprite;
-}
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
