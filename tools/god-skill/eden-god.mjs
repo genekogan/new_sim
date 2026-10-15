@@ -1656,7 +1656,7 @@ async function withRemoteLook(args, runtime, local) {
 }
 
 // lib/chrome-lease.mjs
-async function chromeLease(label = "unknown", { waitMs = 25e3, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
+async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
   const started = Date.now();
   for (; ; ) {
     try {

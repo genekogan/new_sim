@@ -1,6 +1,8 @@
 // Chrome shares the same ownership/stale/release contract as state and keeper startup locks.
 import { acquireLock, CHROME_LOCK, LOCK_TTL_MS } from './locks.mjs';
-export async function chromeLease(label = 'unknown', { waitMs = 25_000, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
+// waitMs: one browser per machine is shared by every god and test lane; a look's own deadline (120 s by default) bounds the
+// whole wait, so wait most of it here rather than failing after 25 s while another look finishes.
+export async function chromeLease(label = 'unknown', { waitMs = 110_000, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
   const started = Date.now();
   for (;;) {
     try { return acquireLock(leaseDir, { label, ttlMs: staleMs }); }
