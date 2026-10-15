@@ -27,6 +27,8 @@ export type Slot = {
   level: number;
   /** Action id holding `slot:<id>`, if any. */
   claimedBy?: string;
+  /** Versioned in the asset fact, retained in planned slots and snapshots. */
+  approachPolicy?: 'reachable/1';
 };
 
 /**
@@ -62,7 +64,7 @@ export function fixtureSlots(rt: Runtime, e: Entity): Slot[] {
   const defs = CATALOG[e.def]?.slots ?? [];
   const level = levelOf(rt, e);
   const c: Vec2 = [e.pose.p[0], e.pose.p[2]];
-  return defs.map((d) => claimed(rt, { id: `${e.id}#${d.id}`, owner: e.id, kind: d.kind, p: add2(c, rot2(d.local, e.pose.yaw)), yaw: wrapAngle(e.pose.yaw + d.yaw), level }));
+  return defs.map((d) => claimed(rt, { id: `${e.id}#${d.id}`, owner: e.id, kind: d.kind, p: add2(c, rot2(d.local, e.pose.yaw)), yaw: wrapAngle(e.pose.yaw + d.yaw), level, ...(d.approachPolicy ? { approachPolicy: d.approachPolicy } : {}) }));
 }
 
 export function pointInPolygon(p: Vec2, poly: [number, number][]): boolean {
@@ -234,7 +236,7 @@ export const needsApproach = (w: WorldState, s: Slot) => s.kind === 'seat' && !!
  * Approach point of a fixture seat (see APPROACH_GAPS), or `slot.unreachable` naming what blocks
  * both the front and the back (e.g. "passage-e (passage east wall)").
  */
-export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
+export function seatApproach(rt: Runtime, s: Slot, opts: { minClearance?: number; accept?: (p: Vec2) => boolean; anyAngle?: boolean } = {}): Vec2 | Diagnostic {
   const e = rt.world.entities[s.owner];
   const d = CATALOG[e.def];
   const sp = rt.services.spatial as Spatial | undefined;
@@ -244,6 +246,7 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   const local = rot2(sub2(s.p, c), -e.pose.yaw);
   const half: Vec2 = [d.size[0] / 2, d.size[2] / 2];
   const tried: { p: Vec2; cl: number }[] = [];
+  const required = Math.max(APPROACH_CLEARANCE, opts.minClearance ?? 0);
   for (const side of [1, -1]) {
     const yawL = s.yaw - e.pose.yaw + (side < 0 ? Math.PI : 0);
     const u: Vec2 = [dcos(yawL), dsin(yawL)];
@@ -251,7 +254,7 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
     for (const gap of APPROACH_GAPS) {
       const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
       const cl = g ? clearanceAt(g, p) : Infinity;
-      if (cl >= APPROACH_CLEARANCE) return p;
+      if (cl >= required && (!opts.accept || opts.accept(p))) return p;
       tried.push({ p, cl });
     }
   }
@@ -263,7 +266,18 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
     const edge = edgeDistance(local, u, half);
     for (const gap of SIDE_GAPS) {
       const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
-      if ((g ? clearanceAt(g, p) : Infinity) >= APPROACH_CLEARANCE) return p;
+      if ((g ? clearanceAt(g, p) : Infinity) >= required && (!opts.accept || opts.accept(p))) return p;
+    }
+  }
+  // A rotated, furnished room may have standing room diagonally off a seat's corner even when its four axes are
+  // pinched. Only the versioned entity-seat policy requests this bounded angular search; old assets stay identical.
+  if (opts.anyAngle) for (let k = 1; k < 16; k++) {
+    if (k % 4 === 0) continue; // front/back/sides were tried above
+    const yawL = s.yaw - e.pose.yaw + k * Math.PI / 8, u: Vec2 = [dcos(yawL), dsin(yawL)];
+    const edge = edgeDistance(local, u, half);
+    for (const gap of SIDE_GAPS) {
+      const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
+      if ((g ? clearanceAt(g, p) : Infinity) >= required && (!opts.accept || opts.accept(p))) return p;
     }
   }
   const front = tried[0], back = tried[APPROACH_GAPS.length];
@@ -277,7 +291,7 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   const bf = blocker(front.p), bb = blocker(back.p);
   return {
     code: 'slot.unreachable',
-    message: `${s.id} cannot be sat on: no standing room ${APPROACH_GAPS[0]}–${APPROACH_GAPS[APPROACH_GAPS.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${APPROACH_CLEARANCE.toFixed(2)} m`,
+    message: `${s.id} cannot be sat on: no standing room ${APPROACH_GAPS[0]}–${APPROACH_GAPS[APPROACH_GAPS.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${required.toFixed(2)} m`,
     subjects: [s.id, s.owner, ...new Set([bf, bb].filter((x): x is string => !!x))],
     at: [front.p[0], 0, front.p[1]],
   };

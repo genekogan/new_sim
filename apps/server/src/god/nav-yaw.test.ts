@@ -79,7 +79,8 @@ test('furnished roundhouses: enter, reach the named room, sit and leave at 0/30/
   await settle(4);
   const seatOf = (ref: string) => {
     const house = god.model.get(ref)!;
-    const seat = [...god.model.entities.values()].find((e) => e.in.parent === house.id && e.in.slot === 'living' && god.model.slotsOf(e).some((s) => s.kind === 'seat'));
+    const seat = [...god.model.entities.values()].filter((e) => e.in.parent === house.id && e.in.slot === 'living' && god.model.slotsOf(e).some((s) => s.kind === 'seat'))
+      .sort((a, b) => Number(!/armchair/.test(a.def)) - Number(!/armchair/.test(b.def)))[0];
     assert.ok(seat, `${ref} has a seat inside its named living room`);
     return seat.id;
   };
@@ -150,6 +151,22 @@ test('furnished roundhouses: enter, reach the named room, sit and leave at 0/30/
     ownSeat = undefined;
   };
   await walk('walk:lawn');
+  await t.test('a closed door refuses an indoor seat without walking through walls', async () => {
+    const original = god.model.resolvedDef(coreRef('roundhouse'))!;
+    const { ref: _ref, hash: _hash, by: _by, born: _born, ...definition } = original;
+    edit([
+      { op: 'define', def: { ...definition, name: 'closeable-roundhouse', state: { ...definition.state, doors: { type: 'json', default: {} } } } },
+      { op: 'place', tmp: '$sealed', def: 'closeable-roundhouse@1', name: 'sealed-house', p: [0, -24], r: radians(37), state: { doors: { 'front-door': 'closed' } } },
+      { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$sealed', slot: 'living' }, p: [0, 0, 0] },
+    ], 'close the only entrance to an indoor chair');
+    await settle(4);
+    const denied: any = await accept(f.host, edge.act(soul, { capability: `sit:${seatOf('sealed-house')}` }));
+    assert.equal(denied.accepted, false, 'the unreachable seat is refused before movement');
+    assert.match(denied.code, /^(route|slot)\./);
+    assert.equal(room(), null, 'the resident remains outside');
+    edit([{ op: 'remove', id: 'sealed-house' }], 'remove the closed-door control');
+    await settle(4);
+  });
   for (const degrees of [0, 30, 37, 45, 60, 82]) {
     await t.test(`${degrees} degrees`, async () => {
       edit([{ op: 'move', id: 'rose-house', p: [-12, 4], r: radians(degrees) }], `turn the empty house to ${degrees} degrees`);

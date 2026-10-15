@@ -38,8 +38,10 @@ const r4 = (v: number) => Math.round(v * 10000) / 10000;
 const short = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 10);
 
 /** Engine asset id for a def at given params/scale: stable, namespaced, ≤ 80 chars. */
-export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'>, paramsKey: string): string {
-  return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi, '').slice(0, 48)}:${short(`${d.hash}|${paramsKey}|${d.box.map(r4).join(',')}`)}`;
+export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'> & Partial<Pick<DefFacts, 'slots'>>, paramsKey: string): string {
+  // A policy change gets a new asset identity. Old logged assets/active slots keep their original approach semantics.
+  const policy = d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '';
+  return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi, '').slice(0, 48)}:${short(`${d.hash}|${paramsKey}|${d.box.map(r4).join(',')}${policy}`)}`;
 }
 
 /** Surface-slot lattice over a top of size (w, d) at height y (pitch 0.3 m, ids `<slot>-r<i>c<j>`), centred on (cx, cz). */
@@ -73,7 +75,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
     // one hand, palm under the base (catalog-items.ts hand1): the engine's take_item / put_item / serve verbs
     out.handling = { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'hand', local: [0, 0, 0] }] }, carryHeight: 0.95, hands: 1, small: true };
   } else if (!isFloatingDef(d)) out.obstacle = true;
-  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
+  const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1' }));
   const stands: SlotDef[] = d.slots.filter((s) => s.kind === 'stand').map((s) => ({ id: s.id, kind: 'stand' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
   if (seats.length || stands.length) out.slots = [...seats, ...stands];
   const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
