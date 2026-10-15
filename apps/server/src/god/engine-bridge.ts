@@ -24,7 +24,7 @@ import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
-import { inSite, siteLocal, siteWorld } from './builds.ts';
+import { inClosure, siteLocal, siteWorld } from './builds.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -98,6 +98,14 @@ export class EngineBridge {
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.god.builds.inventoryContext = () => {
+      this.places.sync();
+      return {
+        occupied: id => this.seatTakers(id).length > 0,
+        places: [...(this.edge?.places.byId.values() ?? [])].filter(p => p.parent !== null && !p.carrier).map(p => ({ id: p.id, name: p.name, polygon: p.polygon })),
+        bodies: [...this.host.minds.values()].flatMap(m => { const b = this.engine.world.entities[m.entityId]; return b && !isVerificationProbe(m.soulId) ? [{ name: m.name, soulId: m.soulId, at: [b.pose.p[0], b.pose.p[2]] as Vec2 }] : []; }),
+      };
+    };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
     this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
@@ -345,14 +353,17 @@ export class EngineBridge {
       const b = E.world.entities[m.entityId], h = b?.human;
       if (!h || (h.level ?? 0) !== 0 || h.activity === 'sit' || h.baseActivity === 'sit' || h.sleepPose || h.carrier || E.programOf(m.entityId)) continue;
       const p: Vec2 = [b.pose.p[0], b.pose.p[2]];
-      const site = sites.find(s => inSite(s.site, p, .5) || s.roots.some(id => this.model.footprintsOf(id).some(f => inSite({ at: f.c, size: [f.half[0] * 2, f.half[1] * 2], yaw: f.yaw }, p))));
+      const site = sites.find(s => inClosure(s, p));
       if (!site) continue;
-      const local = siteLocal(site.site, p), half = site.site.size.map(x => x / 2) as Vec2;
       const clamp = (x: number, radius: number) => Math.max(-radius, Math.min(radius, x));
-      // Side projections are the nearest points on the expanded rectangle. Corners give alternatives when a side is blocked.
-      const candidates: Vec2[] = [[-half[0] - 1.5, clamp(local[1], half[1])], [half[0] + 1.5, clamp(local[1], half[1])], [clamp(local[0], half[0]), -half[1] - 1.5], [clamp(local[0], half[0]), half[1] + 1.5]];
-      for (const x of [-1, 1]) for (const z of [-1, 1]) candidates.push([x * (half[0] + 1.5), z * (half[1] + 1.5)]);
-      const world = candidates.map(q => siteWorld(site.site, q)).filter(q => !sites.some(s => inSite(s.site, q, .5))).sort((a, b) => Math.hypot(a[0] - p[0], a[1] - p[1]) - Math.hypot(b[0] - p[0], b[1] - p[1]));
+      // Project off the actual zone union, leaving room for the resident's body. The plot is only a marker.
+      const candidates = site.zones.flatMap(zone => {
+        const local = siteLocal(zone, p), half = zone.size.map(x => x / 2) as Vec2, gap = .6;
+        const qs: Vec2[] = [[-half[0] - gap, clamp(local[1], half[1])], [half[0] + gap, clamp(local[1], half[1])], [clamp(local[0], half[0]), -half[1] - gap], [clamp(local[0], half[0]), half[1] + gap]];
+        for (const x of [-1, 1]) for (const z of [-1, 1]) qs.push([x * (half[0] + gap), z * (half[1] + gap)]);
+        return qs.map(q => siteWorld(zone, q));
+      });
+      const world = candidates.filter(q => !sites.some(s => inClosure(s, q))).sort((a, b) => Math.hypot(a[0] - p[0], a[1] - p[1]) - Math.hypot(b[0] - p[0], b[1] - p[1]));
       const goal = world.find(q => E.reachV1({ p, level: 0 }, { p: q, level: 0 }).ok); if (!goal) continue;
       try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: goal, why: 'the god started building here: stepped off the site' }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ }
     }

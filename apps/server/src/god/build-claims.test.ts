@@ -35,6 +35,39 @@ function fixture() {
   return { db, god, req, body, claim, field, act, lead, emitted, identities, now: () => now, advance: (ms: number) => { now += ms; } };
 }
 
+test('CE1/WD2: claim narration advances only its step; a committed claim batch re-arms closure', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const c = await f.claim({ part: 'east', root: 'shell/east' }), before = f.body();
+  f.advance(1_800_000); f.god.builds.sweep(); assert.equal(f.god.builds.publicList().builds[0].closed, false);
+  const input = { claim: c.claim.id, n: 2, label: 'east roof', say: 'Designing the east roof' };
+  const r = await f.req('/v1/god/builds/church/step', input, 1); assert.equal(r.ok, true);
+  assert.deepEqual(f.body().step, before.step); assert.deepEqual(f.body().steps, before.steps); assert.equal(f.body().lastBatchAt, before.lastBatchAt);
+  assert.equal(r.build.closed, false); assert.equal(r.build.claims[0].step.n, 2); assert.equal(r.build.claims[0].status, 'held');
+  const delta = (f.emitted.at(-1) as WorldBuildMessage).delta!; assert.equal(delta.claim!.part, 'east'); assert.equal(delta.say!.text, input.say);
+  assert.equal((await f.req('/v1/god/builds/church/step', input, 1)).replayed, true);
+  f.advance(10); accepted(await f.act([place('roof', 0, 0, 'shell/east')], f.field(c.claim.id, { step: 2 }), 1, { note: 'East roof placed' }));
+  const committed = (f.emitted.at(-1) as WorldDiffMessage).builds![0]; assert.equal(committed.closed, true); assert.equal(committed.reopensAt, f.now() + 1_800_000); assert.equal(committed.note!.text, 'East roof placed');
+  await f.req(`/v1/god/builds/church/claims/${c.claim.id}/release`, {}, 1);
+  assert.equal(code(await f.req('/v1/god/builds/church/step', input, 1)), 'build.claim-unknown');
+});
+
+test('M4: undo --group build covers the lead and two released claim groups, newest first, open or finished', async t => {
+  for (const finished of [false, true]) {
+    const f = fixture(); t.after(() => f.db.close());
+    const east = await f.claim({ part: 'east', root: 'shell/east' }), west = await f.claim({ part: 'west', root: 'shell/west' }, 2);
+    accepted(await f.act([place('east-detail', 0, 0, 'shell/east')], f.field(east.claim.id), 1));
+    accepted(await f.act([place('west-detail', 0, 0, 'shell/west')], f.field(west.claim.id), 2));
+    // Live claims still enforce their original refusal, even for the whole-build shortcut.
+    const held = await f.req('/v1/god/undo?group=church', {}); assert.equal(code(held), 'build.claimed'); assert.deepEqual(held.reverted, []);
+    await f.req(`/v1/god/builds/church/claims/${east.claim.id}/release`, {}, 1); await f.req(`/v1/god/builds/church/claims/${west.claim.id}/release`, {}, 2);
+    const expected = f.god.store.groupEditsUnder('church', false, 100).map(e => e.seq); assert.ok(expected.length >= 3);
+    assert.ok(f.god.store.groupEdits('church/east').length); assert.ok(f.god.store.groupEdits('church/west').length); assert.ok(f.god.store.groupEdits('church').length);
+    if (finished) assert.equal((await f.req('/v1/god/builds/church/done', {})).ok, true);
+    const r = await f.req('/v1/god/undo?group=church', {}); assert.equal(r.accepted, true); assert.deepEqual(r.reverted, expected); assert.deepEqual(r.notReverted, []);
+    assert.equal(f.god.model.get('shell'), undefined); assert.equal(f.god.model.get('outside'), undefined);
+  }
+});
+
 test('§9.3.1 root scopes, mapped group, claim progress and receipt replay', async t => {
   const f = fixture(); t.after(() => f.db.close()); const c = await f.claim({ part: 'east-aisle', root: 'shell/east' }); assert.equal(c.ok, true); assert.match(c.claim.id, /^c_[0-9a-f]{8}$/);
   const leadStep = f.body().step;

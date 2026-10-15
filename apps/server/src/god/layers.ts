@@ -23,7 +23,7 @@ import { hashOf } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
 import type { Objects } from '../edge/comms/objects/framework.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
-import { inSite, type Site } from './builds.ts';
+import { inClosure, type ClosingSite } from './builds.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -66,7 +66,7 @@ export type LayersHost = {
   placeOf?(e: Entity): { id: string; name: string } | null;
   building?: (id: string) => { id: string; title: string; step: string } | null;
   buildingActive?: () => boolean;
-  closingSites?: () => { id: string; site: Site }[];
+  closingSites?: () => ClosingSite[];
   log(m: string): void;
 };
 
@@ -227,7 +227,7 @@ export class GodLayers {
       const blocked = entity ? this.buildingRefusal(entity, soul) : null; if (blocked) return blocked;
       const pose = entity ? this.h.engine.world.entities[entity]?.pose.p : undefined;
       const at: Vec2 | undefined = Array.isArray(to) ? [Number(to[0]), Number(to[1])] : pose ? [pose[0], pose[2]] : typeof p.x === 'number' && typeof p.z === 'number' ? [p.x, p.z] : undefined;
-      const site = at && sites.find(s => inSite(s.site, at, .5));
+      const site = at && sites.find(s => inClosure(s, at));
       if (site) return { code: 'site.under-construction', reason: `${site.id} is under construction; come back when it is finished.` };
     }
     return null;

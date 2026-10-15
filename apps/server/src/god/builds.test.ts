@@ -10,7 +10,7 @@ import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode, type GodEvent, type WorldDiffMessage, type WorldBuildMessage, type GodOptions } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
-import type { BuildBody, BuildField } from './builds.ts';
+import { closureMeetsPolygon, type BuildBody, type BuildField } from './builds.ts';
 import { GOD_EDIT_OUTCOME_BYTES } from './store.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -33,11 +33,140 @@ const body = (f: ReturnType<typeof fixture>, id = 'church'): BuildBody => JSON.p
 const code = (r: any) => r.failures?.[0]?.code;
 const assertAccepted = (r: any) => assert.equal(r.accepted, true, JSON.stringify(r));
 
+test('CE1: step announces before an edit, sanitizes public text, and replays without counting a batch', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start(), seq = f.god.model.editSeq;
+  f.advance(10);
+  const input = { lease: s.lease, n: 2, label: 'roof details', say: 'Two\u0000 green\nspires\u0085', masses: ['nave'] };
+  const r = await f.req('/v1/god/builds/church/step', input); assert.equal(r.status, 200); assert.equal(r.headers.get('cache-control'), 'no-store'); assert.equal(r.data.ok, true);
+  const b = r.data.build; assert.equal(b.step.n, 2); assert.equal(b.step.seq, null); assert.equal(b.step.label, 'roof details');
+  assert.deepEqual(b.say, { text: 'Two green spires', at: f.now() }); assert.equal(b.sayAt, f.now()); assert.deepEqual(b.designing, ['nave']);
+  assert.equal(f.god.model.editSeq, seq); assert.deepEqual(body(f).steps, []); assert.equal(body(f).lastBatchAt, undefined); assert.equal(b.lastAt, f.now());
+  const event = f.emitted.at(-1) as WorldBuildMessage; assert.equal(event.event, 'step'); assert.equal(event.site, undefined); assert.deepEqual(event.delta!.say, b.say); assert.deepEqual(event.delta!.designing, ['nave']);
+  assert.equal((f.events.at(-1)!.data as any).view, undefined);
+  const replay = (await f.req('/v1/god/builds/church/step', input)).data; assert.equal(replay.replayed, true); assert.equal(replay.build.rev, b.rev); assert.deepEqual(replay.build.say, b.say);
+  const pub = (await f.req('/v1/world/snapshot', undefined, null)).data.builds[0]; assert.deepEqual(pub.say, b.say); assert.deepEqual(pub.designing, ['nave']);
+  assert.equal(pub.reopensAt, s.build.createdAt + 500); assert.equal(JSON.stringify(pub).includes(s.lease), false); assert.equal(JSON.stringify(pub).includes('god-only brief'), false);
+  // A late batch from a prior step cannot move the announced step backwards.
+  f.advance(10); const committed = (await f.req('/v1/god/act', { ops: [f.place('caption')], note: 'Placed\u0001 ten ribs ' + 'r'.repeat(150), build: f.field(s.lease, { step: 1 }) })).data; assertAccepted(committed);
+  const delta = (f.emitted.at(-1) as WorldDiffMessage).builds![0]; assert.equal(delta.step!.n, 2); assert.equal(delta.note!.text.length, 140); assert.ok(!delta.note!.text.includes('\u0001')); assert.equal(delta.note!.at, f.now());
+  assert.equal(delta.say, undefined, 'unchanged narration is not repeated on every batch'); assert.equal(delta.designing, undefined);
+  assert.deepEqual(f.god.builds.publicList().builds[0].note, delta.note);
+  assert.equal(body(f).steps[0].batches, 1);
+  assertAccepted(f.god.act({ ops: [f.place('uncaptioned', 8)], build: f.field(s.lease) }));
+  assert.equal(f.god.builds.publicList().builds[0].note, undefined); assert.equal((f.emitted.at(-1) as WorldDiffMessage).builds![0].note!.text, '', 'a batch without a note clears the previous caption');
+  f.advance(10); assert.equal((await f.req('/v1/god/builds/church/step', { lease: s.lease, n: 3, say: 'Designing the door' })).data.ok, true);
+  const latest = body(f).say;
+  assert.equal((await f.req('/v1/god/builds/church/step', input)).data.replayed, true); assert.deepEqual(body(f).say, latest, 'an old tuple retry cannot replace newer narration'); assert.equal(body(f).step.n, 3);
+});
+
+test('CE1: a long, chatty build keeps a bounded step-call record and still saves', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  // Direct calls: the route's per-token edit limiter is tested elsewhere; this is about the stored record.
+  const caller = f.god.godIdentity(f.token)!;
+  for (let i = 0; i < 300; i++) { f.advance(1); assert.equal(f.god.builds.step('church', { lease: s.lease, say: `sub-step ${i} of the nave` }, caller).ok, true); }
+  const b = body(f); assert.equal(b.stepCalls!.length, 256); assert.equal(b.say!.text, 'sub-step 299 of the nave');
+  assertAccepted(f.god.act({ ops: [f.place('after-chatter')], build: f.field(s.lease) }));
+});
+
+test('CE1: step validates lease/claim, text, masses and the existing edit limiter', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start(), path = '/v1/god/builds/church/step';
+  assert.equal((await f.req(path, { lease: s.lease }, null)).status, 401);
+  for (const input of [{}, { lease: s.lease, claim: 'c_00000000' }, { lease: s.lease, n: 1.5 }, { lease: s.lease, label: 'x'.repeat(61) }, { lease: s.lease, say: 'x'.repeat(141) }, { lease: s.lease, masses: Array(9).fill('nave') }]) assert.equal(code((await f.req(path, input)).data), 'schema');
+  assert.equal(code((await f.req(path, { lease: 'l_00000000' })).data), 'build.lease');
+  assert.equal(code((await f.req(path, { claim: 'c_00000000' })).data), 'build.claim-unknown');
+  assert.equal((await f.req(path, { lease: s.lease, masses: ['absent'] })).data.failures[0].field, 'masses');
+  const schema = (await f.req('/v1/god/schema')).data; assert.ok(schema.builds.actions.step); assert.ok(schema.endpoints.god.includes('POST /v1/god/builds/:id/step'));
+  let limited = false;
+  for (let i = 0; i < 121; i++) { const r = await f.req(path, { lease: s.lease, n: 2, say: 'Designing' }); if (r.status === 429) { assert.ok(r.data.retryAfterMs > 0); limited = true; break; } }
+  assert.ok(limited);
+  f.god.builds.done('church', {}, f.god.godIdentity(f.token)!);
+  assert.equal(code(f.god.builds.step('church', { lease: s.lease })), 'build.closed');
+  assert.equal(code(f.god.builds.step('missing', { lease: s.lease })), 'build.unknown');
+});
+
+test('WD2: only committed work extends closure while the lead keeps reading and narrating', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  const first = (await f.req('/v1/god/act', { ops: [f.place('first')], build: f.field(s.lease), clientRef: 'first' })).data; assertAccepted(first);
+  const at = f.now(), deadline = at + 500;
+  for (let i = 0; i < 13; i++) {
+    f.advance(40); await f.req('/v1/god/snapshot');
+    if (i % 3 === 0) assert.equal((await f.req('/v1/god/builds/church/step', { lease: s.lease, n: 2, say: `Design ${i}` })).data.ok, true);
+    const p = f.god.builds.publicList().builds[0]; assert.equal(p.status, 'active'); assert.equal(p.reopensAt, deadline); assert.equal(p.closed, f.now() < deadline); assert.equal(body(f).lastBatchAt, at);
+  }
+  assert.ok(body(f).closureLapsedAt); assert.equal(f.emitted.filter(m => m.kind === 'world-build' && m.event === 'closure-lifted').length, 1);
+  assert.equal((await f.req('/v1/god/builds/church/resume', {})).data.build.closed, false);
+  assert.equal((await f.req('/v1/god/act', { ops: [f.place('first')], build: f.field(s.lease), clientRef: 'first' })).data.replayed, true);
+  assert.equal(f.god.builds.publicList().builds[0].reopensAt, deadline);
+  assert.equal(code((await f.req('/v1/god/act', { ops: [f.place('bad')], build: f.field('l_00000000') })).data), 'build.lease');
+  await f.req('/v1/god/preview', { ops: [f.place('preview', 10)], build: f.field(s.lease) });
+  assert.equal(body(f).lastBatchAt, at);
+  const next = (await f.req('/v1/god/act', { ops: [f.place('rearmed', 5)], build: f.field(s.lease), note: 'Committed again' })).data; assertAccepted(next);
+  const delta = (f.emitted.at(-1) as WorldDiffMessage).builds![0]; assert.equal(delta.closed, true); assert.equal(delta.reopensAt, f.now() + 500); assert.equal(body(f).closureLapsedAt, undefined);
+  const restarted = new GodMode(f.db, { worldId: 'build-test', ownerId: 'owner', tick: () => 100, now: f.now, buildPauseMs: 50, buildClosureMs: 500, emit() {} });
+  assert.equal(restarted.builds.publicList().builds[0].reopensAt, f.now() + 500);
+  f.advance(500); assert.equal(restarted.builds.publicList().builds[0].closed, false, 'deadline is inclusive');
+});
+
+test('WD2: new starts get one idle window; legacy rows use committed edits, and default CLOSE_IDLE is 30 minutes', async t => {
+  const saved = process.env.GOD_BUILD_CLOSE_IDLE_MS; delete process.env.GOD_BUILD_CLOSE_IDLE_MS;
+  t.after(() => { if (saved === undefined) delete process.env.GOD_BUILD_CLOSE_IDLE_MS; else process.env.GOD_BUILD_CLOSE_IDLE_MS = saved; });
+  const f = fixture({ buildClosureMs: undefined }); t.after(() => f.db.close()); const s = await f.start();
+  assert.equal(f.god.builds.closureMs, 1_800_000); assert.equal(s.build.reopensAt, f.now() + 1_800_000);
+  const b = body(f) as any; b.lastEditAt = f.now() - 1000; b.closureLiftedAt = f.now() - 1;
+  f.db.db.prepare('UPDATE god_builds_v1 SET body=?,last_at=? WHERE id=?').run(JSON.stringify(b), f.now(), 'church');
+  const again = new GodMode(f.db, { worldId: 'build-test', ownerId: 'owner', tick: () => 100, now: f.now, buildClosureMs: 500, emit() {} });
+  const p = again.builds.publicList().builds[0]; assert.equal(p.reopensAt, b.lastEditAt + 500); assert.equal(p.closed, false); assert.equal((again.builds.status('church')!.build as any).closureLiftedAt, undefined);
+  process.env.GOD_BUILD_CLOSE_IDLE_MS = '750';
+  const env = fixture({ buildClosureMs: undefined }); t.after(() => env.db.close()); assert.equal(env.god.builds.closureMs, 750);
+});
+
+test('WD1: inventory is bounded with total counts, inherited protection and explicit include', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [{ op: 'define', def: { schema: 'def/1', name: 'inventory-seat', size: { box: [.1, .5, .1] }, layer: 'decor', make: { kind: 'none' }, components: { seat: { height: .5 } } } }, ...Array.from({ length: 55 }, (_, i) => ({ op: 'place', def: 'inventory-seat@1', name: `chair-${i}`, p: [i / 20, 0], owner: 'soul:Ana' }))] }));
+  const sources = { occupied: () => true, places: Array.from({ length: 55 }, (_, i) => ({ id: `p-${i}`, name: `Place ${i}`, polygon: [[-1, -1], [1, -1], [1, 1], [-1, 1]] as [number, number][] })), bodies: Array.from({ length: 55 }, (_, i) => ({ name: `Soul ${i}`, soulId: `s_${i}`, at: [0, 0] as [number, number] })) };
+  f.god.builds.inventoryContext = () => sources;
+  const no = await f.start(); assert.equal(code(no), 'build.site'); assert.equal(no.failures[0].field, 'include'); assert.match(no.failures[0].fix, /chair-0 \(e_/); assert.equal(f.god.store.build('church'), null);
+  for (const key of ['things', 'seats', 'places', 'owned', 'bodies']) { assert.equal(no.inventory[key].length, 50); assert.equal(no.inventory.counts[key], 55); }
+  const yes = await f.start({ include: [...f.god.model.entities.keys()] }); assert.equal(yes.ok, true); assert.deepEqual(yes.inventory, no.inventory); assert.equal((await f.start({ include: [...f.god.model.entities.keys()] })).replayed, true);
+});
+
+test('WD1: inherited Soul ownership and private things require their explicit ids, including privacy without an owner', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [
+    { op: 'define', def: { schema: 'def/1', name: 'private-root', size: { box: [1, 1, 1] }, layer: 'decor', make: { kind: 'none' } } },
+    { op: 'place', def: 'private-root@1', name: 'home', owner: 'soul:Ana' },
+    { op: 'place', def: coreRef('sign'), name: 'notice', in: { parent: 'home' } },
+    { op: 'place', def: coreRef('sign'), name: 'private', p: [4, 0], access: 'private' },
+  ] }));
+  const no = await f.start(); assert.equal(code(no), 'build.site'); assert.equal(no.failures[0].field, 'include'); assert.equal(no.failures[0].measured, 3);
+  assert.deepEqual(no.inventory.owned.map((e: any) => [e.path, e.owner]), [['home', 'soul:Ana'], ['home/notice', 'soul:Ana'], ['private', null]]);
+  assert.equal(code(await f.start({ include: [f.god.model.get('home')!.id] })), 'build.site');
+  assert.equal((await f.start({ include: no.inventory.things.map((e: any) => e.id) })).ok, true);
+});
+
+test('WD1: named-place inventory intersects rotated/concave polygons rather than their broad bounds', () => {
+  const zones = [{ at: [0, 0] as [number, number], size: [2, 2] as [number, number], yaw: Math.PI / 4 }];
+  assert.equal(closureMeetsPolygon(zones, [[-10, -.1], [10, -.1], [10, .1], [-10, .1]]), true, 'crossing without a vertex inside');
+  assert.equal(closureMeetsPolygon(zones, [[-10, -10], [10, -10], [10, 10], [-10, 10]]), true, 'zone wholly contained');
+  assert.equal(closureMeetsPolygon(zones, [[2, 2], [5, 2], [5, 5], [2, 5]]), false);
+  assert.equal(closureMeetsPolygon(zones, [[-10, -10], [10, -10], [10, 10], [3, 10], [3, -3], [-3, -3], [-3, 10], [-10, 10]]), false, 'concave void stays open');
+});
+
+test('M4: a non-build group retains exact-group undo semantics', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [f.place('plain')], group: 'ordinary' }));
+  assertAccepted(f.god.act({ ops: [f.place('child', 10)], group: 'ordinary/child' }));
+  const seq = f.god.store.groupEdits('ordinary')[0].seq;
+  const r = (await f.req('/v1/god/undo?group=ordinary', {})).data; assert.equal(r.accepted, true); assert.deepEqual(r.reverted, [seq]);
+  assert.equal(f.god.model.get('plain'), undefined); assert.ok(f.god.model.get('child'));
+});
+
 test('start/get/snapshot/status are bounded public projections and never leak identity or brief', async t => {
   const f = fixture(); t.after(() => f.db.close());
   assert.equal((await f.req('/v1/god/builds', undefined, null)).status, 401);
   const s = await f.start(); assert.equal(s.ok, true); assert.match(s.lease, /^l_[a-f0-9]{8}$/);
   assert.equal(s.build.plan.brief, 'god-only brief'); assert.equal(s.build.lead.lease, undefined); assert.equal(s.build.lead.tokenHash, undefined);
+  assert.equal(body(f).startHash, hashOf({ id: 'church', title: 'Stone church', steps: ['shell', 'roof', 'interior'], site: { at: [0, 0], size: [80, 80], yaw: 0 }, massing: [{ name: 'nave', at: [0, 0], size: [20, 10], h: 8, roof: 'gable' }], brief: 'god-only brief' }), 'omitting include preserves pre-WD1 start hashes');
   const get = await f.req('/v1/god/builds/church'); assert.equal(get.data.build.id, 'church'); assert.deepEqual(get.data.journal, []);
   for (const path of ['/v1/world/builds', '/v1/world/snapshot']) {
     const r = await f.req(path, undefined, null); assert.equal(r.headers.get('cache-control'), 'no-store'); assert.equal(r.data.builds.length, 1);
@@ -63,7 +192,12 @@ test('batch echo, rev and receipt share one commit; retry does not count again; 
   assert.deepEqual(f.god.store.receipt('five')!.result, r);
   const diff = f.emitted.at(-1) as WorldDiffMessage; assert.equal(diff.kind, 'world-diff'); assert.equal(diff.builds![0].rev, stored.rev); assert.equal(diff.builds![0].rootsAdded!.length, 5); assert.ok(Buffer.byteLength(JSON.stringify(diff.builds)) <= 400);
   const event = f.events.at(-1)!.data as any; assert.equal(event.kind, 'step'); assert.equal(event.view, undefined);
-  if (process.env.BUILD_EXPORT_FIXTURES === '1') { const dir = new URL('./fixtures/', import.meta.url); mkdirSync(dir, { recursive: true }); const started = f.emitted.find(m => m.kind === 'world-build')!; writeFileSync(new URL('build-messages.json', dir), JSON.stringify({ started, diff, revGap: [started, { ...diff, builds: diff.builds!.map(d => ({ ...d, rev: d.rev + 1 })) }] }, null, 2) + '\n'); }
+  if (process.env.BUILD_EXPORT_FIXTURES === '1') {
+    const dir = new URL('./fixtures/', import.meta.url); mkdirSync(dir, { recursive: true }); const started = f.emitted.find(m => m.kind === 'world-build')!;
+    assert.equal(f.god.builds.step('church', { lease: s.lease, n: 3, say: 'Designing the stone vault', masses: ['nave'] }).ok, true); const narration = f.emitted.at(-1);
+    assertAccepted((await f.req('/v1/god/act', { ops: [{ op: 'set', id: 'bench-0', name: 'bench-caption' }], build: f.field(s.lease), note: 'Placed the first vault rib' })).data); const caption = f.emitted.at(-1);
+    writeFileSync(new URL('build-messages.json', dir), JSON.stringify({ started, diff, narration, caption, revGap: [started, { ...diff, builds: diff.builds!.map(d => ({ ...d, rev: d.rev + 1 })) }] }, null, 2) + '\n');
+  }
 });
 
 test('preview seals build/group, checks lease and claim in preview and dryrun, and never mutates progress', async t => {
@@ -269,15 +403,20 @@ test('closed retention prunes by rev and never loses the world revision high-wat
 
 test('bench: commitBatch 300 five-place batches with/without build plus 300 undos', { skip: process.env.BUILD_BENCH !== '1' }, t => {
   const summary: any = {};
-  for (const withBuild of [false, true]) {
+  const fixtures = [false, true].map(withBuild => {
     const f = fixture({ buildPauseMs: 600_000 }); t.after(() => f.db.close());
     const started = withBuild ? f.god.builds.start({ id: 'church', title: 'Bench', steps: ['shell'], site: { at: [0, 0], size: [200, 200] } }, f.god.godIdentity(f.token)!) as any : null;
-    const times: number[] = [], undo: number[] = [], receipt: number[] = [], deltas: number[] = [], sse: number[] = [], touch: number[] = [];
-    for (let batch = 0; batch < (withBuild ? 500 : 300); batch++) {
-      const ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`b-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
-      const begin = performance.now(), result = f.god.act({ ops, clientRef: `bench-${batch}`, ...(started ? { build: f.field(started.lease) } : {}) }); const elapsed = performance.now() - begin; assertAccepted(result);
-      if (batch < 300) { times.push(elapsed); receipt.push(Buffer.byteLength(JSON.stringify(result))); const m = f.emitted.at(-1) as WorldDiffMessage; deltas.push(Buffer.byteLength(JSON.stringify(m.builds ?? []))); sse.push(Buffer.byteLength(JSON.stringify(f.events.at(-1)))); }
-    }
+    return { f, started, withBuild, times: [] as number[], receipt: [] as number[], deltas: [] as number[], sse: [] as number[] };
+  });
+  // As in the claims bench, interleave modes to share warmup and scheduler/thermal drift.
+  for (let batch = 0; batch < 500; batch++) for (const sample of batch % 2 ? [...fixtures].reverse() : fixtures) {
+    const { f, started, withBuild } = sample; if (!withBuild && batch >= 300) continue;
+    const ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`b-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
+    const begin = performance.now(), result = f.god.act({ ops, clientRef: `bench-${batch}`, ...(started ? { build: f.field(started.lease) } : {}) }); const elapsed = performance.now() - begin; assertAccepted(result);
+    if (batch < 300) { sample.times.push(elapsed); sample.receipt.push(Buffer.byteLength(JSON.stringify(result))); const m = f.emitted.at(-1) as WorldDiffMessage; sample.deltas.push(Buffer.byteLength(JSON.stringify(m.builds ?? []))); sample.sse.push(Buffer.byteLength(JSON.stringify(f.events.at(-1)))); }
+  }
+  for (const { f, withBuild, times, receipt, deltas, sse } of fixtures) {
+    const undo: number[] = [], touch: number[] = [];
     const ring500Bytes = withBuild ? Buffer.byteLength(JSON.stringify(f.events.slice(-500))) : undefined;
     const tokenHash = f.god.godIdentity(f.token)!.hash;
     if (withBuild) for (let i = 0; i < 10000; i++) { const begin = performance.now(); f.god.builds.touch(tokenHash); touch.push(performance.now() - begin); }
@@ -285,7 +424,10 @@ test('bench: commitBatch 300 five-place batches with/without build plus 300 undo
     const stats = (xs: number[]) => { const sorted = [...xs].sort((a, b) => a - b); return { p50: sorted[Math.floor(sorted.length * .5)], p95: sorted[Math.floor(sorted.length * .95)] }; };
     summary[withBuild ? 'build' : 'plain'] = { ms: stats(times), receiptBytes: stats(receipt), deltaBytes: stats(deltas), sseBytes: stats(sse), ...(undo.length ? { undoMs: stats(undo), ring500Bytes, touchMs: stats(touch) } : {}) };
   }
+  summary.overheadMs = { p50: summary.build.ms.p50 - summary.plain.ms.p50, p95: summary.build.ms.p95 - summary.plain.ms.p95 };
   console.log('BUILD_BENCH ' + JSON.stringify(summary));
+  assert.ok(summary.overheadMs.p95 <= .5, `build p95 overhead ${summary.overheadMs.p95}ms exceeds 0.5ms`);
+  assert.ok(summary.build.deltaBytes.p95 <= 400); assert.ok(summary.build.touchMs.p95 <= .05);
 });
 
 // C1b adversarial-review regressions. Numbers match evidence/review-c1.json confirmed[].
@@ -325,10 +467,10 @@ test('C1b #2: receipt admission reserves the real SQL revision width and stays a
 test('C1b #3: a lead group-only revert clears pause markers and emits the next closure lift', async t => {
   const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
   assertAccepted(f.god.act({ ops: [f.place('one')], build: f.field(s.lease) }));
-  f.advance(501); f.god.builds.sweep(); assert.ok(body(f).closureLiftedAt); assert.equal(f.god.builds.hasClosure(), false);
+  f.advance(501); f.god.builds.sweep(); assert.ok(body(f).closureLapsedAt); assert.equal(f.god.builds.hasClosure(), false);
   const caller = f.god.godIdentity(f.token)!;
   assertAccepted(f.god.as({ identity: caller }, () => f.god.undo()));
-  assert.equal(f.god.store.build('church')!.status, 'active'); assert.equal(body(f).paused, undefined); assert.equal(body(f).closureLiftedAt, undefined);
+  assert.equal(f.god.store.build('church')!.status, 'active'); assert.equal(body(f).paused, undefined); assert.equal(body(f).closureLapsedAt, undefined);
   assert.equal(f.god.builds.hasClosure(), true); f.advance(501); f.god.builds.sweep();
   const lifts = f.emitted.filter((m): m is WorldBuildMessage => m.kind === 'world-build' && m.event === 'closure-lifted'); assert.equal(lifts.length, 2);
   assert.ok(lifts[1].rev > lifts[0].rev); assert.equal(f.god.builds.publicList().builds[0].closed, false);
@@ -351,10 +493,10 @@ test('C1b #4: superseded leads cannot pause a live lease or enable an unrequeste
 test('C1b #5: non-lead field-less reverts and abandon undo never revive a quiet lead', async t => {
   const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
   for (let i = 0; i < 2; i++) assertAccepted(f.god.act({ ops: [f.place(`part-${i}`, i * 4)], build: f.field(s.lease) }));
-  f.advance(501); f.god.builds.sweep(); const before = f.god.store.build('church')!, lifted = body(f).closureLiftedAt;
+  f.advance(501); f.god.builds.sweep(); const before = f.god.store.build('church')!, lifted = body(f).closureLapsedAt;
   for (const action of ['undo', 'redo'] as const) {
     assertAccepted((await f.req(`/v1/god/${action}`, {}, f.other)).data);
-    assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(body(f).closureLiftedAt, lifted);
+    assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(body(f).closureLapsedAt, lifted);
     assert.equal(f.god.builds.publicList().builds[0].closed, false);
   }
   let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'busy' } : null };
@@ -430,10 +572,10 @@ test('C1b #13: every build body write is bounded, leaves transition space and ca
   seed(65_530); const other = await f.start({ id: 'other', site: { at: [100, 0], size: [10, 10] }, massing: [] }); assert.equal(other.ok, true);
   f.advance(501);
   for (const path of ['/v1/world/snapshot', '/v1/world/builds', '/v1/world/seq']) { const out = await f.req(path, undefined, null); assert.equal(out.status, 200, path); }
-  assert.ok(JSON.parse(f.god.store.build('other')!.body).closureLiftedAt);
+  assert.ok(JSON.parse(f.god.store.build('other')!.body).closureLapsedAt);
   assert.ok(f.god.store.build('church')!.body.length <= 65_536);
   // A healthy row near the admission bound has enough room for both persisted lazy markers.
-  seed(65_260); f.god.builds.sweep(); assert.equal(f.god.store.build('church')!.status, 'paused'); assert.ok(body(f).closureLiftedAt);
+  seed(65_260); f.god.builds.sweep(); assert.equal(f.god.store.build('church')!.status, 'paused'); assert.ok(body(f).closureLapsedAt);
 });
 
 function journalReads(f: ReturnType<typeof fixture>, work: () => void) {

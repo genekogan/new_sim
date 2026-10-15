@@ -35,8 +35,11 @@ const labelSchema = z.string().min(1).max(60);
 export const buildFieldSchema = z.object({ id: idSchema, lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), claim: z.string().regex(/^c_[0-9a-f]{8}$/).optional(), step: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), done: z.boolean().optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.');
 const siteSchema = z.object({ at: pair, size: z.tuple([z.number().min(1).max(200), z.number().min(1).max(200)]), yaw: z.number().finite().default(0) }).strict();
 export const massSchema = z.object({ name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/).optional(), at: pair, size: z.tuple([z.number().positive().max(200), z.number().positive().max(200)]), h: z.number().min(.5).max(120), yaw: z.number().finite().optional(), roof: z.enum(['flat', 'gable', 'pyramid']).optional() }).strict();
-export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), root: z.string().min(1).max(300).optional() }).strict();
+export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), root: z.string().min(1).max(300).optional(), include: z.array(z.string().min(1).max(300)).max(512).optional() }).strict();
+const STEP_CALLS = 256;
+const cleanText = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/ {2,}/g, ' ').trim();
 export const buildActionSchemas = {
+  step: z.object({ lease: buildFieldSchema.shape.lease, claim: buildFieldSchema.shape.claim, n: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), say: z.string().transform(cleanText).pipe(z.string().min(1).max(140)).optional(), masses: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/)).max(8).optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.'),
   pause: z.object({ lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), note: z.string().max(4000).optional() }).strict(),
   resume: z.object({ lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), take: z.boolean().optional() }).strict(),
   done: z.object({ summary: z.string().max(4000).optional(), force: z.boolean().optional() }).strict(),
@@ -50,6 +53,7 @@ export type Site = z.infer<typeof siteSchema>;
 export type Identity = { hash: string; label: string };
 export type BuildCaller = { identity?: Identity; build?: BuildField };
 export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
+type Caption = { text: string; at: number };
 export type BuildBody = {
   id: string; title: string; plan: { steps: string[]; brief?: string }; site: Site; massing: Mass[]; roots: string[];
   lead: { lease: string; label: string; hash8: string; tokenHash: string; since: number };
@@ -57,18 +61,19 @@ export type BuildBody = {
   steps: { n: number; label: string; claim?: string; batches: number; firstSeq: number; lastSeq: number; at: number }[];
   claims: Claim[]; agents: { label: string; hash8: string; at: number }[]; pauses: number;
   firstEditAt?: number; lastEditAt?: number; paused?: { from: number; seenAt: number; explicit?: boolean; note?: string };
-  closureLiftedAt?: number; done?: { at: number; summary?: string; byLabel: string };
+  lastBatchAt?: number; closureLapsedAt?: number; say?: Caption; sayAt?: number; designing?: string[]; note?: Caption; stepCalls?: string[];
+  done?: { at: number; summary?: string; byLabel: string };
   abandoned?: { at: number; undo?: { reverted: number[]; notReverted: number[] } }; startHash: string;
 };
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
-export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[] };
-export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
+export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[]; say?: Caption; designing?: string[]; note?: Caption; reopensAt?: number };
+export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt' | 'say' | 'designing' | 'note' | 'reopensAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
 export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group?: string; step: { n: number; label: string }; claim?: string };
 export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted';
-export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: Exclude<BuildEventKind, 'step'>; site?: PublicSite; delta?: SiteDelta };
+export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
-  status: BuildRow['status']; rev: number; createdAt: number; lastAt: number; pauseAfterMs: number; now: number; closed: boolean;
+  status: BuildRow['status']; rev: number; createdAt: number; lastAt: number; pauseAfterMs: number; now: number; closed: boolean; reopensAt?: number;
   lead: { label: string; hash8: string; since: number; live: boolean }; roots: { id: string; path: string }[];
   claims: (Omit<Claim, 'user' | 'status'> & { status: Claim['status'] | 'stale'; rootPath?: string })[];
   current: (BuildBody['steps'][number] & { recent: { seq: number; note: string | null; at: number }[] }) | null;
@@ -80,7 +85,12 @@ type PlannedWrite = BuildWrite & { kind: BuildEventKind; before: Row; next: Buil
 type Admission = { field?: BuildField; row?: Row; mine?: LiveClaim; group?: string; warnings: string[]; failures?: Failure[] };
 const lease = () => 'l_' + randomBytes(4).toString('hex');
 const claimId = () => 'c_' + randomBytes(4).toString('hex');
-const decode = (r: BuildRow): Row => ({ ...r, body: JSON.parse(r.body) });
+const decode = (r: BuildRow): Row => {
+  const body = JSON.parse(r.body); delete body.closureLiftedAt;
+  // Old rows recorded committed work as lastEditAt; request liveness must never extend their closure.
+  body.lastBatchAt ??= body.lastEditAt;
+  return { ...r, body };
+};
 const open = (r: Pick<Row, 'status'>) => r.status === 'active' || r.status === 'paused';
 export const effective = (r: Pick<Row, 'status' | 'last_at'>, now: number, pauseMs: number): BuildRow['status'] => r.status === 'active' && now - r.last_at > pauseMs ? 'paused' : r.status;
 /** Same yaw convention as model.worldPose (local +x rotates toward -z). */
@@ -89,6 +99,56 @@ export function siteWorld(site: Site, p: [number, number]): [number, number] { c
 export function inSite(site: Site, p: [number, number], margin = 0): boolean { const [x, z] = siteLocal(site, p); return Math.abs(x) <= site.size[0] / 2 + margin && Math.abs(z) <= site.size[1] / 2 + margin; }
 const box = (site: Site): OBB => ({ c: site.at, half: [site.size[0] / 2, site.size[1] / 2], yaw: site.yaw, y0: -1e6, y1: 1e6 });
 const meets = (m: WorldModel, id: string, site: Site): boolean => { const fs = m.footprintsOf(id); if (fs.length) return fs.some(f => obbOverlap(f, box(site))); const p = m.worldPose(m.entities.get(id)!); return inSite(site, [p.x, p.z]); };
+export const CLOSURE_MARGIN_M = 1.5;
+export type ClosingSite = { id: string; site: Site; roots: string[]; zones: Site[] };
+export const inClosure = (site: Pick<ClosingSite, 'zones'>, p: [number, number]) => site.zones.some(zone => inSite(zone, p));
+/** Current collider footprints, with a point fallback for non-solid roots such as signs. */
+function entityBoxes(model: WorldModel, id: string): Site[] {
+  const e = model.entities.get(id); if (!e) return [];
+  const def = e.in.parent === 'world' ? undefined : model.resolvedDef(e.def);
+  const fs = e.in.parent === 'world' ? model.footprintsOf(id) : def?.layer === 'solid' ? model.footprint(e, def) : [];
+  if (fs.length) return fs.map(f => ({ at: f.c, size: [f.half[0] * 2, f.half[1] * 2], yaw: f.yaw }));
+  const p = model.worldPose(e); return [{ at: [p.x, p.z], size: [0, 0], yaw: p.yaw }];
+}
+function closureZones(b: Pick<BuildBody, 'site' | 'massing' | 'roots'>, model: WorldModel): Site[] {
+  const zones: Site[] = b.massing.map(m => ({ at: siteWorld(b.site, m.at), size: [...m.size], yaw: b.site.yaw + (m.yaw ?? 0) }));
+  const seen = new Set<string>();
+  for (const root of b.roots) for (const id of model.entities.has(root) ? model.subtree(root) : []) {
+    if (seen.has(id)) continue; seen.add(id);
+    if (model.resolvedDef(model.entities.get(id)!.def)?.components.body) continue;
+    zones.push(...entityBoxes(model, id));
+  }
+  return zones.map(s => ({ ...s, size: [s.size[0] + 2 * CLOSURE_MARGIN_M, s.size[1] + 2 * CLOSURE_MARGIN_M] }));
+}
+/** Segment clipping also catches thin/concave named places crossing a zone without a vertex inside it. */
+export function closureMeetsPolygon(zones: Site[], polygon: [number, number][]): boolean {
+  if (polygon.length < 3) return false;
+  return zones.some(zone => {
+    const p = polygon.map(v => siteLocal(zone, v)), [hx, hz] = zone.size.map(v => v / 2);
+    let inside = false;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const a = p[j], b = p[i];
+      if ((a[1] > 0) !== (b[1] > 0) && 0 < (b[0] - a[0]) * -a[1] / (b[1] - a[1]) + a[0]) inside = !inside;
+      let lo = 0, hi = 1;
+      for (const [v, d, h] of [[a[0], b[0] - a[0], hx], [a[1], b[1] - a[1], hz]]) {
+        if (d === 0) { if (Math.abs(v) > h) { hi = -1; break; } }
+        else { const t = [(-h - v) / d, (h - v) / d].sort((x, y) => x - y); lo = Math.max(lo, t[0]); hi = Math.min(hi, t[1]); }
+      }
+      if (lo <= hi) return true;
+    }
+    return inside;
+  });
+}
+export type BuildInventory = {
+  things: { id: string; path: string; def: string }[]; seats: { id: string; path: string; occupied: boolean }[];
+  places: { id: string; name: string }[]; owned: { id: string; path: string; owner: string | null }[];
+  bodies: { name: string; soulId?: string }[]; counts?: Partial<Record<'things' | 'seats' | 'places' | 'owned' | 'bodies', number>>;
+};
+export type BuildInventoryContext = {
+  occupied: (id: string) => boolean;
+  places: { id: string; name: string; polygon: [number, number][] }[];
+  bodies: { name: string; soulId?: string; at: [number, number] }[];
+};
 type Scope = { roots: Set<string>; region?: Site };
 export type LiveClaim = Claim & { scope: Scope };
 const scoped = (c: Claim): LiveClaim => ({ ...c, scope: { roots: new Set([...(c.root ? [c.root] : []), ...c.made]), ...(c.region ? { region: c.region } : {}) } });
@@ -211,7 +271,7 @@ export function advance(body: BuildBody, field: BuildField | undefined, made: st
   if (!s) { s = { n, label, ...(claim ? { claim: claim.id } : {}), batches: 0, firstSeq: seq, lastSeq: seq, at }; b.steps.push(s); }
   s.batches++; s.lastSeq = seq; s.at = at; s.label = label;
   b.steps = b.steps.slice(-64); b.firstEditAt ??= at; b.lastEditAt = at;
-  delete b.paused; delete b.closureLiftedAt;
+  delete b.paused;
   if (caller && !b.agents.some(a => a.hash8 === caller.hash.slice(0, 8))) b.agents = [...b.agents, { label: caller.label, hash8: caller.hash.slice(0, 8), at }].slice(-8);
   if (field.done && claim) claim.status = 'done';
   else if (field.done && !b.claims.some(c => c.status === 'held' && at - c.lastAt <= pauseMs)) b.done = { at, byLabel: caller?.label ?? b.lead.label };
@@ -220,6 +280,9 @@ export function advance(body: BuildBody, field: BuildField | undefined, made: st
 
 export class GodBuilds {
   private rows = new Map<string, Row>();
+  private geometry = new WeakMap<WorldModel, { seq: number; rows: Map<string, { body: BuildBody; zones: Site[]; hits: Map<string, boolean> }> }>();
+  /** Engine-only observations are read at start, never persisted in a public site. */
+  inventoryContext?: () => BuildInventoryContext;
   readonly rootIndex = new Map<string, string>();
   readonly pauseMs: number; readonly closureMs: number;
   readonly store: WorldStore;
@@ -228,19 +291,43 @@ export class GodBuilds {
     this.store = store; this.host = host;
     const positive = (v: number | undefined, fallback: number) => v !== undefined && Number.isFinite(v) && v > 0 ? v : fallback;
     this.pauseMs = positive(host.pauseMs ?? (process.env.GOD_BUILD_PAUSE_MS ? Number(process.env.GOD_BUILD_PAUSE_MS) : undefined), 600_000);
-    this.closureMs = positive(host.closureMs ?? (process.env.GOD_BUILD_CLOSURE_MS ? Number(process.env.GOD_BUILD_CLOSURE_MS) : undefined), 43_200_000);
+    this.closureMs = positive(host.closureMs ?? (process.env.GOD_BUILD_CLOSE_IDLE_MS ? Number(process.env.GOD_BUILD_CLOSE_IDLE_MS) : undefined), 1_800_000);
     for (const r of store.builds(true)) this.rows.set(r.id, decode(r)); this.index();
   }
   private index() { this.rootIndex.clear(); for (const r of this.rows.values()) for (const id of r.body.roots) this.rootIndex.set(id, r.id); }
   private row(id: string) { return this.rows.get(id) ?? (() => { const r = this.store.build(id); return r ? decode(r) : undefined; })(); }
-  private isClosing(r: Row, now: number) { return open(r) && !(effective(r, now, this.pauseMs) === 'paused' && now - r.last_at > this.closureMs); }
+  private reopensAt(r: Row) { return (r.body.lastBatchAt ?? r.created_at) + this.closureMs; }
+  private isClosing(r: Row, now: number) { return open(r) && now < this.reopensAt(r); }
+  private shape(r: Row, model: WorldModel) {
+    let cache = this.geometry.get(model);
+    if (!cache || cache.seq !== model.editSeq) { cache = { seq: model.editSeq, rows: new Map() }; this.geometry.set(model, cache); }
+    let shape = cache.rows.get(r.id);
+    if (!shape || shape.body !== r.body) { shape = { body: r.body, zones: closureZones(r.body, model), hits: new Map() }; cache.rows.set(r.id, shape); }
+    return shape;
+  }
   hasClosure(now = this.host.now()): boolean { return [...this.rows.values()].some(r => this.isClosing(r, now)); }
   closing(id: string, model = this.host.model(), now = this.host.now()): { id: string; title: string; step: string } | null {
-    for (let e = model.entities.get(id); e; e = model.entities.get(e.in.parent)) { const b = this.rootIndex.get(e.id), r = b && this.rows.get(b); if (r && this.isClosing(r, now)) return { id: r.id, title: r.body.title, step: `step ${r.body.step.n}/${r.body.plan.steps.length}: ${r.body.step.label}` }; }
+    if (!model.entities.has(id)) return null;
+    for (const r of this.rows.values()) {
+      if (!this.isClosing(r, now)) continue;
+      const shape = this.shape(r, model); let hit = shape.hits.get(id);
+      if (hit === undefined) { const fs = entityBoxes(model, id); hit = shape.zones.some(zone => fs.some(f => obbOverlap(box(f), box(zone)))); shape.hits.set(id, hit); }
+      if (hit) return { id: r.id, title: r.body.title, step: `step ${r.body.step.n}/${r.body.plan.steps.length}: ${r.body.step.label}` };
+    }
     return null;
   }
-  closingSites(now = this.host.now()): { site: Site; roots: string[]; id: string }[] { return [...this.rows.values()].filter(r => this.isClosing(r, now)).map(r => ({ id: r.id, site: r.body.site, roots: [...r.body.roots] })); }
-  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status })) }; }
+  closingSites(now = this.host.now()): ClosingSite[] { return [...this.rows.values()].filter(r => this.isClosing(r, now)).map(r => ({ id: r.id, site: r.body.site, roots: [...r.body.roots], zones: this.shape(r, this.host.model()).zones })); }
+  private captions(r: Row, previous?: BuildBody) {
+    const b = r.body;
+    return {
+      ...(b.say && (!previous || b.say.at !== previous.say?.at || b.say.text !== previous.say?.text) ? { say: { ...b.say } } : {}),
+      ...(b.designing && (!previous || b.designing.join(',') !== previous.designing?.join(',')) ? { designing: [...b.designing] } : {}),
+      ...(b.note && (!previous || b.note.at !== previous.note?.at || b.note.text !== previous.note?.text) ? { note: { ...b.note } } : {}),
+      ...(!b.note && previous?.note ? { note: { text: '', at: b.lastBatchAt ?? r.last_at } } : {}),
+      ...(open(r) ? { reopensAt: this.reopensAt(r) } : {}),
+    };
+  }
+  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status })), ...this.captions(r) }; }
   private view(r: Row, now: number, recent?: { seq: number; note: string | null; at: number }[]): GodBuildView {
     const b = structuredClone(r.body), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
     const step = [...b.steps].reverse().find(s => s.n === b.step.n && !s.claim);
@@ -252,7 +339,7 @@ export class GodBuilds {
       const p = siteLocal(b.site, fs.length ? [fs.reduce((a, f) => a + f.c[0], 0) / fs.length, fs.reduce((a, f) => a + f.c[1], 0) / fs.length] : [wp!.x, wp!.z]);
       boxes.forEach((ms, i) => { if (inSite(ms, p)) massing[i].parts++; });
     }
-    return { ...b, status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
+    return { ...b, ...this.captions(r), status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
   }
   publicList(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), builds: [...this.rows.values()].map(r => this.public(r, now)) }; }
   list(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), open: [...this.rows.values()].map(r => this.view(r, now)), recent: this.store.builds().filter(r => !open(r)).slice(0, 20).map(r => { const b = decode(r); return { id: r.id, title: b.body.title, status: r.status, rev: r.rev, step: b.body.step, lastAt: r.last_at }; }) }; }
@@ -262,10 +349,35 @@ export class GodBuilds {
     const step = [...r.body.steps].reverse().find(s => s.n === r.body.step.n && !s.claim), { journal, recent } = this.store.buildJournal(id, step);
     return { ok: true as const, build: this.view(r, now, recent), journal };
   }
+  private inventory(body: Pick<BuildBody, 'site' | 'massing' | 'roots'>) {
+    const model = this.host.model(), zones = closureZones(body, model), context = this.inventoryContext?.();
+    const inventory: BuildInventory = { things: [], seats: [], places: [], owned: [], bodies: [] }, protectedThings: { id: string; path: string }[] = [];
+    const counts: NonNullable<BuildInventory['counts']> = {};
+    const add = <K extends Exclude<keyof BuildInventory, 'counts'>>(key: K, value: BuildInventory[K][number]) => {
+      counts[key] = (counts[key] ?? 0) + 1;
+      if (inventory[key].length < 50) (inventory[key] as (typeof value)[]).push(value);
+    };
+    for (const e of model.entities.values()) {
+      const def = model.resolvedDef(e.def); if (def?.components.body) continue;
+      const fs = entityBoxes(model, e.id); if (!zones.some(z => fs.some(f => obbOverlap(box(z), box(f))))) continue;
+      const path = model.pathOf(e.id); add('things', { id: e.id, path, def: e.def });
+      const seat = !!def?.components.seat || model.slotsOf(e).some(s => s.kind === 'seat');
+      const occupied = seat && (context?.occupied(e.id) ?? false);
+      if (seat) add('seats', { id: e.id, path, occupied });
+      let owner: string | undefined, access: string | undefined;
+      for (let p: typeof e | undefined = e; p; p = model.entities.get(p.in.parent)) if (p.owner || p.access) { owner = p.owner; access = p.access; break; }
+      if (owner || access === 'private') add('owned', { id: e.id, path, owner: owner ?? null });
+      if (owner?.startsWith('soul:') || access === 'private' || occupied) protectedThings.push({ id: e.id, path });
+    }
+    for (const p of context?.places ?? []) if (closureMeetsPolygon(zones, p.polygon)) add('places', { id: p.id, name: p.name });
+    for (const b of context?.bodies ?? []) if (zones.some(z => inSite(z, b.at))) add('bodies', { name: b.name, ...(b.soulId ? { soulId: b.soulId } : {}) });
+    for (const [key, count] of Object.entries(counts)) if (count > 50) (inventory.counts ??= {})[key as keyof typeof counts] = count;
+    return { inventory, protectedThings };
+  }
   start(raw: unknown, caller: Identity) {
     const now = this.host.now(); this.sweep(now); const p = buildStartSchema.safeParse(raw); if (!p.success) return schemaFailure(p.error);
     const input = p.data, startHash = hashOf(input), prior = this.row(input.id);
-    if (prior) return !open(prior) ? fail('build.closed', input.id) : prior.body.startHash === startHash && prior.body.lead.tokenHash === caller.hash ? { ok: true as const, build: this.view(prior, now), lease: prior.body.lead.lease, replayed: true } : fail('build.exists', `${input.id} already exists.`);
+    if (prior) return !open(prior) ? fail('build.closed', input.id) : prior.body.startHash === startHash && prior.body.lead.tokenHash === caller.hash ? { ok: true as const, build: this.view(prior, now), lease: prior.body.lead.lease, inventory: this.inventory(prior.body).inventory, replayed: true } : fail('build.exists', `${input.id} already exists.`);
     if (this.store.hasGroupUnder(input.id)) return fail('build.exists', `${input.id} is already a journal group.`);
     if (this.rows.size >= BUILD_LIMITS.open) return fail('build.limit', 'At most 8 builds may be open.');
     const model = this.host.model(), [x0, z0, x1, z1] = model.ground().extent, [x, z] = input.site.at;
@@ -276,11 +388,14 @@ export class GodBuilds {
     if (input.root && !root) return { ok: false as const, failures: [{ op: -1, code: 'entity.unknown', entity: input.root, detail: `Unknown root ${input.root}.`, fix: 'Use an existing entity id or path.' }] };
     if (root && this.rootIndex.has(root.id)) return fail('build.site', 'Root already belongs to an open build.', 'root');
     const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief ? { brief: input.brief } : {}) }, site: input.site, massing: input.massing, roots: root ? [root.id] : [], lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
+    const { inventory, protectedThings } = this.inventory(body), included = new Set((input.include ?? []).map(id => model.get(id)?.id ?? id));
+    const missing = protectedThings.filter(e => !included.has(e.id));
+    if (missing.length) return { ...fail('build.site', `Closure would cover ${missing.length} protected thing(s).`, 'include', { fix: `Include ${missing.slice(0, 50).map(e => `${e.path} (${e.id})`).join(', ')}${missing.length > 50 ? `; ${missing.length - 50} more (see inventory counts)` : ''}, or move/shrink the massing or root.`, measured: missing.length }), inventory };
     const encoded = JSON.stringify(body), failure = buildBodyFailure(encoded); if (failure) return { ok: false as const, failures: [failure] };
     const inserted = this.store.insertBuild(input.id, now, encoded); if (!inserted) return fail('build.exists', `${input.id} already exists.`);
     if ('accepted' in inserted) return { ok: false as const, failures: inserted.failures };
     const row = decode(inserted); this.rows.set(row.id, row); this.index(); const build = this.view(row, now); this.announce(row, 'started', { added: row.body.roots, removed: [] }, false, build);
-    return { ok: true as const, build, lease: body.lead.lease };
+    return { ok: true as const, build, lease: body.lead.lease, inventory };
   }
   private save(row: Row, body: BuildBody, status: Row['status'], at: number, kind: BuildEventKind, transition = false) {
     const w: BuildWrite = { id: row.id, expectRev: row.rev, status, lastAt: at, body: JSON.stringify(body) };
@@ -303,12 +418,12 @@ export class GodBuilds {
       for (const id of previous?.body.roots ?? []) if (this.rootIndex.get(id) === row.id) this.rootIndex.delete(id);
     }
   }
-  private delta(row: Row, roots: RootChange, claim?: PublicSite['claims'][number]): SiteDelta {
+  private delta(row: Row, roots: RootChange, claim?: PublicSite['claims'][number], previous?: BuildBody): SiteDelta {
     const now = this.host.now(), b = row.body;
-    return { id: row.id, rev: row.rev, status: effective(row, now, this.pauseMs), lastAt: row.last_at, closed: this.isClosing(row, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, ...(claim ? { claim } : {}), ...(roots.added.length ? { rootsAdded: [...roots.added] } : {}), ...(roots.removed.length ? { rootsRemoved: [...roots.removed] } : {}) };
+    return { id: row.id, rev: row.rev, status: effective(row, now, this.pauseMs), lastAt: row.last_at, closed: this.isClosing(row, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, ...this.captions(row, previous), ...(claim ? { claim } : {}), ...(roots.added.length ? { rootsAdded: [...roots.added] } : {}), ...(roots.removed.length ? { rootsRemoved: [...roots.removed] } : {}) };
   }
-  private announce(row: Row, kind: BuildEventKind, roots: RootChange, inEdit = false, view?: GodBuildView, claim?: PublicSite['claims'][number]) {
-    const delta = this.delta(row, roots, claim), full = kind === 'started' || kind === 'resumed';
+  private announce(row: Row, kind: BuildEventKind, roots: RootChange, inEdit = false, view?: GodBuildView, claim?: PublicSite['claims'][number], previous?: BuildBody) {
+    const delta = this.delta(row, roots, claim, previous), full = kind === 'started' || kind === 'resumed';
     if (!inEdit) this.host.emit({ type: 'edge', kind: 'world-build', event: kind as WorldBuildMessage['event'], rev: row.rev, now: this.host.now(), ...(full ? { site: this.public(row, this.host.now()) } : { delta }) });
     this.host.notice({ kind, id: row.id, rev: row.rev, now: this.host.now(), delta, ...(full ? { view: view ?? this.view(row, this.host.now()) } : {}) });
   }
@@ -321,8 +436,8 @@ export class GodBuilds {
           const saved = this.save(row, body, 'paused', row.last_at, 'paused', true);
           if (saved.ok) { row = saved.row; this.announce(row, 'paused', { added: [], removed: [] }); }
         }
-        if (effective(row, now, this.pauseMs) === 'paused' && now - row.last_at > this.closureMs && row.body.closureLiftedAt === undefined) {
-          const body = structuredClone(row.body); body.closureLiftedAt = now;
+        if (open(row) && now >= this.reopensAt(row) && row.body.closureLapsedAt === undefined) {
+          const body = structuredClone(row.body); body.closureLapsedAt = now;
           const saved = this.save(row, body, row.status, row.last_at, 'closure-lifted', true);
           if (saved.ok) this.announce(saved.row, 'closure-lifted', { added: [], removed: [] });
         }
@@ -336,10 +451,42 @@ export class GodBuilds {
       // A deliberate handoff survives even reads from the lead's token; a lease/claim batch can resume it.
       if (row.body.lead.tokenHash !== hash || row.body.paused?.explicit || now - row.last_at <= this.pauseMs / 4) continue;
       const body = structuredClone(row.body), paused = effective(row, now, this.pauseMs) === 'paused';
-      if (paused) body.pauses++; delete body.paused; delete body.closureLiftedAt;
+      if (paused) body.pauses++; delete body.paused;
       const saved = this.save(row, body, 'active', now, paused ? 'resumed' : 'alive');
       if (saved.ok) this.announce(saved.row, saved.kind, { added: [], removed: [] });
     }
+  }
+  step(id: string, raw: unknown, caller?: Identity) {
+    const now = this.host.now(); this.sweep(now);
+    const p = buildActionSchemas.step.safeParse(raw); if (!p.success) return schemaFailure(p.error);
+    const input = p.data, field: BuildField = { id, ...(input.lease ? { lease: input.lease } : { claim: input.claim }) };
+    const admission = this.admit(field, {}, caller); if (admission.failures) return { ok: false as const, failures: admission.failures };
+    const row = admission.row!;
+    const unknown = input.masses?.filter(name => !row.body.massing.some(m => m.name === name));
+    if (unknown?.length) return fail('build.site', `Unknown mass(es): ${unknown.join(', ')}.`, 'masses', { fix: 'Use mass names from this build\'s massing.' });
+    const old = input.claim ? row.body.claims.find(c => c.id === input.claim)! : row.body;
+    const key = hashOf({ claim: input.claim ?? null, n: input.n ?? old.step.n, say: input.say ?? null }).slice(0, 16);
+    if (row.body.stepCalls?.includes(key)) {
+      if (input.lease) this.touch(row.body.lead.tokenHash, now);
+      return { ok: true as const, build: this.view(this.row(id)!, now), replayed: true };
+    }
+    const body = structuredClone(row.body), claim = input.claim ? body.claims.find(c => c.id === input.claim)! : undefined;
+    const current = claim?.step ?? body.step, n = Math.max(current.n, input.n ?? current.n);
+    const label = input.n !== undefined && input.n < current.n ? current.label : input.label ?? (n > current.n ? body.plan.steps[n - 1] ?? `step ${n}` : current.label);
+    if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
+    else body.step = { n, label, at: now, seq: null };
+    // Keep the last STEP_CALLS accepted tuples (16 hex each): a retry cannot replace a newer announcement, and a long,
+    // chatty build can never grow its body to the 64 KiB guard (which would refuse every later batch).
+    body.stepCalls = [...(body.stepCalls ?? []), key].slice(-STEP_CALLS);
+    if (input.say !== undefined) { body.say = { text: input.say, at: now }; body.sayAt = now; }
+    body.designing = [...new Set(input.masses ?? [])];
+    let status = row.status;
+    if (!claim) { if (effective(row, now, this.pauseMs) === 'paused') body.pauses++; delete body.paused; status = 'active'; }
+    const saved = this.save(row, body, status, claim ? row.last_at : now, 'step');
+    if (!saved.ok) return saved;
+    const build = this.view(saved.row, now);
+    this.announce(saved.row, 'step', { added: [], removed: [] }, false, build, claim ? { part: claim.part, status: claim.status } : undefined);
+    return { ok: true as const, build };
   }
   pause(id: string, raw: unknown, caller?: Identity) {
     this.sweep(); const p = buildActionSchemas.pause.safeParse(raw); if (!p.success) return schemaFailure(p.error); const row = this.row(id); if (!row) return fail('build.unknown', id);
@@ -362,7 +509,7 @@ export class GodBuilds {
     if (!replayed) body.lead = { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now };
     if (!body.agents.some(a => a.hash8 === caller.hash.slice(0, 8))) body.agents = [...body.agents, { label: caller.label, hash8: caller.hash.slice(0, 8), at: now }].slice(-8);
     const resumed = !replayed || effective(row, now, this.pauseMs) === 'paused';
-    delete body.paused; delete body.closureLiftedAt; const r = this.savedView(this.save(row, body, 'active', now, resumed ? 'resumed' : 'alive'));
+    delete body.paused; const r = this.savedView(this.save(row, body, 'active', now, resumed ? 'resumed' : 'alive'));
     if (!r.ok) return r; return { ...r, lease: body.lead.lease, current: r.build.current, next: r.build.next, massing: r.build.massing, ...(replayed ? { replayed: true } : {}) };
   }
   claim(id: string, raw: unknown, caller: Identity) {
@@ -463,7 +610,7 @@ export class GodBuilds {
     return checked;
   }
   rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field?: BuildField) { return rootsDelta(before, after, diff, kind, field, [...this.rows.values()], this.rootIndex); }
-  writes(admission: Admission, roots: RootsDelta, seq: number, at: number, caller?: Identity, group?: string, revert = false, made: string[] = []): { writes: PlannedWrite[]; echo?: BuildEcho; warnings: string[]; failures?: Failure[] } {
+  writes(admission: Admission, roots: RootsDelta, seq: number, at: number, caller?: Identity, group?: string, revert = false, made: string[] = [], note?: string): { writes: PlannedWrite[]; echo?: BuildEcho; warnings: string[]; failures?: Failure[] } {
     const ids = new Set(roots.changes.keys()); if (admission.row) ids.add(admission.row.id);
     // Prune removed made ids even for field-less edits, engine removals, and retained claims outside this batch.
     if (roots.removed.size) for (const row of this.rows.values()) if (row.body.claims.some(c => c.made.some(id => roots.removed.has(id)))) ids.add(row.id);
@@ -477,13 +624,13 @@ export class GodBuilds {
       const groupLead = !!group && !row.body.paused?.explicit && (group === id || group.startsWith(id + '/')) && caller?.hash === row.body.lead.tokenHash;
       const refresh = !!field || groupLead;
       const claim = field?.claim ? body.claims.find(c => c.id === field.claim) : undefined;
-      if (refresh) { delete body.paused; delete body.closureLiftedAt; status = !revert && body.done ? 'done' : 'active'; if (wasPaused) { body.pauses++; kind = 'resumed'; } if (status === 'done') kind = 'done'; if (!revert && field?.done && !field.claim && !body.done) warnings.push(`${id} stays open: ${this.liveClaims(row, at).length} live claims (${this.liveClaims(row, at).map(c => c.part).join(', ')}); release them or build done --force`); if (claim?.status === 'done') kind = 'released'; }
+      if (refresh) { body.lastBatchAt = at; delete body.closureLapsedAt; delete body.paused; if (note !== undefined) body.note = { text: cleanText(note).slice(0, 140), at }; else delete body.note; status = !revert && body.done ? 'done' : 'active'; if (wasPaused) { body.pauses++; kind = 'resumed'; } if (status === 'done') kind = 'done'; if (!revert && field?.done && !field.claim && !body.done) warnings.push(`${id} stays open: ${this.liveClaims(row, at).length} live claims (${this.liveClaims(row, at).map(c => c.part).join(', ')}); release them or build done --force`); if (claim?.status === 'done') kind = 'released'; }
       const encoded = JSON.stringify(body), failure = buildBodyFailure(encoded); if (failure) return { writes: [], warnings, failures: [failure] };
       const w: PlannedWrite = { id, expectRev: row.rev, status, lastAt: refresh ? at : row.last_at, body: encoded, next: body, before: row, roots: change, kind, ...(field ? { echo: true } : {}), ...(claim ? { claim: { part: claim.part, status: claim.status } } : {}) };
       writes.push(w); if (field) echo = { id, status, rev: 0, group: revert ? group : admission.group!, step: { n: claim?.step.n ?? body.step.n, label: claim?.step.label ?? body.step.label }, ...(claim ? { claim: claim.id } : {}) };
     }
     return { writes, echo, warnings };
   }
-  accepted(writes: PlannedWrite[]): SiteDelta[] { return writes.map(w => { const row: Row = { ...w.before, body: w.next, rev: w.rev!, status: w.status, last_at: w.lastAt }; this.install(row, w.roots); return this.delta(row, w.roots, w.claim); }); }
-  announceCommitted(writes: PlannedWrite[]) { for (const w of writes) this.announce({ ...w.before, body: w.next, rev: w.rev!, status: w.status, last_at: w.lastAt }, w.kind, w.roots, true, undefined, w.claim); }
+  accepted(writes: PlannedWrite[]): SiteDelta[] { return writes.map(w => { const row: Row = { ...w.before, body: w.next, rev: w.rev!, status: w.status, last_at: w.lastAt }; this.install(row, w.roots); return this.delta(row, w.roots, w.claim, w.before.body); }); }
+  announceCommitted(writes: PlannedWrite[]) { for (const w of writes) this.announce({ ...w.before, body: w.next, rev: w.rev!, status: w.status, last_at: w.lastAt }, w.kind, w.roots, true, undefined, w.claim, w.before.body); }
 }

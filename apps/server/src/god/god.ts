@@ -274,7 +274,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const result = this.finalizeAct?.(r.result, next) ?? r.result;
     if (!result.accepted) return result;
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
-    const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made);
+    const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made, journalNote);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
     result.warnings.push(...this.parts.warnings(normalized.ops));
@@ -353,6 +353,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
 
   /** Undo every edit of a group (newest first). Stops at the first conflict and reports how far it got. */
   undoGroup(group: string): { accepted: boolean; reverted: number[]; notReverted: number[]; failed?: number; failures?: Failure[] } {
+    // A build owns its lead group and every claim/subgroup, including after finish.
+    if (this.store.build(group)) return this.undoGroupUnder(group);
     const reverted: number[] = [];
     const targets = this.store.groupEdits(group);
     for (const [index, target] of targets.entries()) {
