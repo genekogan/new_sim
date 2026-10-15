@@ -17,6 +17,8 @@ const port = Number(process.argv[3] ?? 5960);
 if (!Number.isInteger(port) || port < 5960 || port > 5968) throw Error('This lane owns ports 5960–5969 only');
 mkdirSync(out, {recursive: true});
 const {chromium} = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
+process.env.EDGE_CLI_FILE = resolve(root, 'tools/world-launcher/soul/eden-agent.mjs');
+process.env.EDGE_SKILL_FILE = resolve(root, 'tools/world-launcher/soul/skill.md');
 const report = {startedAt: new Date().toISOString(), status: 'running', runs: []};
 const running = new Set();
 let browser;
@@ -59,6 +61,12 @@ try {
       mkdirSync(godDir); mkdirSync(soulDir);
       writeFileSync(resolve(godDir, '.eden-god.json'), JSON.stringify({world: base, token: god}), {mode: 0o600});
       writeFileSync(resolve(soulDir, '.eden-agent.json'), JSON.stringify({world: base, token: soulToken, soul: soul.id, mode: 'edge'}), {mode: 0o600});
+      for (const [dir, name, route] of [[godDir, 'eden-god.mjs', '/god/eden-god.mjs'], [soulDir, 'eden-agent.mjs', '/eden-agent.mjs']]) {
+        const download = await fetch(base + route); assert.equal(download.status, 200);
+        writeFileSync(resolve(dir, name), await download.text());
+      }
+      const entrySkill = await (await fetch(base + '/SKILL.md')).text();
+      assert.match(entrySkill, /eden-god\.mjs listen/); assert.match(entrySkill, /eden-agent\.mjs listen/);
       await page.goto(`${base}?dev=1#soul/${soul.id}`, {waitUntil: 'domcontentloaded'});
       await page.locator('[data-agent-message="soul"]').waitFor({state: 'visible', timeout: 90000});
       run.renderer = await page.evaluate(() => {
@@ -100,8 +108,8 @@ try {
       await api(`/v1/edge/inbox/${soulMessage.id}/ack`, soulToken, {reply: 'I will come to the water.'});
       await both('acknowledged', 'acknowledged');
       for (const [kind, dir, cli, ownerPath, previous] of [
-        ['god', godDir, 'tools/god-skill/eden-god.mjs', '/v1/god/inbox', godMessage],
-        ['soul', soulDir, 'tools/edge-skill/eden-agent.mjs', `/v1/edge/owner/${soul.id}/inbox`, soulMessage],
+        ['god', godDir, resolve(godDir, 'eden-god.mjs'), '/v1/god/inbox', godMessage],
+        ['soul', soulDir, resolve(soulDir, 'eden-agent.mjs'), `/v1/edge/owner/${soul.id}/inbox`, soulMessage],
       ]) {
         const child = spawn(process.execPath, [resolve(root, cli), 'listen', '--after', previous.id], {cwd: dir, env: process.env, stdio: ['ignore', 'pipe', 'pipe']});
         running.add(child);
