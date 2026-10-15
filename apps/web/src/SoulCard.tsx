@@ -54,7 +54,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
  if(view==='activity')return <SoulActivity soul={soul} rec={rec} plays={plays} talk={talk} back={()=>setView('card')}/>;
  return <article className="soul-card" aria-labelledby="soul-card-name">
   <div className="soul-card-portrait"><SoulAvatar soul={soul}/></div>
-  <h1 id="soul-card-name" ref={title} tabIndex={-1}>{soul.name}</h1>
+  <h1 id="soul-card-name" ref={title} tabIndex={-1} title={soul.name}>{soul.name}</h1>
   {soul.description&&<p className="soul-character">{soul.description}</p>}
   <p className="soul-meta">
    {fade&&<span className="soul-status"><i style={{background:fade.colour}} aria-hidden="true"/>{fade.word}</span>}
@@ -81,7 +81,7 @@ function SoulActivity({soul,rec,plays,talk,back}:{soul:PublicSoul;rec:Rec;plays:
  const last=r?.receipts[0],lastAgo=ago(r?.lastAcceptedAt);
  const empty=!where&&!last&&!lastAgo&&!(r?.receipts.length)&&!(r?.events.length)&&!rows.length;
  return <article className="soul-card soul-activity" aria-labelledby="soul-activity-title">
-  <button className="soul-back" onClick={back}><span aria-hidden="true">‹</span>{soul.name}</button>
+  <button className="soul-back" onClick={back} title={soul.name}><span aria-hidden="true">‹</span><span className="soul-back-name">{soul.name}</span></button>
   <h2 id="soul-activity-title" ref={heading} tabIndex={-1}>Activity</h2>
   {(where||lastAgo||last)&&<dl className="soul-facts">
    {where&&<><dt>Now</dt><dd>{where}</dd></>}

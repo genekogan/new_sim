@@ -1,6 +1,6 @@
 /* UI2 Soul card: name, character, status line, Share/Activity. Light/dark from styles.css tokens. */
 .human-world .soul-card{display:block;margin:0;padding:0;border:0;background:transparent;font:14px/1.45 system-ui,sans-serif;color:var(--fg)}
-.human-world .human-panel .soul-card h1{margin:0 40px 6px 0;font:680 24px/1.15 system-ui,sans-serif;letter-spacing:-.015em;outline:none}
+.human-world .human-panel .soul-card h1{margin:0 40px 6px 0;font:680 24px/1.15 system-ui,sans-serif;letter-spacing:-.015em;outline:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .soul-character{margin:0 0 12px;font-size:14.5px;line-height:1.5;color:var(--fg);opacity:.86}
 .soul-meta{display:flex;flex-wrap:wrap;align-items:center;margin:0 0 14px;font-size:13px;color:var(--fg)}
 .soul-meta>span+span::before{content:'·';margin:0 8px;color:var(--dim)}
@@ -21,6 +21,8 @@
 .human-world .soul-card .soul-back{display:inline-flex;align-items:center;gap:6px;min-height:28px;margin:-4px 0 6px -6px;padding:2px 8px 2px 6px;border:0;border-radius:999px;background:transparent;color:var(--dim);font:600 13px/1 system-ui,sans-serif}
 .human-world .soul-card .soul-back:hover{color:var(--fg);background:color-mix(in srgb,var(--fg) 7%,transparent)}
 .soul-back span{font-size:18px;line-height:1;margin-top:-2px}
+.human-world .soul-card .soul-back{max-width:100%;min-width:0}
+.soul-back .soul-back-name{font:inherit;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .human-world .human-panel .soul-activity h2{margin:0 0 10px;font:680 20px/1.2 system-ui,sans-serif;letter-spacing:-.01em;color:var(--fg);text-transform:none;outline:none}
 .soul-facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 14px;margin:0 0 14px;font-size:13.5px}
 .soul-facts dt{color:var(--dim)}.soul-facts dd{margin:0;overflow-wrap:anywhere}

@@ -58,3 +58,4 @@
   .lh-dialog { padding: 20px 16px 16px; }
 }
 .lh-desc { display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lh-card .lh-world-slug{margin:4px 0 14px;font:600 13px/1.4 ui-monospace,monospace;color:var(--fg);overflow-wrap:anywhere}

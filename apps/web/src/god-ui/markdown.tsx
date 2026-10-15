@@ -2,8 +2,9 @@
 // template notes). Enough of CommonMark for what the server writes: ATX
 // headings, paragraphs, bullet and numbered lists, fenced code (with a copy
 // button), inline code, bold, italic, links. Never injects HTML.
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { commandText, parseMarkdown } from './md-parse.ts';
+import {copyText,manualCopyHint} from '../clipboard.ts';
 
 /** Inline spans: `code`, **bold**, *italic* / _italic_, [text](url). */
 export function inline(text: string, key = 'i'): ReactNode[] {
@@ -25,16 +26,14 @@ export function inline(text: string, key = 'i'): ReactNode[] {
 }
 
 export function CopyButton({ text, label = 'copy' }: { text: string; label?: string }) {
-  const [done, setDone] = useState(false);
+  const [result, setResult] = useState<boolean|null>(null);
+  const fallback=useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(()=>{if(result===false){fallback.current?.focus();fallback.current?.select();}},[result]);
   const copy = async () => {
-    try { await navigator.clipboard.writeText(text); }
-    catch {  // clipboard API refused (http, headless): fall back to a selection copy
-      const ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); } catch { /* nothing more to try */ } ta.remove();
-    }
-    setDone(true); setTimeout(() => setDone(false), 1400);
+    const copied=await copyText(text);setResult(copied);
+    if(!copied){fallback.current?.focus();fallback.current?.select();}
   };
-  return <button type="button" className="gp-copy" data-copy={text.slice(0, 40)} onClick={copy} title="Copy to the clipboard">{done ? 'copied' : label}</button>;
+  return <span className="gp-copy-control"><button type="button" className="gp-copy" data-copy={text.slice(0, 40)} onClick={copy} title="Copy to the clipboard">{result===true ? 'copied' : label}</button>{result!==null&&<span role="status">{result?'Copied.':manualCopyHint}</span>}{result===false&&<textarea ref={fallback} aria-label="Text to copy" readOnly rows={3} value={text}/>}</span>;
 }
 
 export function Markdown({ source, skipFirstHeading = false }: { source: string; skipFirstHeading?: boolean }) {

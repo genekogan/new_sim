@@ -3,6 +3,7 @@ import {isConnectionRefusal,type AgentConnectionProjection} from './connection-r
 import type {Api} from './useSim.ts';
 import {connectionSetupPrompt} from './connection-prompt.ts';
 import {BASE} from './base-path.ts';
+import {copyText,manualCopyHint} from './clipboard.ts';
 type Connection=AgentConnectionProjection;
 type Props={api:Api;soulId:string;name:string;base:string;connection:Connection|null;refresh():void;notice?:{message:string;setMessage(value:string):void}};
 export function AgentConnection(props:Props){
@@ -13,6 +14,7 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
   const message=notice?.message??localMessage,setMessage=notice?.setMessage??setLocalMessage;
   const [issuedAt,setIssuedAt]=useState(0),[clock,setClock]=useState(Date.now());
   const pending=useRef(false),live=useRef(true);
+  const prompt=useRef<HTMLTextAreaElement>(null);
   useEffect(()=>{live.current=true;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>{live.current=false;clearInterval(timer);};},[]);
   useEffect(()=>{if(connection?.attached&&connection.since&&connection.since>=issuedAt)setCode(null);},[connection?.since,connection?.attached,issuedAt]);
   const expired=!!code&&clock-issuedAt>=15*60_000;
@@ -35,7 +37,7 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
     {connection?.attached&&<p className="small dim">Granted access does not confirm that your agent is running.</p>}
     <details><summary>Connect or re-pair your agent</summary>
       <p>Give this prompt to your agent, then approve its link in your browser.</p>
-      {setupPrompt&&<><textarea aria-label="Connection setup prompt" readOnly rows={4} value={setupPrompt}/><button onClick={async()=>{try{await navigator.clipboard.writeText(setupPrompt);if(live.current)setMessage('Copied.');}catch{if(live.current)setMessage('Copy unavailable. Select the prompt and copy it.');}}}>Copy prompt</button></>}
+      {setupPrompt&&<><textarea ref={prompt} aria-label="Connection setup prompt" readOnly rows={4} value={setupPrompt}/><button onClick={async()=>{const copied=await copyText(setupPrompt);if(!live.current)return;if(!copied){prompt.current?.focus();prompt.current?.select();}setMessage(copied?'Copied.':manualCopyHint);}}>Copy prompt</button></>}
       <a href={`${base}/instructions.md`} target="_blank" rel="noreferrer">Read the instructions</a>
     </details>
     {connection?.attached&&<button disabled={busy} onClick={()=>void act('revoke')}>Disconnect assistant</button>}
