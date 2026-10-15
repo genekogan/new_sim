@@ -83,11 +83,15 @@ export class WorldModel {
   private footprints = new Map<string, OBB[]>();
   private safetyKey?: { parts: unknown[]; key: object };
 
-  /** Model-local cache identity: never shared across a fork/model or reused after structural mutation.
+  private safetyParts(): unknown[] | undefined {
+    if (this.entities instanceof ModelMap && this.defs instanceof ModelMap)
+      return [this.entities, this.entities.revision, this.defs, this.defs.revision, this.library, this.assets];
+    return undefined;
+  }
+  /** Identical structural forks may share derived data until either copy changes its own maps.
    * Untracked replacement Maps deliberately disable caching rather than risk stale admission. */
   safetyCacheKey(): object {
-    if (!(this.entities instanceof ModelMap) || !(this.defs instanceof ModelMap)) return {};
-    const parts = [this.entities, this.entities.revision, this.defs, this.defs.revision, this.library, this.assets];
+    const parts = this.safetyParts(); if (!parts) return {};
     if (!this.safetyKey || parts.some((p, i) => p !== this.safetyKey!.parts[i])) this.safetyKey = {parts, key: {}};
     return this.safetyKey.key;
   }
@@ -169,6 +173,25 @@ export class WorldModel {
       const out = { ...r, params: { ...gp, ...r.params } }; if (r === d) withGenParams.set(d, out); return out;
     }
     return r;
+  }
+
+  /** Cheap effective-content identity, memoized by ref for one unchanged definition binding set.
+   * Match resolvedDef's inheritance depth and include the generator fields it adds at the root.
+   * Callers discard the memo after define/restore; forks never carry a stale binding identity. */
+  effectiveDefIdentity(ref: string, memo: Map<string, string>): string {
+    const hit = memo.get(ref); if (hit !== undefined) return hit;
+    const hashes: string[] = [];
+    let d = this.def(ref), make: StoredDef['make'] | undefined;
+    for (let depth = 0; d && depth <= 9; depth++) {
+      hashes.push(d.hash);
+      if (!make && d.make.kind !== 'none') make = d.make;
+      d = d.extends ? this.def(d.extends) : undefined;
+    }
+    const gp = make?.kind === 'gen' ? genParams(make.gen) : undefined;
+    let fields = gp && genParamIdentities.get(gp);
+    if (gp && fields === undefined) { fields = hashOf(gp); genParamIdentities.set(gp, fields); }
+    const identity = `${hashes.join(':')}|${fields ?? ''}`;
+    memo.set(ref, identity); return identity;
   }
 
   // ---------- baking ----------
@@ -364,6 +387,9 @@ export class WorldModel {
     out.cells = new Map([...(self.cells as Map<string, Set<string>>)].map(([k, v]) => [k, new Set(v)]));
     out.footprints = new Map(self.footprints as Map<string, unknown>);
     w.terrain = this.terrain.clone();
+    // GodMode forks before calling plan (which forks again). Preserve the exact copied state's
+    // warm totals/entrance index; each fork's own Map revisions invalidate it independently.
+    if (this.safetyParts()) w.safetyKey = {parts: w.safetyParts()!, key: this.safetyCacheKey()};
     return w;
   }
 
@@ -417,6 +443,7 @@ function defaultsOf(fields: Record<string, { default?: unknown }>): Record<strin
 
 const withGenParams = new WeakMap<StoredDef, StoredDef>();
 const genParamsCache = new Map<string, StoredDef['params'] | null>();
+const genParamIdentities = new WeakMap<StoredDef['params'], string>();
 /** A generator's params parsed as def fields (defaults filled), cached per generator id. */
 function genParams(gen: string): StoredDef['params'] | undefined {
   if (!genParamsCache.has(gen)) {

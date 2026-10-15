@@ -79,3 +79,21 @@ test('warm triangle budget bakes only changed ids and region budget visits only 
   assert.equal(worldTris(after), total); assert.equal(bakes, 2);
   assert.deepEqual(cells, new Set([...w.solidRegionsOf([e.id]), ...after.solidRegionsOf([e.id])])); // Only overloaded cells need an old count read.
 });
+
+test('server-style speculative forks retain warm safety caches until their own maps change', t => {
+  const w = new WorldModel({constants: {ground: 'land'}, seed: 'server-forks'});
+  w.defineDef(cube, 'god', 0);
+  const initial = applyBatch(w, {ops: Array.from({length: 100}, (_, i) => ({op: 'place', def: 'cube@1', name: `c${i}`, p: [i * 2, 0]}))}, 'god', 0);
+  assert.equal(initial.result.accepted, true, JSON.stringify(initial.result));
+  const bake = WorldModel.prototype.bake;
+  let bakes = 0;
+  t.mock.method(WorldModel.prototype, 'bake', function(this: WorldModel, ...args: Parameters<WorldModel['bake']>) {bakes++; return bake.apply(this, args);});
+  for (let i = 0; i < 3; i++) {
+    // GodMode first forks the public model; plan then forks that speculative model again.
+    const next = w.fork();
+    const r = applyBatch(next, {ops: [{op: 'world', state: {constitution: `draft ${i}`}}]}, 'god', i + 1);
+    assert.equal(r.result.accepted, true, JSON.stringify(r.result));
+    Object.assign(w, next);
+  }
+  assert.equal(bakes, 0, 'unchanged entities must not be re-baked by cold safety scans on each server edit');
+});

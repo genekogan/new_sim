@@ -136,6 +136,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   /** With a `refuse` hook, uses refusals are held back while the batch is simulated to the end, so the hook sees the
    *  would-be world first (its refusal wins); then the earliest held-back one is the batch's refusal. */
   const heldBack: Failure[] = [];
+  // Content hashes already summarize stored defs. Resolve each distinct instance ref only once
+  // per binding set; never serialize a large resolved kit for every entity in a define batch.
+  let effectiveDefs = new Map<string, string>();
+  const instanceDefs = () => {
+    for (const e of scratch.entities.values()) scratch.effectiveDefIdentity(e.def, effectiveDefs);
+    return effectiveDefs;
+  };
   /** A Soul uses something in this subtree: refuse naming them. */
   const inUse = (id: string, i: number): boolean => {
     if (!opts.uses) return false;
@@ -155,7 +162,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const rebindInstances = (before: Map<string, string>, i: number, restores: NonNullable<Extract<Op, { op: 'restore-def' }>['instances']> = []) => {
     const back: typeof restores = [], restore = new Map(restores.map(r => [r.entity.id, r]));
     const affected = new Set<string>();
-    for (const e of scratch.entities.values()) if (restore.has(e.id) || before.get(e.id) !== hashOf(scratch.resolvedDef(e.def) ?? null)) {
+    for (const e of scratch.entities.values()) if (restore.has(e.id) || before.get(e.def) !== scratch.effectiveDefIdentity(e.def, effectiveDefs)) {
       for (const id of scratch.subtree(e.id)) affected.add(id);
     }
     const instances = [...affected].map(id => scratch.entities.get(id)!).sort((a, b) => scratch.ancestors(a.id).size - scratch.ancestors(b.id).size);
@@ -210,8 +217,9 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const refuse = checkDef(scratch, op.def as never, i);
         if (refuse) { failures.push(refuse); return; }
         // Discover affected instances before rebinding, including inheritance and expanded prefab/contents children.
-        const before = new Map([...scratch.entities.values()].map(e => [e.id, hashOf(scratch.resolvedDef(e.def) ?? null)]));
+        const before = previous ? instanceDefs() : undefined;
         const stored = scratch.defineDef(op.def as never, by, tick);
+        effectiveDefs = new Map();
         if (previous?.hash === stored.hash) {
           // Preserve first adoption of an identical shared library record; an already owned identical def is a no-op.
           if (!owned) diff.defs.push(stored);
@@ -224,15 +232,16 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         }
         diff.defs.push(stored);
         if (previous) {
-          const instances = rebindInstances(before, i);
+          const instances = rebindInstances(before!, i);
           inverse.unshift({ op: 'restore-def', ref, hash: previous.hash, ...(instances.length ? { instances } : {}) });
         }
         return;
       }
       case 'restore-def': {
         const previous = scratch.def(op.ref);
-        const before = new Map([...scratch.entities.values()].map(e => [e.id, hashOf(scratch.resolvedDef(e.def) ?? null)]));
+        const before = instanceDefs();
         const stored = scratch.restoreDef(op.ref, op.hash);
+        effectiveDefs = new Map();
         if (!stored || !previous) { failures.push({ ...fail(i, 'undo.conflict', `stored definition ${op.ref} at ${op.hash} is unavailable`), field: 'def', fix: 'Restore the missing stored definition before retrying undo.' }); return; }
         if (previous.hash === stored.hash && !op.instances?.length) return;
         diff.defs.push(stored);
