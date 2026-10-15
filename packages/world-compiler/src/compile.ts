@@ -14,6 +14,7 @@ import { sealedRouteFailure } from './architecture.ts';
 import { overlapNotWorse } from './overlap.ts';
 import { worldBudgetFailure } from './budgets.ts';
 import { creationInputFailure } from './input.ts';
+import { signMediaFailure } from './sign-media.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
@@ -532,6 +533,11 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   }
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
+  for (const e of diff.upserts) {
+    const def = scratch.resolvedDef(e.def)!;
+    const failure = signMediaFailure(scratch, def, e.state?.media ?? def.state.media?.default, touchedAt.get(e.id) ?? sourceOp(e), e.id);
+    if (failure) return { ok: false, failures: [failure] };
+  }
   // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
   // (with its `extends` chain and any def named by a param), so the world keeps exactly what it placed.
   if (scratch.library) {
@@ -643,6 +649,8 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
   try {
     const trial = w.fork(), stored = trial.defineDef(def, 'admission', 0);
     resolved = trial.resolvedDef(stored.ref)!;
+    const mediaFailure = signMediaFailure(trial, resolved, resolved.state.media?.default, i);
+    if (mediaFailure) return mediaFailure;
     if (resolved.make.kind === 'gen') {
       const g = GENERATORS[resolved.make.gen];
       if (!g) return { ...fail(i, 'def.invalid', `generator ${resolved.make.gen} unknown`), def: stored.ref,

@@ -2,15 +2,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
+import { Hono } from 'hono';
 import { fixture, invite, accept, factory } from '../../test/native-owner-fixture.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { hereFrame } from '../edge/perception/here.ts';
 import { GodMode } from './god.ts';
 import { installEngineBridge } from './engine-bridge.ts';
 import { envClockConfig, PAUSED_DAY_TICKS } from './world-clock.ts';
-import { envPatch, setEnv, envView, installWorldEnv, parseHour, weatherNow } from './world-env.ts';
+import { envPatch as patchForSeq, setEnv, envView, installWorldEnv, parseHour, weatherNow, mountEnvRoutes } from './world-env.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const envPatch = (state: any, input: Parameters<typeof patchForSeq>[1]) => patchForSeq(state, input, 7);
 const hourAt = (tick: number, c: { origin: number; dayTicks: number }) => (6 + 24 * ((Math.max(0, tick - c.origin) / c.dayTicks) % 1)) % 24;
 
 test('envClockConfig moves the clock forward to the hour, once per set, and pauses', () => {
@@ -49,6 +51,35 @@ test('envPatch: kinds, intensity, overrides, time scale; validation', () => {
   assert.throws(() => envPatch(base, { timeScale: 5000 }));
   const auto = weatherNow(base, '2026-10-03T14:00:00.000Z');
   assert.equal(auto.scheduled, true);
+});
+
+test('set → undo → set uses the journal sequence and HTTP reports the clock after it is applied', async t => {
+  const f = fixture(':memory:', factory, { durableClockV1: true });
+  const god = new GodMode(f.db, { worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {} });
+  f.brain.quiesce(); t.after(() => { f.brain.quiesce(); f.host.stop(); f.db.close(); });
+  installEngineBridge({ host: f.host, god, log: () => {}, worldClock: true });
+  f.host.drainInputs(); await setImmediate();
+  const app = new Hono(); mountEnvRoutes(app, { god, host: f.host, requireGod: () => {} });
+  const post = async (hour: string) => {
+    let answered = false;
+    const reply = Promise.resolve(app.request('/v1/god/env', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer test-clock' }, body: JSON.stringify({ timeOfDay: hour }) })).then(r => { answered = true; return r; });
+    await setImmediate();
+    assert.equal(answered, false, 'HTTP waits while the engine rules are queued');
+    f.host.drainInputs();
+    const response = await reply; assert.equal(response.status, 200);
+    const data = await response.json() as any;
+    assert.equal(data.accepted, true); assert.equal(data.env.time.set.n, data.seq);
+    assert.equal(data.env.time.clock, hour);
+    assert.equal(data.env.time.datetime, (f.host.engine.world as any).env.datetime);
+    assert.match(data.env.undoNote, /does not rewind/);
+    return data;
+  };
+  const first = await post('21:00');
+  assert.equal(god.undo().accepted, true); f.host.drainInputs(); await setImmediate();
+  const second = await post('14:22');
+  assert.equal(second.seq, first.seq + 2);
+  assert.notEqual(second.env.time.set.n, first.env.time.set.n);
+  assert.equal((f.host.living as any).anchor, second.seq);
 });
 
 test('a god sets dusk, a storm and slow time; the clock and a Soul\'s `here` follow; undo restores', { timeout: 600000 }, async (t) => {

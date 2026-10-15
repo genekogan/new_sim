@@ -242,7 +242,8 @@ export class GodPlaces {
     }
     if (p.of === 'building') {
       const t = things.find((x) => x.ref === p.ref), rooms = all.filter((q) => q.of === 'room' && q.entity === p.entity).map((q) => q.ref);
-      return `${article(kind)} with ${counted('room', rooms.length)} (${rooms.join(', ')}); its front door is ${t?.doorOpen ? 'open' : 'closed'}`;
+      const entrance = t?.doorOpen === undefined ? 'open-sided, with no front door' : `its front door is ${t.doorOpen ? 'open' : 'closed'}`;
+      return `${article(kind)} with ${counted('room', rooms.length)} (${rooms.join(', ')}); ${entrance}`;
     }
     if (p.of === 'landform') {
       const e = m.entities.get(p.entity), [cx, cz] = centroid(p.polygon), top = Math.round(m.terrain.sample(cx, cz));

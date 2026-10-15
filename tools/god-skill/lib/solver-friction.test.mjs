@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { solve, frameOf, toWorldIn, obbHit, dirOfYaw } from './solver.mjs';
+import { solve, frameOf, toWorldIn, obbHit, dirOfYaw, inPoly } from './solver.mjs';
 import { COMMANDS, checkArgs } from '../cli.mjs';
 import { invalidate } from './mirror.mjs';
 
@@ -82,6 +82,38 @@ test('inside explicit point keeps doorways/occupants clear and supports world of
   assert.deepEqual(c.p, [1, 0]); near(c.r + h.slots[0].yaw, Math.PI);
 });
 
+test('inside row/grid preserves the requested count, world gaps and complete footprints in rotated/scaled rooms', () => {
+  for (const [yaw, scale] of [[0, 1], [Math.PI / 2, 1], [.65, 2]]) {
+    const h = house(yaw, scale), F = frameOf(h, 'room');
+    for (const [rel, count] of [[{ row: 3 }, 3], [{ grid: '3x2' }, 6]]) {
+      const sol = solve(view([h]), bench, { inside: 'house/room', gap: 1, ...rel });
+      assert.equal(sol.items.length, count);
+      const ps = sol.items.map(i => i.candidates[0]);
+      for (const c of ps) {
+        assert.deepEqual(c.in, { parent: 'house', slot: 'room' });
+        // The complete rotated footprint, not just its centre, stays in the polygon.
+        for (const a of [-1, 1]) for (const b of [-1, 1]) {
+          const angle = c.r + F.RY - F.PY, x = a * bench.box[0] / 2, z = b * bench.box[2] / 2;
+          assert.ok(inPoly(c.p[0] + x * Math.cos(angle) + z * Math.sin(angle), c.p[1] - x * Math.sin(angle) + z * Math.cos(angle), h.slots[0].local));
+        }
+      }
+      const p0 = toWorldIn(F, ...ps[0].p), p1 = toWorldIn(F, ...ps[1].p);
+      near(Math.hypot(p1[0] - p0[0], p1[1] - p0[1]), bench.box[0] * scale + 1, .04);
+    }
+  }
+});
+
+test('inside row/grid uses exact world anchors and wall placement, and refuses an unfit run with a typed fix', () => {
+  const h = house(), v = view([h]);
+  for (const rel of [{ at: '11,21' }, { wall: 'back' }]) assert.equal(solve(v, bench, { inside: 'house/room', row: 3, gap: .2, ...rel }).items.length, 3);
+  for (const rel of [{ row: 20 }, { grid: '3x20' }, { row: 0 }, { row: 2.5 }, { grid: '2x2x2' }, { row: 2, grid: '2x2' }, { row: 2, gap: -1 }, { row: 2, at: '100,100' }]) {
+    assert.throws(() => solve(v, bench, { inside: 'house/room', ...rel }), e => e.code === 'constraint.unsatisfied' && e.failure.field && /fewer items.*gap.*larger room/.test(e.fix));
+  }
+  // A notch crossing the run between its corners must not be mistaken for room space.
+  h.slots[0].local = [[-5,-3],[5,-3],[5,3],[.5,3],[.5,-1],[-.5,-1],[-.5,3],[-5,3]];
+  assert.throws(() => solve(v, bench, { inside: 'house/room', at: '11,21', row: 3, gap: .1 }), e => e.code === 'constraint.unsatisfied');
+});
+
 function dryFixture(t, h) {
   const cwd = process.cwd(), originalFetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'w3-place-cpu-')), bodies = [];
   process.chdir(dir); invalidate();
@@ -115,4 +147,13 @@ test('place dry run forwards --inside --at as the requested world point in a roo
   assert.deepEqual(json.ops[0].p, [1.5, -.75]); assert.deepEqual(json.ops[0].in, { parent: 'house', slot: 'room' });
   await assert.rejects(COMMANDS.place(['bench'], { ...flags, at: '100,100' }), /outside room/);
   assert.equal(bodies.length, 1, 'outside point refuses before a dry run');
+});
+
+test('place --inside --row sends every entity, and an unfit grid refuses before admission', async t => {
+  const bodies = dryFixture(t, house());
+  const json = await COMMANDS.place(['bench'], { inside: 'house/room', row: '3', gap: '1', dry: true, json: true });
+  assert.equal(json.ops.length, 3); assert.equal(bodies[0].ops.length, 3);
+  assert.ok(json.ops.every(op => op.in.parent === 'house' && op.in.slot === 'room'));
+  await assert.rejects(COMMANDS.place(['bench'], { inside: 'house/room', grid: '8x8', gap: '1', dry: true }), e => e.code === 'constraint.unsatisfied' && !!e.fix);
+  assert.equal(bodies.length, 1);
 });

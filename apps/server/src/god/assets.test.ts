@@ -1,7 +1,7 @@
 // L5: asset store, GLB measurement, footprints, catalog search, asset routes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
@@ -15,6 +15,22 @@ import { GOD_JSON_BYTES } from './ingestion.ts';
 const repo = (p: string) => new Uint8Array(readFileSync(join(REPO_ROOT, p)));
 const DOG = 'worlds/core-assets/packs/dog-pack.glb';
 const TOWER_FP = 'worlds/littlemartians/buildings/ceramic-tower.footprint.json';
+
+test('sign image admission is scoped to this world even when worlds share an asset directory', t => {
+  const db = new Db(':memory:'), dir = mkdtempSync(join(tmpdir(), 'sign-world-assets-'));
+  t.after(() => { db.close(); rmSync(dir, { recursive: true, force: true }); });
+  const opts = { ownerId: null, tick: () => 1, emit: () => {}, assetDir: dir };
+  const a = new GodMode(db, { ...opts, worldId: 'image-world-a' }), b = new GodMode(db, { ...opts, worldId: 'image-world-b' });
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c626001000000050001a5f645400000000049454e44ae426082', 'hex');
+  const asset = a.assets.put(png), media = `/assets/${asset.sha}.${asset.ext}`;
+  const op = { op: 'place', def: 'core/picture-frame@1', state: { media } };
+  assert.equal(a.act({ ops: [op] }).accepted, true);
+  assert.ok(b.assets.info(asset.sha), 'the shared directory contains the file');
+  const refused = b.act({ ops: [op] }); assert.equal(refused.accepted, false);
+  if (!refused.accepted) { assert.equal(refused.failures[0].code, 'params.invalid'); assert.equal(refused.failures[0].field, 'state.media'); assert.match(refused.failures[0].fix!, /Upload.*this world/); }
+  b.assets.put(png);
+  assert.equal(b.act({ ops: [op] }).accepted, true, 'uploading into B records its world provenance');
+});
 
 function fixture() {
   const db = new Db(':memory:');

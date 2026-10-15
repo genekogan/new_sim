@@ -40,7 +40,7 @@ export class BakeError extends Error {
   }
 }
 /** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
-export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
+export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; /** An image available to this world for same-origin sign media. */ image?: { ext: 'png' | 'jpg' }; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
 export type AssetLookup = (hash: string) => AssetInfo | undefined;
 /** CATRUN: a process-wide, read-only, content-addressed def library (the core kit). A world resolves refs it does not
  *  store itself through it, and a def enters the world's own store (pinned by hash) the first time it is used

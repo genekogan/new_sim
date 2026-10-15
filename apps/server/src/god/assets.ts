@@ -423,7 +423,9 @@ export class AssetStore {
   readonly lookup: AssetLookup = (sha: string) => {
     const m = this.info(sha); if (!m) return undefined;
     const fp = m.kind === 'footprint' ? m : m.footprint ? this.info(m.footprint) : undefined;
-    return { tris: m.tris, bytes: m.bytes, textures: m.textures, box: m.box, ...(fp?.baked ? { baked: fp.baked } : {}) } as AssetInfo;
+    const image = m.kind === 'image' && (m.ext === 'png' || m.ext === 'jpg') && this.file(sha, m.ext)
+      && (this.core[sha] || !this.db || !this.worldId || this.db.db.prepare('SELECT 1 FROM world_assets_v1 WHERE world_id=? AND sha=?').get(this.worldId, sha));
+    return { tris: m.tris, bytes: m.bytes, textures: m.textures, box: m.box, ...(image ? { image: { ext: m.ext as 'png' | 'jpg' } } : {}), ...(fp?.baked ? { baked: fp.baked } : {}) } as AssetInfo;
   };
   info(sha: string): AssetMeta | undefined {
     if (!SHA.test(sha)) return undefined;

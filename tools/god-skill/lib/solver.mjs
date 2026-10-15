@@ -113,6 +113,17 @@ const serverSide = (side) => (SERVER_SIDE_MIRRORED && side === 'left' ? 'right' 
 // ---------------------------------------------------------------- overlap (local pre-check; the server decides)
 
 function corners(b) { const c = Math.cos(b.yaw), s = Math.sin(b.yaw); return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => [b.c[0] + i * b.half[0] * c + j * b.half[1] * s, b.c[1] - i * b.half[0] * s + j * b.half[1] * c]); }
+function boxInPolygon(box, poly) {
+  const points = corners(box);
+  if (!points.every(([x, z]) => inPoly(x, z, poly))) return false;
+  const cross = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  // Corners alone miss an edge crossing a concave room's notch.
+  for (let i = 0; i < 4; i++) for (let j = 0; j < poly.length; j++) {
+    const a = points[i], b = points[(i + 1) % 4], c = poly[j], d = poly[(j + 1) % poly.length];
+    if (cross(a, b, c) * cross(a, b, d) < -1e-12 && cross(c, d, a) * cross(c, d, b) < -1e-12) return false;
+  }
+  return true;
+}
 export function obbHit(a, b, margin = 0) {
   const A = { ...a, half: [a.half[0] + margin, a.half[1] + margin] };
   const axes = [[Math.cos(A.yaw), -Math.sin(A.yaw)], [Math.sin(A.yaw), Math.cos(A.yaw)], [Math.cos(b.yaw), -Math.sin(b.yaw)], [Math.sin(b.yaw), Math.cos(b.yaw)]];
@@ -634,21 +645,49 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
   const isRect = poly.length === 4 && poly.every(([x, z]) => (Math.abs(x - lx0) < 1e-3 || Math.abs(x - lx1) < 1e-3) && (Math.abs(z - lz0) < 1e-3 || Math.abs(z - lz1) < 1e-3));
   const cx = isRect ? (lx0 + lx1) / 2 : poly.reduce((a, p) => a + p[0], 0) / poly.length, cz = isRect ? (lz0 + lz1) / 2 : poly.reduce((a, p) => a + p[1], 0) / poly.length;
   const boxL = (lx, lz, ly, grow = 0) => ({ c: [lx, lz], half: [hw + grow, hd + grow], yaw: ly + dY });
-  const fits = (lx, lz, ly) => corners(boxL(lx, lz, ly, 0.08)).every(([x, z]) => inPoly(x, z, poly));
+  const fits = (lx, lz, ly) => boxInPolygon(boxL(lx, lz, ly, 0.08 / F.s), poly);
   const floor = room.floor ?? 0;
   // doorways stay clear (as furnish keeps them): 0.85 m either side of every door on this floor
-  const doors = (host.doors ?? []).filter((d) => (d.level ?? 0) === floor).map((d) => ({ id: d.id, zone: { c: toLocal(F, d.at[0], d.at[1]), half: [d.width / 2 + 0.15, 0.85], yaw: d.yaw - F.PY } }));
+  const doors = (host.doors ?? []).filter((d) => (d.level ?? 0) === floor).map((d) => ({ id: d.id, zone: { c: toLocal(F, d.at[0], d.at[1]), half: [d.width / 2 + 0.15 / F.s, 0.85 / F.s], yaw: d.yaw - F.PY } }));
   const roomSkip = new Set([...skip, host.id, ...v.rows.filter((x) => !(x.parent === host.id && x.slot === room.id)).map((x) => x.id)]);
   const taken = [];
   const yawAt = (lx, lz, ly) => { const [wx, wz] = toWorldIn(F, lx, lz); const f = faceAt(wx, wz); return f !== undefined ? f - F.RY : ly; };
   const why = (lx, lz, ly) => {
     if (!fits(lx, lz, ly)) return 'through a wall';
     const d = solid && doors.find((x) => obbHit(boxL(lx, lz, ly), x.zone)); if (d) return `in the doorway ${d.id}`;
-    if (solid) { const [x, z] = toWorldIn(F, lx, lz); const b = blockers(v, { c: [x, z], half: [hw, hd], yaw: F.RY + ly }, roomSkip); if (b.length) return `against ${b[0]}`; }
-    if (taken.some((t) => obbHit(boxL(lx, lz, ly, 0.08), t))) return 'on another one';
+    if (solid) { const [x, z] = toWorldIn(F, lx, lz); const b = blockers(v, { c: [x, z], half: [hw * F.s, hd * F.s], yaw: F.RY + ly }, roomSkip); if (b.length) return `against ${b[0]}`; }
+    if (taken.some((t) => obbHit(boxL(lx, lz, ly), t))) return 'on another one';
     return null;
   };
   const at = (lx, lz, ly, how) => ({ in: { parent: host.path, slot: room.id }, p: [r2(lx), r2(lz)], r: r2(ly), constraints: [...constraints, ...facingConstraint(), { kind: 'inside', ref: label }], note: `inside ${label}${how ? ', ' + how : ''}` });
+  if (rel.row !== undefined || rel.grid !== undefined) {
+    const refuse = (detail, field = 'inside') => {
+      const fix = `Use fewer items, a smaller --gap or a larger room than ${label}; the whole row/grid must fit.`;
+      const failure = { op: -1, code: 'constraint.unsatisfied', field, detail, fix };
+      throw Object.assign(new Error(`REFUSED: ${failure.code}: ${detail} Fix: ${fix}`), failure, { failure });
+    };
+    if (rel.row !== undefined && rel.grid !== undefined) refuse('Choose either --row or --grid.', 'row');
+    const [cols, rows] = rel.grid !== undefined ? String(rel.grid).split(/[x×,]/).map(Number) : [Number(rel.row), 1];
+    if (![cols, rows].every(n => Number.isSafeInteger(n) && n > 0) || (rel.grid !== undefined && String(rel.grid).split(/[x×,]/).length !== 2) || cols * rows > 256) refuse('A row/grid needs positive integer dimensions, at most 256 items.', rel.grid !== undefined ? 'grid' : 'row');
+    if (rel.count !== undefined && Number(rel.count) !== 1) refuse('--count cannot be combined with --inside --row/--grid.', 'count');
+    const gap = Number(rel.gap ?? 2);
+    if (!Number.isFinite(gap) || gap < 0) refuse('--gap must be a finite nonnegative number.', 'gap');
+    // Solve the whole run as one envelope, so alternatives move it together and never truncate the count.
+    const width = cols * hw * 2 + (cols - 1) * gap / F.s, depth = rows * hd * 2 + (rows - 1) * gap / F.s;
+    let center;
+    try {
+      center = solveInRoom(v, host, room, thing, { ...rel, row: undefined, grid: undefined, count: 1 }, { ...ctx, hw: width / 2, hd: depth / 2 }).items[0].candidates[0];
+    } catch (e) { refuse(`Cannot fit ${cols}×${rows} in ${label}: ${e.message}`); }
+    const items = [];
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const [dx, dz] = rot(center.r + dY, (i - (cols - 1) / 2) * (hw * 2 + gap / F.s), (j - (rows - 1) / 2) * (hd * 2 + gap / F.s));
+      const lx = r2(center.p[0] + dx), lz = r2(center.p[1] + dz), ly = r2(yawAt(lx, lz, center.r));
+      const reason = why(lx, lz, ly); if (reason) refuse(`Item ${items.length + 1} in ${label} would be ${reason}.`);
+      taken.push(boxL(lx, lz, ly));
+      items.push({ candidates: [at(lx, lz, ly, `${rel.row !== undefined ? `row of ${cols}` : `grid ${cols}×${rows}`}, gap ${gap} m`)] });
+    }
+    return { items, notes };
+  }
   // the farthest distance along u from c at which the thing still fits (−1 if it does not fit at c)
   const reach = (c, u, ly) => { if (!fits(c[0], c[1], ly)) return -1; let lo = 0, hi = Math.hypot(lx1 - lx0, lz1 - lz0); for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (fits(c[0] + u[0] * mid, c[1] + u[1] * mid, ly)) lo = mid; else hi = mid; } return lo; };
   const choose = (cands, what) => {
