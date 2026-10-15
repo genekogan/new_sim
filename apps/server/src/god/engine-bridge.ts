@@ -674,6 +674,8 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
+    const priorUseRefusal = L.nativeUseRefusal;
+    L.nativeUseRefusal = capability => priorUseRefusal?.(capability) ?? this.bedUseRefusal(capability);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
@@ -685,6 +687,15 @@ export class EngineBridge {
       if (typeof input?.capability === 'string' && /^(buy|pay|sell):/.test(input.capability)) return self.trade(L, soul, input as { capability: string; params?: unknown; clientRef?: unknown });
       return act(soul, input as never);
     };
+  }
+  /** Bed slots describe an intended use point; they do not yet provide native support/contact or ownership.
+   * Never substitute a generic floor pose for use of a named bed. Classification uses slot/component semantics. */
+  private bedUseRefusal(capability: string): {code: string; reason: string} | null {
+    const target = /^(?:lie|sleep):(.+)$/.exec(capability)?.[1];
+    if (!target) return null;
+    const e = this.model.entities.get(target);
+    if (!e || (!this.model.resolvedDef(e.def)?.components.bed && !this.model.slotsOf(e).some(s => s.kind === 'bed'))) return null;
+    return {code: 'bed.attachment-unavailable', reason: `${this.model.pathOf(target)} has no qualified native berth support; your body cannot lie or sleep on it yet.`};
   }
   private pray(L: EdgeLedger, soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
     const params = (input.params ?? {}) as { text?: unknown };
@@ -746,21 +757,14 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
-      // SOULFIX: a bed (a def slot of kind bed) offers lie:<bed> and sleep:<bed>, like Eden's lie/nap: the body walks to
-      // the bed's side and lies along it at the mattress height (the engine's lying-on-furniture posture)
+      // Bed use remains discoverable but unsupported until a native berth owns support, contact and the body.
+      // No approach/pose plan is emitted: a nearby floor pose cannot fulfil use of the named bed.
       const bedEnt = this.model.entities.get(x.id), bed = bedEnt ? this.model.slotsOf(bedEnt).find((q) => q.kind === 'bed') : undefined;
       if (bed && x.support?.kind !== 'in-hand') {
-        const lying = Object.values(ents).find((o: any) => o.human && o.id !== soul.entityId && ['lie', 'nap'].includes(o.human.activity) && Math.hypot(o.pose.p[0] - x.pose.p[0], o.pose.p[2] - x.pose.p[2]) < 1.2) as any;
-        const top = Math.min(1.2, Math.max(0.2, Number(bed.height ?? bed.p[1]) || 0.5));
-        // the long axis of the bed (its slot yaw in the entity frame) and a free point at its side
-        const yaw = x.pose.yaw + (Number(bed.yaw) || 0), along: Vec2 = [Math.cos(yaw), Math.sin(yaw)], c: Vec2 = [x.pose.p[0], x.pose.p[2]];
-        const side = this.engine.standableNearV1(c, levelOf(x), soul.entityId, 0.35, 8);
-        const face: Vec2 = side ? [Math.round((side[0] + along[0]) * 100) / 100, Math.round((side[1] + along[1]) * 100) / 100] : c;
-        for (const [verb, act, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
+        for (const [verb, sec] of [['lie', 120], ['sleep', 600]] as const) {
           const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-          const block = lying ? { code: 'bed.taken', reason: `${this.soulName(lying.id)} is lying there.` } : !side ? { code: 'bed.no-room', reason: `There is no room beside ${name(x.id)} to get in.` } : null;
-          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 3600, default: sec } } });
-          if (side) plans.set(id, { label, seconds: true, steps: [...stand, { verb: 'mars:walk_to', params: { x: side[0], z: side[1], level: levelOf(x) } }, { verb: 'mars:pose_v1', params: { activity: act, seconds: sec, seatHeight: top, seatTogether: true, face } }] });
+          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: false, blocked: this.bedUseRefusal(id)!, params: { seconds: { type: 'integer', min: 1, max: 3600, default: sec } } });
+          plans.delete(id);
         }
       }
       if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {

@@ -95,6 +95,10 @@ export interface Engine {
   /** The program an actor is running, if any. */
   programOf(actor: string): string | null;
   programAction?(programId:string): ProgramAction | null;
+  /** Actual native actor+seat claims, including fixture-selected and cancelling seats. Read only. */
+  nativeSeatHoldsV1?(actor:string):{action:string;slot:string}[];
+  /** Native ordinary standing support/clearance after releasing a seat. Null means supported. */
+  standingSupportProblemV1?(actor:string,originalSeats?:{action:string;slot:string}[]):{code:string;message:string}|null;
   /** Candidate read-only public physical evidence. Native settled gather slots
    * at fixtures only; no private intent, proximity classifier or music/action admission. */
   gatheringObservation?(): NativeGatheringObservationV1;

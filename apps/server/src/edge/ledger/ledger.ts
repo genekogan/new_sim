@@ -36,6 +36,7 @@ const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
 type Row = {created_at: number; receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
+type StandReleaseV1={actor:string;owner:string;seats:{action:string;slot:string}[]};
 
 export class EdgeLedger implements EdgeLedgerHooks {
   places: PlaceIndex;
@@ -48,6 +49,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** GOD-ENV: what a Soul at (x, z) perceived of the lightning in the last minute (god worlds only). */
   lightningNear?: (x: number, z: number) => {last: string; strikes: number; nearest: number} | null;
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
+  /** A world target whose physical use is unsupported must refuse, even during quiet renewal.
+   * Checked on admission/dispatch/completion, never by a per-tick world scan. Historical terminal receipts stay immutable. */
+  nativeUseRefusal?: (capability: string) => {code: string; reason: string} | null;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
@@ -184,6 +188,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     tx(this.db.db,()=>{this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,ended_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick,OPEN.includes(phase)?null:tick, clientRef ?? null, Date.now());
     this.outcomes.capture(id,{soulId:soul.soulId,capability,params:content,acceptedTick:tick,holdingBefore:holdingFact(this.together.heldBy(soul.soulId)),...(detail.confirmedEffects?{confirmedEffects:detail.confirmedEffects as ConfirmedEffects}:{}),...(Array.isArray(detail.confirmedProduced)?{confirmedProduced:detail.confirmedProduced as NonNullable<EdgeReceipt['outcome']>['produced']}:{}),...(Array.isArray(detail.confirmedChanges)?{confirmedChanges:detail.confirmedChanges as NonNullable<EdgeReceipt['outcome']>['changed']}:{} )});
     if(capability.startsWith('warm-by-fire:'))this.setDetail(id,{warmTargetV1:capability.slice('warm-by-fire:'.length)});
+    if(capability==='stand:here'&&OPEN.includes(phase)&&this.body(soul.entityId)?.body?.family!=='floater'){
+      const seats=this.host.engine.nativeSeatHoldsV1?.(soul.entityId)??[];
+      if(seats.length)this.setDetail(id,{standReleaseV1:{actor:soul.entityId,owner:soul.owner,seats} satisfies StandReleaseV1});
+    }
     if(phase==='completed'&&capability==='stand:here')this.ownerControlGrace(soul.soulId);
     if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...detail, ...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
     if(!OPEN.includes(phase))this.finishOutcome(this.rows('receipt_id=?',id)[0]);});
@@ -223,6 +231,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (ev.kind === 'step') return;
     const r = this.rows("program_id=? AND phase IN ('waiting','started')", ev.id)[0]; if (!r) return;
     if (ev.kind === 'completed') {
+      const unsupported = this.nativeUseRefusal?.(r.capability);
+      if (unsupported) { this.update(r.receipt_id, {phase: 'failed', code: unsupported.code, reason: unsupported.reason}); return; }
+      const stand=r.detail?(JSON.parse(r.detail) as {standReleaseV1?:StandReleaseV1}).standReleaseV1:undefined;
+      if(stand){
+        const row=this.db.soul(r.soul_id),mind=this.host.minds.get(r.soul_id),live=new Set(this.host.engine.runtime.liveIds());
+        const identity=row?.world_id===this.host.worldId&&row.retired_at===null&&row.entity_id===stand.actor&&row.owner===stand.owner&&mind?.entityId===stand.actor&&mind.owner===stand.owner;
+        const released=!stand.seats.some(s=>live.has(s.action))&&!this.host.engine.nativeSeatHoldsV1?.(stand.actor).length;
+        const support=this.host.engine.standingSupportProblemV1?.(stand.actor,stand.seats);
+        if(!identity||!released||!this.host.engine.standingSupportProblemV1||support){this.update(r.receipt_id,{phase:'failed',code:!identity?'stand.identity-changed':support?.code??'stand.not-released',reason:!identity?'The original Soul/body binding changed before standing.':support?.message??'The original seat claim was not released on admitted standing support.'});return;}
+        this.setDetail(r.receipt_id,{standWitnessV1:{actor:stand.actor,released:stand.seats,tick:this.host.engine.world.tick,position:[...this.body(stand.actor)!.pose.p]}});
+      }
       // together/1: a follow walks on leg after leg under the same receipt until it is stopped or its target is gone
       const m = this.host.minds.get(r.soul_id);
       if (m && this.together.continueFollow(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
@@ -320,7 +339,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.pending.set(p.soul.soulId, p);
     this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({label: p.label, steps: p.steps}), this.host.worldId, p.receipt);
   }
-  private decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
+  private async decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
+    const unsupported = this.nativeUseRefusal?.(capability);
+    if (unsupported) { this.update(receipt, {phase: 'failed', code: unsupported.code, reason: unsupported.reason}); return; }
     return this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: capability, label, steps, reevalTicks: 1e9, fallback: false, trigger: `edge-act:${receipt}`});
   }
 
@@ -520,6 +541,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // together/1: doing a paired gesture back to someone who offered it is accepting their invitation
     if (cap.target?.kind === 'soul' && cap.verb in PAIRED) {const back = this.together.reciprocal(soul.soulId, cap.target.id, cap.verb), acc = back ? caps.find(c => c.id === 'accept:' + back.id) : undefined; if (acc) {cap = acc; capability = acc.id;}}
     const resolved: {resolved?: Resolved} = capability !== asked ? {resolved: {from: asked, to: cap.id, note: note || `${asked} is ${cap.id}.`}} : {};
+    const nativeUse = this.nativeUseRefusal?.(capability);
+    if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     if (cap.verb === 'accept') return this.acceptInvite(soul, cap, plans, caps, clientRef, resolved, refuse);
     if (cap.verb === 'object' && cap.object && cap.action && this.comms?.objects.prepareAct) {
       // Object actions listed in capabilities may be acted on here too (same effect as POST /objects/:id/act);
@@ -611,6 +634,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     if (plan.stop) {
       const program = this.host.engine.programOf(soul.entityId), h = this.body(soul.entityId)?.human;
+      // A finite sit timer does not own the lasting native seat. Release the real claim,
+      // including fixture-param seats, through a strict tracked action rather than edge-stop.
+      const seats=this.host.engine.nativeSeatHoldsV1?.(soul.entityId)??[];
+      if(seats.length&&this.body(soul.entityId)?.body?.family!=='floater')return this.launch(soul,capability,'Stand up',[{verb:'stand',params:{nativeSeatReleaseV1:seats[0].action}}],clientRef,resolved,refuse);
       // Seated with nothing running (a seat stays held after its act ends): stand up for real.
       if (!program && h && (h.activity === 'sit' || h.baseActivity === 'sit')) {
         const r = this.insert(soul, capability, 'waiting', clientRef);
@@ -644,6 +671,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** Start a body plan as the Soul's act: queued through a quiet renewal or a safe stop, else decided now. */
   private async launch(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}, commit?: (receipt: string) => void,contentParams:Record<string,unknown>={}) {
+    const nativeUse = this.nativeUseRefusal?.(capability);
+    if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     const unsupported=bodyCapabilityProblem(this.body(soul.entityId),{id:capability,verb:capability.split(':')[0]!,label,available:true},steps);if(unsupported)return refuse(unsupported.code,unsupported.reason);
     if (this.host.quietBarrier) {
       // Quiet renewal is brief and always ends (stall release): accept and start at first light, receipt 'waiting'.
@@ -711,8 +740,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    if(admission)return this.performAtomicObjectBodies(soul,capability,label,steps,clientRef,admission);
     const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code); return {accepted: false as const, code, reason};};
+    const nativeUse = this.nativeUseRefusal?.(capability);
+    if (nativeUse) return refuse(nativeUse.code, nativeUse.reason);
+    if(admission)return this.performAtomicObjectBodies(soul,capability,label,steps,clientRef,admission);
     if (this.faded.has(soul.soulId)) return refuse('soul.faded', 'This Soul has faded; act once (e.g. stand:here) to come back first.');
     if (this.host.quietBarrier) {const r = this.insert(soul, capability, 'waiting', clientRef,false,{...(effects?{confirmedEffects:effects}:{})}); this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability}); return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!};}
     const issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
