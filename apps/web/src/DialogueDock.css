@@ -66,7 +66,10 @@
 .dialogue-popup:focus-visible{outline:2px solid var(--thread);outline-offset:2px;border-radius:3px}
 @keyframes dlg-pop-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.dialogue-popup.in{animation:none}.dialogue-popup{transition:none}}
-@media (max-width:700px){.dialogue-popping{max-width:176px!important;padding:3px 7px 5px!important}.dialogue-popup{max-width:160px;font-size:11.5px}}
+/* Phones (lane phones, V4): read without zooming. Speech at 14px over three lines, name tags at 13px; both stay within
+ * about two thirds of a 390px screen so the label packing can still keep them apart. */
+@media (max-width:700px){.dialogue-popping{max-width:min(262px,72vw)!important;padding:5px 10px 7px!important}.dialogue-popup{max-width:min(242px,66vw);font-size:14px;line-height:1.36;-webkit-line-clamp:3}
+ .world-name-tag{font-size:13px!important;padding:3px 9px 4px!important;border-radius:7px!important}}
 
 /* Nearby group markers and Soul-scoped threads. */
 .conversation-marker{position:absolute;z-index:3;transform:translate(-50%,-100%);width:38px;height:38px;padding:6px;border-radius:50%;background:var(--panel,#fff);border:1px solid var(--thread);box-shadow:0 2px 8px #0003;color:var(--thread);cursor:pointer}

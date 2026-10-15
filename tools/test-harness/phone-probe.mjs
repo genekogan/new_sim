@@ -33,7 +33,15 @@ const UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, 
 // to GL objects (textures by level and format, buffers, renderbuffers), tracked per object so deletes are subtracted.
 const INIT = `(() => {
   const P = window.__phone = { frames: [], perFrame: [], recording: true, firstDraw: null, draws: 0, tris: 0, tex: 0, buf: 0, rb: 0, texCount: 0, contexts: 0 };
-  const tick = (t) => { if (P.recording) P.frames.push(t); if (P.draws) { P.perFrame.push([P.draws, P.tris]); if (P.perFrame.length > 600) P.perFrame.shift(); } P.lastDraws = P.draws; P.lastTris = P.tris; P.draws = 0; P.tris = 0; requestAnimationFrame(tick); };
+  P.gpu = []; let qPending = [], qOpen = null;
+  const gpuTick = () => { const gl = P.gl, ext = P.timer; if (!gl || !ext) return; try {
+    if (qOpen) { gl.endQuery(ext.TIME_ELAPSED_EXT); qPending.push(qOpen); qOpen = null; }
+    const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
+    qPending = qPending.filter((q) => { if (!disjoint && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) return true; if (!disjoint && P.recording) P.gpu.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(q); return false; });
+    if (qPending.length < 4) { qOpen = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, qOpen); } } catch {} };
+  const gc = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (type, ...rest) { const ctx = gc.call(this, type, ...rest); if (ctx && type === 'webgl2' && !P.gl && this.width * this.height > 0) { const e = ctx.getExtension('EXT_disjoint_timer_query_webgl2'); if (e) { P.gl = ctx; P.timer = e; } } return ctx; };
+  const tick = (t) => { gpuTick(); if (P.recording) P.frames.push(t); if (P.draws) { P.perFrame.push([P.draws, P.tris]); if (P.perFrame.length > 600) P.perFrame.shift(); } P.lastDraws = P.draws; P.lastTris = P.tris; P.draws = 0; P.tris = 0; requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   const bpp = (fmt, type, gl) => {
     const T = { 0x1401: 1, 0x1400: 1, 0x1403: 2, 0x1402: 2, 0x1405: 4, 0x1404: 4, 0x1406: 4, 0x140B: 2, 0x8D61: 2, 0x8033: 2, 0x8034: 2, 0x8363: 2, 0x84FA: 4, 0x8C3B: 4, 0x8C3E: 4, 0x8368: 4 };
@@ -109,7 +117,7 @@ const q = (a, p) => { if (!a.length) return null; const s = [...a].sort((x, y) =
 const summarize = (frames, ms) => { const iv = frames.slice(1).map((t, i) => t - frames[i]); return { fps: +(iv.length * 1000 / Math.max(1, frames.at(-1) - frames[0])).toFixed(1), p50: q(iv, 0.5), p95: q(iv, 0.95), max: iv.length ? +Math.max(...iv).toFixed(0) : null, over50: iv.filter((x) => x > 50).length, over100: iv.filter((x) => x > 100).length, ms }; };
 
 const release = await chromeLease('phones-probe');
-const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-precise-memory-info'] });
+const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-precise-memory-info', '--explicitly-allowed-ports=6000'] });
 const results = [];
 try {
   for (const url of urls) {
@@ -138,10 +146,10 @@ try {
     }
     const firstDraw = await page.evaluate(() => window.__phone.firstDraw);
     const win = async (during) => {
-      await page.evaluate(() => { const P = window.__phone; P.frames = []; P.perFrame = []; P.recording = true; });
+      await page.evaluate(() => { const P = window.__phone; P.frames = []; P.perFrame = []; P.gpu = []; P.recording = true; });
       const t0 = Date.now(); await during(); const ms = Date.now() - t0;
-      const d = await page.evaluate(() => { const P = window.__phone; P.recording = false; return { frames: P.frames, perFrame: P.perFrame }; });
-      return { ...summarize(d.frames, ms), drawsP50: q(d.perFrame.map((x) => x[0]), 0.5), drawsMax: d.perFrame.length ? Math.max(...d.perFrame.map((x) => x[0])) : null, trisP50k: q(d.perFrame.map((x) => x[1] / 1000), 0.5) };
+      const d = await page.evaluate(() => { const P = window.__phone; P.recording = false; return { frames: P.frames, perFrame: P.perFrame, gpu: P.gpu }; });
+      return { ...summarize(d.frames, ms), drawsP50: q(d.perFrame.map((x) => x[0]), 0.5), drawsMax: d.perFrame.length ? Math.max(...d.perFrame.map((x) => x[0])) : null, trisP50k: q(d.perFrame.map((x) => x[1] / 1000), 0.5), gpuP50: q(d.gpu, 0.5), gpuP95: q(d.gpu, 0.95), gpuN: d.gpu.length };
     };
     const still = await win(() => page.waitForTimeout(seconds * 1000));
     const mem = await page.evaluate(() => { const P = window.__phone; const c = document.querySelector('canvas[aria-label="Live 3D view of the world"]'); const fb = c ? c.width * c.height * (4 + 4) * 4 + c.width * c.height * 4 * 2 : 0; return { texMB: +(P.tex / 1048576).toFixed(1), textures: P.texCount, bufMB: +(P.buf / 1048576).toFixed(1), rbMB: +(P.rb / 1048576).toFixed(1), canvasMB: +(fb / 1048576).toFixed(1), totalMB: +((P.tex + P.buf + P.rb + fb) / 1048576).toFixed(1), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, quality: window.__simQuality?.tier ?? null }; });
@@ -162,9 +170,28 @@ try {
     const camMoved = await page.evaluate(() => JSON.stringify(window.__simCamera ?? null));
     await page.waitForTimeout(800);
     await page.screenshot({ path: resolve(out, `${tag}-orbit.png`) });
-    const r = { url, label, size: `${W}x${H}`, dpr, cpu, load1m: load0, timing: { firstDrawMs: firstDraw === null ? null : Math.round(firstDraw + navOffset), revealedMs: revealedAt, settledMs: settledAt }, still, orbit, mem, audit, camMoved: camMoved !== 'null' ? 'tracked' : 'n/a', errors };
+    // Speech: the first resident (fake mind) says a line through the edge API; then the bubbles and tags are audited.
+    let speech = null;
+    if (args.includes('--speak')) {
+      const base = url.split('?')[0].replace(/\/$/, ''), owner = { authorization: 'Bearer dev:admin' };
+      const mine = (await (await ctx.request.get(base + '/v1/me', { headers: owner })).json().catch(() => null))?.souls ?? [];
+      const soul = mine.find((s) => s.name === 'Phone probe') ?? mine[0];
+      let speechTap = 'no avatar button';
+      if (soul) {
+        const pair = await (await ctx.request.post(`${base}/v1/souls/${soul.id}/pair`, { headers: owner, data: {} })).json();
+        const cred = await (await ctx.request.post(base + '/v1/agent/pair', { data: { code: pair.code, agent: 'phones-probe' } })).json();
+        const open = page.locator(`[aria-label="Open ${soul.name}"]`).first();
+        if (await open.count()) { const tapped = await open.tap({ timeout: 4000 }).then(() => true, () => false); if (!tapped) await open.click({ force: true }).catch(() => {}); speechTap = tapped ? 'tapped' : 'covered (forced)'; await page.waitForTimeout(2500); }
+        const said = await ctx.request.post(base + '/v1/edge/say', { headers: { authorization: `Bearer ${cred.token}` }, data: { text: 'Hello from this phone. Can you read these two lines while walking through the world?' } });
+        await page.waitForTimeout(2500);
+        speech = await page.evaluate(() => ({ bubbles: [...document.querySelectorAll('.dialogue-popup, .dialogue-popping, .dialogue-dock')].filter((e) => e.getClientRects().length && !e.hidden).map((e) => { const b = e.getBoundingClientRect(); return { cls: e.className.slice(0, 40), text: (e.textContent || '').slice(0, 60), font: getComputedStyle(e).fontSize, box: [b.x, b.y, b.width, b.height].map(Math.round), clipped: e.scrollHeight > e.clientHeight + 1 }; }) }));
+        speech.sayStatus = said.status(); speech.avatarTap = speechTap;
+        await page.screenshot({ path: resolve(out, `${tag}-speech.png`) });
+      } else speech = { unverified: 'no resident' };
+    }
+    const r = { url, label, size: `${W}x${H}`, dpr, cpu, load1m: load0, timing: { firstDrawMs: firstDraw === null ? null : Math.round(firstDraw + navOffset), revealedMs: revealedAt, settledMs: settledAt }, still, orbit, mem, audit, speech, camMoved: camMoved !== 'null' ? 'tracked' : 'n/a', errors };
     results.push(r);
-    console.log(`${tag} load ${load0} | first ${r.timing.firstDrawMs} revealed ${revealedAt} settled ${settledAt} ms | still ${still.fps}fps p50 ${still.p50} p95 ${still.p95} >50:${still.over50} draws ${still.drawsP50} tris ${still.trisP50k}k | orbit ${orbit.fps}fps p50 ${orbit.p50} p95 ${orbit.p95} draws ${orbit.drawsP50} | gpu ~${mem.totalMB}MB (tex ${mem.texMB} ×${mem.textures}, buf ${mem.bufMB}, rb ${mem.rbMB}, canvas ${mem.canvasMB}) heap ${mem.heapMB}MB quality ${mem.quality} | text<12px ${audit.smallText.length} tags ${audit.nameTags}@${audit.nameTagFont}px targets<32 ${audit.smallTargetCount}${errors.length ? ' errors ' + errors.length : ''}`);
+    console.log(`${tag} load ${load0} | first ${r.timing.firstDrawMs} revealed ${revealedAt} settled ${settledAt} ms | still ${still.fps}fps p50 ${still.p50} p95 ${still.p95} >50:${still.over50} draws ${still.drawsP50} tris ${still.trisP50k}k gpu ${still.gpuP50}/${still.gpuP95}ms | orbit ${orbit.fps}fps p50 ${orbit.p50} p95 ${orbit.p95} draws ${orbit.drawsP50} gpu ${orbit.gpuP50}/${orbit.gpuP95}ms | gpu ~${mem.totalMB}MB (tex ${mem.texMB} ×${mem.textures}, buf ${mem.bufMB}, rb ${mem.rbMB}, canvas ${mem.canvasMB}) heap ${mem.heapMB}MB quality ${mem.quality} | text<12px ${audit.smallText.length} tags ${audit.nameTags}@${audit.nameTagFont}px targets<32 ${audit.smallTargetCount}${errors.length ? ' errors ' + errors.length : ''}`);
     await ctx.close();
   }
 } finally { await browser.close(); release(); }

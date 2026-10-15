@@ -67,7 +67,7 @@ import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -232,8 +232,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       problem('This browser could not start 3D graphics, so the world view is unavailable here.');
       return () => abort.abort();
     }
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    const adaptive=newWorld?new AdaptiveResolution(renderer,devicePixelRatio):null;if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // lane PERF: new worlds step the pixel ratio down on a slow GPU
+    // Lane phones (V4): a phone draws fewer pixels, a smaller shadow map and less far detail (quality-tier.ts).
+    const quality=browserQuality(),distanceDetail=quality.detail?new WorldDistanceDetail(quality.detail):null;
+    (window as unknown as {__simQuality?:unknown}).__simQuality={tier:quality.tier,reason:quality.reason,maxPixelRatio:quality.maxPixelRatio,detail:()=>distanceDetail?{...distanceDetail.stats}:null};
+    renderer.setPixelRatio(Math.min(devicePixelRatio, quality.maxPixelRatio));
+    const adaptive=newWorld?new AdaptiveResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio)):null;if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // lane PERF: new worlds step the pixel ratio down on a slow GPU
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-label', 'Live 3D view of the world');
@@ -328,7 +331,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // MARSLAND-FORK: the Mars fork (/worlds/w/mars) draws the mars-two template's drone surroundings and its desert sky (lazy: only the fork loads the kit)
     let forkLand:ForkLand|null=null,forkLandLoad:Promise<void>|null=null;
     const dressForkLand=(camp:THREE.Object3D)=>{if(!marsFork)return;forkLandLoad??=import('./WorldMarsForkLand.ts').then(m=>{if(abort.signal.aborted)return;forkLand=m.createForkLand(0);scene.add(forkLand.group);(window as unknown as {__simForkLand?:unknown}).__simForkLand=forkLand.stats;},e=>console.warn('mars fork land could not be drawn',e));void forkLandLoad.then(()=>forkLand?.dress(camp));};let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
-    const light = new Daylight(scene);
+    const light = new Daylight(scene);if(quality.shadowMapSize!==light.sun.shadow.mapSize.x)light.sun.shadow.mapSize.set(quality.shadowMapSize,quality.shadowMapSize);
     const broadcast = new WorldBroadcast();
     broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
     const followView=new WorldFollow();
@@ -538,7 +541,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const labelFor = (soul: PublicSoul): Label => {
       let l = labels.get(soul.id);
       if (l) return l;
-      const el = document.createElement('div');
+      const el = document.createElement('div');el.className='world-name-tag';
       el.style.cssText = 'font:11px/1.25 system-ui,sans-serif;color:#fff;background:rgba(18,20,18,.66);padding:2px 7px 3px;border-radius:5px;text-align:center;white-space:nowrap;pointer-events:auto;cursor:pointer;max-width:260px';
       const name = document.createElement('b'), line = document.createElement('div'), card = document.createElement('div'), chan = document.createElement('div');
       line.style.cssText = 'opacity:.85'; card.style.cssText = 'opacity:.7;font-style:italic'; chan.style.cssText = 'display:none;font-size:10px;margin-top:1px;white-space:normal;max-width:240px'; chan.dataset.channelChip = '';
@@ -842,7 +845,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       expansion?.wallFrames.update(camera,expansion.group.visible&&!past.current);
       // Initial required attachments are prepared together, never per GLB.
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
-      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);try{if(!eyes?.render())renderer.render(scene,camera);}finally{diagnostics.endRender();}};
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render())renderer.render(scene,camera);}finally{distanceDetail?.restore();diagnostics.endRender();}};
       if(batchEnabled)staticBatches.withRender(draw);else draw();
       shadowDetail?.restore();
       idleLife.restore();
@@ -952,7 +955,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();
-      initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
+      initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();distanceDetail?.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();
       sceneRequest++;sceneHistory.dispose();
