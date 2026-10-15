@@ -95,7 +95,7 @@ test('vocabulary (audit P0a): "go for a X" resolves X; rides join the balloon; u
  assert.equal(go('go for a swim'), 'swim:shore-water');assert.equal(go('go for a walk'), 'wander:here');assert.equal(go('take a nap'), 'nap:here');
  assert.equal(go('go for a balloon ride'), join.id);assert.equal(go('ride the balloon'), join.id);assert.equal(go('fly in the balloon'), join.id);assert.equal(go('take a ride'), join.id);
  for (const s of ['go for a run', 'run to the deck', 'jog around', 'give Moss a hug', 'go for a jog']) {const r = resolveCapability(s, c3);assert.equal(r.kind, 'unknown', s);}
- assert.match((resolveCapability('go for a run', c3) as any).reason, /cannot run yet/);
+ assert.match((resolveCapability('go for a run', c3) as any).reason, /No "run-around" capability/);
  assert.equal(go('do some sit-ups'), 'situps:here');assert.equal(go('do push ups'), 'pushups:here');assert.equal(go('jumping jacks'), 'jumping-jacks:here');assert.equal(go('dance'), 'dance:here');
 });
 test('vocabulary (CN5): computers, stage music, singing, the audience, the gym and park games in plain words; nothing named → the nearest free spot', () => {
@@ -150,4 +150,26 @@ test('real-fire qualifier keeps sit as an offered fire seat, warm as the actual 
  for(const words of ['sit by a real fire on the moon','sit by a real fountain','sit:real fire','warm-by-fire:real fire'])assert.equal(resolveCapability(words,c).kind,'unknown',words);
  const named:EdgeCapability={...seat,id:'sit:real-fire-bench',label:'Real Fire Bench',target:{id:'real-fire-bench',kind:'object'}};
  const explicit=resolveCapability(named.id,{...c,caps:[...c.caps,named]});assert.equal(explicit.kind,'exact');assert.equal(explicit.cap.id,named.id,'explicit named ID untouched');
+});
+
+
+test('todo gaits and water rides resolve only to the requested activity and named place', () => {
+ const jog = P('jog', 'commons'), run = P('run', 'commons-deck'), loop = P('jog-around', 'shore-water');
+ const punt: EdgeCapability = {id:'object:ride-eden-punt:join',verb:'object',object:'ride-eden-punt',action:'join',label:'Join ride (Pond rowing punt)',available:true};
+ const balloon: EdgeCapability = {id:'object:ride-balloon:join',verb:'object',object:'ride-balloon',action:'join',label:'Join ride (Red balloon)',available:true};
+ const c: VocabContext = {...ctx(),caps:[...caps,jog,run,loop,punt,balloon]};
+ const id=(s:string)=>{const r=resolveCapability(s,c); assert.notEqual(r.kind,'unknown',s+' '+JSON.stringify(r));return r.kind==='unknown'?'':r.cap.id;};
+ assert.equal(id('jog to the commons'),jog.id);
+ assert.equal(id('go to the deck running'),run.id);
+ assert.equal(id('run to the deck'),run.id);
+ assert.equal(id('go for a jog around the pond'),loop.id);
+ assert.equal(id('jog around pond'),loop.id);
+ for(const s of ['row a boat','go rowing','row the punt','go for a punt ride'])assert.equal(id(s),punt.id,s);
+ assert.equal(id('ride the balloon'),balloon.id);
+ for(const s of ['go to the boat','walk to the punt','sit by the boat']){const r=resolveCapability(s,c);assert.ok(r.kind==='unknown'||r.cap.id!==punt.id,s+' never boards unasked');}
+ const noWater=resolveCapability('row a boat',{...c,caps:c.caps.filter(x=>x!==punt)});
+ assert.equal(noWater.kind,'unknown');assert.equal((noWater as any).code,'ride.no-water-route');
+ assert.equal(resolveCapability('row a boat on the moon',c).kind,'unknown','unknown named water is never another ride');
+ assert.equal(resolveCapability('go fishing',c).kind,'unknown');assert.equal(resolveCapability('go sailing',c).kind,'unknown');
+ assert.equal(resolveCapability('run to the moon',c).kind,'unknown','never select another run target');
 });

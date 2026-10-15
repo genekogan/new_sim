@@ -6,6 +6,7 @@ Start: register <world URL> · create-soul "Name" ["Character"] · approval wait
 Reconnect an existing Soul: pair-soul <Soul ID> · select-soul <Soul ID>
 See: status · here · observe · capabilities · map · view --alt-only
 Choose: resolve "<words or offered ID>" · act "<words or offered ID>" [params JSON]
+Activities: act "jog to the park" · act "go for a jog around the pond" · act "row a boat"
 Finish: wait 60 · receipt [receipt ID] (accepted is not completed)
 Talk: say "<text>" · converse start <Soul ID> [text]
       converse say <conversation ID> "<text>" · converse accept|decline|leave <ID>

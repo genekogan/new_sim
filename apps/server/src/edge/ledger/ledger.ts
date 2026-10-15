@@ -404,10 +404,37 @@ export class EdgeLedger implements EdgeLedgerHooks {
       this.together.capabilities(soul, caps, plans as Map<string, TogetherPlan>);
       const lead = caps.filter(c => c.verb === 'accept' || c.verb === 'decline'); for (const c of lead.reverse()) {caps.splice(caps.indexOf(c), 1); caps.unshift(c);}
     } catch (e) {console.error('[edge] together capabilities', e instanceof Error ? e.message : e);}
-    // carrier/1: a rider in the air can talk and use objects, but its body stays in the basket until it lands.
-    const ride = this.aboard(soul.entityId);
-    if (ride) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are aloft in ${ride.label}; it lands by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
     if (this.worldProfile) try {this.worldProfile(soul, caps, plans);} catch (e) {console.error('[edge] world profile', e instanceof Error ? e.message : e);}
+    // Gaits apply to ordinary native walks, including the destinations a world creator adds.
+    if (me && !isRigidBody(me)) {
+      for (const c of [...caps]) {
+        if (c.verb !== 'walk' || !c.target || this.places.byId.get(c.target.id)?.kind === 'water') continue;
+        const base = plans.get(c.id); if (!base || !base.steps.some(s => s.verb === 'walk_to')) continue;
+        for (const gait of ['jog', 'run'] as const) {
+          const id = `${gait}:${c.target.id}`, label = `${gait === 'jog' ? 'Jog' : 'Run'} to ${this.places.byId.get(c.target.id)?.name ?? c.label.replace(/^walk to /i, '')} (${gait === 'jog' ? '2.5' : '4'} m/s on dry ground)`;
+          caps.push({...c, id, verb: gait, label});
+          plans.set(id, {label, steps: base.steps.map(s => s.verb === 'walk_to' ? {...s, params: {...s.params, gait}} : structuredClone(s))});
+        }
+      }
+      for (const place of this.places.byId.values()) {
+        if (place.parent === null || place.carrier || place.enclosed || area(place.polygon) < 250) continue;
+        const native = (w.regions as Record<string, unknown>)[place.id];
+        if (place.kind !== 'water' && !native && !this.placeWalkable?.(place.id)) continue;
+        if (!['water', 'outdoor', 'park', 'garden', 'plaza', 'lawn', 'field', 'place', 'shore'].includes(place.kind)) continue;
+        const from: [number, number] = [me.pose.p[0], me.pose.p[2]];
+        const route = place.kind === 'water' ? this.bankLoop(place.polygon, from) : this.strollRoute(place.id, place.polygon, from);
+        if (route.length < 3) continue;
+        const closed = [...route, route[0]];
+        for (const gait of ['jog', 'run'] as const) {
+          const id = `${gait}-around:${place.id}`, label = `${gait === 'jog' ? 'Jog' : 'Run'} around ${place.name} (one loop, ${gait === 'jog' ? '2.5' : '4'} m/s on dry ground)`;
+          caps.push({id, verb: `${gait}-around`, label, available: true, target: {id: place.id, kind: 'place'}});
+          plans.set(id, {label, steps: closed.map(to => ({verb: 'walk_to', params: {to, gait, standoff: 0}}))});
+        }
+      }
+    }
+    // A moving carrier retains its riders until it returns, regardless of which world supplied the offer.
+    const ride = this.aboard(soul.entityId);
+    if (ride) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are travelling in ${ride.label}; it returns by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
     if(isRigidBody(me)){
       for(let i=caps.length-1;i>=0;i--)if(bodyCapabilityProblem(me,caps[i]!,plans.get(caps[i]!.id)?.steps)){plans.delete(caps[i]!.id);caps.splice(i,1);}
@@ -430,6 +457,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const left = [...hit.spots], out: [number, number][] = []; let at = from;
     while (left.length) {left.sort((a, b) => Math.hypot(a[0] - at[0], a[1] - at[1]) - Math.hypot(b[0] - at[0], b[1] - at[1]) || a[0] - b[0] || a[1] - b[1]); at = left.shift()!; out.push(at);}
     return out;
+  }
+  /** A pond loop must stay outside its entire outline and on admitted clear ground.
+   * If a world has only one accessible bank, it gets no misleading "around" offer. */
+  private bankLoop(poly: [number, number][], from: [number, number]): [number, number][] {
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    if (!engine.clearanceAtV1 || poly.length < 3) return [];
+    const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
+    for (const margin of [2, 3.5, 5]) {
+      const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
+      const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
+      if (route.some(p => engine.clearanceAtV1!(p[0], p[1]) < 0.7)) continue;
+      let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
+      return [...route.slice(near), ...route.slice(0,near)];
+    }
+    return [];
   }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
@@ -749,7 +791,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   // ---------------------------------------------------------------- rides (carrier/1)
-  private carriersNative(): {id: string; def: string; label: string; pose: {p: number[]; yaw: number}; state: {phase: string; home: number[]; yaw: number; seats: Record<string, string | null>; route: {id: string; keys: {t: number; p: number[]}[]}; elapsed: number; departAtTick: number | null; flights: number; holding: boolean; waitTicks: number; phaseTick: number; hold?: {by: string; seats: number; filled: number; untilTick: number}}}[] {
+  private carriersNative(): {id: string; def: string; label: string; pose: {p: number[]; yaw: number}; state: {phase: string; home: number[]; yaw: number; seats: Record<string, string | null>; route: {id: string; keys: {t: number; p: number[]}[]}; elapsed: number; departAtTick: number | null; flights: number; holding: boolean; waitTicks: number; phaseTick: number; bank?: {door: [number,number,number]; exits: Record<string,[number,number,number]>}; hold?: {by: string; seats: number; filled: number; untilTick: number}}}[] {
     return (this.host.engine as unknown as {carriers?: () => never[]}).carriers?.() ?? [];
   }
   /** The ride this body is boarding, seated in or leaving. */
@@ -764,11 +806,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (this.places.carrierPlaces.has(c.id)) continue;
       const seats = (CATALOG[c.def]?.capabilities?.carrier?.seats ?? []).map(s => s.id), size = CATALOG[c.def]?.size ?? [1.5, 1, 1.2];
       const parent = this.places.containing(c.state.home[0], c.state.home[2], 0)[0]?.id ?? [...this.places.byId.values()].find(p => p.parent === null)!.id;
-      const hx = size[0] / 2, hz = size[2] / 2, id = `${c.id}-basket`;
-      this.places.add({id, name: `${c.label} basket`, kind: 'vehicle', parent, level: 0, enclosed: true, capacity: seats.length, starting: false,
+      const hx = size[0] / 2, hz = size[2] / 2, id = `${c.id}-basket`, rowing = c.def === 'rowing-punt';
+      this.places.add({id, name: `${c.label}${rowing ? '' : ' basket'}`, kind: 'vehicle', parent, level: 0, enclosed: !rowing, capacity: seats.length, starting: false,
         polygon: [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]], carrier: {entity: c.id, frame: 'local'},
         occupiers: seats.map(s => ({id: `${c.id}-${s}`, fixture: c.id, slot: s, kind: 'seat'})),
-        description: `The basket of ${c.label}. Room for ${seats.length}. Speech inside stays inside; it carries its riders on a flight and back.`});
+        description: rowing ? `An open rowing punt. Room for ${seats.length}; a loop on the water and back to its bank.` : `The basket of ${c.label}. Room for ${seats.length}. Speech inside stays inside; it carries its riders on a flight and back.`});
     }
   }
   /** Public ride state (World draws it; agents read it through the ride object). No owner data. */
@@ -778,12 +820,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const rot = (l: [number, number]) => {const cs = Math.cos(c.pose.yaw), sn = Math.sin(c.pose.yaw); return [Math.round((c.state.home[0] + l[0] * cs - l[1] * sn) * 100) / 100, Math.round((c.state.home[2] + l[0] * sn + l[1] * cs) * 100) / 100];};
     const riders = Object.entries(c.state.seats).flatMap(([seat, entity]) => {
       if (!entity) return []; const m = this.host.mindByEntity?.get(entity) ?? [...this.host.minds.values()].find(x => x.entityId === entity), b = this.aboard(entity);
-      const exit = def?.seats.find(s => s.id === seat)?.exit;
-      return [{seat, entityId: entity, soulId: m?.soulId ?? null, name: m?.name ?? null, phase: b?.riderPhase ?? 'boarding', ...(exit ? {exit: rot(exit)} : {})}];
+      const exit = def?.seats.find(s => s.id === seat)?.exit, bankExit = c.state.bank?.exits[seat];
+      return [{seat, entityId: entity, soulId: m?.soulId ?? null, name: m?.name ?? null, phase: b?.riderPhase ?? 'boarding', ...(bankExit ? {exit: [bankExit[0], bankExit[2]]} : exit ? {exit: rot(exit)} : {})}];
     });
     const end = c.state.route.keys[c.state.route.keys.length - 1].t;
     return {id: c.id, def: c.def, label: c.label, place: place?.id ?? null, phase: c.state.phase, holding: c.state.holding,
-      position: c.pose.p.map(v => Math.round(v * 1000) / 1000), yaw: c.pose.yaw, home: c.state.home, door: def ? rot(def.door) : null,
+      position: c.pose.p.map(v => Math.round(v * 1000) / 1000), yaw: c.pose.yaw, home: c.state.home, door: c.state.bank ? [c.state.bank.door[0], c.state.bank.door[2]] : def ? rot(def.door) : null,
       // together/1: places kept for invited companions are not free to others
       capacity: def?.seats.length ?? 0, seatsFree: Math.max(0, Object.values(c.state.seats).filter(v => !v).length - (c.state.hold ? Math.max(0, c.state.hold.seats - c.state.hold.filled) : 0)), riders,
       ...(c.state.hold ? {hold: {seats: c.state.hold.seats, boarded: c.state.hold.filled, secondsLeft: Math.max(0, Math.round((c.state.hold.untilTick - tick) / 20)), for: this.together.rideGuests(c.id)}} : {}),
@@ -1108,11 +1150,14 @@ export function edgeIdOf(b: HumanBindingV1): {id: string; verb: string} {
 export function stateOf(host: WorldHost, entityId: string): string {
   const h = (host.engine.world as NativeWorld).entities[entityId]?.human; if (!h) return 'absent';
   if (h.sleepPose) return 'sleeping';
-  if (h.carrier) return 'riding';
+  if (h.carrier) return h.activity === 'row' ? 'rowing' : 'riding';
   const a = String(h.activity ?? 'idle');
   if (a === 'sit' || a.startsWith('sit') || h.baseActivity === 'sit') return 'seated';
   if (a === 'lie' || a === 'nap') return 'lying';
   if (a === 'walk') return 'walking';
+  if (a === 'jog') return 'jogging';
+  if (a === 'run') return 'running';
+  if (a === 'row') return 'rowing';
   if (a === 'swim' || a === 'tread' || a === 'wade') return 'swimming';
   if (a === 'wait') return 'waiting';
   if (a === 'idle') return host.engine.programOf(entityId) ? 'busy' : 'standing';
