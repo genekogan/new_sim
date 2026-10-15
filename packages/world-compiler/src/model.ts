@@ -8,6 +8,29 @@ import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
+/** Structural edits, including direct fixture/import Map writes, invalidate derived safety caches.
+ * Entity/definition records themselves follow the model's existing immutable-record convention. */
+class ModelMap<K, V> extends Map<K, V> {
+  revision: object = {};
+  private valuesUsed?: Map<V, number>;
+  constructor(entries?: Iterable<readonly [K, V]>, countValues = false) {
+    super();
+    // Native Map construction preserves the cheap structural fork; per-entry JS hooks run only for edits.
+    const map = Object.setPrototypeOf(new Map(entries), new.target.prototype) as ModelMap<K, V>;
+    map.revision = {};
+    if (countValues) { map.valuesUsed = new Map(); for (const v of map.values()) map.valuesUsed.set(v, (map.valuesUsed.get(v) ?? 0) + 1); }
+    return map;
+  }
+  get uniqueSize() { return this.valuesUsed?.size ?? new Set(this.values()).size; }
+  override set(k: K, v: V): this {
+    if (this.has(k) && this.get(k) === v) return this;
+    if (this.valuesUsed) { if (this.has(k)) this.drop(this.get(k)!); this.valuesUsed.set(v, (this.valuesUsed.get(v) ?? 0) + 1); }
+    this.revision = {}; return super.set(k, v);
+  }
+  private drop(v: V) { const n = this.valuesUsed!.get(v)!; if (n === 1) this.valuesUsed!.delete(v); else this.valuesUsed!.set(v, n - 1); }
+  override delete(k: K): boolean { if (!this.has(k)) return false; if (this.valuesUsed) this.drop(this.get(k)!); this.revision = {}; return super.delete(k); }
+  override clear() { this.valuesUsed?.clear(); this.revision = {}; super.clear(); }
+}
 /** Preserve which def failed even when a parent, prefab child or dependent is being baked. */
 export class BakeError extends Error {
   readonly def: StoredDef;
@@ -47,10 +70,10 @@ export class WorldModel {
   seed: string;
   seq = 0;            // entity counter (ids)
   editSeq = 0;        // committed batches
-  defs = new Map<string, StoredDef>();      // by ref ("name@v") and by "sha:<hash>": the defs this world stores
+  defs: Map<string, StoredDef> = new ModelMap(undefined, true);      // by ref ("name@v") and by "sha:<hash>": the defs this world stores
   /** The shared library behind `defs` (null = the world stores everything it can resolve, as before CATRUN). */
   library: DefLibrary | null = null;
-  entities = new Map<string, Entity>();
+  entities: Map<string, Entity> = new ModelMap();
   children = new Map<string, Set<string>>();
   names = new Map<string, string>();        // `${parent}/${name}` → id
   terrain: Terrain;
@@ -58,6 +81,21 @@ export class WorldModel {
   private bakes = new Map<string, Baked>();
   private cells = new Map<string, Set<string>>(); // spatial hash of solid footprints
   private footprints = new Map<string, OBB[]>();
+  private safetyKey?: { parts: unknown[]; key: object };
+
+  /** Model-local cache identity: never shared across a fork/model or reused after structural mutation.
+   * Untracked replacement Maps deliberately disable caching rather than risk stale admission. */
+  safetyCacheKey(): object {
+    if (!(this.entities instanceof ModelMap) || !(this.defs instanceof ModelMap)) return {};
+    const parts = [this.entities, this.entities.revision, this.defs, this.defs.revision, this.library, this.assets];
+    if (!this.safetyKey || parts.some((p, i) => p !== this.safetyKey!.parts[i])) this.safetyKey = {parts, key: {}};
+    return this.safetyKey.key;
+  }
+  retainedDefCount(): number { return this.defs instanceof ModelMap ? this.defs.uniqueSize : new Set(this.defs.values()).size; }
+  /** Transfer only when committing these exact scratch maps; independent worlds never inherit a total. */
+  adoptSafetyCache(scratch: WorldModel) {
+    if (this.entities === scratch.entities && this.defs === scratch.defs) this.safetyKey = scratch.safetyKey;
+  }
 
   constructor(opts: { constants: Partial<WorldConstants> & { ground: WorldConstants['ground'] }; seed: string; state?: Partial<WorldState>; assets?: AssetLookup }) {
     this.constants = worldConstantsSchema.parse({ extent: 1000, ...opts.constants });
@@ -288,6 +326,13 @@ export class WorldModel {
   footprintsOf(id: string): OBB[] { return this.footprints.get(id) ?? []; }
   /** Same conservative cells as collision lookup; count each solid entity once per cell. */
   solidRegionCounts(): Map<string, number> { return new Map([...this.cells].filter(([, ids]) => ids.size).map(([cell, ids]) => [cell, ids.size])); }
+  solidRegionCount(cell: string): number { return this.cells.get(cell)?.size ?? 0; }
+  /** Only cells touched by a diff's old/new indexed footprints need density checks. */
+  solidRegionsOf(ids: Iterable<string>): Set<string> {
+    const cells = new Set<string>();
+    for (const id of ids) for (const box of this.footprintsOf(id)) for (const cell of this.cellKeys(box)) cells.add(cell);
+    return cells;
+  }
 
   // ---------- ground ----------
 
@@ -313,7 +358,7 @@ export class WorldModel {
     const w = Object.create(WorldModel.prototype) as WorldModel;
     const self = this as unknown as Record<string, unknown>, out = w as unknown as Record<string, unknown>;
     w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets; w.library = this.library;
-    w.defs = new Map(this.defs); w.entities = new Map(this.entities); w.names = new Map(this.names);
+    w.defs = new ModelMap(this.defs, true); w.entities = new ModelMap(this.entities); w.names = new Map(this.names);
     w.children = new Map([...this.children].map(([k, v]) => [k, new Set(v)]));
     out.bakes = self.bakes;  // keyed by content hash: safe to share
     out.cells = new Map([...(self.cells as Map<string, Set<string>>)].map(([k, v]) => [k, new Set(v)]));

@@ -538,7 +538,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
   let refused: Failure | null | undefined;
-  try { refused = worldBudgetFailure(world, scratch, ops.length - 1) ?? sealedRouteFailure(world, scratch, ops.length - 1) ?? opts.refuse?.(scratch, diff, ops); }
+  try { refused = worldBudgetFailure(world, scratch, diff, ops.length - 1) ?? sealedRouteFailure(world, scratch, diff, ops.length - 1) ?? opts.refuse?.(scratch, diff, ops); }
   catch (error) {
     if (!(error instanceof BakeError)) throw error;
     const entity = [...scratch.entities.values()].find((e) => scratch.def(e.def)?.hash === error.def.hash);
@@ -559,6 +559,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       (world as unknown as { cells: unknown }).cells = (scratch as unknown as { cells: unknown }).cells;
       (world as unknown as { bakes: unknown }).bakes = (scratch as unknown as { bakes: unknown }).bakes;
       world.terrain = scratch.terrain;
+      world.adoptSafetyCache(scratch);
       return { seq, undoId, diff, inverse };
     },
   };

@@ -17,12 +17,13 @@ import {installBirthLooks} from './birth-look.ts';
 import {seatProviders} from './query.ts';
 import {GroundHost} from './ground-host.ts';
 
-function world(t: TestContext, options: {durableClockV1?: boolean; district?: boolean} = {}) {
+function world(t: TestContext, options: {durableClockV1?: boolean; district?: boolean; beforeVerify?: (w: ReturnType<typeof fixture>) => void} = {}) {
   const w = fixture(':memory:', factory, {durableClockV1: options.durableClockV1 ?? true});
   w.brain.quiesce();
   const god = new GodMode(w.db, {worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}, ...(options.district ? {genesis: JSON.parse(fs.readFileSync(new URL('../../../../worlds/templates/eden-district.json', import.meta.url), 'utf8'))} : {})});
   if (options.district) new GroundHost(w.db, w.host, god);
   const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({host: w.host, god, edge, log() {}, worldClock: false, worldLore: false});
+  options.beforeVerify?.(w);
   const verify = new VerifyUse(w.host, w.souls, god, edge);
   const app = new Hono(), token = god.mintFor({id: 'owner', role: 'user'}, 'test');
   mountGodRoutes(app, {god, worldName: 'Probe fixture', requireUser: async () => {throw new ApiError(401, 'unauthorized', 'test');}, soulFromBearer: () => null, baseOf: () => 'http://127.0.0.1:5360', limitIp() {}, verifyUse: verify});
@@ -346,4 +347,47 @@ test('god auth, malformed input and schema are handled without internal errors',
   const res = await w.app.request('/v1/god/schema'), schema = await res.json() as any;
   assert.ok(schema.endpoints.god.includes('POST /v1/god/verify-use')); assert.ok(schema.refusals.includes('verify.busy'));
   assert.equal(w.removed().length, 0);
+});
+
+test('boot retires a probe planted in the DB through the journal and verification runs', async t => {
+  const id = 's_vpbootstale', entityId = 'h_vpbootstale';
+  const w = world(t, {beforeVerify: fixture => {
+    fixture.db.createSoul({id, worldId: fixture.host.worldId, owner: PROBE_OWNER, entityId, name: 'stale verifier', description: 'crashed before birth', native: false});
+    fixture.db.createSoul({id: 'ordinary-probe-owner', worldId: fixture.host.worldId, owner: PROBE_OWNER, entityId: 'h_ordinary', name: 'nonprobe', description: '', native: false});
+    fixture.db.createSoul({id: 's_vpforeignowner', worldId: fixture.host.worldId, owner: 'ordinary-owner', entityId: 'h_vpforeignowner', name: 'wrong owner', description: '', native: false});
+    fixture.db.createSoul({id: 's_vpotherworld', worldId: 'another-world', owner: PROBE_OWNER, entityId: 'h_vpotherworld', name: 'other world', description: '', native: false});
+  }});
+  await w.build();
+  const r = await w.drive(w.verify.run({target: 'house', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.notEqual(w.db.soul(id)?.retired_at, null);
+  assert.equal(w.db.soul('ordinary-probe-owner')?.retired_at, null);
+  assert.equal(w.db.soul('s_vpforeignowner')?.retired_at, null);
+  assert.equal(w.db.soul('s_vpotherworld')?.retired_at, null);
+  assert.ok(w.db.events(w.host.worldId, 0, 1000).some(e => e.kind === 'retire' && e.payload.soulId === id));
+});
+
+test('boot sweeps a loaded probe mind and body, including an already SQL-retired probe', async t => {
+  let stale = '';
+  const w = world(t, {beforeVerify: fixture => {
+    const born = fixture.souls.createVerificationProbe(); stale = born.soul.id;
+    fixture.host.drainInputs(); assert.ok(fixture.host.minds.has(stale));
+    fixture.db.retireSoul(stale); // crash after SQL revocation, before journal/native retirement
+  }});
+  await w.build();
+  const r = await w.drive(w.verify.run({target: 'house', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(w.host.minds.has(stale), false); w.removed();
+});
+
+test('boot retires an orphaned native probe body after its SQL row and mind were retired', async t => {
+  let stale = '';
+  const w = world(t, {beforeVerify: fixture => {
+    const born = fixture.souls.createVerificationProbe(); stale = born.soul.id;
+    fixture.host.drainInputs(); fixture.db.retireSoul(stale); fixture.host.minds.delete(stale);
+    assert.ok(fixture.host.engine.world.entities[born.soul.entity_id]);
+  }});
+  await w.build();
+  const r = await w.drive(w.verify.run({target: 'house', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r)); w.removed();
+  assert.ok(w.db.events(w.host.worldId, 0, 1000).some(e => e.kind === 'retire' && e.payload.soulId === stale));
 });

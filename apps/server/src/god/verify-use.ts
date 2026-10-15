@@ -11,7 +11,7 @@ import {inPoly} from '../edge/ledger/places.ts';
 import {engineBridges, type EngineBridge} from './engine-bridge.ts';
 import type {GodMode} from './god.ts';
 import {runQuery} from './query.ts';
-import {isVerificationProbe} from '../verification-probe.ts';
+import {isVerificationProbe, PROBE_OWNER} from '../verification-probe.ts';
 
 type V2 = [number, number];
 type Use = 'enter' | 'sit';
@@ -39,6 +39,7 @@ type Body = {pose: {p: [number, number, number]}; human?: {activity?: string; le
 type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null; reachV1(from: Point, to: Point): Reach; freeSeatSlotsV1(id: string, except?: string): {id: string; p: V2; level: number; approach?: V2}[]};
 const active = new WeakSet<WorldHost>();
 const pendingRemoval = new WeakMap<WorldHost, Promise<void>>();
+const bootSwept = new WeakSet<WorldHost>();
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const dist = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 class Failure extends Error {
@@ -49,7 +50,42 @@ const reasonOf = (e: unknown): Reason => e instanceof Failure ? e.reason : {code
 
 export class VerifyUse {
   readonly host: WorldHost; readonly souls: Souls; readonly god: GodMode; readonly edge?: EdgeLedger;
-  constructor(host: WorldHost, souls: Souls, god: GodMode, edge?: EdgeLedger) { this.host = host; this.souls = souls; this.god = god; this.edge = edge; }
+  constructor(host: WorldHost, souls: Souls, god: GodMode, edge?: EdgeLedger) {
+    this.host = host; this.souls = souls; this.god = god; this.edge = edge;
+    // Once per host boot, never when another facade is constructed during a live verification.
+    if (bootSwept.has(host)) return;
+    bootSwept.add(host);
+    const rows = new Map(souls.db.liveSouls(host.worldId).map(s => [s.id, s]));
+    // A crash can follow the SQL retirement but precede native body removal.
+    for (const id of host.minds.keys()) { const s = souls.db.soul(id); if (s?.world_id === host.worldId) rows.set(id, s); }
+    for (const id of new Set([...Object.keys(host.engine.world.entities), ...god.model.entities.keys()])) {
+      if (!id.startsWith('h_vp')) continue;
+      const s = souls.db.soul('s_' + id.slice(2)); if (s?.world_id === host.worldId) rows.set(s.id, s);
+    }
+    const probes = [...rows.values()].filter(s => s.owner === PROBE_OWNER && isVerificationProbe(s.id));
+    if (!probes.length) return;
+    active.add(host);
+    let done!: () => void, accepted = false;
+    pendingRemoval.set(host, new Promise<void>(resolve => {done = resolve;}));
+    const check = () => {
+      if (!accepted) return;
+      for (const s of probes) {
+        if (host.minds.has(s.id) || host.engine.world.entities[s.entity_id]) return;
+        engineBridges.get(god.model)?.bodyRetired({entityId: s.entity_id});
+        if (god.model.entities.has(s.entity_id)) return;
+      }
+      active.delete(host); pendingRemoval.delete(host); done();
+      const i = host.listeners.indexOf(cleanup); if (i >= 0) host.listeners.splice(i, 1);
+    };
+    const cleanup: HostListener = {afterTick: check};
+    host.listeners.push(cleanup);
+    // Normal journaled retirement owns SQL revocation and engine/controller cleanup.
+    const retirements = probes.map(s => souls.retire(s)); host.drainInputs();
+    void Promise.all(retirements).then(() => {accepted = true; check();}, () => {
+      // Keep admission busy on a failed retirement; never admit a second probe over it.
+      const i = host.listeners.indexOf(cleanup); if (i >= 0) host.listeners.splice(i, 1);
+    });
+  }
 
   async run(raw: unknown): Promise<VerifyReceipt> {
     const started = performance.now();

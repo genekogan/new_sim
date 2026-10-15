@@ -56,3 +56,37 @@ test('solid colliders on the surface layer also protect the last entrance', () =
   const r = applyBatch(w, { ops: [{ op: 'place', def: 'surface-crate@1', p }] }, 'god', 2).result;
   assert.equal((r as Refused).failures?.[0].code, 'architecture.sealed');
 });
+
+test('far-away batch evaluates no unrelated building or surface footprints', t => {
+  const {w} = fresh();
+  const placed = applyBatch(w, {ops: [
+    {op: 'place', def: 'core/church@1', name: 'far-church', p: [150, 150]},
+    {op: 'place', def: 'core/plaza@1', name: 'far-surface', shape: {area: [[100,100],[110,100],[110,110],[100,110]]}},
+  ]}, 'god', 1).result;
+  assert.equal(placed.accepted, true, JSON.stringify(placed));
+  const originalBake = WorldModel.prototype.bake, originalFootprint = WorldModel.prototype.footprint;
+  let buildings = 0, surfaces = 0;
+  t.mock.method(WorldModel.prototype, 'bake', function(this: WorldModel, ...args: Parameters<WorldModel['bake']>) {if (args[0].ref === 'core-church@1') buildings++; return originalBake.apply(this, args);});
+  t.mock.method(WorldModel.prototype, 'footprint', function(this: WorldModel, ...args: Parameters<WorldModel['footprint']>) {if (args[0].name === 'far-surface') surfaces++; return originalFootprint.apply(this, args);});
+  const r = applyBatch(w, {ops: [{op: 'place', def: 'door-crate@1', p: [-200, -200]}]}, 'god', 2).result;
+  assert.equal(r.accepted, true, JSON.stringify(r)); assert.equal(buildings, 0); assert.equal(surfaces, 0);
+  const next = applyBatch(w, {ops: [{op: 'place', def: 'door-crate@1', p: [-190, -200]}]}, 'god', 3).result;
+  assert.equal(next.accepted, true, JSON.stringify(next)); assert.equal(buildings, 0); assert.equal(surfaces, 0);
+});
+
+test('upserted building moving onto an existing doorway blocker still refuses', () => {
+  const {w, p} = fresh();
+  assert.equal(applyBatch(w, {ops: [{op: 'place', def: 'door-crate@1', p: [p[0]+30, p[1], p[2]]}]}, 'god', 1).result.accepted, true);
+  const r = applyBatch(w, {ops: [{op: 'move', id: 'church', p: [30, 0]}]}, 'god', 2).result as Refused;
+  assert.equal(r.failures?.[0].code, 'architecture.sealed');
+});
+
+test('legacy sealed room remains editable and removing its blocker repairs the cached route', () => {
+  const {w, p} = fresh();
+  const e = {id: 'legacy-blocker', def: 'door-crate@1', in: {parent: 'world'}, p: p as [number,number,number], by: 'fixture', born: 0, v: 1};
+  w.insert(e); w.index(e.id, w.footprint(e));
+  assert.equal(applyBatch(w, {ops: [{op: 'set', id: 'church', name: 'legacy-church'}]}, 'god', 1).result.accepted, true);
+  assert.equal(applyBatch(w, {ops: [{op: 'remove', id: e.id}]}, 'god', 2).result.accepted, true);
+  const r = applyBatch(w, {ops: [{op: 'place', def: e.def, p}]}, 'god', 3).result as Refused;
+  assert.equal(r.failures?.[0].code, 'architecture.sealed');
+});

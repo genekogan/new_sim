@@ -6,6 +6,8 @@ export const CREATION_LIMITS = Object.freeze({
   bodyHeightM: 2,
   /** Keep this short corridor outside an exterior opening passable. */
   sealApproachDepthM: 1.5,
+  /** Broad-phase entrance queries include a small contact/numeric margin. */
+  sealQueryMarginM: 0.05,
   /** Maximum yaw boxes replacing one pitched/rolled primitive. */
   kitColliderSlices: 8,
   /** Target vertical over-coverage for a sliced tilted primitive, before the slice cap. */

@@ -40,3 +40,42 @@ test('definition input size is bounded independently of asset bytes', () => {
   const r = applyBatch(w, { ops: [{ op: 'define', def: large }] }, 'god', 1).result as Refused;
   assert.equal(r.failures[0].code, 'def.budget'); assert.equal(r.failures[0].limit, L.defBytes);
 });
+
+test('cached triangles follow diffs, definition rebinds, removal and independent model mutations', async () => {
+  const {worldTris} = await import('./budgets.ts');
+  const w = new WorldModel({constants: {ground: 'land'}, seed: 'incremental'}); w.defineDef(cube, 'god', 0);
+  const run = (ops: unknown[]) => {const r = applyBatch(w, {ops}, 'god', 1).result; assert.equal(r.accepted, true, JSON.stringify(r));};
+  const unit = w.bake(w.resolvedDef('cube@1')!, {}, 0).tris;
+  run([{op: 'place', def: 'cube@1', name: 'a'}, {op: 'place', def: 'cube@1', name: 'b', p: [3,0]}]);
+  assert.equal(worldTris(w), unit * 2);
+  run([{op: 'define', def: {...cube, make: {...cube.make, args: {shapes: [...cube.make.args.shapes, {kind: 'box', at: [0,2,0], size: [.1,1,.1]}]}}}}]);
+  const revised = w.bake(w.resolvedDef('cube@1')!, {}, 0).tris;
+  assert.equal(worldTris(w), revised * 2);
+  run([{op: 'remove', id: 'a'}]); assert.equal(worldTris(w), revised);
+  const e = w.get('b')!;
+  w.entities.set(e.id, {...e, def: 'missing@1'}); assert.equal(worldTris(w), 0);
+  w.entities.set(e.id, e); assert.equal(worldTris(w), revised);
+  const snapshot = WorldModel.fromSnapshot(w.snapshot()); assert.equal(worldTris(snapshot), revised);
+  snapshot.delete(e.id); assert.equal(worldTris(snapshot), 0); assert.equal(worldTris(w), revised);
+  const fork = w.fork(); fork.delete(e.id); assert.equal(worldTris(fork), 0); assert.equal(worldTris(w), revised);
+  const empty = w.defineDef({...cube, name: 'empty', make: {kind: 'none'}}, 'fixture', 0);
+  w.defs.set('cube@1', empty); assert.equal(worldTris(w), 0);
+});
+
+test('warm triangle budget bakes only changed ids and region budget visits only touched cells', async t => {
+  const {worldTris, worldBudgetFailure} = await import('./budgets.ts');
+  const w = new WorldModel({constants: {ground: 'land'}, seed: 'budget-local'}); w.defineDef(cube, 'god', 0);
+  for (let i = 0; i < 100; i++) { const e: Entity = {id: `local-${i}`, def: 'cube@1', seed: i, p: [i*3,0,0], in: {parent: 'world'}, by: 'fixture', born: 0, v: 1}; w.insert(e); w.index(e.id, w.footprint(e)); }
+  const total = 100 * w.bake(w.resolvedDef('cube@1')!, {}, 0).tris;
+  assert.equal(worldTris(w), total);
+  const after = w.fork(), old = w.entities.get('local-0')!, e: Entity = {...old, p: [-10,0,-10]};
+  after.delete(e.id); after.insert(e); after.index(e.id, after.footprint(e));
+  const bake = WorldModel.prototype.bake, region = WorldModel.prototype.solidRegionCount;
+  let bakes = 0; const cells = new Set<string>();
+  t.mock.method(WorldModel.prototype, 'bake', function(this: WorldModel, ...args: Parameters<WorldModel['bake']>) {assert.equal(args[2], 0, 'unrelated entity was baked'); bakes++; return bake.apply(this, args);});
+  t.mock.method(WorldModel.prototype, 'solidRegionCount', function(this: WorldModel, cell: string) {cells.add(cell); return region.call(this,cell);});
+  t.mock.method(WorldModel.prototype, 'solidRegionCounts', () => {throw Error('whole-world region scan');});
+  assert.equal(worldBudgetFailure(w, after, {upserts: [e], removes: []}, 0), null);
+  assert.equal(worldTris(after), total); assert.equal(bakes, 2);
+  assert.deepEqual(cells, new Set([...w.solidRegionsOf([e.id]), ...after.solidRegionsOf([e.id])])); // Only overloaded cells need an old count read.
+});
