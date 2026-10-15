@@ -283,6 +283,8 @@ const clone = z.object({
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
 const define = z.object({ op: z.literal('define'), def: defSchema });
+// W1: retire an unused local ref; hashed content remains available to undo.
+const undefine = z.object({ op: z.literal('undefine'), ref: z.string() });
 const world = z.object({ op: z.literal('world'), state: worldPatchSchema });
 /** Grow the world: `extent` = a centred square of that side (the original form); `bounds` = [x0, z0, x1, z1] metres, any
  *  direction (GOD-ENV: "extend the world east by 300 m"), each side ≤ 16 km. Grows only; its inverse (trusted) shrinks back. */
@@ -295,10 +297,11 @@ const restoreDef = z.object({ op: z.literal('restore-def'), ref: z.string(), has
   /** Only geometry fields changed by admission/preparation are restored; unrelated later state edits survive. */
   instances: z.array(z.object({ entity: entitySchema, fields: z.array(z.enum(['p', 'r', 'shape', 'params'])) })).optional(),
 });
+const reviveDef = z.object({ op: z.literal('revive-def'), ref: z.string(), hash: z.string().regex(/^[0-9a-f]{64}$/) });
 
-export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, restore, restoreDef, economy, mint, pay, relate]);
+export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, undefine, world, expand, answer, restore, restoreDef, reviveDef, economy, mint, pay, relate]);
 export type Op = z.infer<typeof opSchema>;
-export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, economy, mint, pay, relate]);
+export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, undefine, world, expand, answer, economy, mint, pay, relate]);
 
 export const batchSchema = z.object({
   schema: z.literal(EDIT_SCHEMA).default(EDIT_SCHEMA),
@@ -323,7 +326,7 @@ export type Refused = { accepted: false; failures: Failure[] };
 export type Result = Accepted | Refused;
 
 export const refusalCodes = [
-  'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid',
+  'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid', 'def.in-use',
   'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
   'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture', 'architecture.sealed', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',

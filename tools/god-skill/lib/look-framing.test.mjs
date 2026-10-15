@@ -52,6 +52,8 @@ async function realized(frame, cam, { keep = false, first = false, fov = 45, asp
       const receipt = await shoot({ worldUrl: 'http://world.invalid/w/fixture', eye: cam.eye, at: cam.at, span: frame.fitSpan,
         out, timeoutMs: 9000, settleMs: first ? 3500 : 800, keep, ...overrides },
         { pw: { chromium: { launch: async () => browser, connectOverCDP: async () => browser } },
+          // This fixture isolates capture/camera policy; look-sheet.test covers the real event waiter.
+          waitReady: async () => { advance(3000); if (!window.__shotReady) throw Error('viewer did not initialize and settle'); return { ready: true }; },
           ensureKeeper: async () => ({ port: 1 }), lease: async () => () => { released++; }, now: () => clock, sleep: async ms => advance(ms) });
       assert.equal(readFileSync(out, 'utf8'), 'scripted');
       results.push({ receipt, url, navigations: navigations.length });

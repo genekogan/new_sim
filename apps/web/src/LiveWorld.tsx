@@ -1,3 +1,4 @@
+import { whenAssetsSettled } from './gen-mesh/gltf-assets.ts';
 import {ALL_OPTIONAL_APPEARANCE_PROFILES,optionalAppearanceProfilesForVerifiedCapture,type OptionalAppearanceProfiles} from './optional-appearance-profiles.ts';
 import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
 import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
@@ -301,7 +302,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const shotMode=new URLSearchParams(location.search).has('shot');
     const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
-    void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
+    // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
+    void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
+      if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
+      if(shotMode){await whenAssetsSettled();requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
+        (window as unknown as {__shotReady?:boolean}).__shotReady=true;window.dispatchEvent(new Event('sim-shot-ready'));
+      }));}
+    });
     const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));if(newWorld)scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: this world's god token, minted with the page's signed-in person (Clerk in production, a local name in dev).

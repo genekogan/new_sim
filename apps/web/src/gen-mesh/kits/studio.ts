@@ -12,7 +12,7 @@ import { gait, type Rig } from '../motion.ts';
 type Cell = { def: StoredDef; label: string; sub: string; walk?: boolean; phase?: number };
 declare global { interface Window { studio: { render(defs: StoredDef[], o?: { cols?: number; cw?: number; ch?: number; walk?: boolean; frames?: number }): Promise<{ cells: number; tris: number[]; errors: string[] }> } } }
 
-function ctxFor(def: StoredDef, model: WorldModel, lib: MaterialLib): MeshCtx {
+export function ctxFor(def: StoredDef, model: WorldModel, lib: MaterialLib): MeshCtx {
   const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
   const params: Record<string, Value> = {};
   for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: Value }).default !== undefined) params[k] = (f as { default: Value }).default;

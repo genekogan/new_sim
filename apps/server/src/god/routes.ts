@@ -23,6 +23,7 @@ import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
+import { mountWorkbenchRoutes } from './workbench.ts';
 
 export type GodDeps = {
   god: GodMode;
@@ -62,6 +63,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     return d.god.as({ identity, build: parsed.data }, fn);
   };
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
+  // W1: mount exact /defs/unused before the catalog's wildcard def route.
+  mountWorkbenchRoutes(app, { god: d.god, requireGod, limitGod, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountLandRoutes(app, { god: d.god, requireGod });
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });

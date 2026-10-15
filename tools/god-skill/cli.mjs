@@ -10,6 +10,7 @@ import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
+import { kitDefinition } from './lib/kit.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -156,6 +157,13 @@ async function defDetail(d, others) {
   return L.join('\n');
 }
 export async function defs(q, flags = {}) {
+  if (flags.remove && !flags.unused) throw Error('defs --remove requires --unused');
+  if (flags.unused) {
+    if (q || flags.tag) throw Error('defs --unused does not take a search or tag filter');
+    const r = ok(await call(`/v1/god/defs/unused${flags.remove ? '/remove' : ''}`, flags.remove ? { body: {} } : {}), 'defs --unused');
+    if (flags.remove) { invalidate(); return flags.json ? r : `removed ${r.removed.length} never-placed trial defs (seq ${r.seq})${r.remaining ? `; ${r.remaining} remain` : ''}; undo restores them`; }
+    return flags.json ? r.defs : `${r.defs.length} never-placed trial defs${r.defs.length ? ':\n' + r.defs.map(d => '- ' + d.ref).join('\n') : ''}`;
+  }
   if (q && !/\s/.test(q.trim())) {
     const name = q.trim().toLowerCase().replace(/^core[/-]/, '').replace(/@\d+$/, '');
     const qs = new URLSearchParams({ q: name.replace(/-/g, ' ') });
@@ -352,6 +360,7 @@ const HINTS = {
   'slot.outside': 'the point is not inside that room; use --inside <house>/<room> or a world point inside it',
   'size.range': 'that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead',
   'float.no-water': 'there is no water there; use --float --at <lake|pond|river>',
+  'def.in-use': 'cleanup only removes never-placed trials without dependent definitions; keep this def',
   'def.unknown': 'no such def; `defs <word>` searches the library',
   'params.invalid': '`defs <name>` shows params with ranges',
   'state.invalid': 'unknown or bad state field; `describe` shows the state',
@@ -913,15 +922,59 @@ export function lookOverrides(flags = {}) {
   }
   return out;
 }
+/** Semicolon-separated camera specs; options stay local to each view. */
+export function lookViews(spec, base = {}) {
+  if (typeof spec !== 'string' || !spec.trim()) throw Error('look --views takes semicolon-separated views');
+  const rows = spec.split(';').map(s => s.trim());
+  if (rows.some(s => !s) || rows.length > 8) throw Error('look --views takes 1..8 nonempty views');
+  return rows.map(label => {
+    const tokens = label.split(/\s+/), first = tokens[0].startsWith('--') ? undefined : tokens.shift();
+    const { flags, rest } = parseFlags(tokens, boolsFor('look'));
+    checkArgs('look', flags, rest);
+    if (Object.keys(flags).some(k => !['at', 'from', 'dist', 'span', 'height', 'inside', 'floor', 'hide-roofs'].includes(k))) throw Error('view specs take only camera options');
+    if (first && first !== 'inside' && !['above', 'top'].includes(first) && !compassKey(first)) throw Error(`unknown look view ${first}`);
+    return { ...base, ...flags, ...(first === 'inside' ? { inside: true } : first ? { from: first } : {}), label };
+  });
+}
+export async function kitLook(json, flags = {}, runtime = {}) {
+  const overrides = lookOverrides(flags), def = kitDefinition(typeof json === 'string' ? JSON.parse(json) : json);
+  const admitted = ok(await call('/v1/god/kit/render', { body: { def, ...(flags.beside ? { beside: normDef(flags.beside) } : {}) } }), 'kit look');
+  if (!admitted.accepted) throw Error(`kit look refused: ${admitted.failures.map(explainFailure).join('; ')}`);
+  const shot = await (runtime.shoot ?? shoot)({ worldUrl: load().world, studio: admitted, out: resolve(flags.out ?? 'looks/kit-workbench.png'), ...overrides,
+    ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) });
+  return flags.json ? shot : `kit look: ${shot.file} · front, side, top, ¾ · ${Math.round(shot.ms) / 1000} s\n${(shot.warnings ?? []).join('\n')}${shot.warnings?.length ? '\n' : ''}  No world edit. Read the sheet before define-kit.`;
+}
 export async function look(flags = {}, runtime = {}) {
   if (flags.stop) return stopKeeper();
-  const overrides = lookOverrides(flags);
+  const overrides = lookOverrides(flags), count = flags.frames === undefined ? 1 : num(flags.frames), every = flags.every === undefined ? 250 : num(flags.every);
+  if (!Number.isInteger(count) || count < 1 || count > 16 || every < 16 || every > 60000) throw Error('look --frames takes 1..16; --every takes 16..60000 ms');
+  if (flags.every !== undefined && flags.frames === undefined) throw Error('look --every requires --frames');
+  if (flags.frames !== undefined && (flags.views || flags.site)) throw Error('choose --frames or --views/--site');
   const m = await mirror(); const v = view(m);
-  const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags);
-  if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
-  const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
+  let base = { ...flags };
+  if (flags.site) {
+    const current = load().build;
+    if (!current?.id) throw Error('look --site needs a current build; use build resume <id>');
+    const b = ok(await call(`/v1/god/builds/${encodeURIComponent(current.id)}`), 'look --site').build;
+    base = { ...base, at: b.site.at.join(','), span: flags.span ?? String(Math.max(...b.site.size) * 1.15) };
+  }
+  const specs = flags.views || flags.site ? lookViews(flags.views ?? 'sw;w;above;inside', base) : [base];
+  const views = [], ground = new Map();
+  for (const spec of specs) {
+    const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, spec);
+    if (target[1] === 0 || spec.at === undefined || !Number.isFinite(target[1])) {
+      const key = `${target[0]},${target[2]}`;
+      if (!ground.has(key)) ground.set(key, (await query({ points: [[target[0], target[2]]] })).points[0]);
+      const g = ground.get(key); target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0));
+    }
+    const cam = camera({ target, span, from: spec.from ?? 's', dist, tight, inside: !!spec.inside, height: spec.height ? num(spec.height) : undefined });
+    views.push({ ...cam, hideRoofs: !!(spec.inside || spec['hide-roofs'] || spec.floor !== undefined), cut: spec.floor !== undefined ? num(spec.floor) : null, span: fitSpan, label: spec.label ?? cam.from });
+  }
+  const cam = views[0];
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, ...cam, out, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides,
+    ...(flags.views || flags.site ? { views } : {}), frames: count, every,
+    ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
   if (!flags.keep) shot = await (runtime.shoot ?? shoot)(args);
   else {
@@ -973,10 +1026,7 @@ export async function defineKit(json, flags = {}) {
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, ' '), ...(k.tags ?? [])].join(' '))).defs;
   const picks = [...matches.filter(d => usedIn(d).length), ...matches.filter(d => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map(d => d.ref.replace(/^core-/, 'core/'));
-  const ext = (sh) => { const [x, y, z] = sh.at; const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)]; return [x - sz[0] / 2, y - (sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'sphere' || sh.kind === 'capsule' ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2]; };
-  const e = k.shapes.map(ext);
-  const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
-  const def = { schema: 'def/1', name: k.name, version: k.version ?? 1, description: k.description ?? '', tags: k.tags ?? [], form: 'point', layer: k.layer ?? 'solid', make: { kind: 'gen', gen: 'kit/2', args: { shapes: k.shapes, ...(k.gait ? { gait: k.gait } : {}), ...(k.slots ? { slots: k.slots } : {}), ...(k.round !== undefined ? { round: k.round } : {}) } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...(k.components ? { components: k.components } : {}), ...(k.anchor ? { anchor: k.anchor } : {}), ...(k.state ? { state: k.state } : {}), ...(k.params ? { params: k.params } : {}) };
+  const def = kitDefinition(k);
   if (flags.dry) return { def, similar };
   if (picks.length) console.error(`similar defs already in the library: ${picks.map(d => oneLine(d.ref.replace(/^core-/, 'core/')) + usedBadge(d) + (usedIn(d).length && d.hash ? ' · ' + placePart({ sha: d.hash }) : '')).join('; ')} — prefer them when they fit`);
   const r = await define(def);
@@ -1024,7 +1074,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1049,15 +1099,15 @@ const FLAGS = {
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
-  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop hour weather', defs: 'tag all', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
+  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
+const POS = { kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
   const allowed = new Set(['json', 'no-build', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
@@ -1078,6 +1128,7 @@ export function checkArgs(cmd, f, rest) {
 }
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = {
+  kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
@@ -1099,7 +1150,7 @@ export const COMMANDS = {
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
-look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
+look:   --views \"sw;w --dist 30;inside\" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).\nlook:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'

@@ -213,6 +213,26 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     try {
     contextDef = scratch.resolvedDef(op.op === 'place' ? op.def : before?.def ?? (op.op === 'restore' ? op.entity.def : ''));
     switch (op.op) {
+      // W1: the server also excludes refs used in placement history. Keep dependency safety here.
+      case 'undefine': {
+        const d = scratch.def(op.ref);
+        if (!d || !scratch.owns(d.ref) || d.by === 'core' || scratch.library?.get(d.ref)) {
+          failures.push(fail(i, 'constant.immutable', 'Only a world-local unused definition can be retired')); return;
+        }
+        if ([...scratch.entities.values()].some(e => scratch.def(e.def)?.ref === d.ref) ||
+            scratch.allDefs().some(other => other.ref !== d.ref && definitionRefs(other).some(ref => scratch.def(ref)?.ref === d.ref))) {
+          failures.push(fail(i, 'def.in-use', `${d.ref} is referenced by an entity or another definition`)); return;
+        }
+        for (const [ref, value] of scratch.defs) if (!ref.startsWith('sha:') && value.ref === d.ref) scratch.defs.delete(ref);
+        inverse.unshift({ op: 'revive-def', ref: d.ref, hash: d.hash });
+        return;
+      }
+      case 'revive-def': {
+        const d = scratch.def('sha:' + op.hash);
+        if (!d || d.ref !== op.ref || scratch.def(op.ref)) { failures.push(fail(i, 'undo.conflict', 'Retired definition is unavailable or its name has been reused')); return; }
+        scratch.defs.set(d.ref, d); diff.defs.push(d);
+        inverse.unshift({ op: 'undefine', ref: d.ref }); return;
+      }
       case 'define': {
         const ref = `${op.def.name}@${op.def.version}`, previous = scratch.def(ref), owned = scratch.owns(ref);
         const refuse = checkDef(scratch, op.def as never, i);

@@ -586,3 +586,5 @@ build done "hall, tower, three stalls"
 Massing is ≤8 site-local boxes, not grey entities to remove later. Remove + replacement belong in one batch.
 In a fresh folder, `build resume market-hall` reports the unfinished `current` step, recent edits, roots,
 massing part counts and `next`. Finish `current` before advancing.
+
+Preview bespoke kits with `kit look defs/x.kit.json [--hour 21] [--beside core/church@1]`: a world-free sheet (front/side/top/¾), colliders, seats and a 1.8 m figure. Iterate there before `define-kit`; target ≤2 defines per final kit. `defs --unused [--remove]` lists/retires never-placed trials; removal is undoable. `look --views "sw;w --dist 30;inside"` or `look --site` captures one labelled sheet from one browser load. For motion, `look --frames 4 --every 250` captures a timed strip.
