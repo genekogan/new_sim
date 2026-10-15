@@ -15,8 +15,8 @@ changed = sum(1 for r,g,b in zip(*[iter(d.tobytes())]*3) if r or g or b)
 sheet = Image.new('RGB',(a.width*2,a.height+32),'#17202c')
 sheet.paste(a,(0,32));sheet.paste(b,(a.width,32))
 draw = ImageDraw.Draw(sheet)
-draw.text((12,10),'OLD ENGINE | same world coordinates',fill='white')
-draw.text((a.width+12,10),'CANDIDATE | same world coordinates',fill='white')
+draw.text((12,10),'OLD ENGINE | matched named view',fill='white')
+draw.text((a.width+12,10),'CANDIDATE | matched named view',fill='white')
 sheet.save(output)
 print(json.dumps({'status':'PASS' if changed==0 else 'FAIL','meanAbsoluteError':mae,
  'changedPixels':changed,'totalPixels':a.width*a.height,'changedFraction':changed/(a.width*a.height),

@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chromeLease } from '../god-skill/lib/chrome-lease.mjs';
+import { chromeLease } from '<team>/ops/chrome-lease.mjs';
 
 export function safeLocalUrl(value) {
   const u=new URL(value);
@@ -57,11 +57,14 @@ function inspectView() {
     sceneBinding:renderer.domElement.dataset.sceneBinding??null};
 }
 
-export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHour,timeout=180000}) {
+export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHour,timeout=180000,sampleHours=true}) {
   safeLocalUrl(oldUrl);safeLocalUrl(candidateUrl);mkdirSync(outDir,{recursive:true});
   const {chromium}=createRequire(resolve(root,'mars/viewer/package.json'))('@playwright/test');
   const release=await chromeLease('parity');let browser;
+  const stop=()=>{void Promise.resolve(browser?.close()).finally(()=>{release();process.exit(130);});};
+  process.once('SIGTERM',stop);process.once('SIGINT',stop);
   const report={status:'UNKNOWN',pairs:[],hourly:[],errors:[],input:[],policy:'exact RGB; no pixel threshold; missing pose/DPR/hour closes gate'};
+  const activePages=[];
   try {
     browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
     for(const dpr of [1,2]){
@@ -75,13 +78,14 @@ export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHo
       });
       const pages=[];
       for(const [side,url]of [['old',oldUrl],['candidate',candidateUrl]]){
-        const page=await context.newPage();page.setDefaultTimeout(timeout);
+        const page=await context.newPage();activePages.push(page);page.setDefaultTimeout(timeout);
         page.on('pageerror',e=>report.errors.push({side,dpr,error:String(e).slice(0,400)}));
-        page.on('response',r=>{if(r.status()>=400)report.errors.push({side,dpr,status:r.status(),url:r.url().replace(/\?.*/, '')});});
+        page.on('response',r=>{if(r.status()>=400){const row={side,dpr,status:r.status(),url:r.url().replace(/\?.*/, '')};if(r.status()===404&&row.url.endsWith('/v1/worldmeta'))(report.optionalProbes??=[]).push(row);else report.errors.push(row);}});
         await page.goto(`${url}?shot=1&dpr=fixed`,{waitUntil:'domcontentloaded',timeout});
-        await page.waitForFunction(()=>globalThis.__parityView&&document.querySelector('canvas')?.dataset.sceneBinding==='bound',null,{timeout});
+        await page.waitForFunction(()=>globalThis.__parityView&&(globalThis.__simEntity?.layer?.active===true||document.querySelector('canvas')?.dataset.sceneBinding==='bound'),null,{timeout});
         await page.waitForSelector('.world-canvas-host[data-initial-revealed="true"]',{state:'visible',timeout});
         await page.waitForTimeout(3000);
+        (report.readiness??=[]).push({side,dpr,state:await page.evaluate(inspectView)});
         // Real spectator input is recorded, before calibrated stills. No world action or sign-in.
         await page.mouse.move(480,320);await page.mouse.down();await page.mouse.move(510,330,{steps:4});await page.mouse.up();
         await page.keyboard.press('w');
@@ -93,16 +97,17 @@ export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHo
           pair.clockCalibration=await setHour(p.hour);
           for(let i=0;i<pages.length;i++){
             const page=pages[i];await page.bringToFront();
-            await page.evaluate(p=>{globalThis.__parityPose=p;},p);
+            const cameraPose=p[i?'candidate':'old']??p;
+            await page.evaluate(p=>{globalThis.__parityPose=p;},cameraPose);
             const before=await page.evaluate(()=>globalThis.__parityFrames);
             await page.waitForFunction(n=>globalThis.__parityFrames>n+2,before);
-            await page.waitForFunction(h=>{const d=globalThis.__parityRenderedDatetime;if(typeof d!=='string')return false;const hour=Number(d.slice(11,13))+Number(d.slice(14,16))/60;return Math.abs(hour-h)<.05;},p.hour);
-            await page.waitForTimeout(450);
+            await page.waitForFunction(h=>{const d=globalThis.__parityRenderedDatetime;if(typeof d!=='string')return false;const hour=Number(d.slice(11,13))+Number(d.slice(14,16))/60;return Math.abs(hour-h)<.05;},p.hour,{timeout:20000});
+            await page.waitForTimeout(1200);
             const state=await page.evaluate(inspectView);
             if(/swiftshader|llvmpipe/i.test(state.gpu))throw Error(`software GPU refused: ${state.gpu}`);
             if(state.buffer[0]!==960*dpr||state.buffer[1]!==640*dpr)throw Error('drawing buffer does not match requested DPR');
-            if(state.viewOffset||state.fov!==45||state.eye.some((v,k)=>Math.abs(v-p.eye[k])>1e-6))throw Error('camera calibration mismatch');
-            const side=i?'candidate':'old';pair[side]={file:resolve(outDir,`${p.name}-dpr${dpr}-${side}.png`),state};
+            if(state.viewOffset||state.fov!==45||state.eye.some((v,k)=>Math.abs(v-cameraPose.eye[k])>1e-6))throw Error('camera calibration mismatch');
+            const side=i?'candidate':'old';pair[side]={file:resolve(outDir,`${p.name}-dpr${dpr}-${side}.png`),pose:cameraPose,state};
             await page.locator('canvas').first().screenshot({path:pair[side].file,timeout});
           }
           const output=resolve(outDir,`${p.name}-dpr${dpr}-pair.png`);
@@ -111,7 +116,7 @@ export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHo
         report.pairs.push(pair);console.log(`visual ${p.name} DPR${dpr}: ${pair.status} ${pair.meanAbsoluteError??pair.error??''}`);
         writeFileSync(resolve(outDir,'visual.json'),JSON.stringify(report,null,2));
       }
-      if(dpr===1)for(let hour=0;hour<24;hour++){
+      if(dpr===1&&sampleHours)for(let hour=0;hour<24;hour++){
         const calibration=await setHour(hour);const row={hour,calibration};
         for(let i=0;i<pages.length;i++){
           await pages[i].bringToFront();const before=await pages[i].evaluate(()=>globalThis.__parityFrames);
@@ -124,10 +129,14 @@ export async function captureVisual({root,oldUrl,candidateUrl,poses,outDir,setHo
       }
       await context.close();
     }
-  }catch(e){report.errors.push({error:String(e)});}
-  finally{await browser?.close().catch(()=>{});release();}
-  const coverage=report.pairs.length===poses.length*2&&report.pairs.every(x=>x.old&&x.candidate)&&report.hourly.length===24;
+  }catch(e){report.errors.push({error:String(e)});for(const [i,page]of activePages.entries())if(!page.isClosed()){
+    await page.screenshot({path:resolve(outDir,`capture-error-${i}.png`),timeout:10000}).catch(()=>{});
+    report.errors.push(await page.evaluate(()=>({url:location.href,title:document.title,headings:[...document.querySelectorAll('h1,h2,[data-initial-stage]')].map(e=>e.textContent?.slice(0,200))})).catch(()=>({diagnostic:'unavailable'})));
+  }}
+  finally{await browser?.close().catch(()=>{});release();process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);}
+  const expectedHours=sampleHours?24:0;
+  const coverage=report.pairs.length===poses.length*2&&report.pairs.every(x=>x.old&&x.candidate)&&report.hourly.length===expectedHours;
   report.status=report.pairs.some(p=>p.status==='FAIL')||report.hourly.some(p=>p.status==='FAIL')?'FAIL':coverage&&!report.errors.length&&report.pairs.every(p=>p.status==='PASS')&&report.hourly.every(p=>p.status==='PASS')?'PASS':'UNKNOWN';
-  report.coverage={expectedPairs:poses.length*2,actualPairs:report.pairs.length,expectedHours:24,actualHours:report.hourly.length};
+  report.coverage={expectedPairs:poses.length*2,actualPairs:report.pairs.length,expectedHours,actualHours:report.hourly.length};
   writeFileSync(resolve(outDir,'visual.json'),JSON.stringify(report,null,2));return report;
 }

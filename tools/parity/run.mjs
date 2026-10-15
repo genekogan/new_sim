@@ -20,18 +20,24 @@ mkdirSync(out,{recursive:true});
 if(readFileSync(resolve(root,'AGENTS.md'),'utf8').length===0)throw Error('missing project instructions');
 const candidate=world==='mars'?'my-mars-college-2026-3':'little-martians-arium';
 const template=resolve(root,`worlds/templates/${world==='mars'?'mars-two':'littlemartians-two'}.json`);
-const oldPort=world==='mars'?5900:5902,newPort=oldPort+1,controlPort=5904;
-let old,newWorld,control;
+const oldPort=world==='mars'?5900:5902,newPort=oldPort+1,controlPort=world==='mars'?5904:5905;
+// The legacy launcher validates its historical virtual port. The sanctioned preload
+// remaps listen/connect before any socket opens; the browser only sees 5900–5909.
+const virtualPort=world==='mars'?4963:4964;
+process.env.PORT_REMAP_BASE=String(oldPort-(virtualPort-4930));
+await import('../test-harness/port-remap.mjs');
+let old,newWorld,control,evaluator;
 const cleanup=async()=>{
+  if(evaluator?.exitCode===null)evaluator.kill('SIGTERM');
   newWorld?.child.kill('SIGTERM');
   if(newWorld)await Promise.race([new Promise(r=>newWorld.child.once('exit',r)),new Promise(r=>setTimeout(r,10000))]);
   await old?.close();if(control){control.closeAllConnections?.();await new Promise(r=>control.close(r));}
 };
 let shutting=false;for(const sig of ['SIGINT','SIGTERM'])process.once(sig,()=>{if(!shutting){shutting=true;void cleanup().finally(()=>process.exit(130));}});
 try{
-  // basePath permits an explicit isolated port; never invoke the legacy hard-coded port defaults.
+  // Root-built viewer keeps /w/<key>; no unsupported path prefix is invented.
   old=await openWorldServer({input:root,dataDir:resolve(out,'old-data'),worldKey:world,worldId:`parity-old-${world}`,
-    port:oldPort,build:'local-parity/1',basePath:'/parity',webDir:resolve(root,'apps/web/dist'),marsWebDir:resolve(root,'.lane/mars-web'),
+    port:virtualPort,publicOrigin:`http://127.0.0.1:${oldPort}`,build:'local-parity/1',webDir:resolve(root,'apps/web/dist'),marsWebDir:resolve(root,'.lane/mars-web'),
     seedCast:false,nativeCast:false,installLiving:true,authMode:'local-dev',cards:false});
   control=createServer(async(req,res)=>{
     if(req.method!=='POST'||req.url!=='/hour'){res.writeHead(404).end();return;}
@@ -46,11 +52,12 @@ try{
   });
   await new Promise((yes,no)=>{control.once('error',no);control.listen(controlPort,'127.0.0.1',yes);});
   newWorld=await startWorld({slug:candidate,port:newPort,data:resolve(out,'candidate-data'),genesis:template,log:resolve(out,'candidate-server.log')});
-  const config={root,world,candidate,template,out,oldUrl:`http://127.0.0.1:${oldPort}/parity/w/${world}`,candidateUrl:newWorld.base,
+  const config={root,world,candidate,template,out,oldUrl:`http://127.0.0.1:${oldPort}/w/${world}`,candidateUrl:newWorld.base,
+    views:flag('--views','').split(',').filter(Boolean),captureOnly:args.includes('--capture-only'),
     controlUrl:`http://127.0.0.1:${controlPort}/hour`,freshWorld:true,
     sourceCommit:execFileSync('git',['-C',root,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),
     provenance:{liveSourceAndHistory:false,source:'old repo fixture + candidate repo genesis; no production database, roster or accepted history copied'}};
   const cfg=resolve(out,'config.json');writeFileSync(cfg,JSON.stringify(config,null,2));
-  const child=spawn('python3',['<team>/ops/with-heavy-slot.py','--owner','parity','--purpose',`${world}-parity-gate`,'--timeout','1800','--',process.execPath,resolve(root,'tools/parity/evaluate.mjs'),cfg],{cwd:root,stdio:'inherit'});
-  process.exitCode=await new Promise(r=>child.once('exit',r));
+  evaluator=spawn('python3',['<team>/ops/with-heavy-slot.py','--owner','parity','--purpose',`${world}-comparison`,'--timeout','1800','--',process.execPath,resolve(root,'tools/parity/compare.mjs'),cfg],{cwd:root,stdio:'inherit'});
+  process.exitCode=await new Promise(r=>evaluator.once('exit',r));
 }finally{await cleanup();}
