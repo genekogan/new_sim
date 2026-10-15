@@ -8,12 +8,14 @@
 // terrain, water and solids. Gaits: quadruped-walk, biped-waddle, bird-fly, fish-swim, hover.
 import type * as THREE from 'three';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
+// L1: the singular and plural light components share their pattern curves with pools and halos.
+import {defLights,lightPatternLevel,lightPhase} from '../WorldNightLights.ts';
 import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose, type Surroundings, type V2 } from './creatures/behavior.ts';
 
 /** True if this entity needs per-frame motion (the layer only calls `animate` for these). */
 export function hasMotion(def: StoredDef): boolean {
   const c = def.components;
-  if (c.spin || c.sway || c.hover || c.route || c.behavior || c.light) return true;
+  if (c.spin || c.sway || c.hover || c.route || c.behavior || c.light || c.lights) return true;
   if (def.tags.includes('creature') || def.tags.includes('moving')) return true;
   if (def.make.kind === 'gen' && def.make.gen === 'animals/1') return true;
   const gait = def.make.kind === 'gen' && def.make.gen === 'kit/2' ? (def.make.args as { gait?: string } | undefined)?.gait : undefined;
@@ -21,6 +23,7 @@ export function hasMotion(def: StoredDef): boolean {
 }
 
 let boundModel: WorldModel | null = null;
+const reducedLightMotion=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
 /** World time in seconds shared by every viewer: the layer passes page time (performance.now) —
  *  convert to wall-clock epoch seconds so two browsers agree; epoch values pass through. */
 export function worldSeconds(t: number): number { return t > 1e8 ? t : (typeof performance !== 'undefined' ? performance.timeOrigin / 1000 : 0) + t; }
@@ -44,7 +47,7 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
   }
   if (c.sway) { obj.rotation.z = Math.sin(t * (Math.PI * 2) / c.sway.period + phase) * c.sway.amount * 0.3; obj.rotation.x = Math.cos(t * (Math.PI * 2) / (c.sway.period * 1.3) + phase) * c.sway.amount * 0.2; }
   if (c.hover) obj.position.y = (c.route ? obj.position.y : base.y + c.hover.height) + Math.sin(t * (Math.PI * 2) / c.hover.period + phase) * c.hover.bob;
-  if (c.light) glowStep(obj, entity, model, t);
+  if (c.light || c.lights) glowStep(obj, entity, def, model, t);
 }
 
 // ---------------------------------------------------------------- world reading
@@ -299,13 +302,21 @@ function routeStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldM
 }
 
 /** Lamps glow at dusk and night; `state.on: false` darkens this one (its own material copy). */
-function glowStep(obj: THREE.Object3D, e: Entity, model: WorldModel | null, t: number) {
-  const ud = obj.userData as { glow?: THREE.Mesh[]; glowOff?: boolean };
-  if (!ud.glow) { ud.glow = []; obj.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && (m as { emissive?: THREE.Color }).emissive && m.emissive.getHex() !== 0 && m.emissiveIntensity > 0) ud.glow!.push(c as THREE.Mesh); }); }
-  const off = e.state?.on === false;
-  if (off && !ud.glowOff) { ud.glowOff = true; for (const m of ud.glow) { const mat = (m.material as THREE.MeshStandardMaterial).clone(); mat.emissiveIntensity = 0; m.material = mat; } }
+function glowStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number) {
+  const ud = obj.userData as { glow?: THREE.Mesh[] };
+  if (!ud.glow) {
+    ud.glow = []; obj.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && (m as { emissive?: THREE.Color }).emissive && m.emissive.getHex() !== 0 && m.emissiveIntensity > 0) { (c as THREE.Mesh).material=m.clone();ud.glow!.push(c as THREE.Mesh); } });
+    // The layer caches its library materials; these per-entity copies belong to this root instead.
+    const disposeGlow=()=>{for(const mesh of ud.glow??[])(mesh.material as THREE.Material).dispose();obj.removeEventListener('removed',disposeGlow);};
+    obj.addEventListener('removed',disposeGlow);
+  }
+  const lights=defLights(def.components),off = e.state?.on === false || lights.every(l=>l.on===false);
+  if (off) for (const m of ud.glow) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
   if (off) return;
-  const night = nightOf(model), level = 0.25 + 1.4 * night + 0.03 * Math.sin(t * 3);
+  const reduced=!!reducedLightMotion?.matches;
+  const patterned=lights.some(l=>l.pattern&&l.pattern!=='steady');
+  const pattern=patterned?lights.reduce((v,l,i)=>v+(l.on===false?0:lightPatternLevel(l.pattern,t,lightPhase(e.id,i,lights.length,l.pattern),reduced)),0)/lights.length:1;
+  const night = nightOf(model), level = (0.25 + 1.4 * night + (patterned?0:0.03 * Math.sin(t * 3)))*pattern;
   for (const m of ud.glow) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = level;
 }
 

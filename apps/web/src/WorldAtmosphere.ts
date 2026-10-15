@@ -14,7 +14,7 @@ import {SkyDome} from './atmosphere/sky.ts';
 import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
 import {Rain} from './atmosphere/rain.ts';
-import {Halos} from './atmosphere/halos.ts';
+import {Halos,type HaloSource} from './atmosphere/halos.ts';
 import {Lighthouse} from './atmosphere/lighthouse.ts';
 import {FogBanks} from './atmosphere/fogbanks.ts';
 import {SURF} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/coast-surf.ts';
@@ -90,11 +90,11 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   const fov=(camera as THREE.PerspectiveCamera).isPerspectiveCamera?(camera as THREE.PerspectiveCamera).fov:50;halos.uniforms.uHalo.value.z=size.y/(fov*Math.PI/180);};
  // Sky bodies (sun, moon and phase, star rotation) from the world clock, recomputed about once a second.
  let bodies:SkyBodies|null=null,bodiesAt=-Infinity,bodiesClock='';
- const lightList:[number,number,number,string,number][]=[],lv=new THREE.Vector3();
+ const lightList:HaloSource[]=[],lv=new THREE.Vector3();
  /** Published night lights (lamps, lanterns, fires) in world space, for the glow sprites. */
  function collectLights(){lightList.length=0;scene.updateWorldMatrix(true,false);
   scene.traverse(o=>{if(o===root)return;const list=o.userData?.edenLightSources;if(!Array.isArray(list))return;o.updateWorldMatrix(true,false);
-   for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4]]);}});
+   for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4],a[5],a[6],a[7]]);}});
   // The commons campfire (native fixture) and the garden fire circle publish no anchors of their own.
   if(lightList.length&&profile==='eden')lightList.push([24,0,-7,'fire',1],[47,0,64,'fire',.8]);
   halos.setSources(lightList);}
@@ -181,7 +181,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    sky.uniforms.uBow.value.y*=1-.5*b.illumination*moonUp;
    setGrade(day,b.warmth,b.blueHour,state.cloud);
   }else{u.uSun.value.w=0;u.uMoon.value.w=0;u.uDusk.value.w=0;u.uMoonLight.value.set(0,0,1,0);setGrade(day,0,0,state.cloud);}
-  halos.update(frame.reducedMotion?0:frame.seconds,Math.pow(1-day,1.5));
+  halos.update(frame.reducedMotion?0:frame.seconds,Math.pow(1-day,1.5),frame.reducedMotion);
   sky.follow(frame.camera);
  }
  /** Camera-dependent parts, redone for every render of the scene (the viewer camera, and on-demand eyes /

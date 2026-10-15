@@ -394,6 +394,7 @@ are; use it when only new copies should change.
   "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground
   at dusk and night (to let Souls switch it, copy what a library lamp declares: `defs lamp-post --json`).
   See it with `look --hour 21`; add `--weather rain` for a rainy picture.
+- **Light/motion.** `light.at:[x,y,z]` offsets the bulb (pool uses x/z); `pattern` = steady/blink/twinkle/chase/pulse (<3 Hz; reduced motion = steady). `lights:[…]` replaces `light`, ≤8 bulbs; offsets follow yaw/scale. `find twinkle` finds a ready kit. For spin (`rpm`, `axis`), sway (`amount`, `period`), hover (`height`, `bob`), route (`ref`, `speed`) and sound (`kind`, `radius`, `when`), read `<world-url>/god/examples/light-motion.mjs`: one runnable def example each. Inspect definitions first; no test entities.
 - **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`: a kit is a solid
   object Souls walk around, not into.
   A kit has no rooms or doors. For something people enter, use a building def (`church`, `chapel`, `hall`,

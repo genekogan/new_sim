@@ -18,6 +18,13 @@ export const DEF_REF = /^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0
 // ---------- defs ----------
 
 /** Closed component set; each is a config object the engine understands. New components are level-3 code work. */
+export const lightSchema = z.object({
+  color: z.string().regex(/^#[0-9a-f]{6}$/).default('#ffe9c4'), range: num.positive().default(8), on: z.boolean().default(true),
+  /** Local offset, rotated/scaled with the entity. Only x/z move the ground pool; y locates the bulb's halo. */
+  at: z.union([v2, v3]).optional(),
+  /** Fixed, gentle rates below 3 Hz; reduced-motion viewers hold these steady. */
+  pattern: z.enum(['steady', 'blink', 'twinkle', 'chase', 'pulse']).optional(),
+});
 export const componentsSchema = z.object({
   seat: z.object({ height: num.default(0.45) }).optional(),
   bed: z.object({ height: num.default(0.5) }).optional(),
@@ -31,7 +38,9 @@ export const componentsSchema = z.object({
   water: z.object({ level: num }).optional(),
   landform: landformBodySchema.optional(),
   scatter: z.object({ of: z.array(z.object({ def: z.string().regex(DEF_REF), weight: num.positive().default(1) })).min(1).max(16), density: num.positive().max(10), minSpacing: num.positive().default(1.5), except: z.array(v2).max(256).default([]) }).optional(),
-  light: z.object({ color: z.string().regex(/^#[0-9a-f]{6}$/).default('#ffe9c4'), range: num.positive().default(8), on: z.boolean().default(true) }).optional(),
+  light: lightSchema.optional(),
+  /** A list replaces the singular light when supplied. */
+  lights: z.array(lightSchema).min(1).max(8).optional(),
   display: z.object({ w: num.positive(), h: num.positive() }).optional(),
   paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
   plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),

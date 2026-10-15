@@ -16,8 +16,38 @@ import {installGroundOcclusion} from './WorldGroundOcclusion.ts';
  * height under the light so pools hug sloping ground (hill villages) too. */
 export type NightSource={x:number;z:number;radius:number;intensity:number;color:string;halo?:number;
  /** Ground height under the source (metres, default 0). */
- base?:number};
+ base?:number;pattern?:LightPattern;phase?:number};
+export type LightPattern='steady'|'blink'|'twinkle'|'chase'|'pulse';
+export type AuthoredLight={color?:string;range?:number;on?:boolean;at?:readonly number[];pattern?:LightPattern};
+export function defLights(components?:{light?:AuthoredLight;lights?:AuthoredLight[]}):readonly AuthoredLight[]{return components?.lights??(components?.light?[components.light]:[]);}
+export function lightPhase(id:string,index:number,count:number,pattern?:LightPattern){
+ if(pattern==='chase')return index/Math.max(1,count);
+ if(pattern!=='twinkle')return 0;let h=2166136261;for(const c of id)h=Math.imul(h^c.charCodeAt(0),16777619);return ((h>>>0)/4294967296+index*.61803398875)%1;
+}
+export const LIGHT_PATTERN_GLSL=`float edenPattern(float pattern,float seconds,float phase,float reduced){
+ if(reduced>.5||pattern<.5)return 1.0;
+ float wave=.5+.5*cos(6.28318530718*(seconds*(pattern>1.5&&pattern<2.5?1.0/3.0:.5)-phase));
+ if(pattern<1.5)return wave>=.5?1.0:.15;
+ if(pattern<2.5)return .35+.65*wave*wave;
+ if(pattern<3.5)return .15+.85*pow(wave,4.0);
+ return .4+.6*wave;}`;
+export type NightBounds={x0:number;z0:number;x1:number;z1:number};
 export const NIGHT_MAP_BOUNDS=Object.freeze({x0:-240,z0:-210,x1:320,z1:190});
+/** Canonical world ground bounds include asymmetric land extensions; extent is the old centred square. */
+export function worldNightBounds(extent=1000,bounds?:readonly number[]):NightBounds{
+ if(bounds?.length===4&&bounds.every(Number.isFinite)&&bounds[2]>bounds[0]&&bounds[3]>bounds[1])return {x0:bounds[0],z0:bounds[1],x1:bounds[2],z1:bounds[3]};
+ const half=Number.isFinite(extent)&&extent>0?extent/2:500;return {x0:-half,z0:-half,x1:half,z1:half};
+}
+/** Same curves as the GPU pool pass. One cycle per 2 s (blink/pulse/chase) or 3 s (twinkle). */
+export function lightPatternLevel(pattern:LightPattern='steady',seconds=0,phase=0,reducedMotion=false):number{
+ if(reducedMotion||pattern==='steady')return 1;
+ seconds=((seconds%6)+6)%6;
+ const wave=.5+.5*Math.cos(2*Math.PI*(seconds*(pattern==='twinkle'?1/3:.5)-phase));
+ if(pattern==='blink')return wave>=.5?1:.15;
+ if(pattern==='twinkle')return .35+.65*wave*wave;
+ if(pattern==='chase')return .15+.85*Math.pow(wave,4);
+ return .4+.6*wave;
+}
 /** Ground heights the alpha channel can carry (metres). */
 const BASE_MIN=-10,BASE_RANGE=100;
 const WARM='#ffc27a',FIRE='#ff9448',WINDOW='#ffd79a',PATH='#ffcf8a',COOL='#cfe3ff';
@@ -76,8 +106,8 @@ class SharedDataTexture extends THREE.DataTexture{override clone(){return this a
 /** Paint sources into a float RGB map, then soft-saturate so clusters glow
  * brighter without blowing out (diffuse pooling rather than spotlights). Alpha
  * carries the light-weighted ground height under the pools. */
-function paintInto(data:Uint8Array,sources:readonly NightSource[],paths:readonly (readonly [number,number])[][]){
- const [w,h]=SIZE,{x0,z0,x1,z1}=NIGHT_MAP_BOUNDS,sx=(x1-x0)/w,sz=(z1-z0)/h,acc=new Float32Array(w*h*4),wsum=new Float32Array(w*h),c=new THREE.Color();
+function paintInto(data:Uint8Array,sources:readonly NightSource[],paths:readonly (readonly [number,number])[][],bounds:NightBounds=NIGHT_MAP_BOUNDS){
+ const [w,h]=SIZE,{x0,z0,x1,z1}=bounds,sx=(x1-x0)/w,sz=(z1-z0)/h,acc=new Float32Array(w*h*4),wsum=new Float32Array(w*h),c=new THREE.Color();
  const splat=(x:number,z:number,radius:number,intensity:number,color:string,halo:number,base:number)=>{
   c.set(color);const reach=Math.max(radius,halo)*2.2,i0=Math.max(0,Math.floor((x-reach-x0)/sx)),i1=Math.min(w-1,Math.ceil((x+reach-x0)/sx)),j0=Math.max(0,Math.floor((z-reach-z0)/sz)),j1=Math.min(h-1,Math.ceil((z+reach-z0)/sz));
   const r2=radius*radius,h2=halo*halo;
@@ -91,14 +121,17 @@ function paintInto(data:Uint8Array,sources:readonly NightSource[],paths:readonly
   // Light-weighted mean ground height (0 where there is no light).
   const base=wt>1e-4?acc[k+3]/wt:0;data[k+3]=Math.round(255*Math.min(1,Math.max(0,(base-BASE_MIN)/BASE_RANGE)));}
 }
-export function paintNightMap(sources:readonly NightSource[],paths:readonly (readonly [number,number])[][]){
- const [w,h]=SIZE,data=new Uint8Array(w*h*4);if(sources.length||paths.length)paintInto(data,sources,paths);
+export function paintNightMap(sources:readonly NightSource[],paths:readonly (readonly [number,number])[][],bounds:NightBounds=NIGHT_MAP_BOUNDS){
+ const [w,h]=SIZE,data=new Uint8Array(w*h*4);if(sources.length||paths.length)paintInto(data,sources,paths,bounds);
  const texture=new SharedDataTexture(data,w,h,THREE.RGBAFormat);texture.magFilter=THREE.LinearFilter;texture.minFilter=THREE.LinearMipmapLinearFilter;texture.generateMipmaps=true;texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.needsUpdate=true;
  return texture;
 }
 // Shared uniform objects: plain {x,y,z,w} so three's per-material uniform
 // cloning keeps the reference, and one assignment updates every material.
 const NIGHT_PARAMS={x:0,y:0,z:0,w:0};
+// A plain struct survives UniformsUtils cloning by reference, including its replaceable sampler.
+const NIGHT_MAP={map:null as THREE.Texture|null,bounds:{x:0,y:0,z:1,w:1},raw:0};
+function useMap(map:THREE.Texture,bounds:NightBounds,raw=0){NIGHT_MAP.map=map;Object.assign(NIGHT_MAP.bounds,{x:bounds.x0,y:bounds.z0,z:bounds.x1-bounds.x0,w:bounds.z1-bounds.z0});NIGHT_MAP.raw=raw;}
 /** Lit windows (eden-window-interiors): x fraction of rooms lit now, y time (s) for the slow silhouettes. */
 const WINDOW_PARAMS={x:.75,y:0,z:0,w:0};
 let installed=false,installedTexture:THREE.DataTexture|null=null;
@@ -106,7 +139,8 @@ let installed=false,installedTexture:THREE.DataTexture|null=null;
  * paints it once when it is built (paintNightSources), since the lights only show there. */
 export function installNightLighting(texture=paintNightMap([],[])){
  if(installed)return;installed=true;installedTexture=texture;
- const {x0,z0,x1,z1}=NIGHT_MAP_BOUNDS,f=(n:number)=>n.toFixed(4);
+ useMap(texture,NIGHT_MAP_BOUNDS);
+ const f=(n:number)=>n.toFixed(4);
  THREE.ShaderChunk.common+='\nvarying vec3 vEdenNightWorld;\n';
  THREE.ShaderChunk.project_vertex+=`
 vec4 edenNightWorld=vec4(transformed,1.0);
@@ -118,19 +152,23 @@ edenNightWorld=instanceMatrix*edenNightWorld;
 #endif
 vEdenNightWorld=(modelMatrix*edenNightWorld).xyz;
 `;
- THREE.ShaderChunk.lights_pars_begin+='\nuniform sampler2D uEdenNightMap;\nuniform vec4 uEdenNight;\n';
+ THREE.ShaderChunk.lights_pars_begin+='\nstruct EdenNightMap { sampler2D map; vec4 bounds; float raw; };\nuniform EdenNightMap uEdenLightMap;\nuniform vec4 uEdenNight;\n';
  THREE.ShaderChunk.lights_fragment_end+=`
 if(uEdenNight.x>0.0){
- vec2 edenUv=(vEdenNightWorld.xz-vec2(${f(x0)},${f(z0)}))/vec2(${f(x1-x0)},${f(z1-z0)});
+ vec2 edenUv=(vEdenNightWorld.xz-uEdenLightMap.bounds.xy)/uEdenLightMap.bounds.zw;
  if(edenUv.x>0.0&&edenUv.x<1.0&&edenUv.y>0.0&&edenUv.y<1.0){
-  vec4 edenLight=texture2D(uEdenNightMap,edenUv);
+  vec4 edenLight=texture2D(uEdenLightMap.map,edenUv);
+  if(uEdenLightMap.raw>0.5){
+   edenLight.a/=max(dot(edenLight.rgb,vec3(0.2126,0.7152,0.0722)),0.0001);
+   edenLight.rgb=min(vec3(1.0),1.25*edenLight.rgb/(vec3(1.0)+edenLight.rgb));
+  }
   // Light pools hug the ground under them (alpha = ground height): roofs and tree tops receive less.
   float edenHeight=clamp(1.0-max(0.0,vEdenNightWorld.y-(${f(BASE_MIN)}+edenLight.a*${f(BASE_RANGE)})-1.0)/7.0,0.2,1.0);
   reflectedLight.indirectDiffuse+=diffuseColor.rgb*edenLight.rgb*(uEdenNight.x*edenHeight);
  }
 }
 `;
- for(const name of ['lambert','phong','standard','physical','toon'] as const){const lib=THREE.ShaderLib[name];if(!lib)continue;lib.uniforms.uEdenNightMap={value:texture};lib.uniforms.uEdenNight={value:NIGHT_PARAMS};lib.uniforms.uEdenWindows={value:WINDOW_PARAMS};}
+ for(const name of ['lambert','phong','standard','physical','toon'] as const){const lib=THREE.ShaderLib[name];if(!lib)continue;lib.uniforms.uEdenNightMap={value:texture};lib.uniforms.uEdenLightMap={value:NIGHT_MAP};lib.uniforms.uEdenNight={value:NIGHT_PARAMS};lib.uniforms.uEdenWindows={value:WINDOW_PARAMS};}
  // Contact ambient occlusion shares this patch's world-position varying and map extent.
  installGroundOcclusion(NIGHT_MAP_BOUNDS);
 }
@@ -157,14 +195,58 @@ export function collectNightSources(root:THREE.Object3D):NightSource[]{
  return out;
 }
 /** R4-LIVE: a god (new) world paints only its own lights (none of Eden's static layout). */
-export function paintOnlySources(sources:readonly NightSource[]){
- if(installedTexture){const data=installedTexture.image.data as Uint8Array;data.fill(0);if(sources.length)paintInto(data,sources,[]);installedTexture.needsUpdate=true;}
+export function paintOnlySources(sources:readonly NightSource[],bounds:NightBounds=NIGHT_MAP_BOUNDS){
+ if(installedTexture){const data=installedTexture.image.data as Uint8Array;data.fill(0);if(sources.length)paintInto(data,sources,[],bounds);installedTexture.needsUpdate=true;useMap(installedTexture,bounds);}
  return sources.length;
 }
 /** Repaint the installed map with the static sources plus these (sources within 1 m of a static one are dropped). */
 export function paintNightSources(extra:readonly NightSource[]){
  const sources=[...EDEN_NIGHT_SOURCES];
  for(const s of extra)if(!EDEN_NIGHT_SOURCES.some(o=>Math.hypot(o.x-s.x,o.z-s.z)<1&&o.color===s.color))sources.push(s);
- if(installedTexture){paintInto(installedTexture.image.data as Uint8Array,sources,EDEN_NIGHT_PATHS);installedTexture.needsUpdate=true;}
+ if(installedTexture){paintInto(installedTexture.image.data as Uint8Array,sources,EDEN_NIGHT_PATHS);installedTexture.needsUpdate=true;useMap(installedTexture,NIGHT_MAP_BOUNDS);}
  return sources.length;
+}
+
+/** Patterned god lights: all pools in one instanced draw into a shared world-space map. No point lights,
+ * CPU repaint, geometry changes or per-frame allocations. The static/legacy map keeps its original path. */
+export class PatternNightMap {
+ private readonly target=new THREE.WebGLRenderTarget(SIZE[0],SIZE[1],{type:THREE.HalfFloatType,depthBuffer:false,stencilBuffer:false});
+ private readonly scene=new THREE.Scene();
+ private readonly camera=new THREE.Camera();
+ private geometry=new THREE.InstancedBufferGeometry();
+ private readonly material=new THREE.ShaderMaterial({
+  uniforms:{bounds:{value:new THREE.Vector4()},seconds:{value:0},reduced:{value:0}},
+  vertexShader:`attribute vec2 center; attribute vec4 shape; attribute vec4 tint; attribute float kind;
+   uniform vec4 bounds; varying vec2 delta; varying vec4 pool; varying vec4 colorBase; varying float pattern;
+   void main(){float reach=max(shape.x,shape.y)*2.2;delta=position.xy*reach;pool=shape;colorBase=tint;pattern=kind;
+    vec2 uv=(center+delta-bounds.xy)/bounds.zw;gl_Position=vec4(uv*2.0-1.0,0.0,1.0);}`,
+  fragmentShader:`uniform float seconds; uniform float reduced; ${LIGHT_PATTERN_GLSL}
+   varying vec2 delta; varying vec4 pool; varying vec4 colorBase; varying float pattern;
+   void main(){float d2=dot(delta,delta);float v=pool.z*(exp(-d2/(pool.x*pool.x))+.18*exp(-d2/(pool.y*pool.y)));
+    float level=edenPattern(pattern,seconds,pool.w,reduced);
+    vec3 energy=colorBase.rgb*v*level;
+    gl_FragColor=vec4(energy,dot(energy,vec3(.2126,.7152,.0722))*colorBase.a);}`,
+  depthTest:false,depthWrite:false,transparent:true,toneMapped:false,
+  blending:THREE.CustomBlending,blendEquation:THREE.AddEquation,blendSrc:THREE.OneFactor,blendDst:THREE.OneFactor,
+ });
+ private readonly mesh=new THREE.Mesh(this.geometry,this.material);
+ private readonly viewport=new THREE.Vector4();private readonly scissor=new THREE.Vector4();private readonly clearColor=new THREE.Color();
+ private bounds:NightBounds=NIGHT_MAP_BOUNDS;
+ constructor(){this.target.texture.generateMipmaps=false;this.target.texture.minFilter=THREE.LinearFilter;this.mesh.frustumCulled=false;this.scene.add(this.mesh);}
+ setSources(sources:readonly NightSource[],bounds:NightBounds){
+  this.bounds=bounds;this.material.uniforms.bounds.value.set(bounds.x0,bounds.z0,bounds.x1-bounds.x0,bounds.z1-bounds.z0);
+  const g=new THREE.InstancedBufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,1,-1,0,1,1,0,-1,-1,0,1,1,0,-1,1,0],3));
+  const centers:number[]=[],shapes:number[]=[],colors:number[]=[],kinds:number[]=[],c=new THREE.Color();
+  for(const s of sources){centers.push(s.x,s.z);shapes.push(s.radius,s.halo??s.radius*2.5,s.intensity,s.phase??0);c.set(s.color);colors.push(c.r,c.g,c.b,Math.max(0,Math.min(1,((s.base??0)-BASE_MIN)/BASE_RANGE)));kinds.push(['steady','blink','twinkle','chase','pulse'].indexOf(s.pattern??'steady'));}
+  for(const [key,data,size] of [['center',centers,2],['shape',shapes,4],['tint',colors,4],['kind',kinds,1]] as const)g.setAttribute(key,new THREE.InstancedBufferAttribute(new Float32Array(data),size));
+  g.instanceCount=sources.length;this.geometry.dispose();this.geometry=g;this.mesh.geometry=g;
+ }
+ render(renderer:THREE.WebGLRenderer,seconds:number,reducedMotion=false){
+  this.material.uniforms.seconds.value=seconds%6;this.material.uniforms.reduced.value=reducedMotion?1:0;
+  const target=renderer.getRenderTarget(),face=renderer.getActiveCubeFace(),mip=renderer.getActiveMipmapLevel(),auto=renderer.autoClear,shadow=renderer.shadowMap.autoUpdate,xr=renderer.xr.enabled;
+  renderer.getViewport(this.viewport);renderer.getScissor(this.scissor);const scissorTest=renderer.getScissorTest(),alpha=renderer.getClearAlpha();renderer.getClearColor(this.clearColor);
+  try{renderer.xr.enabled=false;renderer.shadowMap.autoUpdate=false;renderer.autoClear=false;renderer.setRenderTarget(this.target);renderer.setScissorTest(false);renderer.setClearColor(0,0);renderer.clear();renderer.render(this.scene,this.camera);useMap(this.target.texture,this.bounds,1);}
+  finally{renderer.setRenderTarget(target,face,mip);renderer.setViewport(this.viewport);renderer.setScissor(this.scissor);renderer.setScissorTest(scissorTest);renderer.setClearColor(this.clearColor,alpha);renderer.autoClear=auto;renderer.shadowMap.autoUpdate=shadow;renderer.xr.enabled=xr;}
+ }
+ dispose(){if(NIGHT_MAP.map===this.target.texture&&installedTexture)useMap(installedTexture,NIGHT_MAP_BOUNDS);this.geometry.dispose();this.material.dispose();this.target.dispose();}
 }
