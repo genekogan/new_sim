@@ -1,12 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { CACHE, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, shaFile } from './inventory.mjs';
+import { CACHE, DEFAULT_SOURCES, inventory, keyFor, licenceEvidence, parseCsv, readReviewed, shaFile } from './inventory.mjs';
 import { ENDPOINT, loadCredentials, publish, signRequest, sigv4Headers } from './publish.mjs';
 import { verify } from './verify.mjs';
+import { withNewReceipt } from './receipt.mjs';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
 const data = Buffer.from('synthetic GLB test asset'), sha256 = hash(data);
@@ -110,36 +111,67 @@ test('credential loader only accepts an owned mode0600 regular file with exact t
   await assert.rejects(loadCredentials('relative'), /absolute/);
 }));
 
-test('new upload uses HEAD then conditional PUT and byte/SHA readback', async () => fixture(async ({ plan }) => {
+test('new upload uses HEAD then conditional PUT and byte/SHA readback', async () => fixture(async ({ plan, sources }) => {
   const methods = [];
-  const result = await publish(plan, { credentials, fetcher: async (url, opts) => {
+  const result = await publish(plan, { sources, credentials, fetcher: async (url, opts) => {
     methods.push(opts.method); assert.equal(opts.redirect, 'error'); assert.ok(url.startsWith(ENDPOINT));
     if (opts.method === 'HEAD') return new Response(null, { status: 404 });
     if (opts.method === 'PUT') { assert.equal(opts.headers['if-none-match'], '*'); assert.equal(opts.headers['cache-control'], CACHE); assert.equal(opts.headers['content-type'], object.contentType); assert.deepEqual(opts.body, data); return new Response(null); }
     return new Response(data, { headers: objectHeaders });
   } });
   assert.deepEqual(methods, ['HEAD', 'PUT', 'GET']); assert.equal(result.results[0].disposition, 'uploaded');
+  assert.equal(result.sources, sources); assert.equal(result.sourcesSha256, hash(await readFile(sources)));
 }));
 
-test('existing verified object is idempotent: HEAD+GET, zero PUTs', async () => fixture(async ({ plan }) => {
+test('a forged plan CSV cannot authorize an object; apply CLI rejects a sources override', async () => fixture(async ({ plan, sources, dir }) => {
+  const canonicalRows = parseCsv(await readFile(DEFAULT_SOURCES, 'utf8'));
+  assert.ok(licenceEvidence(canonicalRows, sha256, data.length).reason, 'synthetic fixture is absent from trusted sources');
+  await assert.rejects(publish(plan, { credentials, fetcher: async () => assert.fail('forged CSV must not enable network access') }), /allowlisted SOURCES.csv/);
+  const cli = spawnSync(process.execPath, [new URL('./publish.mjs', import.meta.url).pathname, '--apply', '--plan', join(dir, 'not-read.json'), '--sources', sources], { encoding: 'utf8', env: { ...process.env, EDEN_ASSETS_CREDENTIALS: '/no/such/credentials' } });
+  assert.equal(cli.status, 1); assert.match(cli.stderr, /dry-run only/);
+}));
+
+test('publish uses canonical sources despite a forged or absent plan.sources and receipts its exact raw CSV hash', async () => fixture(async ({ plan, sources }) => {
+  const reviewed = await readReviewed(), d = reviewed.derivatives[0];
+  const file = new URL('../../' + d.path, import.meta.url), body = await readFile(file);
+  const headers = { ...objectHeaders, 'content-length': String(d.bytes), 'x-amz-meta-sha256': d.sha256 };
+  const objects = [{ ...object, key: keyFor(d.sha256, '.glb'), sha256: d.sha256, bytes: d.bytes, file }];
+  for (const sourceField of [{ sources }, {}]) {
+    const result = await publish({ version: 1, bucket: 'eden-assets', objects, ...sourceField }, { credentials, fetcher: async (_, opts) => new Response(opts.method === 'HEAD' ? null : body, { headers }) });
+    assert.equal(result.sources, resolve(DEFAULT_SOURCES));
+    assert.equal(result.sourcesSha256, hash(await readFile(DEFAULT_SOURCES)));
+  }
+}));
+
+test('source receipt hash identifies the parsed snapshot even if a test source file changes during requests', async () => fixture(async ({ plan, sources }) => {
+  const before = await readFile(sources); let calls = 0;
+  const result = await publish(plan, { sources, credentials, fetcher: async (_, opts) => {
+    if (++calls === 1) await writeFile(sources, 'path,licence,sha256,bytes\nchanged,private,x,1\n');
+    return new Response(opts.method === 'HEAD' ? null : data, { headers: objectHeaders });
+  } });
+  assert.equal(result.sourcesSha256, hash(before));
+  assert.notEqual(result.sourcesSha256, hash(await readFile(sources)));
+}));
+
+test('existing verified object is idempotent: HEAD+GET, zero PUTs', async () => fixture(async ({ plan, sources }) => {
   const methods = [];
-  const result = await publish(plan, { credentials, fetcher: async (_, opts) => { methods.push(opts.method); return new Response(opts.method === 'HEAD' ? null : data, { headers: objectHeaders }); } });
+  const result = await publish(plan, { sources, credentials, fetcher: async (_, opts) => { methods.push(opts.method); return new Response(opts.method === 'HEAD' ? null : data, { headers: objectHeaders }); } });
   assert.deepEqual(methods, ['HEAD', 'GET']); assert.equal(result.results[0].disposition, 'existing');
 }));
 
-test('metadata conflict, failed HEAD and corrupted readback never overwrite an existing object', async () => fixture(async ({ plan }) => {
+test('metadata conflict, failed HEAD and corrupted readback never overwrite an existing object', async () => fixture(async ({ plan, sources }) => {
   for (const conflict of ['content-length', 'content-type', 'cache-control', 'x-amz-meta-sha256', 'x-amz-meta-licence']) {
     let calls = 0;
-    await assert.rejects(publish(plan, { credentials, fetcher: async () => { calls++; return new Response(null, { headers: { ...objectHeaders, [conflict]: 'different' } }); } }), /Refusing immutable overwrite/);
+    await assert.rejects(publish(plan, { sources, credentials, fetcher: async () => { calls++; return new Response(null, { headers: { ...objectHeaders, [conflict]: 'different' } }); } }), /Refusing immutable overwrite/);
     assert.equal(calls, 1);
   }
-  await assert.rejects(publish(plan, { credentials, fetcher: async () => new Response(null, { status: 403 }) }), /HEAD failed \(403\)/);
-  await assert.rejects(publish(plan, { credentials, fetcher: async (_, opts) => new Response(opts.method === 'HEAD' ? null : 'corrupt', { headers: objectHeaders }) }), /Readback bytes\/SHA-256/);
+  await assert.rejects(publish(plan, { sources, credentials, fetcher: async () => new Response(null, { status: 403 }) }), /HEAD failed \(403\)/);
+  await assert.rejects(publish(plan, { sources, credentials, fetcher: async (_, opts) => new Response(opts.method === 'HEAD' ? null : 'corrupt', { headers: objectHeaders }) }), /Readback bytes\/SHA-256/);
 }));
 
-test('racing conditional PUT is verified rather than overwritten', async () => fixture(async ({ plan }) => {
+test('racing conditional PUT is verified rather than overwritten', async () => fixture(async ({ plan, sources }) => {
   const methods = []; let heads = 0;
-  const result = await publish(plan, { credentials, fetcher: async (_, opts) => {
+  const result = await publish(plan, { sources, credentials, fetcher: async (_, opts) => {
     methods.push(opts.method);
     if (opts.method === 'HEAD') return heads++ === 0 ? new Response(null, { status: 404 }) : new Response(null, { headers: objectHeaders });
     if (opts.method === 'PUT') return new Response(null, { status: 412 });
@@ -149,7 +181,7 @@ test('racing conditional PUT is verified rather than overwritten', async () => f
 }));
 
 test('changed bytes, changed licence and malformed content key are rejected before network access', async () => fixture(async ({ plan, file, sources }) => {
-  const options = { credentials, fetcher: async () => assert.fail('network must not be called') };
+  const options = { sources, credentials, fetcher: async () => assert.fail('network must not be called') };
   await writeFile(file, 'changed'); await assert.rejects(publish(plan, options), /changed since dry-run/);
   await writeFile(file, data); await writeFile(sources, `path,licence,sha256,bytes\nx,private,${sha256},${data.length}\n`);
   await assert.rejects(publish(plan, options), /allowlisted SOURCES.csv/);
@@ -170,3 +202,47 @@ test('public checker fails warm-only MISS proof, absent cache/CORS/Age, and corr
   assert.match(errors, /first request cache HIT/); assert.match(errors, /Age/); assert.match(errors, /CORS/); assert.match(errors, /SHA-256/);
   for (const origin of ['http://assets.example.test', 'https://user:pass@assets.example.test', 'https://assets.example.test/path']) await assert.rejects(verify(origin, { objects: [object] }), /bare HTTPS/);
 });
+
+test('receipts reserve a new file before operations and refuse existing files or symlinks', async () => fixture(async ({ dir }) => {
+  const file = join(dir, 'receipt.json'), result = { ok: true, proof: 'synthetic' };
+  assert.deepEqual(await withNewReceipt(file, async () => result), result);
+  const original = await readFile(file, 'utf8');
+  const link = join(dir, 'linked.json'), dangling = join(dir, 'dangling.json');
+  await symlink(file, link); await symlink(join(dir, 'absent.json'), dangling);
+  for (const target of [file, link, dangling]) await assert.rejects(withNewReceipt(target, async () => assert.fail('existing receipt must stop before work')), { code: 'EEXIST' });
+  assert.equal(await readFile(file, 'utf8'), original);
+}));
+
+test('concurrent receipt reservations have one winner; failed attempts remain labelled and cannot be overwritten', async () => fixture(async ({ dir }) => {
+  let calls = 0;
+  const file = join(dir, 'race.json'), work = async () => { calls++; return { ok: true }; };
+  const outcomes = await Promise.allSettled([withNewReceipt(file, work), withNewReceipt(file, work)]);
+  assert.equal(calls, 1); assert.equal(outcomes.filter(r => r.status === 'fulfilled').length, 1);
+  const failed = join(dir, 'failed.json');
+  await assert.rejects(withNewReceipt(failed, async () => { throw Error('synthetic upload failure'); }), /synthetic upload failure/);
+  const receipt = JSON.parse(await readFile(failed, 'utf8'));
+  assert.equal(receipt.ok, false); assert.equal(receipt.status, 'incomplete');
+  await assert.rejects(withNewReceipt(failed, work), { code: 'EEXIST' });
+}));
+
+test('a replaced receipt pathname cannot be reported as saved or overwrite its replacement', async () => fixture(async ({ dir }) => {
+  const file = join(dir, 'receipt.json');
+  await assert.rejects(withNewReceipt(file, async () => {
+    await rename(file, join(dir, 'reserved-original.json'));
+    await writeFile(file, 'an earlier receipt moved here');
+    return { ok: true };
+  }), /Receipt path changed/);
+  assert.equal(await readFile(file, 'utf8'), 'an earlier receipt moved here');
+}));
+
+test('both CLI commands refuse existing receipt paths before reading a plan or accessing credentials/network', async () => fixture(async ({ dir }) => {
+  const receipt = join(dir, 'prior-receipt.json'); await writeFile(receipt, 'preserve this audit record');
+  for (const [script, args] of [
+    ['publish.mjs', ['--apply', '--plan', join(dir, 'absent-plan.json'), '--receipt', receipt]],
+    ['verify.mjs', ['https://assets.example.test', join(dir, 'absent-plan.json'), '--out', receipt]],
+  ]) {
+    const cli = spawnSync(process.execPath, [new URL('./' + script, import.meta.url).pathname, ...args], { encoding: 'utf8', env: { ...process.env, EDEN_ASSETS_CREDENTIALS: '/no/such/credentials' } });
+    assert.equal(cli.status, 1); assert.match(cli.stderr, /EEXIST/);
+    assert.equal(await readFile(receipt, 'utf8'), 'preserve this audit record');
+  }
+}));

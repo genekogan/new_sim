@@ -113,7 +113,7 @@ export async function installCdnAssets(manifestPath: string): Promise<void> {
   if (typeof __SIM_ASSETS_CDN_ENABLED__ === 'undefined' || !__SIM_ASSETS_CDN_ENABLED__) return;
   try {
     const original = window.fetch.bind(window);
-    const response = await original(manifestPath, { cache: 'no-cache', signal: AbortSignal.timeout(3000) });
+    const response = await original(manifestPath, { signal: AbortSignal.timeout(3000) });
     if (!response.ok) return;
     const manifest = readCdnManifest(await response.json());
     const transport = cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href);

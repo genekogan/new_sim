@@ -7,6 +7,7 @@ import { lstat, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ALLOWED_LICENCES, CACHE, DEFAULT_SOURCES, ROOT, TYPES, inventory, licenceEvidence, parseCsv, readReviewed, shaFile, validKey } from './inventory.mjs';
+import { withNewReceipt } from './receipt.mjs';
 
 export const ENDPOINT = 'https://<cf-account-id>.r2.cloudflarestorage.com';
 export const BUCKET = 'eden-assets';
@@ -58,9 +59,11 @@ function metadataErrors(response, object) {
   return errors;
 }
 
-export async function publish(plan, { credentials, fetcher = fetch, now, onProgress = () => {} } = {}) {
+export async function publish(plan, { sources = DEFAULT_SOURCES, credentials, fetcher = fetch, now, onProgress = () => {} } = {}) {
   if (plan.version !== 1 || plan.bucket !== BUCKET || !Array.isArray(plan.objects) || !plan.objects.length) throw Error('No approved immutable objects in this plan');
-  const rows = parseCsv(await readFile(plan.sources, 'utf8')), reviewed = await readReviewed(), results = [], seen = new Set();
+  // A plan is untrusted input. Only direct function callers (tests) can override the trusted licence source.
+  const sourceBytes = await readFile(sources), sourcesSha256 = sha(sourceBytes);
+  const rows = parseCsv(sourceBytes.toString('utf8')), reviewed = await readReviewed(), results = [], seen = new Set();
   // Validate every object before making the first network request.
   for (const object of plan.objects) {
     const ext = '.' + object.key.split('.').at(-1);
@@ -100,7 +103,7 @@ export async function publish(plan, { credentials, fetcher = fetch, now, onProgr
     const result = { key: object.key, disposition, bytes, sha256: object.sha256, verified: true };
     results.push(result); onProgress(result);
   }
-  return { version: 1, at: new Date().toISOString(), bucket: BUCKET, ok: true, results };
+  return { version: 1, at: new Date().toISOString(), bucket: BUCKET, sources: resolve(sources), sourcesSha256, ok: true, results };
 }
 
 async function main() {
@@ -109,10 +112,10 @@ async function main() {
   for (const arg of args.filter(a => a.startsWith('--'))) if (!allowed.has(arg)) throw Error(`Unknown option ${arg}`);
   if (args.includes('--apply') && args.includes('--dry-run')) throw Error('Choose --dry-run or --apply');
   if (args.includes('--apply')) {
+    if (args.includes('--sources')) throw Error('--sources is dry-run only; publishing always uses DEFAULT_SOURCES');
     const file = value('--plan'); if (!file) throw Error('--apply requires the reviewed --plan file');
     const receipt = resolve(value('--receipt', 'cdn-upload-receipt.json'));
-    const result = await publish(JSON.parse(await readFile(file, 'utf8')), { onProgress: result => console.log(JSON.stringify(result)) });
-    await writeFile(receipt, JSON.stringify(result, null, 2) + '\n');
+    const result = await withNewReceipt(receipt, async () => publish(JSON.parse(await readFile(file, 'utf8')), { onProgress: result => console.log(JSON.stringify(result)) }));
     console.log(JSON.stringify({ ok: true, objects: result.results.length, receipt }));
   } else {
     const root = resolve(value('--root', ROOT)), sources = resolve(value('--sources', DEFAULT_SOURCES));
