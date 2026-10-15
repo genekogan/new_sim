@@ -450,8 +450,8 @@ export async function openLauncher(cfg = {}) {
   log(`${origin}${B}/  (data ${dataDir}, worlds ${registry.worlds.length}/${MAX_WORLDS}, running cap ${prod.maxRunning}, children ${range[0]}–${range[1]}, sign-in ${auth ? `Clerk for ${publicOrigin}` : 'dev names'}, build ${BUILD})`);
 
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
-  const eager = adopting ? 0 : cfg.eager ?? 4;   // a handover wakes nothing until it has taken over (takeOverAll)
-  for (const w of [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).slice(0, eager)) pool.ensure(worldEnv(w)).then((p) => log(`woke ${w.slug} on :${p}`), (e) => log(`could not wake ${w.slug}: ${e.message}`));
+  const wakeRecent = () => { for (const w of [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).slice(0, cfg.eager ?? 4)) if (pool.status(w.slug).status !== 'running') pool.ensure(worldEnv(w)).then((p) => log(`woke ${w.slug} on :${p}`), (e) => log(`could not wake ${w.slug}: ${e.message}`)); };
+  if (!adopting) wakeRecent();   // a handover wakes nothing until it has taken over (takeOverAll)
 
   let closed = false;
   return {
@@ -494,6 +494,7 @@ export async function openLauncher(cfg = {}) {
       };
       const lanes = Array.from({ length: Math.max(1, concurrency) }, async () => { while (todo.length) await one(todo.shift()); });
       await Promise.all(lanes);
+      wakeRecent();
       return out;
     },
     /** Open (non-upgraded) requests still being answered here. */
