@@ -518,7 +518,7 @@ test('bench: 300 five-place build commits with two live claims versus none; 200-
     const started = f.god.builds.start({ id: 'church', title: 'Claims bench', steps: ['shell'], site: { at: [0, 0], size: [200, 200] } }, f.god.godIdentity(f.token)!) as any;
     const build = f.field(started.lease);
     assertAccepted(f.god.act({ ops: [f.place('east-anchor', -80, 90), f.place('tower-anchor', 80, 90)], build }));
-    if (withClaims) for (const [part, root] of [['east-aisle', 'east-anchor'], ['tower', 'tower-anchor']]) assert.equal(f.god.builds.claim('church', { part, root }, f.god.godIdentity(f.other)!).ok, true);
+    if (withClaims) for (const [part, root, x] of [['east-aisle', 'east-anchor', -80], ['tower', 'tower-anchor', 80]] as const) assert.equal(f.god.builds.claim('church', { part, root, region: { at: [x, 90], size: [12, 12] } }, f.god.godIdentity(f.other)!).ok, true);
     return { f, build, times: [] as number[], withClaims };
   });
   // Interleave the two worlds so warmup, thermal drift and scheduler noise affect both modes.
