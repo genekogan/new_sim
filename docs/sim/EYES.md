@@ -49,3 +49,19 @@ its direct worker loop intentionally excludes HTTP rate-limit waiting. The focus
 tests prove authentication, visibility, caption fallback, caching, expiry and both budgets.
 The release owner must retain the report and qualify the actual chosen world's asset and
 resident load before enabling it; a small fixture's throughput does not qualify every world.
+
+Measured on 2026-10-15 in Modal, four CPU cores / 8 GiB RAM, Node 22.23.3, no GPU:
+
+| Frame | Samples | p50 | p95 (observed maximum) | Serial estimate at p95 |
+| --- | ---: | ---: | ---: | ---: |
+| Eyes 512×320 | 8 | 589 ms | 1,098 ms | 54/min |
+| Eyes 320×180 | 8 | 468 ms | 538 ms | 111/min |
+| Map 256×256 | 8 | 123 ms | 303 ms | 198/min |
+
+The actual renderer identified itself as ANGLE Vulkan SwiftShader. The fresh world booted
+in 2,597 ms; worker readiness including viewer load and shader warm-up took another 8,027 ms.
+All 24 captures succeeded, zero worker failures, with real JPEGs visually inspected. The
+512×320 fixture result leaves room for the 12/minute world limit; it is a serial render
+estimate over eight samples, excludes HTTP budget waiting, and does not measure a populated
+Mars/Arium world or aggregate load from multiple browsers. Receipt and JPEGs:
+`team/scratch/bodies/eyes/cpu-modal/out/cpu/` in the Eden strategy workspace.
