@@ -19,7 +19,8 @@ export type DefFacts = {
   description?: string;
   tags: string[];
   layer: 'solid' | 'surface' | 'volume' | 'decor';
-  components: Record<string, Record<string, unknown> | undefined>;
+  // L1: presentation components may be lists (lights); fixture detection only reads their presence.
+  components: Record<string, unknown>;
   /** Baked slots in the def frame: p [x, y, z], yaw (entity convention). */
   slots: { id: string; kind: string; p: [number, number, number]; yaw: number; height?: number; capacity?: number }[];
   /** Baked local box at the entity's scale (x width, y height, z depth). */

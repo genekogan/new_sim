@@ -406,11 +406,14 @@ are; use it when only new copies should change.
   "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground
   at dusk and night (to let Souls switch it, copy what a library lamp declares: `defs lamp-post --json`).
   See it with `look --hour 21`; add `--weather rain` for a rainy picture.
+- **Light/motion.** `light.at:[x,y,z]` offsets the bulb (pool uses x/z); `pattern` = steady/blink/twinkle/chase/pulse (<3 Hz; reduced motion = steady). `lights:[…]` replaces `light`, ≤8 bulbs; offsets follow yaw/scale. `find twinkle` finds a ready kit. For spin (`rpm`, `axis`), sway (`amount`, `period`), hover (`height`, `bob`), route (`ref`, `speed`) and sound (`kind`, `radius`, `when`), read `<world-url>/god/examples/light-motion.mjs`: one runnable def example each. Inspect definitions first; no test entities.
 - **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`.
   For a walkable gazebo, add `"footprint":"open"` to the kit JSON: one ground room, open on all sides.
   Or supply a ground-only `lm-building-footprint/1` object with rooms and door portals. Keep floor tops at y=0;
   stairs and upper decks are deferred. Declare seat slots/components on the same kit. `describe` lists the room
   and its `walk:` check; `verify-use` can enter and sit. Sealed entrances and headroom under 2 m refuse placement.
+  For a building people enter, use a building def (`church`, `chapel`, `hall`, `tower`… or your own `plan`) and attach
+  kits to it: on a flat roof's `roof` slot (`--in tower/roof`), against a wall (`--against <building>.n`) or beside it.
 - **Budgets.** A def bakes to ≤ 80 000 triangles; keep props a few hundred and repeated things low (every
   copy is drawn). Size 0.05–400 m (height ≤ 120 m). `describe` prints a placed thing's triangles.
 - **Meshes.** Model locally if you can (any tool that writes GLB), then

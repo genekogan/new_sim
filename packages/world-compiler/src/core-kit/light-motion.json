@@ -1,0 +1,248 @@
+[
+  {
+    "schema": "def/1",
+    "name": "core-twinkle-lights",
+    "version": 1,
+    "description": "Eight warm twinkle bulbs on an 8 m cord. Gentle one-third Hz light pools follow each bulb; reduced-motion viewers see steady light. Served authoring example: god/examples/light-motion.mjs.",
+    "category": "utility.lighting",
+    "synonyms": [
+      "twinkle",
+      "fairy lights",
+      "string lights",
+      "festoon",
+      "night market lights"
+    ],
+    "tags": [
+      "light",
+      "lamp",
+      "decor",
+      "twinkle"
+    ],
+    "form": "point",
+    "layer": "decor",
+    "make": {
+      "kind": "gen",
+      "gen": "kit/2",
+      "args": {
+        "shapes": [
+          {
+            "kind": "box",
+            "at": [
+              0,
+              2.8,
+              0
+            ],
+            "size": [
+              8,
+              0.035,
+              0.035
+            ],
+            "color": "#524638",
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              -3.5,
+              2.7,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffe9c4",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              -2.5,
+              2.6,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffc780",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              -1.5,
+              2.5,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffb897",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              -0.5,
+              2.4000000000000004,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffe9c4",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              0.5,
+              2.4000000000000004,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#c4dfff",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              1.5,
+              2.5,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffe9c4",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              2.5,
+              2.6,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#ffc780",
+            "glow": 0.8,
+            "collide": false
+          },
+          {
+            "kind": "sphere",
+            "at": [
+              3.5,
+              2.7,
+              0
+            ],
+            "r": 0.14,
+            "segments": 5,
+            "color": "#c4dfff",
+            "glow": 0.8,
+            "collide": false
+          }
+        ]
+      }
+    },
+    "components": {
+      "lights": [
+        {
+          "at": [
+            -3.5,
+            2.7,
+            0
+          ],
+          "range": 4,
+          "color": "#ffe9c4",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            -2.5,
+            2.6,
+            0
+          ],
+          "range": 4,
+          "color": "#ffc780",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            -1.5,
+            2.5,
+            0
+          ],
+          "range": 4,
+          "color": "#ffb897",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            -0.5,
+            2.4000000000000004,
+            0
+          ],
+          "range": 4,
+          "color": "#ffe9c4",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            0.5,
+            2.4000000000000004,
+            0
+          ],
+          "range": 4,
+          "color": "#c4dfff",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            1.5,
+            2.5,
+            0
+          ],
+          "range": 4,
+          "color": "#ffe9c4",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            2.5,
+            2.6,
+            0
+          ],
+          "range": 4,
+          "color": "#ffc780",
+          "pattern": "twinkle"
+        },
+        {
+          "at": [
+            3.5,
+            2.7,
+            0
+          ],
+          "range": 4,
+          "color": "#c4dfff",
+          "pattern": "twinkle"
+        }
+      ]
+    },
+    "state": {
+      "on": {
+        "type": "bool",
+        "default": true
+      }
+    },
+    "size": {
+      "box": [
+        8,
+        2.98,
+        0.28
+      ]
+    }
+  }
+]

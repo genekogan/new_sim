@@ -2,8 +2,9 @@
 // state (the god's `world` op; apps/server/src/god/world-env.ts is the setter). Presentation only.
 import * as THREE from 'three';
 import type { SetWeather } from './WorldAtmosphere.ts';
-import { setClockNight } from './gen-mesh/motion.ts';
-import { paintOnlySources, setNightLightStrength, type NightSource } from './WorldNightLights.ts';
+import { setClockNight, worldSeconds } from './gen-mesh/motion.ts';
+import { defLights, lightPhase, PatternNightMap, paintOnlySources, setNightLightStrength, worldNightBounds, type AuthoredLight, type NightSource } from './WorldNightLights.ts';
+import type { HaloSource } from './atmosphere/halos.ts';
 
 type WorldStateLike = { weather?: { kind?: string; clouds?: number; rain?: number; wind?: number; fog?: number; intensity?: number } } | null | undefined;
 
@@ -56,8 +57,10 @@ const _p = new THREE.Vector3();
 
 type ModelLike = {
   entities: Map<string, { id: string; def: string; state?: Record<string, unknown> }>;
-  resolvedDef(ref: string): { components?: { light?: { color?: string; range?: number; on?: boolean } }; tags?: string[] } | undefined;
-  worldPose(e: unknown): { x: number; y: number; z: number };
+  resolvedDef(ref: string): { components?: { light?: AuthoredLight; lights?: AuthoredLight[] }; tags?: string[] } | undefined;
+  worldPose(e: unknown): { x: number; y: number; z: number; yaw?: number; s?: number };
+  constants?: { extent?: number };
+  ground?(): { extent?: readonly number[] };
   editSeq?: number;
 };
 type LayerLike = { active: boolean; groundAt(x: number, z: number): number | null; group: THREE.Object3D };
@@ -70,42 +73,58 @@ export class GodWorldLiving {
   private signature = '';
   private checkedAt = -Infinity;
   private readonly cover: CoverProbe;
+  private patterns: PatternNightMap | null = null;
+  private reduced = false;
   lights = 0;
-  constructor(private layer: LayerLike) {
+  constructor(private layer: LayerLike, private renderer?: THREE.WebGLRenderer) {
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
     this.cover = new CoverProbe(() => (this.layer.active ? [this.layer.group] : []));
   }
   private get model(): ModelLike | null { return (this.layer as unknown as { model?: ModelLike | null }).model ?? null; }
   /** Every frame: lamps follow the world clock; the night map is repainted when the god's lights change (checked 2×/s). */
-  update(nowMs: number, daylight: number | null) {
+  update(nowMs: number, daylight: number | null, reducedMotion = false) {
     if (!this.layer.active) { setClockNight(null); return; }
     setClockNight(daylight === null ? null : 1 - Math.max(0, Math.min(1, daylight)));
     setNightLightStrength(daylight);
+    if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
+    this.reduced = reducedMotion;
     if (nowMs - this.checkedAt < 500) return;
     this.checkedAt = nowMs;
     // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
-    const sources: NightSource[] = [], marks: [number, number, number, string, number][] = [];
+    const sources: NightSource[] = [], marks: HaloSource[] = [];
     for (const e of m.entities.values()) {
-      const light = m.resolvedDef(e.def)?.components?.light;
-      if (!light || light.on === false || e.state?.on === false) continue;
-      const p = m.worldPose(e), base = this.layer.groundAt(p.x, p.z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
+      if (e.state?.on === false) continue;
+      const components = m.resolvedDef(e.def)?.components, lights = defLights(components);
+      if (!lights.length) continue;
+      const p = m.worldPose(e), yaw = p.yaw ?? 0, scale = p.s ?? 1, cos = Math.cos(yaw), sin = Math.sin(yaw);
       const fire = /fire|hearth|brazier|campfire|torch/.test(e.def);
-      sources.push({ x: p.x, z: p.z, base, radius: range * (fire ? 0.55 : 0.42), intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25 });
-      marks.push([p.x, base, p.z, fire ? 'fire' : 'lamp', range / 8]);
+      for (const [i, light] of lights.entries()) {
+        if (light.on === false) continue;
+        const at = light.at, dx = (at?.[0] ?? 0) * scale, dz = (at?.[at.length - 1] ?? 0) * scale;
+        const x = p.x + dx * cos + dz * sin, z = p.z - dx * sin + dz * cos;
+        const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
+        const phase = lightPhase(e.id, i, lights.length, light.pattern);
+        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42), intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25, pattern: light.pattern, phase });
+        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, light.pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
+      }
     }
-    const sig = JSON.stringify(sources.map((s) => [s.x.toFixed(1), s.z.toFixed(1), s.color, s.radius.toFixed(1)]));
+    const bounds = worldNightBounds(m.constants?.extent, m.ground?.().extent);
+    const sig = JSON.stringify([sources, marks, bounds]);
     if (sig === this.signature) return;
     this.signature = sig; this.lights = sources.length;
-    paintOnlySources(sources);
+    if (this.renderer && sources.some(s => s.pattern && s.pattern !== 'steady')) {
+      this.patterns ??= new PatternNightMap(); this.patterns.setSources(sources, bounds);
+      this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
+    } else { this.patterns?.dispose(); this.patterns = null; paintOnlySources(sources, bounds); }
     this.group.userData.edenLightSources = marks;
   }
   /** For the atmosphere: the god's weather (null = scheduled) and "under a roof" for camera-local rain. */
   atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {
     return { weather: setWeatherOf(entityWorldState(this.layer)), indoors: (x, y, z) => this.cover.test(x, y, z) };
   }
-  dispose() { setClockNight(null); this.group.removeFromParent(); }
+  dispose() { setClockNight(null); this.patterns?.dispose(); this.patterns = null; this.group.removeFromParent(); }
 }
 
 // ---------------------------------------------------------------- broadcast: a god world's establishing views
