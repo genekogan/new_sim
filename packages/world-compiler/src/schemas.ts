@@ -289,8 +289,13 @@ const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16
 const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.string().max(4000) });
 /** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
 const restore = z.object({ op: z.literal('restore'), entity: entitySchema });
+/** Internal: restore the active revision of an already stored definition. */
+const restoreDef = z.object({ op: z.literal('restore-def'), ref: z.string(), hash: z.string().regex(/^[0-9a-f]{64}$/),
+  /** Only geometry fields changed by admission/preparation are restored; unrelated later state edits survive. */
+  instances: z.array(z.object({ entity: entitySchema, fields: z.array(z.enum(['p', 'r', 'shape', 'params'])) })).optional(),
+});
 
-export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, restore, economy, mint, pay, relate]);
+export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, restore, restoreDef, economy, mint, pay, relate]);
 export type Op = z.infer<typeof opSchema>;
 export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, economy, mint, pay, relate]);
 
@@ -303,8 +308,8 @@ export const batchSchema = z.object({
   group: z.string().max(60).optional(),
 });
 export type Batch = z.infer<typeof batchSchema>;
-/** Server-internal: the same batch shape but allowing `restore` (used when replaying stored inverses). */
-export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).min(1).max(256) });
+/** Server-internal: stored inverses may restore content or be empty (an accepted no-op revert). */
+export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).max(256) });
 
 export type Failure = {
   op: number; code: string; detail: string;

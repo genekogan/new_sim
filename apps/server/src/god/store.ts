@@ -30,7 +30,7 @@ export function ensureWorldSchema(db: Db) {
   if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
 }
 
-type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null };
+type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null; defRefs?: Record<string, string> };
 
 export class WorldStore {
   readonly db: Db; readonly worldId: string;
@@ -45,7 +45,7 @@ export class WorldStore {
     const meta = this.meta(); if (!meta) return null;
     const defs = (this.db.db.prepare('SELECT body FROM world_defs_v1 WHERE world_id=?').all(this.worldId) as { body: string }[]).map((r) => JSON.parse(r.body) as StoredDef);
     const entities = (this.db.db.prepare('SELECT body FROM world_entities_v1 WHERE world_id=?').all(this.worldId) as { body: string }[]).map((r) => JSON.parse(r.body) as Entity);
-    const model = WorldModel.fromSnapshot({ constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs, entities, ground: meta.ground }, assets, library);
+    const model = WorldModel.fromSnapshot({ constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs, defRefs: meta.defRefs, entities, ground: meta.ground }, assets, library);
     return { model, owner: meta.owner };
   }
   /** First write: constants, seed, and any defs the model already stores (none from the shared library: CATRUN). */
@@ -56,7 +56,7 @@ export class WorldStore {
     });
   }
   private writeMeta(model: WorldModel, owner: string | null) {
-    const meta: Meta = { constants: model.constants, state: model.state, seed: model.seed, seq: model.seq, editSeq: model.editSeq, ground: model.ground(), owner };
+    const meta: Meta = { constants: model.constants, state: model.state, seed: model.seed, seq: model.seq, editSeq: model.editSeq, ground: model.ground(), owner, defRefs: model.defRefs() };
     this.db.db.prepare('INSERT INTO world_meta_v1 (world_id, body) VALUES (?, ?) ON CONFLICT(world_id) DO UPDATE SET body=excluded.body').run(this.worldId, JSON.stringify(meta));
   }
   private writeDef(d: StoredDef) {
@@ -107,6 +107,11 @@ export class WorldStore {
   undoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.kind !== 'engine') ?? null; }
   /** The undo `redo` would revert: newest not-undone undo. */
   redoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind === 'undo') ?? null; }
+  /** Snapshot the complete group stack before undo starts; newly journaled undos cannot hide older group edits. */
+  groupEdits(group: string): EditRow[] {
+    return (this.db.db.prepare("SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? AND grp=? AND undone=0 AND kind IN ('edit','redo') ORDER BY seq DESC").all(this.worldId, group) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
+      .map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
+  }
 
   // ---- god tokens
   addToken(hash: string, label: string | null) { this.db.db.prepare('INSERT OR IGNORE INTO god_tokens_v1 (world_id, token_hash, label, created_at) VALUES (?, ?, ?, ?)').run(this.worldId, hash, label, Date.now()); }

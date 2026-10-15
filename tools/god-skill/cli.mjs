@@ -469,7 +469,10 @@ export async function group(name, flags = {}) { if (flags.off || name === 'off' 
 export async function undo(flags = {}) {
   const g = flags.group === true ? load().group : flags.group;
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ''}`, { method: 'POST' }), 'undo'); invalidate();
-  if (g) return r.accepted ? `undid group "${g}": edits ${r.reverted.join(', ')}` : `nothing undone: ${JSON.stringify(r.failures ?? r)}`;
+  if (g) {
+    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(', ')}`;
+    return `group "${g}" undo incomplete; undone edits: ${r.reverted?.join(', ') || 'none'}; not undone edits: ${r.notReverted?.join(', ') || (r.failed !== undefined ? r.failed : 'unknown (server did not list them)')}\n${r.failures?.map(explainFailure).join('; ') || 'Undo did not complete.'}`;
+  }
   return r.accepted ? `undid edit ${r.reverted}` : `nothing undone: ${r.failures?.map(explainFailure).join('; ')}`;
 }
 export async function redo() { const r = ok(await call('/v1/god/redo', { method: 'POST' }), 'redo'); invalidate(); return r.accepted ? `redid edit ${r.reverted}` : `nothing to redo: ${r.failures?.map(explainFailure).join('; ')}`; }

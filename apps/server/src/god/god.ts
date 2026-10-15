@@ -255,7 +255,6 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return this.revert(target, 'redo');
   }
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
-    if (!target.inverse.length) return { accepted: false, failures: [{ op: -1, code: 'undo.conflict', detail: `edit ${target.seq} has no inverse (${kind === 'undo' ? 'expand/define/answer' : 'nothing to redo'})` }] };
     const tick = this.opts.tick();
     const next = this.model.fork();
     const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
@@ -283,16 +282,15 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
 
   /** Undo every edit of a group (newest first). Stops at the first conflict and reports how far it got. */
-  undoGroup(group: string): { accepted: boolean; reverted: number[]; failures?: unknown } {
+  undoGroup(group: string): { accepted: boolean; reverted: number[]; notReverted: number[]; failed?: number; failures?: Failure[] } {
     const reverted: number[] = [];
-    for (;;) {
-      const target = this.store.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.grp === group);
-      if (!target) break;
+    const targets = this.store.groupEdits(group);
+    for (const [index, target] of targets.entries()) {
       const r = this.revert(target, 'undo');
-      if (!r.accepted) return { accepted: reverted.length > 0, reverted, failures: r.failures };
+      if (!r.accepted) return { accepted: false, reverted, notReverted: targets.slice(index).map(e => e.seq), failed: target.seq, failures: r.failures };
       reverted.push(target.seq);
     }
-    return { accepted: reverted.length > 0, reverted, ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
+    return { accepted: reverted.length > 0, reverted, notReverted: [], ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
   }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {

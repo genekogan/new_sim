@@ -77,7 +77,7 @@ export class WorldModel {
     const { budget: _b, ...hashable } = def;
     const hash = hashOf(hashable);
     const existing = this.defs.get('sha:' + hash);
-    if (existing) return existing;
+    if (existing) return this.store(existing, true);
     const shared = this.library?.get('sha:' + hash);
     if (shared) return this.store(shared, true);
     const ref = `${def.name}@${def.version}`;
@@ -91,9 +91,9 @@ export class WorldModel {
   def(ref: string): StoredDef | undefined { const k = aliasRef(ref); return this.defs.get(k) ?? this.library?.get(k); }
   /** True when the world itself stores this ref (not only the shared library). */
   owns(ref: string): boolean { return this.defs.has(aliasRef(ref)); }
-  /** Every def this world can resolve: its own, plus the library's whose ref it does not shadow. */
+  /** Active named defs, plus the library's unshadowed refs. Historical revisions remain addressable by hash. */
   allDefs(): StoredDef[] {
-    const own = [...new Set(this.defs.values())];
+    const own = [...new Set([...this.defs.keys()].filter(ref => !ref.startsWith('sha:')).map(ref => this.defs.get(ref)!))];
     if (!this.library) return own;
     const refs = new Set(own.map((d) => d.ref));
     return [...own, ...this.library.all().filter((d) => !refs.has(d.ref))];
@@ -110,6 +110,14 @@ export class WorldModel {
     if (takeRef || !this.defs.has(d.ref)) { this.defs.set(d.ref, d); if (d.ref.startsWith('core-')) this.defs.set('core/' + d.ref.slice(5), d); }
     return d;
   }
+  /** Rebind a ref to content already retained by hash (trusted definition undo/redo). */
+  restoreDef(ref: string, hash: string): StoredDef | undefined {
+    const d = this.def('sha:' + hash);
+    if (!d || d.ref !== ref) return undefined;
+    return this.store(d, true);
+  }
+  /** Active bindings are separate from retained content: SQL/hash iteration order cannot choose a revision. */
+  defRefs(): Record<string, string> { return Object.fromEntries([...this.defs].filter(([ref]) => !ref.startsWith('sha:')).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0).map(([ref, d]) => [ref, d.hash])); }
   /** Follow `extends` to merge params defaults/components/slots. Child overrides parent field-by-field. */
   resolvedDef(ref: string, depth = 0): StoredDef | undefined {
     const d = this.def(ref);
@@ -129,7 +137,8 @@ export class WorldModel {
 
   bake(def: StoredDef, params: Record<string, Value>, seed: number, shape?: Entity['shape']): Baked {
     try {
-    const key = hashOf([def.hash, params, seed, shape ?? null]);
+    // Inherited make/slots/components can change while the child's own content hash stays fixed.
+    const key = hashOf([def.extends ? def : def.hash, params, seed, shape ?? null]);
     const hit = this.bakes.get(key);
     if (hit) return hit;
     let baked: Baked;
@@ -313,14 +322,19 @@ export class WorldModel {
   snapshot() {
     return {
       constants: this.constants, state: this.state, seed: this.seed, seq: this.seq, editSeq: this.editSeq,
-      defs: [...new Set(this.defs.values())].sort((a, b) => (a.ref < b.ref ? -1 : 1)), entities: [...this.entities.values()].sort((a, b) => (a.id < b.id ? -1 : 1)), ground: this.terrain.ground,
+      // Active content last for older snapshot consumers that reconstruct ref bindings from this array.
+      defs: [...new Set(this.defs.values())].sort((a, b) => a.ref === b.ref
+        ? Number(this.def(a.ref) === a) - Number(this.def(b.ref) === b) || (a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0)
+        : a.ref < b.ref ? -1 : 1),
+      defRefs: this.defRefs(), entities: [...this.entities.values()].sort((a, b) => (a.id < b.id ? -1 : 1)), ground: this.terrain.ground,
     };
   }
-  static fromSnapshot(s: ReturnType<WorldModel['snapshot']>, assets?: AssetLookup, library?: DefLibrary | null): WorldModel {
+  static fromSnapshot(s: Omit<ReturnType<WorldModel['snapshot']>, 'defRefs'> & { defRefs?: Record<string, string> }, assets?: AssetLookup, library?: DefLibrary | null): WorldModel {
     const w = new WorldModel({ constants: s.constants, seed: s.seed, state: s.state, assets });
     w.library = library ?? null;
     w.seq = s.seq; w.editSeq = s.editSeq;
     for (const d of s.defs) { w.defs.set('sha:' + d.hash, d); w.defs.set(d.ref, d); if (d.ref.startsWith('core-')) w.defs.set('core/' + d.ref.slice(5), d); }
+    for (const [ref, hash] of Object.entries(s.defRefs ?? {})) { const d = w.def('sha:' + hash); if (d) w.defs.set(ref, d); }
     w.terrain = new Terrain(s.ground);
     for (const e of s.entities) w.insert(e);
     for (const e of s.entities) { const def = w.resolvedDef(e.def); if (def && def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }

@@ -45,7 +45,8 @@ export function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
   const byPath = new Map(m.rows.map((r) => [r.path, r]));
   const lib = new Map();
-  for (const d of [...(m.snapshot.library ?? []), ...(m.snapshot.defs ?? [])]) { lib.set('sha:' + d.hash, d); lib.set(d.ref, d); if (d.ref.startsWith('core-')) lib.set('core/' + d.ref.slice(5), d); }
+  // The god library carries active named revisions; in-use defs can also contain older hash-pinned content.
+  for (const d of [...(m.snapshot.defs ?? []), ...(m.snapshot.library ?? [])]) { lib.set('sha:' + d.hash, d); lib.set(d.ref, d); if (d.ref.startsWith('core-')) lib.set('core/' + d.ref.slice(5), d); }
   const get = (ref) => {
     if (!ref) return null;
     const r = String(ref).replace(/^flag:/, '');

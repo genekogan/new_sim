@@ -1028,7 +1028,7 @@ function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
   const byPath = new Map(m.rows.map((r) => [r.path, r]));
   const lib = /* @__PURE__ */ new Map();
-  for (const d of [...m.snapshot.library ?? [], ...m.snapshot.defs ?? []]) {
+  for (const d of [...m.snapshot.defs ?? [], ...m.snapshot.library ?? []]) {
     lib.set("sha:" + d.hash, d);
     lib.set(d.ref, d);
     if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
@@ -2457,7 +2457,11 @@ async function undo(flags2 = {}) {
   const g = flags2.group === true ? load().group : flags2.group;
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ""}`, { method: "POST" }), "undo");
   invalidate();
-  if (g) return r.accepted ? `undid group "${g}": edits ${r.reverted.join(", ")}` : `nothing undone: ${JSON.stringify(r.failures ?? r)}`;
+  if (g) {
+    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(", ")}`;
+    return `group "${g}" undo incomplete; undone edits: ${r.reverted?.join(", ") || "none"}; not undone edits: ${r.notReverted?.join(", ") || (r.failed !== void 0 ? r.failed : "unknown (server did not list them)")}
+${r.failures?.map(explainFailure).join("; ") || "Undo did not complete."}`;
+  }
   return r.accepted ? `undid edit ${r.reverted}` : `nothing undone: ${r.failures?.map(explainFailure).join("; ")}`;
 }
 async function redo() {

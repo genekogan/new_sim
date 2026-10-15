@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status } from './cli.mjs';
+import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo } from './cli.mjs';
+import { view } from './lib/mirror.mjs';
 
 function fixture(t, data) {
   const cwd = process.cwd(), originalFetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'god-cli-offline-')), calls = [];
@@ -68,4 +69,28 @@ test('answer and layer commands use receipt-protected acts with fresh refs', asy
   const [one, two] = calls.map((c) => JSON.parse(c.body));
   assert.deepEqual(one.ops, [{ op: 'answer', prayer: 'prayer-1', text: 'A place to rest' }]);
   assert.notEqual(one.clientRef, two.clientRef);
+});
+
+test('group undo prints failures and both sides of a partial revert', async t => {
+  fixture(t, { accepted: false, reverted: [16], notReverted: [15, 14], failed: 15, failures: [{ op: 0, code: 'occupied.by-body', detail: 'Ada occupies bench', entity: 'e_bench', field: 'def', fix: 'Wait until Ada is done.' }] });
+  const text = await undo({ group: 'g' });
+  assert.match(text, /incomplete/); assert.match(text, /undone edits: 16/); assert.match(text, /not undone edits: 15, 14/);
+  assert.match(text, /occupied.by-body/); assert.match(text, /field def/); assert.match(text, /Wait until Ada/);
+});
+
+test('group undo never hides failures behind an accepted partial response from an older server', async t => {
+  fixture(t, { accepted: true, reverted: [16], failures: [{ op: 0, code: 'undo.conflict', detail: 'edit 15 conflicts' }] });
+  const text = await undo({ group: 'g' });
+  assert.match(text, /incomplete/); assert.match(text, /undone edits: 16/); assert.match(text, /edit 15 conflicts/);
+});
+
+test('a complete group undo prints all reverted edits', async t => {
+  fixture(t, { accepted: true, reverted: [16, 15, 14], notReverted: [] });
+  assert.equal(await undo({ group: 'g' }), 'undid group "g": edits 16, 15, 14');
+});
+
+test('mirror preserves the active named definition when only an older hash-pinned revision is in use', () => {
+  const old = { hash: 'old', ref: 'post@1' }, active = { hash: 'active', ref: 'post@1' };
+  const v = view({ rows: [], snapshot: { defs: [old], library: [active], entities: [] } });
+  assert.equal(v.def('post@1'), active); assert.equal(v.def('sha:old'), old);
 });

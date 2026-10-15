@@ -532,21 +532,37 @@ export class EngineBridge {
   pinnedCheck(after: WorldModel, diff: Diff, ops: unknown[]): Failure | null {
     const pinned = this.pinnedBodies(); if (!pinned.length) return null;
     const name = (b: { id: string; doing: string }) => `${this.soulName(b.id)} (${b.id}), ${b.doing}`;
-    const no = (i: number, detail: string): Failure => { this.stats.refusals++; return { op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }; };
-    const opOf = (id: string) => { const k = ops.findIndex((o) => { const x = o as { id?: string; name?: string }; return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id); }); return k < 0 ? 0 : k; };
+    const no = (i: number, detail: string, entity?: string): Failure => { this.stats.refusals++; return { op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)`, ...(entity ? { entity, field: 'def', fix: 'Adjust the definition so this instance clears the body, or wait until the body is done.' } : {}) }; };
+    const opOf = (id: string) => {
+      const refs = new Set<string>();
+      for (const eid of [id, ...this.model.ancestors(id)]) {
+        let d = this.model.def(this.model.entities.get(eid)?.def ?? '');
+        for (let depth = 0; d && depth <= 8; depth++) { refs.add(d.ref); d = d.extends ? this.model.def(d.extends) : undefined; }
+      }
+      const k = ops.findIndex((o) => {
+        const x = o as { op?: string; id?: string; name?: string; ref?: string; def?: { name: string; version?: number } };
+        return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id)
+          || (x?.op === 'define' && x.def && refs.has(`${x.def.name}@${x.def.version ?? 1}`)) || (x?.op === 'restore-def' && x.ref && refs.has(x.ref));
+      });
+      return k < 0 ? 0 : k;
+    };
     for (const e of diff.upserts) {
       const live = this.model.entities.get(e.id); if (!live || this.model.resolvedDef(live.def)?.components.body) continue;
       // 1. the seat (or anything around it) moved as a side effect
       const a = this.model.worldPose(live), w = after.worldPose(e);
       if (Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) > 1e-3 || Math.abs(a.yaw - w.yaw) > 1e-4) for (const sid of this.model.subtree(e.id)) {
         const u = this.engine.bodyUsesV1(sid); const b = u && pinned.find((x) => x.id === u.body);
-        if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`);
+        if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`, e.id);
       }
     }
     // 2. the ground rising over a pinned body
     if (diff.tiles.length) for (const b of pinned) {
       const g = after.terrain.sample(b.p[0], b.p[2]);
-      if (g > b.p[1] + 0.25) return no(Math.max(0, ops.findIndex((o) => (o as { op?: string })?.op === 'place' || (o as { op?: string })?.op === 'move' || (o as { op?: string })?.op === 'set')), `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`);
+      if (g > b.p[1] + 0.25) {
+        const source = diff.upserts.find(e => { const d = after.resolvedDef(e.def); return d && after.bake(d, e.params ?? {}, e.seed ?? 0, e.shape).landform; });
+        const i = source ? opOf(source.id) : Math.max(0, ops.findIndex((o) => ['place', 'move', 'set', 'define', 'restore-def'].includes((o as { op: string })?.op)));
+        return no(i, `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`, source?.id);
+      }
     }
     // 3. a new or changed solid where a pinned body is
     for (const e of diff.upserts) {
@@ -557,7 +573,7 @@ export class EngineBridge {
       for (const o of fp) for (const b of pinned) {
         const y = b.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.6) continue;
         const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.p[0] - o.c[0], dz = b.p[2] - o.c[1];
-        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${after.pathOf(e.id)}`);
+        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${after.pathOf(e.id)}`, e.id);
       }
     }
     return null;
@@ -571,7 +587,7 @@ export class EngineBridge {
       if (!codes.includes(fl.code)) continue;
       const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
       const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
-      if (b) { this.stats.refusals++; return { accepted: false, failures: [{ op: fl.op, code: 'occupied.by-body', detail: `would bury ${this.soulName(b.id)} (${b.id}), ${b.doing}: ${fl.detail}; wait until they are done (or ask them in a prayer answer)` }] }; }
+      if (b) { this.stats.refusals++; return { accepted: false, failures: [{ ...fl, code: 'occupied.by-body', detail: `would bury ${this.soulName(b.id)} (${b.id}), ${b.doing}: ${fl.detail}; wait until they are done (or ask them in a prayer answer)` }] }; }
     }
     return null;
   }

@@ -32,6 +32,21 @@ async function world(dbFile = ':memory:') {
   return { ...f, god, edge, bridge, settle };
 }
 
+test('definition edits and their undo/redo update the native engine physics', async t => {
+  const w = await world(); w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  const definition = (size: [number, number, number]) => ({ schema: 'def/1', name: 'bridge-post', size: { box: size }, make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, size[1] / 2, 0], size }] } } });
+  assert.equal(w.god.act({ ops: [{ op: 'define', def: definition([0.5, 1, 0.5]) }, { op: 'place', def: 'bridge-post@1', name: 'post', p: [0, 0] }] }).accepted, true);
+  await w.settle(2);
+  const id = w.god.model.get('post')!.id, engine = w.host.engine as any;
+  const solids = () => structuredClone(engine.world.entityPhysicsV1.byEntity[id].solids);
+  const before = solids();
+  assert.equal(w.god.act({ ops: [{ op: 'define', def: definition([2, 3, 2]) }] }).accepted, true);
+  await w.settle(2); const changed = solids(); assert.notDeepEqual(changed, before);
+  assert.equal(w.god.undo().accepted, true); await w.settle(2); assert.deepEqual(solids(), before);
+  assert.equal(w.god.redo().accepted, true); await w.settle(2); assert.deepEqual(solids(), changed);
+});
+
 test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refuse edits; replay agrees', { timeout: 600000 }, async (t) => {
   const w = await world();
   w.brain.quiesce();

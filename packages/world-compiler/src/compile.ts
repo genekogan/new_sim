@@ -134,10 +134,51 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       const u = opts.uses(sid);
       if (!u) continue;
       const f = fail(i, u.code, `${sid !== id ? `${scratch.pathOf(id)}: ` : ''}${u.detail}`);
+      f.entity = sid; f.field = 'entity'; f.fix = 'Wait until the body is no longer using this entity, then retry.';
       if (opts.refuse) { heldBack.push(f); return false; }
       failures.push(f); return true;
     }
     return false;
+  };
+
+  /** A ref change is a physical edit of every instance whose effective def changed, plus its children (slots may
+   * move/disappear). Remove all old indices first, then admit parent-first against the new geometry as one plan. */
+  const rebindInstances = (before: Map<string, string>, i: number, restores: NonNullable<Extract<Op, { op: 'restore-def' }>['instances']> = []) => {
+    const back: typeof restores = [], restore = new Map(restores.map(r => [r.entity.id, r]));
+    const affected = new Set<string>();
+    for (const e of scratch.entities.values()) if (restore.has(e.id) || before.get(e.id) !== hashOf(scratch.resolvedDef(e.def) ?? null)) {
+      for (const id of scratch.subtree(e.id)) affected.add(id);
+    }
+    const instances = [...affected].map(id => scratch.entities.get(id)!).sort((a, b) => scratch.ancestors(a.id).size - scratch.ancestors(b.id).size);
+    for (const e of instances) if (inUse(e.id, i)) return back;
+    for (const e of instances) { scratch.unindex(e.id); clearGround(scratch, e, diff); }
+    for (const e of instances) {
+      const def = scratch.resolvedDef(e.def);
+      const repair = (f: Failure): Failure => ({ ...f, entity: e.id, def: def?.ref ?? e.def,
+        detail: `${scratch.pathOf(e.id)}: ${f.detail}`, field: f.field ?? 'def',
+        fix: f.fix ?? `Adjust the definition or move ${scratch.pathOf(e.id)} so it fits, then retry the definition change.` });
+      if (!def) throw new PlanningFailure(repair(fail(i, 'def.unknown', e.def)));
+      const next: Entity = { ...e, v: e.v + 1 };
+      const previous = restore.get(e.id);
+      for (const field of previous?.fields ?? []) {
+        if (previous!.entity[field] === undefined) delete next[field];
+        else (next as Record<string, unknown>)[field] = previous!.entity[field];
+      }
+      const params = checkFields(def.params, next.params, false);
+      if (!params.ok) throw new PlanningFailure(repair({ ...fail(i, 'params.invalid', params.detail), field: 'params' }));
+      if (def.form !== 'point' && !next.shape) throw new PlanningFailure(repair({ ...fail(i, 'params.invalid', `${def.form} form needs a shape`), field: 'shape' }));
+      try {
+        prepareEntity(scratch, def, next, next.params);
+        const problem = admit(scratch, next, def, i, 'strict', false);
+        if (problem) throw new PlanningFailure(repair(problem));
+        const fields = (['p', 'r', 'shape', 'params'] as const).filter(field => hashOf(e[field] ?? null) !== hashOf(next[field] ?? null));
+        if (fields.length) back.push({ entity: e, fields });
+        scratch.delete(e.id); scratch.insert(next); indexAndGround(scratch, next, def, diff); upsert(next);
+      } catch (error) {
+        throw error instanceof PlanningFailure ? error : new PlanningFailure(repair(generatorFailure(i, error, def, e.id)));
+      }
+    }
+    return back;
   };
 
   // sky palettes are a closed list (replayed inverses may restore an older free-form one)
@@ -156,10 +197,36 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     contextDef = scratch.resolvedDef(op.op === 'place' ? op.def : before?.def ?? (op.op === 'restore' ? op.entity.def : ''));
     switch (op.op) {
       case 'define': {
+        const ref = `${op.def.name}@${op.def.version}`, previous = scratch.def(ref), owned = scratch.owns(ref);
         const refuse = checkDef(scratch, op.def as never, i);
         if (refuse) { failures.push(refuse); return; }
+        // Discover affected instances before rebinding, including inheritance and expanded prefab/contents children.
+        const before = new Map([...scratch.entities.values()].map(e => [e.id, hashOf(scratch.resolvedDef(e.def) ?? null)]));
         const stored = scratch.defineDef(op.def as never, by, tick);
+        if (previous?.hash === stored.hash) {
+          // Preserve first adoption of an identical shared library record; an already owned identical def is a no-op.
+          if (!owned) diff.defs.push(stored);
+          return;
+        }
+        if (previous && ref.startsWith('core-') && !opts.trusted) {
+          failures.push({ ...fail(i, 'constant.immutable', `${ref} is a library definition and cannot be redefined`), def: ref, field: 'def.name', fix: 'Choose a world-local name for your definition.' }); return;
+        }
         diff.defs.push(stored);
+        if (previous) {
+          const instances = rebindInstances(before, i);
+          inverse.unshift({ op: 'restore-def', ref, hash: previous.hash, ...(instances.length ? { instances } : {}) });
+        }
+        return;
+      }
+      case 'restore-def': {
+        const previous = scratch.def(op.ref);
+        const before = new Map([...scratch.entities.values()].map(e => [e.id, hashOf(scratch.resolvedDef(e.def) ?? null)]));
+        const stored = scratch.restoreDef(op.ref, op.hash);
+        if (!stored || !previous) { failures.push({ ...fail(i, 'undo.conflict', `stored definition ${op.ref} at ${op.hash} is unavailable`), field: 'def', fix: 'Restore the missing stored definition before retrying undo.' }); return; }
+        if (previous.hash === stored.hash && !op.instances?.length) return;
+        diff.defs.push(stored);
+        const instances = rebindInstances(before, i, op.instances);
+        inverse.unshift({ op: 'restore-def', ref: op.ref, hash: previous.hash, ...(instances.length ? { instances } : {}) });
         return;
       }
       case 'place': {
