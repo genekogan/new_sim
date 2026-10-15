@@ -1,0 +1,1829 @@
+{
+  "version": 1,
+  "assets": {
+    "/world-assets/core-assets/packs/apple-pack.glb": {
+      "key": "assets/c0/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb",
+      "sha256": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+      "bytes": 6604,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/autumn-tree-1-pack.glb": {
+      "key": "assets/67/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb",
+      "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+      "bytes": 41536,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/autumn-tree-2-pack.glb": {
+      "key": "assets/6c/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb",
+      "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+      "bytes": 42428,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/banana-pack.glb": {
+      "key": "assets/64/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb",
+      "sha256": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+      "bytes": 5704,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/beet-crop-pack.glb": {
+      "key": "assets/40/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb",
+      "sha256": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+      "bytes": 5176,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/beet-crop-young-pack.glb": {
+      "key": "assets/ba/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb",
+      "sha256": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+      "bytes": 2564,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/berries-crop-pack.glb": {
+      "key": "assets/4e/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb",
+      "sha256": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+      "bytes": 11024,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/berries-crop-young-pack.glb": {
+      "key": "assets/a5/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb",
+      "sha256": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+      "bytes": 2992,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bicycle-pack.glb": {
+      "key": "assets/04/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb",
+      "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+      "bytes": 43152,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bicycle-simple-pack.glb": {
+      "key": "assets/4f/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb",
+      "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+      "bytes": 19540,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/birch-tree-1-pack.glb": {
+      "key": "assets/5a/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb",
+      "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+      "bytes": 26860,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/birch-tree-2-pack.glb": {
+      "key": "assets/b9/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb",
+      "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+      "bytes": 24224,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/birch-tree-autumn-pack.glb": {
+      "key": "assets/50/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb",
+      "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+      "bytes": 26872,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bird-pack.glb": {
+      "key": "assets/ce/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb",
+      "sha256": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+      "bytes": 183264,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bread-loaf-pack.glb": {
+      "key": "assets/f6/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb",
+      "sha256": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+      "bytes": 5148,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bush-1-pack.glb": {
+      "key": "assets/e3/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb",
+      "sha256": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+      "bytes": 3836,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bush-2-pack.glb": {
+      "key": "assets/73/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb",
+      "sha256": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+      "bytes": 2600,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bush-3-pack.glb": {
+      "key": "assets/8c/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb",
+      "sha256": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+      "bytes": 6772,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bush-4-pack.glb": {
+      "key": "assets/55/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb",
+      "sha256": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+      "bytes": 5956,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/bush-5-pack.glb": {
+      "key": "assets/0b/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb",
+      "sha256": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+      "bytes": 6472,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/canoe-pack.glb": {
+      "key": "assets/88/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb",
+      "sha256": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+      "bytes": 4732,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/carrot-crop-pack.glb": {
+      "key": "assets/93/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb",
+      "sha256": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+      "bytes": 6828,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/carrot-crop-young-pack.glb": {
+      "key": "assets/fe/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb",
+      "sha256": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+      "bytes": 3656,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/cat-pack.glb": {
+      "key": "assets/ab/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb",
+      "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+      "bytes": 264704,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/corn-crop-pack.glb": {
+      "key": "assets/2f/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb",
+      "sha256": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+      "bytes": 7960,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/corn-crop-young-pack.glb": {
+      "key": "assets/a8/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb",
+      "sha256": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+      "bytes": 2380,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/cow-pack.glb": {
+      "key": "assets/bb/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb",
+      "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+      "bytes": 267528,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/croissant-pack.glb": {
+      "key": "assets/dc/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb",
+      "sha256": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+      "bytes": 3200,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/cup-of-coffee-pack.glb": {
+      "key": "assets/41/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb",
+      "sha256": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+      "bytes": 4568,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/cup-of-tea-pack.glb": {
+      "key": "assets/e5/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb",
+      "sha256": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+      "bytes": 5340,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/cutting-board-pack.glb": {
+      "key": "assets/a4/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb",
+      "sha256": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+      "bytes": 4820,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/dinghy-pack.glb": {
+      "key": "assets/a6/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb",
+      "sha256": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+      "bytes": 3676,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/dinner-plate-pack.glb": {
+      "key": "assets/2c/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb",
+      "sha256": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+      "bytes": 11280,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/dog-pack.glb": {
+      "key": "assets/0a/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb",
+      "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+      "bytes": 241060,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/flowers-crop-pack.glb": {
+      "key": "assets/46/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb",
+      "sha256": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+      "bytes": 3116,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/flowers-crop-young-pack.glb": {
+      "key": "assets/25/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb",
+      "sha256": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+      "bytes": 1488,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/food-bowl-pack.glb": {
+      "key": "assets/32/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb",
+      "sha256": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+      "bytes": 3608,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/fox-pack.glb": {
+      "key": "assets/90/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb",
+      "sha256": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+      "bytes": 223640,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/glass-of-wine-pack.glb": {
+      "key": "assets/b4/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb",
+      "sha256": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+      "bytes": 5488,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/grass-short-pack.glb": {
+      "key": "assets/c6/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb",
+      "sha256": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+      "bytes": 4064,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/grass-tuft-pack.glb": {
+      "key": "assets/17/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb",
+      "sha256": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+      "bytes": 3236,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/horse-pack.glb": {
+      "key": "assets/58/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb",
+      "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+      "bytes": 254596,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/koi-pack.glb": {
+      "key": "assets/34/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb",
+      "sha256": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+      "bytes": 225944,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/lettuce-crop-pack.glb": {
+      "key": "assets/c5/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb",
+      "sha256": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+      "bytes": 15696,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/lettuce-crop-young-pack.glb": {
+      "key": "assets/eb/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb",
+      "sha256": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+      "bytes": 6664,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/lilypad-pack.glb": {
+      "key": "assets/d3/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb",
+      "sha256": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+      "bytes": 4908,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/llama-pack.glb": {
+      "key": "assets/77/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb",
+      "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+      "bytes": 249220,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mossy-log-pack.glb": {
+      "key": "assets/91/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb",
+      "sha256": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+      "bytes": 6956,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mossy-rock-1-pack.glb": {
+      "key": "assets/96/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb",
+      "sha256": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+      "bytes": 2264,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mossy-rock-2-pack.glb": {
+      "key": "assets/17/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb",
+      "sha256": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+      "bytes": 2172,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mossy-stump-pack.glb": {
+      "key": "assets/7e/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb",
+      "sha256": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+      "bytes": 3928,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mushroom-red-pack.glb": {
+      "key": "assets/73/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb",
+      "sha256": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mushroom-tan-pack.glb": {
+      "key": "assets/e7/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb",
+      "sha256": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mushrooms-red-pack.glb": {
+      "key": "assets/a6/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb",
+      "sha256": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/mushrooms-tan-pack.glb": {
+      "key": "assets/a2/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb",
+      "sha256": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/oak-tree-1-pack.glb": {
+      "key": "assets/71/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb",
+      "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+      "bytes": 41520,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/oak-tree-2-pack.glb": {
+      "key": "assets/50/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb",
+      "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+      "bytes": 42416,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/oak-tree-3-pack.glb": {
+      "key": "assets/2f/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb",
+      "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+      "bytes": 23256,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/orange-pack.glb": {
+      "key": "assets/a3/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb",
+      "sha256": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+      "bytes": 3940,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/pie-pack.glb": {
+      "key": "assets/91/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb",
+      "sha256": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+      "bytes": 7984,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/pig-pack.glb": {
+      "key": "assets/8d/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb",
+      "sha256": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+      "bytes": 237852,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/pug-pack.glb": {
+      "key": "assets/d8/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb",
+      "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+      "bytes": 245468,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/pumpkin-crop-pack.glb": {
+      "key": "assets/d2/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb",
+      "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+      "bytes": 21096,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/pumpkin-crop-young-pack.glb": {
+      "key": "assets/68/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb",
+      "sha256": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+      "bytes": 8064,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/round-carpet-pack.glb": {
+      "key": "assets/92/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb",
+      "sha256": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+      "bytes": 3848,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/rowboat-pack.glb": {
+      "key": "assets/c1/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb",
+      "sha256": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+      "bytes": 6896,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/sheep-pack.glb": {
+      "key": "assets/8b/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb",
+      "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+      "bytes": 243232,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/tomato-crop-pack.glb": {
+      "key": "assets/27/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb",
+      "sha256": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+      "bytes": 9948,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/tomato-crop-young-pack.glb": {
+      "key": "assets/23/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb",
+      "sha256": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+      "bytes": 3424,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/watermelon-crop-pack.glb": {
+      "key": "assets/46/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb",
+      "sha256": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+      "bytes": 21176,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/watermelon-crop-young-pack.glb": {
+      "key": "assets/2d/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb",
+      "sha256": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+      "bytes": 8072,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/wheat-crop-pack.glb": {
+      "key": "assets/1e/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb",
+      "sha256": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+      "bytes": 2092,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/wheat-crop-young-pack.glb": {
+      "key": "assets/b2/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb",
+      "sha256": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+      "bytes": 2100,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/wildflowers-pack.glb": {
+      "key": "assets/a4/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb",
+      "sha256": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+      "bytes": 5128,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/willow-tree-1-pack.glb": {
+      "key": "assets/70/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb",
+      "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+      "bytes": 28288,
+      "licence": "CC0-1.0"
+    },
+    "/world-assets/core-assets/packs/willow-tree-2-pack.glb": {
+      "key": "assets/7b/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb",
+      "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+      "bytes": 39576,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/apple-pack.glb": {
+      "key": "assets/c0/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb",
+      "sha256": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+      "bytes": 6604,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/autumn-tree-1-pack.glb": {
+      "key": "assets/67/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb",
+      "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+      "bytes": 41536,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/autumn-tree-2-pack.glb": {
+      "key": "assets/6c/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb",
+      "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+      "bytes": 42428,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/banana-pack.glb": {
+      "key": "assets/64/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb",
+      "sha256": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+      "bytes": 5704,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/beet-crop-pack.glb": {
+      "key": "assets/40/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb",
+      "sha256": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+      "bytes": 5176,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/beet-crop-young-pack.glb": {
+      "key": "assets/ba/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb",
+      "sha256": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+      "bytes": 2564,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/berries-crop-pack.glb": {
+      "key": "assets/4e/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb",
+      "sha256": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+      "bytes": 11024,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/berries-crop-young-pack.glb": {
+      "key": "assets/a5/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb",
+      "sha256": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+      "bytes": 2992,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bicycle-pack.glb": {
+      "key": "assets/04/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb",
+      "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+      "bytes": 43152,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bicycle-simple-pack.glb": {
+      "key": "assets/4f/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb",
+      "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+      "bytes": 19540,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/birch-tree-1-pack.glb": {
+      "key": "assets/5a/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb",
+      "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+      "bytes": 26860,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/birch-tree-2-pack.glb": {
+      "key": "assets/b9/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb",
+      "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+      "bytes": 24224,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/birch-tree-autumn-pack.glb": {
+      "key": "assets/50/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb",
+      "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+      "bytes": 26872,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bird-pack.glb": {
+      "key": "assets/ce/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb",
+      "sha256": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+      "bytes": 183264,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bread-loaf-pack.glb": {
+      "key": "assets/f6/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb",
+      "sha256": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+      "bytes": 5148,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bush-1-pack.glb": {
+      "key": "assets/e3/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb",
+      "sha256": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+      "bytes": 3836,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bush-2-pack.glb": {
+      "key": "assets/73/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb",
+      "sha256": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+      "bytes": 2600,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bush-3-pack.glb": {
+      "key": "assets/8c/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb",
+      "sha256": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+      "bytes": 6772,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bush-4-pack.glb": {
+      "key": "assets/55/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb",
+      "sha256": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+      "bytes": 5956,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/bush-5-pack.glb": {
+      "key": "assets/0b/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb",
+      "sha256": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+      "bytes": 6472,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/canoe-pack.glb": {
+      "key": "assets/88/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb",
+      "sha256": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+      "bytes": 4732,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/carrot-crop-pack.glb": {
+      "key": "assets/93/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb",
+      "sha256": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+      "bytes": 6828,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/carrot-crop-young-pack.glb": {
+      "key": "assets/fe/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb",
+      "sha256": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+      "bytes": 3656,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/cat-pack.glb": {
+      "key": "assets/ab/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb",
+      "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+      "bytes": 264704,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/corn-crop-pack.glb": {
+      "key": "assets/2f/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb",
+      "sha256": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+      "bytes": 7960,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/corn-crop-young-pack.glb": {
+      "key": "assets/a8/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb",
+      "sha256": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+      "bytes": 2380,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/cow-pack.glb": {
+      "key": "assets/bb/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb",
+      "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+      "bytes": 267528,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/croissant-pack.glb": {
+      "key": "assets/dc/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb",
+      "sha256": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+      "bytes": 3200,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/cup-of-coffee-pack.glb": {
+      "key": "assets/41/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb",
+      "sha256": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+      "bytes": 4568,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/cup-of-tea-pack.glb": {
+      "key": "assets/e5/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb",
+      "sha256": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+      "bytes": 5340,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/cutting-board-pack.glb": {
+      "key": "assets/a4/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb",
+      "sha256": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+      "bytes": 4820,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/dinghy-pack.glb": {
+      "key": "assets/a6/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb",
+      "sha256": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+      "bytes": 3676,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/dinner-plate-pack.glb": {
+      "key": "assets/2c/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb",
+      "sha256": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+      "bytes": 11280,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/dog-pack.glb": {
+      "key": "assets/0a/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb",
+      "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+      "bytes": 241060,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/flowers-crop-pack.glb": {
+      "key": "assets/46/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb",
+      "sha256": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+      "bytes": 3116,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/flowers-crop-young-pack.glb": {
+      "key": "assets/25/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb",
+      "sha256": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+      "bytes": 1488,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/food-bowl-pack.glb": {
+      "key": "assets/32/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb",
+      "sha256": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+      "bytes": 3608,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/fox-pack.glb": {
+      "key": "assets/90/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb",
+      "sha256": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+      "bytes": 223640,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/glass-of-wine-pack.glb": {
+      "key": "assets/b4/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb",
+      "sha256": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+      "bytes": 5488,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/grass-short-pack.glb": {
+      "key": "assets/c6/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb",
+      "sha256": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+      "bytes": 4064,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/grass-tuft-pack.glb": {
+      "key": "assets/17/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb",
+      "sha256": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+      "bytes": 3236,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/horse-pack.glb": {
+      "key": "assets/58/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb",
+      "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+      "bytes": 254596,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/koi-pack.glb": {
+      "key": "assets/34/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb",
+      "sha256": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+      "bytes": 225944,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/lettuce-crop-pack.glb": {
+      "key": "assets/c5/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb",
+      "sha256": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+      "bytes": 15696,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/lettuce-crop-young-pack.glb": {
+      "key": "assets/eb/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb",
+      "sha256": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+      "bytes": 6664,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/lilypad-pack.glb": {
+      "key": "assets/d3/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb",
+      "sha256": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+      "bytes": 4908,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/llama-pack.glb": {
+      "key": "assets/77/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb",
+      "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+      "bytes": 249220,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mossy-log-pack.glb": {
+      "key": "assets/91/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb",
+      "sha256": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+      "bytes": 6956,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mossy-rock-1-pack.glb": {
+      "key": "assets/96/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb",
+      "sha256": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+      "bytes": 2264,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mossy-rock-2-pack.glb": {
+      "key": "assets/17/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb",
+      "sha256": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+      "bytes": 2172,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mossy-stump-pack.glb": {
+      "key": "assets/7e/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb",
+      "sha256": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+      "bytes": 3928,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mushroom-red-pack.glb": {
+      "key": "assets/73/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb",
+      "sha256": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mushroom-tan-pack.glb": {
+      "key": "assets/e7/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb",
+      "sha256": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mushrooms-red-pack.glb": {
+      "key": "assets/a6/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb",
+      "sha256": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/mushrooms-tan-pack.glb": {
+      "key": "assets/a2/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb",
+      "sha256": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/oak-tree-1-pack.glb": {
+      "key": "assets/71/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb",
+      "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+      "bytes": 41520,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/oak-tree-2-pack.glb": {
+      "key": "assets/50/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb",
+      "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+      "bytes": 42416,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/oak-tree-3-pack.glb": {
+      "key": "assets/2f/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb",
+      "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+      "bytes": 23256,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/orange-pack.glb": {
+      "key": "assets/a3/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb",
+      "sha256": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+      "bytes": 3940,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/pie-pack.glb": {
+      "key": "assets/91/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb",
+      "sha256": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+      "bytes": 7984,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/pig-pack.glb": {
+      "key": "assets/8d/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb",
+      "sha256": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+      "bytes": 237852,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/pug-pack.glb": {
+      "key": "assets/d8/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb",
+      "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+      "bytes": 245468,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/pumpkin-crop-pack.glb": {
+      "key": "assets/d2/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb",
+      "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+      "bytes": 21096,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/pumpkin-crop-young-pack.glb": {
+      "key": "assets/68/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb",
+      "sha256": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+      "bytes": 8064,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/round-carpet-pack.glb": {
+      "key": "assets/92/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb",
+      "sha256": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+      "bytes": 3848,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/rowboat-pack.glb": {
+      "key": "assets/c1/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb",
+      "sha256": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+      "bytes": 6896,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/sheep-pack.glb": {
+      "key": "assets/8b/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb",
+      "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+      "bytes": 243232,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/tomato-crop-pack.glb": {
+      "key": "assets/27/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb",
+      "sha256": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+      "bytes": 9948,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/tomato-crop-young-pack.glb": {
+      "key": "assets/23/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb",
+      "sha256": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+      "bytes": 3424,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/watermelon-crop-pack.glb": {
+      "key": "assets/46/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb",
+      "sha256": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+      "bytes": 21176,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/watermelon-crop-young-pack.glb": {
+      "key": "assets/2d/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb",
+      "sha256": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+      "bytes": 8072,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/wheat-crop-pack.glb": {
+      "key": "assets/1e/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb",
+      "sha256": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+      "bytes": 2092,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/wheat-crop-young-pack.glb": {
+      "key": "assets/b2/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb",
+      "sha256": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+      "bytes": 2100,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/wildflowers-pack.glb": {
+      "key": "assets/a4/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb",
+      "sha256": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+      "bytes": 5128,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/willow-tree-1-pack.glb": {
+      "key": "assets/70/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb",
+      "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+      "bytes": 28288,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/world-assets/core-assets/packs/willow-tree-2-pack.glb": {
+      "key": "assets/7b/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb",
+      "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+      "bytes": 39576,
+      "licence": "CC0-1.0"
+    },
+    "/assets/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb": {
+      "key": "assets/c0/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb",
+      "sha256": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+      "bytes": 6604,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb": {
+      "key": "assets/c0/c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf.glb",
+      "sha256": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+      "bytes": 6604,
+      "licence": "CC0-1.0"
+    },
+    "/assets/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb": {
+      "key": "assets/67/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb",
+      "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+      "bytes": 41536,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb": {
+      "key": "assets/67/67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb.glb",
+      "sha256": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+      "bytes": 41536,
+      "licence": "CC0-1.0"
+    },
+    "/assets/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb": {
+      "key": "assets/6c/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb",
+      "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+      "bytes": 42428,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb": {
+      "key": "assets/6c/6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c.glb",
+      "sha256": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+      "bytes": 42428,
+      "licence": "CC0-1.0"
+    },
+    "/assets/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb": {
+      "key": "assets/64/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb",
+      "sha256": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+      "bytes": 5704,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb": {
+      "key": "assets/64/64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676.glb",
+      "sha256": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+      "bytes": 5704,
+      "licence": "CC0-1.0"
+    },
+    "/assets/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb": {
+      "key": "assets/40/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb",
+      "sha256": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+      "bytes": 5176,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb": {
+      "key": "assets/40/40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29.glb",
+      "sha256": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+      "bytes": 5176,
+      "licence": "CC0-1.0"
+    },
+    "/assets/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb": {
+      "key": "assets/ba/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb",
+      "sha256": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+      "bytes": 2564,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb": {
+      "key": "assets/ba/ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67.glb",
+      "sha256": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+      "bytes": 2564,
+      "licence": "CC0-1.0"
+    },
+    "/assets/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb": {
+      "key": "assets/4e/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb",
+      "sha256": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+      "bytes": 11024,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb": {
+      "key": "assets/4e/4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315.glb",
+      "sha256": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+      "bytes": 11024,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb": {
+      "key": "assets/a5/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb",
+      "sha256": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+      "bytes": 2992,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb": {
+      "key": "assets/a5/a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b.glb",
+      "sha256": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+      "bytes": 2992,
+      "licence": "CC0-1.0"
+    },
+    "/assets/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb": {
+      "key": "assets/04/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb",
+      "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+      "bytes": 43152,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb": {
+      "key": "assets/04/042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2.glb",
+      "sha256": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+      "bytes": 43152,
+      "licence": "CC0-1.0"
+    },
+    "/assets/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb": {
+      "key": "assets/4f/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb",
+      "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+      "bytes": 19540,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb": {
+      "key": "assets/4f/4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd.glb",
+      "sha256": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+      "bytes": 19540,
+      "licence": "CC0-1.0"
+    },
+    "/assets/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb": {
+      "key": "assets/5a/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb",
+      "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+      "bytes": 26860,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb": {
+      "key": "assets/5a/5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc.glb",
+      "sha256": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+      "bytes": 26860,
+      "licence": "CC0-1.0"
+    },
+    "/assets/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb": {
+      "key": "assets/b9/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb",
+      "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+      "bytes": 24224,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb": {
+      "key": "assets/b9/b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295.glb",
+      "sha256": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+      "bytes": 24224,
+      "licence": "CC0-1.0"
+    },
+    "/assets/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb": {
+      "key": "assets/50/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb",
+      "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+      "bytes": 26872,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb": {
+      "key": "assets/50/502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7.glb",
+      "sha256": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+      "bytes": 26872,
+      "licence": "CC0-1.0"
+    },
+    "/assets/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb": {
+      "key": "assets/ce/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb",
+      "sha256": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+      "bytes": 183264,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb": {
+      "key": "assets/ce/cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647.glb",
+      "sha256": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+      "bytes": 183264,
+      "licence": "CC0-1.0"
+    },
+    "/assets/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb": {
+      "key": "assets/f6/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb",
+      "sha256": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+      "bytes": 5148,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb": {
+      "key": "assets/f6/f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a.glb",
+      "sha256": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+      "bytes": 5148,
+      "licence": "CC0-1.0"
+    },
+    "/assets/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb": {
+      "key": "assets/e3/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb",
+      "sha256": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+      "bytes": 3836,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb": {
+      "key": "assets/e3/e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b.glb",
+      "sha256": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+      "bytes": 3836,
+      "licence": "CC0-1.0"
+    },
+    "/assets/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb": {
+      "key": "assets/73/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb",
+      "sha256": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+      "bytes": 2600,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb": {
+      "key": "assets/73/73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a.glb",
+      "sha256": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+      "bytes": 2600,
+      "licence": "CC0-1.0"
+    },
+    "/assets/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb": {
+      "key": "assets/8c/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb",
+      "sha256": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+      "bytes": 6772,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb": {
+      "key": "assets/8c/8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263.glb",
+      "sha256": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+      "bytes": 6772,
+      "licence": "CC0-1.0"
+    },
+    "/assets/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb": {
+      "key": "assets/55/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb",
+      "sha256": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+      "bytes": 5956,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb": {
+      "key": "assets/55/551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0.glb",
+      "sha256": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+      "bytes": 5956,
+      "licence": "CC0-1.0"
+    },
+    "/assets/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb": {
+      "key": "assets/0b/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb",
+      "sha256": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+      "bytes": 6472,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb": {
+      "key": "assets/0b/0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e.glb",
+      "sha256": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+      "bytes": 6472,
+      "licence": "CC0-1.0"
+    },
+    "/assets/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb": {
+      "key": "assets/88/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb",
+      "sha256": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+      "bytes": 4732,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb": {
+      "key": "assets/88/885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe.glb",
+      "sha256": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+      "bytes": 4732,
+      "licence": "CC0-1.0"
+    },
+    "/assets/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb": {
+      "key": "assets/93/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb",
+      "sha256": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+      "bytes": 6828,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb": {
+      "key": "assets/93/93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b.glb",
+      "sha256": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+      "bytes": 6828,
+      "licence": "CC0-1.0"
+    },
+    "/assets/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb": {
+      "key": "assets/fe/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb",
+      "sha256": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+      "bytes": 3656,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb": {
+      "key": "assets/fe/fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e.glb",
+      "sha256": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+      "bytes": 3656,
+      "licence": "CC0-1.0"
+    },
+    "/assets/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb": {
+      "key": "assets/ab/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb",
+      "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+      "bytes": 264704,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb": {
+      "key": "assets/ab/ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497.glb",
+      "sha256": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+      "bytes": 264704,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb": {
+      "key": "assets/2f/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb",
+      "sha256": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+      "bytes": 7960,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb": {
+      "key": "assets/2f/2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d.glb",
+      "sha256": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+      "bytes": 7960,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb": {
+      "key": "assets/a8/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb",
+      "sha256": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+      "bytes": 2380,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb": {
+      "key": "assets/a8/a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c.glb",
+      "sha256": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+      "bytes": 2380,
+      "licence": "CC0-1.0"
+    },
+    "/assets/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb": {
+      "key": "assets/bb/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb",
+      "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+      "bytes": 267528,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb": {
+      "key": "assets/bb/bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9.glb",
+      "sha256": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+      "bytes": 267528,
+      "licence": "CC0-1.0"
+    },
+    "/assets/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb": {
+      "key": "assets/dc/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb",
+      "sha256": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+      "bytes": 3200,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb": {
+      "key": "assets/dc/dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937.glb",
+      "sha256": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+      "bytes": 3200,
+      "licence": "CC0-1.0"
+    },
+    "/assets/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb": {
+      "key": "assets/41/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb",
+      "sha256": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+      "bytes": 4568,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb": {
+      "key": "assets/41/4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174.glb",
+      "sha256": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+      "bytes": 4568,
+      "licence": "CC0-1.0"
+    },
+    "/assets/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb": {
+      "key": "assets/e5/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb",
+      "sha256": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+      "bytes": 5340,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb": {
+      "key": "assets/e5/e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a.glb",
+      "sha256": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+      "bytes": 5340,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb": {
+      "key": "assets/a4/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb",
+      "sha256": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+      "bytes": 4820,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb": {
+      "key": "assets/a4/a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494.glb",
+      "sha256": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+      "bytes": 4820,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb": {
+      "key": "assets/a6/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb",
+      "sha256": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+      "bytes": 3676,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb": {
+      "key": "assets/a6/a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587.glb",
+      "sha256": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+      "bytes": 3676,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb": {
+      "key": "assets/2c/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb",
+      "sha256": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+      "bytes": 11280,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb": {
+      "key": "assets/2c/2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954.glb",
+      "sha256": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+      "bytes": 11280,
+      "licence": "CC0-1.0"
+    },
+    "/assets/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb": {
+      "key": "assets/0a/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb",
+      "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+      "bytes": 241060,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb": {
+      "key": "assets/0a/0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f.glb",
+      "sha256": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+      "bytes": 241060,
+      "licence": "CC0-1.0"
+    },
+    "/assets/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb": {
+      "key": "assets/46/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb",
+      "sha256": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+      "bytes": 3116,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb": {
+      "key": "assets/46/466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e.glb",
+      "sha256": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+      "bytes": 3116,
+      "licence": "CC0-1.0"
+    },
+    "/assets/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb": {
+      "key": "assets/25/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb",
+      "sha256": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+      "bytes": 1488,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb": {
+      "key": "assets/25/25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4.glb",
+      "sha256": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+      "bytes": 1488,
+      "licence": "CC0-1.0"
+    },
+    "/assets/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb": {
+      "key": "assets/32/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb",
+      "sha256": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+      "bytes": 3608,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb": {
+      "key": "assets/32/328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d.glb",
+      "sha256": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+      "bytes": 3608,
+      "licence": "CC0-1.0"
+    },
+    "/assets/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb": {
+      "key": "assets/90/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb",
+      "sha256": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+      "bytes": 223640,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb": {
+      "key": "assets/90/90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470.glb",
+      "sha256": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+      "bytes": 223640,
+      "licence": "CC0-1.0"
+    },
+    "/assets/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb": {
+      "key": "assets/b4/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb",
+      "sha256": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+      "bytes": 5488,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb": {
+      "key": "assets/b4/b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7.glb",
+      "sha256": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+      "bytes": 5488,
+      "licence": "CC0-1.0"
+    },
+    "/assets/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb": {
+      "key": "assets/c6/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb",
+      "sha256": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+      "bytes": 4064,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb": {
+      "key": "assets/c6/c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48.glb",
+      "sha256": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+      "bytes": 4064,
+      "licence": "CC0-1.0"
+    },
+    "/assets/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb": {
+      "key": "assets/17/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb",
+      "sha256": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+      "bytes": 3236,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb": {
+      "key": "assets/17/17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247.glb",
+      "sha256": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+      "bytes": 3236,
+      "licence": "CC0-1.0"
+    },
+    "/assets/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb": {
+      "key": "assets/58/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb",
+      "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+      "bytes": 254596,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb": {
+      "key": "assets/58/58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a.glb",
+      "sha256": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+      "bytes": 254596,
+      "licence": "CC0-1.0"
+    },
+    "/assets/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb": {
+      "key": "assets/34/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb",
+      "sha256": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+      "bytes": 225944,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb": {
+      "key": "assets/34/34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6.glb",
+      "sha256": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+      "bytes": 225944,
+      "licence": "CC0-1.0"
+    },
+    "/assets/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb": {
+      "key": "assets/c5/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb",
+      "sha256": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+      "bytes": 15696,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb": {
+      "key": "assets/c5/c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6.glb",
+      "sha256": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+      "bytes": 15696,
+      "licence": "CC0-1.0"
+    },
+    "/assets/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb": {
+      "key": "assets/eb/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb",
+      "sha256": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+      "bytes": 6664,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb": {
+      "key": "assets/eb/eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36.glb",
+      "sha256": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+      "bytes": 6664,
+      "licence": "CC0-1.0"
+    },
+    "/assets/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb": {
+      "key": "assets/d3/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb",
+      "sha256": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+      "bytes": 4908,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb": {
+      "key": "assets/d3/d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf.glb",
+      "sha256": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+      "bytes": 4908,
+      "licence": "CC0-1.0"
+    },
+    "/assets/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb": {
+      "key": "assets/77/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb",
+      "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+      "bytes": 249220,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb": {
+      "key": "assets/77/773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be.glb",
+      "sha256": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+      "bytes": 249220,
+      "licence": "CC0-1.0"
+    },
+    "/assets/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb": {
+      "key": "assets/91/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb",
+      "sha256": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+      "bytes": 6956,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb": {
+      "key": "assets/91/91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2.glb",
+      "sha256": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+      "bytes": 6956,
+      "licence": "CC0-1.0"
+    },
+    "/assets/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb": {
+      "key": "assets/96/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb",
+      "sha256": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+      "bytes": 2264,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb": {
+      "key": "assets/96/964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174.glb",
+      "sha256": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+      "bytes": 2264,
+      "licence": "CC0-1.0"
+    },
+    "/assets/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb": {
+      "key": "assets/17/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb",
+      "sha256": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+      "bytes": 2172,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb": {
+      "key": "assets/17/1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517.glb",
+      "sha256": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+      "bytes": 2172,
+      "licence": "CC0-1.0"
+    },
+    "/assets/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb": {
+      "key": "assets/7e/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb",
+      "sha256": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+      "bytes": 3928,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb": {
+      "key": "assets/7e/7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f.glb",
+      "sha256": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+      "bytes": 3928,
+      "licence": "CC0-1.0"
+    },
+    "/assets/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb": {
+      "key": "assets/73/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb",
+      "sha256": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb": {
+      "key": "assets/73/7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b.glb",
+      "sha256": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/assets/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb": {
+      "key": "assets/e7/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb",
+      "sha256": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb": {
+      "key": "assets/e7/e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b.glb",
+      "sha256": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+      "bytes": 1800,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb": {
+      "key": "assets/a6/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb",
+      "sha256": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb": {
+      "key": "assets/a6/a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564.glb",
+      "sha256": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb": {
+      "key": "assets/a2/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb",
+      "sha256": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb": {
+      "key": "assets/a2/a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b.glb",
+      "sha256": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+      "bytes": 3412,
+      "licence": "CC0-1.0"
+    },
+    "/assets/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb": {
+      "key": "assets/71/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb",
+      "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+      "bytes": 41520,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb": {
+      "key": "assets/71/7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524.glb",
+      "sha256": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+      "bytes": 41520,
+      "licence": "CC0-1.0"
+    },
+    "/assets/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb": {
+      "key": "assets/50/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb",
+      "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+      "bytes": 42416,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb": {
+      "key": "assets/50/50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936.glb",
+      "sha256": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+      "bytes": 42416,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb": {
+      "key": "assets/2f/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb",
+      "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+      "bytes": 23256,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb": {
+      "key": "assets/2f/2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd.glb",
+      "sha256": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+      "bytes": 23256,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb": {
+      "key": "assets/a3/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb",
+      "sha256": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+      "bytes": 3940,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb": {
+      "key": "assets/a3/a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5.glb",
+      "sha256": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+      "bytes": 3940,
+      "licence": "CC0-1.0"
+    },
+    "/assets/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb": {
+      "key": "assets/91/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb",
+      "sha256": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+      "bytes": 7984,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb": {
+      "key": "assets/91/910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef.glb",
+      "sha256": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+      "bytes": 7984,
+      "licence": "CC0-1.0"
+    },
+    "/assets/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb": {
+      "key": "assets/8d/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb",
+      "sha256": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+      "bytes": 237852,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb": {
+      "key": "assets/8d/8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f.glb",
+      "sha256": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+      "bytes": 237852,
+      "licence": "CC0-1.0"
+    },
+    "/assets/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb": {
+      "key": "assets/d8/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb",
+      "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+      "bytes": 245468,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb": {
+      "key": "assets/d8/d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf.glb",
+      "sha256": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+      "bytes": 245468,
+      "licence": "CC0-1.0"
+    },
+    "/assets/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb": {
+      "key": "assets/d2/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb",
+      "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+      "bytes": 21096,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb": {
+      "key": "assets/d2/d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39.glb",
+      "sha256": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+      "bytes": 21096,
+      "licence": "CC0-1.0"
+    },
+    "/assets/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb": {
+      "key": "assets/68/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb",
+      "sha256": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+      "bytes": 8064,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb": {
+      "key": "assets/68/6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1.glb",
+      "sha256": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+      "bytes": 8064,
+      "licence": "CC0-1.0"
+    },
+    "/assets/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb": {
+      "key": "assets/92/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb",
+      "sha256": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+      "bytes": 3848,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb": {
+      "key": "assets/92/92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf.glb",
+      "sha256": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+      "bytes": 3848,
+      "licence": "CC0-1.0"
+    },
+    "/assets/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb": {
+      "key": "assets/c1/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb",
+      "sha256": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+      "bytes": 6896,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb": {
+      "key": "assets/c1/c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e.glb",
+      "sha256": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+      "bytes": 6896,
+      "licence": "CC0-1.0"
+    },
+    "/assets/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb": {
+      "key": "assets/8b/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb",
+      "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+      "bytes": 243232,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb": {
+      "key": "assets/8b/8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407.glb",
+      "sha256": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+      "bytes": 243232,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb": {
+      "key": "assets/27/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb",
+      "sha256": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+      "bytes": 9948,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb": {
+      "key": "assets/27/2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2.glb",
+      "sha256": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+      "bytes": 9948,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb": {
+      "key": "assets/23/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb",
+      "sha256": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+      "bytes": 3424,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb": {
+      "key": "assets/23/2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146.glb",
+      "sha256": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+      "bytes": 3424,
+      "licence": "CC0-1.0"
+    },
+    "/assets/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb": {
+      "key": "assets/46/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb",
+      "sha256": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+      "bytes": 21176,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb": {
+      "key": "assets/46/4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e.glb",
+      "sha256": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+      "bytes": 21176,
+      "licence": "CC0-1.0"
+    },
+    "/assets/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb": {
+      "key": "assets/2d/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb",
+      "sha256": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+      "bytes": 8072,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb": {
+      "key": "assets/2d/2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba.glb",
+      "sha256": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+      "bytes": 8072,
+      "licence": "CC0-1.0"
+    },
+    "/assets/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb": {
+      "key": "assets/1e/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb",
+      "sha256": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+      "bytes": 2092,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb": {
+      "key": "assets/1e/1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412.glb",
+      "sha256": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+      "bytes": 2092,
+      "licence": "CC0-1.0"
+    },
+    "/assets/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb": {
+      "key": "assets/b2/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb",
+      "sha256": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+      "bytes": 2100,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb": {
+      "key": "assets/b2/b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62.glb",
+      "sha256": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+      "bytes": 2100,
+      "licence": "CC0-1.0"
+    },
+    "/assets/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb": {
+      "key": "assets/a4/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb",
+      "sha256": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+      "bytes": 5128,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb": {
+      "key": "assets/a4/a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575.glb",
+      "sha256": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+      "bytes": 5128,
+      "licence": "CC0-1.0"
+    },
+    "/assets/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb": {
+      "key": "assets/70/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb",
+      "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+      "bytes": 28288,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb": {
+      "key": "assets/70/7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3.glb",
+      "sha256": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+      "bytes": 28288,
+      "licence": "CC0-1.0"
+    },
+    "/assets/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb": {
+      "key": "assets/7b/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb",
+      "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+      "bytes": 39576,
+      "licence": "CC0-1.0"
+    },
+    "/worlds/assets/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb": {
+      "key": "assets/7b/7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155.glb",
+      "sha256": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+      "bytes": 39576,
+      "licence": "CC0-1.0"
+    }
+  }
+}
