@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { acquireLock, holder } from './locks.mjs';
 
 export const STATE = '.eden-god.json';
 const read = (file) => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
@@ -25,7 +26,14 @@ export function load() {
   if (merged.build) { const { lease, ...build } = merged.build; merged.build = { ...build, claim: cid }; }
   return merged;
 }
-export function save(patch) {
+export function withStateLock(run) {
+  const file = process.env.EDEN_GOD_CLAIM ? claimFile(process.env.EDEN_GOD_CLAIM) : STATE;
+  const release = acquireLock(`${file}.lock`, { label: 'claim/step state', reentrant: true });
+  try { const out = run(); if (out?.then) return out.finally(release); release(); return out; }
+  catch (e) { release(); throw e; }
+}
+export function save(patch) { return withStateLock(() => saveUnlocked(patch)); }
+function saveUnlocked(patch) {
   const file = process.env.EDEN_GOD_CLAIM ? claimFile(process.env.EDEN_GOD_CLAIM) : STATE;
   const s = { ...read(file), ...patch };
   for (const k of Object.keys(s)) if (s[k] === undefined) delete s[k];
@@ -35,6 +43,7 @@ export function save(patch) {
   return load();
 }
 const context = new AsyncLocalStorage();
+export const withDeadline = (deadlineAt, signal, run) => context.run({ ...context.getStore(), deadlineAt, signal }, run);
 export const OUTPUT_SUFFIX = Symbol('build output suffix');
 export const withoutBuild = (run) => context.run({ ...context.getStore(), noBuild: true }, run);
 export function withBuildOptions(flags, run) {
@@ -74,6 +83,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   const s = load(), world = need(s, 'world', 'Run: node eden-god.mjs register <world-url>'), headers = { 'content-type': 'application/json' };
   if (as === 'god' && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === 'owner' && s.identity) headers.authorization = `Bearer ${s.identity}`;
+  headers['x-eden-god-holder'] = JSON.stringify(holder('eden-god CLI'));
   const verb = method ?? (body ? 'POST' : 'GET'), pathname = path.split('?')[0];
   const batchPath = ['/v1/god/act', '/v1/god/preview', '/v1/god/dryrun'].includes(pathname);
   const revertPath = ['/v1/god/undo', '/v1/god/redo'].includes(pathname);
@@ -93,7 +103,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   let waited = 0;
   async function send(requestPath, requestMethod, requestBody, deadline = timeoutMs) {
     const t0 = Date.now();
-    const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.timeout(deadline) });
+    const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.any([AbortSignal.timeout(Math.max(1, Math.min(deadline, (context.getStore()?.deadlineAt ?? Infinity) - Date.now()))), ...(context.getStore()?.signal ? [context.getStore().signal] : [])]) });
     // Reading a response can also lose the connection after the edit committed.
     const text = await r.text(); let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ''}`);

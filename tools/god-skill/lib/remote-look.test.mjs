@@ -119,3 +119,35 @@ test('remote refusal, malformed PNG and missing token do not write a screenshot'
   await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, load: () => ({}) }), /needs a god token/);
   assert.equal(existsSync(f.args.out), false);
 });
+
+for (const fallback of ['remote', 'missing Chrome', 'launch failure', 'keeper failure']) test(`one look deadline aborts ${fallback} remote fetch and rejects a late PNG`, { timeout: 2000 }, async t => {
+  const f = fixture(t); let signal, respond, released = 0;
+  const runtime = { ...f.runtime, fetch: async (_url, options) => { signal = options.signal; return new Promise(resolve => { respond = resolve; }); } };
+  if (fallback === 'missing Chrome') runtime.chromeExists = () => false;
+  if (fallback === 'launch failure') {
+    runtime.lease = async () => () => { released++; };
+    runtime.pw = { chromium: { launch: async () => { await new Promise(resolve => setTimeout(resolve, 20)); throw Error('browserType.launch: unavailable'); } } };
+  }
+  if (fallback === 'keeper failure') {
+    runtime.pw = {};
+    runtime.ensureKeeper = async () => { await new Promise(resolve => setTimeout(resolve, 20)); throw Error('EACCES: keeper cannot start'); };
+  }
+  await assert.rejects(shoot({ ...f.args, remote: fallback === 'remote', keep: fallback === 'keeper failure', timeoutMs: 60 }, runtime), { code: 'look.timeout' });
+  assert.ok(signal?.aborted, 'the shared deadline must cancel the remote request too');
+  if (fallback === 'launch failure') assert.equal(released, 1);
+  respond(new Response(png, { headers: { 'content-type': 'image/png' } }));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(existsSync(f.args.out), false, 'an ignored abort must never write output after timeout');
+});
+
+test('the remote body must finish inside the same look deadline', { timeout: 2000 }, async t => {
+  const f = fixture(t); let body, signal;
+  const runtime = { ...f.runtime, fetch: async (_url, options) => {
+    signal = options.signal;
+    return { ok: true, headers: new Headers({ 'content-type': 'image/png' }), arrayBuffer: () => new Promise(resolve => { body = resolve; }) };
+  } };
+  await assert.rejects(shoot({ ...f.args, remote: true, timeoutMs: 30 }, runtime), { code: 'look.timeout' });
+  assert.ok(signal.aborted); body(png);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(existsSync(f.args.out), false);
+});

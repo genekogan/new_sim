@@ -1,4 +1,5 @@
 // Build records are server metadata, never entity state. Planning is pure; only committed writes replace the cache.
+import { lockStatus, type Holder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldModel, type OBB, type Op } from '@sim/world-compiler';
@@ -54,13 +55,13 @@ export const buildActionSchemas = {
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
 export type Site = z.infer<typeof siteSchema>;
-export type Identity = { hash: string; label: string };
+export type Identity = { hash: string; label: string; holder?: Holder };
 export type BuildCaller = { identity?: Identity; build?: BuildField };
-export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
+export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string; process?: Holder }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
 type Caption = { text: string; at: number };
 export type BuildBody = {
   id: string; title: string; plan: { steps: string[]; brief?: string; asks?: string[] }; root?: string; chapterOf?: string; include?: string[]; initialRoots?: string[]; refusals?: { at: number; code: string; entity?: string; detail: string }[]; refusalCount?: number; site: Site; massing: Mass[]; roots: string[];
-  lead: { lease: string; label: string; hash8: string; tokenHash: string; since: number };
+  lead: { lease: string; label: string; hash8: string; tokenHash: string; since: number; holder?: Holder };
   step: { n: number; label: string; at: number; seq: number | null };
   steps: { n: number; label: string; claim?: string; batches: number; firstSeq: number; lastSeq: number; at: number }[];
   claims: Claim[]; agents: { label: string; hash8: string; at: number }[]; pauses: number;
@@ -79,7 +80,7 @@ export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: 
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
   chapters?: { id: string; brief?: string; asks?: string[] }[];
   status: BuildRow['status']; rev: number; createdAt: number; lastAt: number; pauseAfterMs: number; now: number; closed: boolean; reopensAt?: number;
-  lead: { label: string; hash8: string; since: number; live: boolean }; roots: { id: string; path: string }[];
+  lead: { label: string; hash8: string; since: number; live: boolean; holder?: Holder }; roots: { id: string; path: string }[];
   claims: (Omit<Claim, 'user' | 'status'> & { status: Claim['status'] | 'stale'; rootPath?: string })[];
   current: (BuildBody['steps'][number] & { recent: { seq: number; note: string | null; at: number }[] }) | null;
   next: { n: number; label: string } | null; massing: (Mass & { parts: number })[];
@@ -88,6 +89,7 @@ type RootChange = { added: string[]; removed: string[] };
 export type RootsDelta = { changes: Map<string, RootChange>; warnings: string[]; removed: ReadonlySet<string> };
 type PlannedWrite = BuildWrite & { kind: BuildEventKind; before: Row; next: BuildBody; roots: RootChange; claim?: PublicSite['claims'][number] };
 type Admission = { field?: BuildField; row?: Row; mine?: LiveClaim; group?: string; warnings: string[]; failures?: Failure[] };
+const holderName = (h: Holder | undefined, label: string) => h ? `${label} pid=${h.pid} host=${h.host} start=${h.start}` : label;
 const lease = () => 'l_' + randomBytes(4).toString('hex');
 const claimId = () => 'c_' + randomBytes(4).toString('hex');
 const decode = (r: BuildRow): Row => {
@@ -203,7 +205,7 @@ export function claimCheck(before: WorldModel, after: WorldModel, diff: Diff, op
     const touches = (roots: Set<string>) => existed && inScope(before, id, roots) || kind === 'up' && inScope(after, id, roots);
     const other = others.find(c => touches(c.scope.roots));
     const opOf = () => ops.findIndex(o => 'id' in o && (before.get(o.id as string)?.id === id || after.get(o.id as string)?.id === id));
-    if (other) return { failure: buildFailure('build.claimed', `${path()} is inside claim ${other.id} (${other.part}), held by another agent.`, 'id', { op: opOf(), entity: id, limit: { claim: other.id, part: other.part, root: other.root, region: other.region } }) };
+    if (other) return { failure: buildFailure('build.claimed', `${path()} is inside claim ${other.id} (${other.part}), held by ${holderName(other.holder.process, other.holder.label)}.`, 'id', { op: opOf(), entity: id, limit: { claim: other.id, part: other.part, root: other.root, region: other.region } }) };
   }
   const regions = others.filter(c => c.scope.region);
   if (regions.length) {
@@ -216,7 +218,7 @@ export function claimCheck(before: WorldModel, after: WorldModel, diff: Diff, op
     }
     for (const id of affected) {
       const other = regions.find(c => afterRegion(id, c.scope.region!) && (!before.entities.has(id) || !beforeRegion(id, c.scope.region!)));
-      if (other) return { failure: buildFailure('build.claimed', `${after.pathOf(id) || id} enters claim ${other.id} (${other.part}), held by another agent.`, 'id', { op: ops.findIndex(o => 'id' in o && after.subtree(after.get(o.id as string)?.id ?? '').includes(id)), entity: id, limit: { claim: other.id, part: other.part, region: other.region } }) };
+      if (other) return { failure: buildFailure('build.claimed', `${after.pathOf(id) || id} enters claim ${other.id} (${other.part}), held by ${holderName(other.holder.process, other.holder.label)}.`, 'id', { op: ops.findIndex(o => 'id' in o && after.subtree(after.get(o.id as string)?.id ?? '').includes(id)), entity: id, limit: { claim: other.id, part: other.part, region: other.region } }) };
     }
   }
   if (mine) for (const [kind, id] of touched) {
@@ -267,6 +269,8 @@ export function advance(body: BuildBody, field: BuildField | undefined, made: st
   for (const claim of b.claims) claim.made = claim.made.filter(id => !removed.has(id));
   if (!field) return b;
   const claim = field.claim ? b.claims.find(c => c.id === field.claim)! : undefined;
+  if (claim && caller?.holder) claim.holder.process = caller.holder;
+  if (!claim && caller?.holder) b.lead.holder = caller.holder;
   if (claim) { claim.made = [...new Set([...claim.made, ...made])]; claim.lastAt = at; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
   if (revert) return b;
   const current = claim?.step ?? b.step, n = Math.max(current.n, field.step ?? current.n);
@@ -339,7 +343,7 @@ export class GodBuilds {
       ...(open(r) ? { reopensAt: this.reopensAt(r) } : {}),
     };
   }
-  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status })), ...this.captions(r) }; }
+  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale ? 'stale' : c.status })), ...this.captions(r) }; }
   private view(r: Row, now: number, recent?: { seq: number; note: string | null; at: number }[]): GodBuildView {
     const b = structuredClone(r.body), refused = this.store.buildRefusals(r.id), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
     if (b.done && !b.done.receipt) b.done.receipt = this.store.buildReceipt(r.id);
@@ -355,7 +359,7 @@ export class GodBuilds {
     const chapters: NonNullable<GodBuildView['chapters']> = [];
     let parent = b.chapterOf; const seen = new Set([b.id]);
     while (parent && !seen.has(parent) && chapters.length < 24) { seen.add(parent); const previous = this.row(parent); if (!previous) break; chapters.unshift({ id: previous.id, brief: previous.body.plan.brief, asks: previous.body.plan.asks }); parent = previous.body.chapterOf; }
-    return { ...b, ...(refused.count ? { refusalCount: refused.count, refusals: refused.recent } : {}), ...(chapters.length ? { chapters } : {}), ...this.captions(r), status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
+    return { ...b, ...(refused.count ? { refusalCount: refused.count, refusals: refused.recent } : {}), ...(chapters.length ? { chapters } : {}), ...this.captions(r), status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: !lockStatus(b.lead.holder, r.last_at, this.pauseMs, now).stale }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
   }
   publicList(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), builds: [...this.rows.values()].map(r => this.public(r, now)) }; }
   list(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), open: [...this.rows.values()].map(r => this.view(r, now)), recent: this.store.builds().filter(r => !open(r)).slice(0, 20).map(r => { const b = decode(r); return { id: r.id, title: b.body.title, status: r.status, rev: r.rev, step: b.body.step, lastAt: r.last_at }; }) }; }
@@ -410,7 +414,7 @@ export class GodBuilds {
     if (adopted.some(id => this.rootIndex.has(id))) return fail('build.site', 'A chapter root already belongs to an open build.', 'root');
     const included: string[] = [];
     for (const ref of input.include ?? []) { const e = model.get(ref); if (!e) return fail('build.site', `Unknown included entity ${ref}.`, 'include', { fix: 'Use an existing entity id or path.' }); included.push(e.id); }
-    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief !== undefined ? { brief: input.brief } : {}), ...(input.asks ? { asks: input.asks } : {}) }, ...(input.root ? { root: input.root } : {}), ...(chapter ? { chapterOf: chapter.id } : {}), ...(included.length ? { include: [...new Set(included)] } : {}), site: input.site, massing: input.massing, roots: adopted, ...(adopted.length ? { initialRoots: adopted } : {}), lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
+    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief !== undefined ? { brief: input.brief } : {}), ...(input.asks ? { asks: input.asks } : {}) }, ...(input.root ? { root: input.root } : {}), ...(chapter ? { chapterOf: chapter.id } : {}), ...(included.length ? { include: [...new Set(included)] } : {}), site: input.site, massing: input.massing, roots: adopted, ...(adopted.length ? { initialRoots: adopted } : {}), lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now, ...(caller.holder ? { holder: caller.holder } : {}) }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
     const { inventory, protectedThings } = this.inventory(body), explicit = new Set(included);
     const missing = protectedThings.filter(e => !explicit.has(e.id));
     if (missing.length) return { ...fail('build.site', `Closure would cover ${missing.length} protected thing(s).`, 'include', { fix: `Include ${missing.slice(0, 50).map(e => `${e.path} (${e.id})`).join(', ')}${missing.length > 50 ? `; ${missing.length - 50} more (see inventory counts)` : ''}, or move/shrink the massing or root.`, measured: missing.length }), inventory };
@@ -502,6 +506,8 @@ export class GodBuilds {
     if (input.asks) { body.plan.asks = [...new Set([...(body.plan.asks ?? []), ...input.asks])]; if (body.plan.asks.length > 64) return fail('build.limit', 'At most 64 owner asks per chapter.', 'asks'); }
     const current = claim?.step ?? body.step, n = Math.max(current.n, input.n ?? current.n);
     const label = input.n !== undefined && input.n < current.n ? current.label : input.label ?? (n > current.n ? body.plan.steps[n - 1] ?? `step ${n}` : current.label);
+    if (claim && caller?.holder) claim.holder.process = caller.holder;
+    if (!claim && caller?.holder) body.lead.holder = caller.holder;
     if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
     else body.step = { n, label, at: now, seq: null };
     // Keep the last STEP_CALLS accepted tuples (16 hex each): a retry cannot replace a newer announcement, and a long,
@@ -530,12 +536,13 @@ export class GodBuilds {
   resume(id: string, raw: unknown, caller: Identity) {
     const now = this.host.now(); this.sweep(now); const p = buildActionSchemas.resume.safeParse(raw); if (!p.success) return schemaFailure(p.error); const row = this.row(id); if (!row) return fail('build.unknown', id); if (!open(row)) return fail('build.closed', id);
     const replayed = p.data.lease === row.body.lead.lease || caller.hash === row.body.lead.tokenHash;
-    if (!replayed && !row.body.paused?.explicit && now - row.last_at <= this.pauseMs && !p.data.take) return fail('build.leased', `${row.body.lead.label} leads ${id}; quietFor=${now - row.last_at}ms, staleIn=${this.pauseMs - (now - row.last_at)}ms.`, 'build', { measured: { label: row.body.lead.label, quietFor: now - row.last_at, staleIn: this.pauseMs - (now - row.last_at) } });
-    if (replayed && row.status === 'active' && row.last_at === now) {
+    if (!replayed && !row.body.paused?.explicit && !lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, now).stale && !p.data.take) return fail('build.leased', `${holderName(row.body.lead.holder, row.body.lead.label)} leads ${id}; quietFor=${now - row.last_at}ms, staleIn=${this.pauseMs - (now - row.last_at)}ms.`, 'build', { measured: { label: row.body.lead.label, ...(row.body.lead.holder ? { holder: row.body.lead.holder } : {}), quietFor: now - row.last_at, staleIn: this.pauseMs - (now - row.last_at) } });
+    if (replayed && !caller.holder && row.status === 'active' && row.last_at === now) {
       const build = this.view(row, now); return { ok: true as const, build, lease: row.body.lead.lease, current: build.current, next: build.next, massing: build.massing, replayed: true };
     }
     const body = structuredClone(row.body); if (effective(row, now, this.pauseMs) === 'paused') body.pauses++;
-    if (!replayed) body.lead = { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now };
+    if (!replayed) body.lead = { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now, ...(caller.holder ? { holder: caller.holder } : {}) };
+    if (caller.holder) body.lead.holder = caller.holder;
     if (!body.agents.some(a => a.hash8 === caller.hash.slice(0, 8))) body.agents = [...body.agents, { label: caller.label, hash8: caller.hash.slice(0, 8), at: now }].slice(-8);
     const resumed = !replayed || effective(row, now, this.pauseMs) === 'paused';
     delete body.paused; const r = this.savedView(this.save(row, body, 'active', now, resumed ? 'resumed' : 'alive'));
@@ -547,23 +554,24 @@ export class GodBuilds {
     const input = p.data, prior = row.body.claims.find(c => c.part === input.part && c.status === 'held' && c.user.tokenHash === caller.hash);
     // A retry of take may still name the taken id; replay its already-issued replacement.
     if (prior && (!input.take || input.take === prior.id || row.body.claims.find(c => c.id === input.take)?.takenBy?.claim === prior.id)) {
-      if (input.take === prior.id && now - prior.lastAt <= this.pauseMs) return fail('build.claim-unknown', `${prior.id} is still live.`);
+      if (input.take === prior.id && !lockStatus(prior.holder.process, prior.lastAt, this.pauseMs, now).stale) return fail('build.claim-unknown', `${prior.id} is still live.`);
       if (!input.take || input.take !== prior.id) { const build = this.view(row, now); return { ok: true as const, claim: build.claims.find(c => c.id === prior.id)!, build, replayed: true }; }
     }
     const old = input.take ? row.body.claims.find(c => c.id === input.take) : undefined;
-    if (input.take && (!old || old.status !== 'held' || now - old.lastAt <= this.pauseMs || old.part !== input.part)) return fail('build.claim-unknown', `${input.take} is unknown, not stale, or belongs to a different part.`);
-    if (row.body.claims.some(c => c.part === input.part && c.status === 'held' && c.id !== old?.id)) return fail('build.claimed', `${input.part} is already held; take its claim after it goes stale.`);
+    if (input.take && (!old || old.status !== 'held' || !lockStatus(old.holder.process, old.lastAt, this.pauseMs, now).stale || old.part !== input.part)) return fail('build.claim-unknown', `${input.take} is unknown, not stale, or belongs to a different part.`);
+    const busy = row.body.claims.find(c => c.part === input.part && c.status === 'held' && c.id !== old?.id);
+    if (busy) return fail('build.claimed', `${input.part} is held by ${holderName(busy.holder.process, busy.holder.label)}; take ${busy.id} after it goes stale.`, 'build.claim', { measured: { holder: busy.holder.process ?? { label: busy.holder.label }, ttlMs: this.pauseMs, heartbeatAt: busy.lastAt } });
     if (row.body.claims.filter(c => c.status === 'held' && c.id !== old?.id).length >= BUILD_LIMITS.claims) return fail('build.limit', 'At most 8 claims may be held.');
     const model = this.host.model(), root = old ? old.root : input.root ? model.get(input.root)?.id : undefined, region = old ? old.region : input.region;
     if (!old && input.root && (!root || !inScope(model, root, new Set(row.body.roots)))) return { ok: false as const, failures: [{ op: -1, code: 'entity.unknown', entity: input.root, field: 'root', detail: `${input.root} is not an entity inside build ${id}.`, fix: 'Use a root or subtree from this build.' }] };
     if (region && !containsRect(row.body.site, region)) return fail('build.site', `Claim region must be wholly inside site ${id}.`, 'region');
     const made = (old?.made ?? []).filter(id => model.entities.has(id)), roots = new Set([...(root ? [root] : []), ...made]);
     const overlap = this.overlap({ roots, region }, now, old?.id);
-    if (overlap) return fail('build.claimed', `Claim overlaps ${overlap.id} (${overlap.part}).`, 'root', { limit: { claim: overlap.id, part: overlap.part } });
+    if (overlap) return fail('build.claimed', `Claim overlaps ${overlap.id} (${overlap.part}), held by ${holderName(overlap.holder.process, overlap.holder.label)}.`, 'root', { limit: { claim: overlap.id, part: overlap.part } });
     const body = structuredClone(row.body); let cid: string; do { cid = claimId(); } while (body.claims.some(c => c.id === cid));
     if (old) { const taken = body.claims.find(c => c.id === old.id)!; taken.status = 'taken'; taken.takenBy = { claim: cid, label: caller.label, at: now }; }
     while (body.claims.length >= BUILD_LIMITS.retainedClaims) { const i = body.claims.findIndex(c => c.status !== 'held'); body.claims.splice(i, 1); }
-    const claim: Claim = { id: cid, part: input.part, ...(root ? { root } : {}), ...(region ? { region: structuredClone(region) } : {}), made, step: old ? { ...old.step } : { n: 1, label: body.plan.steps[0] }, status: 'held', lastAt: now, holder: { label: caller.label, hash8: caller.hash.slice(0, 8) }, user: { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash } };
+    const claim: Claim = { id: cid, part: input.part, ...(root ? { root } : {}), ...(region ? { region: structuredClone(region) } : {}), made, step: old ? { ...old.step } : { n: 1, label: body.plan.steps[0] }, status: 'held', lastAt: now, holder: { label: caller.label, hash8: caller.hash.slice(0, 8), ...(caller.holder ? { process: caller.holder } : {}) }, user: { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash } };
     body.claims.push(claim);
     const result = this.save(row, body, row.status, row.last_at, old ? 'taken' : 'claimed'); if (!result.ok) return result;
     const build = this.view(result.row, now); this.announce(result.row, result.kind, { added: [], removed: [] }, false, build, { part: claim.part, status: 'held' });
@@ -595,7 +603,12 @@ export class GodBuilds {
     if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo preflight failed; no build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
     row = this.row(id)!; const body = structuredClone(row.body); if (p.data.force) for (const c of body.claims) if (c.status === 'held') c.status = 'released'; body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
   }
-  private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && now - c.lastAt <= this.pauseMs); }
+  breakStaleLead(id: string) {
+    const row = this.row(id); if (!row || !open(row)) return false;
+    if (!lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale) return false;
+    return this.pause(id, { lease: row.body.lead.lease, note: 'doctor: stale holder' }).ok;
+  }
+  private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && !lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale); }
   private overlap(scope: Scope, now: number, except?: string) {
     const others: LiveClaim[] = [];
     for (const row of this.rows.values()) for (const c of this.liveClaims(row, now)) if (c.id !== except) others.push(scoped(c));
@@ -607,7 +620,7 @@ export class GodBuilds {
     if (field.claim) {
       const claim = row.body.claims.find(c => c.id === field.claim);
       if (!claim || claim.status !== 'held') return { warnings, failures: [buildFailure('build.claim-unknown', `${field.claim}${claim?.takenBy ? ` was taken by ${claim.takenBy.label} at ${claim.takenBy.at}` : ' is unknown or released'}.`)] };
-      if (this.host.now() - claim.lastAt > this.pauseMs) {
+      if (lockStatus(claim.holder.process, claim.lastAt, this.pauseMs, this.host.now()).stale) {
         const overlap = this.overlap(scoped(claim).scope, this.host.now(), claim.id);
         if (overlap) return { warnings, failures: [buildFailure('build.claimed', `Claim ${claim.id} cannot resume: overlaps ${overlap.id} (${overlap.part}).`, 'build.claim', { limit: { claim: overlap.id, part: overlap.part } })] };
       }

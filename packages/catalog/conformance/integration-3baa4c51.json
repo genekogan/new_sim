@@ -1,0 +1,245 @@
+{
+  "schema": "library-conformance-integration/1",
+  "source": "3baa4c51a8c1aec0a24f29701be9435153008989",
+  "seed": "EF4",
+  "k": 2,
+  "policy": "Exact additional findings already present at integration 3baa4c51 before E1. B1 (38b90658) adds six boolean building parameters: endpoint samples exercise the existing default geometry, and seeded joint samples now draw additional booleans, shifting later sample values. No geometry, placement, budget, library or sampler change is made to accept these findings. Original 28d72980 K=32 evidence is retained unchanged; this is a supplementary K=2 integration record, not a full-sweep or GPU certificate.",
+  "sourceVerification": "git diff --exit-code 3baa4c51 -- apps/web/src/gen-mesh packages/generators packages/world-compiler packages/catalog/src/library.ts packages/catalog/src/measure.ts tools/god-skill/lib/furnish.mjs (exit 0)",
+  "summary": {
+    "defs": 777,
+    "samples": 10334,
+    "placed": 10257,
+    "baked": 10334,
+    "furnished": 2880,
+    "rendered": 7596
+  },
+  "qualificationGapCount": 416,
+  "additionalFindingCount": 49,
+  "additionalCounts": {
+    "gallery-budget:triangles": 42,
+    "place:architecture": 5,
+    "place:architecture.sealed": 2
+  },
+  "findings": [
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fa018aa5d14dfdabbab933aa1c10a6ef150d8fb3aea959aa5680a6800bb8f28f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6214 > 6000",
+      "fields": [
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.hood=true",
+        "params.doorLamp=false",
+        "params.doorLamp=true"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fa018aa5d14dfdabbab933aa1c10a6ef150d8fb3aea959aa5680a6800bb8f28f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6178 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fa018aa5d14dfdabbab933aa1c10a6ef150d8fb3aea959aa5680a6800bb8f28f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6312 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-cafe@1",
+      "hash": "b84a38e321876fad2deb1cac77914918e8b09a8e19120fbe64ccb11157fa0ebd",
+      "stage": "place",
+      "code": "architecture.sealed",
+      "detail": "p sample: room cafe loses its last exterior route; blocked door/opening: front-door",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-cottage@1",
+      "hash": "a35b094047d57c43ebc9da2fb6339a17f0ea03659a22884a3a27d58a2fd94c9a",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " stairs.outside-room: stairs runs through a wall of living",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "c7c868e3c1559b67584e596f3eaef8bf3c0d47c0af2e4ca215046a094b09ce47",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7450 > 6000",
+      "fields": [
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.hood=true",
+        "params.doorLamp=false",
+        "params.doorLamp=true"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "c7c868e3c1559b67584e596f3eaef8bf3c0d47c0af2e4ca215046a094b09ce47",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7414 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "c7c868e3c1559b67584e596f3eaef8bf3c0d47c0af2e4ca215046a094b09ce47",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "10442 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-lighthouse@1",
+      "hash": "788a9901741b2b9d223e3c959eebb455c10514724e627934b2bb695aa4f058ea",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " building.no-entrance: no door to the outside; room.unreachable: entrance (floor 0) cannot be reached from a door to the outside",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "c6d0a3940267af307004c8c57187aedff86bea343bea442974d1dc3a9afd8cbc",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6196 > 6000",
+      "fields": [
+        "params.chimney=false",
+        "params.chimney=true",
+        "params.shutters=false",
+        "params.shutters=true",
+        "params.flowerBoxes=false",
+        "params.flowerBoxes=true",
+        "params.quoins=false",
+        "params.quoins=true",
+        "params.hood=true",
+        "params.doorLamp=false",
+        "params.doorLamp=true"
+      ]
+    },
+    {
+      "def": "core-mansion@1",
+      "hash": "c6d0a3940267af307004c8c57187aedff86bea343bea442974d1dc3a9afd8cbc",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6160 > 6000",
+      "fields": [
+        "params.hood=false"
+      ]
+    },
+    {
+      "def": "core-office-block@1",
+      "hash": "fd7e228039fbadb4fe48ba654ad50c7470f12d57b889c77c9cda5824da827b4d",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6526 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-prison@1",
+      "hash": "b0dc861b2dbbbe6cd24e8326caee5272f3b89531239b62aa29b161721f501e8e",
+      "stage": "place",
+      "code": "architecture.sealed",
+      "detail": "p sample: room guardroom loses its last exterior route; blocked door/opening: front-door",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-school@1",
+      "hash": "ebf17aa3c7bd1b277d27b397e29eda4b2071b39888109a38ddd318ac37b700b3",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6108 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-town-hall@1",
+      "hash": "cfd835de7cfcd6cd1e1bccc2cc090b35460f377110b2a14e62c3771fe3e00389",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " building.no-entrance: no door to the outside; room.unreachable: chamber (floor 0) cannot be reached from a door to the outside; room.unreachable: office-1 (floor 0) cannot be reached from a door to the outside",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "19f7cb5fb7e8433ffb864d73a578deb25afe339333d2e5e04accb10ec3e15697",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "7256 > 6000",
+      "fields": [
+        "random[0]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "19f7cb5fb7e8433ffb864d73a578deb25afe339333d2e5e04accb10ec3e15697",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " stairs.outside-room: stairs runs through a wall of living-1",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-townhouse-row@1",
+      "hash": "19f7cb5fb7e8433ffb864d73a578deb25afe339333d2e5e04accb10ec3e15697",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6654 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-townhouse@1",
+      "hash": "dfbc48b20a4f4e6ec1896ab26c083a2c43b20d016ab7808805ec8749ea906474",
+      "stage": "place",
+      "code": "architecture",
+      "detail": " stairs.outside-room: stairs runs through a wall of hall",
+      "fields": [
+        "random[1]"
+      ]
+    }
+  ]
+}

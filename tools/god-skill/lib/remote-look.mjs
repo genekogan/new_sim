@@ -4,19 +4,21 @@ import { resolve } from 'node:path';
 import { load } from './state.mjs';
 
 export async function remoteLook(args, runtime = {}) {
+  runtime.signal?.throwIfAborted();
   const now = runtime.now ?? Date.now, t0 = now();
   const token = (runtime.load ?? load)().token;
   if (!token) throw Error('look: remote rendering needs a god token; run pair (or mint on a local dev world)');
   const body = Object.fromEntries(['eye', 'at', 'hideRoofs', 'cut', 'span', 'hour', 'weather', 'width', 'height'].filter(k => args[k] !== undefined).map(k => [k, args[k]]));
   const r = await (runtime.fetch ?? fetch)(`${args.worldUrl.replace(/\/$/, '')}/v1/god/look`, {
     method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body),
-    redirect: 'error', signal: AbortSignal.timeout(args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 90_000)),
+    redirect: 'error', signal: AbortSignal.any([AbortSignal.timeout(args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 120_000)), ...(runtime.signal ? [runtime.signal] : [])]),
   });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw Error(`look: ${e.code ?? r.status}: ${e.message ?? 'world renderer refused the screenshot'}${e.retry_after ? `; retry in ${e.retry_after}s` : ''}`);
   }
   const png = Buffer.from(await r.arrayBuffer());
+  runtime.signal?.throwIfAborted();
   if (!r.headers.get('content-type')?.startsWith('image/png') || !png.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw Error('look: world renderer did not return a PNG');
   writeFileSync(resolve(args.out), png);
   return { file: resolve(args.out), ms: now() - t0, via: 'remote', size: r.headers.get('x-look-size') ?? undefined };
@@ -30,6 +32,7 @@ export async function withRemoteLook(args, runtime, local) {
   const now = runtime.now ?? Date.now, started = now();
   try { return await local(); }
   catch (e) {
+    runtime.signal?.throwIfAborted();
     if (!/cannot start Chrome|no Playwright|browserType\.launch|executable doesn't exist|browser keeper did not start/i.test(String(e.message))) throw e;
     return { ...await remoteLook(args, runtime), ms: now() - started };
   }
