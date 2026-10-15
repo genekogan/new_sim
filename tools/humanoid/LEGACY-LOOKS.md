@@ -59,3 +59,6 @@ node tools/humanoid/migrate-looks.browser.mjs
 The browser proof uses only fresh data, fake minds, bodies ports 5940–5941 and real Chrome
 with the `bodies` lease. It records the same residents before/after at dpr 1 and 2, then
 checks rollback and a second boot. Scratch defaults to `team/scratch/bodies/migration`.
+It uses this branch's tracked `mars/viewer/public` assets, including the humanoid kit;
+the older shared preview overlay has no kit. A release must serve `/modular/humanoid/`
+from its matching assets before applying the migration. A missing kit is a visual hold.

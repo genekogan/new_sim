@@ -16,7 +16,9 @@ const report={startedAt:new Date().toISOString(),steps:[],shots:[],pageErrors:[]
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 let server,browser,release;
 const env={...process.env,PORT:String(port),HOST:'127.0.0.1',WORLD_KEY:slug,WORLD_ID:'bodies-1',WORLD_PATH:'/w/bodies',ENGINE:'mars',MIND_DRIVER:'edge',BRAIN_MODE:'fake',
-  DATA_DIR:data,MARS_WEB_DIR:resolve(root,'.lane/mars-web'),PUBLIC_URL:`http://127.0.0.1:${port}`,BIRTH_LOOKS:'0',SEED_NATIVES:'0',SOUL_LIFECYCLE:'1',INVITE_REQUIRED:'0',DEV_AUTH:'1',EDGE_FADING:'0',TAKES_PERSIST:'0',
+  // The retained preview overlay predates the kit. This small field fixture needs
+  // only the tracked assets from this exact branch; never modify the shared overlay.
+  DATA_DIR:data,MARS_WEB_DIR:resolve(root,'mars/viewer/public'),PUBLIC_URL:`http://127.0.0.1:${port}`,BIRTH_LOOKS:'0',SEED_NATIVES:'0',SOUL_LIFECYCLE:'1',INVITE_REQUIRED:'0',DEV_AUTH:'1',EDGE_FADING:'0',TAKES_PERSIST:'0',
   ANTHROPIC_API_KEY:'',OPENAI_API_KEY:'',TYPESAFE_API_KEY:'',LEGACY_LOOKS_MODE:'',LEGACY_LOOKS_SOCIAL_PRESETS:'0'};
 async function boot(mode=''){
   const log=resolve(out,`server-${mode||'before'}.log`),fd=openSync(log,'a');
@@ -54,6 +56,7 @@ async function shoot(stage,names){
       page.on('pageerror',e=>report.pageErrors.push(e.message));
       await page.goto(base+'?dev=1',{waitUntil:'domcontentloaded',timeout:120000});
       await page.waitForSelector('canvas',{timeout:120000});await wait(7000);await frame(page,name);
+      assert.equal(await page.getByText(/A Soul.*look could not be composed/).count(),0,'the actual composed body must load');
       const renderer=await page.evaluate(()=>{const gl=document.querySelector('canvas')?.getContext('webgl2'),ext=gl?.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):null;});
       assert.match(renderer??'',/Apple|Metal/,'real GPU required');
       const path=resolve(out,`${stage}-dpr${dpr}-${name}.png`);await page.screenshot({path,timeout:120000});

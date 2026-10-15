@@ -19,15 +19,9 @@ const {chromium} = createRequire(from)('@playwright/test');
 
 const order = eyesBrowserModes();
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
-let releaseChrome = null;
 const queue = [];
 
 async function launch() {
-  if (process.platform === 'darwin' && !releaseChrome) {
-    // All real Chrome work on the shared laptop participates in the same lease as visual QA.
-    const {chromeLease} = await import('../../../../../tools/god-skill/lib/chrome-lease.mjs');
-    releaseChrome = await chromeLease(process.env.EDGE_EYES_CHROME_OWNER || 'bodies');
-  }
   for (const mode of order) {
     try {
       const b = await chromium.launch(eyesBrowserLaunch(mode));
@@ -87,7 +81,7 @@ process.on('message', msg => {
   if (msg?.t === 'render') {queue.push(msg); void drain();}
   else if (msg?.t === 'close') void shutdown(0);
 });
-async function shutdown(code) {closing = true; try {await browser?.close();} catch {/* gone */} await releaseChrome?.(); releaseChrome = null; process.exit(code);}
+async function shutdown(code) {closing = true; try {await browser?.close();} catch {/* gone */} process.exit(code);}
 process.on('disconnect', () => void shutdown(0));
 process.on('SIGTERM', () => void shutdown(0));
 // liveness: if the page stops answering, start it again

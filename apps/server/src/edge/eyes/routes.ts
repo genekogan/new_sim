@@ -10,6 +10,7 @@ import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul} from '
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import {planView, type ViewPlan, type ViewRequest} from './view.ts';
 import {EyesUnavailable, EyesWorker, NO_RENDERER, type EyesRenderer} from './worker.ts';
+import {eyesWorkerProblem} from './browser-config.mjs';
 
 const TPS = 20;
 export type EyesOptions = {
@@ -45,7 +46,7 @@ export function parseViewQuery(q: (k: string) => string | undefined): ViewReques
 
 export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options: EyesOptions = {}) {
   const now = options.now ?? Date.now;
-  const viewerUrl=eyesViewerUrl(process.env.EDGE_EYES,deps.souls.cfg),problem=viewerUrl?eyesViewerProblem(viewerUrl,deps.souls.cfg):null;
+  const viewerUrl=eyesViewerUrl(process.env.EDGE_EYES,deps.souls.cfg),problem=viewerUrl?(eyesViewerProblem(viewerUrl,deps.souls.cfg)??eyesWorkerProblem()):null;
   const refused:EyesRenderer={status:()=>({...NO_RENDERER.status(),detail:problem}),render:()=>Promise.reject(new EyesUnavailable(problem!)),close(){}};
   const renderer: EyesRenderer = options.renderer ?? (problem?refused:viewerUrl ? new EyesWorker({viewerUrl, timeoutMs: envNum('EDGE_EYES_TIMEOUT_SECONDS', 90) * 1000}) : NO_RENDERER);
   // Operators may tighten these budgets, never exceed the published 30 s / 12 per minute bounds.

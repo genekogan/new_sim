@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {eyesBrowserLaunch, eyesBrowserModes} from './edge/eyes/browser-config.mjs';
+import {eyesBrowserLaunch, eyesBrowserModes, eyesWorkerProblem} from './edge/eyes/browser-config.mjs';
 
 test('CPU Eyes defaults directly to SwiftShader on Linux, with one persistent Chromium worker', () => {
   assert.deepEqual(eyesBrowserModes({}, 'linux'), ['swiftshader']);
@@ -11,9 +11,9 @@ test('CPU Eyes defaults directly to SwiftShader on Linux, with one persistent Ch
   assert.ok(launch.args.includes('--enable-unsafe-swiftshader'));
   assert.throws(() => eyesBrowserModes({EDGE_EYES_GPU: 'typo'}, 'linux'), /EDGE_EYES_GPU/);
 });
-test('shared Mac requires real Chrome with hardware, no software fallback even when explicitly requested', () => {
-  assert.deepEqual(eyesBrowserModes({}, 'darwin'), ['metal']);
-  assert.deepEqual(eyesBrowserModes({EDGE_EYES_GPU: 'metal'}, 'darwin'), ['metal']);
-  for (const mode of ['swiftshader', 'gl']) assert.throws(() => eyesBrowserModes({EDGE_EYES_GPU: mode}, 'darwin'), /real Chrome/);
-  assert.deepEqual(eyesBrowserLaunch('metal', {}, 'darwin'), {headless: true, channel: 'chrome', args: ['--ignore-gpu-blocklist', '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows']});
+test('persistent service refuses the shared Mac before taking a Chrome lease or launching a browser', () => {
+  assert.equal(eyesWorkerProblem('linux'),null);
+  assert.match(eyesWorkerProblem('darwin')!,/disabled on the shared Mac/);
+  for (const mode of ['auto','metal','swiftshader', 'gl']) assert.throws(() => eyesBrowserModes({EDGE_EYES_GPU: mode}, 'darwin'), /disabled on the shared Mac/);
+  assert.throws(()=>eyesBrowserLaunch('metal',{},'darwin'),/disabled on the shared Mac/);
 });

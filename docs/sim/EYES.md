@@ -20,9 +20,11 @@ long-lived browser/page per enabled world, a serial queue of at most six waiting
 90 s render timeout, restart backoff, and a viewer reload between jobs after six hours.
 Check aggregate CPU and memory before enabling several worlds on the same CPU host.
 
-The shared Mac requires real Chrome and hardware rendering, obtains the Chrome lease, and
-refuses software fallback. Local qualification uses lease owner `bodies`
-(`EDGE_EYES_CHROME_OWNER` may name a later operator). Run CPU qualification remotely.
+The persistent Eyes service is explicitly disabled on the shared Mac, even when configured.
+It returns the caption fallback without launching a browser or taking the Chrome lease.
+Finite local visual QA still uses real Chrome/Metal and releases its lease immediately after
+closing the browser; a long-lived worker must not outlive that lease. Qualify Eyes on a
+remote CPU host instead.
 
 The public status endpoint exposes worker health, renderer, queue, failures, and p50/p95
 capture latency, without resident data. A ready worker does not grant access to a resident:
