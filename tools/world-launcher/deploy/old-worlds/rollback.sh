@@ -1,63 +1,87 @@
 #!/usr/bin/env bash
-# Roll the old worlds back to the laptop after cutover.sh. Lane CLOUD2 2026-10-11; rewritten by lane KIT 2026-10-15
-# after safety review KIT-REVIEW-1 (team/reviews/sim-release-20261015/). Run ON THE LAPTOP. Safe to re-run.
-#   bash rollback.sh <cutover-TS>        (TS from the cutover log name, e.g. 20261016-140000)
-# 0 Classify each world on the laptop: SERVED (its port still has a listener: left alone), HUNG (a writer for it is
-#   alive but not listening: waited for up to RB_HUNG_WAIT s, then SIGKILLed: its close already stopped the world clock,
-#   SQLite commits are durable, and the servers treat a lock held by a dead PID as stale), or CLOSED.
-# 1 Caddy: the catch-all `reverse_proxy 127.0.0.1:4670` is switched back to 4505 (sed on that line only; other edits made
-#   since cutover are kept; backup sim.caddy.post-kit-<now>.bak), validate, reload. Anything else -> STOP before touching
-#   eden2 or the laptop data. eden2 is never stopped while Caddy might still route to it.
-# 2 Stop + disable the eden2 sim-old units (SIGTERM = normal close with snapshot).
-# 3 History back, only if eden2 was public (sim.caddy had 4670 or the cutover backup sim.caddy.pre-kit-<TS>.bak exists)
-#   and only for CLOSED/HUNG worlds: full parity JSON compared; eden2 copied back only when it differs AND extends the
-#   laptop history (eden2 maxSeq >= laptop, and eden2's event prefix up to the laptop maxSeq hashes the same). A compact
-#   snapshot is pulled to <db>.incoming-<now>, verified (parity == eden2's, quick_check), and only then are the laptop
-#   originals RENAMED to *.pre-rollback-<now> (never deleted). eden2 unreadable or diverged -> that world's data untouched
-#   and its writer NOT restarted (STOP note). Accounts registry likewise by content hash (dbhash.py).
-# 4 Restart the writers of CLOSED/HUNG worlds that passed 3: run-world.mjs + the live descriptors, Clerk env-file and
-#   registry by path, detached in their own session (setsid via python; immune to closing the Terminal).
-# Test hooks (rehearsal on scratch copies only; never set them for the real rollback): RB_E2 RB_RDATA RB_CADDY
-# RB_CADDY_VALIDATE RB_CADDY_RELOAD RB_UNITS RB_LAPTOP_ROOT RB_ACC RB_DESC RB_LPORTS RB_PORT_MAP RB_HUNG_WAIT RB_PUBLIC RB_LOG_DIR.
+# Roll the old worlds back to the laptop after cutover.sh. Lane CLOUD2 2026-10-11; rewritten by lane KIT 2026-10-15 after
+# safety review KIT-REVIEW-1 and incident INCIDENT-20261015-MARS-LM (team/reviews/sim-release-20261015/). Run ON THE LAPTOP.
+#   bash rollback.sh <cutover-TS>        (TS from the cutover log name, e.g. 20261016-140000). Safe to re-run.
+# 0 Classify each world on the laptop: SERVED (its port has a listener: left alone), HUNG (one of its writers is alive but
+#   not listening: waited up to RB_HUNG_WAIT s, then SIGKILLed; its close already stopped the world clock, SQLite commits
+#   are durable, and the servers treat a lock held by a dead PID as stale) or CLOSED. A lock naming a live PID that is not
+#   a writer of that world -> FAILED (never signalled).
+# 1 Caddy: the catch-all `reverse_proxy 127.0.0.1:4670` goes back to 4505 (sed on that line only; other edits kept; backup
+#   sim.caddy.post-kit-<now>.bak), validate, reload. Anything else -> STOP before touching eden2 or the laptop data.
+# 2 Stop + disable the eden2 sim-old units (only now that Caddy no longer routes to them).
+# 3 History back, only if eden2 was public (sim.caddy had 4670 or the cutover backup sim.caddy.pre-kit-<TS>.bak exists) and
+#   only for CLOSED/HUNG worlds: full parity JSON compared; eden2 copied back only when it differs AND extends the laptop
+#   history (eden2 maxSeq >= laptop and eden2's event prefix up to the laptop maxSeq hashes the same). The compact snapshot
+#   lands in <db>.incoming-<now>, is verified (parity == eden2's, quick_check), and only then are the laptop originals
+#   RENAMED to *.pre-rollback-<now> (never deleted). eden2 unreadable or diverged -> that world untouched and NOT restarted.
+#   Accounts registry likewise by content hash (dbhash.py).
+# 4 Restart the writers of CLOSED/HUNG worlds that passed 3: run-world.mjs (which ignores SIGHUP) + the live descriptors,
+#   Clerk env-file and registry by path, in a new session (python os.setsid; no controlling terminal).
+#
+# TEST MODE (RB_LAPTOP_ROOT set) exists only for the rehearsal on eden2 (rollback-rehearsal.sh); it refuses to run on macOS.
+# In test mode the script signals only PIDs listed in $RB_LAPTOP_ROOT/.pids (written by whoever spawned them) whose args
+# name the scratch descriptor and whose cwd is inside the scratch tree, and aborts if any target is a live writer
+# (listener on 4950/4963/4964/4970/4660-4662, a convergence/run-world writer outside the scratch tree, or a sim-old unit).
 set -uo pipefail
 TS=${1:?usage: rollback.sh <cutover-TS>}; H=<team>/runtime/sim-old-cloud; NOW=$(date -u +%Y%m%d-%H%M%S)
-N=~/.nvm/versions/node/v22.20.0/bin/node; ENV=<team>/pm-integration/auth-account-20261009/clerk-publication-types-003/STAGED-PUBLIC-SETTINGS.env
+KITBIN=${RB_KITBIN:-$H/bin}; N=${RB_NODE:-~/.nvm/versions/node/v22.20.0/bin/node}
+ENV=${RB_ENV:-<team>/pm-integration/auth-account-20261009/clerk-publication-types-003/STAGED-PUBLIC-SETTINGS.env}
 E2=${RB_E2:-root@eden2}; RDATA=${RB_RDATA:-/srv/sim-old-data}; RBIN=/srv/sim-old/current/bin
 CADDY=${RB_CADDY:-/etc/caddy/sites/sim.caddy}
 CVALIDATE=${RB_CADDY_VALIDATE:-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile}; CRELOAD=${RB_CADDY_RELOAD:-systemctl reload caddy}
 UNITS=${RB_UNITS-sim-old-proxy sim-old@eden sim-old@mars sim-old@littlemartians}
-ACC=${RB_ACC:-<team>/runtime/production-accounts/accounts.sqlite}; DESC=${RB_DESC:-$H/rollback/descriptors-1080cfa9}
+ACC=${RB_ACC:-<team>/runtime/production-accounts/accounts.sqlite}; PROD_DESC=$H/rollback/descriptors-1080cfa9; DESC=${RB_DESC:-$PROD_DESC}
 LPORTS=${RB_LPORTS:-eden:4950,mars:4963,littlemartians:4964}; HUNG_WAIT=${RB_HUNG_WAIT:-120}; PUBLIC=${RB_PUBLIC:-1}
-LOGD=${RB_LOG_DIR:-$H/logs}; LOG=$LOGD/rollback-$NOW.log
-if [ -n "${RB_LAPTOP_ROOT:-}" ]; then   # test mode: everything must point at scratch
-  case "$RDATA:$CADDY" in /srv/sim-old-rbtest/*:/srv/sim-old-rbtest/*) ;; *) echo "test mode needs RB_RDATA and RB_CADDY under /srv/sim-old-rbtest"; exit 2;; esac
-  [ -n "${RB_ACC:-}" ] && [ -n "${RB_DESC:-}" ] && [ -n "${RB_LPORTS:-}" ] || { echo "test mode needs RB_ACC RB_DESC RB_LPORTS"; exit 2; }
+LOGD=${RB_LOG_DIR:-$H/logs}; LOG=$LOGD/rollback-$NOW.log; TEST=${RB_LAPTOP_ROOT:-}
+if [ -n "$TEST" ]; then
+  [ "$(uname)" = Linux ] || { echo "test mode runs only on eden2 (never on the laptop)"; exit 2; }
+  for v in "$TEST" "$RDATA" "$CADDY" "$ACC" "$DESC" "$LOGD"; do case "$v" in /srv/sim-old-rbtest/*) ;; *) echo "test mode: $v is outside /srv/sim-old-rbtest"; exit 2;; esac; done
+  [ -n "${RB_LPORTS:-}" ] || { echo "test mode needs RB_LPORTS"; exit 2; }
+  case "$LPORTS" in *49[0-9][0-9]*|*466[0-9]*|*4670*) echo "test mode: RB_LPORTS must not name live ports"; exit 2;; esac
 fi
 WORLDS="eden mars littlemartians"
 wid()  { case $1 in eden) echo pm-preview-eden-20261005;; mars) echo mars-2026-1;; littlemartians) echo littlemartians-1;; esac; }
 lport() { echo "$LPORTS" | tr ',' '\n' | awk -F: -v w=$1 '$1==w{print $2}'; }
-ddir() { if [ -n "${RB_LAPTOP_ROOT:-}" ]; then echo $RB_LAPTOP_ROOT/$1; else case $1 in eden) echo <team>/previews/20261007-edge/eden-data;; *) echo <team>/previews/20261010-restoration-auth/canonical-$1-data;; esac; fi; }
-# Test mode must only ever see its own scratch writers (2026-10-15 incident: the unscoped pattern matched the LIVE
-# convergence writers during a rehearsal and SIGKILLed Mars + LM).
-writers() { if [ -n "${RB_LAPTOP_ROOT:-}" ]; then pgrep -f "run-world\.mjs $DESC/$1\.json" || true; else pgrep -f "convergence-world-run\.mjs $1 /|run-world\.mjs $DESC/$1\.json" || true; fi; }
-listener() { /usr/sbin/lsof -nP -iTCP:$(lport $1) -sTCP:LISTEN -t 2>/dev/null || true; }
+ddir() { if [ -n "$TEST" ]; then echo $TEST/$1; else case $1 in eden) echo <team>/previews/20261007-edge/eden-data;; *) echo <team>/previews/20261010-restoration-auth/canonical-$1-data;; esac; fi; }
+listeners() { if [ "$(uname)" = Darwin ]; then /usr/sbin/lsof -nP -iTCP:$1 -sTCP:LISTEN -t 2>/dev/null; else ss -ltnpH "sport = :$1" | grep -o 'pid=[0-9]*' | cut -d= -f2; fi | sort -u; }
+listener() { listeners $(lport $1); }
+args() { ps -o command= -p $1 2>/dev/null; }
+cwd() { if [ "$(uname)" = Darwin ]; then /usr/sbin/lsof -a -p $1 -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; else readlink /proc/$1/cwd 2>/dev/null; fi; }
+alive() { kill -0 $1 2>/dev/null; }
+# Live writers anywhere on this host, detected generally (never hard-coded PIDs): the test mode must never target one.
+live_set() { { for p in 4950 4963 4964 4970 4660 4661 4662; do listeners $p; done
+  pgrep -f 'convergence-world-run\.mjs' ; pgrep -f "run-world\.mjs $PROD_DESC/"; pgrep -f 'run-world\.mjs /srv/sim-old/current/descriptors/'
+  [ "$(uname)" = Linux ] && for u in sim-old@eden sim-old@mars sim-old@littlemartians sim-old-proxy; do systemctl show -p MainPID --value $u; done; } 2>/dev/null | grep -v '^0$' | sort -u; }
+writers() { # $1 world -> PIDs of that world's laptop writers
+  if [ -n "$TEST" ]; then
+    [ -f $TEST/.pids ] || return 0
+    awk -v w=$1 '$2==w{print $1}' $TEST/.pids | while read -r p; do alive $p || continue
+      case "$(args $p)" in *"$DESC/$1.json"*) ;; *) echo "REFUSE:$p:args"; continue;; esac
+      case "$(cwd $p)/" in "$TEST"/*) ;; *) echo "REFUSE:$p:cwd"; continue;; esac
+      echo $p; done
+  else pgrep -f "convergence-world-run\.mjs $1 /|run-world\.mjs $PROD_DESC/$1\.json" || true; fi; }
+guard_signal() { # $1 pid: last check before any signal
+  if [ -n "$TEST" ]; then live_set | grep -qx "$1" && { say "ABORT: test target $1 is a live writer; nothing signalled"; exit 3; }
+    awk '{print $1}' $TEST/.pids | grep -qx "$1" || { say "ABORT: $1 not in the test pidfile; nothing signalled"; exit 3; }; fi; }
 lockpid() { python3 -c 'import json,sys,os
 try: p=json.load(open(sys.argv[1]))["pid"]; os.kill(p,0); print(p)
 except Exception: pass' "$(ddir $1)/edge-server.lock"; }
 say() { echo "[$(date -u +%T)] $*" | tee -a "$LOG"; }
-e2() { ssh -o BatchMode=yes -o ConnectTimeout=10 $E2 "$@"; }
+if [ "$E2" = local ]; then e2() { bash -c "$*"; }; RSRC=; else e2() { ssh -o BatchMode=yes -o ConnectTimeout=10 $E2 "$@"; }; RSRC=$E2:; fi
 jget() { python3 -c 'import json,sys
 try: d=json.loads(sys.argv[1]); v=d[sys.argv[2]]; assert v is not None; print(v)
 except Exception: sys.exit(1)' "$1" "$2"; }
-mkdir -p "$LOGD"; say "rollback for cutover $TS (log $LOG)"
 st() { eval "echo \${ST_$1:-}"; }; setst() { eval "ST_$1=$2"; }
+mkdir -p "$LOGD"; say "rollback for cutover $TS (log $LOG)${TEST:+ TEST MODE root $TEST}"
 
 # 0 classify (changes nothing)
 for w in $WORLDS; do
-  lp=$(lockpid $w); wp=$(writers $w | tr '\n' ' ')
-  if [ -n "$(listener $w)" ]; then setst $w SERVED; say "$w: laptop :$(lport $w) still served by pid $(listener $w) -> left alone"
+  wp=$(writers $w | tr '\n' ' '); case "$wp" in *REFUSE*) say "ABORT: $w: $wp (pid outside the scratch tree); nothing changed"; exit 3;; esac
+  [ -n "$TEST" ] && for x in $wp; do guard_signal $x; done   # self-check before ANY change: no target may be a live writer
+  lp=$(lockpid $w)
+  if [ -n "$(listener $w)" ]; then setst $w SERVED; say "$w: :$(lport $w) still served by pid $(listener $w | tr '\n' ' ')-> left alone"
   elif [ -n "${wp// /}" ]; then setst $w HUNG; say "$w: writer(s) $wp alive but not listening (hung close)"
-  elif [ -n "$lp" ]; then setst $w FAILED; say "STOP-NOTE $w: lock names live pid $lp that is not a writer for this world; check by hand (never killed)"
+  elif [ -n "$lp" ]; then setst $w FAILED; say "STOP-NOTE $w: lock names live pid $lp that is not a writer for this world; check by hand (never signalled)"
   else setst $w CLOSED; say "$w: closed"; fi
 done
 
@@ -78,53 +102,55 @@ SERVED=0; case "$CR" in *served=1*) SERVED=1;; esac
 # 2 stop eden2 (Caddy no longer routes to it)
 if [ -n "$UNITS" ]; then e2 "systemctl disable --now $UNITS 2>&1 | tail -1; systemctl is-active $UNITS | tr '\n' ' '" | tee -a "$LOG"
   [ "${PIPESTATUS[0]}" = 0 ] || { say "STOP: could not stop eden2 units; laptop untouched"; exit 1; }
-else say "(no eden2 units configured: test mode)"; fi
+else say "eden2 units: none configured (test mode)"; fi
 
-# HUNG writers: wait, then kill (world already down; its close stopped the clock)
+# HUNG writers: wait, then SIGKILL (the world is already down; its close stopped the clock)
 for w in $WORLDS; do [ "$(st $w)" = HUNG ] || continue
-  p=$(writers $w | tr '\n' ' '); for i in $(seq 1 $HUNG_WAIT); do alive=; for x in $p; do kill -0 $x 2>/dev/null && alive=1; done; [ -z "$alive" ] && break; sleep 1; done
-  for x in $p; do kill -0 $x 2>/dev/null && { say "$w: SIGKILL hung writer $x after ${HUNG_WAIT}s"; kill -KILL $x; }; done; sleep 1
-  for x in $p; do kill -0 $x 2>/dev/null && { setst $w FAILED; say "STOP-NOTE $w: writer $x survived SIGKILL; not restarted"; }; done
+  for i in $(seq 1 $HUNG_WAIT); do [ -z "$(writers $w)" ] && break; sleep 1; done
+  for x in $(writers $w); do case $x in REFUSE*) say "ABORT: $x"; exit 3;; esac; guard_signal $x; say "$w: SIGKILL hung writer $x after ${HUNG_WAIT}s"; kill -KILL $x; done
+  sleep 1; [ -n "$(writers $w)" ] && { setst $w FAILED; say "STOP-NOTE $w: writer survived SIGKILL; not restarted"; }
   [ -n "$(listener $w)" ] && { setst $w FAILED; say "STOP-NOTE $w: port :$(lport $w) taken meanwhile; not restarted"; }
 done
 
 # 3 history back (only if eden2 was public)
-pull() { # $1 world|accounts  $2 laptop dst  $3 remote src  $4 expected-json  $5 verify command, {} = the pulled file
+pull() { # $1 world|accounts  $2 laptop dst  $3 eden2 src  $4 expected-json  $5 verify command, {} = the pulled file
   local w=$1 dst=$2 src=$3 want=$4 inc="$2.incoming-$NOW"
   e2 "rm -f $RDATA/rollback-$w.db; python3 $RBIN/$([ $w = accounts ] && echo online-backup.py || echo compact-copy.py) $src $RDATA/rollback-$w.db >/dev/null" || { say "STOP-NOTE $w: snapshot on eden2 failed; laptop untouched"; return 1; }
-  rsync -az $E2:$RDATA/rollback-$w.db "$inc" || { rm -f "$inc"; say "STOP-NOTE $w: copy failed; laptop untouched"; return 1; }
+  rsync -az $RSRC$RDATA/rollback-$w.db "$inc" || { rm -f "$inc"; say "STOP-NOTE $w: copy failed; laptop untouched"; return 1; }
   got=$(eval "${5//\{\}/\"$inc\"}"); ok=$(python3 -c "import sqlite3,sys;print(sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True).execute('pragma quick_check').fetchone()[0])" "$inc")
-  [ "$got" = "$want" ] && [ "$ok" = ok ] || { say "STOP-NOTE $w: pulled copy does not verify (got $got, quick_check $ok); kept as $inc, laptop untouched"; return 1; }
+  [ "$got" = "$want" ] && [ "$ok" = ok ] || { say "STOP-NOTE $w: pulled copy does not verify (quick_check $ok); kept as $inc, laptop untouched"; return 1; }
   for f in "$dst" "$dst-wal" "$dst-shm"; do [ -e "$f" ] && mv "$f" "$f.pre-rollback-$NOW"; done
   mv "$inc" "$dst" && e2 "rm -f $RDATA/rollback-$w.db"; say "$w: eden2 history copied back (originals kept as *.pre-rollback-$NOW)"; }
 if [ $SERVED = 0 ]; then say "eden2 never served the public for $TS: laptop data is authoritative, nothing copied back"
-else for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac
-  dst=$(ddir $w)/sim.db; src=$RDATA/$w/sim.db
-  a=$(python3 $H/bin/parity.py "$dst" $(wid $w) 2>/dev/null); b=$(e2 "python3 $RBIN/parity.py $src $(wid $w)" 2>/dev/null)
-  am=$(jget "$a" maxSeq) && bm=$(jget "$b" maxSeq) || { setst $w FAILED; say "STOP-NOTE $w: cannot read parity (laptop '${a:0:60}', eden2 '${b:0:60}'); laptop untouched, not restarted"; continue; }
-  say "$w laptop $a"; say "$w eden2  $b"
-  if [ "$a" = "$b" ]; then say "$w: identical, laptop kept"; continue; fi
-  b2=$(e2 "python3 $RBIN/parity.py $src $(wid $w) $am" 2>/dev/null)
-  if [ "$bm" -ge "$am" ] && [ -n "$b2" ] && [ "$(jget "$b2" prefixSHA256)" = "$(jget "$a" prefixSHA256)" ]; then
-    pull $w "$dst" $src "$b" "python3 $H/bin/parity.py {} $(wid $w)" || setst $w FAILED
-  else setst $w FAILED; say "STOP-NOTE $w: eden2 history does not extend the laptop's (maxSeq $bm vs $am or prefix differs); laptop untouched, not restarted"; fi
-done
-  ha=$(python3 $H/bin/dbhash.py "$ACC" 2>/dev/null); hb=$(e2 "python3 $RBIN/dbhash.py $RDATA/accounts/accounts.sqlite" 2>/dev/null)
+else
+  for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac
+    dst=$(ddir $w)/sim.db; src=$RDATA/$w/sim.db
+    a=$(python3 $KITBIN/parity.py "$dst" $(wid $w) 2>/dev/null); b=$(e2 "python3 $RBIN/parity.py $src $(wid $w)" 2>/dev/null)
+    am=$(jget "$a" maxSeq) && bm=$(jget "$b" maxSeq) || { setst $w FAILED; say "STOP-NOTE $w: cannot read parity (laptop '${a:0:60}', eden2 '${b:0:60}'); laptop untouched, not restarted"; continue; }
+    say "$w laptop $a"; say "$w eden2  $b"
+    if [ "$a" = "$b" ]; then say "$w: identical, laptop kept"; continue; fi
+    b2=$(e2 "python3 $RBIN/parity.py $src $(wid $w) $am" 2>/dev/null)
+    if [ "$bm" -ge "$am" ] && [ -n "$b2" ] && [ "$(jget "$b2" prefixSHA256)" = "$(jget "$a" prefixSHA256)" ]; then
+      pull $w "$dst" $src "$b" "python3 $KITBIN/parity.py {} $(wid $w)" || setst $w FAILED
+    else setst $w FAILED; say "STOP-NOTE $w: eden2 history does not extend the laptop's (maxSeq $bm vs $am or prefix differs); laptop untouched, not restarted"; fi
+  done
+  ha=$(python3 $KITBIN/dbhash.py "$ACC" 2>/dev/null); hb=$(e2 "python3 $RBIN/dbhash.py $RDATA/accounts/accounts.sqlite" 2>/dev/null)
   if ! jget "$hb" sha256 >/dev/null; then say "WARN accounts: eden2 registry unreadable; laptop registry kept"
   elif [ "$ha" = "$hb" ]; then say "accounts: identical, laptop kept"
-  else pull accounts "$ACC" $RDATA/accounts/accounts.sqlite "$hb" "python3 $H/bin/dbhash.py {}" || say "WARN accounts: laptop registry kept"; fi
+  else pull accounts "$ACC" $RDATA/accounts/accounts.sqlite "$hb" "python3 $KITBIN/dbhash.py {}" || say "WARN accounts: laptop registry kept"; fi
 fi
 
-# 4 restart laptop writers (detached session)
+# 4 restart laptop writers in a new session (no controlling terminal; run-world.mjs also ignores SIGHUP)
 for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac
   L=$LOGD/laptop-$w-$NOW.log
-  (cd /tmp && SIM_PORT_MAP=${RB_PORT_MAP:-} AUTH_PROVIDER=clerk ACCOUNT_REGISTRY_PATH=$ACC nohup python3 -c 'import os,sys;os.setsid();os.execvp(sys.argv[1],sys.argv[1:])' \
-    $N ${RB_PORT_MAP:+--import=$H/bin/port-map.mjs} --experimental-transform-types --env-file=$ENV $H/bin/run-world.mjs $DESC/$w.json >> $L 2>&1 < /dev/null &)
+  (cd ${TEST:-/tmp} || exit 1; SIM_PORT_MAP=${RB_PORT_MAP:-} AUTH_PROVIDER=clerk ACCOUNT_REGISTRY_PATH=$ACC nohup python3 -c 'import os,sys;os.setsid();os.execvp(sys.argv[1],sys.argv[1:])' \
+    $N ${RB_PORT_MAP:+--import=$KITBIN/port-map.mjs} --experimental-transform-types --env-file=$ENV $KITBIN/run-world.mjs $DESC/$w.json >> $L 2>&1 < /dev/null & echo $! > $L.pid)
+  [ -n "$TEST" ] && echo "$(cat $L.pid) $w rollback" >> $TEST/.pids
   setst $w STARTED; done
 for w in $WORLDS; do [ "$(st $w)" = STARTED ] || continue; L=$LOGD/laptop-$w-$NOW.log
   for i in $(seq 1 100); do grep -q '"phase":"ready"' $L 2>/dev/null && break; grep -q 'refused\|^Error' $L 2>/dev/null && break; sleep 3; done
-  say "$w: $(grep -h '"phase":"ready"' $L | cut -c1-220 || echo "NOT READY - see $L")"; done
+  say "$w: $(grep -h '"phase":"ready"' $L | cut -c1-200 || echo "NOT READY - see $L")"; done
 [ "$PUBLIC" = 1 ] && for w in $WORLDS; do say "public /w/$w/v1/config $(curl -s -o /dev/null -w '%{http_code}' https://sim.eden.art/w/$w/v1/config)"; done
-say "ROLLBACK END: $(for w in $WORLDS; do printf '%s=%s ' $w $(st $w); done)(SERVED=left alone, STARTED=restarted, FAILED=see STOP-NOTE)"
-say "Laptop proxy :4970 routes to the restarted writers; if it was stopped meanwhile, restart it from team/reviews/convergence-ops-1080cfa9-001/PROXY.json."
-grep -q STOP-NOTE "$LOG" && exit 1 || exit 0
+say "ROLLBACK END: $(for w in $WORLDS; do printf '%s=%s ' $w $(st $w); done)(SERVED=left alone, STARTED=restarted, FAILED=see the notes above)"
+[ -n "$TEST" ] || say "Laptop proxy :4970 routes to the restarted writers; if it was stopped meanwhile, restart it from team/reviews/convergence-ops-1080cfa9-001/PROXY.json."
+grep -q "] STOP-NOTE " "$LOG" && exit 1 || exit 0

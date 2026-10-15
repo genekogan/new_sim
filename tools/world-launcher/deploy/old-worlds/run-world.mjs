@@ -28,6 +28,8 @@ const cold=new DatabaseSync(join(d.dataDir,'sim.db'),{readOnly:true});const befo
 console.log(JSON.stringify({phase:'pre-boot',world:key,worldId:d.worldId,events:before.count,maxSeq:before.maxSeq,prefixSHA256:before.prefixSHA256,soulsSHA256:before.soulsSHA256,activeSouls:before.activeSouls}));
 let app;
 const close=()=>app.close();
+// A relaunched laptop writer must survive its launching Terminal closing (Node resets inherited SIG_IGN at startup).
+process.on('SIGHUP',()=>console.log(JSON.stringify({phase:'sighup-ignored',world:key,atUTC:new Date().toISOString()})));
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{if(!app)process.exit(1);void close().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1);});});
 if(key==='eden'){
  check(desc.flags?.accountAuth===true,'Eden account authorization disabled');
