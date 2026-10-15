@@ -22,18 +22,30 @@ export const MATERIAL_LOOKS: Record<Material, Look> = {
   rubber: { color: '#2b2b2b', roughness: 0.9, metalness: 0 }, emissive: { color: '#ffe9c4', roughness: 0.5, metalness: 0, emissive: true },
 };
 
+/** A subclass keeps the shader on material clones made by lights/state/look overrides. */
+class VertexGlowMaterial extends THREE.MeshStandardMaterial {
+  override onBeforeCompile(shader: Parameters<THREE.Material['onBeforeCompile']>[0]) {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n totalEmissiveRadiance *= vColor;\n#endif');
+  }
+  override customProgramCacheKey() { return 'kit-vertex-glow/2'; }
+}
+
 export class MaterialLib {
   private cache = new Map<string, THREE.Material>();
   /** A material for a kind and colour. `vertexColors` materials ignore `color` (the geometry carries it). */
-  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side } = {}): THREE.Material {
+  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side; finish?: 'kit-metal'; vertexGlow?: boolean } = {}): THREE.Material {
     const look = MATERIAL_LOOKS[kind ?? 'paint'] ?? MATERIAL_LOOKS.paint;
     const c = color ?? look.color;
-    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}`;
+    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}${opts.finish ? '|' + opts.finish : ''}${opts.vertexGlow ? '|vertex-glow' : ''}`;
     let m = this.cache.get(key);
     if (!m) {
-      const mat = new THREE.MeshStandardMaterial({ color: opts.vertexColors ? '#ffffff' : c, roughness: look.roughness, metalness: look.metalness, vertexColors: !!opts.vertexColors, transparent: !!look.transparent, opacity: look.opacity ?? 1, depthWrite: !look.transparent, side: opts.side ?? THREE.FrontSide });
       const glow = opts.glow ?? (look.emissive ? 1 : 0);
-      if (glow > 0) { mat.emissive = new THREE.Color(c); mat.emissiveIntensity = glow; }
+      const Mat = opts.vertexGlow && opts.vertexColors && glow > 0 ? VertexGlowMaterial : THREE.MeshStandardMaterial;
+      const mat = new Mat({ color: opts.vertexColors ? '#ffffff' : c, roughness: opts.finish === 'kit-metal' ? 0.32 : look.roughness, metalness: opts.finish === 'kit-metal' ? 0.25 : look.metalness, vertexColors: !!opts.vertexColors, transparent: !!look.transparent, opacity: look.opacity ?? 1, depthWrite: !look.transparent, side: opts.side ?? THREE.FrontSide });
+      if (glow > 0) {
+        mat.emissive = new THREE.Color(opts.vertexGlow && opts.vertexColors ? '#ffffff' : c); mat.emissiveIntensity = glow;
+        if (opts.vertexGlow) mat.userData.kitGlowIntensity = glow;
+      }
       m = mat; this.cache.set(key, m);
     }
     return m;

@@ -345,6 +345,16 @@ test('define-kit dry runs return similarities without printing or writing; no-ma
   assert.equal(calls.length, 4, 'dry search, normal search, schema, define');
 });
 
+test('define-kit carries an explicit kit contract separately from the definition version', async t => {
+  await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: [] } : null);
+  const kit = { name: 'slit-dome', version: 7, shapes: [{ kind: 'lathe', at: [0, 0, 0], profile: [[2, 0], [0, 2]], arc: 5.8 }] };
+  const legacy = await COMMANDS['define-kit']([JSON.stringify(kit)], { dry: true });
+  assert.equal(Object.hasOwn(legacy.def.make.args, 'v'), false);
+  const next = await COMMANDS['define-kit']([JSON.stringify({ ...kit, v: 2 })], { dry: true });
+  assert.equal(next.def.make.args.v, 2); assert.equal(next.def.version, 7);
+  assert.equal(next.def.make.args.shapes[0].arc, 5.8);
+});
+
 test('build done and show report the server reuse summary without another request', async t => {
   const reuse = { newDefs: 3, placedFromParts: 2, fromBuilds: ['chapel'], kept: ['gothic-buttress@1'], recorded: false, code: 'parts.cap' };
   const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/builds/church') ? { ok: true, build: serverBuild({ status: 'done', reuse }), reuse } : null);
