@@ -394,11 +394,11 @@ are; use it when only new copies should change.
   "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground
   at dusk and night (to let Souls switch it, copy what a library lamp declares: `defs lamp-post --json`).
   See it with `look --hour 21`; add `--weather rain` for a rainy picture.
-- **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`: a kit is a solid
-  object Souls walk around, not into.
-  A kit has no rooms or doors. For something people enter, use a building def (`church`, `chapel`, `hall`,
-  `tower`… or your own `plan`) and attach kits to it: on a flat roof's `roof` slot (`--in tower/roof`),
-  against a wall (`--against <building>.n`) or beside it; `describe <building>` lists its slots.
+- **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`.
+  For a walkable gazebo, add `"footprint":"open"` to the kit JSON: one ground room, open on all sides.
+  Or supply a ground-only `lm-building-footprint/1` object with rooms and door portals. Keep floor tops at y=0;
+  stairs and upper decks are deferred. Declare seat slots/components on the same kit. `describe` lists the room
+  and its `walk:` check; `verify-use` can enter and sit. Sealed entrances and headroom under 2 m refuse placement.
 - **Budgets.** A def bakes to ≤ 80 000 triangles; keep props a few hundred and repeated things low (every
   copy is drawn). Size 0.05–400 m (height ≤ 120 m). `describe` prints a placed thing's triangles.
 - **Meshes.** Model locally if you can (any tool that writes GLB), then

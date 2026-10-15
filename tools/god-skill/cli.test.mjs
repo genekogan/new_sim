@@ -345,6 +345,19 @@ test('define-kit dry runs return similarities without printing or writing; no-ma
   assert.equal(calls.length, 4, 'dry search, normal search, schema, define');
 });
 
+test('define-kit preserves optional open and inline footprints in dry and committed definitions', async t => {
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/defs?') ? { defs: [] } : null);
+  const kit = { name: 'walkable-gazebo', shapes: [{ kind: 'box', at: [0, 3, 0], size: [6, 0.2, 6] }] };
+  for (const footprint of ['open', { schema: 'lm-building-footprint/1', rooms: [] }]) {
+    const dry = await COMMANDS['define-kit']([JSON.stringify({ ...kit, footprint })], { dry: true });
+    assert.deepEqual(dry.def.make.args.footprint, footprint);
+    await COMMANDS['define-kit']([JSON.stringify({ ...kit, footprint })]);
+    assert.deepEqual(calls.filter(c => c.path === '/v1/god/act').at(-1).body.ops[0].def.make.args.footprint, footprint);
+  }
+  const dry = await COMMANDS['define-kit']([JSON.stringify(kit)], { dry: true });
+  assert.equal(Object.hasOwn(dry.def.make.args, 'footprint'), false);
+});
+
 test('build done and show report the server reuse summary without another request', async t => {
   const reuse = { newDefs: 3, placedFromParts: 2, fromBuilds: ['chapel'], kept: ['gothic-buttress@1'], recorded: false, code: 'parts.cap' };
   const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/builds/church') ? { ok: true, build: serverBuild({ status: 'done', reuse }), reuse } : null);

@@ -212,14 +212,15 @@ export class EngineBridge {
     const toWorld = (x: number, z: number): Vec2 => { if (worldFrame) return [r3(x), r3(z)]; const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
     const heightAt = (y: number, at: Vec2, abs?: boolean) => r3(worldFrame ? (abs ? y : this.model.terrain.sample(at[0], at[1]) + y) : wp.y + y * wp.s);
     const part: Part = {};
+    const walkableKit = def.make.kind === 'gen' && def.make.gen === 'kit/2' && !!def.make.args?.footprint; // XP5 hook
     if (isFixtureDef(def)) {
       const facts = factsOf(def, baked, wp.s);
       // a floating boat's asset carries no obstacle (catalog-adapter isFloatingDef): a new id, so worlds that registered
       // the old one (an obstacle) are sent the new one
-      const aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + (isFloatingDef(def) ? '|afloat' : ''));
-      if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts);
+      const aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + (isFloatingDef(def) ? '|afloat' : '') + (walkableKit ? '|ground-kit/1' : ''));
+      if (!known[aid] && !assets[aid]) { const asset = assetFromDef(aid, facts); if (walkableKit) { delete asset.obstacle; asset.seatApproach = 'slot'; } assets[aid] = asset; } // XP5: seats retain slots; kit solids supply the obstacle geometry.
       part.fixture = this.fixtureSpec(e, def, aid, (assets[aid] ?? known[aid]) as any, wp);
-      return part;
+      if (!walkableKit) return part;
     }
     // solids: wall segments and blocks (solid layer only; a def's own stair treads are walked by its links)
     if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {

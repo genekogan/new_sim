@@ -173,6 +173,12 @@ export class GodNav {
         doorOpen = st === 'open' || (st === undefined && front.state !== 'closed' && !(def.components.opening && e.state?.open === false));
       }
       if (frontSlot) stands.push(toWorld(frontSlot.p[0], frontSlot.p[2]));
+      // XP5 hook: the footprint's clear lane can be off-centre, or on an open side without a radial front door.
+      if (def.make.kind === 'gen' && def.make.gen === 'kit/2' && def.make.args?.footprint && frontSlot) {
+        const n: Vec2 = [Math.sin(frontSlot.yaw), Math.cos(frontSlot.yaw)];
+        stands.unshift(toWorld(frontSlot.p[0], frontSlot.p[2]));
+        inside = toWorld(frontSlot.p[0] + n[0] * 2.2, frontSlot.p[2] + n[1] * 2.2); doorOpen = true;
+      }
       const roomRefs: string[] = [];
       for (const r of rooms) {
         const rref = `${ref}/${r.id}`; if (m.get(rref)) continue; // a child named like a room keeps its name

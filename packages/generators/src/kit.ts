@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { materialEnum, num, slotSchema, v2, v3 } from './fields.ts';
 import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
 import { CREATION_LIMITS } from './creation-limits.ts';
+import { kitFootprint, kitFootprintSchema } from './kit-footprint.ts'; // XP5 hook
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -52,6 +53,7 @@ export type KitShape = z.infer<typeof shape>;
 
 export const kitArgs = z.object({
   shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitShapes),
+  footprint: kitFootprintSchema.optional(), // XP5: opt-in ground rooms; absent keeps today's bake.
   slots: z.array(slotSchema).max(64).optional(),
   /** Override the computed bounds (rarely needed). */
   box: v3.optional(),
@@ -158,8 +160,8 @@ export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}):
   if (!Number.isFinite(x0)) { x0 = y0 = z0 = -0.5; x1 = y1 = z1 = 0.5; }
   const box: Vec3 = args.box ?? [Math.max(0.01, x1 - x0), Math.max(0.01, y1 - Math.min(0, y0)), Math.max(0.01, z1 - z0)];
   // merge colliders into one when there are many small ones (keeps the spatial index lean)
-  const merged = !tilted && colliders.length > CREATION_LIMITS.uprightKitMergeThreshold ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: Math.max(0, y0), y1 }] : colliders;
-  return { box, colliders: merged, slots: args.slots ?? [], tris };
+  const merged = !args.footprint && !tilted && colliders.length > CREATION_LIMITS.uprightKitMergeThreshold ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: Math.max(0, y0), y1 }] : colliders;
+  return kitFootprint(args.footprint, { box, colliders: merged, slots: args.slots ?? [], tris }, { min: [x0, 0, z0], max: [x1, y1, z1] }); // XP5 hook
 }
 
 export const kitGen: Generator = {

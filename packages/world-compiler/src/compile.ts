@@ -3,7 +3,7 @@
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
 import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
-import { CREATION_LIMITS, GENERATORS, prepareFor, queryOf } from '@sim/generators';
+import { CREATION_LIMITS, GENERATORS, kitFootprintIssues, prepareFor, queryOf } from '@sim/generators';
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
@@ -684,6 +684,11 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   const s = e.s ?? 1;
   if (s < def.size.scale[0] || s > def.size.scale[1]) return fail(i, 'size.range', `scale ${s} outside [${def.size.scale.join(', ')}]`);
   const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+  // XP5: opt-in kit rooms use their actual solids and the placed body's clearance.
+  if (def.make.kind === 'gen' && def.make.gen === 'kit/2' && def.make.args?.footprint) {
+    const issue = kitFootprintIssues(baked, w.worldPose(e).s)[0];
+    if (issue) return { ...fail(i, issue.code, issue.detail), entity: e.id, field: 'make.args.footprint', fix: 'Keep a ground entrance at least 0.75 m wide, 2 m headroom, and a clear route into each room.' };
+  }
   // generators report design faults as `violation:` notes (building/1: sealed rooms, blocked stairs, headroom)
   const violations = (baked.notes ?? []).filter((n) => n.startsWith('violation: '));
   if (violations.length) return fail(i, 'architecture', violations.map((n) => n.slice(11)).join('; '));
