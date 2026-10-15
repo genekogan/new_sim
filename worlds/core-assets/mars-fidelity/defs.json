@@ -1,0 +1,201 @@
+[
+ {
+  "schema": "def/1",
+  "name": "core-mars-mimos",
+  "version": 2,
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): the brown glazing cloth has a sagged upper edge and fine gathered folds, fitted to drone f040/f117; original footprint retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "building",
+   "cafe",
+   "lounge",
+   "tea",
+   "study",
+   "mimos"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7105e3cc4c94f6ff1dde852da1f081902a0430e5b68c0ddedcdfb75433abca45",
+   "collide": "box",
+   "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
+  },
+  "size": {
+   "box": [
+    15.553,
+    6.465,
+    7.919
+   ],
+   "scale": [
+    1,
+    1
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ],
+  "slots": [
+   {
+    "id": "main",
+    "kind": "room",
+    "p": [
+     -2.611,
+     0.7703,
+     0.647
+    ],
+    "yaw": 0,
+    "floor": 1,
+    "polygon": [
+     [
+      -5.1354,
+      -0.5998
+     ],
+     [
+      1.8696,
+      -0.5998
+     ],
+     [
+      1.8696,
+      3.1002
+     ],
+     [
+      -5.1354,
+      3.1002
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Mimos main (raised: coffee counter, MIMOS sign, study table)"
+   },
+   {
+    "id": "main-south",
+    "kind": "room",
+    "p": [
+     1.189,
+     0.2403,
+     0.597
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      -1.9304,
+      -0.5498
+     ],
+     [
+      5.1996,
+      -0.5498
+     ],
+     [
+      5.1996,
+      3.1502
+     ],
+     [
+      -1.9304,
+      3.1502
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Mimos main south (ground level, the lounge by the glazing)"
+   },
+   {
+    "id": "floor",
+    "kind": "room",
+    "p": [
+     1.389,
+     0.2403,
+     -0.903
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      -2.1304,
+      -2.9198
+     ],
+     [
+      4.9996,
+      -2.9198
+     ],
+     [
+      4.9996,
+      0.9502
+     ],
+     [
+      -2.1304,
+      0.9502
+     ]
+    ],
+    "height": 2.4,
+    "accepts": {},
+    "capacity": 64,
+    "label": "Mimos floor (glazed tea room, honey sofa under the posters)"
+   }
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-chiba",
+  "version": 2,
+  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 99 wall/solid colliders, 0 stairs. 64520 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): the three native upper-gallery photos display upright, with original source pixels, mounting positions and footprint retained.",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "building",
+   "auditorium",
+   "hall",
+   "gallery",
+   "chiba",
+   "venue"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "99a67a05aa1f72d27fd40d78f4bd76ad3dbda9a588780244ea4a3c89c55c5415",
+   "collide": "box",
+   "footprint": "81961faa571d8311fdb4689c50eeb6d325856ba8ef1b578b258d112c0a57dca0"
+  },
+  "size": {
+   "box": [
+    38.581,
+    7.46,
+    26.95
+   ],
+   "scale": [
+    1,
+    1
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": false
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ }
+]
