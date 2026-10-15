@@ -2,7 +2,7 @@
 // Runs the actual shoot callbacks against a scripted viewer; no browser, server or GPU.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { lookFrame, parseFlags, checkArgs, COMMANDS } from '../cli.mjs';
@@ -19,7 +19,7 @@ class Vector {
   set(...a) { this.a = a; return this; }
   toArray() { return [...this.a]; }
 }
-async function realized(frame, cam, { keep = false, first = false, fov = 45, aspect = 1.6, nearPlane = .1, drift = false, neverReady = false } = {}) {
+async function realized(frame, cam, { keep = false, first = false, fov = 45, aspect = 1.6, nearPlane = .1, drift = false, neverReady = false, shots = [{}] } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'w3-look-cpu-')), out = join(dir, 'scripted.png');
   const saved = Object.fromEntries(['window', 'document', 'requestAnimationFrame'].map(k => [k, globalThis[k]]));
   let closed = 0, released = 0, captures = 0, clock = 0, navigations = [], appliedBeforeReady = false;
@@ -47,12 +47,16 @@ async function realized(frame, cam, { keep = false, first = false, fov = 45, asp
     evaluate: async (fn, args) => fn(args), waitForTimeout: async ms => { advance(ms); if (drift) viewer.controls.target.set(7, 8, 9); } };
   const browser = { contexts: () => [{ pages: () => [page] }], newContext: async () => ({ addInitScript: async () => {}, newPage: async () => page }), close: async () => { closed++; } };
   try {
-    const receipt = await shoot({ worldUrl: 'http://world.invalid/w/fixture', eye: cam.eye, at: cam.at, span: frame.fitSpan,
-      out, timeoutMs: 9000, settleMs: first ? 3500 : 800, keep },
-      { pw: { chromium: { launch: async () => browser, connectOverCDP: async () => browser } },
-        ensureKeeper: async () => ({ port: 1 }), lease: async () => () => { released++; }, now: () => clock, sleep: async ms => advance(ms) });
-    assert.equal(readFileSync(out, 'utf8'), 'scripted');
-    return { eye: viewer.camera.position.toArray(), at: viewer.controls.target.toArray(), receipt, navigations, appliedBeforeReady, captures };
+    const results = [];
+    for (const overrides of shots) {
+      const receipt = await shoot({ worldUrl: 'http://world.invalid/w/fixture', eye: cam.eye, at: cam.at, span: frame.fitSpan,
+        out, timeoutMs: 9000, settleMs: first ? 3500 : 800, keep, ...overrides },
+        { pw: { chromium: { launch: async () => browser, connectOverCDP: async () => browser } },
+          ensureKeeper: async () => ({ port: 1 }), lease: async () => () => { released++; }, now: () => clock, sleep: async ms => advance(ms) });
+      assert.equal(readFileSync(out, 'utf8'), 'scripted');
+      results.push({ receipt, url, navigations: navigations.length });
+    }
+    return { eye: viewer.camera.position.toArray(), at: viewer.controls.target.toArray(), receipt: results.at(-1).receipt, results, navigations, appliedBeforeReady, captures };
   } catch (e) {
     assert.equal(existsSync(out), false, 'refuse before writing an unverified shot');
     assert.equal(captures, 0, 'refuse before reading the canvas');
@@ -80,6 +84,67 @@ test('subsequent kept shots reuse the initialized tab and apply new framing', as
   const actual = await realized(frame, cam, { keep: true });
   assert.equal(actual.navigations.length, 0);
   assert.deepEqual(actual.eye, cam.eye); assert.deepEqual(actual.at, cam.at);
+});
+
+test('plain and first kept shots carry hour/weather without changing initial camera framing', async () => {
+  const frame = { fitSpan: 0 }, cam = camera({ target: [3, 2, -4], span: 4, dist: 12 });
+  for (const keep of [false, true]) {
+    const actual = await realized(frame, cam, { keep, first: true, shots: [{ hour: '21:00', weather: 'rain' }] });
+    assert.equal(actual.navigations.length, 1);
+    const q = new URL(actual.navigations[0]).searchParams;
+    assert.equal(q.get('hour'), '21:00'); assert.equal(q.get('weather'), 'rain');
+    assert.equal(q.get('eye'), cam.eye.join(',')); assert.equal(q.get('at'), cam.at.join(','));
+    assert.equal(q.get('shot'), '1'); assert.equal(q.get('settle'), '1500');
+    assert.equal(actual.appliedBeforeReady, false);
+    assert.deepEqual(actual.eye, cam.eye); assert.deepEqual(actual.at, cam.at);
+  }
+});
+
+test('kept shots reload only when hour/weather change or clear, and reuse repeats', async () => {
+  const frame = { fitSpan: 0 }, cam = camera({ target: [3, 2, -4], span: 4, dist: 12 });
+  const shots = [{}, { hour: '21:00', weather: 'rain' }, { hour: '21:00', weather: 'rain' },
+    { hour: '22:00', weather: 'rain' }, { hour: '22:00', weather: 'clear' },
+    { hour: '22:00' }, { hour: '22:00' }, { weather: 'rain' }, { weather: 'rain' }, {}, {}];
+  const actual = await realized(frame, cam, { keep: true, shots });
+  assert.deepEqual(actual.results.map(r => r.navigations), [0, 1, 1, 2, 3, 4, 4, 5, 5, 6, 6]);
+  for (const [i, result] of actual.results.entries()) {
+    const q = new URL(result.url).searchParams;
+    assert.equal(q.get('hour'), shots[i].hour ?? null);
+    assert.equal(q.get('weather'), shots[i].weather ?? null);
+    assert.deepEqual(result.receipt.frames.eye, cam.eye); assert.deepEqual(result.receipt.frames.at, cam.at);
+  }
+  assert.equal(actual.captures, shots.length);
+  assert.equal(actual.appliedBeforeReady, false);
+});
+
+test('shots without overrides preserve the existing launch URL and kept tab URL', async () => {
+  const frame = { fitSpan: 0 }, cam = camera({ target: [3, 2, -4], span: 4, dist: 12 });
+  const expected = `http://world.invalid/w/fixture?${new URLSearchParams({ shot: '1', eye: cam.eye.join(','), at: cam.at.join(','), settle: '1500' })}`;
+  for (const keep of [false, true]) {
+    const first = await realized(frame, cam, { keep, first: true });
+    assert.deepEqual(first.navigations, [expected]);
+  }
+  const reused = await realized(frame, cam, { keep: true });
+  assert.deepEqual(reused.navigations, []);
+  assert.equal(reused.results[0].url, 'http://world.invalid/w/fixture?shot=1&eye=0,10,10&at=0,0,0');
+});
+
+test('npx fallback carries hour/weather and leaves URLs without overrides unchanged', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'look-fallback-')), out = join(dir, 'fallback.png');
+  const eye = [0, 10, 10], at = [0, 0, 0];
+  try {
+    for (const overrides of [{}, { hour: '21:00', weather: 'rain' }]) {
+      const calls = [];
+      const receipt = await shoot({ worldUrl: 'http://world.invalid/w/fixture', eye, at, out, ...overrides },
+        { pw: null, spawnSync: (cmd, args) => { calls.push({ cmd, args }); writeFileSync(out, 'scripted'); return { status: 0 }; } });
+      assert.equal(calls.length, 1); assert.equal(calls[0].cmd, 'npx');
+      const url = calls[0].args.at(-2), q = new URL(url).searchParams;
+      assert.equal(q.get('hour'), overrides.hour ?? null); assert.equal(q.get('weather'), overrides.weather ?? null);
+      assert.equal(q.get('eye'), eye.join(',')); assert.equal(q.get('at'), at.join(','));
+      assert.equal(receipt.via, 'npx playwright-core screenshot'); assert.equal(receipt.file, out);
+      if (!Object.keys(overrides).length) assert.equal(url, 'http://world.invalid/w/fixture?shot=1&eye=0%2C10%2C10&at=0%2C0%2C0');
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('camera retargeting during settle refuses capture', async () => {

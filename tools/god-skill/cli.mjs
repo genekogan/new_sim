@@ -261,12 +261,43 @@ export async function describe(ref, flags = {}) {
 export async function where(spec, flags = {}) {
   const m = await mirror(); const v = view(m);
   const p = refPoint(v, spec, flags.offset);
-  const d = (await query({ where: [p.x, p.z] })).where;
+  // Ask the existing clearance query for a point's standing-height column in the
+  // same request. Bounds alone cannot tell whether an open gate's passage is blocked.
+  const result = await query({ where: [p.x, p.z], clearance: { at: [p.x, p.z], size: [0, 0] } });
+  const d = result.where, colliders = new Set(result.clearance?.blockedBy ?? []);
   if (flags.json) return d;
   return [`(${d.x}, ${d.z}): ground y ${d.y}, slope ${d.slopeDeg}°, ${d.medium}${d.water ? `, water level ${d.water.level} (${d.water.depth} m deep)` : ''}`,
     d.room ? `  inside ${d.room.building}, room ${d.room.room} (floor ${d.room.floor})` : '',
-    d.inside.length ? `  within: ${d.inside.map((x) => `${x.path} [${x.layer}]`).join(', ')}` : '  nothing built here',
+    d.inside.length ? `  within: ${d.inside.map((x) => `${x.path} [${colliders.has(x.path) ? 'collider' : 'bounds'}] (${x.layer})`).join(', ')}` : '  nothing built here',
     d.near.length ? `  nearest: ${d.near.map((n) => `${n.path} ${n.dist} m ${n.dir}`).join(', ')}` : ''].filter(Boolean).join('\n');
+}
+
+/** reach <from> <to>: the server's engine route check; refs (including path:room) stay server-side. */
+export async function reach(from, to, flags = {}) {
+  const end = (s) => {
+    if (typeof s !== 'string' || !s.trim()) throw new Error('reach needs <from> <to> (refs or x,z / x,y,z)');
+    if (!s.includes(',')) return s;
+    const parts = s.split(',');
+    if (![2, 3].includes(parts.length) || parts.some(x => !x.trim() || !Number.isFinite(Number(x)))) throw new Error('reach coordinates need x,z or x,y,z');
+    return parts.map(Number);
+  };
+  const d = (await query({ reach: { from: end(from), to: end(to) } })).reach;
+  if (flags.json) return d;
+  if (d.supported === false) return `reach: not checked — ${d.note}`;
+  return `reach: ${d.reachable ? 'OK' : 'FAILED'}${d.length !== undefined ? ` (${d.length} m)` : ''}${d.code ? ` — ${d.code}` : ''}${d.detail ? ` — ${d.detail}` : ''}${d.note ? ` — ${d.note}` : ''}`;
+}
+
+/** clear <x,z|ref> --size WxD: the existing footprint-clearance query, without editing. */
+export async function clear(spec, flags = {}) {
+  if (typeof spec !== 'string' || !spec.trim()) throw new Error('clear needs <x,z|ref> --size WxD');
+  if (typeof flags.size !== 'string') throw new Error('clear needs --size WxD');
+  const size = buildPair(flags.size.replace(/[x×]/i, ','), '--size');
+  if (size.some(x => x <= 0)) throw new Error('--size must be positive');
+  let point;
+  if (spec.includes(',')) point = buildPair(spec, 'clear position');
+  else { const p = refPoint(view(await mirror()), spec); point = [p.x, p.z]; }
+  const d = (await query({ clearance: { at: point, size } })).clearance;
+  return flags.json ? d : d.clear ? `clear: ${size.join('×')} m at ${point.join(',')}` : `blocked: ${d.blockedBy.join(', ')}`;
 }
 
 /** free WxD [--near ref] [--radius r] [--count n]: flat dry plots nobody occupies. */
@@ -581,6 +612,9 @@ export const BUILD_API = {
     return { id: b.id, lease: r.lease, n: step?.n || 1, label: step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status };
   },
   claim: (b, c) => ({ id: b.id, claim: c.id, part: c.part, n: c.step?.n || 1, label: c.step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status }),
+  stepBody: (b, n, label, say, masses) => ({ ...(b.claim ? { claim: b.claim } : { lease: b.lease }), n, label, say, ...(masses ? { masses } : {}) }),
+  stepEcho: (b, local) => local.claim ? b.claims.find(c => c.id === local.claim)?.step : b.step,
+  say: (b) => typeof b.say === 'string' ? b.say : b.say?.text,
 };
 const buildPair = (s, what) => {
   if (typeof s !== 'string' || s.split(',').some((v) => !v.trim())) throw new Error(`${what} needs two numbers`);
@@ -646,11 +680,47 @@ function buildReport(r) {
   const reuse = reuseReport(r.reuse ?? b.reuse); if (reuse) lines.push(reuse);
   return lines.join('\n');
 }
+const waitTimeout = (value = '15m') => {
+  const m = typeof value === 'string' && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
+  const ms = m && Number(m[1]) * { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[m[2]];
+  if (!Number.isSafeInteger(ms) || ms <= 0) throw new Error('build wait --timeout needs a positive duration, e.g. 15m or 30s');
+  return ms;
+};
+/** Read only; injected time/sleep let stub-server tests exercise the full backoff without waiting minutes. */
+export async function buildWait(id, flags = {}, runtime = {}) {
+  const timeout = waitTimeout(flags.timeout), now = runtime.now ?? Date.now, wait = runtime.sleep ?? sleep;
+  const print = runtime.print ?? (line => console.error(line)), start = now(), deadline = start + timeout;
+  let previous, last, delay = 2000;
+  const summary = (b) => b ? `${b.status}; claims: ${b.claims.map(c => `${c.part} ${c.status}${c.step ? ` ${c.step.n} ${c.step.label}` : ''}`).join('; ') || 'none'}` : 'claim state not received';
+  const finish = (reason) => {
+    const result = { ok: reason !== 'timeout', reason, build: last, waitedMs: now() - start };
+    return flags.json ? result : `${id}: ${reason === 'timeout' ? 'timed out' : reason === 'abandoned' ? 'claim abandoned' : reason === 'closed' ? 'build ended' : 'all claims released'}; ${summary(last)}`;
+  };
+  for (;;) {
+    const response = await call(BUILD_API.path(id), { timeoutMs: Math.max(1, Math.min(180_000, deadline - now())) });
+    if (response.status === 0 && response.data?.code === 'slow') return finish('timeout');
+    const r = ok(response, 'build wait');
+    if (r.ok === false) return flags.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+    last = r.build;
+    const line = summary(last), changed = line !== previous;
+    if (changed && !flags.json) print(`${id}: ${line}`);
+    previous = line;
+    if (['done', 'abandoned'].includes(last.status)) return finish('closed');
+    if (last.claims.some(c => c.status === 'abandoned')) return finish('abandoned');
+    if (last.claims.every(c => ['released', 'done', 'taken'].includes(c.status))) return finish('released');
+    const remaining = deadline - now();
+    if (remaining <= 0) return finish('timeout');
+    if (changed) delay = 2000;
+    await wait(Math.min(delay, remaining));
+    if (now() >= deadline) return finish('timeout');
+    delay = Math.min(15_000, delay * 1.5);
+  }
+}
 export async function build(sub = 'show', args = [], f = {}) {
   const s = load(), b = s.build, arg = args[0];
-  const options = { start: 'title steps at offset size yaw mass brief root', step: '', show: '', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
-  if (!Object.hasOwn(options, sub)) throw new Error('build: start|step|show|resume|claim|release|pause|done|abandon');
-  if (args.length > (['release', 'abandon'].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
+  const options = { start: 'title steps at offset size yaw mass brief root', step: 'say mass', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
+  if (!Object.hasOwn(options, sub)) throw new Error('build: start|step|show|wait|resume|claim|release|pause|done|abandon');
+  if (args.length > (['release', 'abandon', 'wait'].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
   for (const [k, v] of Object.entries(f)) {
     if (!['json', 'no-build', ...options[sub].split(' ')].includes(k)) throw new Error(`build ${sub} has no option --${k}`);
     if (Array.isArray(v)) throw new Error(`build ${sub} --${k} takes one value`);
@@ -662,8 +732,28 @@ export async function build(sub = 'show', args = [], f = {}) {
     if (b.n >= 999) throw new Error('build step cannot exceed 999');
     const n = b.n + 1, label = arg ?? b.steps[n - 1] ?? `step ${n}`;
     if (typeof label !== 'string' || !label.trim() || label.length > 60) throw new Error('step label is 1..60 characters');
+    if (f.mass !== undefined && f.say === undefined) throw new Error('build step --mass needs --say');
+    if (f.say !== undefined) {
+      if (typeof f.say !== 'string') throw new Error('--say needs 1..140 characters');
+      const say = f.say.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+      if (!say.trim() || say.length > 140) throw new Error('--say needs 1..140 characters');
+      const masses = f.mass === undefined ? undefined : typeof f.mass === 'string' ? f.mass.split(',').map(x => x.trim()) : [];
+      if (masses && (!masses.length || masses.length > 8 || masses.some(x => !/^[a-z0-9][a-z0-9-]{0,18}$/.test(x)))) throw new Error('--mass needs at most 8 mass names, e.g. nave,tower');
+      if (!b.claim && !b.lease) throw new Error('no build lease; build resume first');
+      const r = ok(await call(BUILD_API.path(b.id, 'step'), { body: BUILD_API.stepBody(b, n, label, say, masses) }), 'build step');
+      if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+      const step = BUILD_API.stepEcho(r.build, b);
+      if (!step) throw new Error('build step response is missing the server step; build show before continuing');
+      save({ build: { ...b, n: step.n, label: step.label, status: r.build.status } });
+      invalidate();
+      return f.json ? r : `step ${step.n}/${b.steps.length}: ${step.label}${BUILD_API.say(r.build) ? ` — designing: ${BUILD_API.say(r.build)}` : ''}`;
+    }
     save({ build: { ...b, n, label } });
     return `step ${n}/${b.steps.length}: ${label} (rides on your next edit)`;
+  }
+  if (sub === 'wait') {
+    if (!b) throw new Error('no current build; build resume <id> first');
+    return buildWait(b.id, f);
   }
   if (sub === 'show') {
     const response = await call(BUILD_API.path(arg));
@@ -810,16 +900,30 @@ export function lookFrame(v, extent, flags = {}) {
     tight: explicitSpan && dist === undefined && !flags.inside };
 }
 /** look [--at ref|x,z] [--from n|e|s|w|ne…|above] [--dist m] [--span m] [--inside] [--out file]: a screenshot to read. */
-export async function look(flags = {}) {
+export function lookOverrides(flags = {}) {
+  const out = {};
+  if (flags.hour !== undefined) {
+    if (typeof flags.hour !== 'string' || !/^(?:[01]?\d|2[0-3])(?::[0-5]\d)?$/.test(flags.hour)) throw new Error('look --hour takes HH[:MM], from 00:00 to 23:59');
+    const [hour, minute = '00'] = flags.hour.split(':');
+    out.hour = `${hour.padStart(2, '0')}:${minute}`;
+  }
+  if (flags.weather !== undefined) {
+    if (typeof flags.weather !== 'string' || !/^[a-z][a-z-]{0,31}$/.test(flags.weather)) throw new Error('look --weather takes one weather name, e.g. rain or clear');
+    out.weather = flags.weather;
+  }
+  return out;
+}
+export async function look(flags = {}, runtime = {}) {
   if (flags.stop) return stopKeeper();
+  const overrides = lookOverrides(flags);
   const m = await mirror(); const v = view(m);
   const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags);
   if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
   const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
-  if (!flags.keep) shot = await shoot(args);
+  if (!flags.keep) shot = await (runtime.shoot ?? shoot)(args);
   else {
     // a kept browser: the shot runs in a child process so its browser connection does not keep this one alive
     const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
@@ -897,7 +1001,7 @@ export async function furnish(ref, flags = {}) {
   const r = await act({ ops: f.ops, ...(flags.group ? { group: flags.group } : {}) }, `furnish ${ref}`);
   return r.accepted ? [`furnished ${ref}: ${summarizeOps(f.ops)} (seq ${r.seq})`, ...lines].join('\n') : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
-export const EXAMPLES = { hamlet: 'a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog', 'two-floor-house': 'a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1', 'river-bridge': 'a lake, a river to the south edge, roads that bridge it', 'market-square': 'a plaza, a row of stalls, benches, lamps, a fountain', 'forest-edge': 'a woodland, a meadow, a track along the edge, deer', 'hillside-village': 'a hill, a road up it, cottages along it, a chapel, door paths', 'church-massing': 'a church: site and massing first, then shell, roof and tower, openings, interior, furnishing' };
+export const EXAMPLES = { hamlet: 'a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog', 'two-floor-house': 'a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1', 'river-bridge': 'a lake, a river to the south edge, roads that bridge it', 'market-square': 'a plaza, a row of stalls, benches, lamps, a fountain', 'forest-edge': 'a woodland, a meadow, a track along the edge, deer', 'hillside-village': 'a hill, a road up it, cottages along it, a chapel, door paths' };
 /** examples [name]: the worked examples served by the world (the exact commands and their answers). */
 export async function examples(name) {
   if (!name) return ['worked examples (each = the exact commands a god agent typed and the answers it got):', ...Object.entries(EXAMPLES).map(([k, d]) => `- ${k}: ${d}`), `read one: examples <name>  (saves examples/<name>.log and .mjs here; also served at ${load().world}/god/examples/<name>.log)`].join('\n');
@@ -942,17 +1046,17 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
-  build: 'title steps at offset size yaw mass brief root take done force undo',
+  build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
-  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
+  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop hour weather', defs: 'tag all', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -978,7 +1082,7 @@ export const COMMANDS = {
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
-  describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
+  describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), reach: (r, f) => reach(r[0], r[1], f), clear: (r, f) => clear(r[0], f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
@@ -994,14 +1098,14 @@ export const COMMANDS = {
 };
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
-read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
-look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane.
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
+look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] · build [show [id]] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>

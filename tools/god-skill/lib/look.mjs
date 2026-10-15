@@ -101,29 +101,31 @@ async function ensureKeeper(worldUrl, cliPath) {
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
+export async function shoot({ worldUrl, eye, at, out, hour, weather, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   const t0 = now();
-  const pw = runtime.pw ?? findPlaywright();
+  const overrides = { ...(hour != null ? { hour } : {}), ...(weather != null ? { weather } : {}) };
+  const pw = runtime.pw === undefined ? findPlaywright() : runtime.pw;
   if (!pw) {
     if (keep) throw new Error('look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works');
-    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
-    const r = spawnSync('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
+    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
+    const r = (runtime.spawnSync ?? spawnSync)('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: now() - t0, via: 'npx playwright-core screenshot' };
   }
   let page, browser, release = () => {};
-  const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
+  const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}), ...overrides });
   if (keep) {
     const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
     browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
     // A newly started (or older) keeper has only ?shot=1. Give the viewer its initial camera too,
-    // so its own delayed arrival framing cannot overwrite the first requested shot.
+    // so its own delayed arrival framing cannot overwrite the first requested shot. Hour/weather
+    // overrides are read at page load, so reload when either changes (including removal).
     const current = new URL(page.url()).searchParams;
-    if (!current.has('eye') || !current.has('at')) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
+    if (!current.has('eye') || !current.has('at') || ['hour', 'weather'].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
   } else {
     release = await (runtime.lease ?? chromeLease)('eden-god look');
     browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch((e) => { release(); throw new Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });

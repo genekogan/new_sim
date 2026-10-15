@@ -109,6 +109,14 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   }
   const finish = (r) => {
     const b = body?.build, data = r.data;
+    // env.mjs formats only the applied environment. Surface the server's shared-clock
+    // warning here as well, including sky's world-state act, without another call.
+    if (as === 'god' && ['/v1/god/env', '/v1/god/act'].includes(pathname)) {
+      for (const w of data?.warnings ?? []) {
+        if (typeof w === 'string' && /^env\.shared-clock\b/.test(w)) console.error(w);
+        else if (w?.code === 'env.shared-clock') console.error(`${w.code}: ${w.detail ?? w.message ?? ''}`);
+      }
+    }
     if (as === 'god' && pathname === '/v1/god/preview' && data?.accepted && data.id && b?.claim && b.done) {
       // The commit must send only {preview}. Keep just the local completion
       // intent so a sealed claim done:true can clear its own file on success.

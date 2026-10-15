@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
 import { view, invalidate, mirror } from './lib/mirror.mjs';
-import { build, group, act, dryrun, importWorld, parseFlags, parseMassing } from './cli.mjs';
+import { build, buildWait, EXAMPLES, examples, group, act, dryrun, importWorld, look, lookOverrides, parseFlags, parseMassing } from './cli.mjs';
 import { buildSuffix, call, claimFile, load, save } from './lib/state.mjs';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -14,7 +14,7 @@ function fixture(t, data) {
   const cwd = process.cwd(), originalFetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'god-cli-offline-')), calls = [];
   process.chdir(dir);
   writeFileSync('.eden-god.json', JSON.stringify({ world: 'https://world.invalid', token: 'fixture-only', group: 'previewed-group' }));
-  globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return Response.json(data); };
+  globalThis.fetch = async (url, options) => { const c = { url, ...options }; calls.push(c); return Response.json(typeof data === 'function' ? data(c) : data); };
   t.after(() => { globalThis.fetch = originalFetch; process.chdir(cwd); rmSync(dir, { recursive: true, force: true }); });
   return calls;
 }
@@ -170,8 +170,8 @@ async function buildFixture(t, handler = () => null) {
         else if (c.path === '/v1/god/query') reply = c.body.furnish ? { furnish: { ops: [{ op: 'set', id: 'church', state: { paint: '#fff' } }], notes: [], rooms: [] } } : { layout: { entities: [] } };
         else reply = { accepted: true, seq: 2, reverted: [1], ...(c.body?.build ? { build: echo(c.body) } : {}) };
       }
-      res.writeHead(reply.httpStatus ?? 200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify(reply.data ?? reply));
+      res.writeHead(reply.httpStatus ?? 200, { 'content-type': reply.contentType ?? 'application/json' });
+      res.end(reply.rawText ?? JSON.stringify(reply.data ?? reply));
     } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
   });
   for (;;) {
@@ -710,7 +710,8 @@ test('invalid build options/masses refuse locally before any HTTP request', asyn
   for (const f of [{ steps: true }, { steps: 'a,,b' }, { size: ',3' }, { at: '1,no' }, { offset: '1,no' }, { title: true }, { mass: 'nave 0,0 0x10 h12' }, { mass: 'nave 0,0 10x10 h121' }, { mass: 'nave 0,0 10x10 h12 tent' }, { mass: true }, { steps: ['a', 'b'] }]) await assert.rejects(build('start', ['church'], { ...startFlags(), ...f }));
   assert.throws(() => parseMassing(Array(9).fill('0,0 1x1 h1').join(';')), /at most 8/);
   assert.throws(() => checkArgs('build', { plan: true }, ['start', 'church']), /no option --plan/);
-  await assert.rejects(build('step', [], { mass: 'ignored' }), /no option --mass/);
+  save({ build: localBuild() });
+  await assert.rejects(build('step', [], { mass: 'ignored' }), /needs --say/);
   await assert.rejects(build('resume', ['church'], { take: 'c_11111111' }), /takes no value/);
   assert.equal(calls.length, 0);
 });
@@ -821,4 +822,234 @@ test('downloadable bundle runs the build lifecycle and global bypass against onl
   assert.equal(parts.stderr, '');
   assert.deepEqual(JSON.parse((await cli(['parts', '--json'])).stdout), { parts: [keptPart()] });
   assert.match((await cli(['find', 'gothic', 'stone'])).stdout, /used in: black-church \(done; 10 standing\)/);
+});
+
+test('narrated build step posts once and prints/saves the server echo before any design edit', async t => {
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/step') ? { ok: true, build: serverBuild({ step: { n: 3, label: 'server roof' }, say: 'Server narration', sayAt: 123, designing: ['nave', 'tower'] }) } : null);
+  save({ build: localBuild() });
+  const out = await COMMANDS.build(['step', 'roof'], { say: 'Copper\nspires', mass: 'nave, tower' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'POST'); assert.equal(calls[0].path, '/v1/god/builds/church/step');
+  assert.deepEqual(calls[0].body, { lease: 'l_1234abcd', n: 2, label: 'roof', say: 'Copperspires', masses: ['nave', 'tower'] });
+  assert.equal(out, 'step 3/5: server roof — designing: Server narration');
+  assert.equal(load().build.n, 3); assert.equal(load().build.label, 'server roof');
+  await build('step'); assert.equal(calls.length, 1, 'the legacy step stays local');
+  await act({ ops: [{ op: 'remove', id: 'old' }] });
+  assert.equal(calls[1].body.build.step, 4);
+});
+
+test('narrated claim steps use exactly the claim credential and only rewrite the claim file', async t => {
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/step') ? { ok: true, build: serverBuild({ step: { n: 7, label: 'lead' }, claims: [{ id: 'c_1234abcd', step: { n: 2, label: 'pews' } }], say: { text: 'Six pews', at: 123 } }) } : null);
+  save({ build: localBuild() }); const lead = readFileSync('.eden-god.json', 'utf8');
+  process.env.EDEN_GOD_CLAIM = 'c_1234abcd';
+  const r = await build('step', ['pews'], { say: 'Six pews', json: true });
+  assert.equal(r.build.step.n, 7);
+  assert.deepEqual(calls[0].body, { claim: 'c_1234abcd', n: 2, label: 'pews', say: 'Six pews' });
+  assert.equal(load().build.n, 2); assert.equal(load().build.label, 'pews');
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+});
+
+test('narration refuses invalid input locally and preserves progress on server refusal or HTTP error', async t => {
+  let http = false;
+  const refusal = { ok: false, failures: [{ op: -1, code: 'build.lease', detail: 'superseded' }] };
+  const { calls } = await buildFixture(t, () => http ? { httpStatus: 401, data: { error: 'unauthorized' } } : refusal);
+  save({ build: localBuild() }); const before = readFileSync('.eden-god.json', 'utf8');
+  for (const flags of [{ say: true }, { say: '' }, { say: '\n\t' }, { say: 'x'.repeat(141) }, { say: ['one', 'two'] }, { say: 'roof', mass: '' }, { say: 'roof', mass: true }, { say: 'roof', mass: 'nave,,tower' }, { say: 'roof', mass: Array(9).fill('nave').join(',') }, { mass: 'nave' }]) {
+    await assert.rejects(build('step', [], flags));
+  }
+  assert.equal(calls.length, 0);
+  assert.match(await build('step', [], { say: 'Roof' }), /REFUSED: build.lease.*build resume church/);
+  assert.deepEqual(await build('step', [], { say: 'Roof', json: true }), refusal);
+  http = true; await assert.rejects(build('step', [], { say: 'Roof' }), /HTTP 401/);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
+});
+
+test('build wait backs off 2s to 15s, prints only changed claim state and finishes on release', async t => {
+  let poll = 0, clock = 0; const waits = [], changes = [];
+  const { calls } = await buildFixture(t, () => { poll++; return { ok: true, build: serverBuild({ claims: [{ id: 'c_1234abcd', part: 'tower', status: poll === 10 ? 'done' : 'held', step: { n: poll >= 9 ? 2 : 1, label: 'spire' } }] }) }; });
+  const out = await buildWait('church', {}, { now: () => clock, sleep: async ms => { waits.push(ms); clock += ms; }, print: s => changes.push(s) });
+  assert.deepEqual(waits, [2000, 3000, 4500, 6750, 10125, 15000, 15000, 15000, 2000]);
+  assert.equal(changes.length, 3); assert.match(changes[0], /tower held 1 spire/); assert.match(changes[1], /tower held 2 spire/); assert.match(changes[2], /tower done/);
+  assert.match(out, /all claims released/);
+  assert.ok(calls.every(c => c.method === 'GET' && c.path === '/v1/god/builds/church' && c.body === undefined));
+});
+
+test('build wait stops for abandonment or build end; done/released/taken claims count as released', async t => {
+  let b;
+  const { calls } = await buildFixture(t, () => ({ ok: true, build: b }));
+  for (const [status, claims, reason] of [
+    ['active', [], 'released'],
+    ['paused', ['done', 'released', 'taken'], 'released'],
+    ['active', ['held', 'abandoned'], 'abandoned'],
+    ['done', ['held'], 'closed'],
+    ['abandoned', ['stale'], 'closed'],
+  ]) {
+    b = serverBuild({ status, claims: claims.map((status, i) => ({ id: `c_${i}`, part: `part-${i}`, status })) });
+    const r = await buildWait('church', { json: true }, { print: () => assert.fail('JSON prints no progress'), sleep: () => assert.fail('terminal state does not wait') });
+    assert.equal(r.reason, reason); assert.equal(r.ok, true); assert.equal(r.build.status, status);
+  }
+  assert.equal(calls.length, 5);
+});
+
+test('build wait times out with a final summary, keeps stale claims pending and never changes local state', async t => {
+  let clock = 0; const changes = [], waits = [];
+  const { calls } = await buildFixture(t, () => ({ ok: true, build: serverBuild({ claims: [{ id: 'c_1234abcd', part: 'tower', status: 'stale' }] }) }));
+  save({ build: localBuild() }); const before = readFileSync('.eden-god.json', 'utf8');
+  const runtime = { now: () => clock, sleep: async ms => { waits.push(ms); clock += ms; }, print: s => changes.push(s) };
+  assert.match(await buildWait('church', { timeout: '3s' }, runtime), /timed out; active; claims: tower stale/);
+  assert.deepEqual(waits, [2000, 1000]); assert.equal(changes.length, 1); assert.equal(calls.length, 2);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
+  const json = await buildWait('church', { timeout: '3s', json: true }, runtime);
+  assert.equal(json.ok, false); assert.equal(json.reason, 'timeout');
+});
+
+test('build wait validates locally and propagates server refusal without polling', async t => {
+  const refusal = { ok: false, failures: [{ op: -1, code: 'build.unknown', detail: 'no such build' }] };
+  const { calls } = await buildFixture(t, () => refusal);
+  await assert.rejects(build('wait'), /no current build/);
+  save({ build: localBuild() });
+  for (const timeout of ['0s', '-1m', 'tomorrow', true, '1', ['1s'], 'Infinityh']) await assert.rejects(build('wait', [], { timeout }));
+  await assert.rejects(build('wait', ['church']), /too many arguments/);
+  assert.equal(calls.length, 0);
+  assert.match(await COMMANDS.build(['wait'], {}), /REFUSED: build.unknown/);
+  assert.equal(calls.length, 1);
+});
+
+test('reach preserves server refs, parses 2D/3D points and reports engine success/refusal/unsupported', async t => {
+  let result = { reachable: true, length: 12, legs: 3, levels: [0, 1] };
+  const { calls } = await buildFixture(t, c => c.body?.reach ? { reach: result } : null);
+  assert.equal(await COMMANDS.reach(['plaza', 'hall:upstairs'], {}), 'reach: OK (12 m)');
+  assert.deepEqual(calls[0].body, { reach: { from: 'plaza', to: 'hall:upstairs' } });
+  assert.deepEqual(await COMMANDS.reach(['-1,2', '3,4,5'], { json: true }), result);
+  assert.deepEqual(calls[1].body, { reach: { from: [-1, 2], to: [3, 4, 5] } });
+  result = { reachable: false, code: 'reach.bad-to', detail: 'no standing room' };
+  assert.match(await COMMANDS.reach(['plaza', 'hall'], {}), /FAILED.*reach.bad-to.*no standing room/);
+  result = { supported: false, note: 'engine unavailable' };
+  assert.match(await COMMANDS.reach(['plaza', 'hall'], {}), /not checked.*engine unavailable/);
+  const count = calls.length;
+  for (const args of [[], ['plaza'], ['1,', 'hall'], ['1,2,3,4', 'hall'], ['NaN,2', 'hall']]) await assert.rejects(COMMANDS.reach(args, {}));
+  assert.equal(calls.length, count);
+});
+
+test('clear sends footprint size and resolved reference position; where labels bounds honestly', async t => {
+  let clearance = { clear: true, blockedBy: [] };
+  const layout = { layout: { entities: [{ id: 'e_gate', path: 'gate', name: 'gate', parent: 'world', pose: [4, 0, 6, 0, 1], aabb: [0, 0, 8, 12], layer: 'solid' }] } };
+  const { calls } = await buildFixture(t, c => c.body?.where ? { where: { x: 4, z: 6, y: 0, slopeDeg: 0, medium: 'dry', inside: [{ path: 'gate', layer: 'solid' }, { path: 'road', layer: 'surface' }, { path: 'wall', layer: 'solid' }], near: [] }, clearance: { clear: false, blockedBy: ['wall'] } } : c.body?.clearance ? { clearance } : c.body?.layout ? layout : null);
+  assert.equal(await COMMANDS.clear(['-1,2'], { size: '2×3' }), 'clear: 2×3 m at -1,2');
+  assert.deepEqual(calls[0].body, { clearance: { at: [-1, 2], size: [2, 3] } });
+  clearance = { clear: false, blockedBy: ['gate/wall'] };
+  assert.match(await COMMANDS.clear(['gate'], { size: '2x3' }), /blocked: gate\/wall/);
+  assert.deepEqual(calls.at(-1).body, { clearance: { at: [4, 6], size: [2, 3] } });
+  assert.deepEqual(await COMMANDS.clear(['4,6'], { size: '2,3', json: true }), clearance);
+  assert.match(await COMMANDS.where(['gate'], {}), /gate \[bounds\] \(solid\), road \[bounds\] \(surface\), wall \[collider\] \(solid\)/);
+  assert.deepEqual(calls.at(-1).body, { where: [4, 6], clearance: { at: [4, 6], size: [0, 0] } });
+  const count = calls.length;
+  for (const size of [undefined, true, '0x3', '2x-3', '2x', 'NaNx3', ['2x3']]) await assert.rejects(COMMANDS.clear(['gate'], { size }));
+  await assert.rejects(COMMANDS.clear(['1,'], { size: '2x3' }));
+  assert.equal(calls.length, count);
+  checkArgs('reach', {}, ['a', 'b']); checkArgs('clear', { size: '2x3' }, ['gate']);
+  assert.throws(() => checkArgs('reach', {}, ['a', 'b', 'c']), /takes 2 words/);
+});
+
+test('time, weather and sky print server shared-clock warnings and preserve the applied clock', async t => {
+  const warning = "this changes the world's clock for everyone; for a picture use look --hour";
+  const env = { time: { clock: '21:03', datetime: '2026-10-15', paused: false, timeScale: 24 }, weather: { kind: 'clear', intensity: 1, clouds: 0, rain: 0, wind: 0, fog: 0 } };
+  const { calls } = await buildFixture(t, c => ['/v1/god/env', '/v1/god/act'].includes(c.path) ? { accepted: true, seq: 7, env, warnings: c.path.endsWith('/env') ? [{ code: 'env.shared-clock', detail: warning }] : [`env.shared-clock: ${warning}`] } : null);
+  const notices = []; t.mock.method(console, 'error', s => notices.push(s));
+  save({ build: localBuild() });
+  assert.match(await COMMANDS.time(['21:00'], {}), /^21:03/);
+  assert.match(await COMMANDS.weather([], { kind: 'clear' }), /^21:03/);
+  await COMMANDS.sky([], { palette: 'clear-day', sun: '.5' });
+  assert.deepEqual(notices, Array(3).fill(`env.shared-clock: ${warning}`));
+  assert.ok(calls.filter(c => c.body).every(c => !c.body.build));
+});
+
+test('examples catalogue is linted against recorded files and every listed example is served', async t => {
+  const root = new URL('./examples/', import.meta.url);
+  const recorded = readdirSync(new URL('shots/', root)).filter(f => f.endsWith('.log')).map(f => f.slice(0, -4));
+  assert.deepEqual(Object.keys(EXAMPLES).sort(), recorded.sort());
+  const contents = new Map();
+  for (const name of Object.keys(EXAMPLES)) for (const ext of ['log', 'mjs']) contents.set(`${name}.${ext}`, readFileSync(new URL(`${ext === 'log' ? 'shots/' : ''}${name}.${ext}`, root), 'utf8'));
+  const { calls } = await buildFixture(t, c => {
+    const file = c.path.replace('/god/examples/', '');
+    return contents.has(file) ? { rawText: contents.get(file), contentType: file.endsWith('.mjs') ? 'text/javascript' : 'text/plain' } : { httpStatus: 404, data: {} };
+  });
+  const listing = await examples();
+  const listed = [...listing.matchAll(/^- ([a-z0-9-]+):/gm)].map(m => m[1]);
+  assert.deepEqual(listed, Object.keys(EXAMPLES));
+  for (const name of listed) {
+    assert.match(await examples(name), /saved examples\//);
+    for (const ext of ['log', 'mjs']) assert.equal(readFileSync(`examples/${name}.${ext}`, 'utf8'), contents.get(`${name}.${ext}`));
+  }
+  assert.equal(calls.length, listed.length * 2);
+  await assert.rejects(examples('church-massing'), /no example/);
+});
+
+test('look validates and normalizes hour/weather, forwards only shot options and never edits the clock', async t => {
+  const calls = fixture(t, c => {
+    const path = new URL(c.url).pathname;
+    if (path === '/v1/world/seq') return { seq: 1, builds: 1 };
+    if (path === '/v1/god/snapshot') return { seq: 1, buildsRev: 1, constants: { extent: 200 }, entities: [], library: [], defs: [] };
+    if (path === '/v1/god/query') return JSON.parse(c.body).points ? { points: [{ y: 0, water: 0 }] } : { layout: { entities: [] } };
+    assert.fail(`unexpected request: ${c.method} ${path}`);
+  });
+  invalidate(); t.after(invalidate);
+  assert.deepEqual(lookOverrides({ hour: '0' }), { hour: '00:00' });
+  assert.deepEqual(lookOverrides({ hour: '9:05', weather: 'rain' }), { hour: '09:05', weather: 'rain' });
+  assert.deepEqual(lookOverrides({ weather: 'clear' }), { weather: 'clear' });
+  assert.deepEqual(lookOverrides(), {});
+  for (const hour of [true, ['21', '22'], '24', '-1', '21:60', '2:3', '21.5', '', 'NaN']) await assert.rejects(look({ hour }));
+  for (const weather of [true, ['rain'], '', 'rain&hour=2']) await assert.rejects(look({ weather }));
+  assert.equal(calls.length, 0);
+  const seen = [];
+  const shot = args => { seen.push(args); return { file: args.out, ms: 1 }; };
+  const result = await look({ at: '0,0', hour: '21', weather: 'rain', json: true }, { shoot: shot });
+  assert.equal(seen[0].hour, '21:00'); assert.equal(seen[0].weather, 'rain');
+  assert.equal(result.file, seen[0].out);
+  assert.ok(calls.every(c => c.method === 'GET' || new URL(c.url).pathname === '/v1/god/query'));
+  assert.ok(calls.every(c => !['/v1/god/env', '/v1/god/act'].includes(new URL(c.url).pathname)));
+  checkArgs('look', { hour: '21', weather: 'rain' }, []);
+  assert.match(COMMANDS.help(), /--hour HH\[:MM\].*never the world clock/);
+});
+
+test('build wait prints a timeout summary even when its first read never answers', async t => {
+  fixture(t, {});
+  globalThis.fetch = async () => { throw new DOMException('deadline elapsed', 'TimeoutError'); };
+  const notices = [];
+  const r = await buildWait('church', { timeout: '1s' }, { print: s => notices.push(s) });
+  assert.equal(r, 'church: timed out; claim state not received');
+  assert.deepEqual(notices, []);
+});
+
+test('downloadable commands run narration, wait, reach, clear and clock warnings on the loopback stub', async t => {
+  const env = { time: { clock: '21:02', timeScale: 24 }, weather: { kind: 'clear', intensity: 1, clouds: 0, rain: 0, wind: 0, fog: 0 } };
+  const { calls, dir } = await buildFixture(t, c => {
+    if (c.path.endsWith('/step')) return { ok: true, build: serverBuild({ step: { n: c.body.n, label: 'roof echo' }, say: 'Copper spires' }) };
+    if (c.body?.reach) return { reach: { reachable: true, length: 4 } };
+    if (c.body?.clearance) return { clearance: { clear: true, blockedBy: [] } };
+    if (c.path === '/v1/god/env') return { accepted: true, seq: 4, env, warnings: [{ code: 'env.shared-clock', detail: 'use look --hour' }] };
+  });
+  save({ build: localBuild() });
+  const executable = new URL('./eden-god.mjs', import.meta.url).pathname;
+  const cli = args => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [executable, ...args], { cwd: dir, env: { ...process.env, EDEN_GOD_TRACE: '', EDEN_GOD_TIMING: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = ''; child.stdout.on('data', d => { stdout += d; }); child.stderr.on('data', d => { stderr += d; });
+    child.on('error', reject); child.on('exit', code => code ? reject(new Error(stderr)) : resolve({ stdout, stderr }));
+  });
+  const before = calls.length;
+  assert.match((await cli(['build', 'step', 'roof', '--say', 'Copper spires', '--mass', 'nave'])).stdout, /step 2\/5: roof echo — designing: Copper spires/);
+  assert.equal(calls.length, before + 1); assert.equal(load().build.label, 'roof echo');
+  const waited = await cli(['build', 'wait', '--timeout', '15m']);
+  assert.match(waited.stdout, /all claims released/); assert.match(waited.stderr, /claims: none/);
+  assert.match((await cli(['reach', '0,0', 'hall:nave'])).stdout, /reach: OK \(4 m\)/);
+  assert.match((await cli(['clear', '2,3', '--size', '4x5'])).stdout, /clear: 4×5 m at 2,3/);
+  const time = await cli(['time', '21:00']);
+  assert.match(time.stdout, /^21:02/); assert.match(time.stderr, /env.shared-clock: use look --hour/);
+  assert.ok(calls.every(c => c.path !== '/v1/god/act'));
+});
+
+test('skill preserves stopping/use evidence and teaches the C7 construction workflow', () => {
+  const skill = readFileSync(new URL('./SKILL.md', import.meta.url), 'utf8');
+  for (const expected of ["owner's words as `--brief`", '`build start <id>-2 --root <id>`', '`build step <label> --say', '`look --hour 21`', "never change the world's clock for a picture", 'trust', '`walk:`', '"reachable from outside"', '>3 minutes', 'first minute', 'about 5 minutes, ≤ 30 shapes', 'Lead takes the largest part', 'Never poll: `build wait', '`reach <from> <to>`', '`clear <x,z|ref> --size WxD`', 'Stop when every listed item exists', 'offers instead of']) assert.ok(skill.toLowerCase().includes(expected.toLowerCase()), expected);
+  assert.doesNotMatch(skill, /time 21:00|set the time back/);
 });

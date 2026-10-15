@@ -69,20 +69,25 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 
 ## The loop
 
-0. For anything bigger than one object, `build start`: site, title, 3–6 `--steps`, and `--mass` boxes for the main volumes (site-local metres).
-   **h = wall/eave height**, not total height; gable/pyramid roofs add half the shorter side (flat adds none).
+0. For more than one object, `build start`: site, title, 3–6 `--steps`, `--mass` boxes (site-local metres), owner's words as `--brief`.
+   **h = wall/eave height**; gable/pyramid roofs add half the shorter side, flat none. Follow-ups: `build start <id>-2 --root <id>`.
 1. `map` — the whole world as structure: terrain, water, every root thing with pose and contents,
    flags, prayers. It is complete and exact; plan from it.
 2. `find <words>` / `defs <words>` — see what already exists and what it offers (see below).
 3. `place <def> <relations>` — the solver turns relations into a pose, dry-runs it, steps around
    collisions, commits, and tells you what it did.
-   Use `build step` between stages; edits carry it.
+   Before designing each step, announce one line: `build step <label> --say "…" [--mass nave,tower]`; edits carry it.
 4. **`look` after a meaningful step** — then open the PNG it names. Fix what looks wrong.
 5. `undo` (or `undo --group <name>`) when something went wrong; `history` shows the journal.
 6. `build done` (or `build abandon`); `done:true` can ride on the last edit's `build` field.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
+
+Helpers only for ≥2 independent parts each taking >3 minutes. Claim from the massing at `build start` so helpers
+start in the first minute; pass their printed `EDEN_GOD_CLAIM=c_…`. Each brief gives a time box and shape budget
+("about 5 minutes, ≤ 30 shapes"). Lead takes the largest part; helpers end `build release --done`.
+Never poll: `build wait [--timeout 15m]` when nothing remains to do.
 
 ## Done means done (the stopping rule)
 
@@ -93,14 +98,13 @@ The owner is waiting; a fast, honest, complete answer beats an endlessly polishe
 2. **Show a first look early**: give `--mass` at `build start`; `look` and tell the owner within about 2 minutes.
    Look again after the first real step.
 3. **Check the asked-for uses with what the world tells you**: `describe` (rooms, doors, the `walk:` line,
-   seat slots and who sits there) and `where`. `walk:` is the engine's own route check from the front door into
-   every room and back; trust it over "reachable from outside", which only reads the design's doors and stairs. `verify-use` (a probe resident that walks in and sits, see *Making
+   seat slots and occupants) and `where`. Trust `walk:` (engine routes into every room and back) over
+   "reachable from outside" (design only). `verify-use` (a probe resident that walks in and sits, see *Making
    things usable*) is an optional extra check; it is never a reason to keep rebuilding something that already works.
 4. **Stop when every listed item exists and you have checked the uses.** Report then, saying how you checked each use.
    Put further ideas (night lighting tweaks, extra furniture, colour variations) in your report as offers instead of
    doing them.
-5. **Never wait for the world clock** (a service, nightfall, residents arriving): it runs in real time. To see night
-   lighting, `time 21:00`, look, then set the time back.
+5. **Never wait for the world clock** (services, nightfall, residents): to see night, `look --hour 21` — never change the world's clock for a picture.
 6. If something asked for cannot be done here, say so and stop; do not substitute silently.
 
 ## Choosing how to make something
@@ -123,11 +127,8 @@ character. Say plainly what you approximated ("marble = pale stone colour; there
 
 - `defs <words>` (plain words work: `defs houses`, `defs street lamp`); a wrong name also tells you what
   the library has (`place house` → "the library has: core/cottage@1 …").
-- **Parts from finished builds.** `parts [words]` lists them, `build start` suggests them, and `find` badges
-  them `used in`. Check before authoring. Reuse with `place sha:<hash> --at …`: the hash pins the copy;
-  editing the original never changes it. A part counts only after its build is done and it is still standing.
-  Parts with no copies standing remain listed with provenance. Never redefine a part's name: that changes
-  copies placed by name; scale or recolour your pinned copy, or define a new name.
+- **Parts from finished builds:** check `parts [words]`, `build start`'s suggestions and `find`'s `used in` before
+  authoring. `place sha:<hash> --at …` pins a copy: scale/recolour it or define a new name; never redefine the original.
 - A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
   `--scale s` resizes a point thing within **its def's range**, which `defs` prints (`scale 0.3–6`;
   `fixed size` = no `--scale`: a lantern, a boat); outside it the server refuses `size.range`.
@@ -335,13 +336,13 @@ day is a Saturday.
   hides roofs to show a building's top storey, `--floor 0` its ground floor. Each look opens Chrome
   and waits for the world to settle: about 5–10 s on a free machine, longer on a busy one, so give the
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
-  before judging the build: `look --keep` (a kept browser) has been seen to capture the default view
-  instead of the requested one; if so, look again without `--keep` (`look --stop` closes the browser).
+  before judging the build. `look --keep` reuses a browser; `look --stop` closes it.
 - `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; optional ok/failed receipt
   (about 5–10 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
+- `reach <from> <to>` checks the engine's route (refs or x,z / x,y,z); `clear <x,z|ref> --size WxD` checks footprint clearance. `where`'s `[bounds]` means containment, not a blocked passage.
 - `where <x,z|ref>` — ground height, slope, water, what contains the point, which room, nearest things.
 - `free 10x8 --near square` — empty flat dry plots.
 - `plan '<batch>'` — a dry run in words; `preview '<batch>'` — a ghost the owner can open in the
@@ -392,7 +393,7 @@ are; use it when only new copies should change.
   bright at night but lights nothing around it. A def with `components: {"light": {"color": "#ffe9c4",
   "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground
   at dusk and night (to let Souls switch it, copy what a library lamp declares: `defs lamp-post --json`).
-  See it with `time 21:00` (or `sky --palette night`), then set the time back.
+  See it with `look --hour 21`; add `--weather rain` for a rainy picture.
 - **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`: a kit is a solid
   object Souls walk around, not into.
   A kit has no rooms or doors. For something people enter, use a building def (`church`, `chapel`, `hall`,
@@ -432,27 +433,22 @@ about 5–10 s (`--from` walks the whole way and takes longer); one probe per wo
 
 ## Submitting, previewing and recovering
 
-- Edits carry the build id and step; retries never count twice. `build resume <id>` restores server state:
-  finish its `current` step before `build step`. `--no-build` skips automatic metadata.
-- Every write the CLI sends carries a fresh request id (`clientRef`). The server stores each accepted edit's
-  receipt with it, so a lost answer is recoverable: the CLI looks the id up, and resends the identical request
-  only when the server says it never arrived. A message ending "check `request <id>`" means the outcome is still
-  unknown: run `request <id>` before doing anything else. A reused id with different content is refused
-  (`request.conflict`); it is never silently replayed.
+- Edits carry build/step; retries count once. `build resume <id>` restores state; finish `current` before advancing.
+  `--no-build` skips metadata.
+- Writes carry a fresh `clientRef`; accepted edits store a receipt. After a lost answer the CLI checks it,
+  resending identical bytes only if the server confirms absence. "Check `request <id>`" means unresolved:
+  check before another edit. Reusing an id with different content refuses `request.conflict`.
 - Raw batches: `act '{"ops":[…],"group":"church"}'` — the body is an object with `ops`, never a bare array.
-  `dryrun` checks without keeping anything; `preview` keeps a ghost for 10 minutes and prints its id and
-  `commit <id>`, which builds exactly the previewed ops. If something the preview touched changed meanwhile
-  (moved, re-parented, removed, a name now meaning another thing), `commit` refuses `revision.stale` naming it;
-  unrelated edits elsewhere do not block it.
-- A refusal names the operation, and often the field and a fix:
+  `dryrun` checks without keeping anything. `preview` keeps a ghost for 10 minutes; `commit <id>` builds those
+  exact ops. A changed preview dependency refuses `revision.stale`: re-preview. Unrelated edits do not block it.
+- Refusals name the op, field and fix:
   `REFUSED: def.invalid (op 0): … — field make.args.shapes.3.profile — fix: lathe profile needs ≥ 2 points`.
-  Fix that field and resubmit; do not change unrelated parts of your design to make a refusal go away.
+  Fix that field and resubmit.
 
 ## When the world says no
 
-Refusals come back as `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]`. Read them; do not retry
-blindly. `REFUSED by the CLI: …` means the CLI could not read your command (an unknown option, a missing value,
-an extra word, several options in one quoted argument); nothing was sent. Fix the command as it says.
+Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` before retrying.
+`REFUSED by the CLI` means invalid command syntax; nothing was sent. Follow its fix.
 
 | code | do this |
 |---|---|
@@ -475,9 +471,9 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
 | `wallet.insufficient` | the wallet has less than that (a Soul spent it); `layers` shows wallets |
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
-| `build.claim` · `build.claimed` | stay in your claim; wait for another holder to release its scope |
-| `build.lease` · `build.leased` | `build resume <id>`; wait for the live lead; `--take` only when it has stopped |
-| other `build.*` | follow the named fix; `build show <id>` lists state and claims |
+| `build.claim` · `build.claimed` | stay in your scope; `build wait` for others |
+| `build.lease` · `build.leased` | `build resume <id>`; `--take` only after the lead stops |
+| other `build.*` | follow `fix`; `build show <id>` for state |
 | `site.under-construction` | finish the build before residents use it |
 | `architecture.sealed` | preserve another entrance or clear the named approach |
 | `budget.world` · `budget.region` | use field/measured/limit/fix to reduce or spread construction |
@@ -499,7 +495,7 @@ prayer then **leaves** `prayers` (the Soul sees your answer). `prayers --all` sh
 too, with what you said. `map` and `status` count the waiting ones. Interpret prayers under the
 world's constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
-## Seven worked examples
+## Six recorded examples and a massing illustration
 
 `examples` lists recorded runs; `examples <name>` prints a transcript (every command with the answer it got)
 and saves `examples/<name>.log` and `.mjs` here (also served at `<world-url>/god/examples/<name>.log`).
@@ -573,15 +569,16 @@ resolve                                          # every kept relation still hol
 look --at hill --from s
 ```
 
-**7. A market hall, massing first**
+**Massing illustration: a market hall** (not a recorded run)
 ```
-build start market-hall --title "Market hall and tower" --steps "hall,tower,stalls" --at 0,0 --size 40,18 --mass "hall 0,0 24x12 h5 gable; tower -17,0 6x6 h15 pyramid"
+build start market-hall --title "Market hall and tower" --steps "massing,hall,tower,stalls" --at 0,0 --size 40,18 --mass "hall 0,0 24x12 h5 gable; tower -17,0 6x6 h15 pyramid" --brief "Market hall, tower and three stalls"
 look --at 0,0 --span 44               # massing is visible from start; tell the owner
+build step hall --say "A timber hall with a pitched roof" --mass hall
 place hall --at 0,0 --name hall --param w=24 --param d=12 --param floorHeight=5 --param roof=gable --param roofPitch=45
 look --at hall --span 44              # inspect the first real step
-build step
+build step tower --say "A tall tower beside the hall" --mass tower
 place tower --at -17,0 --name market-tower --param w=6 --param d=6 --param floors=3 --param floorHeight=5 --param roof=hip --param roofPitch=45
-build step
+build step stalls --say "Three stalls inside the hall"
 place long-table --inside hall --count 3 --name stall
 describe hall                        # default use check; verify-use is optional
 build done "hall, tower, three stalls"
@@ -589,5 +586,3 @@ build done "hall, tower, three stalls"
 Massing is ≤8 site-local boxes, not grey entities to remove later. Remove + replacement belong in one batch.
 In a fresh folder, `build resume market-hall` reports the unfinished `current` step, recent edits, roots,
 massing part counts and `next`. Finish `current` before advancing.
-For help: `build claim stalls --root hall`; give the helper its printed
-`EDEN_GOD_CLAIM=c_…`. It keeps its own step file and ends with `build release --done`.
