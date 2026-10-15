@@ -1,0 +1,207 @@
+{
+  "contract": "eden-2026-comparison-views/1",
+  "frame": "metres: x east, z south, y up; old/new same world coordinates",
+  "source": "apps/web/src/WorldPlaces.ts; eden-regions/index.ts; eden-interiors/index.ts (pond framing widened for balloon)",
+  "candidate": "eden-2026",
+  "timePresets": {
+    "day": 12,
+    "dusk": 19,
+    "night": 22
+  },
+  "dpr": [
+    1,
+    2
+  ],
+  "views": [
+    {
+      "id": "overview",
+      "label": "All of Eden",
+      "eye": [
+        112,
+        76,
+        115
+      ],
+      "at": [
+        7,
+        0,
+        5
+      ]
+    },
+    {
+      "id": "commons",
+      "label": "Commons",
+      "eye": [
+        35,
+        20,
+        35
+      ],
+      "at": [
+        8,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "homes",
+      "label": "Homes and roof gardens",
+      "eye": [
+        68,
+        23,
+        48
+      ],
+      "at": [
+        44,
+        2,
+        23
+      ]
+    },
+    {
+      "id": "library",
+      "label": "Library",
+      "eye": [
+        82,
+        16,
+        8
+      ],
+      "at": [
+        75,
+        3,
+        -4
+      ]
+    },
+    {
+      "id": "library-interior",
+      "label": "Library reading interior",
+      "eye": [
+        78.4,
+        2.5,
+        -3.5
+      ],
+      "at": [
+        71,
+        0.6,
+        -9.5
+      ]
+    },
+    {
+      "id": "cafe-interior",
+      "label": "Corner caf\u00e9",
+      "eye": [
+        99.2,
+        1.7,
+        22
+      ],
+      "at": [
+        103.5,
+        1,
+        27
+      ]
+    },
+    {
+      "id": "campus",
+      "label": "Campus and library annex",
+      "eye": [
+        -12,
+        10,
+        -72
+      ],
+      "at": [
+        -12,
+        3,
+        -105
+      ]
+    },
+    {
+      "id": "park",
+      "label": "Park, pond and gazebo",
+      "eye": [
+        -24,
+        10,
+        90
+      ],
+      "at": [
+        -4,
+        0,
+        112
+      ]
+    },
+    {
+      "id": "pond",
+      "label": "Pond and balloon",
+      "eye": [
+        0,
+        35,
+        60
+      ],
+      "at": [
+        -48,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "market",
+      "label": "Market hall",
+      "eye": [
+        83,
+        12,
+        42
+      ],
+      "at": [
+        70,
+        1,
+        29
+      ]
+    },
+    {
+      "id": "canal",
+      "label": "Canal town",
+      "eye": [
+        95,
+        45,
+        -60
+      ],
+      "at": [
+        170,
+        0,
+        30
+      ]
+    },
+    {
+      "id": "harbour",
+      "label": "Harbour and lighthouse",
+      "eye": [
+        20,
+        9,
+        122
+      ],
+      "at": [
+        45,
+        1,
+        152
+      ]
+    }
+  ],
+  "landmarks": [
+    "Commons kitchen and fire circle",
+    "Thirty sleeping places",
+    "Shore pond and launch balloon",
+    "Campus quad and library annex",
+    "Library reading room",
+    "Corner caf\u00e9",
+    "Four courtyard/balcony homes and roof gardens",
+    "Park pond and gazebo",
+    "Market hall and kiosks",
+    "Office studios",
+    "Barn and gardens",
+    "Canal quarter",
+    "Old town plaza",
+    "Harbour and lighthouse",
+    "Vineyard",
+    "Abbey",
+    "Botanic garden",
+    "Hillside village",
+    "Festival meadow",
+    "Northern mountains"
+  ]
+}
