@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
 import { assetShown, deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
+import { assetHidden } from '../moderation-hidden.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 import { adoptInstance, GLB_INSTANCING } from './glb-instances.ts';
@@ -74,12 +75,14 @@ const meshBuilder: MeshBuilder = {
         }));
       }
     }).catch(() => {
-      if (gone) return;
+      if (gone || assetHidden(make.asset)) return;
       // the asset is missing or broken: a soft placeholder of the def's size, so the place is still visible
       const [w, h, d] = ctx.def.size.box;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ctx.materials.get('paint', '#b0a090')); m.position.y = h / 2; m.name = 'asset missing';
       holder.add(m); assetShown(make.asset);
     }); };
+    // G8: a file hidden by moderation is not drawn at all (no request, no placeholder)
+    if (assetHidden(make.asset)) return holder;
     if (isEager(make.asset)) load(); else { holder.add(deferLoad(make.asset, load, frameHook)); noteDeferred(); }
     holder.addEventListener('removed', () => { gone = true; inst?.dispose(); });
     return holder;

@@ -3,6 +3,7 @@
 // placed entity drawn from its def. Diffs arrive over the hub as
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
+import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
@@ -67,7 +68,7 @@ export class WorldEntityLayer {
     if (this.resyncing || !this.signal) return;
     this.resyncing = true;
     try {
-      const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return;
+      const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version'));
       const snap: Snapshot = await r.json(); if (snap.contract !== 'world/1') return;
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
       this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
@@ -83,7 +84,7 @@ export class WorldEntityLayer {
   async start(signal: AbortSignal) {
     this.signal = signal;
     let snap: Snapshot;
-    try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; snap = await r.json(); } catch { return; }
+    try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json(); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
@@ -134,7 +135,8 @@ export class WorldEntityLayer {
     if (this.horizon) this.horizon.visible = this.horizonBy.size === 0;
     if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
-      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number } | null) => { if (j && j.seq !== this.seq) void this.resync(); }).catch(() => {});
+      // G8: a changed moderation veto also takes the whole (server-filtered) picture again
+      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number; moderation?: { version?: unknown; hidden?: unknown } } | null) => { if (j && (noteModeration(j.moderation) || j.seq !== this.seq)) void this.resync(); }).catch(() => {});
     }
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)
