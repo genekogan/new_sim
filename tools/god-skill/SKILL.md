@@ -1,13 +1,16 @@
-# God mode for an Eden world (skill v1.0)
+# God mode for an Eden world (skill v1.1, protocol god/1)
 
 You are the god of one Eden world: its owner's agent. You build the world by placing, moving,
 shaping and removing **entities**; the server checks every edit against physics (support, no solid
 interpenetration, sizes, the world's edge) and refuses with a precise code when something cannot be.
-Everything you do is undoable. Souls (mortal residents) carry and use what you build and **pray** to
-you. A watching audience sees things ease in as you work.
+Everything you do is undoable. Souls (mortal residents) **use what offers them a way to use it**
+(a seat slot, a bed, a room behind a door — see *Making things usable*); a thing that only looks
+usable is scenery to them. They also **pray** to you. A watching audience sees things ease in as you work.
 
 The CLI `eden-god.mjs` is one file with no dependencies (Node ≥ 20). Every command prints a short
-human answer; add `--json` for data. `node eden-god.mjs help` lists everything.
+human answer; add `--json` for data. `node eden-god.mjs help` lists everything. `status` prints the
+server's protocol, schema, skill and source versions: if its skill version is newer than this file's,
+fetch `SKILL.md` and `eden-god.mjs` again before relying on advice here.
 
 ## Setup (once per folder)
 
@@ -68,32 +71,40 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 
 1. `map` — the whole world as structure: terrain, water, every root thing with pose and contents,
    flags, prayers. It is complete and exact; plan from it.
-2. `defs <words>` — **search the library before you place or invent anything** (see below).
+2. `find <words>` / `defs <words>` — see what already exists and what it offers (see below).
 3. `place <def> <relations>` — the solver turns relations into a pose, dry-runs it, steps around
    collisions, commits, and tells you what it did.
-4. **`look` after every few edits** — then open the PNG it names. Fix what looks wrong.
+4. **`look` after a meaningful step** — then open the PNG it names. Fix what looks wrong.
 5. `undo` (or `undo --group <name>`) when something went wrong; `history` shows the journal.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
-garden), not one giant batch.
+garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
 
-## The library first (the rule)
+## Choosing how to make something
 
-The world ships with ~180 kinds of things, made to look right together (rounded low-poly, the Eden
-look) and to work for Souls (seats, beds, surfaces, doors, rooms). **Use them.** A def you write
-yourself is slower, uglier and knows nothing about Souls. The order is always:
+Match the request, not a habit. Every route below is ordinary, editable, undoable god content.
 
-1. `defs <words>` (plain words work: `defs houses`, `defs street lamp`, `defs market`); a wrong
-   name also tells you what the library has (`place house` → "the library has: core/cottage@1 …").
-2. A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
-   `--scale s` resizes a point thing within **its def's range**, which `defs` prints (`scale 0.3–6`;
-   `fixed size` = no `--scale`: a lantern, a boat); outside it the server refuses `size.range`.
-   For a bigger version use params (`w`, `d`, `height`, `radius`) or another def.
-   `recolor`, `--scale` and `set --param` change one already placed.
-3. Several library things together (a stall = a `parasol-table` + `crate`s + `barrel`s) or a
-   **prefab** of them.
-4. Only when nothing fits: `define-kit` (below), and say so to the owner ("the library has no
-   market stall; I made one from a table, posts and an awning").
+| route | good for | what you get for Souls |
+|---|---|---|
+| a library def (`find`, `defs`) | standard things: cottages, churches, benches, lamps, trees | its built-in rooms, doors, seats, beds, surfaces |
+| its **params** / `recolor` / `set` | the same thing in another size, colour, roof, material, plan | the same, regenerated |
+| several library things composed (a group, or a `parts` prefab) | stalls, plazas, furnished rooms | each part's own uses |
+| a **bespoke kit** (`define-kit`, below) | forms the library lacks: spires, buttresses, a shrine, a sculpture, trim | only the slots/components you declare (see *Making things usable*) |
+| an uploaded **GLB mesh** (`POST /v1/god/assets`) | a specific shape you can model or already have | a collider box; seats/rooms only if declared (footprint sidecar) |
+
+The library is fastest when it fits and its things already work for Souls. When the request names a
+form, style or material the library does not have (Gothic spires, a marble shrine, LED strips), author it:
+a substitute that ignores what was asked is not a fulfilled request. Common, effective mix: a library
+building for the walkable shell (rooms, doors, pews) plus bespoke kits for the parts that give it its
+character. Say plainly what you approximated ("marble = pale stone colour; there is no veined texture").
+
+- `defs <words>` (plain words work: `defs houses`, `defs street lamp`); a wrong name also tells you what
+  the library has (`place house` → "the library has: core/cottage@1 …").
+- A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
+  `--scale s` resizes a point thing within **its def's range**, which `defs` prints (`scale 0.3–6`;
+  `fixed size` = no `--scale`: a lantern, a boat); outside it the server refuses `size.range`.
+  For a bigger version use params (`w`, `d`, `height`, `radius`) or another def.
+  `recolor`, `--scale` and `set --param` change one already placed.
 
 | family (`defs --tag …`) | what is in it |
 |---|---|
@@ -294,9 +305,10 @@ day is a Saturday.
   where it looks, so look at parts (`--at village`, `--at bridge`), never the whole world at once; `map` is
   the whole-world view; `--inside`
   hides roofs to show a building's top storey, `--floor 0` its ground floor. Each look opens Chrome
-  and waits for the world to settle: a minute or several on a busy machine, so give the shell call a
-  10-minute timeout rather than giving up. `look --keep` keeps the browser for faster later looks;
-  `look --stop` closes it.
+  and waits for the world to settle: about 5–10 s on a free machine, longer on a busy one, so give the
+  shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
+  before judging the build: `look --keep` (a kept browser) has been seen to capture the default view
+  instead of the requested one; if so, look again without `--keep` (`look --stop` closes the browser).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
@@ -307,28 +319,89 @@ day is a Saturday.
 - `history` — the journal (seq, group, note, what each edit did). `schema --md` — the full
   vocabulary (every generator's params with ranges, kit primitives, ops, refusal codes) = SCHEMA.md.
 
-## New kinds of things (only after `defs` found nothing)
+## New kinds of things (bespoke kits and meshes)
 
-When the library truly lacks a thing (see the rule above), compose a **kit** from rounded primitives:
+Compose a **kit** from rounded primitives (data, not code; the server bakes it). Write the JSON to a file in
+your folder and pass the path (`define-kit defs/birdbath.kit.json`) so you can edit and resubmit it:
 ```
 define-kit '{"name":"birdbath","tags":["garden","prop"],"shapes":[
-  {"kind":"cyl","at":[0,0,0],"r":0.18,"h":0.8,"material":"stone"},
+  {"kind":"cyl","at":[0,0.4,0],"r":0.18,"h":0.8,"material":"stone"},
   {"kind":"lathe","at":[0,0.8,0],"profile":[[0,0],[0.45,0.05],[0.5,0.15],[0.1,0.1]],"material":"stone"}]}'
 place birdbath@1 --near garden
 ```
-Primitives: box, rbox (rounded), cyl, cone, capsule, sphere, wedge, arch, ring, torus, lathe
-(profile revolved), extrude (polygon × height), sweep (profile along a path). Each shape: `at`
-(base centre), `size` or `r`/`h`, `material` or `color`, optional `role` (creature parts animate by
-role: `leg.fl`, `wing.l`, `tail`, `head` …) and `gait` on the kit (`quadruped-walk`, `biped-waddle`,
-`bird-fly`, `fish-swim`). Keep props ≤ 400 triangles, creatures ≤ 600: few, rounded shapes. The
-Eden look is rounded low-poly, never voxel. `define '<def/1 json>'` takes a full def.
+The def's frame: metres, y = 0 is the ground it stands on, +y up, its front faces +z. For box, rbox, cyl,
+cone, capsule, sphere, wedge, arch, ring and torus, **`at` is the shape's centre**: a 1 m box standing on
+the ground is `"at":[0,0.5,0]` (at y 0 it is half buried). lathe (profile `[[radius, y], …]` revolved, ≥ 2
+points), extrude (polygon `[[x, z], …]` raised `h`) and sweep (radius `r` along a 3-D path) are drawn from
+`at` upward/outward. Each shape also takes `size` or `r`/`h` (`r2` = top radius of a cyl, tube of a
+torus), `yaw`/`pitch`/`roll`, `scale`, `segments` (≤ 16), `material` or `color`, optional `tint` (a palette
+key the instance can recolour), `when` (show only for a param/state value), `collide`, `role` (creature
+parts and doors/lids/flames animate by role) and `gait` on the kit. `describe` prints the placed bounds
+(`y -0.5…0.5` means half below ground). To change a kit you already placed, define it as
+`"version": 2` and place/replace with `name@2`.
 
-`export [file]` writes the world as a genesis/1 template; `import <file>` applies one.
+- **Colour and material.** Per shape `color: "#rrggbb"` and `material` = wood stone plaster brick glass metal
+  fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. Materials are flat looks,
+  not textures: marble = pale `stone` with a cool tint; copper = `metal` `#b87333` (weathered `#4f9a83`);
+  there is no veining, roughness or metalness control. Buildings take `wall`, `trim`, `roofColor`, `material`.
+- **Light.** `glow: 0…1` on a shape makes it self-lit (an LED strip, a lit window, a lantern pane): it shows
+  bright at night but lights nothing around it. A def with `components: {"light": {"color": "#ffe9c4",
+  "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground
+  at dusk and night (to let Souls switch it, copy what a library lamp declares: `defs lamp-post --json`).
+  See it with `time 21:00` (or `sky --palette night`), then set the time back.
+- **Solid by default.** Boxes and cylinders ≥ 0.3 m tall collide unless `"collide": false`: a kit is a solid
+  object Souls walk around, not into.
+  A kit has no rooms or doors. For something people enter, use a building def (`church`, `chapel`, `hall`,
+  `tower`… or your own `plan`) and attach kits to it: on a flat roof's `roof` slot (`--in tower/roof`),
+  against a wall (`--against <building>.n`) or beside it; `describe <building>` lists its slots.
+- **Budgets.** A def bakes to ≤ 80 000 triangles; keep props a few hundred and repeated things low (every
+  copy is drawn). Size 0.05–400 m (height ≤ 120 m). `describe` prints a placed thing's triangles.
+- **Meshes.** Model locally if you can (any tool that writes GLB), then
+  `curl -H "authorization: Bearer <token>" -F file=@thing.glb -F name=thing -F height=3 <world>/v1/god/assets`
+  (≤ 3 MB, ≤ 80 000 triangles, textures ≤ 2048 px; `define=1` also creates `thing@1`). The token is in
+  `.eden-god.json`; never print it. Without a footprint sidecar a mesh is one collider box.
+
+`define '<def/1 json>'` takes a full def. `export [file]` writes the world as a genesis/1 template;
+`import <file>` applies one.
+
+## Making things usable (what Souls can actually do)
+
+Souls act on **declared affordances**, not on appearance. What exists today:
+
+| Souls can | when the thing has | check |
+|---|---|---|
+| walk into a building, between rooms, upstairs | a building def's rooms, door openings, stairs | `describe <building>`: rooms, doors, "reachable from outside" |
+| sit | a `seat` slot (library chairs, benches, pews, sofas; or your def: `components: {"seat": {"height": 0.45}}` plus `slots: [{"id":"seat-1","kind":"seat","p":[0,0.45,0],"yaw":0,"accepts":{"tags":["body"]},"capacity":1}]`) | `describe <thing>` lists seat slots and who sits there |
+| put things on / pick them up | a `surface` slot / `components.carryable` | `describe` |
+| open, close, switch, light, fill, play | an actuator state (`open`, `on`, `lit`…) on its def | `defs <thing>` shows state |
+
+Honest limits: **lying in a bed is not reliable today** (a Soul may lie beside the mattress); Souls do
+**not ride** anything that moves (a ferris wheel, a cart, an animated platform is scenery to them); nobody
+climbs onto roofs, kit tops or slopes without a floor or slot; a kit's look (a "bench" made of boxes)
+offers nothing unless it declares the slot. `describe` and reachability are good signs, not proof: the
+proof is a Soul doing it. When you report a build, say which uses you checked and how, and name any
+requested use that is only decorative.
+
+## Submitting, previewing and recovering
+
+- Every write the CLI sends carries a fresh request id (`clientRef`). The server stores each accepted edit's
+  receipt with it, so a lost answer is recoverable: the CLI looks the id up, and resends the identical request
+  only when the server says it never arrived. A message ending "check `request <id>`" means the outcome is still
+  unknown: run `request <id>` before doing anything else. A reused id with different content is refused
+  (`request.conflict`); it is never silently replayed.
+- Raw batches: `act '{"ops":[…],"group":"church"}'` — the body is an object with `ops`, never a bare array.
+  `dryrun` checks without keeping anything; `preview` keeps a ghost for 10 minutes and prints its id and
+  `commit <id>`, which builds exactly the previewed ops. If something the preview touched changed meanwhile
+  (moved, re-parented, removed, a name now meaning another thing), `commit` refuses `revision.stale` naming it;
+  unrelated edits elsewhere do not block it.
+- A refusal names the operation, and often the field and a fix:
+  `REFUSED: def.invalid (op 0): … — field make.args.shapes.3.profile — fix: lathe profile needs ≥ 2 points`.
+  Fix that field and resubmit; do not change unrelated parts of your design to make a refusal go away.
 
 ## When the world says no
 
-Refusals come back as `REFUSED: <code> (op k): <detail> [hint]`. Read the hint; do not retry blindly.
-`REFUSED by the CLI: …` means the CLI could not read your command (an unknown option, a missing value,
+Refusals come back as `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]`. Read them; do not retry
+blindly. `REFUSED by the CLI: …` means the CLI could not read your command (an unknown option, a missing value,
 an extra word, several options in one quoted argument); nothing was sent. Fix the command as it says.
 
 | code | do this |
@@ -340,9 +413,13 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | `size.range` | the scale (or size) is outside what the def allows: `defs <name>` prints its `--scale` range (`fixed size` = none); use params (`w`, `d`, `height`) or another def |
 | `slot.unknown` · `slot.full` · `slot.incompatible` · `slot.outside` | `describe <parent>` for its slots and rooms; choose another (outside = the point is not in that room) |
 | `def.unknown` | `defs <word>`; refs look like `core/bench@1` |
+| `def.invalid` · `def.budget` · `def.expansion` | your definition cannot be built: the `field` and `fix` say what (an unknown generator, a malformed shape, too many triangles) |
 | `params.invalid` · `state.invalid` | `defs <name>` shows params with ranges |
 | `name.taken` | names are unique per parent (refs are names): pick another `--name`, or `remove`/`move` the old one |
-| `slow` | the server was busy; the edit may have landed: `history 3`, then retry only if it is not there |
+| `slow` · `unreachable` | no answer arrived; for edits the CLI already checked the receipt: run `request <id>` if it says the outcome is unknown, else retry |
+| `request.conflict` | that request id already built something different: `request <id>` shows it; a new edit gets a new id (the CLI does this) |
+| `revision.stale` | what you previewed or expected changed: `describe` it again and make a fresh preview |
+| `asset.invalid` · `asset.budget` | the uploaded file is not a usable GLB or exceeds the stated limit (measured vs allowed); nothing was stored |
 | `architecture.unreachable` · `architecture.headroom` | the building's plan has a sealed room / too-low floor; change params (`floors`, `floorHeight`, `plan`) |
 | `occupied.by-body` · `held.by-body` | a Soul is using it; wait or build elsewhere |
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
@@ -351,7 +428,7 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 
 ## Manners
 
-- Library first; name things; group related edits; small batches; look often.
+- Use the library when it fits the request; author what it lacks; name things; group a request's edits; small batches; look often.
 - Keep the land plausible: mountains toward the edges unless asked, water in low ground, roads that
   connect places, paths to doors, room to walk between houses (≥ 3 m).
 - Say what you did in a sentence after each step — the owner is watching the world, not your logs.
