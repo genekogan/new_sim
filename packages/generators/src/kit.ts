@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { materialEnum, num, slotSchema, v2, v3 } from './fields.ts';
 import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
 import { CREATION_LIMITS } from './creation-limits.ts';
+// K2 hook: authored programs share one expansion path with the viewer.
+import { expandKitProgram, withKitPrograms } from './kit-program.ts';
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -50,8 +52,8 @@ const shape = z.object({
 });
 export type KitShape = z.infer<typeof shape>;
 
-export const kitArgs = z.object({
-  shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitShapes),
+export const plainKitArgs = z.object({
+  shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitExpandedShapes),
   slots: z.array(slotSchema).max(64).optional(),
   /** Override the computed bounds (rarely needed). */
   box: v3.optional(),
@@ -60,11 +62,13 @@ export const kitArgs = z.object({
   /** Creature gait the viewer animates from roles: quadruped-walk, biped-waddle, bird-fly, fish-swim, none. */
   gait: z.enum(['none', 'quadruped-walk', 'biped-waddle', 'bird-fly', 'fish-swim', 'hover']).default('none'),
 });
-export type KitArgs = z.infer<typeof kitArgs>;
+export type KitArgs = z.infer<typeof plainKitArgs>;
+export const kitArgs = withKitPrograms(plainKitArgs);
 
 /** Axis-aligned extent of a shape in its own frame (before yaw/pitch/roll), half sizes. */
 function halfOf(sh: KitShape): Vec3 {
-  const sc = sh.scale ?? [1, 1, 1];
+  // K2: a reflected primitive has signed scale, but bounds use positive half extents.
+  const sc = (sh.scale ?? [1, 1, 1]).map(Math.abs);
   let hx = 0.5, hy = 0.5, hz = 0.5;
   switch (sh.kind) {
     case 'box': case 'rbox': case 'wedge': case 'arch': { const [w, h, d] = sh.size ?? [1, 1, 1]; hx = w / 2; hy = h / 2; hz = d / 2; break; }
@@ -79,6 +83,15 @@ function halfOf(sh: KitShape): Vec3 {
 }
 /** Centre offset for shapes whose geometry is not centred on `at` (lathe/extrude/sweep are authored in absolute coordinates relative to `at`). */
 function centreOf(sh: KitShape): Vec3 {
+  // K2: reflection scales the geometry's local centre as well as its extents.
+  // Preserve existing positive-scale kit bakes; only newly reflected geometry takes this path.
+  if (sh.scale?.some(v => v < 0)) {
+    const c = centreOf({ ...sh, scale: undefined }), p = sh.pitch ?? 0, y = sh.yaw ?? 0, r = sh.roll ?? 0;
+    let [x, u, z] = c.map((v, i) => (v - sh.at[i]) * sh.scale![i]);
+    [x, u] = [x * Math.cos(r) - u * Math.sin(r), x * Math.sin(r) + u * Math.cos(r)];
+    [u, z] = [u * Math.cos(p) - z * Math.sin(p), u * Math.sin(p) + z * Math.cos(p)];
+    return [sh.at[0] + x * Math.cos(y) + z * Math.sin(y), sh.at[1] + u, sh.at[2] - x * Math.sin(y) + z * Math.cos(y)];
+  }
   if (sh.kind === 'lathe') { const ys = (sh.profile ?? [[0.5, 0], [0.5, 1]]).map((p) => p[1]); return [sh.at[0], sh.at[1] + (Math.max(...ys) + Math.min(...ys)) / 2, sh.at[2]]; }
   if (sh.kind === 'extrude') { const poly = sh.polygon ?? [[0, 0]]; const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]); return [sh.at[0] + (Math.max(...xs) + Math.min(...xs)) / 2, sh.at[1] + (sh.h ?? 0.2) / 2, sh.at[2] + (Math.max(...zs) + Math.min(...zs)) / 2]; }
   if (sh.kind === 'sweep') { const pts = sh.path ?? [[0, 0, 0]]; const m = (k: number) => (Math.max(...pts.map((p) => p[k])) + Math.min(...pts.map((p) => p[k]))) / 2; return [sh.at[0] + m(0), sh.at[1] + m(1), sh.at[2] + m(2)]; }
@@ -134,7 +147,8 @@ export function kitWhen(when: string | undefined, params: Record<string, unknown
   });
 }
 
-export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}): Baked {
+export function kitPhysics(input: unknown, params: Record<string, unknown> = {}): Baked {
+  const args = expandKitProgram(input, params);
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const colliders: LocalOBB[] = [];
   let tilted = false;
@@ -147,7 +161,7 @@ export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}):
     z0 = Math.min(z0, c[2] - rh[2]); z1 = Math.max(z1, c[2] + rh[2]);
     const seg = sh.segments ?? 10;
     const r = sh.round ?? args.round;
-    tris += sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
+    tris += sh.kind === 'arch' && sh.polygon ? sh.polygon.length * 4 - 4 : sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
     const tall = 2 * h[1] >= 0.3;
     const collide = !sh.when?.includes('@') && (sh.collide ?? ((sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'cyl' || sh.kind === 'extrude') && tall && !sh.role));
     if (collide) {
@@ -167,5 +181,5 @@ export const kitGen: Generator = {
   doc: 'A prop or creature built from rounded primitives (box, rbox, cyl, cone, capsule, sphere, wedge, arch, ring, torus, lathe, extrude, sweep). Shapes live in make.args; instance params may recolour tints.',
   params: {},
   args: kitArgs,
-  physics({ args, params }) { return kitPhysics(kitArgs.parse(args), params); },
+  physics({ args, params }) { return kitPhysics(args, params); },
 };

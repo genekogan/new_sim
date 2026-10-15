@@ -68,8 +68,10 @@ export const CREATION_LIMITS = Object.freeze({
   worldExtentM: 16_000,
   /** JSON parameter/state object serialisation limit. */
   fieldJSONBytes: 8192,
-  /** Number of primitives in a kit definition. */
+  /** Authored entries in a kit definition (before program expansion). */
   kitShapes: 96,
+  /** Maximum primitives after kit program expansion. */
+  kitExpandedShapes: 512,
   /** Existing aggregate-box optimisation applies only to upright kits. */
   uprightKitMergeThreshold: 12,
   /** Maximum depth and total parts in a declared prefab. */

@@ -3219,6 +3219,7 @@ async function define(json2) {
 async function defineKit(json2, flags2 = {}) {
   const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
+  if (!k.box && k.shapes.some((s) => s.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s[key] !== void 0) || JSON.stringify(s).includes("$"))) throw new Error("define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry");
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
   const picks = [...matches.filter((d) => usedIn(d).length), ...matches.filter((d) => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map((d) => d.ref.replace(/^core-/, "core/"));
@@ -3227,7 +3228,7 @@ async function defineKit(json2, flags2 = {}) {
     const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)];
     return [x - sz[0] / 2, y - (sh.kind === "box" || sh.kind === "rbox" || sh.kind === "sphere" || sh.kind === "capsule" ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2];
   };
-  const e = k.shapes.map(ext);
+  const e = k.box ? [] : k.shapes.map(ext);
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
   const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args: { shapes: k.shapes, ...k.gait ? { gait: k.gait } : {}, ...k.slots ? { slots: k.slots } : {}, ...k.round !== void 0 ? { round: k.round } : {} } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...k.components ? { components: k.components } : {}, ...k.anchor ? { anchor: k.anchor } : {}, ...k.state ? { state: k.state } : {}, ...k.params ? { params: k.params } : {} };
   if (flags2.dry) return { def, similar };

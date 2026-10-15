@@ -684,6 +684,11 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   const s = e.s ?? 1;
   if (s < def.size.scale[0] || s > def.size.scale[1]) return fail(i, 'size.range', `scale ${s} outside [${def.size.scale.join(', ')}]`);
   const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+  // K2 hook: instance $params/repeat counts must retain the definition triangle budget.
+  if (def.make.kind === 'gen' && def.make.gen === 'kit/2' && baked.tris > w.constants.limits.budget.tris) return {
+    ...fail(i, 'def.budget', `${baked.tris} tris > ${w.constants.limits.budget.tris}`), def: def.ref, entity: e.id,
+    field: 'make.args.shapes', measured: baked.tris, limit: w.constants.limits.budget.tris, fix: 'Reduce kit repeat/radial counts or primitive segments.',
+  };
   // generators report design faults as `violation:` notes (building/1: sealed rooms, blocked stairs, headroom)
   const violations = (baked.notes ?? []).filter((n) => n.startsWith('violation: '));
   if (violations.length) return fail(i, 'architecture', violations.map((n) => n.slice(11)).join('; '));

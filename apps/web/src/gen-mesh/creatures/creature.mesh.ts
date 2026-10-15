@@ -17,10 +17,11 @@ const SPECIES = /^core-([a-z]+)$/;
 export function creatureObject(def: StoredDef, params: Record<string, Value>, tint: (k: string | undefined, f: string) => string, materials: MeshCtx['materials'], model: WorldModel | null, seed: number, opts: { kind?: BehaviorKind; speed?: number; radius?: number; follow?: string } = {}): { obj: THREE.Object3D; rig: Rig } | null {
   if (def.make.kind !== 'gen' || def.make.gen !== 'kit/2') return null;
   const parsed = kitArgs.safeParse(def.make.args); if (!parsed.success) return null;
-  const colours = Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)));
+  // K2 hook: numeric $params alter kit geometry as well as its palette.
+  const colours = Object.fromEntries(Object.entries(params).filter(([, v]) => typeof v === 'number' || typeof v === 'string' && /^#/.test(v)).sort(([a], [b]) => a.localeCompare(b)));
   const key = def.hash + ':' + JSON.stringify(colours);
   let proto = cache.get(key);
-  if (!proto) { proto = buildKit(parsed.data, { materials, tint }); cache.set(key, proto); }
+  if (!proto) { proto = buildKit(parsed.data, { materials, tint, params }); cache.set(key, proto); }
   const obj = proto.clone(true);
   const b = def.components.behavior;
   const str = (k: string) => (typeof params[k] === 'string' && params[k] ? (params[k] as string) : undefined);
@@ -45,5 +46,5 @@ registerMesh({
     const made = creatureObject(ctx.def, ctx.params, ctx.tint, ctx.materials, ctx.model, ctx.entity.seed ?? seedOf(ctx.entity.id));
     return made?.obj ?? null;
   },
-  instanceKey(ctx) { return ctx.def.hash; },
+  instanceKey(ctx) { return ctx.def.hash + ':' + JSON.stringify(ctx.params); }, // K2: keep differing program dimensions separate.
 });

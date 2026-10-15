@@ -1,0 +1,404 @@
+{
+  "name": "gothic-spire-tower",
+  "tags": [
+    "church",
+    "tower",
+    "gothic",
+    "landmark"
+  ],
+  "shapes": [
+    {
+      "kind": "box",
+      "at": [
+        0,
+        0.4,
+        0
+      ],
+      "size": [
+        4.5,
+        0.8,
+        4.5
+      ],
+      "material": "stone",
+      "color": "#0f0f12"
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        8,
+        0
+      ],
+      "size": [
+        3.8,
+        16,
+        3.8
+      ],
+      "material": "stone",
+      "color": "#18181c"
+    },
+    {
+      "kind": "box",
+      "at": [
+        -1.9,
+        2.2,
+        -1.9
+      ],
+      "size": [
+        0.85,
+        4.4,
+        0.85
+      ],
+      "material": "stone",
+      "color": "#0f0f12",
+      "mirror": [
+        "x",
+        "z"
+      ]
+    },
+    {
+      "kind": "box",
+      "at": [
+        -1.9,
+        8.6,
+        -1.9
+      ],
+      "size": [
+        0.65,
+        8.4,
+        0.65
+      ],
+      "material": "stone",
+      "color": "#18181c",
+      "mirror": [
+        "x",
+        "z"
+      ]
+    },
+    {
+      "kind": "cyl",
+      "at": [
+        -1.85,
+        17,
+        -1.85
+      ],
+      "r": 0.3,
+      "h": 1,
+      "segments": 6,
+      "material": "stone",
+      "color": "#18181c",
+      "collide": false,
+      "mirror": [
+        "x",
+        "z"
+      ]
+    },
+    {
+      "kind": "cone",
+      "at": [
+        -1.85,
+        18.8,
+        -1.85
+      ],
+      "r": 0.34,
+      "h": 2.6,
+      "segments": 6,
+      "material": "metal",
+      "color": "#3f9e6c",
+      "collide": false,
+      "mirror": [
+        "x",
+        "z"
+      ]
+    },
+    {
+      "kind": "sphere",
+      "at": [
+        -1.85,
+        20.15,
+        -1.85
+      ],
+      "r": 0.09,
+      "material": "metal",
+      "color": "#c9a54a",
+      "collide": false,
+      "mirror": [
+        "x",
+        "z"
+      ]
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        5.4,
+        0
+      ],
+      "size": [
+        4,
+        0.25,
+        4
+      ],
+      "material": "stone",
+      "color": "#26262d",
+      "collide": false,
+      "repeat": {
+        "n": 2,
+        "step": [
+          0,
+          4.8,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        16.25,
+        0
+      ],
+      "size": [
+        4.3,
+        0.5,
+        4.3
+      ],
+      "material": "stone",
+      "color": "#26262d"
+    },
+    {
+      "kind": "extrude",
+      "at": [
+        0,
+        6.3,
+        1.93
+      ],
+      "h": 0.06,
+      "pitch": -1.5708,
+      "color": "#22305e",
+      "collide": false,
+      "glow": 0.35,
+      "material": "glass",
+      "outline": "lancet",
+      "size": [
+        0.9,
+        3,
+        0.06
+      ],
+      "segments": 5,
+      "repeat": {
+        "n": 2,
+        "step": [
+          0,
+          0,
+          -3.8
+        ]
+      }
+    },
+    {
+      "kind": "extrude",
+      "at": [
+        -0.55,
+        11,
+        1.93
+      ],
+      "h": 0.06,
+      "pitch": -1.5708,
+      "color": "#0f0f12",
+      "collide": false,
+      "outline": "lancet",
+      "size": [
+        0.7,
+        3.8,
+        0.06
+      ],
+      "segments": 5,
+      "repeat": {
+        "n": 2,
+        "step": [
+          0,
+          0,
+          -3.8
+        ]
+      },
+      "mirror": "x"
+    },
+    {
+      "kind": "extrude",
+      "at": [
+        1.93,
+        6.3,
+        0
+      ],
+      "h": 0.06,
+      "roll": 1.5708,
+      "color": "#22305e",
+      "collide": false,
+      "glow": 0.35,
+      "material": "glass",
+      "outline": "lancet",
+      "size": [
+        0.9,
+        3,
+        0.06
+      ],
+      "segments": 5,
+      "outlineAxis": "yx",
+      "repeat": {
+        "n": 2,
+        "step": [
+          -3.8,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "kind": "extrude",
+      "at": [
+        1.93,
+        11,
+        -0.55
+      ],
+      "h": 0.06,
+      "roll": 1.5708,
+      "color": "#0f0f12",
+      "collide": false,
+      "outline": "lancet",
+      "size": [
+        0.7,
+        3.8,
+        0.06
+      ],
+      "segments": 5,
+      "outlineAxis": "yx",
+      "repeat": {
+        "n": 2,
+        "step": [
+          -3.8,
+          0,
+          0
+        ]
+      },
+      "mirror": "z"
+    },
+    {
+      "kind": "cyl",
+      "at": [
+        0,
+        16.8,
+        0
+      ],
+      "r": 1.85,
+      "r2": 1.75,
+      "h": 0.6,
+      "segments": 8,
+      "material": "metal",
+      "color": "#2c7b52",
+      "collide": false
+    },
+    {
+      "kind": "cone",
+      "at": [
+        0,
+        23.6,
+        0
+      ],
+      "r": 1.75,
+      "h": 13.6,
+      "segments": 8,
+      "material": "metal",
+      "color": "#3f9e6c",
+      "collide": false
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        18,
+        0
+      ],
+      "size": [
+        0.6,
+        1.1,
+        0.6
+      ],
+      "material": "metal",
+      "color": "#2c7b52",
+      "collide": false,
+      "radial": {
+        "n": 4,
+        "r": 1.45,
+        "face": "none"
+      }
+    },
+    {
+      "kind": "cone",
+      "at": [
+        0,
+        18.95,
+        0
+      ],
+      "r": 0.45,
+      "h": 0.8,
+      "segments": 4,
+      "material": "metal",
+      "color": "#3f9e6c",
+      "collide": false,
+      "radial": {
+        "n": 4,
+        "r": 1.45,
+        "face": "none"
+      }
+    },
+    {
+      "kind": "sphere",
+      "at": [
+        0,
+        30.5,
+        0
+      ],
+      "r": 0.22,
+      "material": "metal",
+      "color": "#c9a54a",
+      "collide": false
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        31.2,
+        0
+      ],
+      "size": [
+        0.09,
+        1.2,
+        0.09
+      ],
+      "material": "metal",
+      "color": "#c9a54a",
+      "collide": false
+    },
+    {
+      "kind": "box",
+      "at": [
+        0,
+        31.4,
+        0
+      ],
+      "size": [
+        0.6,
+        0.09,
+        0.09
+      ],
+      "material": "metal",
+      "color": "#c9a54a",
+      "collide": false
+    }
+  ],
+  "box": [
+    6.186,
+    31.8,
+    6.186
+  ]
+}
