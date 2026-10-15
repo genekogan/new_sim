@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { WorldModel, applyBatch, coreLibrary, type DefInput } from './index.ts';
+import { WorldModel, applyBatch, buildLibrary, coreLibrary, type DefInput } from './index.ts';
 
 const fresh = () => { const w = new WorldModel({ constants: { ground: 'land', extent: 128 }, seed: 'define-undo' }); w.library = coreLibrary(); return w; };
 const post = (size: [number, number, number]): DefInput => ({ schema: 'def/1', name: 'probe-post', version: 1, size: { box: size }, make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, size[1] / 2, 0], size }] } } });
@@ -118,6 +118,55 @@ test('library core refs reject changed content; identical adoption remains allow
   assert.equal(act(w, [{ op: 'restore-def', ref: core.ref, hash: core.hash }]).result.accepted, false);
   assert.equal(act(w, []).result.accepted, false);
   ok(act(w, [], true));
+});
+
+test('trusted library revision adoption retains both exact hashes and refuses ordinary redefinition', () => {
+  const old = post([0.5, 1, 0.5]), current = { ...old, description: 'current library revision' };
+  // Library membership, rather than a core-* spelling, owns the ref.
+  const library = buildLibrary('revisions', [old, current]);
+  const w = fresh(); w.library = library;
+  const source = new WorldModel({ constants: { ground: 'land' }, seed: 'revisions' });
+  const pinned = source.defineDef(old, 'core', 0), latest = library.get(pinned.ref)!;
+  const before = structuredClone(w.snapshot());
+  const refused = act(w, [{ op: 'define', def: old }]);
+  assert.equal(refused.result.accepted, false);
+  if (!refused.result.accepted) assert.equal(refused.result.failures[0].code, 'constant.immutable');
+  assert.deepEqual(w.snapshot(), before);
+  ok(act(w, [{ op: 'define', def: old }], true));
+  ok(act(w, [
+    { op: 'place', def: 'sha:' + pinned.hash, name: 'old', p: [0, 0] },
+    { op: 'place', def: 'sha:' + latest.hash, name: 'latest', p: [4, 0] },
+  ]));
+  const loaded = WorldModel.fromSnapshot(JSON.parse(JSON.stringify(w.snapshot())));
+  assert.deepEqual(loaded.def('sha:' + pinned.hash), pinned);
+  assert.deepEqual(loaded.def('sha:' + latest.hash), latest);
+  assert.equal(loaded.get('old')!.def, 'sha:' + pinned.hash);
+  assert.equal(loaded.get('latest')!.def, 'sha:' + latest.hash);
+  assert.equal(w.def(pinned.ref)!.hash, pinned.hash, 'adopting another hash does not rebind the pinned name');
+  const adopted = structuredClone(w.snapshot());
+  assert.equal(act(w, [{ op: 'define', def: { ...old, description: 'agent override' } }]).result.accepted, false);
+  assert.deepEqual(w.snapshot(), adopted);
+});
+
+test('a world-local core-* name is not a library definition', () => {
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'local-core' });
+  const def = { ...post([0.5, 1, 0.5]), name: 'core-local-post' };
+  ok(act(w, [{ op: 'define', def }]));
+  const previous = w.def('core-local-post@1')!.hash;
+  ok(act(w, [{ op: 'define', def: { ...def, description: 'second local revision' } }]));
+  assert.notEqual(w.def('core-local-post@1')!.hash, previous);
+  assert.equal(w.def('sha:' + previous)!.hash, previous);
+});
+
+test('legacy core-owned definitions remain protected without a live library', () => {
+  const w = new WorldModel({ constants: { ground: 'land' }, seed: 'legacy-core' });
+  const def = { ...post([0.5, 1, 0.5]), name: 'core-legacy-post' };
+  w.defineDef(def, 'core', 0);
+  const before = structuredClone(w.snapshot());
+  const r = act(w, [{ op: 'define', def: { ...def, description: 'agent override' } }]);
+  assert.equal(r.result.accepted, false);
+  if (!r.result.accepted) assert.equal(r.result.failures[0].code, 'constant.immutable');
+  assert.deepEqual(w.snapshot(), before);
 });
 
 test('definition undo restores geometry prepared by a new generator while preserving later state edits', () => {

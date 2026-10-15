@@ -2,10 +2,12 @@
 // an old world (which stores the whole kit from an earlier release) boots unchanged: same defs, same hashes, no commit.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CORE_KIT, WorldModel, applyBatch, coreLibrary, type DefInput } from '@sim/world-compiler';
+import { CORE_KIT, WorldModel, applyBatch, buildLibrary, coreLibrary, type DefInput } from '@sim/world-compiler';
 import { Db } from '../db.ts';
 import { GodMode } from './god.ts';
 import { WorldStore } from './store.ts';
+// @ts-expect-error The portable CLI export helper is JavaScript without a declaration file.
+import { exportGenesis } from '../../../../tools/god-skill/lib/export.mjs';
 
 const opts = (worldId: string) => ({ worldId, ownerId: null, tick: () => 1, emit: () => {} });
 const rows = (db: Db, w: string) => (db.db.prepare('SELECT COUNT(*) n FROM world_defs_v1 WHERE world_id=?').get(w) as { n: number }).n;
@@ -53,4 +55,33 @@ test('old world: the full kit stored by an earlier release boots unchanged (same
   const p = god.act({ ops: [{ op: 'place', def: 'core/sofa@1', name: 's', p: [10, 0, 10] }] });
   assert.ok(p.accepted, JSON.stringify(p));
   assert.equal(rows(db, 'old-1'), n0 + 1);
+});
+
+test('genesis imports exact same-major library hashes; ordinary act cannot redefine the library', (t) => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  const input: DefInput = { schema: 'def/1', name: 'core-revision', version: 1, layer: 'decor', make: { kind: 'none' }, size: { box: [1, 1, 1] } };
+  const source = new WorldModel({ constants: { ground: 'land' }, seed: 'export-library' });
+  const old = source.defineDef({ ...input, description: 'one' }, 'core', 0);
+  const latest = source.defineDef({ ...input, description: 'two' }, 'core', 0);
+  const library = buildLibrary('revisions', [old, latest]);
+  const genesis = exportGenesis({ worldId: 'source', seq: 1, constants: source.constants, state: source.state, defs: [old, latest], entities: [
+    { id: 'one', name: 'one', def: 'sha:' + old.hash, in: { parent: 'world' }, p: [0, 0, 0] },
+    { id: 'two', name: 'two', def: 'sha:' + latest.hash, in: { parent: 'world' }, p: [4, 0, 0] },
+  ] });
+  const god = new GodMode(db, { ...opts('genesis-revisions'), library, genesis });
+  assert.equal(rows(db, 'genesis-revisions'), 2);
+  for (const def of [old, latest]) {
+    assert.deepEqual(god.model.def('sha:' + def.hash), def);
+    assert.equal(god.model.get(def === old ? 'one' : 'two')!.def, 'sha:' + def.hash);
+  }
+  const loaded = new GodMode(db, { ...opts('genesis-revisions'), library: null });
+  for (const def of [old, latest]) assert.deepEqual(loaded.model.def('sha:' + def.hash), def);
+  const before = structuredClone(god.model.snapshot()), n = edits(db, 'genesis-revisions');
+  for (const extra of [{}, { trusted: true }, { group: 'genesis' }]) {
+    const r = god.act({ ...extra, ops: [{ op: 'define', def: { ...input, description: 'agent override' } }] });
+    assert.equal(r.accepted, false);
+    if (!r.accepted) assert.equal(r.failures[0].code, 'constant.immutable');
+    assert.deepEqual(god.model.snapshot(), before);
+    assert.equal(edits(db, 'genesis-revisions'), n);
+  }
 });

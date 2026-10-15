@@ -208,7 +208,9 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           if (!owned) diff.defs.push(stored);
           return;
         }
-        if (previous && ref.startsWith('core-') && !opts.trusted) {
+        // Ownership comes from the library (or a legacy core record), not the spelling of a local name.
+        // Trusted import/undo may retain historical revisions; ordinary define cannot replace library content.
+        if (previous && (scratch.library?.get(ref) || previous.by === 'core') && !opts.trusted) {
           failures.push({ ...fail(i, 'constant.immutable', `${ref} is a library definition and cannot be redefined`), def: ref, field: 'def.name', fix: 'Choose a world-local name for your definition.' }); return;
         }
         diff.defs.push(stored);

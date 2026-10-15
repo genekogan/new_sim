@@ -193,6 +193,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
+    return this.commitBatch(batch, note);
+  }
+  /** Only server-owned genesis import can request trusted library adoption; request JSON cannot enable it. */
+  private commitBatch(batch: unknown, note?: string, trusted = false): Result {
     const parsed = submissionSchema.safeParse(batch);
     if (!parsed.success) return { accepted: false, failures: parsed.error.issues.map((i) => ({ op: typeof i.path[1] === 'number' ? i.path[1] : -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the operation shape in GET /v1/god/schema.' })) };
     const input = parsed.data;
@@ -219,7 +223,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     // Keep public state untouched until SQL succeeds. No SQL write lock is held while planning or baking.
     const next = this.model.fork();
     const lifted: string[] = [];
-    const r = applyBatch(next, normalized, 'god', tick, { uses: this.bodies?.uses, refuse: (after, diff, ops) => {
+    const r = applyBatch(next, normalized, 'god', tick, { trusted, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
       const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
       // Warning geometry uses the same typed bake boundary as admission, before any live/SQL mutation.
       if (this.bodies?.lifted) lifted.push(...this.bodies.lifted(diff.upserts.map(e => e.id), after));
@@ -376,7 +380,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (g.schema !== 'genesis/1') throw new Error('genesis: schema must be genesis/1');
     if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], group: 'genesis' }, 'genesis: state'); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
     for (const [i, b] of g.batches.entries()) {
-      const r = this.act({ ops: b.ops, group: b.group ?? 'genesis' }, `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}`);
+      const r = this.commitBatch({ ops: b.ops, group: b.group ?? 'genesis' }, `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}`, true);
       if (!r.accepted) throw new Error(`genesis batch ${i + 1} (${b.note ?? ''}) refused: ${JSON.stringify(r.failures).slice(0, 600)}`);
     }
     this.template = g.name ?? 'custom';
