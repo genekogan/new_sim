@@ -12,6 +12,8 @@ export type VocabTarget = {
   at: [number, number] | null;
 };
 export type VocabPlace = {id: string; name: string; center: [number, number];
+  /** Declared place aliases, distinct from descriptive words and fuzzy matching. */
+  aliases?: readonly string[];
   /** Optional richer facts (live ledger): parent id, kind, description words and whether a walk reaches it natively. */
   parent?: string | null; kind?: string; description?: string; walkable?: boolean};
 export type VocabContext = {
@@ -137,6 +139,7 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
 
 /** Verbs whose target is a place (natural place names and the places map apply). */
 const PLACE_VERBS = new Set(['walk', 'jog', 'run', 'jog-around', 'run-around', 'hang-out', 'gather', 'stroll', 'read']);
+const GAIT_VERBS = new Set(['jog', 'run', 'jog-around', 'run-around']);
 
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
@@ -202,6 +205,26 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   // "stroll" with nothing named is a stroll right here.
   if (verb === 'stroll' && !tokens(rest).length && !ctx.caps.some(c => c.id === 'stroll:here')) {const w = ctx.caps.find(c => c.id === 'wander:here'); if (w) return {kind: 'alias', cap: w, note: `${input} is ${w.id}.`};}
   if (verb === 'stroll' && !verbs.has('stroll') && verbs.has('wander')) verb = 'wander';
+  // Resolve a named gait destination before looking through capability labels.
+  // A park mentioning a pond, or a Library annex, must never replace a named
+  // place that has no faster-gait offer of its own.
+  if (GAIT_VERBS.has(verb)) {
+    const words = tokens(rest), queries = [words, words.filter(t => !ctx.root.includes(t))];
+    for (const query of queries) {
+      const q = query.join(' '); if (!q) continue;
+      const tiers = [
+        ctx.places.filter(p => norm(p.id) === q),
+        ctx.places.filter(p => norm(p.name) === q),
+        ctx.places.filter(p => p.aliases?.some(alias => norm(alias) === q)),
+      ];
+      const named = tiers.find(matches => matches.length); if (!named) continue;
+      if (named.length > 1) return {kind:'unknown',code:'place.ambiguous',reason:`Several places have that name; use an exact offered ${verb} capability. Nothing else was chosen.`,didYouMean:ctx.caps.filter(c => c.verb === verb && named.some(p => p.id === c.target?.id)).map(c => ({id:c.id,label:c.label}))};
+      const place = named[0], offered = ctx.caps.filter(c => c.verb === verb && c.target?.id === place.id).sort((a,b) => Number(b.available)-Number(a.available) || a.id.localeCompare(b.id));
+      if (offered[0]) return {kind:'alias',cap:offered[0],note:`${input} is ${offered[0].id} (${offered[0].label}).`};
+      const bank = verb.endsWith('-around') && place.kind === 'water';
+      return {kind:'unknown',code:bank?'gait.no-bank-loop':'gait.unavailable',reason:bank?`${place.name} has no full loop on reachable dry ground; nothing else was chosen.`:`No ${verb} capability is offered for ${place.name}; nothing else was chosen in its place.`,didYouMean:[]};
+    }
+  }
   // A named pond means its bank loop, never an unrelated park that mentions ponds in its description.
   if (verb === 'jog-around' || verb === 'run-around') {
     const q = tokens(rest).filter(t => !ctx.root.includes(t)), water = ctx.places.filter(p => p.kind === 'water' && q.length && q.every(t => tokenHit(t, tokens(p.id + ' ' + p.name)) || (SYNONYMS[t] ?? []).some(s => tokenHit(s, tokens(p.id + ' ' + p.name)))));
