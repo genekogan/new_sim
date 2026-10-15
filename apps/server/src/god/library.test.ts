@@ -49,7 +49,7 @@ test('old world: the full kit stored by an earlier release boots unchanged (same
   assert.equal(rows(db, 'old-1'), n0, 'no defs written on load');
   assert.equal(edits(db, 'old-1'), e0, 'no core-kit commit on load');
   assert.equal(god.model.def('core/fountain@1')!.hash, oldFountain.hash, 'the pinned older rev wins');
-  assert.equal(JSON.stringify(god.publicSnapshot()), JSON.stringify(bare.publicSnapshot()), 'the viewer sees the identical world');
+  assert.equal(JSON.stringify({ ...god.publicSnapshot(), now: undefined }), JSON.stringify({ ...bare.publicSnapshot(), now: undefined }), 'the viewer sees the identical world (now is the wall clock)');
   // a type the old world never stored resolves through the library and is pinned when placed
   assert.ok(god.model.def('core/sofa@1'));
   const p = god.act({ ops: [{ op: 'place', def: 'core/sofa@1', name: 's', p: [10, 0, 10] }] });

@@ -1,0 +1,1726 @@
+{
+  "started": {
+    "type": "edge",
+    "kind": "world-build",
+    "event": "started",
+    "rev": 1,
+    "now": 1000000,
+    "site": {
+      "id": "church",
+      "title": "Stone church",
+      "status": "active",
+      "rev": 1,
+      "lastAt": 1000000,
+      "pauseAfterMs": 50,
+      "closed": true,
+      "step": {
+        "n": 1,
+        "label": "shell",
+        "of": 3
+      },
+      "site": {
+        "at": [
+          0,
+          0
+        ],
+        "size": [
+          80,
+          80
+        ],
+        "yaw": 0
+      },
+      "massing": [
+        {
+          "name": "nave",
+          "at": [
+            0,
+            0
+          ],
+          "size": [
+            20,
+            10
+          ],
+          "h": 8,
+          "roof": "gable"
+        }
+      ],
+      "roots": [],
+      "claims": []
+    }
+  },
+  "diff": {
+    "type": "edge",
+    "kind": "world-diff",
+    "seq": 1,
+    "tick": 100,
+    "at": 1000000,
+    "now": 1000000,
+    "diff": {
+      "upserts": [
+        {
+          "id": "e_0df38658",
+          "def": "core-bench@1",
+          "in": {
+            "parent": "world"
+          },
+          "by": "god",
+          "born": 100,
+          "v": 1,
+          "name": "bench-0",
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "params": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          }
+        },
+        {
+          "id": "e_abdfd1cd",
+          "def": "core-bench@1",
+          "in": {
+            "parent": "world"
+          },
+          "by": "god",
+          "born": 100,
+          "v": 1,
+          "name": "bench-1",
+          "p": [
+            4,
+            0,
+            0
+          ],
+          "params": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          }
+        },
+        {
+          "id": "e_c8bdaf45",
+          "def": "core-bench@1",
+          "in": {
+            "parent": "world"
+          },
+          "by": "god",
+          "born": 100,
+          "v": 1,
+          "name": "bench-2",
+          "p": [
+            8,
+            0,
+            0
+          ],
+          "params": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          }
+        },
+        {
+          "id": "e_eec43010",
+          "def": "core-bench@1",
+          "in": {
+            "parent": "world"
+          },
+          "by": "god",
+          "born": 100,
+          "v": 1,
+          "name": "bench-3",
+          "p": [
+            12,
+            0,
+            0
+          ],
+          "params": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          }
+        },
+        {
+          "id": "e_a2ae66e3",
+          "def": "core-bench@1",
+          "in": {
+            "parent": "world"
+          },
+          "by": "god",
+          "born": 100,
+          "v": 1,
+          "name": "bench-4",
+          "p": [
+            16,
+            0,
+            0
+          ],
+          "params": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          }
+        }
+      ],
+      "removes": [],
+      "defs": [
+        {
+          "schema": "def/1",
+          "name": "core-bench",
+          "version": 1,
+          "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+          "tags": [
+            "prop",
+            "street",
+            "seat",
+            "bench",
+            "furniture",
+            "park"
+          ],
+          "form": "point",
+          "make": {
+            "kind": "gen",
+            "gen": "kit/2",
+            "args": {
+              "shapes": [
+                {
+                  "kind": "extrude",
+                  "at": [
+                    -0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    -0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    -0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.62,
+                    -0.25
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.79,
+                    -0.28
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    -0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                }
+              ],
+              "round": 0.015
+            }
+          },
+          "params": {
+            "iron": {
+              "type": "color",
+              "default": "#2f3633",
+              "doc": "iron colour"
+            },
+            "wood": {
+              "type": "color",
+              "default": "#9a6b46",
+              "doc": "wood colour"
+            }
+          },
+          "state": {},
+          "slots": [
+            {
+              "id": "seat-1",
+              "kind": "seat",
+              "p": [
+                -0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            },
+            {
+              "id": "seat-2",
+              "kind": "seat",
+              "p": [
+                0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            }
+          ],
+          "components": {
+            "seat": {
+              "height": 0.465
+            }
+          },
+          "actions": [],
+          "anchor": "base",
+          "palette": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          },
+          "layer": "solid",
+          "size": {
+            "box": [
+              1.6,
+              0.871,
+              0.549
+            ],
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "overlaps": [],
+          "budget": {
+            "tris": 0,
+            "bytes": 0,
+            "textures": 0
+          },
+          "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+          "ref": "core-bench@1",
+          "by": "core",
+          "born": 0
+        }
+      ],
+      "tiles": [],
+      "answers": []
+    },
+    "by": "god",
+    "defs": [
+      {
+        "schema": "def/1",
+        "name": "core-bench",
+        "version": 1,
+        "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+        "tags": [
+          "prop",
+          "street",
+          "seat",
+          "bench",
+          "furniture",
+          "park"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "gen",
+          "gen": "kit/2",
+          "args": {
+            "shapes": [
+              {
+                "kind": "extrude",
+                "at": [
+                  -0.72,
+                  0.015,
+                  0
+                ],
+                "polygon": [
+                  [
+                    -0.02,
+                    -0.235
+                  ],
+                  [
+                    0.02,
+                    -0.235
+                  ],
+                  [
+                    0.02,
+                    0.235
+                  ],
+                  [
+                    -0.02,
+                    0.235
+                  ]
+                ],
+                "h": 0.41,
+                "tint": "iron"
+              },
+              {
+                "kind": "extrude",
+                "at": [
+                  0.72,
+                  0.015,
+                  0
+                ],
+                "polygon": [
+                  [
+                    -0.02,
+                    -0.235
+                  ],
+                  [
+                    0.02,
+                    -0.235
+                  ],
+                  [
+                    0.02,
+                    0.235
+                  ],
+                  [
+                    -0.02,
+                    0.235
+                  ]
+                ],
+                "h": 0.41,
+                "tint": "iron"
+              },
+              {
+                "kind": "box",
+                "at": [
+                  -0.72,
+                  0.62,
+                  -0.24
+                ],
+                "size": [
+                  0.06,
+                  0.5,
+                  0.06
+                ],
+                "round": 0,
+                "tint": "iron",
+                "pitch": -0.18
+              },
+              {
+                "kind": "box",
+                "at": [
+                  0.72,
+                  0.62,
+                  -0.24
+                ],
+                "size": [
+                  0.06,
+                  0.5,
+                  0.06
+                ],
+                "round": 0,
+                "tint": "iron",
+                "pitch": -0.18
+              },
+              {
+                "kind": "extrude",
+                "at": [
+                  0,
+                  0.433,
+                  0.16
+                ],
+                "polygon": [
+                  [
+                    -0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    0.05
+                  ],
+                  [
+                    -0.785,
+                    0.05
+                  ]
+                ],
+                "h": 0.015,
+                "tint": "wood"
+              },
+              {
+                "kind": "extrude",
+                "at": [
+                  0,
+                  0.433,
+                  0
+                ],
+                "polygon": [
+                  [
+                    -0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    0.05
+                  ],
+                  [
+                    -0.785,
+                    0.05
+                  ]
+                ],
+                "h": 0.015,
+                "tint": "wood"
+              },
+              {
+                "kind": "extrude",
+                "at": [
+                  0,
+                  0.433,
+                  -0.16
+                ],
+                "polygon": [
+                  [
+                    -0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    -0.05
+                  ],
+                  [
+                    0.785,
+                    0.05
+                  ],
+                  [
+                    -0.785,
+                    0.05
+                  ]
+                ],
+                "h": 0.015,
+                "tint": "wood"
+              },
+              {
+                "kind": "box",
+                "at": [
+                  0,
+                  0.62,
+                  -0.25
+                ],
+                "size": [
+                  1.6,
+                  0.11,
+                  0.03
+                ],
+                "round": 0,
+                "tint": "wood",
+                "pitch": -0.18
+              },
+              {
+                "kind": "box",
+                "at": [
+                  0,
+                  0.79,
+                  -0.28
+                ],
+                "size": [
+                  1.6,
+                  0.11,
+                  0.03
+                ],
+                "round": 0,
+                "tint": "wood",
+                "pitch": -0.18
+              },
+              {
+                "kind": "capsule",
+                "at": [
+                  -0.74,
+                  0.64,
+                  -0.02
+                ],
+                "r": 0.025,
+                "h": 0.38,
+                "segments": 5,
+                "tint": "iron",
+                "pitch": 1.5707963267948966
+              },
+              {
+                "kind": "capsule",
+                "at": [
+                  0.74,
+                  0.64,
+                  -0.02
+                ],
+                "r": 0.025,
+                "h": 0.38,
+                "segments": 5,
+                "tint": "iron",
+                "pitch": 1.5707963267948966
+              }
+            ],
+            "round": 0.015
+          }
+        },
+        "params": {
+          "iron": {
+            "type": "color",
+            "default": "#2f3633",
+            "doc": "iron colour"
+          },
+          "wood": {
+            "type": "color",
+            "default": "#9a6b46",
+            "doc": "wood colour"
+          }
+        },
+        "state": {},
+        "slots": [
+          {
+            "id": "seat-1",
+            "kind": "seat",
+            "p": [
+              -0.4,
+              0.465,
+              0.02
+            ],
+            "yaw": 0,
+            "height": 0.465,
+            "accepts": {
+              "tags": [
+                "body"
+              ]
+            },
+            "capacity": 1
+          },
+          {
+            "id": "seat-2",
+            "kind": "seat",
+            "p": [
+              0.4,
+              0.465,
+              0.02
+            ],
+            "yaw": 0,
+            "height": 0.465,
+            "accepts": {
+              "tags": [
+                "body"
+              ]
+            },
+            "capacity": 1
+          }
+        ],
+        "components": {
+          "seat": {
+            "height": 0.465
+          }
+        },
+        "actions": [],
+        "anchor": "base",
+        "palette": {
+          "iron": "#2f3633",
+          "wood": "#9a6b46"
+        },
+        "layer": "solid",
+        "size": {
+          "box": [
+            1.6,
+            0.871,
+            0.549
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "overlaps": [],
+        "budget": {
+          "tris": 0,
+          "bytes": 0,
+          "textures": 0
+        },
+        "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+        "ref": "core-bench@1",
+        "born": 0
+      }
+    ],
+    "builds": [
+      {
+        "id": "church",
+        "rev": 2,
+        "status": "active",
+        "lastAt": 1000000,
+        "closed": true,
+        "step": {
+          "n": 2,
+          "label": "roof details",
+          "of": 3
+        },
+        "rootsAdded": [
+          "e_0df38658",
+          "e_abdfd1cd",
+          "e_c8bdaf45",
+          "e_eec43010",
+          "e_a2ae66e3"
+        ]
+      }
+    ]
+  },
+  "revGap": [
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "started",
+      "rev": 1,
+      "now": 1000000,
+      "site": {
+        "id": "church",
+        "title": "Stone church",
+        "status": "active",
+        "rev": 1,
+        "lastAt": 1000000,
+        "pauseAfterMs": 50,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "shell",
+          "of": 3
+        },
+        "site": {
+          "at": [
+            0,
+            0
+          ],
+          "size": [
+            80,
+            80
+          ],
+          "yaw": 0
+        },
+        "massing": [
+          {
+            "name": "nave",
+            "at": [
+              0,
+              0
+            ],
+            "size": [
+              20,
+              10
+            ],
+            "h": 8,
+            "roof": "gable"
+          }
+        ],
+        "roots": [],
+        "claims": []
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-diff",
+      "seq": 1,
+      "tick": 100,
+      "at": 1000000,
+      "now": 1000000,
+      "diff": {
+        "upserts": [
+          {
+            "id": "e_0df38658",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "bench-0",
+            "p": [
+              0,
+              0,
+              0
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          },
+          {
+            "id": "e_abdfd1cd",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "bench-1",
+            "p": [
+              4,
+              0,
+              0
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          },
+          {
+            "id": "e_c8bdaf45",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "bench-2",
+            "p": [
+              8,
+              0,
+              0
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          },
+          {
+            "id": "e_eec43010",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "bench-3",
+            "p": [
+              12,
+              0,
+              0
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          },
+          {
+            "id": "e_a2ae66e3",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "bench-4",
+            "p": [
+              16,
+              0,
+              0
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          }
+        ],
+        "removes": [],
+        "defs": [
+          {
+            "schema": "def/1",
+            "name": "core-bench",
+            "version": 1,
+            "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+            "tags": [
+              "prop",
+              "street",
+              "seat",
+              "bench",
+              "furniture",
+              "park"
+            ],
+            "form": "point",
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      -0.72,
+                      0.015,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        0.235
+                      ],
+                      [
+                        -0.02,
+                        0.235
+                      ]
+                    ],
+                    "h": 0.41,
+                    "tint": "iron"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0.72,
+                      0.015,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        0.235
+                      ],
+                      [
+                        -0.02,
+                        0.235
+                      ]
+                    ],
+                    "h": 0.41,
+                    "tint": "iron"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.72,
+                      0.62,
+                      -0.24
+                    ],
+                    "size": [
+                      0.06,
+                      0.5,
+                      0.06
+                    ],
+                    "round": 0,
+                    "tint": "iron",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.72,
+                      0.62,
+                      -0.24
+                    ],
+                    "size": [
+                      0.06,
+                      0.5,
+                      0.06
+                    ],
+                    "round": 0,
+                    "tint": "iron",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      0.16
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      -0.16
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.62,
+                      -0.25
+                    ],
+                    "size": [
+                      1.6,
+                      0.11,
+                      0.03
+                    ],
+                    "round": 0,
+                    "tint": "wood",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.79,
+                      -0.28
+                    ],
+                    "size": [
+                      1.6,
+                      0.11,
+                      0.03
+                    ],
+                    "round": 0,
+                    "tint": "wood",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "capsule",
+                    "at": [
+                      -0.74,
+                      0.64,
+                      -0.02
+                    ],
+                    "r": 0.025,
+                    "h": 0.38,
+                    "segments": 5,
+                    "tint": "iron",
+                    "pitch": 1.5707963267948966
+                  },
+                  {
+                    "kind": "capsule",
+                    "at": [
+                      0.74,
+                      0.64,
+                      -0.02
+                    ],
+                    "r": 0.025,
+                    "h": 0.38,
+                    "segments": 5,
+                    "tint": "iron",
+                    "pitch": 1.5707963267948966
+                  }
+                ],
+                "round": 0.015
+              }
+            },
+            "params": {
+              "iron": {
+                "type": "color",
+                "default": "#2f3633",
+                "doc": "iron colour"
+              },
+              "wood": {
+                "type": "color",
+                "default": "#9a6b46",
+                "doc": "wood colour"
+              }
+            },
+            "state": {},
+            "slots": [
+              {
+                "id": "seat-1",
+                "kind": "seat",
+                "p": [
+                  -0.4,
+                  0.465,
+                  0.02
+                ],
+                "yaw": 0,
+                "height": 0.465,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "seat-2",
+                "kind": "seat",
+                "p": [
+                  0.4,
+                  0.465,
+                  0.02
+                ],
+                "yaw": 0,
+                "height": 0.465,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              }
+            ],
+            "components": {
+              "seat": {
+                "height": 0.465
+              }
+            },
+            "actions": [],
+            "anchor": "base",
+            "palette": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            },
+            "layer": "solid",
+            "size": {
+              "box": [
+                1.6,
+                0.871,
+                0.549
+              ],
+              "scale": [
+                1,
+                1
+              ]
+            },
+            "overlaps": [],
+            "budget": {
+              "tris": 0,
+              "bytes": 0,
+              "textures": 0
+            },
+            "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+            "ref": "core-bench@1",
+            "by": "core",
+            "born": 0
+          }
+        ],
+        "tiles": [],
+        "answers": []
+      },
+      "by": "god",
+      "defs": [
+        {
+          "schema": "def/1",
+          "name": "core-bench",
+          "version": 1,
+          "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+          "tags": [
+            "prop",
+            "street",
+            "seat",
+            "bench",
+            "furniture",
+            "park"
+          ],
+          "form": "point",
+          "make": {
+            "kind": "gen",
+            "gen": "kit/2",
+            "args": {
+              "shapes": [
+                {
+                  "kind": "extrude",
+                  "at": [
+                    -0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    -0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    -0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.62,
+                    -0.25
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.79,
+                    -0.28
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    -0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                }
+              ],
+              "round": 0.015
+            }
+          },
+          "params": {
+            "iron": {
+              "type": "color",
+              "default": "#2f3633",
+              "doc": "iron colour"
+            },
+            "wood": {
+              "type": "color",
+              "default": "#9a6b46",
+              "doc": "wood colour"
+            }
+          },
+          "state": {},
+          "slots": [
+            {
+              "id": "seat-1",
+              "kind": "seat",
+              "p": [
+                -0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            },
+            {
+              "id": "seat-2",
+              "kind": "seat",
+              "p": [
+                0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            }
+          ],
+          "components": {
+            "seat": {
+              "height": 0.465
+            }
+          },
+          "actions": [],
+          "anchor": "base",
+          "palette": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          },
+          "layer": "solid",
+          "size": {
+            "box": [
+              1.6,
+              0.871,
+              0.549
+            ],
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "overlaps": [],
+          "budget": {
+            "tris": 0,
+            "bytes": 0,
+            "textures": 0
+          },
+          "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+          "ref": "core-bench@1",
+          "born": 0
+        }
+      ],
+      "builds": [
+        {
+          "id": "church",
+          "rev": 3,
+          "status": "active",
+          "lastAt": 1000000,
+          "closed": true,
+          "step": {
+            "n": 2,
+            "label": "roof details",
+            "of": 3
+          },
+          "rootsAdded": [
+            "e_0df38658",
+            "e_abdfd1cd",
+            "e_c8bdaf45",
+            "e_eec43010",
+            "e_a2ae66e3"
+          ]
+        }
+      ]
+    }
+  ]
+}

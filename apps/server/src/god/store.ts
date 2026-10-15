@@ -10,7 +10,11 @@ export const GOD_EDIT_RECEIPTS = L.requestReceipts;
 export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
 export type EditRequest = { clientRef: string; requestHash: string; payloadHash: string; result: Accepted };
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
-type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number };
+export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; created_at: number; last_at: number; body: string };
+export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number };
+type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[] };
+class StaleBuild extends Error {}
+const staleBuild = (): Result => ({ accepted: false, failures: [{ op: -1, code: 'revision.stale', field: 'build', detail: 'The durable build changed while this edit was planned.', fix: 'Read the build and re-plan the edit.' }] });
 
 export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine' };
 export type PrayerRow = { id: string; soul_id: string; soul_name: string; text: string; at: number; answer: string | null; answered_at: number | null };
@@ -35,6 +39,17 @@ export function ensureWorldSchema(db: Db) {
   `);
   const cols = (db.db.prepare('PRAGMA table_info(world_edits_v1)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
+  db.db.exec(`
+    CREATE INDEX IF NOT EXISTS world_edits_v1_grp ON world_edits_v1(world_id,grp);
+    CREATE TABLE IF NOT EXISTS god_builds_v1 (
+      world_id TEXT NOT NULL, id TEXT NOT NULL CHECK(length(id)<=40),
+      status TEXT NOT NULL CHECK(status IN ('active','paused','done','abandoned')),
+      rev INTEGER NOT NULL, created_at INTEGER NOT NULL, last_at INTEGER NOT NULL,
+      body TEXT NOT NULL CHECK(json_valid(body) AND length(CAST(body AS BLOB))<=65536),
+      PRIMARY KEY(world_id,id)) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS god_builds_v1_open ON god_builds_v1(world_id,status,last_at);
+    CREATE INDEX IF NOT EXISTS god_builds_v1_rev ON god_builds_v1(world_id,rev);
+  `);
 }
 
 type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null; defRefs?: Record<string, string> };
@@ -71,10 +86,11 @@ export class WorldStore {
   }
   /** One committed batch: entity rows, defs, meta, and the edit with its inverse. */
   commit(model: WorldModel, owner: string | null, diff: Diff, edit: CommitEdit, request?: EditRequest): Result | null {
-    return this.tx(() => {
+    try { return this.tx(() => {
       // Recheck under the write lock: another connection may have committed while this owner planned.
       if (request) { const replay = this.retry(request.clientRef, request.requestHash); if (replay) return replay; }
       if (this.meta()?.editSeq !== edit.seq - 1) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', detail: 'The durable world changed while this owner planned. Reload the world before submitting another edit.', field: 'editSeq', fix: 'Reload the current world and re-plan the edit.' }] } as Result;
+      for (const b of edit.builds ?? []) if ((this.db.db.prepare('SELECT rev FROM god_builds_v1 WHERE world_id=? AND id=?').get(this.worldId, b.id) as { rev: number } | undefined)?.rev !== b.expectRev) return staleBuild();
       const journal = this.journalBudgetFailure(edit, diff); if (journal) return journal;
       for (const d of diff.defs) this.writeDef(d);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
@@ -89,12 +105,17 @@ export class WorldStore {
       // a fresh edit clears the redo stack: pending undos can no longer be redone
       if (edit.kind === 'edit') this.db.db.prepare("UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND kind='undo' AND undone=0").run(this.worldId);
       for (const a of diff.answers) this.db.db.prepare('UPDATE god_prayers_v1 SET answer=?,answered_at=? WHERE world_id=? AND id=?').run(a.text, edit.at, this.worldId, a.prayer);
+      for (const b of edit.builds ?? []) {
+        this.updateBuild(b);
+        if (b.echo && request) (request.result as Accepted & { build: { rev: number } }).build.rev = b.rev!;
+      }
+      if (edit.builds?.length) this.pruneBuilds();
       if (request) {
         this.db.db.prepare('INSERT INTO god_edit_receipts_v1(world_id,client_ref,request_hash,payload_hash,seq,result) VALUES(?,?,?,?,?,?)').run(this.worldId, request.clientRef, request.requestHash, request.payloadHash, edit.seq, JSON.stringify(request.result));
         this.db.db.prepare('DELETE FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref IN (SELECT client_ref FROM god_edit_receipts_v1 WHERE world_id=? ORDER BY seq DESC LIMIT -1 OFFSET ?)').run(this.worldId, this.worldId, GOD_EDIT_RECEIPTS);
       }
       return null;
-    });
+    }); } catch (e) { if (e instanceof StaleBuild) return staleBuild(); throw e; }
   }
   /** Durable aggregate avoids rescanning the append-only journal on each construction edit. */
   private journalBudgetFailure(edit: CommitEdit, diff: Diff): Result | null {
@@ -127,14 +148,45 @@ export class WorldStore {
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
   /** The edit `undo` would revert: newest not-undone edit or redo. */
-  undoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.kind !== 'engine') ?? null; }
+  undoable(): EditRow | null { return this.stackHead("kind IN ('edit','redo')"); }
   /** The undo `redo` would revert: newest not-undone undo. */
-  redoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind === 'undo') ?? null; }
+  redoable(): EditRow | null { return this.stackHead("kind='undo'"); }
+  private stackHead(predicate: string): EditRow | null {
+    const r = this.db.db.prepare(`SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind FROM world_edits_v1 WHERE world_id=? AND undone=0 AND ${predicate} ORDER BY seq DESC LIMIT 1`).get(this.worldId) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
+    return r ? { ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) } : null;
+  }
   /** Snapshot the complete group stack before undo starts; newly journaled undos cannot hide older group edits. */
   groupEdits(group: string): EditRow[] {
     return (this.db.db.prepare("SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? AND grp=? AND undone=0 AND kind IN ('edit','redo') ORDER BY seq DESC").all(this.worldId, group) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
       .map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
+
+  /** Exact group and descendants, with an index range that cannot adopt a neighbouring id. */
+  groupEditsUnder(group: string, journal = false, limit = 200): EditRow[] {
+    const rows = this.db.db.prepare(`SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind FROM world_edits_v1 WHERE world_id=? AND (grp=? OR (grp>=? AND grp<?)) ${journal ? '' : "AND undone=0 AND kind IN ('edit','redo')"} ORDER BY seq DESC LIMIT ?`).all(this.worldId, group, group + '/', group + '0', limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[];
+    return rows.map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
+  }
+  hasGroupUnder(id: string): boolean { return !!this.db.db.prepare('SELECT 1 FROM world_edits_v1 WHERE world_id=? AND (grp=? OR (grp>=? AND grp<?)) LIMIT 1').get(this.worldId, id, id + '/', id + '0'); }
+  builds(openOnly = false): BuildRow[] { return this.db.db.prepare(`SELECT id,status,rev,created_at,last_at,body FROM god_builds_v1 WHERE world_id=? ${openOnly ? "AND status IN ('active','paused')" : ''} ORDER BY rev DESC`).all(this.worldId) as BuildRow[]; }
+  build(id: string): BuildRow | null { return this.db.db.prepare('SELECT id,status,rev,created_at,last_at,body FROM god_builds_v1 WHERE world_id=? AND id=?').get(this.worldId, id) as BuildRow ?? null; }
+  buildsRev(): number { return (this.db.db.prepare('SELECT COALESCE(MAX(rev),0) AS rev FROM god_builds_v1 WHERE world_id=?').get(this.worldId) as { rev: number }).rev; }
+  insertBuild(id: string, at: number, body: string): BuildRow | null {
+    return this.tx(() => {
+      if (this.build(id) || this.hasGroupUnder(id)) return null;
+      this.db.db.prepare("INSERT INTO god_builds_v1(world_id,id,status,rev,created_at,last_at,body) SELECT ?,?,'active',COALESCE(MAX(rev),0)+1,?,?,? FROM god_builds_v1 WHERE world_id=?").run(this.worldId, id, at, at, body, this.worldId);
+      return this.build(id)!;
+    });
+  }
+  saveBuild(b: BuildWrite): Result | null {
+    try { return this.tx(() => { this.updateBuild(b); this.pruneBuilds(); return null; }); }
+    catch (e) { if (e instanceof StaleBuild) return staleBuild(); throw e; }
+  }
+  private updateBuild(b: BuildWrite) {
+    const r = this.db.db.prepare('UPDATE god_builds_v1 SET status=?,rev=(SELECT COALESCE(MAX(rev),0)+1 FROM god_builds_v1 WHERE world_id=?),last_at=?,body=? WHERE world_id=? AND id=? AND rev=? RETURNING rev').get(b.status, this.worldId, b.lastAt, b.body, this.worldId, b.id, b.expectRev) as { rev: number } | undefined;
+    if (!r) throw new StaleBuild();
+    b.rev = r.rev;
+  }
+  private pruneBuilds() { this.db.db.prepare("DELETE FROM god_builds_v1 WHERE world_id=? AND id IN (SELECT id FROM god_builds_v1 WHERE world_id=? AND status IN ('done','abandoned') ORDER BY rev DESC LIMIT -1 OFFSET 200)").run(this.worldId, this.worldId); }
 
   // ---- god tokens
   addToken(hash: string, label: string | null) { this.db.db.prepare('INSERT OR IGNORE INTO god_tokens_v1 (world_id, token_hash, label, created_at) VALUES (?, ?, ?, ?)').run(this.worldId, hash, label, Date.now()); }
@@ -143,6 +195,7 @@ export class WorldStore {
     if (r) this.db.db.prepare('UPDATE god_tokens_v1 SET last_used=? WHERE world_id=? AND token_hash=?').run(Date.now(), this.worldId, hash);
     return !!r;
   }
+  tokenLabel(hash: string): string | null { return (this.db.db.prepare('SELECT label FROM god_tokens_v1 WHERE world_id=? AND token_hash=?').get(this.worldId, hash) as { label: string | null } | undefined)?.label ?? null; }
   tokens(): { label: string | null; created_at: number; last_used: number | null }[] { return this.db.db.prepare('SELECT label, created_at, last_used FROM god_tokens_v1 WHERE world_id=?').all(this.worldId) as never; }
 
   // ---- prayers

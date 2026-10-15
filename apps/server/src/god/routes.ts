@@ -22,6 +22,7 @@ import { resolve } from 'node:path';
 import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
 import { CREATION_LIMITS } from '@sim/generators';
+import { BUILD_LIMITS, buildFieldSchema, buildFailure, type Identity } from './builds.ts';
 
 export type GodDeps = {
   god: GodMode;
@@ -41,11 +42,25 @@ const answerSchema = z.object({ prayer: z.string(), text: z.string().min(1).max(
 const noStore = { 'cache-control': 'no-store' };
 
 export function mountGodRoutes(app: Hono, d: GodDeps) {
+  for (const path of ['/v1/god/builds', '/v1/god/builds/*']) app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   app.use('/v1/god/*', godBodyLimit(() => d.god.model.constants.limits.budget));
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
-  const requireGod = (c: Context) => { if (!d.god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start'); };
-  const limitGod = godTokenLimiter(requireGod);
+  const identities = new WeakMap<Context, Identity>();
+  const requireGod = (c: Context) => {
+    const cached = identities.get(c); if (cached) return cached;
+    const identity = d.god.godIdentity(bearer(c));
+    if (!identity) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start');
+    identities.set(c, identity); d.god.builds.touch(identity.hash, d.god.now()); return identity;
+  };
+  const tokenLimit = godTokenLimiter(requireGod);
+  const limitGod: typeof tokenLimit = (c, bucket, max) => { try { tokenLimit(c, bucket, max); } catch (e) { if (e instanceof ApiError && e.status === 429) { e.extra = { ...e.extra, retryAfterMs: Number(e.extra?.retry_after ?? 1) * 1000 }; } throw e; } };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
+  const optionalBody = async (c: Context) => { const text = await c.req.text(); if (!text.trim()) return {}; try { return JSON.parse(text); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
+  const asGod = <T>(c: Context, b: { build?: unknown } | null, fn: () => T) => {
+    const identity = requireGod(c), parsed = buildFieldSchema.optional().safeParse(b?.build);
+    if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: `build.${i.path.join('.')}`, detail: i.message })) };
+    return d.god.as({ identity, build: parsed.data }, fn);
+  };
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets });
   mountLandRoutes(app, { god: d.god, requireGod });
@@ -55,7 +70,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
   app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));
-  app.get('/v1/world/seq', (c) => c.json({ seq: d.god.model.editSeq, entities: d.god.model.entities.size }, 200, noStore));
+  app.get('/v1/world/seq', (c) => { const b = d.god.builds.publicList(); return c.json({ seq: d.god.model.editSeq, entities: d.god.model.entities.size, builds: b.rev }, 200, noStore); });
+  app.get('/v1/world/builds', (c) => c.json(d.god.builds.publicList(), 200, noStore));
   app.get('/v1/world/ground', (c) => c.json({ contract: 'ground/1', ground: d.god.model.ground(), tiles: d.god.tileHashes() }, 200, noStore));
   app.get('/v1/world/tiles/:tx/:tz', (c) => {
     const tx = Number(c.req.param('tx')), tz = Number(c.req.param('tz'));
@@ -82,10 +98,10 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/god/examples/:file{[a-z0-9-]+\\.(mjs|log)}', (c) => { const f = c.req.param('file'); return serveFile(`examples/${f.endsWith('.mjs') ? '' : 'shots/'}${f}`, f.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'text/plain; charset=utf-8')(c); });
   app.get('/v1/god/status', async (c) => {
     let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
-    const god = d.god.godFromToken(bearer(c));
+    const god = d.god.godIdentity(bearer(c)); if (god) d.god.builds.touch(god.hash);
     const you = god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
     const owner = you === 'owner' || you === 'god';
-    return c.json({ versions: godVersions, worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length } : {}) }, 200, noStore);
+    return c.json({ versions: godVersions, worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length, builds: d.god.builds.summaries() } : {}) }, 200, noStore);
   });
   app.get('/v1/god/welcome', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.text(d.god.welcome(d.baseOf(c), d.worldName), 200, { 'content-type': 'text/markdown; charset=utf-8', ...noStore }); });
   app.get('/v1/god/pairings', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.json({ pending: d.god.pendingPairings() }, 200, noStore); });
@@ -106,6 +122,14 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/mint', async (c) => { const u = await d.requireUser(c); const b = await body(c).catch(() => ({})); return c.json({ ok: true, token: d.god.mintFor(u, typeof b?.label === 'string' ? b.label : 'owner'), world: d.god.opts.worldId }, 200, noStore); });
 
   // ---- god
+  app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); return c.json(d.god.builds.start(await body(c), requireGod(c)), 200, noStore); });
+  app.get('/v1/god/builds', (c) => { requireGod(c); return c.json(d.god.builds.list(), 200, noStore); });
+  app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); return c.json(result, 200, noStore); });
+  app.post('/v1/god/builds/:id/pause', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.pause(c.req.param('id'), await optionalBody(c)), 200, noStore); });
+  app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
+  app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
+  app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id))), 200, noStore); });
+  for (const path of ['/v1/god/builds/:id/claims', '/v1/god/builds/:id/claims/:cid/release']) app.post(path, async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); await body(c); return c.json({ ok: false, failures: [buildFailure('build.claim-unknown', 'Claims are not enabled yet.')] }, 200, noStore); });
   app.get('/v1/god/schema', (c) => c.json(godSchema(d.god.model.constants.limits), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/verify-use', async (c) => {
     limitGod(c, 'verify-use', CREATION_LIMITS.verifyPerMinute);
@@ -114,16 +138,16 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     return c.json(await d.verifyUse.run(raw), 200, noStore);
   });
   app.post('/v1/god/query', async (c) => { if (d.god.godFromToken(bearer(c))) limitGod(c, 'query', CREATION_LIMITS.godQueriesPerMinute); else d.limitIp(c, 'godquery', CREATION_LIMITS.queriesPerMinute, CREATION_LIMITS.rateWindowMs); return c.json(runQuery(d.god.model, await body(c)), 200, noStore); });
-  app.post('/v1/god/preview', async (c) => { limitGod(c, 'preview', CREATION_LIMITS.previewsPerMinute); return c.json(d.god.preview(await body(c)), 200, noStore); });
+  app.post('/v1/god/preview', async (c) => { limitGod(c, 'preview', CREATION_LIMITS.previewsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.preview(b)), 200, noStore); });
   app.get('/v1/god/preview/:id', (c) => { requireGod(c); const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
-  app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); return c.json(d.god.dryrun(await body(c)), 200, noStore); });
-  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const b = await body(c); const r = d.god.act(b, typeof b?.note === 'string' ? b.note : undefined); return c.json(r, 200, noStore); });
+  app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.dryrun(b)), 200, noStore); });
+  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const b = await body(c); const r = asGod(c, b, () => d.god.act(b, typeof b?.note === 'string' ? b.note : undefined)); return c.json(r, 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
   app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });
-  app.post('/v1/god/undo', (c) => { requireGod(c); const g = c.req.query('group'); return c.json(g ? d.god.undoGroup(g) : d.god.undo(), 200, noStore); });
-  app.post('/v1/god/redo', (c) => { requireGod(c); return c.json(d.god.redo(), 200, noStore); });
+  app.post('/v1/god/undo', async (c) => { limitGod(c, 'undo', BUILD_LIMITS.editsPerMinute); const b = await optionalBody(c), g = c.req.query('group'); return c.json(asGod(c, b, () => g ? d.god.undoGroup(g) : d.god.undo()), 200, noStore); });
+  app.post('/v1/god/redo', async (c) => { limitGod(c, 'redo', BUILD_LIMITS.editsPerMinute); const b = await optionalBody(c); return c.json(asGod(c, b, () => d.god.redo()), 200, noStore); });
   app.get('/v1/god/edits', (c) => { requireGod(c); return c.json({ edits: d.god.store.edits(Math.min(200, Number(c.req.query('limit') ?? 50) || 50)) }, 200, noStore); });
   app.get('/v1/god/prayers', (c) => { requireGod(c); return c.json({ prayers: d.god.store.prayers({ unanswered: c.req.query('all') !== '1', limit: 100 }) }, 200, noStore); });
   app.post('/v1/god/answer', async (c) => { requireGod(c); const p = answerSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { prayer, text }'); const row = d.god.answer(p.data.prayer, p.data.text); if (!row) throw new ApiError(404, 'not-found', 'no such prayer'); return c.json({ ok: true, prayer: row }, 200, noStore); });

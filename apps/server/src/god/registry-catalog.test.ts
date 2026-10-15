@@ -69,7 +69,7 @@ test('text publication invalidates ETags while reloads preserve placed snapshots
   const { db, god, catalog, get } = fixture();
   try {
     assert.ok(god.act({ ops: [{ op: 'place', def: 'eden/bench@1', name: 'b', p: [0, 0, 0] }] }).accepted);
-    const snapshot = JSON.stringify(god.publicSnapshot()), rows = db.db.prepare('SELECT COUNT(*) n FROM world_edits_v1').get()!.n;
+    const snapshot = JSON.stringify({ ...god.publicSnapshot(), now: undefined }), rows = db.db.prepare('SELECT COUNT(*) n FROM world_edits_v1').get()!.n;
     const response = await get('/v1/god/catalog?format=json'), etag = response.headers.get('etag');
     const entry = registry.resolve('eden/bench@1')!, item = registry.item(entry.id, entry.major, entry.rev, entry.itemHash)!;
     const next = { ...item, text: { ...item.text, synonyms: [...item.text.synonyms, 'celestial seating'] } };
@@ -77,7 +77,7 @@ test('text publication invalidates ETags while reloads preserve placed snapshots
     assert.notEqual((await get('/v1/god/catalog?format=json')).headers.get('etag'), etag);
     const find = await (await get('/v1/god/defs?q=celestial&compact=1')).json(); assert.equal(find.defs[0].ref, 'eden/bench@1');
     const loaded = new GodMode(db, { ...god.opts, library: catalog });
-    assert.equal(JSON.stringify(loaded.publicSnapshot()), snapshot);
+    assert.equal(JSON.stringify({ ...loaded.publicSnapshot(), now: undefined }), snapshot); // now: wall clock, by design
     assert.equal(db.db.prepare('SELECT COUNT(*) n FROM world_edits_v1').get()!.n, rows);
   } finally { db.close(); }
 });

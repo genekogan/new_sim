@@ -23,6 +23,8 @@ import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
+import { isVerificationProbe } from '../verification-probe.ts';
+import { inSite, siteLocal, siteWorld } from './builds.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -76,13 +78,14 @@ export class EngineBridge {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
-    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, engine: this.host.engine as never, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), log: (m) => this.log(m) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, engine: this.host.engine as never, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
     this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
+    this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) this.rescueTrapped(); } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) { this.rescueTrapped(); this.evacuateSites(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -313,10 +316,33 @@ export class EngineBridge {
   }
 
   private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+  /** Logged relocation of idle residents only. Busy/seated/sleeping residents are retried on the 40-tick cadence. */
+  evacuateSites() {
+    const sites = this.god.builds.closingSites(); if (!sites.length) return;
+    const E = this.engine;
+    for (const m of this.host.minds.values()) {
+      if (isVerificationProbe(m.soulId)) continue;
+      const b = E.world.entities[m.entityId], h = b?.human;
+      if (!h || (h.level ?? 0) !== 0 || h.activity === 'sit' || h.baseActivity === 'sit' || h.sleepPose || h.carrier || E.programOf(m.entityId)) continue;
+      const p: Vec2 = [b.pose.p[0], b.pose.p[2]];
+      const site = sites.find(s => inSite(s.site, p, .5) || s.roots.some(id => this.model.footprintsOf(id).some(f => inSite({ at: f.c, size: [f.half[0] * 2, f.half[1] * 2], yaw: f.yaw }, p))));
+      if (!site) continue;
+      const local = siteLocal(site.site, p), half = site.site.size.map(x => x / 2) as Vec2;
+      const clamp = (x: number, radius: number) => Math.max(-radius, Math.min(radius, x));
+      // Side projections are the nearest points on the expanded rectangle. Corners give alternatives when a side is blocked.
+      const candidates: Vec2[] = [[-half[0] - 1.5, clamp(local[1], half[1])], [half[0] + 1.5, clamp(local[1], half[1])], [clamp(local[0], half[0]), -half[1] - 1.5], [clamp(local[0], half[0]), half[1] + 1.5]];
+      for (const x of [-1, 1]) for (const z of [-1, 1]) candidates.push([x * (half[0] + 1.5), z * (half[1] + 1.5)]);
+      const world = candidates.map(q => siteWorld(site.site, q)).filter(q => !sites.some(s => inSite(s.site, q, .5))).sort((a, b) => Math.hypot(a[0] - p[0], a[1] - p[1]) - Math.hypot(b[0] - p[0], b[1] - p[1]));
+      const goal = world.find(q => E.reachV1({ p, level: 0 }, { p: q, level: 0 }).ok); if (!goal) continue;
+      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: goal, why: 'the god started building here: stepped off the site' }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ }
+    }
+  }
   /** LAYERS: the world clock drives schedules (states that follow them, calendar items); a new day re-derives places. */
   private layerDay = '';
   private layersStep() {
     try {
+      this.god.builds.sweep();
+      if (this.god.builds.hasClosure()) this.evacuateSites();
       if (!this.layers.active()) return;
       const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(); }
       this.layers.step();

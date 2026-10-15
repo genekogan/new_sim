@@ -573,7 +573,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return {accepted: true, receipt: {...this.receipt(soul.soulId, r.id)!, object: cap.object} as EdgeReceipt, ...(out.result ? {result: out.result} : {}), ...resolved};
     }
     const plan = plans.get(capability) as TogetherPlan & {stop?: boolean} | undefined;
-    if (!plan) return refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
+    if (!plan) return cap && cap.available === false && cap.blocked ? refuse(cap.blocked.code, cap.blocked.reason)
+      : refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
     let steps = structuredClone(plan.steps);
     if (steps.length > 40) return refuse('capability.params', 'that plan is too long; act in shorter legs.');
     // CN5 (acceptance): a capability that takes no seconds (a swim) ignores them instead of refusing

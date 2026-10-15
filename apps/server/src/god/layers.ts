@@ -22,6 +22,7 @@ import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { hashOf } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
 import type { Objects } from '../edge/comms/objects/framework.ts';
+import { isVerificationProbe } from '../verification-probe.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -62,6 +63,8 @@ export type LayersHost = {
   engineAct(ops: Op[], note: string): Result;
   /** The place a thing is (its own, else the innermost holding it). */
   placeOf?(e: Entity): { id: string; name: string } | null;
+  building?: (id: string) => { id: string; title: string; step: string } | null;
+  buildingActive?: () => boolean;
   log(m: string): void;
 };
 
@@ -75,7 +78,7 @@ export class GodLayers {
 
   private get m() { return this.h.model; }
   /** Is this world using any layer at all? (cheap) */
-  active(): boolean { if (this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
+  active(): boolean { if (this.h.buildingActive?.() || this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access || (!this.h.buildingActive && this.h.building?.(e.id))) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
   private calendarObjects(): Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> | undefined { return (this.h.edge as any)?.comms?.objects; }
 
   // ---------- the clock ----------
@@ -199,11 +202,17 @@ export class GodLayers {
   }
   /** Can this Soul use (open, sit on, take) this thing? Owners, owner-group members and those who work at it may. */
   refusal(id: string, soul: { soulId: string; name: string }): Refusal | null {
+    const building = this.buildingRefusal(id, soul); if (building) return building;
     const o = this.ownership(id); if (!o || o.access !== 'private') return null;
     if (this.isOf(o.owner, soul)) return null;
     if (this.relations().some((r) => r.rel === 'works-at' && this.isOf(r.a, soul) && (r.b === `thing:${o.from}` || r.b === `thing:${id}`))) return null;
     const what = this.m.entities.get(id)?.name ? this.m.pathOf(id) : 'That';
     return { code: 'object.private', reason: `${what} is ${o.owner ? `${this.nameOf(o.owner)}'s` : 'not yours'} and private.` };
+  }
+  private buildingRefusal(id: string, soul: { soulId: string }): Refusal | null {
+    if (isVerificationProbe(soul.soulId)) return null;
+    const b = this.h.building?.(id);
+    return b ? { code: 'site.under-construction', reason: `${this.m.pathOf(id)} is under construction (${b.title}: ${b.step}); come back when it is finished.` } : null;
   }
   /** "yours" / "Ana's" / "the bakers'" / "public" for a viewer. */
   ownerWord(id: string, soul?: { soulId: string; name: string }): string | null {
@@ -215,6 +224,7 @@ export class GodLayers {
   /** What a thing's public description adds: "Ana's; 3 coins; open 07:00–15:00". */
   tag(e: Entity): string {
     const parts: string[] = [];
+    const b = this.h.building?.(e.id); if (b) parts.push(`under construction (${b.step})`);
     if (e.owner || e.access) { const w = this.ownerWord(e.id); if (w) parts.push(w); }
     if (e.price && economyOn()) parts.push(e.price.service ? `${e.price.service} for ${this.money(e.price.amount)}` : `for sale: ${this.money(e.price.amount)}`);
     if (e.schedule) { const d = describeSchedule(e.schedule); if (d) parts.push(d); }
@@ -227,13 +237,13 @@ export class GodLayers {
     // ownership on the bridge's own caps: seats, hands and surfaces of private things
     for (const c of caps) {
       // a walk into a private building or room of someone else's (walk:ana-house, walk:ana-house/living)
-      if (c.verb === 'walk' && c.id.startsWith('walk:')) {
-        const ref = c.id.slice(5), e = this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined);
-        const r = e && this.enclosed(e) ? this.refusal(e.id, soul) : null;
+      if (['walk', 'hang-out', 'stroll'].includes(c.verb) && /^(walk|hang-out|stroll):/.test(c.id)) {
+        const ref = c.id.slice(c.id.indexOf(':') + 1), e = this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined);
+        const r = e ? this.buildingRefusal(e.id, soul) ?? (this.enclosed(e) ? this.refusal(e.id, soul) : null) : null;
         if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }   // private says more than any other block
         continue;
       }
-      if (!c.target || !this.m.entities.has(c.target.id) || !['sit', 'pick-up', 'put-on'].includes(c.verb)) continue;
+      if (!c.target || !this.m.entities.has(c.target.id) || !['sit', 'lie', 'sleep', 'pick-up', 'put-on'].includes(c.verb)) continue;
       const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' && economyOn() ? this.forSale(c.target.id, soul) : null);
       if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
     }

@@ -15,6 +15,9 @@ import { deferredOp } from './layers.ts';
 import { RegistryCatalog } from '@sim/catalog';
 import { registryCatalog } from './registry-catalog.ts';
 import { submissionSchema, type Expectations } from './submission.ts';
+import { GodBuilds, buildFieldSchema, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
+export type { WorldBuildMessage } from './builds.ts';
+const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -23,11 +26,11 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
-type Preview = { at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; failures?: Failure[] };
-export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
+type Preview = { at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; build?: BuildField; failures?: Failure[] };
+export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; now: number; builds?: SiteDelta[]; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
 /** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
 export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
-export type GodEvent = { id: number; event: 'diff' | 'prayer' | 'soul'; data: unknown };
+export type GodEvent = { id: number; event: 'diff' | 'prayer' | 'soul' | 'build'; data: unknown };
 
 export type GodOptions = {
   worldId: string;
@@ -35,7 +38,10 @@ export type GodOptions = {
   ownerId: string | null;
   tick: () => number;
   /** Viewer broadcast (the hub). */
-  emit: (m: WorldDiffMessage) => void;
+  emit: (m: WorldDiffMessage | WorldBuildMessage) => void;
+  now?: () => number;
+  buildPauseMs?: number;
+  buildClosureMs?: number;
   constants?: Partial<WorldModel['constants']>;
   seed?: string;
   /** A genesis/1 template applied once when the world is first created (worlds/templates/*.json). */
@@ -52,6 +58,12 @@ export type Genesis = { schema: 'genesis/1'; name?: string; description?: string
 export class GodMode {
   readonly store: WorldStore;
   readonly assets: AssetStore;
+  readonly builds: GodBuilds;
+  private caller: BuildCaller = {};
+  private buildListeners: ((e: BuildNotice) => void)[] = [];
+  onBuild(fn: (e: BuildNotice) => void): () => void { this.buildListeners.push(fn); return () => { this.buildListeners = this.buildListeners.filter(f => f !== fn); }; }
+  as<T>(caller: BuildCaller, fn: () => T): T { const previous = this.caller; this.caller = caller; try { return fn(); } finally { this.caller = previous; } }
+  now(): number { return (this.opts.now ?? Date.now)(); }
   model: WorldModel;
   catalog: RegistryCatalog | null;
   owner: string | null;
@@ -73,8 +85,11 @@ export class GodMode {
   private eventSeq = 0;
 
   readonly db: Db; readonly opts: GodOptions;
-  constructor(db: Db, opts: GodOptions) {
-    this.db = db; this.opts = opts;
+  // Existing diff-only embedders remain source compatible; new consumers can explicitly accept both feeds.
+  constructor(db: Db, opts: Omit<GodOptions, 'emit'> & { emit: (m: WorldDiffMessage) => void });
+  constructor(db: Db, opts: GodOptions);
+  constructor(db: Db, opts: GodOptions | (Omit<GodOptions, 'emit'> & { emit: (m: WorldDiffMessage) => void })) {
+    this.db = db; this.opts = opts as GodOptions;
     this.store = new WorldStore(db, opts.worldId);
     this.assets = new AssetStore({ dir: opts.assetDir ?? defaultAssetDir(), db, worldId: opts.worldId });
     // CATRUN (engine fix i): the core kit is one shared, content-addressed library per process, referenced by version
@@ -91,8 +106,12 @@ export class GodMode {
       this.model.library = library;
       this.owner = opts.ownerId;
       this.store.init(this.model, this.owner);
-      if (opts.genesis) this.applyGenesis(opts.genesis);
     }
+    this.builds = new GodBuilds(this.store, { model: () => this.model, now: () => this.now(), pauseMs: opts.buildPauseMs, closureMs: opts.buildClosureMs,
+      emit: m => { try { this.opts.emit(m); } catch { /* viewers are best effort */ } },
+      notice: e => { this.push('build', e); for (const fn of this.buildListeners) { try { fn(e); } catch { /* listeners must not turn a committed edit into a refusal */ } } },
+    });
+    if (!loaded && opts.genesis) this.applyGenesis(opts.genesis);
   }
 
   // ---------- authority ----------
@@ -107,7 +126,8 @@ export class GodMode {
       }
     }
   }
-  godFromToken(token: string | undefined): boolean { return !!token && token.startsWith('god_') && this.store.hasToken(hashToken(token)); }
+  godIdentity(token: string | undefined): Identity | null { if (!token?.startsWith('god_')) return null; const hash = hashToken(token); return this.store.hasToken(hash) ? { hash, label: this.store.tokenLabel(hash) ?? 'an agent' } : null; }
+  godFromToken(token: string | undefined): boolean { return this.godIdentity(token) !== null; }
 
   pairStart(agent: string | undefined, base: string) {
     const code = humanCode(), poll = randomBytes(24).toString('base64url');
@@ -188,8 +208,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   // ---------- edits ----------
 
   dryrun(batch: unknown) {
-    const off = deferredOp(batch); if (off) return { accepted: false as const, failures: [off] };
-    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    this.builds.sweep();
+    const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false as const, failures: [inputFailure] };
+    const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
+    const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
+    const admission = this.builds.admit(parsed.data.build ?? this.caller.build, parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
@@ -197,6 +221,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** Only server-owned genesis import can request trusted library adoption; request JSON cannot enable it. */
   private commitBatch(batch: unknown, note?: string, trusted = false): Result {
+    this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false, failures: [inputFailure] };
     const parsed = submissionSchema.safeParse(batch);
     if (!parsed.success) return { accepted: false, failures: parsed.error.issues.map((i) => ({ op: typeof i.path[1] === 'number' ? i.path[1] : -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the operation shape in GET /v1/god/schema.' })) };
@@ -210,14 +235,17 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       preview = this.getPreview(input.preview);
       if (!preview) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', field: 'preview', detail: `Preview ${input.preview} expired or is unknown.`, fix: 'Create a new preview and commit its id.' }] };
       if (preview.failures) return { accepted: false, failures: structuredClone(preview.failures) };
-      if ((input.ops && hashOf(input.ops) !== hashOf(preview.ops.ops)) || (input.group !== undefined && input.group !== preview.ops.group) || (input.note !== undefined && input.note !== preview.ops.note)) return { accepted: false, failures: [{ op: -1, code: 'schema', field: 'preview', detail: 'The submitted operations or batch metadata differ from the sealed preview.', fix: 'Commit with {preview, clientRef}, or create a new preview for the changed batch.' }] };
+      if ((input.ops && hashOf(input.ops) !== hashOf(preview.ops.ops)) || (input.group !== undefined && input.group !== preview.ops.group) || (input.note !== undefined && input.note !== preview.ops.note) || (input.build !== undefined && hashOf(input.build) !== hashOf(preview.build ?? null))) return { accepted: false, failures: [{ op: -1, code: 'schema', field: 'preview', detail: 'The submitted operations or batch metadata differ from the sealed preview.', fix: 'Commit with {preview, clientRef}, or create a new preview for the changed batch.' }] };
       normalized = { ...preview.ops, clientRef: input.clientRef };
     } else normalized = batchSchema.parse(input);
+    const field = preview ? preview.build : input.build ?? this.caller.build;
     const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
     if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
     for (const [i, op] of normalized.ops.entries()) if (op.op === 'answer' && !this.store.prayer(op.prayer)) return { accepted: false, failures: [{ op: i, code: 'params.invalid', field: 'prayer', detail: `Unknown prayer ${op.prayer}.`, fix: 'Use an id from GET /v1/god/prayers.' }] };
+    const admission = this.builds.admit(field, normalized, this.caller.identity); if (admission.failures) return { accepted: false, failures: admission.failures };
+    normalized.group = admission.group;
     const journalNote = note ?? normalized.note;
-    const payloadHash = hashOf({ batch: normalized, expect: input.expect, preview: input.preview, note: journalNote ?? null });
+    const payloadHash = hashOf({ batch: normalized, build: field ?? null, expect: input.expect, preview: input.preview, note: journalNote ?? null });
     const guard = this.actGuard?.(normalized); if (guard) return guard;
     const off = deferredOp(normalized); if (off) return { accepted: false, failures: [off] } as Result;
     const tick = this.opts.tick();
@@ -238,14 +266,21 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (r.result.accepted) r.result.warnings.push(...lifted);
     const result = this.finalizeAct?.(r.result, next) ?? r.result;
     if (!result.accepted) return result;
+    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
+    const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity);
+    result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
+    if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
     const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
     if (normalized.clientRef !== undefined && bytes > GOD_EDIT_OUTCOME_BYTES) return { accepted: false, failures: [{ op: -1, code: 'request.budget', field: 'result', detail: `Accepted result would require ${bytes} bytes; receipt limit is ${GOD_EDIT_OUTCOME_BYTES}.`, measured: bytes, limit: GOD_EDIT_OUTCOME_BYTES, fix: 'Submit a smaller batch using a fresh clientRef.' }] };
     const { ops, group, clientRef } = normalized;
-    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at: Date.now(), note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit' }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
+    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
     if (concurrent) return concurrent;
+    if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     Object.assign(this.model, next); // preserve bridge/nav references and WeakMap keys
+    const deltas = this.builds.accepted(updates.writes);
     this.notify(result.seq, r.diff!, 'edit', group);
-    this.publish(result.seq, tick, r.diff!, 'god');
+    this.publish(result.seq, tick, r.diff!, 'god', deltas);
+    this.builds.announceCommitted(updates.writes);
     for (const a of r.diff!.answers) { const row = this.store.prayer(a.prayer); if (row) this.push('prayer', row); }
     return result;
   }
@@ -260,15 +295,26 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return this.revert(target, 'redo');
   }
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
+    this.builds.sweep();
+    const field = this.caller.build;
+    // Undo keeps the journal's original group. Only a supplied build needs admission; ordinary undo remains legal.
+    const admission = this.builds.admit(field, field ? { group: target.grp ?? undefined } : {}, this.caller.identity);
+    if (admission.failures) return { accepted: false, failures: admission.failures };
     const tick = this.opts.tick();
     const next = this.model.fork();
     const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
-    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined);
+    r.result.warnings.push(...roots.warnings, ...updates.warnings);
+    if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes });
     if (refused) return refused;
     Object.assign(this.model, next);
+    if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
+    const deltas = this.builds.accepted(updates.writes);
     this.notify(r.result.seq, r.diff!, kind, target.grp ?? undefined);
-    this.publish(r.result.seq, tick, r.diff!, kind);
+    this.publish(r.result.seq, tick, r.diff!, kind, deltas);
+    this.builds.announceCommitted(updates.writes);
     return { ...r.result, reverted: target.seq };
   }
 
@@ -279,10 +325,13 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const next = this.model.fork();
     const r = applyBatch(next, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
-    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' });
+    const roots = this.builds.rootsDelta(this.model, next, r.diff!, 'engine'), updates = this.builds.writes({ warnings: [] }, roots, r.result.seq, this.now());
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes });
     if (refused) return refused;
     Object.assign(this.model, next);
-    this.publish(r.result.seq, tick, r.diff!, 'engine');
+    const deltas = this.builds.accepted(updates.writes);
+    this.publish(r.result.seq, tick, r.diff!, 'engine', deltas);
+    this.builds.announceCommitted(updates.writes);
     return r.result;
   }
 
@@ -297,13 +346,22 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     }
     return { accepted: reverted.length > 0, reverted, notReverted: [], ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
   }
+  /** Abandon must cover every subgroup, with no 200/500-entry truncation of the undo stack. */
+  undoGroupUnder(group: string) {
+    const targets = this.store.groupEditsUnder(group, false, 2_147_483_647), reverted: number[] = [];
+    for (const [i, target] of targets.entries()) { const r = this.revert(target, 'undo'); if (!r.accepted) return { accepted: false, reverted, notReverted: targets.slice(i).map(e => e.seq), failures: r.failures }; reverted.push(target.seq); }
+    return { accepted: true, reverted, notReverted: [] as number[] };
+  }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
+    this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { id: null, accepted: false as const, failures: [inputFailure] };
-    const parsed = batchSchema.safeParse(batch);
+    const parsed = previewBatchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
-    const p = plan(this.model, parsed.data, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
+    if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     const id = 'pv_' + randomBytes(6).toString('hex');
     for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
     while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);
@@ -311,7 +369,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const diff: Diff = p.ok ? p.diff : { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
     const { expect, subtrees } = this.captureRevisions(parsed.data, diff);
     const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
-    this.previews.set(id, { at: Date.now(), baseEditSeq, expect, subtrees, affected, diff, ops: structuredClone(parsed.data), ...(!p.ok ? { failures: p.failures } : {}) });
+    this.previews.set(id, { at: Date.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
     return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), url: `?preview=${id}` };
   }
@@ -369,10 +427,11 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
     for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
   }
-  private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by']) {
+  private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by'], builds: SiteDelta[] = []) {
     const referenced = new Map<string, StoredDef>();
     for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
-    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, defs: [...referenced.values()].map(publicDef), ...(diff.tiles.length || diff.constants ? { ground: this.model.ground() } : {}) };
+    const now = this.now();
+    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: now, now, diff, by, defs: [...referenced.values()].map(publicDef), ...(builds.length ? { builds } : {}), ...(diff.tiles.length || diff.constants ? { ground: this.model.ground() } : {}) };
     try { this.opts.emit(m); } catch { /* viewers are best-effort */ }
     this.push('diff', m);
   }
@@ -392,6 +451,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
 
   /** What a viewer (or anyone) may read: constants, state, every entity, the defs in use, the ground recipe. */
   publicSnapshot() {
+    const builds = this.builds.publicList();
     const s = this.model.snapshot();
     const used = new Set<string>(), pending = s.entities.flatMap(e => [e.def, ...definitionRefs(e.params)]);
     while (pending.length) {
@@ -404,7 +464,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     for (const d of defs) for (const sha of JSON.stringify(d.make ?? null).match(/[0-9a-f]{64}/g) ?? []) { const m = this.assets.info(sha); if (m?.ext === 'glb' && m.bytes > 0) assetBytes[sha] = m.bytes; }
     // LAYERS: wallets are private (the god's GET /v1/god/layers and each Soul's /v1/world/layers/me have them)
     const state = s.state.layers ? { ...s.state, layers: { ...s.state.layers, wallets: {} } } : s.state;
-    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes };
+    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes, builds: builds.builds, buildsRev: builds.rev, now: builds.now };
   }
   /** Demand logging is outside the catalogue registry. Keep only a bounded set of misses in this world's DB. */
   recordFindMiss(query: string) {
@@ -457,6 +517,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     for (const s of this.subscribers) { try { s(e); } catch { /* dropped */ } }
   }
   subscribe(after: number, fn: (e: GodEvent) => void): () => void {
+    this.builds.sweep();
     for (const e of this.ring) if (e.id > after) fn(e);
     this.subscribers.add(fn);
     return () => { this.subscribers.delete(fn); };
