@@ -9,7 +9,7 @@
 // above the camera. Geometry is built once per (def, params, paint) and shared by every instance.
 import * as THREE from 'three';
 import { GENERATORS, type Value } from '@sim/generators';
-import type { BuildingLayout } from '../../../../packages/generators/src/building.ts';
+import { buildingFacadeSlots, type BuildingLayout } from '../../../../packages/generators/src/building.ts';
 import { Builder, hashStr, mix, rng, type Col } from './building-kit.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 
@@ -36,6 +36,7 @@ const ROOM_PAINT: Record<string, string> = { kitchen: '#f3e6c4', bath: '#dfe9ea'
 const FLOOR_FINISH: Record<string, string> = { kitchen: '#c79e7a', bath: '#d9dcd6', shop: '#b88d60', barn: '#a08060', loft: '#b08b5a', greenhouse: '#9e968a', entrance: '#b9b3a6', nave: '#c8bfae', pavilion: '#a77c52' };
 
 const templates = new Map<string, THREE.Group>();
+const ORNAMENTS = new Set(['chimney', 'shutters', 'flowerBoxes', 'quoins', 'hood', 'doorLamp']);
 
 registerMesh({
   gen: 'building/1',
@@ -49,7 +50,9 @@ registerMesh({
     const key = `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
     let tpl = templates.get(key);
     if (!tpl) {
-      const seed = hashStr(key);
+      // New switch defaults must not reshuffle the legacy random facade details.
+      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k)));
+      const seed = hashStr(`${ctx.def.hash}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
       let built: { group: THREE.Group; tris: number } | null = null;
       for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }
       tpl = built!.group;
@@ -75,6 +78,10 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
   const p = ctx.params as Record<string, Value>;
   const mat = L.material in FACADE ? L.material : 'plaster', F = FACADE[mat];
   const trim = col(p.trim, F.trim === '#f4eee2' ? '#6b4a2b' : F.trim), roofCol = col(p.roofColor, '#8a3b2a');
+  // Keep the library's original sill palette at its preset trim; an authored trim change dresses
+  // sills and lintels too, instead of leaving cream stone on Gothic/Japanese facades.
+  const presetTrim = (ctx.def.params.trim as { default?: unknown } | undefined)?.default ?? '#6b4a2b';
+  const sillTrim = p.trim !== undefined && p.trim !== presetTrim ? trim : F.quoin;
   const glassWalls = mat === 'glass';
   const lighthouse = !!L.args.lantern;
   const extOf = (floor: number) => (lighthouse && floor % 2 === 1 ? trim : paint);
@@ -100,7 +107,7 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
     b.slab(L.round ? ngon(L.round.R + L.t / 2, L.round.sides) : rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2), L.wallTop - 0.1, 0.12, '#f4efe6', 'wall'); }
 
   // ---- walls with openings
-  L.walls.forEach((w, wi) => drawWall(b, L, w, L.openings.filter((o) => o.wall === wi), { ext: extOf(w.floor), trim, quoin: F.quoin, roomPaint, glassWalls, shutter, r, detail, mat, F, fy }));
+  L.walls.forEach((w, wi) => drawWall(b, L, w, L.openings.filter((o) => o.wall === wi), { ext: extOf(w.floor), trim, sillTrim, quoin: F.quoin, roomPaint, glassWalls, shutter, r, detail, mat, F, fy }));
 
   // ---- facade details: plinth band, string courses, cornice, corners
   if (!L.open) facade(b, L, { trim, quoin: F.quoin, base: F.base, mat, r, detail, ext: paint, lighthouse });
@@ -169,7 +176,7 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
   return { group: root, tris };
 }
 
-type WallOpts = { ext: string; trim: string; quoin: string; roomPaint: (id: string | null) => string; glassWalls: boolean; shutter: string; r: () => number; detail: number; mat: string; F: (typeof FACADE)[string]; fy: (k: number) => number };
+type WallOpts = { ext: string; trim: string; sillTrim: string; quoin: string; roomPaint: (id: string | null) => string; glassWalls: boolean; shutter: string; r: () => number; detail: number; mat: string; F: (typeof FACADE)[string]; fy: (k: number) => number };
 
 /** One wall run: two skins (outside / inside colours, or room paints either side), cut at its openings, then dressed. */
 function drawWall(b: Builder, L: BuildingLayout, w: Wall, ops: Opening[], o: WallOpts) {
@@ -227,20 +234,24 @@ function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: Wa
     if (op.height > 1.1 && op.width > 0.7 && !tall && o.detail >= 1) b.box(cx, sill + op.height * 0.62, 0, op.width, 0.045, 0.05, fc);
     if (!w.exterior || (o.detail < 1 && L.round)) return; // round towers at the lowest detail: the string courses frame them
     // sill and lintel (eden-facades), shutters and flower boxes on some
-    b.box(cx, sill - 0.07, sOut * (T / 2 + 0.03), op.width + 0.2, 0.08, 0.16, o.F.quoin);
-    b.box(cx, top, sOut * (T / 2 + 0.02), op.width + 0.24, 0.14, 0.08, o.mat === 'wood' ? o.trim : o.F.quoin);
-    if (o.detail >= 1 && L.round === undefined && op.width <= 1.4 && op.height <= 1.9 && o.mat !== 'stone' && o.F.shutters.length && r() < 0.65) {
-      const sw = Math.min(0.5, op.width / 2);
-      for (const sd of [-1, 1]) {
-        const x = cx + sd * (hw + sw / 2 + 0.04);
-        b.box(x, sill, sOut * (T / 2 + 0.03), sw, op.height, 0.04, o.shutter);
-        if (o.detail >= 2) b.face([x - sw / 2 + 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], [x - sw / 2 + 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], '#2b2b2b', 'trim');
+    b.box(cx, sill - 0.07, sOut * (T / 2 + 0.03), op.width + 0.2, 0.08, 0.16, o.sillTrim);
+    b.box(cx, top, sOut * (T / 2 + 0.02), op.width + 0.24, 0.14, 0.08, o.mat === 'wood' ? o.trim : o.sillTrim);
+    b.optional(L.params.shutters !== false, () => {
+      if (o.detail >= 1 && L.round === undefined && op.width <= 1.4 && op.height <= 1.9 && o.mat !== 'stone' && o.F.shutters.length && r() < 0.65) {
+        const sw = Math.min(0.5, op.width / 2);
+        for (const sd of [-1, 1]) {
+          const x = cx + sd * (hw + sw / 2 + 0.04);
+          b.box(x, sill, sOut * (T / 2 + 0.03), sw, op.height, 0.04, o.shutter);
+          if (o.detail >= 2) b.face([x - sw / 2 + 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], [x - sw / 2 + 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], '#2b2b2b', 'trim');
+        }
       }
-    }
-    if (o.detail >= 2 && w.floor === 0 && op.sill > 0.4 && op.sill < 1.4 && r() < 0.5) {
-      b.box(cx, sill - 0.3, sOut * (T / 2 + 0.13), op.width + 0.06, 0.18, 0.2, '#6e4a30');
-      for (let k = 0; k < 4; k++) { const fx = cx - hw + 0.1 + ((op.width - 0.2) * (k + 0.5)) / 4; b.ball(fx, sill - 0.08 + r() * 0.04, sOut * (T / 2 + 0.13), 0.075, 0.06, 0.07, k % 2 ? LEAVES[k % LEAVES.length] : FLOWERS[Math.floor(r() * FLOWERS.length)]); }
-    }
+    });
+    b.optional(L.params.flowerBoxes !== false, () => {
+      if (o.detail >= 2 && w.floor === 0 && op.sill > 0.4 && op.sill < 1.4 && r() < 0.5) {
+        b.box(cx, sill - 0.3, sOut * (T / 2 + 0.13), op.width + 0.06, 0.18, 0.2, '#6e4a30');
+        for (let k = 0; k < 4; k++) { const fx = cx - hw + 0.1 + ((op.width - 0.2) * (k + 0.5)) / 4; b.ball(fx, sill - 0.08 + r() * 0.04, sOut * (T / 2 + 0.13), 0.075, 0.06, 0.07, k % 2 ? LEAVES[k % LEAVES.length] : FLOWERS[Math.floor(r() * FLOWERS.length)]); }
+      }
+    });
     return;
   }
   if (op.kind !== 'door') return;
@@ -254,10 +265,12 @@ function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: Wa
   if (!w.exterior || op.to === 'balcony') return;
   if (o.glassWalls) { b.box(cx, 0, sOut * (T / 2 + 0.25), op.width + 0.5, FLOOR0 + 0.02, 0.5, o.F.base); return; }
   // hood on brackets and a step (eden-facades), a lamp beside the door
-  b.tilt(cx, o.base + op.height + 0.32, sOut * 0.38, op.width + 0.6, 0.06, 0.62, sOut * 0.2, 0, o.F.hood);
-  for (const sd of [-1, 1]) b.box(cx + sd * (hw + 0.22), o.base + op.height + 0.04, sOut * 0.17, 0.06, 0.24, 0.3, o.trim);
+  if (L.params.hood !== false) {
+    b.tilt(cx, o.base + op.height + 0.32, sOut * 0.38, op.width + 0.6, 0.06, 0.62, sOut * 0.2, 0, o.F.hood);
+    for (const sd of [-1, 1]) b.box(cx + sd * (hw + 0.22), o.base + op.height + 0.04, sOut * 0.17, 0.06, 0.24, 0.3, o.trim);
+  }
   if (!L.porch || w.side !== 's') b.box(cx, 0, sOut * (T / 2 + 0.25), op.width + 0.5, FLOOR0 + 0.02, 0.5, o.F.base);
-  if (o.detail >= 1) { b.box(cx + hw + 0.4, o.base + 1.75, sOut * (T / 2 + 0.06), 0.05, 0.05, 0.12, '#3b3d40'); b.box(cx + hw + 0.4, o.base + 1.58, sOut * (T / 2 + 0.14), 0.12, 0.2, 0.12, '#ffd99a', 'glow'); }
+  if (o.detail >= 1 && L.params.doorLamp !== false) { b.box(cx + hw + 0.4, o.base + 1.75, sOut * (T / 2 + 0.06), 0.05, 0.05, 0.12, '#3b3d40'); b.box(cx + hw + 0.4, o.base + 1.58, sOut * (T / 2 + 0.14), 0.12, 0.2, 0.12, '#ffd99a', 'glow'); }
 }
 
 /** Plinth band, string courses between storeys, cornice at the top, quoins or pilasters at corners, a downpipe, ivy. */
@@ -285,7 +298,7 @@ function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string;
     b.group = `level-${L.floors - 1}`;
     { const m = P(len / 2, 0.06); b.box(m[0], top - 0.2, m[1], len + 0.3, 0.2, 0.14, o.trim, 'trim', yaw); }
     // corners: quoins on brick/stone, pilasters on plaster/wood
-    if (o.detail >= 1) for (const end of [0.0]) {
+    if (o.detail >= 1 && L.params.quoins !== false) for (const end of [0.0]) {
       const sign = 1, c0 = P(end, 0.025);
       if (o.mat === 'brick' || o.mat === 'stone') {
         for (let y = 0.45, k = 0; y < top - 0.45; y += 0.84, k++) { const wq = k % 2 ? 0.34 : 0.52; const m = P(end + sign * (wq / 2 - 0.01), 0.025); b.group = `level-${Math.min(L.floors - 1, Math.floor(y / L.fh))}`; b.box(m[0], y, m[1], wq, 0.36, 0.06, o.quoin, 'trim', yaw); }
@@ -425,12 +438,15 @@ function drawRoof(b: Builder, L: BuildingLayout, o: { roofCol: string; trim: str
   }
   b.pop();
   // a chimney with pots on houses
-  if (o.detail >= 1 && /cottage|townhouse|shop|plan/.test(L.style) && !L.open) {
-    const cx = (alongX ? 1 : 0) * (W / 2 - 0.9) * (o.r() < 0.5 ? -1 : 1), cz = (alongX ? 0 : 1) * (D / 2 - 0.9) - (alongX ? 0.5 : 0);
-    const h = rise + 1.0, brick = '#8a4a36';
-    b.box(cx, top, cz, 0.6, h, 0.6, brick, 'roof'); b.box(cx, top + h, cz, 0.74, 0.08, 0.74, o.trim);
-    for (const sd of [-1, 1]) b.cyl(cx + sd * 0.13, top + h + 0.08, cz, 0.06, 0.07, 0.3, '#a3442f', 'roof', 6);
-  }
+  b.optional(L.params.chimney !== false, () => {
+    if (o.detail >= 1 && /cottage|townhouse|shop|plan/.test(L.style) && !L.open) {
+      const cx = (alongX ? 1 : 0) * (W / 2 - 0.9) * (o.r() < 0.5 ? -1 : 1), cz = (alongX ? 0 : 1) * (D / 2 - 0.9) - (alongX ? 0.5 : 0);
+      const h = rise + 1.0, brick = '#8a4a36';
+      b.box(cx, top, cz, 0.6, h, 0.6, brick, 'roof'); b.box(cx, top + h, cz, 0.74, 0.08, 0.74, o.trim);
+      for (const sd of [-1, 1]) b.cyl(cx + sd * 0.13, top + h + 0.08, cz, 0.06, 0.07, 0.3, '#a3442f', 'roof', 6);
+    }
+  });
+
 }
 
 function parapet(b: Builder, poly: V2[], top: number, o: { trim: string; ext: string }) {
@@ -470,6 +486,7 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
   const floorOf: Record<string, number> = { ground: 0, porch: 0, roof: L.floors, ...(L.balcony ? { balcony: L.balcony.floor } : {}) };
   for (let k = 1; k < L.floors; k++) floorOf[`floor-${k}`] = k;
   for (const r of L.rooms) floorOf[r.id] = r.floor;
+  for (const s of buildingFacadeSlots(L, Object.keys(floorOf))) if (s.floor !== undefined) floorOf[s.id] = s.floor;
   root.userData.interior = { cut: () => hideAbove, floorOf };
   inner.traverse((o) => {
     const mesh = o as THREE.Mesh; if (!mesh.isMesh) return;

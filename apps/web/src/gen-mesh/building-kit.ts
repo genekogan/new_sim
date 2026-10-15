@@ -23,6 +23,9 @@ type Buf = { p: number[]; n: number[]; c: number[] };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
+  private enabled = true;
+  /** Consume the same seeded detail choices while omitting an optional ornament's geometry. */
+  optional(enabled: boolean, draw: () => void) { const was = this.enabled; this.enabled = was && enabled; try { draw(); } finally { this.enabled = was; } }
   private m = new THREE.Matrix4(); private stack: THREE.Matrix4[] = [];
   private l = new THREE.Matrix4(); private nm = new THREE.Matrix3(); private v = new THREE.Vector3(); private q = new THREE.Quaternion(); private s = new THREE.Vector3(); private t = new THREE.Vector3(); private e = new THREE.Euler();
   push(x: number, y: number, z: number, yaw = 0) { this.stack.push(this.m.clone()); this.m.multiply(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z)); return this; }
@@ -30,6 +33,7 @@ export class Builder {
   at(x: number, y: number, z: number, yaw: number, f: () => void) { this.push(x, y, z, yaw); try { f(); } finally { this.pop(); } return this; }
   private bufOf(layer: Layer) { const k = `${this.group}|${layer}`; let b = this.buf.get(k); if (!b) { b = { p: [], n: [], c: [] }; this.buf.set(k, b); } return b; }
   private add(g: THREE.BufferGeometry, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, col: Col, layer: Layer, rx = 0, ry = 0, rz = 0) {
+    if (!this.enabled) return;
     this.q.setFromEuler(this.e.set(rx, ry, rz, 'YXZ')); this.l.compose(this.t.set(cx, cy, cz), this.q, this.s.set(sx, sy, sz)); this.l.premultiply(this.m); this.nm.getNormalMatrix(this.l);
     const b = this.bufOf(layer), P = g.attributes.position, N = g.attributes.normal; tmpC.set(col);
     for (let i = 0; i < P.count; i++) {
@@ -45,6 +49,7 @@ export class Builder {
   roundBox(x: number, y: number, z: number, w: number, h: number, d: number, col: Col, layer: Layer = 'trim', yaw = 0) { if (w > 1e-4 && h > 1e-4 && d > 1e-4) this.add(prim('rbox', () => new RoundedBoxGeometry(1, 1, 1, 1, 0.18)), x, y + h / 2, z, w, h, d, col, layer, 0, yaw, 0); return this; }
   /** One planar quad (a, b, c, d counter-clockwise seen from its front) under the current transform; 2 tris, no geometry allocation. */
   face(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'wall') {
+    if (!this.enabled) return this;
     const buf = this.bufOf(layer); tmpC.set(col);
     const P = [a, b, c, d].map((p) => new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(this.m));
     const n = new THREE.Vector3().subVectors(P[1], P[0]).cross(new THREE.Vector3().subVectors(P[2], P[0])).normalize();

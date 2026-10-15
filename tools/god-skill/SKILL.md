@@ -235,6 +235,8 @@ place lantern --on pier --count 2 --name pier-lamp
 place sailboat --float --at sea --name sail
 ```
 
+**Facade dressing.** Buildings accept `chimney shutters flowerBoxes quoins hood doorLamp` booleans (default true; false removes the ornament). Changing `trim` colours sills/lintels; its preset keeps the original palette. `describe house` lists slots: mount kits with `place my-kit --on house/opening-window-1`, `house/gable-e`, `house/ridge` or `house/facade-f1-s-1`. Opening origins are at sills; wall origins at storey centres; +z faces out.
+
 **Buildings.** `place cottage --param floors=2 --param porch=2 --param balcony=true --facing s` (porch depth in m): the preset picks the
 plan (rooms per floor, stairs, doors, windows); `--param plan='…'` gives your own (`schema --md`).
 `describe <house>` (or `describe <house>/<room>` for one room) lists room ids per floor (`living kitchen bath` / `landing bedroom bedroom-2`).
