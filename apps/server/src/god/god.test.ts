@@ -148,7 +148,7 @@ test('contract endpoints: schema, query (terrain, entity, free plots, clearance)
   assert.equal(q.data.clearance.clear, false); assert.ok(q.data.clearance.blockedBy.includes('c'));
   const pv = await f.req('/v1/god/preview', { token, body: { ops: [{ op: 'place', def: coreRef('fountain'), p: [0, 60] }] } });
   assert.equal(pv.data.accepted, true); assert.equal(f.god.model.entities.size, 4, 'preview commits nothing');
-  const got = await f.req(`/v1/god/preview/${pv.data.id}`); assert.equal(got.data.diff.upserts.length, 1);
+  const got = await f.req(`/v1/god/preview/${pv.data.id}`, { token }); assert.equal(got.data.diff.upserts.length, 1);
   const ug = await f.req('/v1/god/undo?group=hamlet', { method: 'POST', token });
   assert.deepEqual(ug.data.reverted, [2, 1]); assert.ok(f.god.model.get('r') && !f.god.model.get('c') && !f.god.model.get('b'));
   const edits = await f.req('/v1/god/edits', { token });

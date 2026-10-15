@@ -14,6 +14,7 @@ import { MaterialLib } from './gen-mesh/materials.ts';
 type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Record<string, unknown> };
 type Snapshot = { contract: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[] };
 export type GhostSummary = { id: string; ok: boolean; added: number; changed: number; removed: number; tiles: number; drawn: number; failures?: { code: string; detail: string }[] | null; message?: string; bounds?: [number, number, number, number] };
+export type PreviewData = { diff: Diff; failures: GhostSummary['failures']; ground?: Ground; ops?: unknown };
 
 const COLORS = { added: 0x2fd27a, changed: 0xf0a92e, removed: 0xe2483d, terrain: 0x6fc3ff };
 
@@ -23,6 +24,7 @@ export class WorldPreviewGhost {
   private readonly mats = new Map<string, THREE.Material>();
   private api: (p: string) => string;
   private raf = 0;
+  private request = 0;
   current: GhostSummary | null = null;
   constructor(api: (p: string) => string) {
     this.api = api;
@@ -31,15 +33,22 @@ export class WorldPreviewGhost {
   }
 
   /** Fetch a preview and draw it; replaces whatever was shown. */
-  async show(id: string): Promise<GhostSummary> {
+  async show(id: string, loadPreview: (path: string) => Promise<PreviewData>): Promise<GhostSummary> {
     this.clear();
-    const pr = await fetch(this.api(`/v1/god/preview/${encodeURIComponent(id)}`));
-    if (!pr.ok) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: pr.status === 404 ? 'This preview has expired (previews last 10 minutes) or never existed.' : `The server answered ${pr.status}.` });
-    const pv = await pr.json() as { diff: Diff; failures: GhostSummary['failures']; ground?: Ground; ops?: unknown };
+    const request = this.request;
+    const closed: GhostSummary = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: 'This preview was closed before it finished loading.' };
+    let pv: PreviewData;
+    try { pv = await loadPreview(`/v1/god/preview/${encodeURIComponent(id)}`); }
+    catch (error) {
+      if (request !== this.request) return closed;
+      return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: error instanceof Error ? error.message : 'This private preview could not be loaded. Sign in as this world’s owner.' });
+    }
+    if (request !== this.request) return closed;
     if (pv.failures?.length) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, failures: pv.failures, message: 'The world would refuse this batch; nothing to show.' });
     const sr = await fetch(this.api('/v1/world/snapshot'));
     if (!sr.ok) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: 'Could not read the world.' });
     const snap = await sr.json() as Snapshot;
+    if (request !== this.request) return closed;
     const load = () => WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'ghost', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     const before = load(), after = load();
     for (const def of pv.diff.defs) for (const m of [before, after]) { m.defs.set('sha:' + def.hash, def); m.defs.set(def.ref, def); if (def.ref.startsWith('core-')) m.defs.set('core/' + def.ref.slice(5), def); }
@@ -72,6 +81,7 @@ export class WorldPreviewGhost {
   }
 
   clear() {
+    this.request++;
     cancelAnimationFrame(this.raf); this.raf = 0;
     for (const c of [...this.group.children]) { this.group.remove(c); c.traverse((o) => { const m = o as THREE.Mesh; if (m.geometry) m.geometry.dispose(); }); }
     this.current = null;

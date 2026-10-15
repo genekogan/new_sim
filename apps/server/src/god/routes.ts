@@ -97,7 +97,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/schema', (c) => c.json(godSchema(), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/query', async (c) => c.json(runQuery(d.god.model, await body(c)), 200, noStore));
   app.post('/v1/god/preview', async (c) => { requireGod(c); return c.json(d.god.preview(await body(c)), 200, noStore); });
-  app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
+  app.get('/v1/god/preview/:id', (c) => { requireGod(c); const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
   app.post('/v1/god/dryrun', async (c) => { requireGod(c); return c.json(d.god.dryrun(await body(c)), 200, noStore); });

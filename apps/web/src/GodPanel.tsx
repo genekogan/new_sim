@@ -9,7 +9,7 @@ import { Markdown } from './god-ui/markdown.tsx';
 import * as G from './god-ui/god-api.ts';
 import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
-import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
+import { previewGhost, type GhostSummary, type PreviewData } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
@@ -43,6 +43,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const seq = status?.seq;
   // who is signed in on this page (Clerk in production, a local name in dev): auth-session.ts
   const session = useSession();
+  const mayPreview = owner && session.authed;
+  const previewAuthority = useRef(false); previewAuthority.current = mayPreview;
   const [naming, setNaming] = useState(false);
   const [devName, setDevName] = useState('');
   const wasAuthed = useRef(false);
@@ -62,14 +64,21 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
 
   // ?preview=<id>: draw it as soon as the world's scene exists, then fly there
   const showPreview = useCallback(async (id: string, fly = true) => {
+    if (!previewAuthority.current) return;
     let g = previewGhost(apiPath);
     for (let i = 0; !g && i < 100; i++) { await new Promise((r) => setTimeout(r, 300)); g = previewGhost(apiPath); }
     if (!g) { setNote({ text: 'The world view is not ready for a preview.', bad: true }); return; }
-    const s = await g.show(id); previewGhost(apiPath); setGhost(s);
+    if (!previewAuthority.current) return;
+    const s = await g.show(id, path => G.god<PreviewData>(path));
+    if (!previewAuthority.current) return;
+    previewGhost(apiPath); setGhost(s);
     if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6, aside: 0.3 }); }
   }, []);
   const hideGhost = () => { previewGhost(apiPath)?.clear(); setGhost(null); const q = new URLSearchParams(location.search); if (q.has('preview')) { q.delete('preview'); history.replaceState(null, '', `${location.pathname}${q.size ? '?' + q : ''}${location.hash}`); } };
-  useEffect(() => { const id = query.get('preview'); if (id) void showPreview(id); }, [showPreview]);
+  useEffect(() => {
+    if (!mayPreview) { previewGhost(apiPath)?.clear(); setGhost(null); return; }
+    const id = query.get('preview'); if (id) void showPreview(id);
+  }, [showPreview, mayPreview]);
 
   const run = async (key: string, fn: () => Promise<unknown>, ok?: (r: unknown) => string | null) => {
     setBusy(key); setNote(null);
