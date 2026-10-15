@@ -40,6 +40,7 @@ ssh $E2 "set -e; test -f /etc/systemd/system/sim-old@.service; test -f /etc/syst
   python3 /srv/sim-old/current/bin/verify-release.py /srv/sim-old/current >/dev/null || { echo 'release verify failed'; exit 1; }
   [ \"\$(grep -c 'reverse_proxy 127.0.0.1:4505' /etc/caddy/sites/sim.caddy)\" = 1 ] || { echo 'sim.caddy: expected exactly one 4505 catch-all'; exit 1; }
   ! grep -q 'reverse_proxy 127.0.0.1:4670' /etc/caddy/sites/sim.caddy || { echo 'sim.caddy already routes to 4670'; exit 1; }
+  for m in /srv/sim-old-data/SERVED-*; do case \"\$m\" in *'*'*|*.rolledback-*) ;; *) echo \"unconsumed \$m from an earlier cutover: finish its rollback first\"; exit 1;; esac; done
   own=\" \$(for u in sim-old@eden sim-old@mars sim-old@littlemartians sim-old-proxy; do systemctl show -p MainPID --value \$u; done | tr '\n' ' ')\"
   for p in 4660 4661 4662 4670; do for pid in \$(ss -ltnpH \"sport = :\$p\" | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u); do case \"\$own\" in *\" \$pid \"*) ;; *) echo \"port \$p held by pid \$pid, not a sim-old unit\"; exit 1;; esac; done; done
   free=\$(df --output=avail -BG /srv | tail -1 | tr -dc 0-9); [ \"\$free\" -ge 8 ] || { echo \"eden2 disk \${free}G < 8G\"; exit 1; }
@@ -84,7 +85,8 @@ ssh $E2 "set -e; T0=\$(date +%s); systemctl start sim-old@eden sim-old@mars sim-
   for w in eden mars littlemartians; do curl -sf -H 'Host: sim.eden.art' http://127.0.0.1:4670/w/\$w/v1/config | python3 -c \"import json,sys;d=json.load(sys.stdin);assert d['build']=='$BUILD';print('eden2 proxy',d['worldKey'],d['worldId'],d['build'])\"; done" | tee -a "$LOG" || die "eden2 start failed (run rollback.sh $TS)"
 
 # 5. Caddy: catch-all from the tunnel (4505) to the eden2 proxy (4670); /worlds unchanged
-ssh $E2 "set -e; cp -a /etc/caddy/sites/sim.caddy /etc/caddy/sites/sim.caddy.pre-kit-$TS.bak
+# The SERVED marker (written BEFORE the change) tells rollback.sh that eden2 may have served the public, whatever TS is typed.
+ssh $E2 "set -e; touch /srv/sim-old-data/SERVED-$TS; cp -a /etc/caddy/sites/sim.caddy /etc/caddy/sites/sim.caddy.pre-kit-$TS.bak
   sed -i 's#reverse_proxy 127.0.0.1:4505#reverse_proxy 127.0.0.1:4670#' /etc/caddy/sites/sim.caddy
   caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || { cp -a /etc/caddy/sites/sim.caddy.pre-kit-$TS.bak /etc/caddy/sites/sim.caddy; echo 'caddy validate failed: file restored (Caddy still on 4505)'; exit 1; }
   systemctl reload caddy || { cp -a /etc/caddy/sites/sim.caddy.pre-kit-$TS.bak /etc/caddy/sites/sim.caddy; systemctl reload caddy && echo 'caddy reload failed: file restored and reloaded on 4505' || echo 'caddy reload failed twice: file restored to 4505, running Caddy state unknown'; exit 1; }
