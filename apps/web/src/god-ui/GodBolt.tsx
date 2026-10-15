@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { worldKey } from '../world-path.ts';
 import { Markdown } from './markdown.tsx';
 import * as G from './god-api.ts';
+import { GodAgentMessageBox } from '../AgentMessageBox.tsx';
 import './god-panel.css';
 
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
@@ -76,12 +77,11 @@ export function GodBolt() {
               ))}
             </div>
           )}
-          <div className="gp-next" data-next-step={paired ? 'build' : 'pair'}>
-            {paired
-              ? <><b>Your agent is this world's god.</b><p>Ask it for things: “a cottage by the pond”, “hills to the east”, “undo that”. Invite friends from your account menu (Copy invite link).</p><p className="gp-dim">Another agent or folder? Give it the same line:</p></>
-              : <><b>Next: give your agent this line</b><p className="gp-dim">Paste it to Claude Code, Codex or any agent you use. It sets itself up and shows a code here: press Approve.</p></>}
+          {!paired && <div className="gp-next" data-next-step="pair">
+            <b>Next: give your agent this line</b><p className="gp-dim">Paste it to Claude Code, Codex or any agent you use. It sets itself up and shows a code here: press Approve.</p>
             <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
-          </div>
+          </div>}
+          <GodAgentMessageBox />
           <div className="god-bolt-weather" data-weather="1">
             <button className="gp-btn" data-weather-kind="rain" disabled={!!busy} onClick={rain}>Rain</button>
             <button className="gp-btn" data-weather-kind="lightning" disabled={!!busy} onClick={lightning}>Lightning</button>
