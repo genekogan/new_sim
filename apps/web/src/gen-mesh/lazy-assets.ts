@@ -3,8 +3,8 @@
 // usable. Now:
 //   - the snapshot plans an EAGER set: the GLBs of things nearest the arrival (the world's centre), up to ~24 MB; the
 //     loading bar expects only those;
-//   - every other GLB loads when its thing is first in view within NEAR_M of the camera, or in the background a few
-//     at a time once the eager set is in (nearest to the camera first), so a world still fills in without waiting;
+//   - after arrival, nearby GLBs load in view-first, nearest-first order, two asset SHAs at a time through attachment;
+//     after a short delay, far assets join the same queue so the complete world fills in;
 //   - `?shot` pages (god `look`, thumbnails) and `?assets=eager` load everything at once, as before.
 // Content-addressed URLs stay immutable (/assets/<sha>.glb): each GLB is fetched once per browser, whenever it is.
 import * as THREE from 'three';
@@ -15,6 +15,53 @@ export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
 export const EAGER_BYTES = Math.max(1, Number(qs.get('eagerMB') ?? 24)) * 1e6;
 export const NEAR_M = 120;
 const BACKGROUND_DELAY_MS = 6000, BACKGROUND_PARALLEL = 2;
+const QUEUED = qs.get('loadqueue') !== '0'; // same-bundle A/B against the legacy near-camera burst
+
+type LoadPriority = readonly [tier: number, distance: number];
+type QueuedLoad = { start: () => unknown | Promise<unknown>; priority: () => LoadPriority | null };
+/** One slot per asset SHA, held until every waiting copy has finished attaching (or failed). Priorities are read when
+ * a slot becomes free, so walking/orbiting changes the next choice rather than freezing the original order. */
+export class DeferredLoadQueue {
+  private pending = new Map<string, Set<QueuedLoad>>();
+  private active = new Map<string, object>();
+  private scheduled = false;
+  private parallel: number;
+  constructor(parallel = BACKGROUND_PARALLEL) { this.parallel = parallel; }
+  add(sha: string, load: QueuedLoad): () => void {
+    let copies = this.pending.get(sha); if (!copies) this.pending.set(sha, (copies = new Set()));
+    copies.add(load);
+    return () => { const list = this.pending.get(sha); list?.delete(load); if (!list?.size) this.pending.delete(sha); };
+  }
+  stats() { return { pending: this.pending.size, active: this.active.size }; }
+  /** A viewer remount abandons its old jobs even if a terminated decode worker never settles its promise. */
+  reset() { this.pending.clear(); this.active.clear(); }
+  pump() {
+    if (this.scheduled) return;
+    this.scheduled = true;
+    // Collect this frame's hooks before ranking: traversal order is not distance order.
+    queueMicrotask(() => {
+      this.scheduled = false;
+      while (this.active.size < this.parallel) {
+        let best: string | null = null, rank: LoadPriority | null = null;
+        for (const [sha, copies] of this.pending) for (const load of copies) {
+          if (this.active.has(sha)) continue;
+          const p = load.priority();
+          if (p && (!rank || p[0] < rank[0] || p[0] === rank[0] && p[1] < rank[1])) { best = sha; rank = p; }
+        }
+        if (best === null) break;
+        const sha = best, copies = this.pending.get(sha)!, token = {}; this.pending.delete(sha); this.active.set(sha, token);
+        void Promise.allSettled([...copies].map((load) => Promise.resolve().then(load.start))).then(() => {
+          // An abandoned generation may finish after a new job for the same SHA has already claimed this slot.
+          if (this.active.get(sha) !== token) return;
+          this.active.delete(sha); this.pump();
+        });
+      }
+    });
+  }
+}
+const loadQueue = new DeferredLoadQueue();
+let backgroundReady = false;
+const inFlight = new Set<Promise<unknown>>();
 
 let eager: Set<string> | null = null;            // null: no plan, everything is eager
 const waiting = new Map<string, { start: () => void; at: THREE.Vector3 }[]>();
@@ -28,6 +75,9 @@ const shasOf = (d: StoredDef | undefined) => { const a = d && d.make.kind === 'm
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
 export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
+  // Called once by a new entity layer, before its holders are built. Old loader/worker promises do not own its slots.
+  loadQueue.reset(); waiting.clear(); inFlight.clear(); started.clear(); backgroundReady = false;
+  if (background) { clearTimeout(background); background = null; }
   // lane PERF: with the arrival eye known, rank by how big a thing looks from it: distance from the eye over the thing's
   // size, for things in front (a 60° half-cone towards the centre); things behind the camera come last. Measured on
   // littlemartians-two at 60 Mbit/s: nearest-the-centre left the foreground bare, nearest-the-eye the plaza's towers.
@@ -71,31 +121,61 @@ if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unkno
 export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
 
-/** Defer one thing's GLB load: returns an invisible hook to add to the thing's group. `start` runs once, when the thing is
- *  in view within NEAR_M of the camera, or when the background loader reaches it. */
-export function deferLoad(sha: string, start: () => void, makeHook: (fn: (cam: THREE.Camera) => void) => THREE.Object3D): THREE.Object3D {
+/** Defer one thing's GLB load: returns an invisible hook to add to the thing's group. `start` runs once when the queue
+ * reaches it (near and in-view first), and its promise holds the slot through attachment. `owner` cancels on removal. */
+export function deferLoad(sha: string, start: () => unknown | Promise<unknown>, makeHook: (fn: (cam: THREE.Camera) => void) => THREE.Object3D, owner?: THREE.Object3D): THREE.Object3D {
   let done = false;
-  const at = new THREE.Vector3();
+  const at = new THREE.Vector3(), projected = new THREE.Vector3();
+  let sampled = false, near = false, visible = false, distance = Infinity;
   // once started the hook has done its job: leave the scene (lane PERF: one no-op draw fewer per thing, every frame)
-  const go = () => { if (done) return; done = true; started.add(sha); start(); queueMicrotask(() => hook.removeFromParent()); };
+  const go = () => {
+    if (done) return;
+    done = true; started.add(sha);
+    const work = Promise.resolve().then(start); inFlight.add(work);
+    void work.then(() => inFlight.delete(work), () => inFlight.delete(work));
+    queueMicrotask(() => hook.removeFromParent());
+    return work;
+  };
   const entry = { start: go, at };
   const list = waiting.get(sha) ?? []; list.push(entry); waiting.set(sha, list);
+  const cancel = QUEUED ? loadQueue.add(sha, { start: go, priority: () => {
+    if (done || arrivalGate.pending()) return null;
+    if (!sampled) {
+      // Hidden interiors never draw their hooks. They still join the background corpus, using their current anchor.
+      if (!backgroundReady) return null;
+      if (owner) owner.getWorldPosition(at);
+      return [2, owner ? at.distanceTo(camera) : Infinity];
+    }
+    return near ? [visible ? 0 : 1, distance] : backgroundReady ? [2, distance] : null;
+  } }) : null;
   const hook = makeHook((cam) => {
     if (done) return;
     hook.getWorldPosition(at); camera.copy(cam.position);
     // while the arrival card waits on the eager set, the rest waits too: the eager GLBs get the whole link (lane PERF)
-    if (started.has(sha) || (at.distanceTo(cam.position) < NEAR_M && !arrivalGate.pending())) go();
+    if (QUEUED) {
+      sampled = true; distance = at.distanceTo(cam.position); near = distance < NEAR_M;
+      projected.copy(at).project(cam);
+      visible = projected.z >= -1 && projected.z <= 1 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1;
+      loadQueue.pump();
+    } else if (started.has(sha) || (at.distanceTo(cam.position) < NEAR_M && !arrivalGate.pending())) void go();
   });
-  hook.addEventListener('removed', () => { done = true; const l = waiting.get(sha); if (l) { const i = l.indexOf(entry); if (i >= 0) l.splice(i, 1); if (!l.length) waiting.delete(sha); } });
+  const remove = () => {
+    done = true; cancel?.();
+    const l = waiting.get(sha); if (l) { const i = l.indexOf(entry); if (i >= 0) l.splice(i, 1); if (!l.length) waiting.delete(sha); }
+    hook.removeEventListener('removed', remove); owner?.removeEventListener('removed', remove);
+  };
+  hook.addEventListener('removed', remove); owner?.addEventListener('removed', remove);
   return hook;
 }
 
 /** After the eager set, fetch the rest a few at a time, nearest to the camera first. */
 function scheduleBackground() {
+  if (QUEUED && backgroundReady) { loadQueue.pump(); return; }
   if (background) clearTimeout(background);
   background = setTimeout(function tick() {
     background = null;
     if (arrivalGate.pending()) { background = setTimeout(tick, 500); return; }
+    if (QUEUED) { backgroundReady = true; loadQueue.pump(); return; }
     while (running < BACKGROUND_PARALLEL && waiting.size) {
       let best: string | null = null, bd = Infinity;
       for (const [sha, list] of waiting) for (const w of list) { const d = w.at.lengthSq() ? w.at.distanceTo(camera) : 1e9; if (d < bd) { bd = d; best = sha; } }
@@ -109,3 +189,6 @@ function scheduleBackground() {
 }
 /** New things after arrival (a god's edit) follow the same rule; a deferred thing re-arms the background loader. */
 export function noteDeferred() { if (LAZY && !background) scheduleBackground(); }
+
+/** Probe settling must include the complete deferred corpus, not a temporary plateau in triangle count. */
+if (typeof window !== 'undefined') (window as unknown as { __simLoadQueueStats?: unknown }).__simLoadQueueStats = () => ({ enabled: QUEUED, pending: waiting.size, activeCopies: inFlight.size, active: loadQueue.stats().active });

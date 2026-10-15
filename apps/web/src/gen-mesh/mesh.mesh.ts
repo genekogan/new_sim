@@ -50,7 +50,7 @@ const meshBuilder: MeshBuilder = {
       inst.play(behavior === 'fly' ? 'Fly' : behavior === 'swim' ? 'Swim' : walking ? 'Walk' : 'Idle', t, { phase });
     });
     // VOCAB-MECH: GLBs outside the eager set load when the thing comes near the camera or in the background (lazy-assets.ts)
-    const load = () => { loadAsset(make.asset).then((gltf) => {
+    const load = () => { return loadAsset(make.asset).then((gltf) => {
       if (gone) return;
       inst = instantiate(gltf, { box: ctx.def.size.box as [number, number, number] });
       // flat things (rugs, boards, plates a few cm thick) would z-fight with gently uneven ground: draw them
@@ -80,7 +80,7 @@ const meshBuilder: MeshBuilder = {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ctx.materials.get('paint', '#b0a090')); m.position.y = h / 2; m.name = 'asset missing';
       holder.add(m); assetShown(make.asset);
     }); };
-    if (isEager(make.asset)) load(); else { holder.add(deferLoad(make.asset, load, frameHook)); noteDeferred(); }
+    if (isEager(make.asset)) void load(); else { holder.add(deferLoad(make.asset, load, frameHook, holder)); noteDeferred(); }
     holder.addEventListener('removed', () => { gone = true; inst?.dispose(); });
     return holder;
   },
