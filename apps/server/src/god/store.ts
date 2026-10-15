@@ -5,7 +5,8 @@
 import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity, type Accepted, type Result } from '@sim/world-compiler';
 import { CREATION_LIMITS as L } from '@sim/generators';
-import { buildBodyFailure, buildFailure } from './builds.ts';
+import { buildBodyFailure, buildFailure, type BuildBody } from './builds.ts';
+import type { BuildReceipt } from './build-integrity.ts';
 import type { DefOrigin } from './parts.ts';
 
 export const GOD_EDIT_RECEIPTS = L.requestReceipts;
@@ -13,7 +14,7 @@ export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
 export type EditRequest = { clientRef: string; requestHash: string; payloadHash: string; result: Accepted };
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
 export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; created_at: number; last_at: number; body: string };
-export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number };
+export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number; receipt?: BuildReceipt };
 type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[]; origins?: DefOrigin[] };
 class StaleBuild extends Error {}
 class BuildLimit extends Error {
@@ -59,6 +60,11 @@ export function ensureWorldSchema(db: Db) {
       PRIMARY KEY(world_id,id)) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS god_builds_v1_open ON god_builds_v1(world_id,status,last_at);
     CREATE INDEX IF NOT EXISTS god_builds_v1_rev ON god_builds_v1(world_id,rev);
+    -- R1: private refusal history is independent of accepted edit/build revisions.
+    CREATE TABLE IF NOT EXISTS god_build_receipts_v1 (world_id TEXT NOT NULL, build TEXT NOT NULL,
+      body TEXT NOT NULL CHECK(json_valid(body) AND length(CAST(body AS BLOB))<=10000), PRIMARY KEY(world_id,build)) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS god_build_refusals_v1 (world_id TEXT NOT NULL, build TEXT NOT NULL, count INTEGER NOT NULL,
+      body TEXT NOT NULL CHECK(json_valid(body) AND length(CAST(body AS BLOB))<=32768), PRIMARY KEY(world_id,build)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_def_origins_v1 (world_id TEXT NOT NULL, hash TEXT NOT NULL, seq INTEGER NOT NULL,
       ref TEXT NOT NULL, at INTEGER NOT NULL, grp TEXT, label TEXT, hash8 TEXT, exact INTEGER NOT NULL,
       PRIMARY KEY(world_id,hash,seq)) WITHOUT ROWID;
@@ -76,6 +82,7 @@ export function ensureWorldSchema(db: Db) {
 type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null; defRefs?: Record<string, string>; partsOriginsV1?: boolean };
 
 export class WorldStore {
+  private transactionDepth = 0;
   readonly db: Db; readonly worldId: string;
   partsOriginsV1: boolean;
   private originInsert?: ReturnType<Db['db']['prepare']>;
@@ -106,6 +113,15 @@ export class WorldStore {
   }
   private writeDef(d: StoredDef) {
     this.db.db.prepare('INSERT OR IGNORE INTO world_defs_v1 (world_id, hash, ref, body) VALUES (?, ?, ?, ?)').run(this.worldId, d.hash, d.ref, JSON.stringify(d));
+  }
+  buildReceipt(id: string): BuildReceipt | undefined { const row = this.db.db.prepare('SELECT body FROM god_build_receipts_v1 WHERE world_id=? AND build=?').get(this.worldId, id) as { body: string } | undefined; return row ? JSON.parse(row.body) : undefined; }
+  // R1: refusals never advance build progress, leases, roots or public revisions.
+  buildRefusals(id: string): { count: number; recent: NonNullable<BuildBody['refusals']> } {
+    const row = this.db.db.prepare('SELECT count,body FROM god_build_refusals_v1 WHERE world_id=? AND build=?').get(this.worldId, id) as { count: number; body: string } | undefined;
+    return row ? { count: row.count, recent: JSON.parse(row.body) } : { count: 0, recent: [] };
+  }
+  noteBuildRefusal(id: string, recent: NonNullable<BuildBody['refusals']>) {
+    this.tx(() => { const prior = this.buildRefusals(id); this.db.db.prepare('INSERT INTO god_build_refusals_v1(world_id,build,count,body) VALUES(?,?,?,?) ON CONFLICT(world_id,build) DO UPDATE SET count=excluded.count,body=excluded.body').run(this.worldId, id, prior.count + 1, JSON.stringify([...prior.recent, ...recent].slice(-16))); });
   }
   /** One committed batch: entity rows, defs, meta, and the edit with its inverse. */
   commit(model: WorldModel, owner: string | null, diff: Diff, edit: CommitEdit, request?: EditRequest): Result | null {
@@ -142,6 +158,17 @@ export class WorldStore {
       }
       return null;
     }); } catch (e) { if (e instanceof StaleBuild) return staleBuild(); if (e instanceof BuildLimit) return buildLimitResult(e.failure); if (buildConstraint(e)) return buildLimitResult(buildFailure('build.limit', 'Build body exceeds the durable body bound.')); throw e; }
+  }
+  /** R1: one rollback boundary, retaining one journal row per inverse. No observers run inside it. */
+  commitSequence(owner: string | null, entries: { model: WorldModel; diff: Diff; edit: CommitEdit }[]): Result | null {
+    class Refused { readonly result: Result; constructor(result: Result) { this.result = result; } }
+    try { return this.tx(() => {
+      for (const entry of entries) {
+        const refusal = this.commit(entry.model, owner, entry.diff, entry.edit);
+        if (refusal) throw new Refused(refusal);
+      }
+      return null;
+    }); } catch (error) { if (error instanceof Refused) return error.result; throw error; }
   }
   /** Durable aggregate avoids rescanning the append-only journal on each construction edit. */
   private journalBudgetFailure(edit: CommitEdit, diff: Diff): Result | null {
@@ -237,8 +264,10 @@ export class WorldStore {
     const r = this.db.db.prepare('UPDATE god_builds_v1 SET status=?,rev=(SELECT COALESCE(MAX(rev),0)+1 FROM god_builds_v1 WHERE world_id=?),last_at=?,body=? WHERE world_id=? AND id=? AND rev=? RETURNING rev').get(b.status, this.worldId, b.lastAt, b.body, this.worldId, b.id, b.expectRev) as { rev: number } | undefined;
     if (!r) throw new StaleBuild();
     b.rev = r.rev;
+    // R1: the checked receipt shares the build transaction without consuming its metadata allowance.
+    if (b.receipt) this.db.db.prepare('INSERT INTO god_build_receipts_v1(world_id,build,body) VALUES(?,?,?) ON CONFLICT(world_id,build) DO UPDATE SET body=excluded.body').run(this.worldId, b.id, JSON.stringify(b.receipt));
   }
-  private pruneBuilds() { this.db.db.prepare("DELETE FROM god_builds_v1 WHERE world_id=? AND id IN (SELECT id FROM god_builds_v1 WHERE world_id=? AND status IN ('done','abandoned') ORDER BY rev DESC LIMIT -1 OFFSET 200)").run(this.worldId, this.worldId); }
+  private pruneBuilds() { this.db.db.prepare("DELETE FROM god_builds_v1 WHERE world_id=? AND id IN (SELECT id FROM god_builds_v1 WHERE world_id=? AND status IN ('done','abandoned') ORDER BY rev DESC LIMIT -1 OFFSET 200)").run(this.worldId, this.worldId); this.db.db.prepare('DELETE FROM god_build_refusals_v1 WHERE world_id=? AND NOT EXISTS (SELECT 1 FROM god_builds_v1 WHERE world_id=god_build_refusals_v1.world_id AND id=god_build_refusals_v1.build)').run(this.worldId); this.db.db.prepare('DELETE FROM god_build_receipts_v1 WHERE world_id=? AND NOT EXISTS (SELECT 1 FROM god_builds_v1 WHERE world_id=god_build_receipts_v1.world_id AND id=god_build_receipts_v1.build)').run(this.worldId); }
 
   // ---- god tokens
   addToken(hash: string, label: string | null) { this.db.db.prepare('INSERT OR IGNORE INTO god_tokens_v1 (world_id, token_hash, label, created_at) VALUES (?, ?, ?, ?)').run(this.worldId, hash, label, Date.now()); }
@@ -267,7 +296,9 @@ export class WorldStore {
   }
 
   private tx<T>(fn: () => T): T {
+    if (this.transactionDepth) return fn();
     this.db.db.exec('BEGIN IMMEDIATE');
-    try { const result = fn(); this.db.db.exec('COMMIT'); return result; } catch (e) { this.db.db.exec('ROLLBACK'); throw e; }
+    this.transactionDepth++;
+    try { const result = fn(); this.db.db.exec('COMMIT'); return result; } catch (e) { this.db.db.exec('ROLLBACK'); throw e; } finally { this.transactionDepth--; }
   }
 }

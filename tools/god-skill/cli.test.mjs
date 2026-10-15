@@ -1053,3 +1053,53 @@ test('skill preserves stopping/use evidence and teaches the C7 construction work
   for (const expected of ["owner's words as `--brief`", '`build start <id>-2 --root <id>`', '`build step <label> --say', '`look --hour 21`', "never change the world's clock for a picture", 'trust', '`walk:`', '"reachable from outside"', '>3 minutes', 'first minute', 'about 5 minutes, ≤ 30 shapes', 'Lead takes the largest part', 'Never poll: `build wait', '`reach <from> <to>`', '`clear <x,z|ref> --size WxD`', 'Stop when every listed item exists', 'offers instead of']) assert.ok(skill.toLowerCase().includes(expected.toLowerCase()), expected);
   assert.doesNotMatch(skill, /time 21:00|set the time back/);
 });
+
+test('CE4/WD4: CLI records verbatim briefs, asks and includes; later asks/includes are one metadata call', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' && c.method === 'POST' ? { ok: true, build: serverBuild({ plan: { steps, brief: c.body.brief, asks: c.body.asks } }), lease: 'l_1234abcd' } : c.path.endsWith('/step') ? { ok: true, build: serverBuild({ step: { n: c.body.n, label: c.body.label } }) } : null);
+  await build('start', ['church'], { ...startFlags(), brief: 'The owner’s exact words', asks: 'black walls; walk inside [use]', include: 'oak-4,old-seat' });
+  assert.equal(calls.length, 1); assert.equal(calls[0].body.brief, 'The owner’s exact words'); assert.deepEqual(calls[0].body.asks, ['black walls', 'walk inside [use]']); assert.deepEqual(calls[0].body.include, ['oak-4', 'old-seat']);
+  await build('step', [], { asks: 'sit by a window [use]', include: 'old-window' });
+  assert.equal(calls.length, 2); assert.deepEqual(calls[1].body.asks, ['sit by a window [use]']); assert.deepEqual(calls[1].body.include, ['old-window']); assert.equal(calls[1].body.say, undefined); assert.equal(calls[1].body.n, 1); assert.equal(load().build.n, 1);
+  checkArgs('build', { include: 'oak-4', asks: 'green roof' }, ['step']);
+  for (const f of [{ asks: 'a;;b' }, { include: 'a,,b' }, { asks: true }, { include: true }]) await assert.rejects(build('step', [], f));
+  assert.equal(calls.length, 2);
+});
+
+test('CE4: show and resume lead with original wording and asks; missing brief warns once after success', async t => {
+  const warnings = [], original = console.error; console.error = s => warnings.push(s); t.after(() => { console.error = original; });
+  await buildFixture(t, c => c.path === '/v1/god/builds/church' || c.path.endsWith('/resume') ? { ok: true, build: serverBuild({ plan: { steps, brief: 'Original owner words', asks: ['Sit inside'] } }), lease: 'l_1234abcd' } : null);
+  assert.match(await build('show', ['church']), /^brief: Original owner words\nask: Sit inside\n/);
+  assert.match(await build('resume', ['church']), /^brief: Original owner words\nask: Sit inside\n/);
+  await build('start', ['church'], startFlags()); await build('start', ['chapel'], startFlags());
+  assert.equal(warnings.filter(x => /without --brief/.test(x)).length, 1);
+});
+
+test('CE4: continue chooses the next chapter and inherits the latest chapter including mass yaw', async t => {
+  const massing = [{ name: 'nave', at: [0, 0], size: [12, 8], h: 5, yaw: .25, roof: 'flat', parts: 8 }];
+  const { calls } = await buildFixture(t, c => {
+    if (c.path === '/v1/god/builds/church') return { ok: true, build: serverBuild({ status: 'done', massing }) };
+    if (c.path === '/v1/god/builds/church-2') return { ok: true, build: serverBuild({ id: 'church-2', status: 'done', title: 'Latest church', massing, chapterOf: 'church' }) };
+    if (c.path === '/v1/god/builds/church-3') return { httpStatus: 404, data: { code: 'not-found' } };
+    if (c.path === '/v1/god/builds' && c.method === 'POST') return { ok: true, build: serverBuild({ id: c.body.id, plan: { steps, brief: c.body.brief } }), lease: 'l_1234abcd' };
+  });
+  await build('continue', ['church'], { brief: 'Follow-up: a new window', asks: 'green glass' });
+  const request = calls.at(-1).body; assert.equal(request.id, 'church-3'); assert.equal(request.root, 'church-2'); assert.equal(request.title, 'Latest church'); assert.equal(request.brief, 'Follow-up: a new window'); assert.deepEqual(request.asks, ['green glass']); assert.deepEqual(request.massing, massing.map(({ parts, ...m }) => m)); assert.equal(load().build.id, 'church-3');
+  await assert.rejects(build('continue', ['church']), /needs --brief/);
+});
+
+const integrityReceipt = () => ({ seq: 42, exists: { count: 2, paths: ['church', 'church/seat'] }, preservation: { outside: [{ path: 'oak-4', included: true }] }, undoability: { ok: false, edits: 3, conflicts: [{ op: 0, code: 'undo.conflict', detail: 'oak-4 is missing' }] }, massing: [{ name: 'nave', parts: 2, height: 4, plannedHeight: 8, fits: true }], uses: [{ path: 'church/seat', behaviours: ['sit'] }], viewerCost: { triangles: { added: null, world: 120, share: null }, draws: { added: null }, note: 'not measured' }, refused: { count: 1, recent: [{ code: 'build.outside', entity: 'oak-4', detail: 'outside scope' }] }, warnings: ['1 owner asks remain unverified'] });
+
+test('EF3: build check is one call, done displays warnings and receipt, JSON keeps raw proof', async t => {
+  const receipt = integrityReceipt(); const { calls } = await buildFixture(t, c => c.path.endsWith('/check') || c.path.endsWith('/done') ? { ok: true, build: serverBuild({ status: c.path.endsWith('/done') ? 'done' : 'active', done: c.path.endsWith('/done') ? { receipt } : undefined }), receipt } : null);
+  save({ build: { id: 'church', lease: 'l_1234abcd', n: 1, steps, label: steps[0] } });
+  const output = await build('check'); assert.equal(calls.length, 1); assert.equal(calls[0].path, '/v1/god/builds/church/check'); assert.match(output, /checked receipt at seq 42.*undo CONFLICT/); assert.match(output, /changed outside: oak-4 \(included\)/); assert.match(output, /build.outside on oak-4/); assert.match(output, /WARNING: 1 owner asks/);
+  assert.deepEqual((await build('check', ['church'], { json: true })).receipt, receipt);
+  const done = await build('done'); assert.match(done, /checked receipt.*undo CONFLICT/); assert.equal(load().build, undefined);
+});
+
+test('EF2: build start prints its server site report without an extra request', async t => {
+  const report = { ground: { min: 1, max: 3, sampled: true }, neighbours: [{ path: 'old-home', eave: 4, eaveSource: 'floors', footprint: [{ size: [6, 8] }] }], eaves: { median: 4, max: 4 }, masses: [{ name: 'nave', fits: true, medianRatio: 3, maxRatio: 3 }], closure: { counts: { things: 1, bodies: 0 }, things: [{ path: 'oak-4' }] }, approach: { from: 'Plaza', checked: false }, library: [{ ref: 'core/bench@1', category: 'furniture' }] };
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' && c.method === 'POST' ? { ok: true, build: serverBuild(), lease: 'l_1234abcd', report } : null);
+  const output = await build('start', ['church'], { ...startFlags(), brief: 'A quiet place' });
+  assert.equal(calls.length, 1); assert.match(output, /site report: ground 1..3 m \(sampled\)/); assert.match(output, /near old-home: 6×8 m/); assert.match(output, /closure: 1 things, 0 bodies; oak-4/); assert.match(output, /approach: Plaza \(not checked\)/); assert.match(output, /library: core\/bench@1/);
+});

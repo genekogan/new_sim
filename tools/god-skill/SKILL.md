@@ -80,6 +80,11 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 4. **`look` after a meaningful step** — then open the PNG it names. Fix what looks wrong.
 5. `undo` (or `undo --group <name>`) when something went wrong; `history` shows the journal.
 6. `build done` (or `build abandon`); `done:true` can ride on the last edit's `build` field.
+   `--asks "item; item"` at start or step keeps later asks private. `build show`/`resume` print the words first.
+   `build continue <id> --brief "follow-up"` starts a linked chapter with its own undo group.
+   `build.outside`: preserve the named thing, or explicitly name it with start/step `--include ref,ref` and retry.
+   `build check [id]` and done return a checked receipt; unverified asks and check warnings do not block done.
+   Group undo is atomic: a conflict reverts nothing. Start's site report rides on the same response.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.

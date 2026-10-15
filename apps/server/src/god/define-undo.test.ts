@@ -38,16 +38,18 @@ test('group undo passes first and identical definitions, removes all placements,
   assert.equal(f.god.model.entities.size, 2);
 });
 
-test('a real mid-group conflict reports partial undo and every remaining edit over HTTP', async t => {
+test('RL2: a real mid-group conflict changes nothing and reports every unreverted edit over HTTP', async t => {
   const f = fixture(t), group = 'g';
   const early = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'early', p: [0, 0] }] }));
   const blocked = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'blocked', p: [5, 0] }] }));
   const last = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'last', p: [10, 0] }] }));
   f.god.bodies = { uses: id => id === f.god.model.get('blocked')?.id ? { code: 'occupied.by-body', detail: 'blocked is occupied by Ada' } : null };
+  const before = f.god.model.snapshot(), journal = f.god.store.edits(), emitted = f.emitted.length;
   const r = await f.request('/v1/god/undo?group=g');
-  assert.equal(r.accepted, false); assert.deepEqual(r.reverted, [last.seq]); assert.deepEqual(r.notReverted, [blocked.seq, early.seq]);
+  assert.equal(r.accepted, false); assert.deepEqual(r.reverted, []); assert.deepEqual(r.notReverted, [last.seq, blocked.seq, early.seq]);
+  assert.deepEqual(f.god.model.snapshot(), before); assert.deepEqual(f.god.store.edits(), journal); assert.equal(f.emitted.length, emitted);
   assert.equal(r.failed, blocked.seq); assert.equal(r.failures[0].code, 'occupied.by-body');
-  assert.ok(f.god.model.get('early') && f.god.model.get('blocked')); assert.equal(f.god.model.get('last'), undefined);
+  assert.ok(f.god.model.get('early') && f.god.model.get('blocked')); assert.ok(f.god.model.get('last'));
 });
 
 test('admitted redefine broadcasts instance changes, persists undo/redo bindings, and keeps retry receipts exact', t => {
