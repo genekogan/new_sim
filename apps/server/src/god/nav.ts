@@ -57,6 +57,8 @@ export type Thing = {
   width?: number;
   /** Rooms: their world outline (for "you are in"). Buildings: their rooms' refs. */
   poly?: Vec2[];
+  /** Room geometry in the building frame, for rotation-invariant fallback sampling only when needed. */
+  roomFrame?: { poly: Vec2[]; at: Vec2; origin: Vec2; yaw: number; scale: number };
   rooms?: string[];
   /** Standing points to approach from (seat fronts, a fountain's rim; a building's door approach), on `level`. */
   stands?: Vec2[];
@@ -166,7 +168,9 @@ export class GodNav {
       const frontSlot = baked.slots.find((x) => x.kind === 'stand' && /front|door|entr/.test(x.id));
       let inside: Vec2 | undefined, doorOpen = false;
       if (front) {
-        const n = Math.hypot(front.at[0], front.at[1]) || 1, ux = front.at[0] / n, uz = front.at[1] / n;
+        // An off-centre door need not face away from the building's centre. Its opening yaw is the outward normal
+        // in the building frame; the same transform as the walls/slots then handles any enclosing world yaw.
+        const ux = Math.sin(front.yaw), uz = Math.cos(front.yaw);
         stands.push(toWorld(front.at[0] + ux * 1.2, front.at[1] + uz * 1.2));
         inside = toWorld(front.at[0] - ux * 1.0, front.at[1] - uz * 1.0);
         const st = ((e.state?.doors ?? {}) as Record<string, unknown>)[front.id];
@@ -180,12 +184,14 @@ export class GodNav {
         const local = slot ? [slot.p[0], slot.p[2]] as Vec2 : centroid(r.polygon as Vec2[]);
         // a room slot's outline is relative to the slot; the baked room's own outline is in the building's frame
         const sp = (slot as { polygon?: Vec2[] } | undefined)?.polygon;
-        const poly = sp?.length ? sp.map(([a, b]) => toWorld(slot!.p[0] + a, slot!.p[2] + b)) : (r.polygon as Vec2[]).map(([a, b]) => toWorld(a, b));
+        const localPoly: Vec2[] = sp?.length ? sp.map(([a, b]) => [slot!.p[0] + a, slot!.p[2] + b]) : r.polygon as Vec2[];
+        const poly = localPoly.map(([a, b]) => toWorld(a, b));
+        const roomFrame = { poly: localPoly, at: local, origin: [wp.x, wp.z] as Vec2, yaw: wp.yaw, scale: wp.s };
         const ry = wp.y + (r.y ?? 0) * wp.s, at = toWorld(local[0], local[1]);
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
         out.push({ id: e.id, room: r.id, ref: rref, name: `${e.name}/${r.id}`, kind: 'room', what: `${rname} of ${e.name}${floor ? `, floor ${floor}` : ''}`,
-          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), poly, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
+          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
       }
       // the room the front door opens into goes first (the entrance)
       if (front) { const fa = toWorld(front.at[0], front.at[1]); roomRefs.sort((a, b) => { const A = out.find((t) => t.ref === a)!, B = out.find((t) => t.ref === b)!; return (A.level - B.level) || (polyDist(A.poly!, fa) - polyDist(B.poly!, fa)); }); }
@@ -263,10 +269,13 @@ export class GodNav {
     let goal: { p: Vec2; level: number } | null = null;
     if (centre && inPoly(centre.p[0], centre.p[1], t.poly ?? []) && reach(centre.p)) goal = centre;
     else if (t.poly?.length) {
-      // a 0.6 m lattice over the room, nearest the centre first; a dozen route checks at most
-      const xs = t.poly.map((p) => p[0]), zs = t.poly.map((p) => p[1]), cand: Vec2[] = [];
-      for (let x = Math.min(...xs) + 0.3; x < Math.max(...xs); x += 0.6) for (let z = Math.min(...zs) + 0.3; z < Math.max(...zs); z += 0.6) if (inPoly(x, z, t.poly)) cand.push([x, z]);
-      cand.sort((a, b) => Math.hypot(a[0] - t.at[0], a[1] - t.at[1]) - Math.hypot(b[0] - t.at[0], b[1] - t.at[1]));
+      // The same bounded search at every yaw: a world-axis lattice changed which furnished pockets were tried
+      // when the building turned. Sample and order in its own frame, then transform exactly as its room/slots.
+      const frame = t.roomFrame;
+      const cand = frame ? roomSamples(frame.poly, frame.at).map(([x, z]): Vec2 => {
+        const c = Math.cos(frame.yaw), s = Math.sin(frame.yaw);
+        return [r3(frame.origin[0] + (x * c + z * s) * frame.scale), r3(frame.origin[1] + (-x * s + z * c) * frame.scale)];
+      }) : roomSamples(t.poly, t.at);
       const tried = new Set<string>();
       for (const c of cand) {
         if (tried.size >= 14) break;
@@ -355,3 +364,10 @@ export class GodNav {
 }
 
 function polyDist(poly: Vec2[], p: Vec2) { return inPoly(p[0], p[1], poly) ? 0 : nearestOn(poly, p, true).d; }
+
+function roomSamples(poly: Vec2[], at: Vec2): Vec2[] {
+  const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]), candidates: Vec2[] = [];
+  for (let x = Math.min(...xs) + 0.3; x < Math.max(...xs); x += 0.6) for (let z = Math.min(...zs) + 0.3; z < Math.max(...zs); z += 0.6)
+    if (inPoly(x, z, poly)) candidates.push([x, z]);
+  return candidates.sort((a, b) => Math.hypot(a[0] - at[0], a[1] - at[1]) - Math.hypot(b[0] - at[0], b[1] - at[1]));
+}
