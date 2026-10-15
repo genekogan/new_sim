@@ -540,12 +540,12 @@ export type SearchHit<T> = { def: T; score: number; why: string[] };
  * something unless none of the defs matches all words (then any). Ties: shorter names first, core
  * kit defs (kit/2 creatures before pack meshes) before world defs.
  */
-export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { tag?: string; limit?: number } & vocab.Facets = {}): SearchHit<T>[] {
+export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { tag?: string; limit?: number; used?: (hash: string) => boolean } & vocab.Facets = {}): SearchHit<T>[] {
   let pool = defs;
   // VOCAB-MECH facets: category subtree, tag, form, has (slot:sit, action:open, comp:light, actuator:door …)
   if (opts.tag || opts.category || opts.form || opts.has?.length) pool = vocab.facetFilter(pool as never[], { tag: opts.tag, category: opts.category, form: opts.form, has: opts.has }) as unknown as T[];
   const qw = words(q);
-  if (!qw.length) return pool.slice(0, opts.limit ?? 500).map((def) => ({ def, score: 0, why: [] }));
+  if (!qw.length) return (opts.used ? [...pool].sort((a, b) => Number(!!b.hash && opts.used!(b.hash)) - Number(!!a.hash && opts.used!(a.hash))) : pool).slice(0, opts.limit ?? 500).map((def) => ({ def, score: 0, why: [] }));
   const whole = qw.join('-');
   const variants = qw.map((w) => {
     const base = new Map<string, number>([[w, 1]]);
@@ -584,7 +584,7 @@ export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { t
   const all = scored.filter((r) => r.matched === qw.length);
   // partial matches (no def matched every word) never stand on a category word alone ("xylophone zeppelin")
   const hits = all.length ? all : scored.filter((r) => r.why.some((w) => !w.startsWith('cat=')));
-  const rank = (d: Searchable) => (d.ref.startsWith('core-') ? (d.make?.kind === 'mesh' ? 1 : 0) : 2);
+  const rank = (d: Searchable) => (d.hash && opts.used?.(d.hash) ? -1 : d.ref.startsWith('core-') ? (d.make?.kind === 'mesh' ? 1 : 0) : 2);
   hits.sort((a, b) => b.score - a.score || rank(a.def) - rank(b.def) || a.def.name.length - b.def.name.length || (a.def.name < b.def.name ? -1 : 1));
   return hits.slice(0, opts.limit ?? 500).map(({ def, score, why }) => ({ def, score: Math.round(score * 10) / 10, why }));
 }
@@ -627,7 +627,7 @@ export function meshDefFor(meta: AssetMeta, opts: { name: string; height?: numbe
 
 // ---------------------------------------------------------------- routes
 
-export type AssetDeps = { god: GodMode; requireGod: (c: Context) => void; store?: AssetStore; dir?: string };
+export type AssetDeps = { god: GodMode; requireGod: (c: Context) => void; store?: AssetStore; dir?: string; asGod?: <T>(c: Context, fn: () => T) => T };
 const noStore = { 'cache-control': 'no-store' };
 
 /**
@@ -718,7 +718,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     if (meta.kind === 'mesh' && meta.tris > 6000) warnings.push(`${meta.tris} triangles: above the prop (400) and building (6000) guides; fine for a landmark, heavy if repeated`);
     const def = meta.kind === 'mesh' && name ? meshDefFor(meta, { name, height, description: field.description, tags: field.tags?.split(',').map((t) => t.trim()).filter(Boolean), layer: field.layer === 'decor' || field.layer === 'solid' ? field.layer : undefined, license: field.license, source: field.source }, fpMeta) : undefined;
     let defined: unknown;
-    if (def && (field.define === '1' || field.define === 'true')) defined = d.god.act({ ops: [{ op: 'define', def }], note: `import ${def.name}` }, `import ${def.name}`);
+    if (def && (field.define === '1' || field.define === 'true')) { const act = () => d.god.act({ ops: [{ op: 'define', def }], note: `import ${def.name}` }, `import ${def.name}`); defined = d.asGod ? d.asGod(c, act) : act(); }
     const report = [
       `${meta.kind} ${meta.sha.slice(0, 12)}… ${meta.bytes} bytes${meta.kind === 'mesh' ? `, ${meta.tris} tris, ${meta.textures} textures (max ${meta.texPx} px), box ${meta.box.join(' × ')} m, clips ${meta.animations?.join(', ') || 'none'}` : ''}`,
       ...(fpMeta?.baked?.notes ?? []), ...(def ? [`def ${def.name}@1: size ${def.size.box.join(' × ')} m, layer ${def.layer}${def.slots ? `, ${def.slots.length} room slots` : ''}`] : []), ...warnings,
@@ -744,17 +744,18 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
         return [{ ...pub, publicRef: h.row.ref, catalogue: { text: h.item.text, itemHash: h.entry.itemHash, licence: h.item.licence },
           interfaces: vocab.interfacesOf(def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(def.hash) ? `/thumbs/${def.hash}.png` : null }];
       });
-      const localDefs = localHits.slice(offset, offset + limit).map((h) => c.req.query('compact') === '1'
+      const localDefs = localHits.slice(offset, offset + limit).map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(c.req.query('compact') === '1'
         ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) }
-        : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null });
+        : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }), ...(used.length ? { used, usedIn: used } : {}) }; });
       const defs = [...localDefs, ...coreDefs];
       if (q.trim() && !localHits.length && !hits.length && offset === 0) d.god.recordFindMiss(q);
       return c.json({ defs, count: defs.length, offset, query: q || null, ...(facets.category || facets.has?.length || facets.form ? { facets } : {}),
         ...(q && !defs.length ? { hint: 'nothing in the catalogue matches; define it in this world or import a mesh' } : {}) }, 200, noStore);
     }
-    const all = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit: offset + limit, ...facets }), hits = all.slice(offset);
+    const all = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit: offset + limit, ...facets, used: hash => d.god.parts.used(hash) }), hits = all.slice(offset);
     const compact = c.req.query('compact') === '1';
-    const defs = hits.map((h) => compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : ({ ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }));
+    const defs = hits.map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }), ...(used.length ? { used, usedIn: used } : {}) }; });
+    if (q.trim() && !all.length && offset === 0) d.god.recordFindMiss(q);
     return c.json({ defs, count: defs.length, offset, query: q || null, ...(facets.category || facets.has?.length || facets.form ? { facets } : {}), ...(q && !defs.length ? { hint: 'nothing in the library matches; define it (kit/2 parts, a generator, or an imported mesh: POST /v1/god/assets)' } : {}) }, 200, noStore);
   });
   app.get('/v1/god/defs/*', (c) => {
@@ -775,6 +776,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     const extendsChain: string[] = []; for (let e = def.extends; e && extendsChain.length < 8; e = d.god.model.def(e)?.extends) extendsChain.push(e);
     return c.json({
       def: pub, publicRef: catalogue?.row.ref ?? publicRef(def), example: { ops: [exampleOp(def)] },
+      parts: d.god.parts.details(def.hash),
       ...(catalogue ? { catalogue: { text: catalogue.item.text, itemHash: catalogue.entry.itemHash, licence: catalogue.item.licence } } : {}),
       slots: def.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, ...(s.label ? { label: s.label } : {}) })),
       components: Object.keys(def.components ?? {}), extends: extendsChain,

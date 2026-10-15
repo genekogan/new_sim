@@ -6,6 +6,7 @@ import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity, type Accepted, type Result } from '@sim/world-compiler';
 import { CREATION_LIMITS as L } from '@sim/generators';
 import { buildBodyFailure, buildFailure } from './builds.ts';
+import type { DefOrigin } from './parts.ts';
 
 export const GOD_EDIT_RECEIPTS = L.requestReceipts;
 export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
@@ -13,7 +14,7 @@ export type EditRequest = { clientRef: string; requestHash: string; payloadHash:
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
 export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; created_at: number; last_at: number; body: string };
 export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number };
-type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[] };
+type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[]; origins?: DefOrigin[] };
 class StaleBuild extends Error {}
 class BuildLimit extends Error {
   readonly failure: NonNullable<ReturnType<typeof buildBodyFailure>>;
@@ -58,14 +59,27 @@ export function ensureWorldSchema(db: Db) {
       PRIMARY KEY(world_id,id)) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS god_builds_v1_open ON god_builds_v1(world_id,status,last_at);
     CREATE INDEX IF NOT EXISTS god_builds_v1_rev ON god_builds_v1(world_id,rev);
+    CREATE TABLE IF NOT EXISTS god_def_origins_v1 (world_id TEXT NOT NULL, hash TEXT NOT NULL, seq INTEGER NOT NULL,
+      ref TEXT NOT NULL, at INTEGER NOT NULL, grp TEXT, label TEXT, hash8 TEXT, exact INTEGER NOT NULL,
+      PRIMARY KEY(world_id,hash,seq)) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS god_def_origins_v1_grp ON god_def_origins_v1(world_id,grp);
+    CREATE TABLE IF NOT EXISTS god_part_uses_v1 (world_id TEXT NOT NULL, hash TEXT NOT NULL, build TEXT NOT NULL,
+      at INTEGER NOT NULL, body TEXT NOT NULL CHECK(json_valid(body) AND length(CAST(body AS BLOB))<=2048),
+      PRIMARY KEY(world_id,hash,build)) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS god_verify_receipts_v1 (world_id TEXT NOT NULL, at INTEGER NOT NULL, entity TEXT NOT NULL,
+      edit_seq INTEGER NOT NULL, def_hash TEXT, ok INTEGER NOT NULL, label TEXT, hash8 TEXT,
+      body TEXT NOT NULL CHECK(json_valid(body) AND length(CAST(body AS BLOB))<=1024),
+      PRIMARY KEY(world_id,at,entity)) WITHOUT ROWID;
   `);
 }
 
-type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null; defRefs?: Record<string, string> };
+type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null; defRefs?: Record<string, string>; partsOriginsV1?: boolean };
 
 export class WorldStore {
   readonly db: Db; readonly worldId: string;
-  constructor(db: Db, worldId: string) { this.db = db; this.worldId = worldId; ensureWorldSchema(db); }
+  partsOriginsV1: boolean;
+  private originInsert?: ReturnType<Db['db']['prepare']>;
+  constructor(db: Db, worldId: string) { this.db = db; this.worldId = worldId; ensureWorldSchema(db); this.partsOriginsV1 = !!this.meta()?.partsOriginsV1; }
 
   meta(): Meta | null {
     const r = this.db.db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(this.worldId) as { body: string } | undefined;
@@ -87,7 +101,7 @@ export class WorldStore {
     });
   }
   private writeMeta(model: WorldModel, owner: string | null) {
-    const meta: Meta = { constants: model.constants, state: model.state, seed: model.seed, seq: model.seq, editSeq: model.editSeq, ground: model.ground(), owner, defRefs: model.defRefs() };
+    const meta: Meta = { constants: model.constants, state: model.state, seed: model.seed, seq: model.seq, editSeq: model.editSeq, ground: model.ground(), owner, defRefs: model.defRefs(), ...(this.partsOriginsV1 ? { partsOriginsV1: true } : {}) };
     this.db.db.prepare('INSERT INTO world_meta_v1 (world_id, body) VALUES (?, ?) ON CONFLICT(world_id) DO UPDATE SET body=excluded.body').run(this.worldId, JSON.stringify(meta));
   }
   private writeDef(d: StoredDef) {
@@ -103,6 +117,8 @@ export class WorldStore {
       for (const b of edit.builds ?? []) { const failure = buildBodyFailure(b.body, false); if (failure) return buildLimitResult(failure); }
       const journal = this.journalBudgetFailure(edit, diff); if (journal) return journal;
       for (const d of diff.defs) this.writeDef(d);
+      for (const o of edit.origins ?? []) (this.originInsert ??= this.db.db.prepare('INSERT OR IGNORE INTO god_def_origins_v1(world_id,hash,seq,ref,at,grp,label,hash8,exact) VALUES(?,?,?,?,?,?,?,?,?)'))
+        .run(this.worldId, o.hash, edit.seq, o.ref, edit.at, edit.group ?? null, o.label, o.hash8, o.exact);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
       for (const e of diff.upserts) up.run(this.worldId, e.id, e.in.parent, JSON.stringify(e));
       const del = this.db.db.prepare('DELETE FROM world_entities_v1 WHERE world_id=? AND id=?');

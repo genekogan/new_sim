@@ -16,6 +16,7 @@ import { RegistryCatalog } from '@sim/catalog';
 import { registryCatalog } from './registry-catalog.ts';
 import { submissionSchema, type Expectations } from './submission.ts';
 import { GodBuilds, buildFieldSchema, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
+import { Parts } from './parts.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -59,6 +60,7 @@ export class GodMode {
   readonly store: WorldStore;
   readonly assets: AssetStore;
   readonly builds: GodBuilds;
+  readonly parts: Parts;
   private caller: BuildCaller = {};
   private buildListeners: ((e: BuildNotice) => void)[] = [];
   onBuild(fn: (e: BuildNotice) => void): () => void { this.buildListeners.push(fn); return () => { this.buildListeners = this.buildListeners.filter(f => f !== fn); }; }
@@ -111,6 +113,9 @@ export class GodMode {
       emit: m => { try { this.opts.emit(m); } catch { /* viewers are best effort */ } },
       notice: e => { this.push('build', e); for (const fn of this.buildListeners) { try { fn(e); } catch { /* listeners must not turn a committed edit into a refusal */ } } },
     });
+    this.parts = new Parts(this.store, { model: () => this.model, now: () => this.now() });
+    this.onBuild(e => { if (e.kind === 'done') this.parts.onDone(e.id); });
+    this.parts.backfill();
     if (!loaded && opts.genesis) this.applyGenesis(opts.genesis);
   }
 
@@ -272,12 +277,13 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
+    result.warnings.push(...this.parts.warnings(normalized.ops));
     if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
     // SQL fills in the real revision. Reserve its widest safe integer representation before admission.
     const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8') + (updates.echo ? String(Number.MAX_SAFE_INTEGER).length - 1 : 0);
     if (normalized.clientRef !== undefined && bytes > GOD_EDIT_OUTCOME_BYTES) return { accepted: false, failures: [{ op: -1, code: 'request.budget', field: 'result', detail: `Accepted result would require ${bytes} bytes; receipt limit is ${GOD_EDIT_OUTCOME_BYTES}.`, measured: bytes, limit: GOD_EDIT_OUTCOME_BYTES, fix: 'Submit a smaller batch using a fresh clientRef.' }] };
     const { ops, group, clientRef } = normalized;
-    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
+    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes, origins: this.parts.origins(ops, next, this.caller.identity) }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
     if (concurrent) return concurrent;
     if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     Object.assign(this.model, next); // preserve bridge/nav references and WeakMap keys
