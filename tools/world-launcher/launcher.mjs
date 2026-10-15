@@ -20,6 +20,10 @@
 //                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
 //   POST /__sim/op/remove-fork   operator only: {slug} → stop and unregister a fork (its data stays)
 //   POST /__sim/op/set-claimable operator only: {slug, claimable} → a world with no god that nobody may claim (false)
+//   POST /__sim/op/archive-world operator only: {slug, reason?} → stop it, move <data>/worlds/<slug> to <data>/archive/<id>/world,
+//                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
+//                                audit {slug?} reads <data>/audit.jsonl
+//   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -55,6 +59,7 @@ import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registr
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
+import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
   try { const h = JSON.parse(readFileSync(join(dataDir, 'host-health.json'), 'utf8')); const stale = Date.now() - Date.parse(h.at) > 30 * 60e3; return stale ? { ...h, ok: false, stale: true } : h; } catch { return null; }
@@ -142,6 +147,47 @@ export async function openLauncher(cfg = {}) {
   /** A world the site admin marked not claimable, while it still has no god: nobody may claim it or mint for it. */
   const claimLocked = (w) => w.claimable === false && !(safeOwner(w.slug) ?? (stats.get(w.slug)?.god || w.god));
   const safeOwner = (slug) => { try { return worldOwner(slug); } catch { return null; } };
+  /** Worlds being archived right now: no request may wake them again. */
+  const closing = new Set();
+
+  // ---------- who is asking (for the owner's own operations)
+  /** The signed-in account behind an Authorization header: Clerk (verified here) or, locally, the world's dev sign-in. */
+  async function whoIs(w, authorization) {
+    if (!/^Bearer\s+\S+/i.test(authorization ?? '')) return null;
+    if (auth) return verifiedCreator(authorization, auth.child, publicOrigin, root);
+    try {
+      const p = await pool.ensure(worldEnv(w));
+      const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}/v1/me`, { headers: { authorization }, signal: AbortSignal.timeout(5000) });
+      const id = r.ok ? (await r.json())?.me?.id : null;
+      return typeof id === 'string' && id ? id : null;
+    } catch { return null; }
+  }
+  /** {account, via, cobuilder?}: a god token of this world (the owner's agent, or a co-builder's), or a signed-in person. */
+  async function actorOf(w, authorization) {
+    const tok = /^Bearer\s+(god_\S+)$/i.exec(authorization ?? '')?.[1];
+    if (tok) {
+      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), `${w.slug}-1`, tok);
+      if (label === null) return null;
+      const co = /^cobuilder:([^:]+):/.exec(label);
+      return co ? { account: co[1], via: 'token', cobuilder: true } : { account: safeOwner(w.slug), via: 'token' };
+    }
+    const id = await whoIs(w, authorization);
+    return id ? { account: id, via: 'session' } : null;
+  }
+  const isOwner = (w, a) => !!a?.account && !a.cobuilder && a.account === safeOwner(w.slug);
+
+  // ---------- archive-first delete (H4): the owner (their browser or their own agent) or the operator
+  async function archive(w, by, reason) {
+    closing.add(w.slug);
+    try { const r = await archiveWorld({ registry, pool, dataDir }, w.slug, by, reason); seen.delete(w.slug); stats.delete(w.slug); log(`archived ${w.slug} → ${r.archive} (by ${by})`); return [200, { ok: true, ...r }]; }
+    finally { closing.delete(w.slug); }
+  }
+  async function ownerArchive(w, body, authorization) {
+    const a = await actorOf(w, authorization);
+    if (!isOwner(w, a)) return [403, { ok: false, code: 'forbidden', message: "only this world's owner (or the site admin) may archive it" }];
+    if (body?.confirm !== w.slug) return [400, { ok: false, code: 'confirm', message: `send {"confirm":"${w.slug}"} to archive this world` }];
+    return archive(w, a.account, body?.reason);
+  }
 
   // ---------- create
   let creating = Promise.resolve();
@@ -158,7 +204,7 @@ export async function openLauncher(cfg = {}) {
     const t = templates.find((x) => x.id === template);
     if (!t) return [400, { ok: false, code: 'invalid', message: `unknown template ${template}; one of ${templates.map((x) => x.id).join(', ')}` }];
     if (registry.worlds.length >= MAX_WORLDS) return [409, { ok: false, code: 'full', message: `this launcher holds at most ${MAX_WORLDS} worlds` }];
-    const slug = slugFor(name, registry.slugs());
+    const slug = slugFor(name, new Set([...registry.slugs(), ...archivedSlugs(dataDir)]));
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
     rmSync(registry.worldDir(slug), { recursive: true, force: true });
     mkdirSync(registry.worldDir(slug), { recursive: true });
@@ -304,6 +350,7 @@ export async function openLauncher(cfg = {}) {
   }
   async function toWorld(req, res, slug, url) {
     const w = registry.get(slug);
+    if (w && closing.has(slug)) { json(res, 503, { ok: false, code: 'world.closing', slug }, { 'retry-after': '5' }); return; }
     if (!w) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
@@ -356,12 +403,24 @@ export async function openLauncher(cfg = {}) {
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
       }
-      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable)$/)?.[1];
+      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable|archive-world|restore-world|list-archive|audit)$/)?.[1];
       if (forkOp && req.method === 'POST') {
         if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
         const chunks = []; for await (const c of req) chunks.push(c);
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const out = await ({ 'register-fork': opRegisterFork, 'remove-fork': opRemoveFork, 'set-claimable': opSetClaimable })[forkOp](body); json(res, out[0], out[1]); return;
+        const out = await ({ 'register-fork': opRegisterFork, 'remove-fork': opRemoveFork, 'set-claimable': opSetClaimable,
+          'archive-world': (b) => { const w = registry.get(typeof b?.slug === 'string' ? b.slug : ''); return w ? archive(w, 'operator', b?.reason) : [404, { ok: false, code: 'not-found', message: 'no world by that slug' }]; },
+          'restore-world': (b) => { const r = restoreWorld({ registry, dataDir }, b?.id, 'operator'); if (r[0] === 200) log(`restored ${r[1].slug} from ${r[1].id} (operator)`); return r; },
+          'list-archive': () => [200, { ok: true, archive: listArchive(dataDir) }],
+          'audit': (b) => [200, { ok: true, audit: readAudit(dataDir, typeof b?.slug === 'string' ? b.slug : undefined) }] })[forkOp](body); json(res, out[0], out[1]); return;
+      }
+      const own = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})\/(archive)$/);
+      if (own && req.method === 'POST') {
+        const w = registry.get(own[1]); if (!w || closing.has(w.slug)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
+        const chunks = []; let n = 0;
+        for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        const out = await ownerArchive(w, body, req.headers.authorization); json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {
@@ -411,7 +470,7 @@ export async function openLauncher(cfg = {}) {
   server.on('upgrade', async (req, socket, head) => {
     const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
-    const w = slug && registry.get(slug);
+    const w = slug && !closing.has(slug) && registry.get(slug);
     if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
     let p; try { p = await pool.ensure(worldEnv(w)); } catch { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
     const up = connect(p, '127.0.0.1', () => {

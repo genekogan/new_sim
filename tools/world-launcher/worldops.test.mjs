@@ -2,7 +2,9 @@
 // Stand-in worlds (fake-world.mjs) write their owner into sim.db the way GodMode does on first boot (WORLD_OWNER_ID).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+import { addGodToken } from './worldops.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
@@ -57,4 +59,46 @@ test('a world that already has a god keeps minting tokens for its owner even whe
   let r = await post('/__sim/op/create-world', { name: 'Owned', template: 'plain', owner: 'dev:gene' }); assert.equal(r.status, 201);
   assert.equal((await post('/__sim/op/set-claimable', { slug: 'owned', claimable: false })).status, 200);
   r = await post('/w/owned/v1/god/mint', {}, { authorization: 'Bearer dev:gene' }); assert.equal(r.status, 200);
+});
+
+const data = join(dir, 'data');
+test('archive-first delete: the owner archives (signed in or via their agent), nothing is deleted, one command restores it', async () => {
+  let r = await post('/__sim/op/create-world', { name: 'Keepsake', template: 'plain', owner: 'dev:gene' }); assert.equal(r.status, 201);
+  const db = join(data, 'worlds/keepsake/sim.db');
+  writeFileSync(join(data, 'worlds/keepsake/marker.txt'), 'built by hand');
+  // strangers, the wrong account and missing confirmation are refused
+  assert.equal((await post('/__sim/worlds/keepsake/archive', { confirm: 'keepsake' })).status, 403);
+  assert.equal((await post('/__sim/worlds/keepsake/archive', { confirm: 'keepsake' }, { authorization: 'Bearer dev:mallory' })).status, 403);
+  assert.equal((await post('/__sim/worlds/keepsake/archive', { confirm: 'keepsake' }, { authorization: 'Bearer god_notarealtoken' })).status, 403);
+  r = await post('/__sim/worlds/keepsake/archive', {}, { authorization: 'Bearer dev:gene' }); assert.equal(r.status, 400); assert.equal((await r.json()).code, 'confirm');
+  // the owner's own agent (a god token of this world) may archive it
+  addGodToken(db, 'keepsake-1', 'god_owneragent', 'claude-code');
+  r = await post('/__sim/worlds/keepsake/archive', { confirm: 'keepsake', reason: 'tidying up' }, { authorization: 'Bearer god_owneragent' });
+  const a = await r.json(); assert.equal(r.status, 200, JSON.stringify(a)); assert.match(a.id, /^keepsake-\d{8}T\d{6}Z$/);
+  assert.ok(!(await list()).some((x) => x.slug === 'keepsake'), 'gone from the list');
+  assert.equal((await api('/w/keepsake/healthz')).status, 404, 'not served');
+  assert.ok(!existsSync(join(data, 'worlds/keepsake')), 'moved out of the live folder');
+  assert.equal(readFileSync(join(data, 'archive', a.id, 'world/marker.txt'), 'utf8'), 'built by hand', 'data kept whole');
+  // the slug stays reserved while archived
+  r = await post('/__sim/worlds', { name: 'Keepsake', template: 'plain' }); assert.equal((await r.json()).slug, 'keepsake-2');
+  const arch = (await (await post('/__sim/op/list-archive', {})).json()).archive;
+  assert.deepEqual(arch.map((x) => [x.id, x.slug, x.by, x.hasData, x.restoredAt]), [[a.id, 'keepsake', 'dev:gene', true, null]]);
+  // restore: same slug, same data, same owner, served again
+  assert.equal((await post('/__sim/op/restore-world', { id: a.id }, { 'x-forwarded-for': '1.2.3.4' })).status, 403);
+  r = await post('/__sim/op/restore-world', { id: a.id }); assert.equal(r.status, 200, JSON.stringify(await r.clone().json()));
+  assert.equal(readFileSync(join(data, 'worlds/keepsake/marker.txt'), 'utf8'), 'built by hand');
+  assert.equal((await api('/w/keepsake/healthz')).status, 200);
+  const d = new DatabaseSync(db, { readOnly: true }); assert.equal(JSON.parse(d.prepare('SELECT body FROM world_meta_v1').get().body).owner, 'dev:gene'); d.close();
+  assert.equal((await post('/__sim/op/restore-world', { id: a.id })).status, 409, 'a restore happens once');
+  const log = (await (await post('/__sim/op/audit', { slug: 'keepsake' })).json()).audit;
+  assert.deepEqual(log.map((x) => [x.op, x.by]), [['archive', 'dev:gene'], ['restore', 'operator']]);
+  assert.equal(log[0].reason, 'tidying up');
+});
+test('the operator archives any world (a godless one too); restore refuses an occupied slug', async () => {
+  let r = await post('/__sim/worlds', { name: 'Orphan', template: 'plain' }); assert.equal(r.status, 201);
+  r = await post('/__sim/op/archive-world', { slug: 'orphan' }); const a = await r.json(); assert.equal(r.status, 200);
+  assert.equal((await post('/__sim/op/archive-world', { slug: 'orphan' })).status, 404);
+  mkdirSync(join(data, 'worlds/orphan'), { recursive: true });
+  r = await post('/__sim/op/restore-world', { id: a.id }); assert.equal(r.status, 409); assert.equal((await r.json()).code, 'occupied');
+  assert.equal((await post('/__sim/op/restore-world', { id: '../etc' })).status, 400);
 });
