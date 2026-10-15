@@ -8,6 +8,14 @@ import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
+/** Preserve which def failed even when a parent, prefab child or dependent is being baked. */
+export class BakeError extends Error {
+  readonly def: StoredDef;
+  constructor(def: StoredDef, cause: unknown) {
+    super(`cannot bake ${def.ref}: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+    this.name = 'BakeError'; this.def = def;
+  }
+}
 /** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
 export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
 export type AssetLookup = (hash: string) => AssetInfo | undefined;
@@ -120,6 +128,7 @@ export class WorldModel {
   // ---------- baking ----------
 
   bake(def: StoredDef, params: Record<string, Value>, seed: number, shape?: Entity['shape']): Baked {
+    try {
     const key = hashOf([def.hash, params, seed, shape ?? null]);
     const hit = this.bakes.get(key);
     if (hit) return hit;
@@ -150,6 +159,9 @@ export class WorldModel {
     if (def.params.sx || def.params.sy || def.params.sz) baked = stretchBaked(baked, stretchOf(def.params, params));
     this.bakes.set(key, baked);
     return baked;
+    } catch (error) {
+      throw error instanceof BakeError ? error : new BakeError(def, error);
+    }
   }
 
   // ---------- entities ----------

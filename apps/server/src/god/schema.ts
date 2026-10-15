@@ -3,6 +3,8 @@
 import { z } from 'zod';
 import { describeGenerators, KIT_PRIMITIVES, KIT_ROLES, kitArgs, materialEnum, slotKind } from '@sim/generators';
 import { clientOpSchema, componentsSchema, constraintSchema, defSchema, refusalCodes } from '@sim/world-compiler';
+import { godVersions } from './versions.ts';
+import { submissionSchema } from './submission.ts';
 
 let cached: unknown = null;
 export function godSchema() {
@@ -10,6 +12,7 @@ export function godSchema() {
   const js = (s: z.ZodType) => { try { return z.toJSONSchema(s, { unrepresentable: 'any', io: 'input' }); } catch (e) { return { error: String(e) }; } };
   cached = {
     contract: 'god-schema/1',
+    versions: godVersions,
     conventions: {
       units: 'metres, radians; +x east, +z south, +y up; origin at the world centre',
       yaw: 'rotation about +y; a thing\'s front faces +z at yaw 0 (buildings: the `front` side); facing a point (dx, dz) is yaw = atan2(dx, dz)',
@@ -21,6 +24,7 @@ export function godSchema() {
       library: 'search the library first (GET /v1/god/defs?q=duck); define only what is missing; prefer params and presets over new kinds',
     },
     ops: js(clientOpSchema),
+    submission: js(submissionSchema),
     def: js(defSchema),
     components: Object.keys((componentsSchema as unknown as { shape: Record<string, unknown> }).shape),
     constraints: js(constraintSchema),
@@ -31,7 +35,7 @@ export function godSchema() {
     refusals: refusalCodes,
     endpoints: {
       read: ['GET /assets/<sha>.<ext>', 'GET /v1/god/assets/<sha>', 'GET /v1/god/defs/<ref>/thumb.png', 'GET /v1/world/snapshot', 'GET /v1/world/ground', 'GET /v1/world/tiles/:tx/:tz', 'GET /v1/world/entities/:path', 'GET /v1/god/schema', 'POST /v1/god/query'],
-      god: ['GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
+      god: ['GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act (ops and/or preview, expect?, clientRef?)', 'GET /v1/god/requests/:clientRef', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
     },
   };
   return cached;

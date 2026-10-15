@@ -3,7 +3,13 @@
 // (meshes, textures) are NOT stored here; they go to the content-addressed
 // file store (M5). Tables carry world_id first and a composite key.
 import type { Db } from '../db.ts';
-import { WorldModel, type Diff, type Op, type StoredDef, type Entity } from '@sim/world-compiler';
+import { WorldModel, type Diff, type Op, type StoredDef, type Entity, type Accepted, type Result } from '@sim/world-compiler';
+
+export const GOD_EDIT_RECEIPTS = 1000;
+export const GOD_EDIT_OUTCOME_BYTES = 256 * 1024;
+export type EditRequest = { clientRef: string; requestHash: string; payloadHash: string; result: Accepted };
+export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
+type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number };
 
 export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine' };
 export type PrayerRow = { id: string; soul_id: string; soul_name: string; text: string; at: number; answer: string | null; answered_at: number | null };
@@ -17,6 +23,8 @@ export function ensureWorldSchema(db: Db) {
     CREATE TABLE IF NOT EXISTS world_edits_v1 (world_id TEXT NOT NULL, seq INTEGER NOT NULL, by TEXT NOT NULL, at INTEGER NOT NULL, note TEXT, ops TEXT NOT NULL, inverse TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0, undo_of INTEGER, kind TEXT NOT NULL DEFAULT 'edit', PRIMARY KEY (world_id, seq)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_tokens_v1 (world_id TEXT NOT NULL, token_hash TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL, last_used INTEGER, PRIMARY KEY (world_id, token_hash)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_prayers_v1 (world_id TEXT NOT NULL, id TEXT NOT NULL, soul_id TEXT NOT NULL, soul_name TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, answer TEXT, answered_at INTEGER, PRIMARY KEY (world_id, id)) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS god_edit_receipts_v1 (world_id TEXT NOT NULL, client_ref TEXT NOT NULL CHECK(length(client_ref)<=100), request_hash TEXT NOT NULL, payload_hash TEXT NOT NULL, seq INTEGER NOT NULL, result TEXT NOT NULL CHECK(json_valid(result) AND length(CAST(result AS BLOB))<=262144), PRIMARY KEY(world_id,client_ref)) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS god_edit_receipts_v1_seq ON god_edit_receipts_v1(world_id,seq DESC);
   `);
   const cols = (db.db.prepare('PRAGMA table_info(world_edits_v1)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
@@ -55,8 +63,11 @@ export class WorldStore {
     this.db.db.prepare('INSERT OR IGNORE INTO world_defs_v1 (world_id, hash, ref, body) VALUES (?, ?, ?, ?)').run(this.worldId, d.hash, d.ref, JSON.stringify(d));
   }
   /** One committed batch: entity rows, defs, meta, and the edit with its inverse. */
-  commit(model: WorldModel, owner: string | null, diff: Diff, edit: { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number }) {
-    this.tx(() => {
+  commit(model: WorldModel, owner: string | null, diff: Diff, edit: CommitEdit, request?: EditRequest): Result | null {
+    return this.tx(() => {
+      // Recheck under the write lock: another connection may have committed while this owner planned.
+      if (request) { const replay = this.retry(request.clientRef, request.requestHash); if (replay) return replay; }
+      if (this.meta()?.editSeq !== edit.seq - 1) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', detail: 'The durable world changed while this owner planned. Reload the world before submitting another edit.', field: 'editSeq', fix: 'Reload the current world and re-plan the edit.' }] } as Result;
       for (const d of diff.defs) this.writeDef(d);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
       for (const e of diff.upserts) up.run(this.worldId, e.id, e.in.parent, JSON.stringify(e));
@@ -69,7 +80,22 @@ export class WorldStore {
       if (edit.kind === 'redo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       // a fresh edit clears the redo stack: pending undos can no longer be redone
       if (edit.kind === 'edit') this.db.db.prepare("UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND kind='undo' AND undone=0").run(this.worldId);
+      for (const a of diff.answers) this.db.db.prepare('UPDATE god_prayers_v1 SET answer=?,answered_at=? WHERE world_id=? AND id=?').run(a.text, edit.at, this.worldId, a.prayer);
+      if (request) {
+        this.db.db.prepare('INSERT INTO god_edit_receipts_v1(world_id,client_ref,request_hash,payload_hash,seq,result) VALUES(?,?,?,?,?,?)').run(this.worldId, request.clientRef, request.requestHash, request.payloadHash, edit.seq, JSON.stringify(request.result));
+        this.db.db.prepare('DELETE FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref IN (SELECT client_ref FROM god_edit_receipts_v1 WHERE world_id=? ORDER BY seq DESC LIMIT -1 OFFSET ?)').run(this.worldId, this.worldId, GOD_EDIT_RECEIPTS);
+      }
+      return null;
     });
+  }
+  receipt(clientRef: string): CommittedReceipt | null {
+    const row = this.db.db.prepare('SELECT payload_hash,seq,result FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref=?').get(this.worldId, clientRef) as { payload_hash: string; seq: number; result: string } | undefined;
+    return row ? { world: this.worldId, clientRef, payloadHash: row.payload_hash, seq: row.seq, result: JSON.parse(row.result) as Accepted } : null;
+  }
+  retry(clientRef: string, requestHash: string): Result | null {
+    const row = this.db.db.prepare('SELECT request_hash,seq,result FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref=?').get(this.worldId, clientRef) as { request_hash: string; seq: number; result: string } | undefined;
+    if (!row) return null;
+    return row.request_hash === requestHash ? { ...JSON.parse(row.result) as Accepted, replayed: true } : { accepted: false, failures: [{ op: -1, code: 'request.conflict', detail: `clientRef ${JSON.stringify(clientRef)} already committed a different payload at seq ${row.seq}.`, field: 'clientRef', measured: { seq: row.seq }, fix: 'Look up the original receipt, or use a fresh clientRef for a different edit.' }] };
   }
   setOwner(model: WorldModel, owner: string) { this.tx(() => this.writeMeta(model, owner)); }
 
@@ -97,6 +123,9 @@ export class WorldStore {
     this.db.db.prepare('UPDATE god_prayers_v1 SET answer=?, answered_at=? WHERE world_id=? AND id=?').run(answer, Date.now(), this.worldId, id);
     return (this.db.db.prepare('SELECT id, soul_id, soul_name, text, at, answer, answered_at FROM god_prayers_v1 WHERE world_id=? AND id=?').get(this.worldId, id) as PrayerRow | undefined) ?? null;
   }
+  prayer(id: string): PrayerRow | null {
+    return (this.db.db.prepare('SELECT id,soul_id,soul_name,text,at,answer,answered_at FROM god_prayers_v1 WHERE world_id=? AND id=?').get(this.worldId, id) as PrayerRow | undefined) ?? null;
+  }
   prayers(opts: { unanswered?: boolean; soulId?: string; limit?: number } = {}): PrayerRow[] {
     const where = ['world_id=?']; const args: unknown[] = [this.worldId];
     if (opts.unanswered) where.push('answer IS NULL');
@@ -104,8 +133,8 @@ export class WorldStore {
     return this.db.db.prepare(`SELECT id, soul_id, soul_name, text, at, answer, answered_at FROM god_prayers_v1 WHERE ${where.join(' AND ')} ORDER BY at DESC LIMIT ?`).all(...(args as never[]), opts.limit ?? 100) as PrayerRow[];
   }
 
-  private tx(fn: () => void) {
+  private tx<T>(fn: () => T): T {
     this.db.db.exec('BEGIN IMMEDIATE');
-    try { fn(); this.db.db.exec('COMMIT'); } catch (e) { this.db.db.exec('ROLLBACK'); throw e; }
+    try { const result = fn(); this.db.db.exec('COMMIT'); return result; } catch (e) { this.db.db.exec('ROLLBACK'); throw e; }
   }
 }

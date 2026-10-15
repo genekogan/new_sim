@@ -27,6 +27,7 @@ import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
+import { FOOTPRINT_BYTES, godBodyLimit } from './ingestion.ts';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const CORE_ASSET_INDEX = join(REPO_ROOT, 'worlds/core-assets/index.json');
@@ -60,8 +61,8 @@ type GltfJson = {
   nodes?: { name?: string; mesh?: number; children?: number[]; matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[]; skin?: number }[];
   meshes?: { name?: string; primitives: { attributes: Record<string, number>; indices?: number; mode?: number }[] }[];
   accessors?: { count: number; min?: number[]; max?: number[]; componentType: number; normalized?: boolean; bufferView?: number }[];
-  bufferViews?: { buffer: number; byteOffset?: number; byteLength: number }[];
-  buffers?: { byteLength: number; uri?: string }[];
+  bufferViews?: { buffer: number; byteOffset?: number; byteLength: number; extensions?: { EXT_meshopt_compression?: { buffer: number; byteOffset?: number; byteLength: number } } }[];
+  buffers?: { byteLength: number; uri?: string; extensions?: { EXT_meshopt_compression?: { fallback?: boolean } } }[];
   images?: { uri?: string; bufferView?: number; mimeType?: string; name?: string }[];
   textures?: unknown[]; materials?: unknown[]; animations?: { name?: string }[]; skins?: unknown[];
   extensionsUsed?: string[]; extensionsRequired?: string[];
@@ -75,16 +76,41 @@ export function parseGlb(buf: Uint8Array): { json: GltfJson; bin: Uint8Array | n
   if (dv.getUint32(0, true) !== 0x46546c67) throw new Error('not a GLB (magic is not "glTF"); upload binary glTF (.glb)');
   if (dv.getUint32(4, true) !== 2) throw new Error(`GLB version ${dv.getUint32(4, true)}; only glTF 2.0 is accepted`);
   const total = dv.getUint32(8, true);
-  if (total > buf.byteLength) throw new Error('GLB truncated');
+  if (total !== buf.byteLength) throw new Error(total > buf.byteLength ? 'GLB truncated' : 'GLB length does not match the uploaded bytes');
   let off = 12, json: GltfJson | null = null, bin: Uint8Array | null = null;
   while (off + 8 <= total) {
     const len = dv.getUint32(off, true), type = dv.getUint32(off + 4, true);
+    if (len % 4 || off + 8 + len > total) throw new Error('GLB chunk is misaligned or truncated');
+    if (off === 12 && type !== 0x4e4f534a) throw new Error('GLB first chunk must be JSON');
     const chunk = buf.subarray(off + 8, off + 8 + len);
-    if (type === 0x4e4f534a) json = JSON.parse(new TextDecoder().decode(chunk));
-    else if (type === 0x004e4942) bin = chunk;
+    if (type === 0x4e4f534a) { if (json) throw new Error('GLB has duplicate JSON chunks'); json = JSON.parse(new TextDecoder().decode(chunk)); }
+    else if (type === 0x004e4942) { if (bin) throw new Error('GLB has duplicate BIN chunks'); bin = chunk; }
     off += 8 + len;
   }
-  if (!json) throw new Error('GLB has no JSON chunk');
+  if (off !== total) throw new Error('GLB has an incomplete chunk header');
+  if (!json || typeof json !== 'object' || Array.isArray(json)) throw new Error('GLB JSON chunk must be an object');
+  // Also check compressed containers: the server carries no Draco/meshopt decoder,
+  // but their buffer references must still point inside the uploaded BIN chunk.
+  const whole = (n: number) => Number.isSafeInteger(n) && n >= 0;
+  for (const [i, b] of (json.buffers ?? []).entries()) {
+    // meshopt may declare a virtual uncompressed fallback buffer; its actual
+    // compressed bytes are checked through each bufferView extension below.
+    const fallback = b.extensions?.EXT_meshopt_compression?.fallback && json.extensionsRequired?.includes('EXT_meshopt_compression');
+    if (!whole(b.byteLength) || (!b.uri && !fallback && (i !== 0 || b.byteLength > (bin?.byteLength ?? 0)))) throw new Error(`buffers.${i}.byteLength exceeds the GLB BIN chunk`);
+  }
+  for (const [i, v] of (json.bufferViews ?? []).entries()) {
+    const b = json.buffers?.[v.buffer], offset = v.byteOffset ?? 0;
+    if (!b || !whole(offset) || !whole(v.byteLength) || offset + v.byteLength > b.byteLength) throw new Error(`bufferViews.${i} is outside its buffer`);
+    const compressed = v.extensions?.EXT_meshopt_compression;
+    if (compressed) {
+      const source = json.buffers?.[compressed.buffer], start = compressed.byteOffset ?? 0;
+      if (!source || source.extensions?.EXT_meshopt_compression?.fallback || !whole(start) || !whole(compressed.byteLength) || start + compressed.byteLength > source.byteLength) throw new Error(`bufferViews.${i}.extensions.EXT_meshopt_compression is outside its buffer`);
+    }
+  }
+  for (const [i, a] of (json.accessors ?? []).entries()) {
+    if (!whole(a.count) || (a.bufferView !== undefined && !json.bufferViews?.[a.bufferView])) throw new Error(`accessors.${i} has an invalid count or bufferView`);
+    if ((a.min && !a.min.every(Number.isFinite)) || (a.max && !a.max.every(Number.isFinite))) throw new Error(`accessors.${i} has invalid bounds`);
+  }
   return { json, bin };
 }
 
@@ -132,8 +158,13 @@ export function measureGlb(buf: Uint8Array): GlbMeasure {
   if (missing.length) throw new Error(`required extension(s) the viewer cannot decode: ${missing.join(', ')}`);
   const acc = json.accessors ?? [];
   let tris = 0;
-  for (const m of json.meshes ?? []) for (const p of m.primitives) {
+  for (const [mesh, m] of (json.meshes ?? []).entries()) for (const [primitive, p] of m.primitives.entries()) {
+    const field = `meshes.${mesh}.primitives.${primitive}`;
+    const position = acc[p.attributes?.POSITION];
+    if (!position || position.min?.length !== 3 || position.max?.length !== 3 || position.min.some((v, i) => v > position.max![i])) throw new Error(`${field}.attributes.POSITION needs a valid accessor with 3D min/max bounds`);
+    if (Object.values(p.attributes).some(i => !Number.isSafeInteger(i) || !acc[i]) || (p.indices !== undefined && (!Number.isSafeInteger(p.indices) || !acc[p.indices]))) throw new Error(`${field} references an unknown accessor`);
     const mode = p.mode ?? 4, n = p.indices !== undefined ? acc[p.indices]?.count ?? 0 : acc[p.attributes.POSITION]?.count ?? 0;
+    if (!Number.isInteger(mode) || mode < 0 || mode > 6) throw new Error(`${field}.mode must be a glTF primitive mode (0–6)`);
     tris += mode === 4 ? n / 3 : mode === 5 || mode === 6 ? Math.max(0, n - 2) : 0;
   }
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
@@ -165,7 +196,7 @@ export function measureGlb(buf: Uint8Array): GlbMeasure {
       for (let c = 0; c < 8; c++) { const q = apply(mm, [c & 1 ? mx[0] : mn[0], c & 2 ? mx[1] : mn[1], c & 4 ? mx[2] : mn[2]]); for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], q[j]); hi[j] = Math.max(hi[j], q[j]); } }
     }
   }
-  if (!Number.isFinite(lo[0])) throw new Error('GLB has no measurable geometry (no POSITION min/max)');
+  if (![...lo, ...hi].every(Number.isFinite) || lo.some((v, i) => v > hi[i])) throw new Error('GLB has no measurable geometry (no finite POSITION min/max)');
   let texPx = 0;
   for (const im of json.images ?? []) {
     let bytes: Uint8Array | null = null;
@@ -184,13 +215,18 @@ export function measureGlb(buf: Uint8Array): GlbMeasure {
   };
 }
 
-/** Full parse with @gltf-transform/core when the file needs no decoder (a second opinion on validity). Null = parsed fine or skipped. */
+/** Full parse when no unavailable geometry/texture decoder is needed. Compressed
+ * files still receive parseGlb's container/reference checks and measurement. */
 export async function validateGlb(buf: Uint8Array, json?: GltfJson): Promise<string | null> {
-  const req = json?.extensionsRequired ?? parseGlb(buf).json.extensionsRequired ?? [];
-  if (req.length) return null; // compressed geometry/textures need decoders the server does not carry; the container was measured already
   try {
+    const req = (json ?? parseGlb(buf).json).extensionsRequired ?? [];
     const { WebIO } = await import('@gltf-transform/core');
-    await new WebIO().readBinary(buf);
+    const io = new WebIO(), document = await io.binaryToJSON(buf);
+    if (req.some(e => ['KHR_draco_mesh_compression', 'EXT_meshopt_compression', 'EXT_texture_webp', 'KHR_texture_basisu'].includes(e))) return null;
+    // These viewer-supported extensions do not need a decoder to validate core
+    // geometry. They must not skip the whole parse just for being required.
+    document.json.extensionsRequired = req.filter(e => !DECODABLE.has(e));
+    await io.readJSON(document);
     return null;
   } catch (e) { return String((e as Error).message ?? e); }
 }
@@ -201,7 +237,7 @@ type LmFootprint = {
   schema: 'lm-building-footprint/1'; id?: string; name?: string;
   bounds?: { min: Vec3; max: Vec3 };
   levels?: { id: number; y: number; label?: string }[];
-  rooms?: { id: string; label?: string; level: number; y0: number; y1: number; polygon: Vec2[] }[];
+  rooms?: { id: string; label?: string; level: number; y0: number; y1: number; clearHeight?: number; polygon: Vec2[] }[];
   terraces?: { id: string; level: number; y: number; polygon: Vec2[]; hole?: Vec2[] }[];
   obstacles?: { id: string; kind: string; obb: { c: Vec2; half: Vec2; yaw: number }; y0: number; y1: number }[];
   portals?: { id: string; kind: 'door' | 'window' | 'shaft'; level: number; center: Vec3; normal?: Vec3; width?: number; diameter?: number; y0: number; y1: number }[];
@@ -213,13 +249,80 @@ const centroid = (poly: Vec2[]): Vec2 => { let x = 0, z = 0; for (const p of pol
 const thin = (poly: Vec2[], max = 64): Vec2[] => (poly.length <= max ? poly : Array.from({ length: max }, (_, i) => poly[Math.floor((i * poly.length) / max)]));
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 
+/** Check source values before arithmetic can coerce null/strings into numbers. */
+function assertFootprint(value: unknown): asserts value is LmFootprint {
+  const object = (v: unknown, field: string): Record<string, unknown> => {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(`${field} must be an object`);
+    return v as Record<string, unknown>;
+  };
+  const number = (v: unknown, field: string): number => {
+    if (typeof v !== 'number' || !Number.isFinite(v)) throw new Error(`${field} must be a finite number`);
+    return v;
+  };
+  const positive = (v: unknown, field: string) => { if (!(number(v, field) > 0)) throw new Error(`${field} must be greater than 0`); };
+  const text = (v: unknown, field: string) => { if (typeof v !== 'string' || !v.length) throw new Error(`${field} must be a nonempty string`); };
+  const vector = (v: unknown, length: number, field: string): number[] => {
+    if (!Array.isArray(v) || v.length !== length) throw new Error(`${field} must have exactly ${length} numeric coordinates`);
+    v.forEach((n, i) => number(n, `${field}.${i}`)); return v;
+  };
+  const points = (v: unknown, length: number, min: number, field: string) => {
+    if (!Array.isArray(v) || v.length < min) throw new Error(`${field} needs at least ${min} points`);
+    v.forEach((p, i) => vector(p, length, `${field}.${i}`));
+  };
+  const fp = object(value, 'footprint');
+  if (fp.schema !== 'lm-building-footprint/1') throw new Error('footprint schema must be lm-building-footprint/1');
+  for (const key of ['id', 'name']) if (fp[key] !== undefined) text(fp[key], `footprint.${key}`);
+  if (fp.bounds !== undefined) {
+    const bounds = object(fp.bounds, 'bounds'), min = vector(bounds.min, 3, 'bounds.min'), max = vector(bounds.max, 3, 'bounds.max');
+    if (min.some((n, i) => n > max[i])) throw new Error('bounds.max must be ≥ bounds.min');
+  }
+  for (const key of ['levels', 'rooms', 'terraces', 'obstacles', 'portals', 'links']) {
+    const entries = fp[key];
+    if (entries === undefined) continue;
+    if (!Array.isArray(entries)) throw new Error(`${key} must be an array`);
+    for (const [i, raw] of entries.entries()) {
+      const field = `${key}.${i}`, entry = object(raw, field);
+      if (key === 'levels') number(entry.id, `${field}.id`); else text(entry.id, `${field}.id`);
+      if (entry.label !== undefined) text(entry.label, `${field}.label`);
+      if (['rooms', 'terraces', 'portals'].includes(key)) number(entry.level, `${field}.level`);
+      if (key === 'levels' || key === 'terraces') number(entry.y, `${field}.y`);
+      if (['rooms', 'obstacles', 'portals'].includes(key)) {
+        const y0 = number(entry.y0, `${field}.y0`), y1 = number(entry.y1, `${field}.y1`);
+        if (!(y1 > y0)) throw new Error(`${field}.y1 must exceed y0`);
+      }
+      if (key === 'rooms' || key === 'terraces') points(entry.polygon, 2, 3, `${field}.polygon`);
+      if (key === 'rooms' && entry.clearHeight !== undefined) positive(entry.clearHeight, `${field}.clearHeight`);
+      if (key === 'terraces' && entry.hole !== undefined) points(entry.hole, 2, 3, `${field}.hole`);
+      if (key === 'obstacles') {
+        const obb = object(entry.obb, `${field}.obb`); text(entry.kind, `${field}.kind`);
+        vector(obb.c, 2, `${field}.obb.c`); vector(obb.half, 2, `${field}.obb.half`).forEach((n, j) => positive(n, `${field}.obb.half.${j}`)); number(obb.yaw, `${field}.obb.yaw`);
+      }
+      if (key === 'portals') {
+        if (!['door', 'window', 'shaft'].includes(entry.kind as string)) throw new Error(`${field}.kind must be door, window or shaft`);
+        vector(entry.center, 3, `${field}.center`); if (entry.normal !== undefined) vector(entry.normal, 3, `${field}.normal`);
+        for (const dimension of ['width', 'diameter']) if (entry[dimension] !== undefined) positive(entry[dimension], `${field}.${dimension}`);
+      }
+      if (key === 'links') {
+        text(entry.kind, `${field}.kind`); positive(entry.width, `${field}.width`); points(entry.path, 3, 2, `${field}.path`);
+        for (const end of ['from', 'to']) { const endpoint = object(entry[end], `${field}.${end}`); number(endpoint.level, `${field}.${end}.level`); number(endpoint.y, `${field}.${end}.y`); }
+      }
+    }
+  }
+}
+
 /**
  * `lm-building-footprint/1` → Baked physics in the def frame (metres, +y up, front +z, origin at the base centre).
  * Obstacle yaws are negated: the engine's rot2 turns counter-clockwise from above, the compiler's OBBs clockwise.
  * `k` scales every length (a def that states a different height than the asset).
  */
 export function footprintToBaked(fp: LmFootprint, k = 1): FootprintBaked {
-  if (fp?.schema !== 'lm-building-footprint/1') throw new Error('footprint schema must be lm-building-footprint/1');
+  assertFootprint(fp);
+  if (!(Number.isFinite(k) && k > 0)) throw new Error('footprint scale must be positive and finite');
+  const finite = (value: unknown, path: string): void => {
+    if (typeof value === 'number' && !Number.isFinite(value)) throw new Error(`${path} must be finite`);
+    if (value && typeof value === 'object') for (const [key, child] of Object.entries(value)) finite(child, `${path}.${key}`);
+  };
+  finite(fp, 'footprint');
   const s2 = (p: Vec2): Vec2 => [r4(p[0] * k), r4(p[1] * k)];
   const colliders: LocalOBB[] = (fp.obstacles ?? []).map((o) => ({ c: s2(o.obb.c), half: s2(o.obb.half), yaw: -o.obb.yaw, y0: r4(o.y0 * k), y1: r4(o.y1 * k), tag: o.id }));
   const rooms: Room[] = (fp.rooms ?? []).map((r) => { const poly = r.polygon.map(s2); return { id: r.id.toLowerCase().replace(/[^a-z0-9._-]+/g, '-'), name: r.label ?? r.id, floor: r.level, y: r4(r.y0 * k), polygon: poly, origin: centroid(poly).map(r4) as Vec2, yaw: 0, height: r4((r.y1 - r.y0) * k) }; });
@@ -235,29 +338,68 @@ export function footprintToBaked(fp: LmFootprint, k = 1): FootprintBaked {
   const slots: Slot[] = rooms.map((r) => ({ id: r.id, kind: 'room', p: [r.origin[0], r.y, r.origin[1]], yaw: 0, floor: r.floor, polygon: thin(r.polygon.map(([x, z]) => [r4(x - r.origin[0]), r4(z - r.origin[1])] as Vec2)), height: r.height, accepts: {}, capacity: 64, label: r.name }));
   const b = fp.bounds ?? { min: [0, 0, 0], max: [0, 0, 0] };
   const box: Vec3 = [r4((b.max[0] - b.min[0]) * k), r4((b.max[1] - b.min[1]) * k), r4((b.max[2] - b.min[2]) * k)];
+  if (box.some(v => !Number.isFinite(v) || v < 0)) throw new Error('footprint bounds must be finite with max ≥ min');
+  if (colliders.some(c => c.half.some(v => !Number.isFinite(v) || v <= 0) || !(c.y1 > c.y0))) throw new Error('footprint obstacles need positive half sizes and y1 > y0');
+  finite({ colliders, rooms, surfaces, openings, links, slots }, 'footprint');
   const shafts = (fp.portals ?? []).filter((p) => p.kind === 'shaft').length;
   return { box, colliders, surfaces, openings, links, rooms, slots, notes: [`footprint ${fp.id ?? ''}: ${rooms.length} rooms, ${openings.length} openings, ${links.length} links (${shafts} shafts, float-only), ${colliders.length} wall/solid colliders`] };
 }
 
 /** The same footprint at `k` times the size (an import that states a different height than the model's own). */
 export function scaleFootprint(fp: LmFootprint, k: number): LmFootprint {
+  assertFootprint(fp);
+  if (!(Number.isFinite(k) && k > 0)) throw new Error('footprint scale must be positive and finite');
   if (k === 1) return fp;
   const v = (a: number[]) => a.map((x) => r4(x * k));
-  return {
+  const scaled = {
     ...fp,
     bounds: fp.bounds && { min: v(fp.bounds.min) as Vec3, max: v(fp.bounds.max) as Vec3 },
     levels: fp.levels?.map((l) => ({ ...l, y: r4(l.y * k) })),
-    rooms: fp.rooms?.map((r) => ({ ...r, y0: r4(r.y0 * k), y1: r4(r.y1 * k), polygon: r.polygon.map((p) => v(p) as Vec2), ...((r as { clearHeight?: number }).clearHeight !== undefined ? { clearHeight: r4((r as unknown as { clearHeight: number }).clearHeight * k) } : {}) })),
+    rooms: fp.rooms?.map((r) => ({ ...r, y0: r4(r.y0 * k), y1: r4(r.y1 * k), polygon: r.polygon.map((p) => v(p) as Vec2), ...(r.clearHeight !== undefined ? { clearHeight: r4(r.clearHeight * k) } : {}) })),
     terraces: fp.terraces?.map((t) => ({ ...t, y: r4(t.y * k), polygon: t.polygon.map((p) => v(p) as Vec2), hole: t.hole?.map((p) => v(p) as Vec2) })),
     obstacles: fp.obstacles?.map((o) => ({ ...o, obb: { ...o.obb, c: v(o.obb.c) as Vec2, half: v(o.obb.half) as Vec2 }, y0: r4(o.y0 * k), y1: r4(o.y1 * k) })),
     portals: fp.portals?.map((p) => ({ ...p, center: v(p.center) as Vec3, y0: r4(p.y0 * k), y1: r4(p.y1 * k), ...(p.width !== undefined ? { width: r4(p.width * k) } : {}), ...(p.diameter !== undefined ? { diameter: r4(p.diameter * k) } : {}) })),
     links: fp.links?.map((l) => ({ ...l, width: r4(l.width * k), from: { ...l.from, y: r4(l.from.y * k) }, to: { ...l.to, y: r4(l.to.y * k) }, path: l.path.map((p) => v(p) as Vec3) })),
   };
+  assertFootprint(scaled);
+  return scaled;
 }
 
 // ---------------------------------------------------------------- the store
 
 type CoreIndex = { schema: 'core-assets/1'; assets: Record<string, AssetMeta> };
+
+type AssetOptions = { name?: string; license?: string; source?: string; by?: string; budget?: Budget; footprint?: Uint8Array | object | null; kind?: 'footprint' };
+
+/** Pure admission: no file, cache or provenance writes. Routes also run the
+ * asynchronous GLB parser before passing admitted bytes to the store. */
+export function inspectAsset(bytes: Uint8Array, opts: Pick<AssetOptions, 'budget' | 'kind'> = {}): AssetMeta {
+  const budget = opts.budget ?? DEFAULT_BUDGET;
+  const footprint = opts.kind === 'footprint' || bytes[0] === 0x7b;
+  const maxBytes = footprint ? FOOTPRINT_BYTES : budget.bytes;
+  if (bytes.byteLength > maxBytes) throw refuse(413, 'asset.budget', `${footprint ? 'footprint' : 'asset'} ${bytes.byteLength} bytes > ${maxBytes}`, { field: 'bytes', measured: { bytes: bytes.byteLength }, allowed: { bytes: maxBytes } });
+  const sha = createHash('sha256').update(bytes).digest('hex');
+  if (footprint) {
+    let baked: FootprintBaked;
+    try { baked = footprintToBaked(JSON.parse(new TextDecoder().decode(bytes))); }
+    catch (e) { throw refuse(400, 'asset.invalid', `invalid footprint: ${(e as Error).message}`, { field: 'footprint', measured: { problem: (e as Error).message }, allowed: { schema: 'lm-building-footprint/1', bytes: FOOTPRINT_BYTES }, fix: 'Provide a valid footprint with finite bounds and room polygons of at least 3 points.' }); }
+    return { sha, ext: 'json', kind: 'footprint', tris: 0, bytes: bytes.byteLength, textures: 0, texPx: 0, box: baked.box, baked };
+  }
+  if (String.fromCharCode(...bytes.subarray(0, 4)) === 'glTF') {
+    let m: GlbMeasure;
+    try { m = measureGlb(bytes); }
+    catch (e) { throw refuse(400, 'asset.invalid', (e as Error).message, { field: 'file', measured: { problem: (e as Error).message, bytes: bytes.byteLength }, allowed: { format: 'self-contained GLB 2.0' }, fix: 'Export a valid self-contained binary glTF 2.0 file.' }); }
+    if (m.tris > budget.tris) throw refuse(413, 'asset.budget', `${m.tris} triangles > ${budget.tris} (simplify the mesh, e.g. gltf-transform simplify)`, { field: 'tris', measured: m, allowed: budget });
+    if (m.texPx > budget.texPx) throw refuse(413, 'asset.budget', `a ${m.texPx} px texture > ${budget.texPx} px (resize textures)`, { field: 'texPx', measured: m, allowed: budget });
+    return { sha, ext: 'glb', kind: 'mesh', tris: m.tris, bytes: m.bytes, textures: m.textures, texPx: m.texPx, box: m.box, min: m.min, animations: m.animations, nodes: m.nodes, extensions: m.extensions };
+  }
+  const s = imageSize(bytes);
+  if (s.type !== 'png' && s.type !== 'jpg') throw refuse(415, 'asset.type', 'accepted: GLB (binary glTF 2.0), PNG, JPEG, footprint JSON (lm-building-footprint/1)', { measured: { bytes: bytes.byteLength }, allowed: { formats: ['glb', 'png', 'jpg', 'lm-building-footprint/1'] } });
+  if (!(s.w > 0 && s.h > 0)) throw refuse(400, 'asset.invalid', 'image has no valid dimensions', { measured: s, allowed: { width: '> 0', height: '> 0' } });
+  if (bytes.byteLength > Math.min(budget.bytes, 2_000_000)) throw refuse(413, 'asset.budget', `image ${bytes.byteLength} bytes > ${Math.min(budget.bytes, 2_000_000)}`, { field: 'bytes', measured: { bytes: bytes.byteLength }, allowed: { bytes: Math.min(budget.bytes, 2_000_000) } });
+  if (Math.max(s.w, s.h) > budget.texPx) throw refuse(413, 'asset.budget', `image ${s.w}×${s.h} > ${budget.texPx} px`, { field: 'texPx', measured: { texPx: Math.max(s.w, s.h) }, allowed: { texPx: budget.texPx } });
+  return { sha, ext: s.type, kind: 'image', tris: 0, bytes: bytes.byteLength, textures: 1, texPx: Math.max(s.w, s.h), box: [s.w, s.h, 0] };
+}
 
 export class AssetStore {
   readonly dir: string;
@@ -301,32 +443,9 @@ export class AssetStore {
    * Ingest bytes: sniff the type, measure, enforce the budget, write `<sha>.<ext>` + meta, record provenance.
    * `footprint` (JSON bytes or object) is ingested first and linked to a GLB.
    */
-  put(bytes: Uint8Array, opts: { name?: string; license?: string; source?: string; by?: string; budget?: Budget; footprint?: Uint8Array | object | null; kind?: 'footprint' } = {}): AssetMeta {
-    const budget = opts.budget ?? DEFAULT_BUDGET;
-    const sha = createHash('sha256').update(bytes).digest('hex');
-    let meta: AssetMeta;
-    const head = String.fromCharCode(...bytes.subarray(0, 4));
-    if (opts.kind === 'footprint' || (bytes[0] === 0x7b /* { */)) {
-      let fp: LmFootprint;
-      try { fp = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw refuse(400, 'asset.invalid', 'footprint must be JSON'); }
-      let baked: FootprintBaked;
-      try { baked = footprintToBaked(fp); } catch (e) { throw refuse(400, 'asset.invalid', String((e as Error).message)); }
-      if (bytes.byteLength > 1_000_000) throw refuse(413, 'asset.budget', `footprint ${bytes.byteLength} bytes > 1000000`);
-      meta = { sha, ext: 'json', kind: 'footprint', tris: 0, bytes: bytes.byteLength, textures: 0, texPx: 0, box: baked.box, baked };
-    } else if (head === 'glTF') {
-      let m: GlbMeasure;
-      try { m = measureGlb(bytes); } catch (e) { throw refuse(400, 'asset.invalid', String((e as Error).message)); }
-      if (m.tris > budget.tris) throw refuse(413, 'asset.budget', `${m.tris} triangles > ${budget.tris} (simplify the mesh, e.g. gltf-transform simplify)`, { measured: m });
-      if (m.bytes > budget.bytes) throw refuse(413, 'asset.budget', `${m.bytes} bytes > ${budget.bytes} (compress: Draco/meshopt geometry, WebP/KTX2 textures)`, { measured: m });
-      if (m.texPx > budget.texPx) throw refuse(413, 'asset.budget', `a ${m.texPx} px texture > ${budget.texPx} px (resize textures)`, { measured: m });
-      meta = { sha, ext: 'glb', kind: 'mesh', tris: m.tris, bytes: m.bytes, textures: m.textures, texPx: m.texPx, box: m.box, min: m.min, animations: m.animations, nodes: m.nodes, extensions: m.extensions };
-    } else {
-      const s = imageSize(bytes);
-      if (s.type !== 'png' && s.type !== 'jpg') throw refuse(415, 'asset.type', 'accepted: GLB (binary glTF 2.0), PNG, JPEG, footprint JSON (lm-building-footprint/1)');
-      if (bytes.byteLength > Math.min(budget.bytes, 2_000_000)) throw refuse(413, 'asset.budget', `image ${bytes.byteLength} bytes > ${Math.min(budget.bytes, 2_000_000)}`);
-      if (Math.max(s.w, s.h) > budget.texPx) throw refuse(413, 'asset.budget', `image ${s.w}×${s.h} > ${budget.texPx} px`);
-      meta = { sha, ext: s.type, kind: 'image', tris: 0, bytes: bytes.byteLength, textures: 1, texPx: Math.max(s.w, s.h), box: [s.w, s.h, 0] };
-    }
+  put(bytes: Uint8Array, opts: AssetOptions = {}): AssetMeta {
+    let meta = inspectAsset(bytes, opts);
+    const sha = meta.sha;
     if (opts.footprint && meta.kind === 'mesh') {
       const fpBytes = opts.footprint instanceof Uint8Array ? opts.footprint : new TextEncoder().encode(JSON.stringify(opts.footprint));
       const fp = this.put(fpBytes, { ...opts, footprint: null, kind: 'footprint', name: opts.name ? `${opts.name}-footprint` : undefined });
@@ -533,37 +652,51 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     return c.body(readFileSync(f) as never, 200, { 'content-type': EXT_TYPES[ext as AssetMeta['ext']], etag, 'cache-control': 'public, max-age=31536000, immutable', 'access-control-allow-origin': '*' });
   });
 
-  app.post('/v1/god/assets', async (c) => {
+  app.post('/v1/god/assets', godBodyLimit(budget), async (c) => {
     d.requireGod(c);
     const ct = c.req.header('content-type') ?? '';
     const q = (k: string) => c.req.query(k);
     let bytes: Uint8Array | null = null, footprint: Uint8Array | null = null;
     const field: Record<string, string | undefined> = {};
     if (ct.startsWith('multipart/form-data')) {
-      const form = await c.req.parseBody({ all: false });
+      let form: Awaited<ReturnType<typeof c.req.parseBody>>;
+      try { form = await c.req.parseBody({ all: false }); }
+      catch { throw new ApiError(400, 'asset.invalid', 'malformed multipart upload', { field: 'body', measured: { format: 'malformed multipart' }, allowed: { format: 'multipart/form-data with a file field' } }); }
       for (const [k, v] of Object.entries(form)) {
         if (typeof v === 'string') field[k] = v;
-        else if (v && typeof (v as Blob).arrayBuffer === 'function') { const b = new Uint8Array(await (v as Blob).arrayBuffer()); if (k === 'footprint') footprint = b; else if (k === 'file' || !bytes) bytes = b; }
+        else if (v && typeof (v as Blob).arrayBuffer === 'function') {
+          const file = v as Blob, max = k === 'footprint' ? FOOTPRINT_BYTES : budget().bytes;
+          if (file.size > max) throw new ApiError(413, 'asset.budget', `${k} ${file.size} bytes > ${max}`, { field: k, measured: { bytes: file.size }, allowed: { bytes: max } });
+          const b = new Uint8Array(await file.arrayBuffer()); if (k === 'footprint') footprint = b; else if (k === 'file' || !bytes) bytes = b;
+        }
       }
       if (!footprint && field.footprint) footprint = new TextEncoder().encode(field.footprint);
     } else {
       const ab = await c.req.arrayBuffer(); bytes = new Uint8Array(ab);
       for (const k of ['name', 'height', 'tags', 'license', 'source', 'define', 'description', 'layer']) field[k] = q(k);
     }
-    if (!bytes?.byteLength) throw new ApiError(400, 'invalid', 'send the file as multipart field `file` (or as the raw body with content-type model/gltf-binary)');
-    if (bytes.byteLength > budget().bytes + 1024) throw new ApiError(413, 'asset.budget', `${bytes.byteLength} bytes > ${budget().bytes}`);
+    if (!bytes?.byteLength) throw new ApiError(400, 'asset.invalid', 'send the file as multipart field `file` (or as the raw body with content-type model/gltf-binary)', { field: 'file', measured: { bytes: 0 }, allowed: { bytes: '> 0' } });
     const name = field.name?.trim() || undefined;
+    const height = field.height !== undefined ? Number(field.height) : undefined;
+    if (height !== undefined && !(height > 0 && height < 400)) throw new ApiError(400, 'asset.invalid', 'height must be metres in (0, 400)', { field: 'height', measured: { height: field.height }, allowed: { minExclusive: 0, maxExclusive: 400, unit: 'metres' }, fix: 'Pass a finite height greater than 0 and less than 400 metres.' });
+    const admitted = inspectAsset(bytes, { budget: budget() });
+    let scaledFootprint: Uint8Array | undefined, footprintScale = 1;
+    if (footprint) {
+      inspectAsset(footprint, { kind: 'footprint' });
+      // Check the transformed sidecar too before ANY store write.
+      if (admitted.kind === 'mesh' && height && admitted.box[1] > 0 && Math.abs(height / admitted.box[1] - 1) > 1e-4) {
+        footprintScale = height / admitted.box[1];
+        try { scaledFootprint = new TextEncoder().encode(JSON.stringify(scaleFootprint(JSON.parse(new TextDecoder().decode(footprint)), footprintScale))); }
+        catch (error) { throw new ApiError(400, 'asset.invalid', `footprint could not be scaled: ${(error as Error).message}`, { field: 'footprint', measured: { problem: (error as Error).message, scale: footprintScale }, allowed: { coordinates: 'finite numeric values after scaling' }, fix: 'Use finite footprint coordinates and a height that keeps its dimensions valid.' }); }
+        inspectAsset(scaledFootprint, { kind: 'footprint' });
+      }
+    }
+    if (admitted.kind === 'mesh') { const v = await validateGlb(bytes); if (v) throw new ApiError(400, 'asset.invalid', `the GLB does not parse: ${v}`, { field: 'file', measured: { problem: v, bytes: bytes.byteLength }, allowed: { format: 'valid self-contained GLB 2.0' }, fix: 'Export a valid self-contained binary glTF 2.0 file.' }); }
     const meta = store.put(bytes, { name, license: field.license, source: field.source, by: 'god', budget: budget(), footprint });
     const warnings: string[] = [];
-    if (meta.kind === 'mesh') { const v = await validateGlb(bytes); if (v) throw new ApiError(400, 'asset.invalid', `the GLB does not parse: ${v}`); }
-    const height = field.height ? Number(field.height) : undefined;
-    if (height !== undefined && !(height > 0 && height < 400)) throw new ApiError(400, 'invalid', 'height must be metres in (0, 400)');
     // the def's footprint is in the def's metres: rescale the sidecar when the import states another height
     let fpMeta = meta.footprint ? store.info(meta.footprint) : undefined;
-    if (fpMeta && footprint && height && meta.box[1] > 0 && Math.abs(height / meta.box[1] - 1) > 1e-4) {
-      const k = height / meta.box[1];
-      fpMeta = store.put(new TextEncoder().encode(JSON.stringify(scaleFootprint(JSON.parse(new TextDecoder().decode(footprint)), k))), { kind: 'footprint', name: `${name ?? 'asset'}-footprint-x${k.toFixed(3)}`, by: 'god' });
-    }
+    if (fpMeta && scaledFootprint) fpMeta = store.put(scaledFootprint, { kind: 'footprint', name: `${name ?? 'asset'}-footprint-x${footprintScale.toFixed(3)}`, by: 'god' });
     if (meta.kind === 'mesh' && !height && (meta.box[1] < 0.05 || meta.box[1] > 200)) warnings.push(`measured height ${meta.box[1]} looks unlike metres; pass height=<m> to scale it`);
     if (meta.kind === 'mesh' && meta.tris > 6000) warnings.push(`${meta.tris} triangles: above the prop (400) and building (6000) guides; fine for a landmark, heavy if repeated`);
     const def = meta.kind === 'mesh' && name ? meshDefFor(meta, { name, height, description: field.description, tags: field.tags?.split(',').map((t) => t.trim()).filter(Boolean), layer: field.layer === 'decor' || field.layer === 'solid' ? field.layer : undefined, license: field.license, source: field.source }, fpMeta) : undefined;

@@ -3,10 +3,11 @@
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
 import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
-import { prepareFor, queryOf } from '@sim/generators';
+import { GENERATORS, prepareFor, queryOf } from '@sim/generators';
+import { z } from 'zod';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
-import { WorldModel, definitionRefs, obbOverlap, type OBB } from './model.ts';
+import { BakeError, WorldModel, definitionRefs, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema, SKY_PALETTES } from './schemas.ts';
 import { layersStateSchema, type LayersState, type Schedule } from './layers.ts';
 
@@ -25,6 +26,56 @@ export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseH
 export type Plan = { ok: true; apply: () => { seq: number; undoId: string; diff: Diff; inverse: Op[] }; ids: Record<string, string>; warnings: string[]; diff: Diff } | { ok: false; failures: Failure[] };
 
 const fail = (op: number, code: string, detail: string, suggest?: Failure['suggest']): Failure => ({ op, code, detail, suggest });
+
+/** Keep a generator's validation issues machine-addressable, without exposing a raw Zod dump. */
+function generatorFailure(op: number, error: unknown, def?: StoredDef, entity?: string, field = 'make'): Failure {
+  if (error instanceof BakeError) { def = error.def; error = error.cause; }
+  const base = { op, code: 'def.invalid', ...(def ? { def: def.ref } : {}), ...(entity ? { entity } : {}) };
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const path = issue?.path ?? [];
+    const at = ['make.args', ...path].join('.');
+    const args = def?.make.kind === 'gen' ? def.make.args ?? {} : {};
+    let value: unknown = args, parent: unknown;
+    for (const part of path) { parent = value; value = value && typeof value === 'object' ? (value as Record<PropertyKey, unknown>)[part] : undefined; }
+    const kind = parent && typeof parent === 'object' && 'kind' in parent ? `${String(parent.kind)} ` : '';
+    const subject = `${kind}${String(path.at(-1) ?? 'arguments')}`;
+    let fix = `Correct ${at}: ${issue?.message ?? 'invalid generator arguments'}`;
+    let measured: unknown = Array.isArray(value) || typeof value === 'string' ? value.length : value === undefined ? 'missing' : typeof value === 'object' ? typeof value : value;
+    let limit: unknown;
+    if (issue?.code === 'too_small' || issue?.code === 'too_big') {
+      limit = issue.code === 'too_small' ? issue.minimum : issue.maximum;
+      if (typeof value === 'number') measured = value;
+      const unit = Array.isArray(value) ? ['profile', 'polygon', 'path'].includes(String(path.at(-1))) ? ' points' : ' entries' : typeof value === 'string' ? ' characters' : '';
+      fix = `${subject} needs ${issue.code === 'too_small' ? '≥' : '≤'}${String(limit)}${unit}`;
+    }
+    return { ...base, field: at, detail: `${def?.ref ?? 'generator'}: ${at}: ${issue?.message ?? 'invalid arguments'}`, fix, measured, ...(limit !== undefined ? { limit } : {}) };
+  }
+  const message = (error instanceof Error ? error.message : String(error)).slice(0, 600);
+  return { ...base, field, detail: `${def?.ref ?? 'generator'}: ${message}`, measured: message,
+    fix: `Correct ${field} for ${def?.make.kind === 'gen' ? def.make.gen : def?.ref ?? 'this definition'} so its physics bake succeeds: ${message}` };
+}
+
+class PlanningFailure extends Error {
+  readonly failure: Failure;
+  constructor(failure: Failure) { super(failure.detail); this.failure = failure; }
+}
+
+/** Deterministic nearest ids for repairing a mistyped generator name. */
+function nearestGenerators(id: string): string[] {
+  // Generator ids arrive from untrusted JSON; cap suggestion work for a wildly long typo.
+  const needle = id.slice(0, 128);
+  const distance = (other: string) => {
+    let row = Array.from({ length: other.length + 1 }, (_, i) => i);
+    for (let i = 0; i < needle.length; i++) {
+      const next = [i + 1];
+      for (let j = 0; j < other.length; j++) next.push(Math.min(next[j] + 1, row[j + 1] + 1, row[j] + Number(needle[i] !== other[j])));
+      row = next;
+    }
+    return row[other.length];
+  };
+  return Object.keys(GENERATORS).sort((a, b) => distance(a) - distance(b) || a.localeCompare(b)).slice(0, 3);
+}
 
 /** Validate values against fields; fills defaults; returns the problem or the normalised record. */
 export function checkFields(fields: Record<string, Field>, values: Record<string, Value> | undefined, fillDefaults: boolean): { ok: true; values: Record<string, Value> } | { ok: false; detail: string } {
@@ -62,8 +113,10 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const diff: Diff = { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
   const inverse: Op[] = [];
   const touched = new Set<string>();
+  const touchedAt = new Map<string, number>(), tileAt = new Map<string, number>(), removedAt = new Map<string, number>();
+  let activeOp = 0;
   let layersTouched = false;
-  const upsert = (e: Entity) => { touched.add(e.id); };
+  const upsert = (e: Entity) => { touched.add(e.id); touchedAt.set(e.id, activeOp); };
   const resolveId = (ref: string, opIndex: number): string | null => {
     if (ref === 'world') return 'world';
     if (ref.startsWith('$')) { const id = ids[ref]; if (!id) failures.push(fail(opIndex, 'entity.unknown', `${ref} is not placed in this batch`)); return id ?? null; }
@@ -94,6 +147,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   });
   ops.forEach((op, i) => {
     if (failures.length) return;
+    activeOp = i;
+    const before = 'id' in op ? scratch.get(op.id) : undefined;
+    let entity = before?.id ?? (op.op === 'restore' ? op.entity.id : undefined);
+    let contextDef: StoredDef | undefined;
+    const tileCount = diff.tiles.length, removeCount = diff.removes.length;
+    try {
+    contextDef = scratch.resolvedDef(op.op === 'place' ? op.def : before?.def ?? (op.op === 'restore' ? op.entity.def : ''));
     switch (op.op) {
       case 'define': {
         const refuse = checkDef(scratch, op.def as never, i);
@@ -116,6 +176,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
+        contextDef = def; entity = id;
         if (scratch.library?.placementRef || op.def.startsWith('sha:')) e.def = 'sha:' + def.hash;
         { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
         { const L = def.layers ?? {};   // VOCAB-W3: the def's LAYERS defaults, unless the op says otherwise
@@ -349,11 +410,39 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         return;
       }
     }
+    } catch (error) {
+      if (error instanceof BakeError && error.def.hash !== contextDef?.hash) {
+        entity = [...scratch.entities.values()].find((e) => scratch.def(e.def)?.hash === error.def.hash)?.id ?? entity;
+      }
+      const f = error instanceof PlanningFailure ? error.failure : generatorFailure(i, error, contextDef, entity,
+        op.op === 'set' && op.params ? 'params' : op.op === 'move' && op.shape ? 'shape' : 'make');
+      if (op.op === 'define') f.def ??= `${op.def.name}@${op.def.version}`;
+      failures.push(f);
+    } finally {
+      for (const tile of diff.tiles.slice(tileCount)) tileAt.set(tile, i);
+      for (const id of diff.removes.slice(removeCount)) removedAt.set(id, i);
+    }
   });
 
   if (failures.length) return { ok: false, failures: heldBack.length && heldBack[0].op <= failures[0].op ? [heldBack[0]] : failures };
   // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
-  const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles);
+  const sourceOp = (e: Entity) => {
+    const indices: number[] = [];
+    for (const c of e.constraints ?? []) if ('ref' in c) {
+      const id = scratch.get(c.ref)?.id ?? world.get(c.ref)?.id ?? c.ref;
+      const at = touchedAt.get(id) ?? removedAt.get(id); if (at !== undefined) indices.push(at);
+    }
+    if (e.p) { const at = tileAt.get(`${Math.floor(e.p[0] / 64)},${Math.floor(e.p[e.p.length - 1] / 64)}`); if (at !== undefined) indices.push(at); }
+    let latest = indices.reduce((n, at) => Math.max(n, at), -1);
+    if (e.shape && 'path' in e.shape) for (const at of tileAt.values()) latest = Math.max(latest, at);
+    return latest >= 0 ? latest : touchedAt.get(e.id) ?? ops.length - 1;
+  };
+  let resolved: string[];
+  try {
+    resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles, sourceOp);
+  } catch (error) {
+    return { ok: false, failures: [error instanceof PlanningFailure ? error.failure : generatorFailure(ops.length - 1, error)] };
+  }
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
@@ -370,7 +459,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   }
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
-  const refused = opts.refuse?.(scratch, diff, ops);
+  let refused: Failure | null | undefined;
+  try { refused = opts.refuse?.(scratch, diff, ops); }
+  catch (error) {
+    if (!(error instanceof BakeError)) throw error;
+    const entity = [...scratch.entities.values()].find((e) => scratch.def(e.def)?.hash === error.def.hash);
+    return { ok: false, failures: [generatorFailure(entity ? sourceOp(entity) : ops.length - 1, error, error.def, entity?.id)] };
+  }
   if (refused) return { ok: false, failures: [refused] };
   if (heldBack.length) return { ok: false, failures: [heldBack[0]] };
   const seq = world.editSeq + 1;
@@ -436,7 +531,6 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
     if (info.bytes > lim.budget.bytes) return fail(i, 'def.budget', `${info.bytes} bytes > ${lim.budget.bytes}`);
     (def as { budget?: unknown }).budget = { tris: info.tris, bytes: info.bytes, textures: info.textures };
   }
-  if (def.make.kind === 'gen' && !(def.make.gen in (globalThis as never as { __gens?: never }) ) ) { /* generator existence is checked at bake */ }
   if (def.make.kind === 'parts') {
     let total = 0;
     const walk = (parts: typeof def.make.parts, depth: number): string | null => {
@@ -453,6 +547,26 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
   }
   for (const p of def.contents ?? []) if (!w.resolvedDef(p.def)) return fail(i, 'def.expansion', `contents ${p.id}: def ${p.def} unknown`);
   if (def.extends && !w.def(def.extends)) return fail(i, 'def.unknown', `extends ${def.extends}`);
+  // One deterministic trial with defaults and at most three shape points. Resolve inheritance in an isolated
+  // fork so a refused def never enters the scratch world's catalogue. Generator schemas bound fixed args.
+  let resolved: StoredDef | undefined;
+  try {
+    const trial = w.fork(), stored = trial.defineDef(def, 'admission', 0);
+    resolved = trial.resolvedDef(stored.ref)!;
+    if (resolved.make.kind === 'gen') {
+      const g = GENERATORS[resolved.make.gen];
+      if (!g) return { ...fail(i, 'def.invalid', `generator ${resolved.make.gen} unknown`), def: stored.ref,
+        field: 'make.gen', measured: resolved.make.gen, fix: `Use a known generator: ${nearestGenerators(resolved.make.gen).join(', ')}` };
+      const args = g.args?.safeParse(resolved.make.args ?? {});
+      if (args && !args.success) return generatorFailure(i, args.error, resolved);
+      const params = checkFields(resolved.params, undefined, true);
+      const shape: Entity['shape'] = resolved.form === 'path' ? { path: [[0, 0], [1, 0]] }
+        : resolved.form === 'area' ? { area: [[0, 0], [1, 0], [0, 1]] } : undefined;
+      trial.bake(resolved, params.ok ? params.values : {}, 0, shape);
+    }
+  } catch (error) {
+    return { ...generatorFailure(i, error, resolved), def: resolved?.ref ?? `${def.name}@${def.version ?? 1}` };
+  }
   return null;
 }
 
@@ -742,14 +856,16 @@ function crossesTiles(path: [number, number][], tiles: Set<string>, tileOf: (x: 
   return false;
 }
 /** Re-solve `float`, `facing`, `along` and ground settling for entities affected by this batch. Returns ids changed. */
-function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[], outTiles: string[] = []): string[] {
+function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[], outTiles: string[] = [], sourceOp: (e: Entity) => number = () => -1): string[] {
   const changed: string[] = [];
   if (!touched.size && !tiles.size && !removed.size) return changed;
   const tileOfXZ = (x: number, z: number) => `${Math.floor(x / 64)},${Math.floor(z / 64)}`;
   for (const e of [...w.entities.values()]) {  // snapshot: re-inserting during iteration would revisit keys
+    let def: StoredDef | undefined;
+    try {
     if (changed.length >= MAX_DEPENDENTS) { warnings.push(`more than ${MAX_DEPENDENTS} dependents; run resolve to finish`); break; }
     if (touched.has(e.id) && !e.constraints?.length) continue;
-    const def = w.resolvedDef(e.def); if (!def) continue;
+    def = w.resolvedDef(e.def); if (!def) continue;
     let next: Entity | null = null;
     const cons = e.constraints ?? [];
     for (const c of cons) {
@@ -796,6 +912,9 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
     if (pad) { delete (trial as Entity & { _pad?: Landform })._pad; for (const c of w.setLandform(pad, pad.id)) for (const t of w.terrain.invalidate(c)) outTiles.push(t); }
     w.insert(trial); if (def.layer === 'solid') w.index(trial.id, w.footprint(trial, def));
     if (JSON.stringify(prevP) !== JSON.stringify(trial.p) || JSON.stringify(prevR) !== JSON.stringify(trial.r) || trial.params !== e.params) changed.push(e.id); else { w.delete(trial.id); w.insert(e); if (def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
+    } catch (error) {
+      throw new PlanningFailure(generatorFailure(sourceOp(e), error, def, e.id));
+    }
   }
   return changed;
 }

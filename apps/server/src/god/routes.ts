@@ -10,6 +10,8 @@ import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { runQuery } from './query.ts';
 import { mountAssetRoutes } from './assets.ts';
+import { godBodyLimit } from './ingestion.ts';
+import { godVersions } from './versions.ts';
 import { mountLandRoutes } from './land.ts';
 import { mountLightningRoutes } from './lightning.ts';
 import { mountLayerRoutes, type GodLayers } from './layers.ts';
@@ -35,6 +37,7 @@ const answerSchema = z.object({ prayer: z.string(), text: z.string().min(1).max(
 const noStore = { 'cache-control': 'no-store' };
 
 export function mountGodRoutes(app: Hono, d: GodDeps) {
+  app.use('/v1/god/*', godBodyLimit(() => d.god.model.constants.limits.budget));
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const requireGod = (c: Context) => { if (!d.god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start'); };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
@@ -73,7 +76,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     const god = d.god.godFromToken(bearer(c));
     const you = god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
     const owner = you === 'owner' || you === 'god';
-    return c.json({ worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length } : {}) }, 200, noStore);
+    return c.json({ versions: godVersions, worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length } : {}) }, 200, noStore);
   });
   app.get('/v1/god/welcome', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.text(d.god.welcome(d.baseOf(c), d.worldName), 200, { 'content-type': 'text/markdown; charset=utf-8', ...noStore }); });
   app.get('/v1/god/pairings', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.json({ pending: d.god.pendingPairings() }, 200, noStore); });
@@ -97,11 +100,13 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/schema', (c) => c.json(godSchema(), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/query', async (c) => c.json(runQuery(d.god.model, await body(c)), 200, noStore));
   app.post('/v1/god/preview', async (c) => { requireGod(c); return c.json(d.god.preview(await body(c)), 200, noStore); });
-  app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
+  app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
   app.post('/v1/god/dryrun', async (c) => { requireGod(c); return c.json(d.god.dryrun(await body(c)), 200, noStore); });
   app.post('/v1/god/act', async (c) => { requireGod(c); const b = await body(c); const r = d.god.act(b, typeof b?.note === 'string' ? b.note : undefined); return c.json(r, 200, noStore); });
+  app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
+  app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });
   app.post('/v1/god/undo', (c) => { requireGod(c); const g = c.req.query('group'); return c.json(g ? d.god.undoGroup(g) : d.god.undo(), 200, noStore); });
   app.post('/v1/god/redo', (c) => { requireGod(c); return c.json(d.god.redo(), 200, noStore); });
   app.get('/v1/god/edits', (c) => { requireGod(c); return c.json({ edits: d.god.store.edits(Math.min(200, Number(c.req.query('limit') ?? 50) || 50)) }, 200, noStore); });

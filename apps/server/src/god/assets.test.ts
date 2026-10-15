@@ -1,7 +1,7 @@
 // L5: asset store, GLB measurement, footprints, catalog search, asset routes.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
@@ -9,7 +9,8 @@ import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
-import { AssetStore, REPO_ROOT, footprintToBaked, measureGlb, mountAssetRoutes, searchDefs } from './assets.ts';
+import { AssetStore, REPO_ROOT, footprintToBaked, measureGlb, mountAssetRoutes, scaleFootprint, searchDefs, validateGlb } from './assets.ts';
+import { GOD_JSON_BYTES } from './ingestion.ts';
 
 const repo = (p: string) => new Uint8Array(readFileSync(join(REPO_ROOT, p)));
 const DOG = 'worlds/core-assets/packs/dog-pack.glb';
@@ -30,7 +31,7 @@ function fixture() {
     soulFromBearer: () => null, baseOf: () => 'http://localhost:4999/w/assets', limitIp: () => {},
   });
   if (owned) assert.equal(store, owned);
-  app.onError((err, c) => err instanceof ApiError ? c.json({ ok: false, code: err.code, message: err.message }, err.status as 400) : c.json({ ok: false, code: 'internal', message: String(err) }, 500));
+  app.onError((err, c) => err instanceof ApiError ? c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400) : c.json({ ok: false, code: 'internal', message: String(err) }, 500));
   const token = god.mintFor({ id: 'dev:gene', role: 'user' }, 'test');
   const req = async (path: string, init: RequestInit & { json?: unknown } = {}) => {
     const r = await app.request(path, { ...init, headers: { authorization: `Bearer ${token}`, ...(init.json ? { 'content-type': 'application/json' } : {}), ...(init.headers as Record<string, string> ?? {}) }, body: init.json ? JSON.stringify(init.json) : init.body });
@@ -136,6 +137,146 @@ test('routes: upload a GLB, define it, place it, fetch it immutable; refuse junk
   assert.equal((await f.req('/v1/god/assets', { method: 'POST', body: new TextEncoder().encode('hello'), headers: { 'content-type': 'application/octet-stream' } })).status, 415);
   const anon = await f.app.request('/v1/god/assets', { method: 'POST', body: glb });
   assert.equal(anon.status, 401);
+});
+
+function syntheticGlb(options: { invalidAccessor?: boolean; missingAccessor?: boolean; compressed?: boolean; meshopt?: boolean; truncatedView?: boolean; extension?: string } = {}) {
+  const json = {
+    asset: { version: '2.0' }, buffers: [{ byteLength: 36 }, ...(options.meshopt ? [{ byteLength: 36, extensions: { EXT_meshopt_compression: { fallback: true } } }] : [])],
+    bufferViews: [{ buffer: options.meshopt ? 1 : 0, byteLength: 36, ...(options.meshopt ? { extensions: { EXT_meshopt_compression: { buffer: 0, byteOffset: 0, byteLength: options.truncatedView ? 100 : 36, byteStride: 12, count: 3, mode: 'ATTRIBUTES' } } } : options.truncatedView ? { byteLength: 100 } : {}) }],
+    accessors: [{ bufferView: 0, componentType: options.invalidAccessor ? 9999 : 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 1] }],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, ...(options.missingAccessor ? { indices: 99 } : {}), ...(options.compressed ? { extensions: { KHR_draco_mesh_compression: { bufferView: 0, attributes: { POSITION: 0 } } } } : {}) }] }],
+    nodes: [{ mesh: 0 }], scenes: [{ nodes: [0] }],
+    ...(options.compressed || options.meshopt || options.extension ? { extensionsRequired: [options.extension ?? (options.meshopt ? 'EXT_meshopt_compression' : 'KHR_draco_mesh_compression')], extensionsUsed: [options.extension ?? (options.meshopt ? 'EXT_meshopt_compression' : 'KHR_draco_mesh_compression')] } : {}),
+  };
+  const text = new TextEncoder().encode(JSON.stringify(json)), padded = Math.ceil(text.length / 4) * 4;
+  const bytes = new Uint8Array(12 + 8 + padded + 8 + 36), dv = new DataView(bytes.buffer);
+  dv.setUint32(0, 0x46546c67, true); dv.setUint32(4, 2, true); dv.setUint32(8, bytes.length, true);
+  dv.setUint32(12, padded, true); dv.setUint32(16, 0x4e4f534a, true); bytes.fill(32, 20, 20 + padded); bytes.set(text, 20);
+  dv.setUint32(20 + padded, 36, true); dv.setUint32(24 + padded, 0x004e4942, true);
+  return bytes;
+}
+
+test('compressed GLB containers check meshopt source ranges while allowing virtual fallback buffers', () => {
+  assert.equal(measureGlb(syntheticGlb({ meshopt: true })).tris, 1);
+  assert.throws(() => measureGlb(syntheticGlb({ meshopt: true, truncatedView: true })), /EXT_meshopt_compression is outside its buffer/);
+});
+
+test('invalid GLB parser, height, footprint and unsupported extensions are refused before store.put', async () => {
+  const f = fixture(); let puts = 0;
+  const put = f.store.put.bind(f.store);
+  f.store.put = (...args) => { puts++; return put(...args); };
+  const parserInvalid = syntheticGlb({ invalidAccessor: true });
+  assert.doesNotThrow(() => measureGlb(parserInvalid), 'measurement alone misses this invalid accessor');
+  assert.ok(await validateGlb(parserInvalid), 'the full parser must catch it');
+  const withRequiredMaterial = syntheticGlb({ invalidAccessor: true, extension: 'KHR_materials_unlit' });
+  assert.ok(await validateGlb(withRequiredMaterial), 'a non-decoder required extension must not skip full parsing');
+  const invalidUploads = [
+    { path: '/v1/god/assets', bytes: parserInvalid },
+    { path: '/v1/god/assets', bytes: withRequiredMaterial },
+    { path: '/v1/god/assets', bytes: syntheticGlb({ missingAccessor: true }) },
+    { path: '/v1/god/assets', bytes: syntheticGlb({ compressed: true, truncatedView: true }) },
+    { path: '/v1/god/assets', bytes: syntheticGlb({ extension: 'UNSUPPORTED_extension' }) },
+    { path: '/v1/god/assets?height=0', bytes: repo(DOG) },
+    { path: '/v1/god/assets?height=Infinity', bytes: repo(DOG) },
+    { path: '/v1/god/assets?height=', bytes: repo(DOG) },
+  ];
+  for (const upload of invalidUploads) {
+    const r = await f.req(upload.path, { method: 'POST', body: upload.bytes, headers: { 'content-type': 'model/gltf-binary' } });
+    assert.equal(r.status, 400, JSON.stringify(r.data)); assert.equal(r.data.code, 'asset.invalid'); assert.ok(r.data.measured); assert.ok(r.data.allowed);
+  }
+  for (const footprint of ['{invalid JSON', JSON.stringify({ schema: 'lm-building-footprint/1', rooms: [{ id: 'bad', level: 0, y0: 0, y1: 1, polygon: [[0, 0]] }] })]) {
+    const form = new FormData(); form.set('file', new Blob([repo(DOG)]), 'dog.glb'); form.set('footprint', footprint);
+    const r = await f.req('/v1/god/assets', { method: 'POST', body: form });
+    assert.equal(r.status, 400); assert.equal(r.data.code, 'asset.invalid'); assert.ok(r.data.measured); assert.ok(r.data.allowed);
+  }
+  assert.equal(puts, 0); assert.equal(f.store.listWorld().length, 0); assert.deepEqual(readdirSync(f.dir), []);
+});
+
+function numericFootprint() {
+  return {
+    schema: 'lm-building-footprint/1' as const, bounds: { min: [0, 0, 0], max: [2, 2, 2] },
+    levels: [{ id: 0, y: 0 }],
+    rooms: [{ id: 'room', level: 0, y0: 0, y1: 2, clearHeight: 2, polygon: [[0, 0], [2, 0], [0, 2]] }],
+    terraces: [{ id: 'terrace', level: 0, y: 0, polygon: [[0, 0], [2, 0], [0, 2]], hole: [[0, 0], [1, 0], [0, 1]] }],
+    obstacles: [{ id: 'wall', kind: 'wall', obb: { c: [0, 0], half: [0.2, 1], yaw: 0 }, y0: 0, y1: 2 }],
+    portals: [{ id: 'door', kind: 'door' as const, level: 0, center: [0, 1, 0], normal: [0, 0, 1], width: 1, diameter: 1, y0: 0, y1: 2 }],
+    links: [{ id: 'link', kind: 'float', width: 1, from: { level: 0, y: 0 }, to: { level: 1, y: 2 }, path: [[0, 0, 0], [0, 2, 0]] }],
+  };
+}
+
+test('raw footprint coordinates and dimensions reject null, strings and wrong vector lengths before storage', async () => {
+  const f = fixture(); let puts = 0;
+  const put = f.store.put.bind(f.store); f.store.put = (...args) => { puts++; return put(...args); };
+  const invalid: [string, unknown][] = [
+    ['bounds', null], ['bounds.min', [0, 0]], ['bounds.min.0', null], ['bounds.max.1', '2'],
+    ['levels.0.id', '0'], ['levels.0.y', null], ['rooms', null], ['rooms.0.level', '0'],
+    ['rooms.0.y0', null], ['rooms.0.y1', '2'], ['rooms.0.clearHeight', null], ['rooms.0.polygon.0', [0, 0, 0]], ['rooms.0.polygon.0.0', null],
+    ['terraces.0.level', null], ['terraces.0.y', '0'], ['terraces.0.polygon.1.1', null], ['terraces.0.hole.0', [0]],
+    ['obstacles.0.obb.c.0', null], ['obstacles.0.obb.half.1', '1'], ['obstacles.0.obb.yaw', null], ['obstacles.0.y0', '0'], ['obstacles.0.y1', null],
+    ['portals.0.center', [0, 1]], ['portals.0.center.0', null], ['portals.0.normal.1', '0'], ['portals.0.width', null], ['portals.0.diameter', '1'], ['portals.0.level', null], ['portals.0.y0', '0'],
+    ['links.0.width', null], ['links.0.path.0', [0, 0]], ['links.0.path.1.2', '0'], ['links.0.from.level', '0'], ['links.0.from.y', null], ['links.0.to.level', null], ['links.0.to.y', '2'],
+  ];
+  for (const [field, value] of invalid) {
+    const footprint = numericFootprint(), path = field.split('.');
+    let parent = footprint as unknown as Record<string, unknown>;
+    for (const segment of path.slice(0, -1)) parent = parent[segment] as Record<string, unknown>;
+    parent[path.at(-1)!] = value;
+    const source = JSON.stringify(footprint);
+    // A direct JSON footprint and a mesh sidecar both use strict admission.
+    const raw = await f.req('/v1/god/assets', { method: 'POST', body: source, headers: { 'content-type': 'application/json' } });
+    assert.equal(raw.status, 400, field); assert.equal(raw.data.code, 'asset.invalid', field); assert.match(raw.data.message, /invalid footprint/); assert.ok(raw.data.message.includes(field), raw.data.message);
+    const form = new FormData(); form.set('file', new Blob([syntheticGlb()]), 'mesh.glb'); form.set('footprint', source); form.set('height', '2');
+    const sidecar = await f.req('/v1/god/assets', { method: 'POST', body: form });
+    assert.equal(sidecar.status, 400, field); assert.equal(sidecar.data.code, 'asset.invalid', field); assert.ok(sidecar.data.measured); assert.ok(sidecar.data.allowed);
+  }
+  const malformed = { schema: 'lm-building-footprint/1', bounds: { min: [0, 0, 0], max: [1, 1, null] } };
+  assert.throws(() => scaleFootprint(malformed as never, 1), /bounds.max.2 must be a finite number/);
+  assert.equal(puts, 0); assert.equal(f.store.listWorld().length, 0); assert.deepEqual(readdirSync(f.dir), []);
+});
+
+test('footprint scaling overflow and collapsed dimensions return asset.invalid before any store.put', async () => {
+  const f = fixture(); let puts = 0;
+  const put = f.store.put.bind(f.store); f.store.put = (...args) => { puts++; return put(...args); };
+  for (const [footprint, height] of [
+    [{ schema: 'lm-building-footprint/1', bounds: { min: [0, 0, 0], max: [1e303, 1e303, 1e303] } }, '399'],
+    [numericFootprint(), '0.000001'],
+  ] as const) {
+    const form = new FormData(); form.set('file', new Blob([syntheticGlb()]), 'mesh.glb'); form.set('footprint', JSON.stringify(footprint)); form.set('height', height);
+    const r = await f.req('/v1/god/assets', { method: 'POST', body: form });
+    assert.equal(r.status, 400, JSON.stringify(r.data)); assert.equal(r.data.code, 'asset.invalid'); assert.match(r.data.message, /footprint could not be scaled/);
+    assert.equal(r.data.measured.scale, Number(height)); assert.ok(r.data.allowed);
+  }
+  assert.equal(puts, 0); assert.equal(f.store.listWorld().length, 0); assert.deepEqual(readdirSync(f.dir), []);
+});
+
+test('upload limits report measured and allowed bytes before storing raw, multipart or interrupted bodies', async () => {
+  const f = fixture(); let puts = 0;
+  const put = f.store.put.bind(f.store); f.store.put = (...args) => { puts++; return put(...args); };
+  f.god.model.constants.limits.budget.bytes = 100;
+  for (const headers of [{ 'content-length': '101' }, { 'content-length': '1' }, {}] as Record<string, string>[]) {
+    const r = await f.req('/v1/god/assets', { method: 'POST', body: new Uint8Array(101), headers });
+    assert.equal(r.status, 413); assert.equal(r.data.code, 'asset.budget'); assert.equal(r.data.measured.bytes, 101); assert.equal(r.data.allowed.bytes, 100);
+  }
+  const form = new FormData(); form.set('file', new Blob([new Uint8Array(101)]), 'large.glb');
+  const multipart = await f.req('/v1/god/assets', { method: 'POST', body: form });
+  assert.equal(multipart.status, 413); assert.equal(multipart.data.code, 'asset.budget'); assert.deepEqual(multipart.data.allowed, { bytes: 100 });
+  let chunks = 0;
+  const interrupted = new ReadableStream<Uint8Array>({ pull(controller) { if (chunks++ === 0) controller.enqueue(new Uint8Array(10)); else controller.error(new Error('interrupted')); } });
+  const r = await f.app.request(new Request('http://localhost/v1/god/assets', { method: 'POST', headers: { authorization: `Bearer ${f.token}` }, body: interrupted, duplex: 'half' } as RequestInit));
+  assert.equal(r.status, 400); assert.equal((await r.json() as { code: string }).code, 'asset.invalid');
+  const malformed = await f.req('/v1/god/assets', { method: 'POST', body: 'broken', headers: { 'content-type': 'multipart/form-data; boundary=missing' } });
+  assert.equal(malformed.status, 400); assert.equal(malformed.data.code, 'asset.invalid');
+  assert.equal(puts, 0); assert.equal(f.store.listWorld().length, 0); assert.deepEqual(readdirSync(f.dir), []);
+});
+
+test('mounted God act and subroute ingestion limits precede route JSON parsing', async () => {
+  const f = fixture();
+  for (const path of ['/v1/god/act', '/v1/god/preview', '/v1/god/land']) {
+    const r = await f.req(path, { method: 'POST', body: '{}', headers: { 'content-type': 'application/json', 'content-length': String(GOD_JSON_BYTES + 1) } });
+    assert.equal(r.status, 413); assert.equal(r.data.code, 'too-large'); assert.deepEqual(r.data.allowed, { bytes: GOD_JSON_BYTES });
+  }
+  const streamed = await f.req('/v1/god/act', { method: 'POST', body: 'x'.repeat(GOD_JSON_BYTES + 1), headers: { 'content-type': 'application/json', 'content-length': '1' } });
+  assert.equal(streamed.status, 413); assert.equal(streamed.data.code, 'too-large'); assert.equal(f.god.model.editSeq, 0);
 });
 
 test('catalog: ranked search with synonyms; def detail with an example op; thumbnails round-trip', async () => {

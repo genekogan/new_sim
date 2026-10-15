@@ -5,15 +5,16 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
+import { WorldModel, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
-import { WorldStore, type EditRow, type PrayerRow } from './store.ts';
+import { WorldStore, GOD_EDIT_OUTCOME_BYTES, type EditRow, type PrayerRow } from './store.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
 import { RegistryCatalog } from '@sim/catalog';
 import { registryCatalog } from './registry-catalog.ts';
+import { submissionSchema, type Expectations } from './submission.ts';
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,6 +23,7 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
+type Preview = { at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; failures?: Failure[] };
 export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
 /** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
 export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
@@ -57,11 +59,14 @@ export class GodMode {
   private commitListeners: CommitListener[] = [];
   /** Name of the genesis template this world was created from (null = empty plain). */
   template: string | null = null;
-  private previews = new Map<string, { at: number; diff: Diff; ground?: ReturnType<WorldModel['ground']>; ops: unknown; failures?: unknown }>();
+  private previews = new Map<string, Preview>();
   /** Subscribe to committed batches (ordered, synchronous). Returns an unsubscribe. */
   /** Body-aware edits (installed by the engine bridge): who uses an entity, and the warnings for bodies an
    *  accepted edit buries (the engine lifts them clear). Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[]) => string[]; refuse?: PlanOptions['refuse'] } | null = null;
+  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: PlanOptions['refuse'] } | null = null;
+  /** Bridge admission/decoration must run before the accepted receipt is persisted, and never on replay. */
+  actGuard: ((batch: unknown) => Result | null) | null = null;
+  finalizeAct: ((result: Result, after: WorldModel) => Result) | null = null;
   onCommit(fn: CommitListener): () => void { this.commitListeners.push(fn); return () => { this.commitListeners = this.commitListeners.filter((f) => f !== fn); }; }
   private subscribers = new Set<(e: GodEvent) => void>();
   private ring: GodEvent[] = [];
@@ -188,17 +193,56 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
-    const off = deferredOp(batch); if (off) return { accepted: false, failures: [off] } as Result;
+    const parsed = submissionSchema.safeParse(batch);
+    if (!parsed.success) return { accepted: false, failures: parsed.error.issues.map((i) => ({ op: typeof i.path[1] === 'number' ? i.path[1] : -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the operation shape in GET /v1/god/schema.' })) };
+    const input = parsed.data;
+    // This canonical envelope survives preview expiry/restart. payloadHash below additionally binds the sealed ops.
+    const requestHash = hashOf({ batch: input, note: note ?? input.note ?? null });
+    if (input.clientRef !== undefined) { const saved = this.store.retry(input.clientRef, requestHash); if (saved) return saved; }
+    let normalized: Batch;
+    let preview: Preview | null = null;
+    if (input.preview !== undefined) {
+      preview = this.getPreview(input.preview);
+      if (!preview) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', field: 'preview', detail: `Preview ${input.preview} expired or is unknown.`, fix: 'Create a new preview and commit its id.' }] };
+      if (preview.failures) return { accepted: false, failures: structuredClone(preview.failures) };
+      if ((input.ops && hashOf(input.ops) !== hashOf(preview.ops.ops)) || (input.group !== undefined && input.group !== preview.ops.group) || (input.note !== undefined && input.note !== preview.ops.note)) return { accepted: false, failures: [{ op: -1, code: 'schema', field: 'preview', detail: 'The submitted operations or batch metadata differ from the sealed preview.', fix: 'Commit with {preview, clientRef}, or create a new preview for the changed batch.' }] };
+      normalized = { ...preview.ops, clientRef: input.clientRef };
+    } else normalized = batchSchema.parse(input);
+    const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
+    if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
+    for (const [i, op] of normalized.ops.entries()) if (op.op === 'answer' && !this.store.prayer(op.prayer)) return { accepted: false, failures: [{ op: i, code: 'params.invalid', field: 'prayer', detail: `Unknown prayer ${op.prayer}.`, fix: 'Use an id from GET /v1/god/prayers.' }] };
+    const journalNote = note ?? normalized.note;
+    const payloadHash = hashOf({ batch: normalized, expect: input.expect, preview: input.preview, note: journalNote ?? null });
+    const guard = this.actGuard?.(normalized); if (guard) return guard;
+    const off = deferredOp(normalized); if (off) return { accepted: false, failures: [off] } as Result;
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, batch, 'god', tick, { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
-    if (!r.result.accepted) return r.result;
-    if (this.bodies?.lifted) r.result.warnings.push(...this.bodies.lifted(r.diff!.upserts.map((e) => e.id)));
-    const ops = (batch as { ops: Op[] }).ops; const group = typeof (batch as { group?: unknown }).group === 'string' ? (batch as { group: string }).group : undefined;
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note, group, ops, inverse: r.inverse!, kind: 'edit' });
-    this.notify(r.result.seq, r.diff!, 'edit', group);
-    this.publish(r.result.seq, tick, r.diff!, 'god');
-    for (const a of r.diff!.answers) this.answer(a.prayer, a.text);
-    return r.result;
+    // Keep public state untouched until SQL succeeds. No SQL write lock is held while planning or baking.
+    const next = this.model.fork();
+    const lifted: string[] = [];
+    const r = applyBatch(next, normalized, 'god', tick, { uses: this.bodies?.uses, refuse: (after, diff, ops) => {
+      const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+      // Warning geometry uses the same typed bake boundary as admission, before any live/SQL mutation.
+      if (this.bodies?.lifted) lifted.push(...this.bodies.lifted(diff.upserts.map(e => e.id), after));
+      return null;
+    } });
+    if (preview && r.result.accepted) {
+      const affected = new Set(preview.affected);
+      const added = [...new Set([...r.diff!.upserts.map(e => e.id), ...r.diff!.removes])].filter(id => this.model.entities.has(id) && !affected.has(id));
+      if (added.length) return { accepted: false, failures: added.map(id => ({ op: -1, code: 'revision.stale', entity: id, field: 'preview.affected', detail: `${this.model.pathOf(id)} would now be changed by this batch but was absent from the preview.`, measured: { id, v: this.model.entities.get(id)!.v }, fix: 'Create a new preview including the newly affected entities.' })) };
+    }
+    if (r.result.accepted) r.result.warnings.push(...lifted);
+    const result = this.finalizeAct?.(r.result, next) ?? r.result;
+    if (!result.accepted) return result;
+    const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8');
+    if (normalized.clientRef !== undefined && bytes > GOD_EDIT_OUTCOME_BYTES) return { accepted: false, failures: [{ op: -1, code: 'request.budget', field: 'result', detail: `Accepted result would require ${bytes} bytes; receipt limit is ${GOD_EDIT_OUTCOME_BYTES}.`, measured: bytes, limit: GOD_EDIT_OUTCOME_BYTES, fix: 'Submit a smaller batch using a fresh clientRef.' }] };
+    const { ops, group, clientRef } = normalized;
+    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at: Date.now(), note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit' }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
+    if (concurrent) return concurrent;
+    Object.assign(this.model, next); // preserve bridge/nav references and WeakMap keys
+    this.notify(result.seq, r.diff!, 'edit', group);
+    this.publish(result.seq, tick, r.diff!, 'god');
+    for (const a of r.diff!.answers) { const row = this.store.prayer(a.prayer); if (row) this.push('prayer', row); }
+    return result;
   }
   undo(): Result & { reverted?: number } {
     const target = this.store.undoable();
@@ -213,9 +257,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
     if (!target.inverse.length) return { accepted: false, failures: [{ op: -1, code: 'undo.conflict', detail: `edit ${target.seq} has no inverse (${kind === 'undo' ? 'expand/define/answer' : 'nothing to redo'})` }] };
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const next = this.model.fork();
+    const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    if (refused) return refused;
+    Object.assign(this.model, next);
     this.notify(r.result.seq, r.diff!, kind, target.grp ?? undefined);
     this.publish(r.result.seq, tick, r.diff!, kind);
     return { ...r.result, reverted: target.seq };
@@ -225,9 +272,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
    *  never the god's to undo (and it does not clear the redo stack), published to viewers, not sent to onCommit. */
   engineAct(ops: Op[], note: string): Result {
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, { ops }, 'engine', tick, { trusted: true });
+    const next = this.model.fork();
+    const r = applyBatch(next, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' });
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' });
+    if (refused) return refused;
+    Object.assign(this.model, next);
     this.publish(r.result.seq, tick, r.diff!, 'engine');
     return r.result;
   }
@@ -246,14 +296,70 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
-    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const parsed = batchSchema.safeParse(batch);
+    if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
+    const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
+    const p = plan(this.model, parsed.data, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     const id = 'pv_' + randomBytes(6).toString('hex');
     for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
-    if (!p.ok) { this.previews.set(id, { at: Date.now(), diff: { upserts: [], removes: [], defs: [], tiles: [], answers: [] }, ops: batch, failures: p.failures }); return { id, accepted: false as const, failures: p.failures }; }
-    this.previews.set(id, { at: Date.now(), diff: p.diff, ops: batch });
-    return { id, accepted: true as const, summary: summarize(p.diff), url: `?preview=${id}` };
+    while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);
+    const baseEditSeq = this.model.editSeq;
+    const diff: Diff = p.ok ? p.diff : { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
+    const { expect, subtrees } = this.captureRevisions(parsed.data, diff);
+    const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
+    this.previews.set(id, { at: Date.now(), baseEditSeq, expect, subtrees, affected, diff, ops: structuredClone(parsed.data), ...(!p.ok ? { failures: p.failures } : {}) });
+    if (!p.ok) return { id, accepted: false as const, failures: p.failures };
+    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), url: `?preview=${id}` };
   }
   getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
+  /** Revision guards check only referenced/touched entities, never the world's global edit sequence. */
+  private stale(expect: Expectations): Failure[] {
+    return Object.entries(expect).flatMap(([ref, expected]) => {
+      const current = this.model.get(ref);
+      return current?.id === expected.id && current.v === expected.v ? [] : [{ op: -1, code: 'revision.stale', entity: expected.id, field: `expect.${ref}`, detail: `${ref} changed: expected ${expected.id} v${expected.v}; now ${current ? `${current.id} v${current.v}` : 'missing'}.`, measured: current ? { id: current.id, v: current.v } : null, limit: expected, fix: 'Read the current entity and create a fresh preview.' }];
+    });
+  }
+  private staleSubtrees(preview: Preview | null): Failure[] {
+    return Object.entries(preview?.subtrees ?? {}).flatMap(([id, expected]) => {
+      const current = this.model.entities.has(id) ? this.model.subtree(id).sort() : [];
+      if (hashOf(current) === hashOf(expected)) return [];
+      const before = new Set(expected), after = new Set(current);
+      return [{ op: -1, code: 'revision.stale', entity: id, field: `preview.subtrees.${id}`, detail: `${this.model.pathOf(id) || id}: subtree membership changed since preview.`, measured: { added: current.filter(x => !before.has(x)), removed: expected.filter(x => !after.has(x)) }, fix: 'Create a fresh preview that includes the current subtree.' }];
+    });
+  }
+  private captureRevisions(batch: Batch, diff: Diff): { expect: Expectations; subtrees: Record<string, string[]> } {
+    const expect: Expectations = {}, subtrees: Record<string, string[]> = {};
+    const add = (ref: string | undefined) => {
+      if (!ref || ref === 'world' || ref.startsWith('$')) return;
+      const e = this.model.get(ref); if (!e) return;
+      expect[ref] = { id: e.id, v: e.v };
+      for (const id of this.model.ancestors(e.id)) { const parent = this.model.entities.get(id)!; expect[id] = { id, v: parent.v }; }
+    };
+    const constraints = (e: Pick<Entity, 'constraints'>) => { for (const c of e.constraints ?? []) if ('ref' in c) add(c.ref); };
+    for (const op of batch.ops) {
+      if ('id' in op) {
+        add(op.id);
+        const e = this.model.get(op.id); if (e) {
+          constraints(e);
+          if (op.op === 'clone' || op.op === 'remove' || op.op === 'move' || (op.op === 'set' && op.params)) {
+            subtrees[e.id] = this.model.subtree(e.id).sort();
+            for (const id of subtrees[e.id]) { add(id); constraints(this.model.entities.get(id)!); }
+          }
+        }
+      }
+      if ('in' in op) add(op.in?.parent);
+      if ('constraints' in op) constraints(op);
+      if (op.op === 'relate') for (const ref of [op.a, op.b]) if (ref.startsWith('thing:')) add(ref.slice(6));
+      if (op.op === 'place' || op.op === 'set') {
+        const e = op.op === 'set' ? this.model.get(op.id) : undefined;
+        const def = this.model.resolvedDef(op.op === 'place' ? op.def : e?.def ?? '');
+        for (const kind of ['params', 'state'] as const) for (const [key, value] of Object.entries(op[kind] ?? {})) if (def?.[kind][key]?.type === 'ref' && typeof value === 'string') add(value);
+      }
+    }
+    for (const e of diff.upserts) if (this.model.entities.has(e.id)) { add(e.id); constraints(e); }
+    for (const id of diff.removes) add(id);
+    return { expect, subtrees };
+  }
   /** The god's recent previews, newest first (the panel lists them to show as ghosts). */
   listPreviews() { const now = Date.now(); return [...this.previews].filter(([, v]) => now - v.at <= 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
   private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {

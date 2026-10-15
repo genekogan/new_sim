@@ -306,8 +306,13 @@ export type Batch = z.infer<typeof batchSchema>;
 /** Server-internal: the same batch shape but allowing `restore` (used when replaying stored inverses). */
 export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).min(1).max(256) });
 
-export type Failure = { op: number; code: string; detail: string; suggest?: { p?: [number, number] | [number, number, number]; r?: number } };
-export type Accepted = { accepted: true; seq: number; undoId: string; ids: Record<string, string>; warnings: string[] };
+export type Failure = {
+  op: number; code: string; detail: string;
+  /** Repair context, additive so existing clients can continue to use code/detail. */
+  field?: string; fix?: string; measured?: unknown; limit?: unknown; def?: string; entity?: string;
+  suggest?: { p?: [number, number] | [number, number, number]; r?: number };
+};
+export type Accepted = { accepted: true; seq: number; undoId: string; ids: Record<string, string>; warnings: string[]; replayed?: true };
 export type Refused = { accepted: false; failures: Failure[] };
 export type Result = Accepted | Refused;
 
@@ -317,5 +322,6 @@ export const refusalCodes = [
   'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
   'wallet.insufficient', 'relation.invalid',
+  'request.conflict', 'request.budget', 'revision.stale', 'asset.invalid', 'asset.budget',
 ] as const;
 export type RefusalCode = (typeof refusalCodes)[number];

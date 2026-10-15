@@ -4,6 +4,7 @@
 
 // lib/state.mjs
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 var STATE = ".eden-god.json";
 var load = () => existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : {};
 var save = (patch) => {
@@ -17,27 +18,62 @@ var need = (s, k, hint) => {
   return s[k];
 };
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+var EDIT_PATHS = /* @__PURE__ */ new Set(["/v1/god/act", "/v1/god/env", "/v1/god/land", "/v1/god/strike", "/v1/god/undo", "/v1/god/redo", "/v1/god/answer"]);
 async function call(path, { body, method, as = "god", timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
-  const s = load(), url = need(s, "world", "Run: node eden-god.mjs register <world-url>") + path, headers = { "content-type": "application/json" };
+  const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
   if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
-  const t0 = Date.now();
-  let r;
+  const verb = method ?? (body ? "POST" : "GET"), pathname = path.split("?")[0];
+  const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID() : void 0;
+  const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
+  const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
+  async function send(requestPath, requestMethod, requestBody, deadline = timeoutMs) {
+    const t0 = Date.now();
+    const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.timeout(deadline) });
+    const text = await r.text();
+    let data;
+    if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ""}`);
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text.slice(0, 400) };
+    }
+    return { status: r.status, data };
+  }
+  const lost = (e) => {
+    const slow = /timeout|abort/i.test(`${e?.name} ${e?.message}`);
+    const detail = slow ? `the world did not answer within ${Math.round(timeoutMs / 1e3)} s` : String(e?.message ?? e);
+    const advice = recoverable ? ` Check \`request ${clientRef}\` before issuing a new edit; its outcome is unresolved.` : clientRef ? " This endpoint has no receipt recovery; verify the world before issuing it again." : "";
+    return { status: 0, data: { ok: false, code: slow ? "slow" : "unreachable", ...clientRef ? { clientRef } : {}, message: detail + advice } };
+  };
+  let failure;
   try {
-    r = await fetch(url, { method: method ?? (body ? "POST" : "GET"), headers, body: body ? JSON.stringify(body) : void 0, signal: AbortSignal.timeout(timeoutMs) });
+    return await send(path, verb, payload);
   } catch (e) {
-    const slow = /timeout|abort/i.test(String(e.message));
-    return { status: 0, data: { ok: false, code: slow ? "slow" : "unreachable", message: slow ? `the world did not answer within ${Math.round(timeoutMs / 1e3)} s (a busy server). An edit may still have landed: run \`history 3\` before you retry.` : String(e.message) } };
+    failure = e;
   }
-  const text = await r.text();
-  let data;
-  if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${method ?? (body ? "POST" : "GET")} ${path} ${r.status} ${Date.now() - t0} ms ${body ? JSON.stringify(body).slice(0, 160) : ""}`);
+  if (!recoverable) return lost(failure);
+  const lookup = async () => send(`/v1/god/requests/${encodeURIComponent(clientRef)}`, "GET", void 0, Math.min(timeoutMs, 1e4));
+  const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true } } : null;
+  let receipt;
   try {
-    data = JSON.parse(text);
+    receipt = await lookup();
   } catch {
-    data = { raw: text.slice(0, 400) };
+    return lost(failure);
   }
-  return { status: r.status, data };
+  const recovered = receiptResult(receipt);
+  if (recovered) return recovered;
+  if (receipt.status !== 404) return lost(failure);
+  try {
+    return await send(path, verb, payload);
+  } catch (e) {
+    failure = e;
+  }
+  try {
+    return receiptResult(await lookup()) ?? lost(failure);
+  } catch {
+    return lost(failure);
+  }
 }
 var ok = (r, what) => {
   if (r.status >= 200 && r.status < 300) return r.data;
@@ -1754,6 +1790,9 @@ var LAYERS_BOOLS = ["clear", "private", "public", "off"];
 var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
+// lib/version.mjs
+var SKILL_VERSION = "1.1";
+
 // cli.mjs
 var SELF = (() => {
   try {
@@ -1762,7 +1801,6 @@ var SELF = (() => {
     return process.argv[1];
   }
 })();
-var SKILL_VERSION = "1.0";
 async function register(url, identity) {
   if (!url) throw new Error("usage: register <world-url> [dev:identity]");
   const base = url.replace(/[?#].*$/, "").replace(/\/$/, "");
@@ -2011,7 +2049,17 @@ async function dryrun(batch) {
 }
 async function preview(batch) {
   const r = ok(await call("/v1/god/preview", { body: withGroup(typeof batch === "string" ? JSON.parse(batch) : batch) }), "preview");
-  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, tell: `Open ${load().world}?preview=${r.id} to see the ghost; act on the same batch to build it.` } : r;
+  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
+}
+async function commit(id) {
+  if (!id) throw new Error("usage: commit <preview-id>");
+  const r = ok(await call("/v1/god/act", { body: { preview: id } }), "commit");
+  invalidate();
+  return r;
+}
+async function request(clientRef) {
+  if (!clientRef) throw new Error("usage: request <clientRef>");
+  return ok(await call(`/v1/god/requests/${encodeURIComponent(clientRef)}`), "request");
 }
 async function planBatch(batch) {
   const b = typeof batch === "string" ? JSON.parse(batch) : batch;
@@ -2041,7 +2089,7 @@ var HINTS = {
   "constraint.unsatisfied": "the constraint cannot hold (its ref is gone or impossible)",
   "undo.conflict": "the world changed since; undo the later edit first or fix by hand"
 };
-var explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.suggest?.p ? ` \u2014 suggest p ${JSON.stringify(f.suggest.p)}` : ""}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ""}`;
+var explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` \u2014 field ${f.field}` : ""}${f.fix ? ` \u2014 fix: ${f.fix}` : ""}${f.suggest?.p ? ` \u2014 suggest p ${JSON.stringify(f.suggest.p)}` : ""}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ""}`;
 var parseKV = (list2) => Object.fromEntries([].concat(list2 ?? []).map((kv) => {
   const i = kv.indexOf("=");
   const k = kv.slice(0, i), v = kv.slice(i + 1);
@@ -2620,7 +2668,7 @@ async function prayers(flags2 = {}) {
   return ok(await call(`/v1/god/prayers${flags2.all ? "?all=1" : ""}`), "prayers");
 }
 async function answer(prayer, text) {
-  return ok(await call("/v1/god/answer", { body: { prayer, text } }), "answer");
+  return act({ ops: [{ op: "answer", prayer, text }] });
 }
 async function stream(seconds = 60) {
   return follow(seconds, (e) => console.log(JSON.stringify(e)));
@@ -2628,7 +2676,8 @@ async function stream(seconds = 60) {
 async function status() {
   const s = load();
   const st = ok(await call("/v1/god/status"), "status");
-  return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}`;
+  const v = st.versions;
+  return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
 var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
@@ -2685,7 +2734,7 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -2728,6 +2777,8 @@ var COMMANDS = {
   dryrun: (r) => dryrun(JSON.parse(readArg(r))),
   plan: (r) => planBatch(readArg(r)),
   preview: (r) => preview(readArg(r)),
+  commit: (r) => commit(r[0]),
+  request: (r) => request(r[0]),
   select: (r, f) => select(f),
   group: (r, f) => group(r[0], f),
   undo: (r, f) => undo(f),
@@ -2788,7 +2839,7 @@ build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
-batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 act '<batch>' \xB7 dryrun '<batch>'
+batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
@@ -2852,6 +2903,7 @@ export {
   bakeInfo,
   checkArgs,
   clone,
+  commit,
   compassKey,
   constitution,
   define,
@@ -2890,6 +2942,7 @@ export {
   refPoint,
   register,
   remove,
+  request,
   resolveCmd,
   schema,
   schemaMarkdown,

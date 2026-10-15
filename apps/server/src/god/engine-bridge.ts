@@ -87,7 +87,7 @@ export class EngineBridge {
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
     // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
     const hooked = 'bodies' in (this.god as object);
-    if (hooked) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids), refuse: (after: WorldModel, diff: Diff, ops: unknown[]) => this.pinnedCheck(after, diff, ops) };
+    if (hooked) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[], after?: WorldModel) => this.buried(ids, after), refuse: (after: WorldModel, diff: Diff, ops: unknown[]) => this.pinnedCheck(after, diff, ops) };
     else this.guardGod();
     this.guardPinned(hooked);
     if (this.edge) this.hookEdge(this.edge);
@@ -492,15 +492,15 @@ export class EngineBridge {
   }
 
   /** Bodies standing where newly placed/moved solids now are: the engine lifts them clear (warned, never refused). */
-  private buried(ids: string[]): string[] {
+  private buried(ids: string[], model = this.model): string[] {
     const out: string[] = [], seen = new Set<string>();
-    for (const id of new Set(ids)) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) for (const o of this.model.footprintsOf(sid)) {
+    for (const id of new Set(ids)) for (const sid of model.entities.has(id) ? model.subtree(id) : []) for (const o of model.footprintsOf(sid)) {
       for (const b of Object.values(this.engine.world.entities) as any[]) {
         if (!b.human || seen.has(b.id)) continue;
         const y = b.pose.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.8) continue;
         const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.pose.p[0] - o.c[0], dz = b.pose.p[2] - o.c[1];
         const lx = dx * c - dz * s, lz = dx * s + dz * c; // into the box frame (entity convention)
-        if (Math.abs(lx) <= o.half[0] + 0.28 && Math.abs(lz) <= o.half[1] + 0.28) { seen.add(b.id); out.push(`body.lifted: ${this.soulName(b.id)} (${b.id}) stood where ${this.model.pathOf(sid)} now is; they step clear to the nearest open ground`); }
+        if (Math.abs(lx) <= o.half[0] + 0.28 && Math.abs(lz) <= o.half[1] + 0.28) { seen.add(b.id); out.push(`body.lifted: ${this.soulName(b.id)} (${b.id}) stood where ${model.pathOf(sid)} now is; they step clear to the nearest open ground`); }
       }
     }
     return out;
@@ -596,7 +596,10 @@ export class EngineBridge {
         if (r.accepted || !r.failures) return r;
         const b = this.buryRefusal(r.failures, codes); return b ? ({ ...extra, accepted: false, failures: (b as { failures: Failure[] }).failures } as unknown as T) : r;
       };
-      g.act = (batch: unknown, note?: string) => named(act(batch, note));
+      if ('finalizeAct' in g) {
+        const finalize = g.finalizeAct;
+        g.finalizeAct = (r: Result, after: WorldModel) => named(finalize?.(r, after) ?? r);
+      } else g.act = (batch: unknown, note?: string) => named(act(batch, note));
       g.dryrun = (batch: unknown) => named(dryrun(batch));
       g.preview = (batch: unknown) => { const r = preview(batch); return named(r, undefined, { id: r.id }); };
       // a revert reports an overlap as undo.conflict (same detail)
@@ -604,7 +607,10 @@ export class EngineBridge {
       g.redo = () => named(redo(), ['overlap.solid', 'undo.conflict']);
       return;
     }
-    g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
+    if ('actGuard' in g) {
+      const guard = g.actGuard;
+      g.actGuard = (batch: unknown) => this.pinnedRefusal(batch) ?? guard?.(batch) ?? null;
+    } else g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
     g.dryrun = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
     g.preview = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
     g.undo = () => { const t = this.god.store.undoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? undo(); };
@@ -616,7 +622,15 @@ export class EngineBridge {
     const g = this.god as any;
     const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
     const opsOf = (b: unknown) => (b && typeof b === 'object' ? (b as { ops?: unknown[] }).ops ?? [] : []);
-    g.act = (batch: unknown, note?: string) => {
+    if ('actGuard' in g) {
+      const guard = g.actGuard, finalize = g.finalizeAct;
+      g.actGuard = (batch: unknown) => this.bodyRefusal(opsOf(batch)) ?? guard?.(batch) ?? null;
+      g.finalizeAct = (r: Result, after: WorldModel) => {
+        const result = finalize?.(r, after) ?? r;
+        if (result.accepted) result.warnings.push(...this.buried(Object.values(result.ids), after));
+        return result;
+      };
+    } else g.act = (batch: unknown, note?: string) => {
       const no = this.bodyRefusal(opsOf(batch)); if (no) return no;
       const r = act(batch, note) as Result;
       if (r.accepted) for (const w of this.buried(Object.values(r.ids))) r.warnings.push(w);

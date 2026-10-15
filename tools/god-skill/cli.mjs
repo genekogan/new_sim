@@ -21,7 +21,8 @@ import { time as envTime, weather as envWeather, strike as envStrike, land as en
 import { hours, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
 export { schemaMarkdown };
 
-export const SKILL_VERSION = '1.0';
+import { SKILL_VERSION } from './lib/version.mjs';
+export { SKILL_VERSION };
 
 // ---------------------------------------------------------------- pairing
 export async function register(url, identity) {
@@ -196,8 +197,10 @@ export async function act(batch, note) { const r = ok(await call('/v1/god/act', 
 export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: withGroup(batch) }), 'dryrun'); }
 export async function preview(batch) {
   const r = ok(await call('/v1/god/preview', { body: withGroup(typeof batch === 'string' ? JSON.parse(batch) : batch) }), 'preview');
-  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, tell: `Open ${load().world}?preview=${r.id} to see the ghost; act on the same batch to build it.` } : r;
+  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
 }
+export async function commit(id) { if (!id) throw new Error('usage: commit <preview-id>'); const r = ok(await call('/v1/god/act', { body: { preview: id } }), 'commit'); invalidate(); return r; }
+export async function request(clientRef) { if (!clientRef) throw new Error('usage: request <clientRef>'); return ok(await call(`/v1/god/requests/${encodeURIComponent(clientRef)}`), 'request'); }
 /** plan '<batch>': a dry run, summarised in words. */
 export async function planBatch(batch) {
   const b = typeof batch === 'string' ? JSON.parse(batch) : batch;
@@ -227,7 +230,7 @@ const HINTS = {
   'constraint.unsatisfied': 'the constraint cannot hold (its ref is gone or impossible)',
   'undo.conflict': 'the world changed since; undo the later edit first or fix by hand',
 };
-export const explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.suggest?.p ? ` — suggest p ${JSON.stringify(f.suggest.p)}` : ''}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ''}`;
+export const explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` — field ${f.field}` : ''}${f.fix ? ` — fix: ${f.fix}` : ''}${f.suggest?.p ? ` — suggest p ${JSON.stringify(f.suggest.p)}` : ''}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ''}`;
 
 const parseKV = (list) => Object.fromEntries([].concat(list ?? []).map((kv) => { const i = kv.indexOf('='); const k = kv.slice(0, i), v = kv.slice(i + 1); return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : /^[[{]/.test(v) ? JSON.parse(v) : v]; }));
 const bakeCache = new Map();
@@ -623,9 +626,9 @@ export async function flags() { const v = view(await mirror()); return v.rows.fi
 export async function flag(label, f) { const v = view(await mirror()); const p = refPoint(v, f.at ?? '0,0', f.offset); const name = label.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'flag'; const r = await act({ ops: [{ op: 'place', def: 'core/flag@1', name, p: [p.x, p.z], state: { label } }] }); return r.accepted ? `flag:${name} at (${p.x}, ${p.z})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 /** prayers [--all]: the prayers waiting for an answer (an answered prayer leaves this list); --all also the answered ones, with their answers. */
 export async function prayers(flags = {}) { return ok(await call(`/v1/god/prayers${flags.all ? '?all=1' : ''}`), 'prayers'); }
-export async function answer(prayer, text) { return ok(await call('/v1/god/answer', { body: { prayer, text } }), 'answer'); }
+export async function answer(prayer, text) { return act({ ops: [{ op: 'answer', prayer, text }] }); }
 export async function stream(seconds = 60) { return follow(seconds, (e) => console.log(JSON.stringify(e))); }
-export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}`; }
+export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); const v = st.versions; return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ''}`; }
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
@@ -659,7 +662,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -684,7 +687,7 @@ export const COMMANDS = {
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
   describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
-  act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)),
+  act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
@@ -702,7 +705,7 @@ build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-batch:  plan '<batch>' · preview '<batch>' · act '<batch>' · dryrun '<batch>'
+batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 ${LAND_HELP}
