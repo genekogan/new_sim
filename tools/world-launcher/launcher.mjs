@@ -19,6 +19,7 @@
 //   POST /__sim/op/register-fork operator only: {slug: eden|mars|littlemartians, descriptor, accounts?} → serve a copy of an
 //                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
 //   POST /__sim/op/remove-fork   operator only: {slug} → stop and unregister a fork (its data stays)
+//   POST /__sim/op/set-claimable operator only: {slug, claimable} → a world with no god that nobody may claim (false)
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -67,6 +68,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers }).end(JSON.stringify(body)); };
 const BUILD = (() => { try { return readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../BUILD'), 'utf8').trim(); } catch { return 'dev'; } })();
 /** Direct requests from this machine (not through a reverse proxy, which adds x-forwarded-for). */
+/** World routes that make someone a world's god while it has none (blocked on a world marked not claimable). */
+const CLAIM_PATHS = new Set(['/v1/god/claim', '/v1/god/mint', '/v1/god/pair/approve']);
+const sameName = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
 const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
 
 /**
@@ -126,12 +130,18 @@ export async function openLauncher(cfg = {}) {
   }
   const describe = (w) => {
     const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir, { all: true }).find((x) => x.id === w.template);
-    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
+    // two worlds with the same shown name are told apart by their slug (the address people see), e.g. "Mars · my-mars-2"
+    const twin = registry.worlds.some((x) => x !== w && sameName(x.name, w.name));
+    return { nameTag: twin ? w.slug : null, claimable: w.claimable !== false, key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
     return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
   }
+
+  /** A world the site admin marked not claimable, while it still has no god: nobody may claim it or mint for it. */
+  const claimLocked = (w) => w.claimable === false && !(safeOwner(w.slug) ?? (stats.get(w.slug)?.god || w.god));
+  const safeOwner = (slug) => { try { return worldOwner(slug); } catch { return null; } };
 
   // ---------- create
   let creating = Promise.resolve();
@@ -241,6 +251,15 @@ export async function openLauncher(cfg = {}) {
     log(`registered fork ${slug} on :${pool.status(slug).port} in ${Math.round(performance.now() - t0)} ms`);
     return [201, { ok: true, slug, url: `${wp(slug)}/`, bootMs: Math.round(performance.now() - t0), world: describe(entry) }];
   }
+  /** Site admin: mark a world claimable or not (only matters while it has no god). */
+  function opSetClaimable(body) {
+    const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
+    if (!w) return [404, { ok: false, code: 'not-found', message: 'no world by that slug' }];
+    if (typeof body?.claimable !== 'boolean') return [400, { ok: false, code: 'invalid', message: 'claimable: true or false' }];
+    registry.update(w.slug, { claimable: body.claimable });
+    log(`${w.slug} is ${body.claimable ? 'claimable again' : 'not claimable'} (operator)`);
+    return [200, { ok: true, slug: w.slug, claimable: body.claimable, hasGod: !!safeOwner(w.slug) }];
+  }
   async function opRemoveFork(body) {
     const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
     if (!w?.fork) return [404, { ok: false, code: 'not-found', message: 'no fork by that slug' }];
@@ -293,6 +312,7 @@ export async function openLauncher(cfg = {}) {
     try { p = await pool.ensure(worldEnv(w)); }
     catch (e) { json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return; }
     const rest = observe(slug, req, url);
+    if (req.method === 'POST' && CLAIM_PATHS.has(rest) && claimLocked(w)) { json(res, 403, { ok: false, code: 'not-claimable', message: 'this world is not open for claiming' }); return; }
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
     proxyHttp(req, res, p, { tee });
   }
@@ -336,12 +356,12 @@ export async function openLauncher(cfg = {}) {
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
       }
-      const forkOp = path.match(/^\/__sim\/op\/(register|remove)-fork$/)?.[1];
+      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable)$/)?.[1];
       if (forkOp && req.method === 'POST') {
         if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
         const chunks = []; for await (const c of req) chunks.push(c);
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const out = await (forkOp === 'register' ? opRegisterFork(body) : opRemoveFork(body)); json(res, out[0], out[1]); return;
+        const out = await ({ 'register-fork': opRegisterFork, 'remove-fork': opRemoveFork, 'set-claimable': opSetClaimable })[forkOp](body); json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {

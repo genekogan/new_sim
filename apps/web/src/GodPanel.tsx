@@ -132,6 +132,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
 
   // A visitor on a world that has a god sees no card, as on the old worlds (e8): the header's New Soul is the way to
   // join. Only the approval link their agent printed (#approve/<id>) opens one, to approve it.
+  // A world the site admin marked not claimable (and still godless) offers no claim card at all.
+  if (!status.hasOwner && !owner && launcher?.world.claimable === false) return ghostBar || null;
   if (status.hasOwner && !owner) return <>{ghostBar}{approvalId && (
     <div data-god-panel="1" className="gp-card">
       <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />
