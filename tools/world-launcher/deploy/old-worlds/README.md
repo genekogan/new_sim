@@ -21,3 +21,6 @@ Status, rehearsal evidence and Gene's three commands: `team/lanes/t3-kit.md`.
   `walk-eden2.mjs` walks the worlds in real Chrome at dpr 1 and 2 under the Chrome lease.
 - `cutover.sh` (no args = preflight only; `--go "<name>"` = cutover) and `rollback.sh <TS>`.
   Run cutover only with Gene's go and an announced freeze.
+- `rollback-rehearsal.sh` rehearses `rollback.sh` **on eden2 only** (scratch tree `/srv/sim-old-rbtest`, ports 4680–4682;
+  it refuses macOS). Never run any rollback test mode on the laptop: it shares the machine with the live writers
+  (INCIDENT-20261015-MARS-LM). `dbhash.py` hashes the accounts registry for rollback's copy-back decision.
