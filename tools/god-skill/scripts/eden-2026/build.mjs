@@ -15,13 +15,15 @@ const db=new Db(':memory:');
 const god=new GodMode(db,{worldId:'eden-2026-build',ownerId:null,tick:()=>0,emit:()=>{},assetDir:`${out}/assets`,seed:'eden-2026'});
 const genesis={schema:'genesis/1',name:'Eden 2026',description:'A shared commons between a pond and a colourful village: furnished courtyard homes, libraries, a cafe and campus, market gardens, a park, canals and hills, with paths to lakes and the harbour. A new Eden world; the original Eden remains independent.',constants:{extent:1000,ground:'land'},state:{constitution:'# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.',sky:{palette:'clear-day',sun:.8},ground:{palette:'grass'},time:{dayTicks:72000,startTick:0,set:{hour:12,n:1}}},batches:[]};
 const stats=[],adjustments=[];
-function apply(label,input){if(!input.length)return;const ops=structuredClone(input),starts=new Map(ops.map((o,i)=>[i,o.p]));let r;
+function apply(label,input,droppable=false){if(!input.length)return;const ops=structuredClone(input),starts=new Map(ops.map((o,i)=>[i,o.p]));let r;
   for(let attempt=0;attempt<40;attempt++){
     r=god.act({ops,group:'eden-2026'},label);if(r.accepted)break;
     const f=r.failures?.[0],op=ops[f?.op],p=f?.suggest?.p,start=starts.get(f?.op);
     // The compiler's collision-free suggestion may make a small, recorded
     // street setback. Never drop a source landmark or bypass admission.
     if(f?.code==='overlap.solid'&&p&&op?.op==='place'&&start?.length===2&&Math.hypot(p[0]-start[0],p[1]-start[1])<=4){adjustments.push({name:op.name,from:op.p,to:p,reason:f.detail});op.p=p;continue;}
+    // Furniture is optional: a piece the compiler refuses is dropped (with anything on it) and recorded, never forced.
+    if(droppable&&f&&ops[f.op]&&f.code==='overlap.solid'){const gone=new Set([ops[f.op].name]);let n=-1;while(gone.size!==n){n=gone.size;for(const o of ops)if(o.in&&gone.has(o.in.parent))gone.add(o.name);}adjustments.push({dropped:[...gone],reason:f.detail});for(let i=ops.length-1;i>=0;i--)if(gone.has(ops[i].name))ops.splice(i,1);continue;}
     writeFileSync(`${out}/REFUSAL.json`,JSON.stringify({label,ops,result:r},null,2));throw Error(`${label}: ${JSON.stringify(r.failures)}`);
   }
   if(!r?.accepted)throw Error(`collision-setback limit: ${label}`);
@@ -33,7 +35,7 @@ apply('commons sleeping mat definition',COMMONS_DEFS);
 for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:op));
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
-for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
+for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
 const courtOps=[];for(const c of COURTYARDS){courtOps.push({op:'place',def:'core/flower-pot@1',name:`${c.name}-court-pot`.slice(0,48),p:[c.coords[0]+.7,c.coords[1]-.7]});if(c.court.w>=4) courtOps.push({op:'place',def:'core/round-table@1',name:`${c.name}-court-table`.slice(0,48),p:c.coords});}
 for(let i=0;i<courtOps.length;i+=10)apply(`courtyard planting ${i/10+1}`,courtOps.slice(i,i+10));
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='detail'))apply(b.name,b.ops);
