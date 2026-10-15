@@ -518,6 +518,8 @@ export async function expand(extent) { return act({ ops: [{ op: 'expand', extent
 // batch field/echo are handled centrally in state.mjs, including direct acts.
 export const BUILD_API = {
   path: (id, action) => `/v1/god/builds${id ? '/' + encodeURIComponent(id) : ''}${action ? '/' + action : ''}`,
+  unknown: (r) => r.status === 404 || r.data?.failures?.some((f) => f.code === 'build.unknown'),
+  resumable: (b) => b.status === 'paused' || (b.status === 'active' && b.lead?.live === false),
   local: (r) => {
     const b = r.build, step = r.current ?? b.current ?? b.step;
     return { id: b.id, lease: r.lease, n: step?.n || 1, label: step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status };
@@ -556,6 +558,12 @@ async function buildSite(f) {
   return { at: [p.x, p.z], size, yaw: f.yaw === undefined ? 0 : num(f.yaw) };
 }
 const buildOutline = (b) => [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join('×')} m, yaw ${b.site.yaw ?? 0}`, `steps: ${b.plan.steps.map((s, i) => `${i + 1} ${s}`).join('; ')}`];
+const buildListLine = (b) => `${b.id}: ${b.title} (${b.status}); step ${b.step?.n ?? 1}/${b.plan?.steps.length ?? '?'} ${b.step?.label ?? ''}`;
+async function buildChoices(sub, reason, f, list) {
+  const r = list ?? ok(await call(BUILD_API.path()), 'build list');
+  const message = [reason, ...(r.open.length ? ['open builds:', ...r.open.map(buildListLine), `choose an id: build ${sub} <id>${sub === 'resume' ? ' [--take]' : ''}`] : ['no open builds; build start <id> to start one'])].join('\n');
+  return f.json ? { ...r, ok: false, message } : message;
+}
 function buildStartReport(b) {
   const masses = b.massing.map((m, i) => {
     const roof = m.roof ?? 'flat', total = m.h + (roof === 'flat' ? 0 : Math.min(...m.size) / 2);
@@ -564,7 +572,7 @@ function buildStartReport(b) {
   return [...buildOutline(b), `massing: ${masses.join('; ') || 'none'}`, `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join('\n');
 }
 function buildReport(r) {
-  if (r.open) return [...r.open.map((b) => `${b.id}: ${b.status}, ${b.step?.n ?? 1}/${b.plan?.steps.length ?? '?'} ${b.step?.label ?? ''}`), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
+  if (r.open) return [...r.open.map(buildListLine), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
   const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
   const lines = buildOutline(b);
   if (current) {
@@ -600,7 +608,9 @@ export async function build(sub = 'show', args = [], f = {}) {
     return `step ${n}/${b.steps.length}: ${label} (rides on your next edit)`;
   }
   if (sub === 'show') {
-    const r = ok(await call(BUILD_API.path(arg)), 'build show');
+    const response = await call(BUILD_API.path(arg));
+    if (arg && BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${arg}`, f);
+    const r = ok(response, 'build show');
     if (r.ok === false) return `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
     return f.json ? r : buildReport(r);
   }
@@ -616,8 +626,13 @@ export async function build(sub = 'show', args = [], f = {}) {
     if (brief !== undefined && (typeof brief !== 'string' || brief.length > 4000)) throw new Error('--brief is at most 4000 characters');
     body = { id: arg, title: f.title, steps, site, massing, ...(brief !== undefined ? { brief } : {}), ...(f.root ? { root: f.root } : {}) };
   } else if (sub === 'resume') {
-    if (!arg) throw new Error('usage: build resume <id> [--take]');
-    id = arg; action = 'resume'; body = { ...(b?.id === id && b.lease ? { lease: b.lease } : {}), ...(f.take ? { take: true } : {}) };
+    id = arg;
+    if (!id) {
+      const list = ok(await call(BUILD_API.path()), 'build list');
+      if (list.open.length !== 1 || !BUILD_API.resumable(list.open[0])) return buildChoices(sub, list.open.length > 1 ? 'several open builds; specify one to resume' : list.open.length ? 'the only open build has a live or unknown lead; specify its id to resume' : 'no build to resume', f, list);
+      id = list.open[0].id;
+    }
+    action = 'resume'; body = { ...(b?.id === id && b.lease ? { lease: b.lease } : {}), ...(f.take ? { take: true } : {}) };
   } else {
     id = b?.id;
     if (!id) throw new Error('no current build; build resume <id> first');
@@ -635,7 +650,9 @@ export async function build(sub = 'show', args = [], f = {}) {
     else if (sub === 'abandon') { action = sub; body = { ...(f.undo ? { undo: true } : {}), ...(f.force ? { force: true } : {}) }; }
     else throw new Error('build: start|step|show|resume|claim|release|pause|done|abandon');
   }
-  const r = ok(await call(BUILD_API.path(id, action), { body }), `build ${sub}`);
+  const response = await call(BUILD_API.path(id, action), { body });
+  if (sub === 'resume' && BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${id}`, f);
+  const r = ok(response, `build ${sub}`);
   if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}${r.notReverted ? `; undone edits: ${r.reverted?.join(', ') || 'none'}; not undone edits: ${r.notReverted.join(', ')}` : ''}`;
   if (sub === 'start' || sub === 'resume') save({ build: BUILD_API.local(r), group: undefined, buildEchoWarned: undefined, buildPreviews: undefined });
   if (sub === 'claim') {
@@ -923,7 +940,8 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] · build [show [id]] · build resume <id> [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] · build [show [id]] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]

@@ -366,6 +366,106 @@ test('resume reconstructs local progress from server and prints unfinished step,
   await build('step'); assert.equal(calls.length, 1); assert.equal(load().build.n, 4);
 });
 
+for (const status of ['paused', 'active']) test(`resume without an id restores the only ${status} build with a dead lead`, async t => {
+  const current = { n: 2, label: 'roof and tower', batches: 1, lastSeq: 8, recent: [] };
+  const b = serverBuild({ status, lead: { label: 'Ada', live: false }, step: current, current });
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { open: [b], recent: [] } : c.path.endsWith('/resume') ? { ok: true, build: { ...b, status: 'active' }, lease: 'l_99999999' } : null);
+  save({ build: status === 'paused' ? localBuild() : { ...localBuild(), id: 'stale-local-build' }, group: 'old-group' });
+  const output = await COMMANDS.build(['resume'], status === 'active' ? { take: true } : {});
+  assert.deepEqual(calls.map(c => [c.method, c.path]), [['GET', '/v1/god/builds'], ['POST', '/v1/god/builds/church/resume']]);
+  assert.deepEqual(calls[1].body, status === 'paused' ? { lease: 'l_1234abcd' } : { take: true });
+  assert.deepEqual(load().build, { id: 'church', lease: 'l_99999999', n: 2, label: 'roof and tower', steps, status: 'active' });
+  assert.equal(load().group, undefined);
+  assert.match(output, /step 2\/5 roof and tower IN PROGRESS/);
+});
+
+test('resume without an id lists every open build and asks for one when several are open', async t => {
+  const open = [serverBuild({ status: 'paused', step: { n: 2, label: 'roof and tower' } }), serverBuild({ id: 'market', title: 'Market hall', lead: { live: true }, step: { n: 3, label: 'openings' } })];
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { open, recent: [] } : null);
+  save({ build: localBuild(), group: 'church/roof' });
+  const before = readFileSync('.eden-god.json', 'utf8');
+  const output = await build('resume');
+  assert.match(output, /several open builds; specify one to resume/);
+  assert.match(output, /church: Black stone church \(paused\); step 2\/5 roof and tower/);
+  assert.match(output, /market: Market hall \(active\); step 3\/5 openings/);
+  assert.match(output, /choose an id: build resume <id>/);
+  assert.equal(calls.length, 1); assert.equal(calls[0].method, 'GET');
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
+});
+
+test('resume without an id reports no open builds and never resumes a recent closed build', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { open: [], recent: [serverBuild({ status: 'done' })] } : null);
+  const output = await build('resume');
+  assert.match(output, /no open builds; build start <id>/);
+  assert.doesNotMatch(output, /church/);
+  assert.equal(calls.length, 1); assert.equal(load().build, undefined);
+});
+
+test('resume without an id preserves a live or unknown lead and requires an explicit id', async t => {
+  let lead = { label: 'Ada', live: true };
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { open: [serverBuild({ lead })], recent: [] } : null);
+  for (const next of [lead, undefined]) {
+    lead = next;
+    const output = await build('resume', [], { take: true });
+    assert.match(output, /specify its id to resume/);
+    assert.match(output, /church: Black stone church \(active\); step 1\/5 shell/);
+    assert.match(output, /build resume <id>.*--take/);
+  }
+  assert.equal(calls.length, 2); assert.ok(calls.every(c => c.method === 'GET'));
+  assert.equal(load().build, undefined);
+});
+
+for (const sub of ['resume', 'show']) for (const httpStatus of [200, 404]) test(`build ${sub} unknown id lists open builds after HTTP ${httpStatus}`, async t => {
+  const open = [serverBuild({ status: 'paused', step: { n: 2, label: 'roof and tower' } }), serverBuild({ id: 'market', title: 'Market hall', step: { n: 3, label: 'openings' } })];
+  const { calls } = await buildFixture(t, c => c.path.startsWith('/v1/god/builds/missing') ? { httpStatus, data: httpStatus === 404 ? { error: 'not-found' } : { ok: false, failures: [{ op: 0, code: 'build.unknown', detail: 'missing does not exist' }] } } : c.path === '/v1/god/builds' ? { open, recent: [serverBuild({ id: 'old', status: 'done' })] } : null);
+  save({ build: localBuild(), group: 'church/roof' });
+  const before = readFileSync('.eden-god.json', 'utf8');
+  const output = await build(sub, ['missing']);
+  assert.match(output, /unknown build: missing/);
+  assert.match(output, /church: Black stone church \(paused\); step 2\/5 roof and tower/);
+  assert.match(output, /market: Market hall \(active\); step 3\/5 openings/);
+  assert.ok(output.includes(`choose an id: build ${sub} <id>`));
+  assert.doesNotMatch(output, /old:|build\.unknown/);
+  assert.deepEqual(calls.map(c => [c.method, c.path]), [[sub === 'resume' ? 'POST' : 'GET', `/v1/god/builds/missing${sub === 'resume' ? '/resume' : ''}`], ['GET', '/v1/god/builds']]);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
+});
+
+test('build listings include titles, status and steps while keeping recent history', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { open: [serverBuild()], recent: [{ id: 'old', status: 'done' }] } : null);
+  const output = await build();
+  assert.match(output, /church: Black stone church \(active\); step 1\/5 shell/);
+  assert.match(output, /old: done/);
+  assert.equal(calls.length, 1);
+});
+
+test('build discovery preserves structured JSON for ambiguous and unknown ids', async t => {
+  let open = [serverBuild(), serverBuild({ id: 'market', title: 'Market hall', status: 'paused' })];
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds' ? { now: 10, rev: 2, open, recent: [] } : c.path.startsWith('/v1/god/builds/missing') ? { httpStatus: 404, data: { error: 'not-found' } } : null);
+  const choices = await build('resume', [], { json: true });
+  assert.equal(choices.ok, false); assert.deepEqual(choices.open, open);
+  assert.match(choices.message, /choose an id: build resume <id>/);
+  assert.equal(load().build, undefined);
+  open = [];
+  const missing = await build('show', ['missing'], { json: true });
+  assert.equal(missing.ok, false); assert.deepEqual(missing.open, []);
+  assert.match(missing.message, /unknown build: missing\nno open builds/);
+  assert.equal(calls.length, 3);
+});
+
+test('build discovery does not replace lease refusals or unrelated HTTP errors with a list', async t => {
+  let reply;
+  const { calls } = await buildFixture(t, () => reply);
+  for (const code of ['build.leased', 'build.closed']) {
+    reply = { ok: false, failures: [{ op: 0, code, detail: 'original refusal' }] };
+    assert.match(await build('resume', ['church']), new RegExp(code.replace('.', '\\.')));
+  }
+  for (const httpStatus of [401, 500]) {
+    reply = { httpStatus, data: { error: 'original error' } };
+    await assert.rejects(build('show', ['church']), new RegExp(`HTTP ${httpStatus}`));
+  }
+  assert.equal(calls.length, 4); assert.ok(calls.every(c => c.path !== '/v1/god/builds'));
+});
+
 test('claim bootstrap, per-claim steps, local guards, group undo and release never rewrite lead state', async t => {
   const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/lead' });
   const original = readFileSync('.eden-god.json', 'utf8');
@@ -376,6 +476,7 @@ test('claim bootstrap, per-claim steps, local guards, group undo and release nev
   await build('step', ['pews']);
   const count = calls.length;
   await assert.rejects(build('resume', ['church']), /take the lead lease/);
+  await assert.rejects(build('resume'), /take the lead lease/);
   await assert.rejects(undo(), /undo --group church\/east-aisle/);
   assert.equal(calls.length, count);
   await act({ ops: [{ op: 'remove', id: 'pew' }] });
@@ -511,7 +612,8 @@ test('accepted remote edits never enter transport recovery when local state fina
 });
 
 test('downloadable bundle runs the build lifecycle and global bypass against only the local stub', async t => {
-  const { calls, dir } = await buildFixture(t);
+  let open = [serverBuild({ status: 'paused', lead: { live: false } })];
+  const { calls, dir } = await buildFixture(t, c => c.path === '/v1/god/builds' && c.method === 'GET' ? { open, recent: [] } : c.path.startsWith('/v1/god/builds/missing') ? { httpStatus: 404, data: { error: 'not-found' } } : null);
   const executable = new URL('./eden-god.mjs', import.meta.url).pathname;
   const cli = args => new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [executable, ...args], { cwd: dir, env: { ...process.env, EDEN_GOD_TRACE: '', EDEN_GOD_TIMING: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -532,4 +634,21 @@ test('downloadable bundle runs the build lifecycle and global bypass against onl
   assert.equal(JSON.parse(jsonEdit.stdout).accepted, true); assert.equal(jsonEdit.stderr, '');
   await cli(['act', batch, '--no-build']); assert.equal(calls.at(-1).body.build, undefined);
   await cli(['build', 'done', 'all listed items exist']); assert.equal(load().build, undefined);
+  const resumed = await cli(['build', 'resume']);
+  assert.match(resumed.stdout, /church: Black stone church \(active\)/);
+  assert.deepEqual(calls.slice(-2).map(c => [c.method, c.path]), [['GET', '/v1/god/builds'], ['POST', '/v1/god/builds/church/resume']]);
+  assert.equal(load().build.lease, 'l_7654abcd');
+  const before = readFileSync('.eden-god.json', 'utf8');
+  for (const sub of ['resume', 'show']) {
+    const missing = await cli(['build', sub, 'missing']);
+    assert.match(missing.stdout, /unknown build: missing/);
+    assert.match(missing.stdout, /church: Black stone church \(paused\); step 1\/5 shell/);
+    assert.ok(missing.stdout.includes(`choose an id: build ${sub} <id>`));
+  }
+  open = [...open, serverBuild({ id: 'market', title: 'Market hall' })];
+  const choices = await cli(['build', 'resume']);
+  assert.match(choices.stdout, /several open builds/);
+  assert.match(choices.stdout, /market: Market hall \(active\); step 1\/5 shell/);
+  assert.equal(calls.at(-1).method, 'GET');
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), before);
 });

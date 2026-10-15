@@ -245,7 +245,7 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync4, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync4, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
 // lib/mirror.mjs
@@ -1157,16 +1157,16 @@ async function mirror({ fresh = false } = {}) {
     return cached;
   }
   const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
-  const snapshot2 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
-  memo = build(world, snapshot2, layout);
+  const snapshot3 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
+  memo = build(world, snapshot3, layout);
   writeCache(memo);
   return memo;
 }
 function invalidate() {
   memo = null;
 }
-function build(world, snapshot2, layout) {
-  return { world, seq: snapshot2.seq, buildsRev: snapshot2.buildsRev, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
+function build(world, snapshot3, layout) {
+  return { world, seq: snapshot3.seq, buildsRev: snapshot3.buildsRev, at: Date.now(), extent: snapshot3.constants.extent, snapshot: snapshot3, rows: layout.entities };
 }
 function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
@@ -1226,8 +1226,8 @@ var pathOf = (byId, entity) => {
   for (let e = entity; e; e = byId.get(e.in.parent)) parts.unshift(e.name ?? e.id);
   return parts.join("/");
 };
-function exportGenesis(snapshot2, { name } = {}) {
-  const s = snapshot2, byId = new Map(s.entities.map((e) => [e.id, e]));
+function exportGenesis(snapshot3, { name } = {}) {
+  const s = snapshot3, byId = new Map(s.entities.map((e) => [e.id, e]));
   const library = /* @__PURE__ */ new Map();
   for (const d of [...s.library ?? [], ...s.defs ?? []]) {
     library.set(d.ref, d);
@@ -1331,41 +1331,73 @@ function exportGenesis(snapshot2, { name } = {}) {
 
 // lib/look.mjs
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync3, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync3, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // lib/chrome-lease.mjs
-import { mkdirSync, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync, readFileSync as readFileSync3, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
 var LEASE = "/tmp/eden-chrome-lease";
-async function chromeLease(holder = "unknown", { waitMs = 20 * 6e4, staleMs = 15 * 6e4 } = {}) {
+var snapshot = (dir) => {
+  const stat = statSync(dir);
+  let holder;
+  try {
+    holder = readFileSync3(`${dir}/holder`, "utf8");
+  } catch {
+  }
+  return { stat, holder };
+};
+var unchanged = (a, b) => a.stat.dev === b.stat.dev && a.stat.ino === b.stat.ino && a.stat.mtimeMs === b.stat.mtimeMs && a.stat.ctimeMs === b.stat.ctimeMs && a.holder === b.holder;
+var deadHolder = (holder) => {
+  const pid = Number(holder?.trim().split(/\s+/).at(-2));
+  if (!Number.isSafeInteger(pid) || pid <= 0 || pid > 2147483647) return void 0;
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (e) {
+    return e.code === "ESRCH";
+  }
+};
+function reclaim(dir, staleMs) {
+  try {
+    const before = snapshot(dir), dead = deadHolder(before.holder);
+    if (dead !== true && !(dead === void 0 && Date.now() - before.stat.mtimeMs > staleMs)) return false;
+    if (!unchanged(before, snapshot(dir))) return true;
+    rmSync(dir, { recursive: true, force: true });
+    return true;
+  } catch (e) {
+    if (e.code === "ENOENT") return true;
+    throw e;
+  }
+}
+async function chromeLease(holder = "unknown", { waitMs = 20 * 6e4, staleMs = 15 * 6e4, leaseDir = LEASE } = {}) {
   const t0 = Date.now();
   for (; ; ) {
     try {
-      mkdirSync(LEASE);
-      writeFileSync2(`${LEASE}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
-`);
-      break;
-    } catch {
-      try {
-        if (Date.now() - statSync(LEASE).mtimeMs > staleMs) {
-          rmSync(LEASE, { recursive: true, force: true });
-          continue;
-        }
-      } catch {
-        continue;
-      }
+      mkdirSync(leaseDir);
+    } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      if (reclaim(leaseDir, staleMs)) continue;
       if (Date.now() - t0 > waitMs) throw new Error(`chrome lease busy for ${Math.round(waitMs / 6e4)} min`);
       await new Promise((r) => setTimeout(r, 3e3 + Math.random() * 2e3));
+      continue;
     }
+    writeFileSync2(`${leaseDir}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+`);
+    break;
   }
+  const owned = snapshot(leaseDir);
   let released = false;
   const release = () => {
-    if (!released) {
-      released = true;
-      rmSync(LEASE, { recursive: true, force: true });
+    if (released) return;
+    released = true;
+    process.removeListener("exit", release);
+    try {
+      if (unchanged(owned, snapshot(leaseDir))) rmSync(leaseDir, { recursive: true, force: true });
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
     }
   };
   process.once("exit", release);
@@ -1448,7 +1480,7 @@ var alive = async (port) => {
 };
 var readKeeper = () => {
   try {
-    return JSON.parse(readFileSync3(KEEPER, "utf8"));
+    return JSON.parse(readFileSync4(KEEPER, "utf8"));
   } catch {
     return null;
   }
@@ -1982,7 +2014,7 @@ async function mint(label = "eden-god") {
   save({ token: r.token });
   return { paired: true, world: r.world };
 }
-async function snapshot() {
+async function snapshot2() {
   return ok(await call("/v1/god/snapshot"), "snapshot");
 }
 var fmtP = (p) => p ? `(${p.map((v) => r2(v)).join(", ")})` : "";
@@ -2627,7 +2659,7 @@ async function clone(id, flags2) {
 }
 var SKY_PALETTES = PALETTE_LIST;
 async function worldState() {
-  return (await snapshot()).state ?? {};
+  return (await snapshot2()).state ?? {};
 }
 var skyText = (st) => `sky ${st.sky?.palette ?? "clear-day"}, sun ${st.sky?.sun ?? 0.6}; weather clouds ${st.weather?.clouds ?? 0}, wind ${st.weather?.wind ?? 0}, rain ${st.weather?.rain ?? 0}`;
 async function sky(flags2 = {}) {
@@ -2651,6 +2683,8 @@ async function expand(extent) {
 }
 var BUILD_API = {
   path: (id, action) => `/v1/god/builds${id ? "/" + encodeURIComponent(id) : ""}${action ? "/" + action : ""}`,
+  unknown: (r) => r.status === 404 || r.data?.failures?.some((f) => f.code === "build.unknown"),
+  resumable: (b) => b.status === "paused" || b.status === "active" && b.lead?.live === false,
   local: (r) => {
     const b = r.build, step = r.current ?? b.current ?? b.step;
     return { id: b.id, lease: r.lease, n: step?.n || 1, label: step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status };
@@ -2688,6 +2722,12 @@ async function buildSite(f) {
   return { at: [p.x, p.z], size, yaw: f.yaw === void 0 ? 0 : num(f.yaw) };
 }
 var buildOutline = (b) => [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join("\xD7")} m, yaw ${b.site.yaw ?? 0}`, `steps: ${b.plan.steps.map((s, i) => `${i + 1} ${s}`).join("; ")}`];
+var buildListLine = (b) => `${b.id}: ${b.title} (${b.status}); step ${b.step?.n ?? 1}/${b.plan?.steps.length ?? "?"} ${b.step?.label ?? ""}`;
+async function buildChoices(sub, reason, f, list2) {
+  const r = list2 ?? ok(await call(BUILD_API.path()), "build list");
+  const message = [reason, ...r.open.length ? ["open builds:", ...r.open.map(buildListLine), `choose an id: build ${sub} <id>${sub === "resume" ? " [--take]" : ""}`] : ["no open builds; build start <id> to start one"]].join("\n");
+  return f.json ? { ...r, ok: false, message } : message;
+}
 function buildStartReport(b) {
   const masses = b.massing.map((m, i) => {
     const roof = m.roof ?? "flat", total = m.h + (roof === "flat" ? 0 : Math.min(...m.size) / 2);
@@ -2696,7 +2736,7 @@ function buildStartReport(b) {
   return [...buildOutline(b), `massing: ${masses.join("; ") || "none"}`, `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join("\n");
 }
 function buildReport(r) {
-  if (r.open) return [...r.open.map((b2) => `${b2.id}: ${b2.status}, ${b2.step?.n ?? 1}/${b2.plan?.steps.length ?? "?"} ${b2.step?.label ?? ""}`), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
+  if (r.open) return [...r.open.map(buildListLine), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
   const b = r.build, steps2 = b.plan.steps, current = r.current ?? b.current, open = ["active", "paused"].includes(b.status);
   const lines = buildOutline(b);
   if (current) {
@@ -2733,7 +2773,9 @@ async function build2(sub = "show", args = [], f = {}) {
     return `step ${n}/${b.steps.length}: ${label} (rides on your next edit)`;
   }
   if (sub === "show") {
-    const r3 = ok(await call(BUILD_API.path(arg)), "build show");
+    const response2 = await call(BUILD_API.path(arg));
+    if (arg && BUILD_API.unknown(response2)) return buildChoices(sub, `unknown build: ${arg}`, f);
+    const r3 = ok(response2, "build show");
     if (r3.ok === false) return `REFUSED: ${r3.failures.map(explainFailure).join("; ")}`;
     return f.json ? r3 : buildReport(r3);
   }
@@ -2745,12 +2787,16 @@ async function build2(sub = "show", args = [], f = {}) {
     const steps2 = f.steps.split(",").map((x) => x.trim());
     if (steps2.length > 24 || steps2.some((x) => !x || x.length > 60)) throw new Error("--steps needs 1..24 labels, each 1..60 characters");
     const massing = parseMassing(f.mass), site = await buildSite(f);
-    const brief = f.brief === void 0 ? void 0 : existsSync4(f.brief) ? readFileSync4(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync4(f.brief) ? readFileSync5(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     body = { id: arg, title: f.title, steps: steps2, site, massing, ...brief !== void 0 ? { brief } : {}, ...f.root ? { root: f.root } : {} };
   } else if (sub === "resume") {
-    if (!arg) throw new Error("usage: build resume <id> [--take]");
     id = arg;
+    if (!id) {
+      const list2 = ok(await call(BUILD_API.path()), "build list");
+      if (list2.open.length !== 1 || !BUILD_API.resumable(list2.open[0])) return buildChoices(sub, list2.open.length > 1 ? "several open builds; specify one to resume" : list2.open.length ? "the only open build has a live or unknown lead; specify its id to resume" : "no build to resume", f, list2);
+      id = list2.open[0].id;
+    }
     action = "resume";
     body = { ...b?.id === id && b.lease ? { lease: b.lease } : {}, ...f.take ? { take: true } : {} };
   } else {
@@ -2778,11 +2824,13 @@ async function build2(sub = "show", args = [], f = {}) {
       body = { ...f.undo ? { undo: true } : {}, ...f.force ? { force: true } : {} };
     } else throw new Error("build: start|step|show|resume|claim|release|pause|done|abandon");
   }
-  const r = ok(await call(BUILD_API.path(id, action), { body }), `build ${sub}`);
+  const response = await call(BUILD_API.path(id, action), { body });
+  if (sub === "resume" && BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${id}`, f);
+  const r = ok(response, `build ${sub}`);
   if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join("; ")}${r.notReverted ? `; undone edits: ${r.reverted?.join(", ") || "none"}; not undone edits: ${r.notReverted.join(", ")}` : ""}`;
   if (sub === "start" || sub === "resume") save({ build: BUILD_API.local(r), group: void 0, buildEchoWarned: void 0, buildPreviews: void 0 });
   if (sub === "claim") {
-    const file = claimFile(r.claim.id), previous = existsSync4(file) ? JSON.parse(readFileSync4(file, "utf8")) : null;
+    const file = claimFile(r.claim.id), previous = existsSync4(file) ? JSON.parse(readFileSync5(file, "utf8")) : null;
     if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + "\n");
     return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
   }
@@ -2939,7 +2987,7 @@ async function look(flags2 = {}) {
   Read the image file; then fix what looks wrong.`;
 }
 async function exportWorld(file, flags2 = {}) {
-  const s = await snapshot();
+  const s = await snapshot2();
   const g = exportGenesis(s, flags2);
   const out = resolve2(file ?? `${s.worldId}.genesis.json`);
   writeFileSync4(out, JSON.stringify(g, null, 1));
@@ -2947,10 +2995,10 @@ async function exportWorld(file, flags2 = {}) {
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
 var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
-  const g = JSON.parse(readFileSync4(file, "utf8"));
+  const g = JSON.parse(readFileSync5(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
   const out = [];
-  const s = await snapshot();
+  const s = await snapshot2();
   if (g.constants?.extent && g.constants.extent > s.constants.extent) {
     await expand(g.constants.extent);
     out.push(`expanded to ${g.constants.extent} m`);
@@ -2967,7 +3015,7 @@ var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   return out.join("\n");
 });
 async function define(json2) {
-  const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
+  const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -2976,7 +3024,7 @@ async function define(json2) {
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function defineKit(json2, flags2 = {}) {
-  const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
+  const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   const similar = ok(await call(`/v1/god/defs?q=${encodeURIComponent(k.name.replace(/[-_.]/g, " "))}`), "defs").defs.slice(0, 5).map((d) => d.ref.replace(/^core-/, "core/"));
   const ext = (sh) => {
@@ -3129,7 +3177,7 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
-var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync4(r[0], "utf8") : r[0] : readFileSync4(0, "utf8");
+var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync5(r[0], "utf8") : r[0] : readFileSync5(0, "utf8");
 var COMMANDS = {
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
@@ -3140,7 +3188,7 @@ var COMMANDS = {
   map: (r, f) => map({ json: !!f.json, all: !!f.all }),
   defs: (r, f) => defs(r.join(" ") || void 0, f),
   schema: (r, f) => schema(f),
-  snapshot,
+  snapshot: snapshot2,
   describe: (r, f) => describe(r[0], f),
   where: (r, f) => where(r[0] ?? f.at, f),
   query: (r) => query(readArg(r)),
@@ -3221,7 +3269,8 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
-site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] \xB7 build step [label] \xB7 build [show [id]] \xB7 build resume <id> [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] \xB7 build step [label] \xB7 build [show [id]] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
@@ -3340,7 +3389,7 @@ export {
   select,
   set,
   sky,
-  snapshot,
+  snapshot2 as snapshot,
   solve,
   status,
   stream,
