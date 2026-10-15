@@ -52,6 +52,7 @@ import { sleepGoal, sleepHands, sleepHeadPitch, sleepRestWeight, sleepHeadRestLi
 import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
+import {runningGaitAt} from './running-gait.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number; sitW: number; warmW: number; expressionT: number; pose: Posture; hands: Hands; pr: ProneState | null };
@@ -412,7 +413,7 @@ export class HumanViews {
       v.base = base;
       v.propWanted = (e.human as { prop?: string }).prop;
       v.instrument=(e.human as {instrument?:string}).instrument;v.game=recordedGame((e.human as {game?:unknown}).game)??undefined;v.gameTick=world.tick;v.gameDt=DT;
-      v.running = act === 'run' || ground > RUN_SPEED;
+      v.running = act === 'jog' || act === 'run' || ground > RUN_SPEED;
       v.grip = e.human.grip?.entity;
       v.gripSlot = e.human.grip?.slot;
       v.on = e.human.on;
@@ -598,7 +599,7 @@ export class HumanViews {
       if (v.groundSeat) v.seat = GROUND_SEAT;
       v.propWanted = f.prop;
       v.instrument=f.instrument;v.game=f.game;v.gameTick=f.gameTick;v.gameDt=f.gameDt;
-      v.running = act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
+      v.running = act === 'jog' || act === 'run' || (typeof f.speed === 'number' && f.speed > RUN_SPEED);
       v.speed = typeof f.speed === 'number' ? f.speed : 0;
       v.since = f.activityAge;
       v.prevAct = f.prevActivity;
@@ -698,6 +699,7 @@ export class HumanViews {
     // running: the library jog / sprint (speed-matched) where present, else the GLB's Run
     const jog = v.running ? libAction(v.rig, v.speed > SPRINT_SPEED && v.rig.template.sprintSpeed ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : null;
     const runW = v.running && (jog || extra.run) ? w : 0;
+    const runFallback = v.running && !jog && !extra.run && w > .05 ? runningGaitAt(Math.max(0,v.dist-v.speed*DT*(1-alpha)),v.speed) : null;
     const libShare = lib.cur || lib.prev ? 1 - w : 0;
     const curW = lib.cur ? libShare * lib.fade : 0, prevW = lib.prev ? libShare * (1 - lib.fade) : 0;
     const waveW = waveClip && !lib.cur ? 1 - w : 0, interactW = interactClip && !lib.cur ? 1 - w : 0;
@@ -724,7 +726,7 @@ export class HumanViews {
       if (weight > 1e-4) { if (!c.isRunning()) c.play(); c.time = ((time % c.getClip().duration) + c.getClip().duration) % c.getClip().duration; c.setEffectiveWeight(weight); }
       else if (c.isRunning()) c.stop();
     };
-    clipAt('run', jog ? 0 : runW, tSec);
+    clipAt('run', jog ? 0 : runW, v.dist/(v.rig.template.runSpeed ?? 2.5));
     clipAt('wave', waveW, tSec);
     clipAt('interact', interactW, tSec);
     clipAt('idleNeutral', neutralW, tSec);
@@ -754,7 +756,7 @@ export class HumanViews {
     // a carried item (engine human.prop) shows in the hand whenever it is set; an activity's own prop while it runs
     const wantProp = !hasHands && !gripping && proneW === 0 ? propFor(act || clipBody || lib.cur ? v.activity : '', v.propWanted,v.instrument) : null;
     if (v.prop && v.prop.kind !== wantProp) v.prop.obj.visible = false;
-    if (!(waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
+    if (!(runFallback || waterFrom || water || expression || Math.abs(gaze) > 1e-5 || sitW > 0 || warmW > 0 || gripping || hasHands || posed || gait || fp || proneW > 0 || act || lib.cur || lib.prev || wantProp)) return;
     for (const s of v.saved) { s.p.copy(s.o.position); s.q.copy(s.o.quaternion); }
     v.layered = true;
     _fwd.set(Math.cos(yaw), 0, Math.sin(yaw)); // engine yaw 0 faces +x; holder.rotation.y = -yaw
@@ -787,6 +789,12 @@ export class HumanViews {
       else if (gait) stairLegs(v, gait.g, gait.f, h);
       else if (fp?.feet && fw > 0) frameLegs(v, fp, pz, fw);
       else if (posed) postureLegs(v, pz);
+      else if (runFallback && v.dims && v.spine && !hasHands && !gripping) {
+        place(v.spine.body,v.spine.body.getWorldPosition(V()).addScaledVector(UP,runFallback.bob*w));
+        bendTorso(v.spine,runFallback.lean*w);h.updateMatrixWorld(true);
+        v.legs.forEach((leg,i)=>{const f=runFallback.legs[leg.side>0?0:1],target=V().copy(h.position).addScaledVector(_fwd,f.forward).addScaledVector(_right,v.footLat[i]).addScaledVector(UP,v.dims!.ankleH+f.up);
+          legTo(leg,v.ankle[i],target,V().copy(_fwd).addScaledVector(UP,.2),.97,footPitch(v,i,0));});
+      }
       if (sitW <= 0 && pz.bend > 1e-4 && v.spine) bendTorso(v.spine, pz.bend);
     }
     if (keep) {
@@ -913,6 +921,8 @@ export class HumanViews {
         armTo(arm, t, 1, 0.98, h, V().copy(_right).multiplyScalar(left ? -0.6 : 0.6).addScaledVector(UP, -0.5).addScaledVector(_fwd, -0.2));
       });
       closeHands(v, targets.map((t) => (t ? 0.6 : 0)));
+    } else if (runFallback && !gait && !fp && !posed && proneW===0 && sitW===0) {
+      source='expression';v.arms.forEach((arm,i)=>{const f=runFallback.hands[arm.side>0?0:1];targets[i]=arm.upper.getWorldPosition(V()).addScaledVector(_fwd,f.forward).addScaledVector(_right,-arm.side*.06).addScaledVector(UP,f.up);});reachTo(v,targets,false);closeHands(v,targets.map(()=>.45));
     } else if (sitW > 0 && !seatClip) v.arms.forEach((_, i) => handOnThigh(v, i, sitW));
     else if (fp && fw > 0 && (fp.hands[0] || fp.hands[1])) {
       // free hands on the frame (climbing: the ladder cycle's holds; on the bracing: column + brace) or held

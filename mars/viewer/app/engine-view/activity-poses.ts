@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import {gameContact,type RecordedGame} from './recorded-games.ts';
+import {rowingStroke} from './rowing-motion.ts';
 // Body activities (ACTIVITIES-v1, Core `mars:pose_v1`) as a cosmetic, random-access renderer layer: hand goals
 // relative to each shoulder, whole-body layouts (sitting on the ground, lying on the back), procedural cycles for
 // exercise/dance ids, and small hand props. Pure function of (activity, base, prop, seconds, id): canonical
 // roots, contacts, seats and hands stay the engine's; engine hand points / grips always win over this layer.
 
 /** Overlay ids drawn on top of their base posture (sit / idle / sit-ground). */
-export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
+export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['row', 'read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
 /** Whole-body ids: the body point stays put and the viewer lays the body out from it along pose.yaw. */
 export const LYING: ReadonlySet<string> = new Set(['lie', 'nap', 'situps', 'bench-press']);
 export const FACE_DOWN: ReadonlySet<string> = new Set(['pushups']);
@@ -85,6 +86,7 @@ export function activityFrame(activity: string, base: string, seconds: number, i
     return f;
   }
   switch (activity) {
+    case 'row': { const {pull,lift}=rowingStroke(seconds);f.hands=[[.3+.16*pull,.06,-.3+.06*lift],[.3+.16*pull,.06,-.3+.06*lift]];f.lean=.06+.12*pull;f.look=.12;return f; }
     case 'read': { const turn = Math.max(0, Math.sin(t * 0.21) - 0.96) * 6; // now and then a page turns
       f.hands = [[0.33, -0.13, down + 0.04], [0.33 + 0.04 * turn, -0.13 + 0.1 * turn, down + 0.04 + 0.03 * turn]]; f.look = 0.38; f.lean = seated ? 0.06 : 0.03; return f; }
     case 'browse': { const k = S(tri(t * 0.45));

@@ -20,6 +20,7 @@ const COMMONS_APPEARANCE:Readonly<Record<string,PrefabKind>>=Object.freeze({
   'eden-commons-bench':'bench','eden-commons-table':'table',
 });
 import { seedbedObject, type SeedbedVisual } from './seedbed.ts';
+import {rowingPuntObject,type RowingPuntVisual} from './rowing-punt.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
 type Stack = { group: THREE.Group; count: number | null };
@@ -28,7 +29,7 @@ type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: num
 const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
-type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; seedbed?: SeedbedVisual; ownedGeometries?: THREE.BufferGeometry[]; appearanceDispose?:()=>void; appearanceSync?:(fixture:Entity)=>void };
+type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; seedbed?: SeedbedVisual; punt?:RowingPuntVisual; rowing?:boolean; ownedGeometries?: THREE.BufferGeometry[]; appearanceDispose?:()=>void; appearanceSync?:(fixture:Entity)=>void };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -307,6 +308,7 @@ export class FixtureViews {
       if(styled)v.appearanceSync=fixture=>{styled.syncNativeFixture(fixture);};
     }
     else if (e.def === 'hot-air-balloon') obj = new THREE.Group(); // carrier/1 balloon: the basket, envelope and launch kit are drawn by World (apps/web WorldBalloonRide) at this entity's pose
+    else if (e.def === 'rowing-punt') {v.punt=rowingPuntObject(e);obj=v.punt.group;v.appearanceDispose=()=>v.punt?.dispose();}
     else if (e.def === 'bench') obj = this.bench(2.4, 0.45, 0.65, color);
     else if (e.def === 'kiosk') {
       const kiosk = new THREE.Group();
@@ -391,9 +393,11 @@ export class FixtureViews {
         v = this.build(e);
         this.views.set(e.id, v);
         this.group.add(v.obj);
+        if(v.punt)this.group.add(v.punt.dock);
       }
       v.prev = v.cur;
       v.cur = poseOf(e);
+      if(v.punt)v.rowing=e.carrier?.phase==='aloft'||Math.hypot(v.cur.p[0]-v.prev.p[0],v.cur.p[2]-v.prev.p[2])>1e-7;
       v.obj.position.set(...v.cur.p);
       v.obj.rotation.set(v.cur.pitch, -v.cur.yaw, v.cur.roll, 'YXZ');
       v.appearanceSync?.(e);
@@ -425,12 +429,13 @@ export class FixtureViews {
   /** Animate the fires: a pure function of (entity id, `t` = seconds of sim time). */
   render(t: number, alpha = 1) {
     for (const v of this.views.values()) {
-      if (CATALOG[v.key]?.capabilities?.fixtureCarry) {
+      if (CATALOG[v.key]?.capabilities?.fixtureCarry || v.punt) {
         const a = v.prev, b = v.cur;
         v.obj.position.set(lerp(a.p[0], b.p[0], alpha), lerp(a.p[1], b.p[1], alpha), lerp(a.p[2], b.p[2], alpha));
         v.obj.rotation.set(lerp(a.pitch, b.pitch, alpha), -lerpAngle(a.yaw, b.yaw, alpha), lerp(a.roll, b.roll, alpha), 'YXZ');
       }
       v.fire?.update(t, this.dusk ? 1 : 0.6, this.dusk ? 1 : 0);
+      v.punt?.update(t,!!v.rowing);
     }
   }
 

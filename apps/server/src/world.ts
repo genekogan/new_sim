@@ -1,4 +1,5 @@
 import {tx} from './edge/comms/store.ts';
+import type {CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {soulProfileFactV1Schema,type SoulProfileFactV1} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 import {edenLectureV1} from '@sim/engine-mars';
@@ -1099,7 +1100,7 @@ export class WorldHost {
   setCarrierRouteV1(spec:{id:string;route:string}){
     return this.enqueue('rules','operator:carrier-route',{carrierRouteV1:structuredClone(spec),why:'a ride flies another named route from its next flight (only while parked and empty); prospective, earlier history replays unchanged'});
   }
-  installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}){
+  installCarrierV1(spec:CarrierInstallSpec){
     const engine=this.engine as unknown as {previewCarrierV1?:(s:unknown)=>{code:string;message:string}|null;world:{entities:Record<string,{carrier?:unknown}>}};
     if(!engine.previewCarrierV1)return Promise.reject(Error('carrier.reader-required'));
     if(engine.world.entities[spec.id]?.carrier)return Promise.resolve();

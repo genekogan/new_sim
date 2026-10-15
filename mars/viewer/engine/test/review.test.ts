@@ -106,7 +106,11 @@ test('no jumps (W21): a person on foot moves ≤ 0.15 m per tick (riders and car
   assert.deepEqual(over('idle', 0.08), []);
   assert.deepEqual(over('wait', 0.3), ['motion.overspeed']);
   assert.deepEqual(over('sit', 0.1), ['motion.overspeed'], 'a published speed in an activity with no cap fails loudly');
-  assert.deepEqual(Object.keys(SPEED_CAPS).sort(), ['climb-down', 'climb-up', 'climb-wait', 'idle', 'wait', 'walk']);
+  assert.deepEqual(Object.keys(SPEED_CAPS).sort(), ['climb-down', 'climb-up', 'climb-wait', 'idle', 'jog', 'run', 'wait', 'walk']);
+  assert.deepEqual(over('jog', 2.5), []);
+  assert.deepEqual(over('run', 4), []);
+  assert.deepEqual(over('jog', 2.7), ['motion.overspeed']);
+  assert.deepEqual(over('run', 4.3), ['motion.overspeed']);
 });
 
 const REST_Y12 = def('upright-12ft').size[2] / 2;

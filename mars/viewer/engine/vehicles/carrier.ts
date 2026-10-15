@@ -26,6 +26,10 @@ export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 
 export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number };
 export type RouteKey = { t: number; p: Vec3 };
 export type CarrierRoute = { id: string; keys: RouteKey[] };
+/** A water ride transfers over a short boarding plank to dry bank points. Absolute world positions,
+ * retained in the logged installation so replay never consults an author's mutable water model. */
+export type CarrierBank = { door: Vec3; exits: Record<string, Vec3> };
+export type CarrierInstallSpec = { id: string; def: string; label?: string; at: [number, number]; y?: number; yaw?: number; route: string; routeKeys?: RouteKey[]; bank?: CarrierBank; waitSeconds?: number };
 export type CarrierState = {
   contract: 'carrier-state/1';
   phase: 'parked' | 'boarding' | 'aloft' | 'landed';
@@ -37,6 +41,7 @@ export type CarrierState = {
   waitTicks: number; departAtTick: number | null; phaseTick: number; flights: number; holding: boolean;
   /** The one body using the boarding step right now (boarding or stepping out), so transfers never cross. */
   doorBy: string | null;
+  bank?: CarrierBank;
   /** together/1: places kept for invited companions (`seats`), how many of them have boarded, until when. Absent otherwise. */
   hold?: { by: string; seats: number; filled: number; untilTick: number };
 };
@@ -78,7 +83,7 @@ export function seatPose(e: Entity, slot: string): { p: Vec3; yaw: number } | nu
   const d = carrierDef(e), s = d?.seats.find(x => x.id === slot); if (!d || !s) return null;
   return { p: at(e, s.local, d.floorY), yaw: wrapAngle(e.pose.yaw + s.yaw) };
 }
-export function doorPoint(e: Entity): Vec3 | null { const d = carrierDef(e); return d ? at(e, d.door) : null; }
+export function doorPoint(e: Entity): Vec3 | null { const d = carrierDef(e); return state(e)?.bank?.door ?? (d ? at(e, d.door) : null); }
 /** The seat this actor holds, else the first free seat (definition order), else null. */
 export function seatFor(e: Entity, actor: string): string | null {
   const c = state(e), d = carrierDef(e); if (!c || !d) return null;
@@ -106,15 +111,22 @@ export function routePosition(route: CarrierRoute, ticks: number): Vec3 {
 export const routeTicks = (route: CarrierRoute) => Math.round(route.keys[route.keys.length - 1].t * TPS);
 
 /** A carrier entity at its home (installed by a logged rules fact). */
-export function carrierEntity(spec: { id: string; def: string; label?: string; at: [number, number]; y?: number; yaw?: number; route: string; waitSeconds?: number }, tick: number): Entity | Diagnostic {
+export function carrierEntity(spec: CarrierInstallSpec, tick: number): Entity | Diagnostic {
   const d = CATALOG[spec.def], cd = d?.capabilities?.carrier;
   if (!cd) return diag('unknown-def', `${spec.def} is not a carrier`);
-  const home: Vec3 = [spec.at[0], spec.y ?? 0, spec.at[1]], route = routeAt(spec.route, home);
+  const home: Vec3 = [spec.at[0], spec.y ?? 0, spec.at[1]], route = spec.routeKeys ? { id: spec.route, keys: structuredClone(spec.routeKeys) } : routeAt(spec.route, home);
   if (!route) return diag('unknown-route', `no route ${spec.route}`);
+  if (!Number.isFinite(home[1]) || !Number.isFinite(spec.yaw ?? 0) || route.keys.length < 2 || route.keys.length > 64
+    || route.keys.some((k, i) => !Number.isFinite(k.t) || k.t < 0 || (i === 0 ? k.t !== 0 : k.t <= route.keys[i - 1].t) || !Array.isArray(k.p) || k.p.length !== 3 || !k.p.every(Number.isFinite)))
+    return diag('bad-route', 'a route needs 2–64 finite positions with strictly increasing seconds from zero');
+  if (spec.bank && (!Array.isArray(spec.bank.door) || spec.bank.door.length !== 3 || !spec.bank.door.every(Number.isFinite)
+    || cd.seats.some(s => !Array.isArray(spec.bank!.exits[s.id]) || spec.bank!.exits[s.id].length !== 3 || !spec.bank!.exits[s.id].every(Number.isFinite))))
+    return diag('bad-bank', 'boarding door and every seat exit must be finite world positions');
   const a = route.keys[0].p, b = route.keys[route.keys.length - 1].p;
   if (hypot(a[0] - home[0], a[1] - home[1], a[2] - home[2]) > 1e-6 || hypot(b[0] - home[0], b[1] - home[1], b[2] - home[2]) > 1e-6) return diag('route-home', 'the route must start and end at the carrier home');
   const st: CarrierState = { contract: 'carrier-state/1', phase: 'parked', home, yaw: spec.yaw ?? 0, seats: Object.fromEntries(cd.seats.map(s => [s.id, null])), route,
-    elapsed: 0, waitTicks: Math.round(Math.max(5, Math.min(600, spec.waitSeconds ?? 45)) * TPS), departAtTick: null, phaseTick: tick, flights: 0, holding: false, doorBy: null };
+    elapsed: 0, waitTicks: Math.round(Math.max(5, Math.min(600, spec.waitSeconds ?? 45)) * TPS), departAtTick: null, phaseTick: tick, flights: 0, holding: false, doorBy: null,
+    ...(spec.bank ? { bank: structuredClone(spec.bank) } : {}) };
   return { id: spec.id, def: spec.def, kind: 'fixture', label: spec.label ?? d.label, pose: { p: [...home] as Vec3, yaw: spec.yaw ?? 0 }, support: { kind: 'ground' },
     provenance: { origin: 'design-edit', confidence: 'hypothetical', note: 'carrier/1 ride' }, carrier: st } as Entity;
 }
@@ -122,7 +134,7 @@ export function carrierEntity(spec: { id: string; def: string; label?: string; a
 function freeBody(rt: Runtime, actor: string): Diagnostic | null {
   const e = rt.world.entities[actor], h = e?.human;
   if (!h || e.kind !== 'human' || (e.body && e.body.family !== 'humanoid')) return diag('body-family', `${actor} cannot ride`, [actor]);
-  if (h.hands?.left || h.hands?.right || h.grip || h.riding || h.on || h.sleepPose || h.boatPassenger || h.boatTransit || h.shore
+  if (h.hands?.left || h.hands?.right || h.grip || h.riding || h.on || h.sleepPose || h.boatPassenger || h.boatTransit || (h.shore && h.shore.depthMetres > 0)
     || Object.values(rt.world.entities).some(o => o.support?.kind === 'in-hand' && o.support.by === actor))
     return diag('occupied-body', `${actor} needs free hands and to be standing on the ground`, [actor]);
   return null;
@@ -145,9 +157,10 @@ function turnToward(e: Entity, yaw: number, dt: number) { const t = angleDelta(e
 /** Take the boarding step if it is free (or already mine). */
 const takeDoor = (c: CarrierState, actor: string) => { if (c.doorBy && c.doorBy !== actor) return false; c.doorBy = actor; return true; };
 const freeDoor = (c: CarrierState, actor: string) => { if (c.doorBy === actor) c.doorBy = null; };
-type RideExec = { actor: string; carrier: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; leg: number; stopping: boolean; waited: number; id: string; path: Vec3[] };
+type RideExec = { actor: string; carrier: string; slot: string; phase: 'boarding' | 'seated' | 'leaving'; leg: number; stopping: boolean; waited: number; id: string; path: Vec3[]; throughReturn?: boolean };
 /** From where the boarder stands, round the basket (never through it) to the boarding step, then in to its seat. */
 function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] {
+  if (state(e)?.bank) return [doorPoint(e)!, seat];
   const l = rot2([from[0] - e.pose.p[0], from[2] - e.pose.p[2]], -e.pose.yaw), hz = CATALOG[e.def].size[2] / 2 + 0.6;
   const side = l[1] >= 0 ? 1 : -1, out = d.door[0] >= 0 ? 1 : -1, pts: Vec2[] = [];
   if (l[0] * out < Math.abs(d.door[0]) - 0.05) { if (Math.abs(l[1]) < hz) pts.push([l[0], side * hz]); pts.push([d.door[0], side * hz]); }
@@ -156,12 +169,12 @@ function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] 
 /** together/1: places kept for companions who have not boarded yet. */
 const keptSeats = (c: CarrierState) => c.hold ? Math.max(0, c.hold.seats - c.hold.filled) : 0;
 const HOLD_MAX_SECONDS = 180;
-type RideParams = { actor: string; carrier: string; slot?: string; holdSeats?: number; holdSeconds?: number; reserved?: boolean };
+type RideParams = { actor: string; carrier: string; slot?: string; holdSeats?: number; holdSeconds?: number; reserved?: boolean; throughReturn?: boolean };
 const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
   verb: 'carrier_ride',
   description: 'Step into a free seat of a parked or boarding carrier (a balloon basket) from its door and stay seated while it carries you; step out only when it is on the ground.',
   schema: z.object({ actor: z.string().min(1), carrier: z.string().min(1), slot: z.string().min(1).max(40).optional(),
-    holdSeats: z.number().int().min(1).max(8).optional(), holdSeconds: z.number().min(5).max(HOLD_MAX_SECONDS).optional(), reserved: z.boolean().optional() }).strict(),
+    holdSeats: z.number().int().min(1).max(8).optional(), holdSeconds: z.number().min(5).max(HOLD_MAX_SECONDS).optional(), reserved: z.boolean().optional(), throughReturn: z.boolean().optional() }).strict(),
   resumable: true,
   reservations: (w: WorldState, p) => {
     const e = w.entities[p.carrier], slot = p.slot ?? (e ? seatFor(e, p.actor) : null) ?? 'none';
@@ -180,7 +193,8 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
     if (!(p.reserved && keptSeats(c) > 0) && free - keptSeats(c) < 1) return { ok: false, diagnostic: diag('reserved', `the last place in ${e.label ?? e.id} is kept for someone who was invited`, [e.id]) };
     if (p.holdSeats && p.holdSeats > free - keptSeats(c) - 1) return { ok: false, diagnostic: diag('full', `${e.label ?? e.id} has no room for ${p.holdSeats} more`, [e.id]) };
     const a = rt.world.entities[p.actor];
-    if (hypot(a.pose.p[0] - e.pose.p[0], a.pose.p[2] - e.pose.p[2]) > BOARD_REACH || Math.abs(a.pose.p[1] - c.home[1]) > 0.05 || (a.human!.level ?? 0) !== 0)
+    const door = doorPoint(e)!;
+    if (hypot(a.pose.p[0] - e.pose.p[0], a.pose.p[2] - e.pose.p[2]) > BOARD_REACH || Math.abs(a.pose.p[1] - (c.bank ? door[1] : c.home[1])) > 0.05 || (c.bank && hypot(a.pose.p[0] - door[0], a.pose.p[2] - door[2]) > 0.35) || (a.human!.level ?? 0) !== 0)
       return { ok: false, diagnostic: diag('not-at-door', `${p.actor} must stand beside ${e.label ?? e.id} first`, [p.actor]) };
     return { ok: true, program: { slot } };
   },
@@ -192,7 +206,7 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
     if (p.holdSeats && !c.hold) c.hold = { by: p.actor, seats: p.holdSeats, filled: 0, untilTick: rt.tick + Math.round((p.holdSeconds ?? 120) * TPS) };
     (h as { carrier?: CarriedBody }).carrier = { id: e.id, slot: prog.slot, phase: 'boarding' };
     h.task = id; h.activity = 'board'; delete h.speed;
-    return { actor: p.actor, carrier: p.carrier, slot: prog.slot, phase: 'boarding', leg: 0, stopping: false, waited: 0, id, path: boardingPath(e, a.pose.p, seatPose(e, prog.slot)!.p, carrierDef(e)!) };
+    return { actor: p.actor, carrier: p.carrier, slot: prog.slot, phase: 'boarding', leg: 0, stopping: false, waited: 0, id, path: boardingPath(e, a.pose.p, seatPose(e, prog.slot)!.p, carrierDef(e)!), ...(p.throughReturn ? { throughReturn: true } : {}) };
   },
   step(rt, ex, dt) {
     const e = rt.world.entities[ex.carrier], c = state(e), d = carrierDef(e), a = rt.world.entities[ex.actor];
@@ -214,20 +228,37 @@ const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
       if (!last) { const dx = to[0] - a.pose.p[0], dz = to[2] - a.pose.p[2]; if (Math.abs(dx) + Math.abs(dz) > 1e-6) turnToward(a, heading([dx, dz]), dt); if (moveToward(a, to, d.transferSpeed, dt)) ex.leg++; return { status: 'running', phase: 'boarding' }; }
       turnToward(a, seat.yaw, dt);
       if (moveToward(a, seat.p, d.transferSpeed, dt) && Math.abs(angleDelta(a.pose.yaw, seat.yaw)) < 1e-9) {
-        ex.phase = 'seated'; body.phase = 'seated'; h.activity = 'ride'; freeDoor(c, ex.actor);
-        return { status: 'running', phase: 'occupied' };
+        ex.phase = 'seated'; body.phase = 'seated'; h.activity = e.def === 'rowing-punt' ? 'row' : 'ride';
+        if (e.def === 'rowing-punt') { h.baseActivity = 'sit'; h.seatHeight = .36; }
+        freeDoor(c, ex.actor);
+        return { status: 'running', phase: ex.throughReturn ? 'rowing' : 'occupied' };
       }
       return { status: 'running', phase: 'boarding' };
     }
     if (ex.phase === 'seated') {
       if (c.phase === 'landed' || (ex.stopping && (c.phase === 'parked' || c.phase === 'boarding'))) { leave(); return { status: 'running', phase: 'leaving' }; }
       a.pose.p = seat.p; a.pose.yaw = seat.yaw;   // follows its seat (stepCarriers moves the carrier first)
-      return { status: 'running', phase: 'occupied' };
+      return { status: 'running', phase: ex.throughReturn ? 'rowing' : 'occupied' };
     }
     // leaving: seat → door → this seat's exit spot (so the next rider has the door), each step only when clear.
-    const door = doorPoint(e)!, exit = at(e, def.exit), path = [door, exit];
+    const door = doorPoint(e)!, exit = c.bank?.exits[ex.slot] ?? at(e, def.exit);
+    // Before departure a rear rider may stop while the front rider stays aboard. Sidestep along the
+    // gunwale to the bow before taking the plank; do not walk through the other occupied thwart.
+    const bypass=c.bank&&c.phase!=='landed'&&d.seats.some(s=>s.local[0]>def.local[0]&&c.seats[s.id]);
+    const path=bypass?[at(e,[def.local[0],-.65],d.floorY),at(e,[1.6,-.65],d.floorY),door,exit]:[door,exit];
+    // The punt's thwarts are in line. At the shared return, the rider nearest the plank gets out first,
+    // so the rear rider never walks through the one still seated at the front thwart.
+    if (c.bank && c.phase === 'landed' && ex.leg === 0) {
+      const mine=hypot(seat.p[0]-door[0],seat.p[2]-door[2]);
+      if (Object.entries(c.seats).some(([slot,actor])=>actor&&actor!==ex.actor&&(()=>{const p=seatPose(e,slot)!.p;return hypot(p[0]-door[0],p[2]-door[2])<mine-.01;})()))
+        return {status:'running',phase:'leaving-wait'};
+    }
     if (ex.leg >= path.length) {
-      freeDoor(c, ex.actor); c.seats[ex.slot] = null; delete (h as { carrier?: CarriedBody }).carrier; delete h.task; h.activity = 'idle'; a.pose.p = [a.pose.p[0], c.home[1], a.pose.p[2]];
+      freeDoor(c, ex.actor); c.seats[ex.slot] = null; delete (h as { carrier?: CarriedBody }).carrier; delete h.task; h.activity = 'idle';
+      delete h.baseActivity; delete h.seatHeight; delete h.speed;
+      a.pose.p = [a.pose.p[0], c.bank ? exit[1] : c.home[1], a.pose.p[2]];
+      const contact = rt.services.carrierBankContact as ((rt: Runtime, actor: string) => void) | undefined;
+      if (c.bank) { delete h.shore; contact?.(rt, ex.actor); }
       return { status: 'completed', outputs: { carrier: e.id, slot: ex.slot, phase: 'ashore', position: [...a.pose.p] } };
     }
     const to = path[ex.leg];
@@ -292,11 +323,12 @@ export function stepCarriers(rt: Runtime): void {
     if (c.phase === 'landed') { if (!riders.length) { c.phase = 'parked'; c.phaseTick = tick; } continue; }
     if (c.phase !== 'aloft') continue;
     const end = routeTicks(c.route), next = routePosition(c.route, c.elapsed + 1);
-    c.holding = next[1] - c.home[1] < LANDING_HEIGHT && c.elapsed + 1 > end / 2 && !landingClear(rt, e, c, d);
+    c.holding = next[1] - c.home[1] < LANDING_HEIGHT && c.elapsed + 1 > (e.def === 'rowing-punt' ? end - TPS : end / 2) && !landingClear(rt, e, c, d);
     if (c.holding) continue;
     c.elapsed++;
     // yaw follows travel high up (World: "yaw follows travel") and turns back to the home yaw low down, so it parks as it left; ≤ 0.5 rad/s.
-    const dx = next[0] - e.pose.p[0], dz = next[2] - e.pose.p[2], want = next[1] - c.home[1] > 10 && hypot(dx, dz) > 0.02 / TPS ? heading([dx, dz]) : c.yaw;
+    const dx = next[0] - e.pose.p[0], dz = next[2] - e.pose.p[2], follow = e.def === 'rowing-punt' ? c.elapsed < end - 4 * TPS : next[1] - c.home[1] > 10;
+    const want = follow && hypot(dx, dz) > 0.02 / TPS ? heading([dx, dz]) : c.yaw;
     const turn = angleDelta(e.pose.yaw, want); e.pose.yaw = wrapAngle(e.pose.yaw + Math.max(-0.5 / TPS, Math.min(0.5 / TPS, turn)));
     e.pose.p = next;
     for (const a of riders) { const b = rt.world.entities[a], s = seatPose(e, carried(b)!.slot); if (b && s) { b.pose.p = s.p; b.pose.yaw = s.yaw; } }

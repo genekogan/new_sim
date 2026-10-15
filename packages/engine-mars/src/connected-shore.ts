@@ -5,7 +5,7 @@ import {loadMars} from './load.ts';
 import {createTerrainGeometryProbe} from './terrain.ts';
 import {createWaterGeometryProbe} from './water-geometry.ts';
 import {connectedShoreAction,inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
-import {shoreActions,shoreContactInvariant,shoreSpeedInvariant,SHORE_POLICY,type ShoreGeometry} from '../../../mars/viewer/engine/locomotion/shore.ts';
+import {shoreActions,shoreContactInvariant,shoreSpeedInvariant,publishShoreContact,SHORE_POLICY,type ShoreGeometry} from '../../../mars/viewer/engine/locomotion/shore.ts';
 import {humanStaticClearance,speedWithinCap} from '../../../mars/viewer/engine/runtime/invariants.ts';
 import {decodeSnapshot,type RuntimeSnapshot} from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import type {Runtime} from '../../../mars/viewer/engine/runtime/runtime.ts';
@@ -30,7 +30,8 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
   if(ground){for(const r of ground.rectangles){const [x0,z0,x1,z1]=r.boundsXZ;if(!(x0<x1&&z0<z1)||x0< -29.5)throw Error('eden-ground.invalid-dry-extension');scene.surfaces.push({id:r.id,level:0,y:0,obb:{c:[(x0+x1)/2,(z0+z1)/2],half:[(x1-x0)/2,(z1-z0)/2],yaw:0}});scene.bounds=[Math.min(scene.bounds[0],x0),Math.min(scene.bounds[1],z0),Math.max(scene.bounds[2],x1),Math.max(scene.bounds[3],z1)];}}
   const rulesVersion='native-commons-shore/1+'+(ground?'eg/1+':'')+(support?support.version+'+':'')+m.rulesVersion;
   const base={campus:ground?'eden-commons-shore-expanded/1':'eden-commons-shore/1',staticHash:hashOf({scene,terrain,water,rulesVersion,policy:SHORE_POLICY,transform:CONNECTED_SHORE_TRANSFORM,sourceHash:hashOf(source)})};
-  const services=m.servicesFor({[base.campus]:scene}),registry=m.createRegistry();
+  const baseServices=m.servicesFor({[base.campus]:scene});
+  const services=(world:WorldState)=>({...baseServices(world),carrierBankContact:(rt:Runtime,actor:string)=>publishShoreContact(rt,geometry,actor,false)}),registry=m.createRegistry();
   const oldWalk=registry.get('walk_to')!;
   registry.set('walk_to',{...oldWalk,plan(rt:Runtime,p:{actor:string;x:number;z:number;level?:number}){
     const e=rt.world.entities[p.actor];
@@ -45,7 +46,9 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
     for(const claim of def.reservations(rt.world,p)){
       if(!claim.resource.startsWith('actor:'))continue;
       const id=claim.resource.slice(6),e=rt.world.entities[id];
-      if(e?.human&&(inShoreDomain(rt.world,e.pose.p[0],e.pose.p[2])||e.human.shore&&(e.human.shore.depthMetres>0||Math.abs(e.pose.p[1])>.001)))
+      const puntBoard = (verb === 'carrier_ride' && rt.world.entities[(p as {carrier?:string}).carrier ?? '']?.def === 'rowing-punt' && !!e?.human?.shore && e.human.shore.depthMetres === 0)
+        || (verb === 'carrier_depart' && rt.world.entities[e?.human?.carrier?.id ?? '']?.def === 'rowing-punt');
+      if(!puntBoard&&e?.human&&(inShoreDomain(rt.world,e.pose.p[0],e.pose.p[2])||e.human.shore&&(e.human.shore.depthMetres>0||Math.abs(e.pose.p[1])>.001)))
         return {ok:false,diagnostic:{code:'connected.unqualified-shore-action',message:verb+' has no qualified slope/water equivalent for '+id+'; return through the dry gate first',subjects:[id]}};
     }
     return planned;
