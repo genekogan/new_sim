@@ -1,3 +1,4 @@
+import './browser-url-fixture.ts';
 import test from 'node:test';import assert from 'node:assert/strict';import * as THREE from 'three';
 import {DECORATIVE_MOTION,DecorativeMotion,decorationAt,nextFerrisAngle,FERRIS_HUB} from '../../../mars/viewer/app/engine-view/content/assets/decorative-motion.ts';
 import {Builder,Materials} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';

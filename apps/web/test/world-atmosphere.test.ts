@@ -1,3 +1,4 @@
+import './browser-url-fixture.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {weatherKindAt,targetFor,easeWeather,copyWeather,parseWeatherOverride,clockMs,regimeOf,WEATHER_KINDS,type WeatherState} from '../src/atmosphere/weather.ts';

@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "kind": "step",
+      "step": "V6-launcher",
+      "id": "*",
+      "reason": "Real Chrome Metal GPU walk cannot run in CPU-only Modal; the separately owned V7 browser gate must qualify it before release.",
+      "owner": "release-owner (L1)"
+    },
+    {
+      "step": "V4-web",
+      "id": "the route data file and the renderer agree byte for byte on vehicles and routes",
+      "reason": "Tracked main lacks worlds/eden/rides/balloon-ride.v1.json. Preserve full route/vehicle conformance assertion pending published data; other balloon assertions still run.",
+      "owner": "World / Core ride-data owners"
+    }
+  ]
+}

@@ -30,6 +30,8 @@ set -u
 cat /in/REFS.txt
 prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 reads HEAD), install deps
   mkdir -p "$2" && tar xzf "$1" -C "$2" && cd "$2" || return 1
+  # The invocation's committed harness tests both source refs with identical rules.
+  tar xzf /in/harness.tgz -C "$2" || return 1
   git init -q -b main && git add -A && git -c user.email=suite@local -c user.name=suite commit -qm "$(basename "$2")"
   if [ -f /in/historical-inputs.pack ]; then
     git index-pack --stdin < /in/historical-inputs.pack || return 1
@@ -39,21 +41,31 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   return "$rc"
 }
 mkdir -p /out
+cp /in/RUN-METADATA.json /out/
 cp /in/historical-inputs.pack.json /out/ 2>/dev/null || true
 prep /in/head.tgz /work/head || exit 1
-BASE=/work/head
-if [ -f /in/base.tgz ]; then prep /in/base.tgz /work/base && BASE=/work/base; fi
+BASE=none
+if [ -f /in/base.tgz ]; then prep /in/base.tgz /work/base || exit 1; BASE=/work/base; fi
 node --version; nproc; grep MemTotal /proc/meminfo
 bash /work/head/tools/test-harness/one-validation.sh /out/suite --baseline "$BASE" --skip "$SKIP"
+rc=$?
+python - "$rc" <<'PY'
+import json, sys
+p = '/out/RUN-METADATA.json'
+with open(p) as f: data = json.load(f)
+data['suiteCompleted'] = sys.argv[1] == '0'
+data['suiteExit'] = int(sys.argv[1])
+with open(p, 'w') as f: json.dump(data, f, indent=2)
+PY
 """
 
 
 @app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600)
 def run(skip: str, server_files: str = "") -> bytes:
     files = server_files.split()
-    if any(not re.fullmatch(r"src/(?:god/)?[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
-        raise ValueError("server files must be src[/god]/<name>.test.ts")
-    subprocess.run(["bash", "-c", INNER], env={**os.environ, "SKIP": skip, "SERVER_TEST_FILES": " ".join(files), "CI": "1"}, check=False)
+    if any(not re.fullmatch(r"src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
+        raise ValueError("server files must be src/<safe path>/<name>.test.ts")
+    subprocess.run(["bash", "-c", INNER], env={**os.environ, "SKIP": skip, "SERVER_TEST_FILES": " ".join(files), "CI": "1", "REMOTE_SUITE_CPU": "1"}, check=False)
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         t.add("/out", arcname="out")

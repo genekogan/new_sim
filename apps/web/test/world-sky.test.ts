@@ -1,3 +1,4 @@
+import './browser-url-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -86,7 +87,8 @@ test('ground details: grass mask keeps paths, buildings and the lake clear; the 
   assert.equal(at(34, 15), 0, 'house 1');
   assert.equal(at(-81, 1), 0, 'lake');
   assert.equal(at(-10, 60), 1, 'south lawn grass');
-  const d = createWorldGroundDetails(), cam = new THREE.PerspectiveCamera();
+  // This test exercises mask/altitude culling on a flat supplied surface.
+  const d = createWorldGroundDetails(() => 0), cam = new THREE.PerspectiveCamera();
   cam.position.set(-10, 1.7, 60); cam.updateMatrixWorld(); d.meadow.follow(cam);
   assert.ok(d.meadow.counts.tufts > 1000 && d.meadow.counts.blooms > 50, JSON.stringify(d.meadow.counts));
   cam.position.set(-10, 60, 60); cam.updateMatrixWorld(); d.meadow.follow(cam);
