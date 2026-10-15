@@ -323,7 +323,7 @@ test('schema and status expose the same protocol/schema/skill/source versions', 
   const f = fixture(t);
   const schema = await f.request('/v1/god/schema'), status = await f.request('/v1/god/status');
   assert.deepEqual(schema.data.versions, status.data.versions);
-  assert.equal(status.data.versions.protocol, 'god/1'); assert.equal(status.data.versions.schema, 'god-schema/1'); assert.equal(status.data.versions.skill, '1.1');
+  assert.equal(status.data.versions.protocol, 'god/1'); assert.equal(status.data.versions.schema, 'god-schema/1'); assert.equal(status.data.versions.skill, '1.2');
   assert.match(status.data.versions.source, /^(unknown|[0-9a-f]{7,40})$/i);
   assert.ok(schema.data.submission); assert.ok(schema.data.refusals.includes('revision.stale'));
 });

@@ -1791,7 +1791,7 @@ var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, 
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/version.mjs
-var SKILL_VERSION = "1.1";
+var SKILL_VERSION = "1.2";
 
 // cli.mjs
 var SELF = (() => {
