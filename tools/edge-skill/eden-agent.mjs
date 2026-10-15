@@ -174,7 +174,9 @@ function finishApproval(dto,pending,world,connection){
 }
 export async function approval(action='status'){
  if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
- if(!['status','wait','cancel'].includes(action))throw Error('usage: approval [status|wait|cancel]');const s=load(),pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
+ if(!['status','wait','cancel'].includes(action))throw Error('usage: approval [status|wait|cancel]');const s=load();
+ if(!s.pendingApproval&&action!=='cancel'&&s.accountAuth&&s.soul&&s.token){const data=ok(await call('/v1/agent/me'),'check selected Soul grant');if(data.soul?.id!==s.soul)throw Error('Selected Soul grant differs; no ready approval was reported.');return {status:'ready',soul:{id:s.soul,name:data.soul.name},paired:true,next:'Run status. The selected Soul is already ready and granted; no new approval was requested.'};}
+ const pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
  const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+15*60000;
  for(;;){let data=ok(await call('/v1/agent/approval/poll',{as:'none',body}),'approval '+action),dto=data.approval??data;
   if(['refused','cancelled','expired'].includes(dto.status))return finishApproval(dto,pending,s.world,'terminal');
