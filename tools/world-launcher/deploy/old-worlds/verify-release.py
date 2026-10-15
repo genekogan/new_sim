@@ -24,6 +24,7 @@ manifest(f'{R}/manifests/CONTENT-MANIFEST.json', f'{R}/input', 'source')
 manifest(f'{R}/manifests/WEB-MANIFEST.json', f'{R}/input/apps/web/dist', 'web')
 manifest(f'{R}/manifests/OVERLAY-WEB-MANIFEST.json', f'{R}/input/apps/web/dist', 'overlay')
 manifest(f'{R}/manifests/STATIC-MANIFEST.json', f'{R}/mars-web', 'static')
+if fsha(f'{R}/CONTENT-MANIFEST.json') != rel['sourceManifestSHA256']: bad.append('root CONTENT-MANIFEST')
 plan = json.load(open(f'{R}/manifests/PLAN.json'))
 for w, item in plan['worlds'].items():
     d = json.load(open(f'{R}/descriptors/{w}.json'))

@@ -5,6 +5,7 @@ usage: pack-release.py OUT_PARENT [--runtime DIR] [--proxy-json PATH] [--kit DIR
   -> OUT_PARENT/so-<source8>-<overlay8>/  (prints its path)
 
 Contents (paths inside are the eden2 release path /srv/sim-old/releases/<name>):
+  CONTENT-MANIFEST.json  next to input/, where edge-server.mjs checks inputManifestSHA256
   input/      sealed source (convergence runtime source/, no node_modules; web dist + Soul CLI/skill/guides inside)
   mars-web/   Mars static root (STATIC-MANIFEST)
   artifacts/  Eden places, authored region boundaries, activity spots (the paths Codex's descriptor names)
@@ -41,6 +42,7 @@ rs = lambda a, b, *x: subprocess.run(['rsync', '-a', *x, a, b], check=True)
 rs(f'{RT}/source/', f'{out}/input/', '--exclude', 'node_modules')
 rs(f'{RT}/mars-web/', f'{out}/mars-web/')
 for m in ('CONTENT-MANIFEST.json', 'WEB-MANIFEST.json', 'STATIC-MANIFEST.json', 'PREPARED.json'): shutil.copy2(f'{RT}/{m}', f'{out}/manifests/')
+shutil.copy2(f'{RT}/CONTENT-MANIFEST.json', f'{out}/')  # edge-server.mjs reads <input>/../CONTENT-MANIFEST.json (inputManifestSHA256)
 for p in (proxy['artifactOverlay']['webManifest'], PROXY, PLAN, LIVE,
           json.load(open(PLAN))['qualification']['path']): shutil.copy2(p, f'{out}/manifests/')
 for f in ('run-world.mjs', 'port-map.mjs', 'parity.py', 'online-backup.py', 'compact-copy.py', 'verify-release.py', 'install-deps.sh'): shutil.copy2(f'{KIT}/{f}', f'{out}/bin/')
