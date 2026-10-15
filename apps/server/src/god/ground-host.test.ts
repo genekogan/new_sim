@@ -9,6 +9,7 @@ import { Db } from '../db.ts';
 import { WorldHost, replayFromGenesis } from '../world.ts';
 import { GodMode } from './god.ts';
 import { GroundHost, loadGroundRecipes } from './ground-host.ts';
+import { groundFact } from '@sim/engine-mars';
 
 const factory = await marsFactory(GREEN_FIELD_WORLD);
 const worldId = 'ground-host-1', seed = 'ground-host';
@@ -69,4 +70,34 @@ test('ground edits faster than the sequencer (raise, then undo before it applies
   assert.equal(god.undo().accepted, true);   // both before the next drain
   await settle(host);
   assert.equal((host.engine as unknown as Eng).world.groundV1!.recipeHash, flat, 'back on the flat ground');
+});
+
+test('support reclaim is a prospective, idempotent policy: old landing prefix and supported suffix replay exactly', async t => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  const id = 'ground-reclaim-policy', host = new WorldHost(db, factory, seed, 1e9, id);
+  host.boot(); host.drainInputs(); t.after(() => host.stop());
+  const god = new GodMode(db, { worldId: id, ownerId: null, tick: () => host.engine.world.tick, emit: () => {} });
+  assert.equal(god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'hill', p: [30, 0], params: { height: 5, radius: 25 } }] }).accepted, true);
+  const logged = async (kind: 'rules' | 'birth' | 'edge-relocate', payload: unknown) => { const p = host.enqueue(kind, 'test', payload); host.drainInputs(); await p; };
+  await logged('rules', { groundV1: groundFact(god.model.ground(), god.model.editSeq, { paged: true }) });
+  await logged('birth', { soulId: 's_ada', entityId: 'h_ada', name: 'Ada', owner: 'dev:ada', description: 'Synthetic fixture' });
+  await logged('edge-relocate', { entityId: 'h_ada', to: [30, 0] });
+  assert.equal(host.engine.world.entities.h_ada.pose.p[1], 0, 'legacy prefix retains the flat landing');
+  await settle(host);
+  const prefixTick = host.engine.world.tick, prefixHash = host.engine.stateHash();
+  new GroundHost(db, host, god);
+  await settle(host);
+  await logged('edge-relocate', { entityId: 'h_ada', to: [30, 0] });
+  await settle(host);
+  assert.equal(host.engine.world.entities.h_ada.pose.p[1], 5, 'new suffix lands on support');
+  new GroundHost(db, host, god); await settle(host);
+  const policies = db.events(id).filter(e => e.payload?.groundReclaimV1 === true);
+  assert.equal(policies.length, 1, 'reopening the ground host does not append another activation');
+  const events = db.events(id);
+  assert.equal(replayFromGenesis(factory, seed, events, prefixTick).engine.stateHash(), prefixHash);
+  assert.equal(replayFromGenesis(factory, seed, events, host.engine.world.tick).engine.stateHash(), host.engine.stateHash());
+  host.saveSnapshot(true);
+  const again = new WorldHost(db, factory, seed, 1e9, id); t.after(() => again.stop());
+  assert.equal(again.boot().from, 'snapshot');
+  assert.equal(again.engine.stateHash(), host.engine.stateHash());
 });
