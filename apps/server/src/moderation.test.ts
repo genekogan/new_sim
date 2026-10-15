@@ -270,3 +270,28 @@ test('Godmode world: a classifier quarantine hides the upload until the site adm
   const rejected = w.store.log({ limit: 5 }).find((e) => e.action === 'reject');
   assert.ok(rejected); assert.equal((await w.req(`/assets/${rejected!.sha}.glb`, { as: 'anon' })).status, 404, 'nothing stored');
 });
+
+test('Soul bodies: a hidden body upload is served as a valid stand-in (never a 404), revalidated not immutable, and cannot be worn', async (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'moderation-body-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const db = new Db(':memory:'), app = new Hono();
+  db.db.exec('CREATE TABLE edge_body_assets_v1(world_id TEXT NOT NULL,asset_id TEXT NOT NULL,descriptor TEXT NOT NULL,content BLOB NOT NULL,PRIMARY KEY(world_id,asset_id)) WITHOUT ROWID');
+  const ceramic = 'e'.repeat(64), human = 'f'.repeat(64);
+  for (const [sha, type] of [[ceramic, 'ceramic'], [human, 'humanoid']]) db.db.prepare('INSERT INTO edge_body_assets_v1 VALUES (?,?,?,?)').run('w-1', `body_${sha}`, JSON.stringify({ type }), rigidGLB());
+  const store = mountModeration(app, { db: db.db, worldId: 'w-1', bearer: () => undefined, requireUser: async () => { throw new ApiError(401, 'unauthorized', 'x'); }, siteLog: join(dir, 'site.jsonl') });
+  app.get('/v1/edge/body/assets/:file', (c) => c.body(new Uint8Array(rigidGLB()), 200, { 'Cache-Control': 'public, max-age=31536000, immutable' }));
+  app.put('/v1/edge/body', (c) => c.json({ ok: true }));
+  const get = (sha: string, h: Record<string, string> = {}) => app.request(`/v1/edge/body/assets/body_${sha}.glb`, { headers: h });
+  const open = await get(ceramic);
+  assert.equal(open.status, 200); assert.equal(open.headers.get('cache-control'), 'public, no-cache'); assert.equal(open.headers.get('etag'), `"body_${ceramic}"`);
+  assert.equal((await get(ceramic, { 'if-none-match': `"body_${ceramic}"` })).status, 304);
+  for (const sha of [ceramic, human]) store.append({ sha, action: 'hide', actor: 'dev:owner', role: 'creator' });
+  const c = await get(ceramic), h = await get(human);
+  assert.equal(c.status, 200); assert.equal(c.headers.get('x-moderation'), 'hidden'); assert.equal(c.headers.get('cache-control'), 'no-store');
+  assert.equal((await get(ceramic, { 'if-none-match': `"body_${ceramic}"` })).status, 200, 'a revalidating browser gets the stand-in, not its cached copy');
+  assert.equal(admitBodyGLB(Buffer.from(await c.arrayBuffer()), RIGID_MANIFEST).triangles, 1, 'the rigid stand-in is a valid body');
+  const humanoid = admitBodyGLB(Buffer.from(await h.arrayBuffer()), { type: 'humanoid', license: 'CC0', rightsConfirmed: true, rig: 'quaternius/1' });
+  assert.equal(humanoid.rig, 'quaternius/1', 'the humanoid stand-in is the canonical rigged figure');
+  const wear = await app.request('/v1/edge/body', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assetId: `body_${ceramic}` }) });
+  assert.equal(wear.status, 409); assert.equal((await wear.json()).error.code, 'body.moderated');
+  assert.equal((await app.request('/v1/edge/body', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'humanoid' }) })).status, 200);
+});
