@@ -337,8 +337,10 @@ points), extrude (polygon `[[x, z], …]` raised `h`) and sweep (radius `r` alon
 torus), `yaw`/`pitch`/`roll`, `scale`, `segments` (≤ 16), `material` or `color`, optional `tint` (a palette
 key the instance can recolour), `when` (show only for a param/state value), `collide`, `role` (creature
 parts and doors/lids/flames animate by role) and `gait` on the kit. `describe` prints the placed bounds
-(`y -0.5…0.5` means half below ground). To change a kit you already placed, define it as
-`"version": 2` and place/replace with `name@2`.
+(`y -0.5…0.5` means half below ground). To change a kit you already placed, define it again under the
+same name and version: every placed copy updates, the server re-checks each one (and refuses, naming the copy,
+if it no longer fits), and `undo` restores the previous version. A new `"version": 2` keeps the old copies as they
+are; use it when only new copies should change.
 
 - **Colour and material.** Per shape `color: "#rrggbb"` and `material` = wood stone plaster brick glass metal
   fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. Materials are flat looks,
@@ -429,6 +431,8 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 ## Manners
 
 - Use the library when it fits the request; author what it lacks; name things; group a request's edits; small batches; look often.
+- Leave the owner's existing things where they are unless the request asks: if your design does not fit, change the
+  design or ask, rather than moving a tree or a bench out of the way.
 - Keep the land plausible: mountains toward the edges unless asked, water in low ground, roads that
   connect places, paths to doors, room to walk between houses (≥ 3 m).
 - Say what you did in a sentence after each step — the owner is watching the world, not your logs.
