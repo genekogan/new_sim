@@ -1,0 +1,144 @@
+[
+  {
+    "name": "church",
+    "source": "B1-church/eval/final-snapshot.json: black-church params",
+    "params": {
+      "w": 12,
+      "d": 24,
+      "floorHeight": 5,
+      "roofPitch": 58,
+      "material": "plaster",
+      "wall": "#161616",
+      "trim": "#2e2e2e",
+      "roofColor": "#1c1e20",
+      "windows": 0,
+      "porch": 0,
+      "plan": {
+        "floors": [
+          {
+            "rooms": [
+              {
+                "id": "nave",
+                "rect": [
+                  0,
+                  3.5,
+                  12,
+                  24
+                ]
+              },
+              {
+                "id": "vestry",
+                "rect": [
+                  0,
+                  0,
+                  12,
+                  3.5
+                ]
+              }
+            ],
+            "doors": [
+              {
+                "between": [
+                  "nave",
+                  "vestry"
+                ],
+                "at": 0.85
+              }
+            ],
+            "exterior": [
+              {
+                "room": "nave",
+                "wall": "s",
+                "kind": "door",
+                "at": 0.5,
+                "width": 2.6
+              }
+            ]
+          }
+        ],
+        "stairs": []
+      },
+      "floors": 1,
+      "style": "cottage",
+      "roof": "gable",
+      "front": "s",
+      "balcony": false,
+      "wallThickness": 0.22
+    }
+  },
+  {
+    "name": "tea-house",
+    "source": "S2-teahouse/op/defs/teahouse-plan.json",
+    "params": {
+      "w": 7,
+      "d": 5.5,
+      "floorHeight": 2.8,
+      "roof": "gable",
+      "material": "wood",
+      "trim": "#382b20",
+      "wall": "#e9dbc1",
+      "plan": {
+        "floors": [
+          {
+            "rooms": [
+              {
+                "id": "tearoom",
+                "name": "tea room",
+                "rect": [
+                  0,
+                  0,
+                  7,
+                  5.5
+                ]
+              }
+            ],
+            "exterior": [
+              {
+                "room": "tearoom",
+                "wall": "s",
+                "kind": "door",
+                "at": 0.5
+              },
+              {
+                "room": "tearoom",
+                "wall": "s",
+                "kind": "window",
+                "at": 0.18
+              },
+              {
+                "room": "tearoom",
+                "wall": "s",
+                "kind": "window",
+                "at": 0.82
+              },
+              {
+                "room": "tearoom",
+                "wall": "n",
+                "kind": "window",
+                "at": 0.3
+              },
+              {
+                "room": "tearoom",
+                "wall": "n",
+                "kind": "window",
+                "at": 0.7
+              },
+              {
+                "room": "tearoom",
+                "wall": "e",
+                "kind": "window",
+                "at": 0.5
+              },
+              {
+                "room": "tearoom",
+                "wall": "w",
+                "kind": "window",
+                "at": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+]

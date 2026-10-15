@@ -24,6 +24,12 @@ export const buildingParams = {
   wall: { type: 'color', default: '#f1e7d2' },
   trim: { type: 'color', default: '#6b4a2b' },
   roofColor: { type: 'color', default: '#8a3b2a' },
+  chimney: { type: 'bool', default: true, doc: 'allow the preset chimney (false removes it)' },
+  shutters: { type: 'bool', default: true, doc: 'allow the preset window shutters' },
+  flowerBoxes: { type: 'bool', default: true, doc: 'allow the preset window flower boxes' },
+  quoins: { type: 'bool', default: true, doc: 'allow corner quoins and pilasters' },
+  hood: { type: 'bool', default: true, doc: 'allow exterior door hoods and brackets' },
+  doorLamp: { type: 'bool', default: true, doc: 'allow lamps beside exterior doors' },
   front: { type: 'enum', values: ['s', 'n', 'e', 'w'], default: 's', doc: 'side of the main door (s = +z)' },
   porch: { type: 'number', min: 0, max: 4, default: 0, doc: 'porch depth in metres (0 = none)' },
   balcony: { type: 'bool', default: false },
@@ -164,6 +170,7 @@ export function buildingPhysics(params: Record<string, unknown>, args: Record<st
       break;
     }
   });
+  slots.push(...buildingFacadeSlots(L, slots.map(s => s.id)));
 
   const H = L.wallTop + L.roofRise + (L.args.lantern ? 0.9 : 0);
   const turned = !(Math.abs(Math.sin(L.yaw)) < 1e-6);
@@ -172,6 +179,41 @@ export function buildingPhysics(params: Record<string, unknown>, args: Record<st
   const box: [number, number, number] = [r2(bw + (turned ? porchExtra : 0) + ringExtra), r2(H), r2(bd + (turned ? 0 : porchExtra) + ringExtra)];
   return { box, colliders, surfaces, openings, links, rooms, slots, tris: estimateTris(L), notes: L.checks.notes };
 }
+
+/** Additive facade frames. +z faces out; opening origins are at their sills, wall origins at
+ * storey mid-height. Existing room and legacy wall slot ids always keep their meaning. */
+export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []): Slot[] {
+  const slots: Slot[] = [], ids = new Set(reserved), c = Math.cos(L.yaw), s = Math.sin(L.yaw);
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+  const add = (base: string, kind: Slot['kind'], x: number, y: number, z: number, yaw: number, floor: number, label: string) => {
+    let id = base; for (let n = 2; ids.has(id); n++) id = `${base}-${n}`;
+    ids.add(id);
+    slots.push({ id, kind, p: [round(x * c + z * s), round(y), round(-x * s + z * c)], yaw: round(yaw + L.yaw), floor, accepts: {}, capacity: 1, label });
+  };
+  for (const o of L.openings) {
+    if (!o.exterior) continue;
+    const w = L.walls[o.wall], out = w?.out ?? normalForPoint(o.at), d = (w?.thick ?? L.t) / 2 + 0.02;
+    add(`opening-${o.id}`, 'wall', o.at[0] + out[0] * d, FLOOR0 + o.floor * L.fh + o.sill, o.at[1] + out[1] * d, Math.atan2(out[0], out[1]), o.floor, `${o.kind} ${o.id} facade`);
+  }
+  const counts = new Map<string, number>();
+  for (const w of L.walls) {
+    if (!w.exterior || !w.out) continue;
+    const key = `facade-f${w.floor}-${w.side ?? 'wall'}`, n = (counts.get(key) ?? 0) + 1; counts.set(key, n);
+    const d = w.thick / 2 + 0.02;
+    add(`${key}-${n}`, 'wall', (w.a[0] + w.b[0]) / 2 + w.out[0] * d, (w.y0 + w.y1) / 2, (w.a[1] + w.b[1]) / 2 + w.out[1] * d, Math.atan2(w.out[0], w.out[1]), w.floor, `${w.side ?? 'Outer'} wall, storey ${w.floor}`);
+  }
+  if (!L.round && (L.roof === 'gable' || L.roof === 'hip')) {
+    const alongX = L.W >= L.D, short = Math.min(L.W, L.D), long = Math.max(L.W, L.D), ov = L.open ? 0.4 : 0.35;
+    if (L.roof === 'gable' && !L.open) for (const sign of [-1, 1]) {
+      const d = long / 2 + 0.02, y = L.wallTop + L.roofRise * (short / 2) / (short / 2 + ov);
+      const side = alongX ? (sign > 0 ? 'e' : 'w') : (sign > 0 ? 's' : 'n');
+      add(`gable-${side}`, 'wall', alongX ? sign * d : 0, y, alongX ? 0 : sign * d, alongX ? sign * Math.PI / 2 : sign > 0 ? 0 : Math.PI, L.floors - 1, `${side} gable apex`);
+    }
+    add('ridge', 'roof', 0, L.wallTop + L.roofRise + 0.18, 0, alongX ? 0 : Math.PI / 2, L.floors, 'Roof ridge centre');
+  }
+  return slots;
+}
+function normalForPoint([x, z]: Vec2): Vec2 { return Math.abs(z) >= Math.abs(x) ? [0, Math.sign(z) || 1] : [Math.sign(x), 0]; }
 
 /** Outer outline of the footprint (canonical). */
 function outline(L: Layout): Vec2[] {
@@ -191,7 +233,7 @@ export function estimateTris(L: Layout): number {
 
 export const buildingGen: Generator & { layout: typeof buildingLayout } = {
   id: 'building/1', form: 'point', owner: 'L2', params: buildingParams as never,
-  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`); floors are slots `ground`, `floor-1`…; `front` is a stand slot outside the door. Style presets plan the rooms (cottage, townhouse, shop, hall, chapel, barn, shed, greenhouse, pavilion, tower); `plan` overrides. `describe` lists rooms, doors, stairs and the architecture checks.',
+  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`); floors are slots `ground`, `floor-1`…; `front` stands outside the door. Styles plan rooms; `plan` overrides. Optional chimney/shutters/flowerBoxes/quoins/hood/doorLamp switches preserve the preset when true. Changing trim recolours sills/lintels. Facade slots: opening-<opening-id> at each exterior sill, facade-f<floor>-<side>-<n> at wall centres, gable-<side> at gable apexes, ridge above the roof. Facades face out (+z); mount kits with place --on house/<slot>. Existing wall-<side>-<n> slots remain.',
   physics({ params, args }) { return buildingPhysics(params, args); },
   layout: buildingLayout,
 };
