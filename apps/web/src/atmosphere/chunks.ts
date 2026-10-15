@@ -12,6 +12,8 @@ import {GRADE_A,GRADE_B,GRADE_PARS,GRADE_GLSL} from './grade.ts';
 export const ATMOS={value:{x:0,y:.5,z:0,w:0}}; // x cloud-shadow strength, y coverage threshold, zw drift
 export const MIST={value:{x:0,y:0,z:-1.5,w:0}}; // x mist amount, y time (s, wrapped), z base y, w wetness
 export const SHEEN={value:{x:.6,y:.65,z:.7,w:0}}; // xyz sky colour reflected by puddles (linear), w rain intensity
+/** Desert dust: x amount (0..0.5), yz world-clock drift, w reserved. Zero costs no noise fetch. */
+export const DUST={value:{x:0,y:0,z:0,w:0}};
 /** Tileable fbm value noise, one texture for all weather patterns (R clouds, G mist, B puddles, A spare):
  * one filtered fetch replaces several procedural noise evaluations per pixel. */
 export function makeAtmosphereNoise(size=128){
@@ -40,13 +42,20 @@ export function installAtmosphereChunks(){
  C.fog_vertex+='\n#ifdef USE_FOG\nvEdenAtmosW=transpose(mat3(viewMatrix))*(mvPosition.xyz-viewMatrix[3].xyz);\n#endif\n';
  // Known interiors stay dry (static rectangles compiled in; evaluated only while the ground is wet).
  const f=(n:number)=>n.toFixed(2),dry='bool edenIndoor(vec3 w){'+INDOOR_RECTS.map(r=>`if(w.x>${f(r[1])}&&w.x<${f(r[3])}&&w.z>${f(r[2])}&&w.z<${f(r[4])}&&w.y<${f(r[5])})return true;`).join('')+'return false;}\n';
- C.fog_pars_fragment+='\n#ifdef USE_FOG\n'+dry+'varying vec3 vEdenAtmosW;\nuniform vec4 uEdenAtmos;\nuniform vec4 uEdenMist;\nuniform vec4 uEdenSheen;\nuniform sampler2D uEdenNoise;\n'+GRADE_PARS+NOISE+'#endif\n';
+ C.fog_pars_fragment+='\n#ifdef USE_FOG\n'+dry+'varying vec3 vEdenAtmosW;\nuniform vec4 uEdenAtmos;\nuniform vec4 uEdenMist;\nuniform vec4 uEdenSheen;\nuniform vec4 uEdenDust;\nuniform sampler2D uEdenNoise;\n'+GRADE_PARS+NOISE+'#endif\n';
  const mix='gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor );';
  if(C.fog_fragment.includes(mix))C.fog_fragment=C.fog_fragment.replace(mix,`if(uEdenMist.x>0.0){
   float edenH=max(vEdenAtmosW.y-uEdenMist.z,0.0);
   float edenN=texture2D(uEdenNoise,vEdenAtmosW.xz*(1.0/90.0)+uEdenAtmos.zw*.42).g;
   float edenM=uEdenMist.x*exp(-edenH/2.2)*(1.0-exp(-vFogDepth*.06))*(.55+.75*edenN);
   fogFactor=1.0-(1.0-fogFactor)*(1.0-clamp(edenM,0.0,.92));
+ }
+ if(uEdenDust.x>0.0){
+  float dustField=texture2D(uEdenNoise,vEdenAtmosW.xz*(1.0/110.0)+uEdenDust.yz).g;
+  float dustPatch=smoothstep(.18,.8,dustField);
+  float dustLow=exp(-max(vEdenAtmosW.y,0.0)/9.0);
+  float dustMass=uEdenDust.x*dustLow*(1.0-exp(-vFogDepth*.035))*(.35+1.15*dustPatch);
+  fogFactor=1.0-(1.0-fogFactor)*(1.0-clamp(dustMass,0.0,.55));
  }
  ${mix}
  ${GRADE_GLSL}`);
@@ -86,5 +95,5 @@ if(uEdenMist.w>0.0&&!edenIndoor(vEdenAtmosW)){
 #endif
 `;
  for(const lib of Object.values(THREE.ShaderLib)){if(!lib.uniforms||!('fogDensity' in lib.uniforms))continue;
-  lib.uniforms.uEdenAtmos=ATMOS;lib.uniforms.uEdenMist=MIST;lib.uniforms.uEdenSheen=SHEEN;lib.uniforms.uEdenNoise=NOISE_MAP;lib.uniforms.uEdenGradeA={value:GRADE_A};lib.uniforms.uEdenGradeB={value:GRADE_B};}
+  lib.uniforms.uEdenAtmos=ATMOS;lib.uniforms.uEdenMist=MIST;lib.uniforms.uEdenSheen=SHEEN;lib.uniforms.uEdenDust=DUST;lib.uniforms.uEdenNoise=NOISE_MAP;lib.uniforms.uEdenGradeA={value:GRADE_A};lib.uniforms.uEdenGradeB={value:GRADE_B};}
 }
