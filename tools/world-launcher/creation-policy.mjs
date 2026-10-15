@@ -16,7 +16,7 @@ export function creationPolicy(cfg = {}) {
 
 export function checkAccountCreation(policy, { createdAt, worlds, now = Date.now() }) {
   // Missing or corrupt registry age must never grant the mature allowance.
-  const young = !Number.isSafeInteger(createdAt) || createdAt > now || now - createdAt < policy.newAccountHours * 3600_000;
+  const young = !Number.isSafeInteger(createdAt) || createdAt <= 0 || createdAt > now || now - createdAt < policy.newAccountHours * 3600_000;
   const cap = young ? Math.min(policy.maxWorldsPerAccount, policy.newAccountWorldLimit) : policy.maxWorldsPerAccount;
   if (worlds.length >= cap) return {
     status: 409, ok: false, code: 'account-world-limit', limit: cap,

@@ -9,7 +9,7 @@ test('mature account cap includes old and sleeping registered worlds; existing o
   const blocked = check(24, [1, 2, 3, 4, 5]);
   assert.equal(blocked.status, 409); assert.equal(blocked.code, 'account-world-limit');
   assert.match(blocked.message, /existing worlds are still available/);
-  assert.equal(check(100, [1, 2, 3, 4, 5, 6]).limit, 5);
+  assert.equal(check(99, [1, 2, 3, 4, 5, 6]).limit, 5);
 });
 
 test('new accounts get a smaller total cap plus a precise rolling creation window', () => {
@@ -21,6 +21,7 @@ test('new accounts get a smaller total cap plus a precise rolling creation windo
   assert.equal(check(24, [1]), null, 'mature at exactly age boundary');
   assert.equal(checkAccountCreation(policy, { now, worlds: [{ createdAt: now }], createdAt: undefined }).status, 429);
   assert.equal(checkAccountCreation(policy, { now, worlds: [{ createdAt: now }], createdAt: now + 1 }).status, 429);
+  for (const createdAt of [0, -1]) assert.equal(checkAccountCreation(policy, { now, worlds: [{ createdAt: now }], createdAt }).status, 429);
 });
 
 test('policy is configurable and rejects invalid limits instead of disabling protection', () => {

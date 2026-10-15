@@ -156,7 +156,7 @@ export async function openLauncher(cfg = {}) {
       try { account = db.prepare('SELECT created_at FROM provider_accounts_v1 WHERE account_id=?').get(creator); }
       finally { db.close(); }
       // Read actual world ownership for old registry rows too: pre-cap worlds did not persist owner in worlds.json.
-      const worlds = registry.worlds.filter(w => worldOwner(w.slug) === creator);
+      const worlds = registry.worlds.filter(w => !w.fork && worldOwner(w.slug) === creator);
       const refusal = checkAccountCreation(accountPolicy, { createdAt: account?.created_at, worlds });
       if (refusal) { const { status, ...body } = refusal; return [status, body]; }
     }

@@ -38,10 +38,14 @@ test('account creation caps use verified owner, survive restart, serialize concu
     for (const method of ['PATCH', 'DELETE']) assert.equal((await fetch(`${origin}/__sim/worlds/alice-one`, { method, headers: bobHeaders, body: '{"name":"Stolen"}' })).status, 404);
     assert.equal((await fetch(`${origin}/__sim/worlds/alice-one/previews`, { headers: bobHeaders })).status, 401);
     assert.equal(launcher.registry.get('alice-one').name, 'Alice One');
+    // Old-world forks have a separate identity registry and need not have GodMode tables.
+    mkdirSync(join(dataDir, 'worlds', 'eden'));
+    new DatabaseSync(join(dataDir, 'worlds', 'eden', 'sim.db')).close();
+    launcher.registry.add({ slug: 'eden', name: 'Old Eden fixture', template: 'fork', fork: { of: 'eden' }, port: null, createdAt: Date.now() });
     sql(db => db.prepare('UPDATE provider_accounts_v1 SET created_at=? WHERE subject=?').run(Date.now() - 25 * 3600_000, 'user_alice'));
     const second = await post('Alice Two', 'user_alice'); assert.equal(second.status, 201, JSON.stringify(await second.json()));
     const cap = await post('Alice Too Many', 'user_alice'); assert.equal(cap.status, 409); assert.equal((await cap.json()).code, 'account-world-limit');
-    assert.equal(launcher.registry.worlds.length, 3);
+    assert.equal(launcher.registry.worlds.length, 4);
     assert.equal(existsSync(join(dataDir, 'worlds', 'alice-too-many')), false);
   } finally { await launcher?.close(); rmSync(dir, { recursive: true, force: true }); }
 });

@@ -6,6 +6,8 @@ Existing worlds remain usable above a newly lowered cap. Creation is serialized,
 survive launcher restarts. Caller-supplied owner, creator and IP do not change account attribution. Failed boots
 do not count. Operator-only creation is an explicit administrative exception. Dev-name launchers keep their
 existing local sandbox behavior; these account limits apply to the Clerk account path.
+Counts are local to the launcher's new-world registry. Old-world forks use a separate account registry and are
+not combined by matching account ID, provider subject or email; this is not a cross-registry human quota.
 
 | Launcher flag | Default | Meaning |
 | --- | --- | --- |
