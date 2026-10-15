@@ -5,6 +5,9 @@ import type {EdgeLedger} from '../ledger/ledger.ts';
 import {admitBodyGLB,BodyAdmissionError,BODY_LIMITS} from './admission.ts';
 import {FLOATER_MODELS} from '../../../../../mars/viewer/engine/bodies/models.ts';
 import {addSchemaPart} from '../events/schema.ts';
+import {intakeUpload,recordIntake} from '../../moderation/intake.ts';
+import {moderationFor} from '../../moderation/store.ts';
+import {BODY_UPLOAD_POLICY,UploadRejected} from '../../moderation/validate.ts';
 import {randomInt} from 'node:crypto';
 import {lookRequest,resolveLook,legacyPreset,LookError,HUMANOID_PARAMS,HUMANOID_REF} from '../../../../web/src/humanoid/look.ts';
 
@@ -31,6 +34,7 @@ async function uploadForm(c:Context){
 
 export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
   const db=deps.db.db,world=deps.host.worldId;
+  const moderation=moderationFor(db,world);
   const available=!!deps.host.engine.assignBodyV1&&!!deps.host.engine.bodyAssignmentProblemV1;
   const prefix=deps.souls.cfg.worldPath?.replace(/\/$/,'')??'';
   db.exec(`CREATE TABLE IF NOT EXISTS edge_body_assets_v1(world_id TEXT NOT NULL,asset_id TEXT NOT NULL,descriptor TEXT NOT NULL,content BLOB NOT NULL,PRIMARY KEY(world_id,asset_id)) WITHOUT ROWID;
@@ -58,7 +62,9 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
     const model=form.get('model'),raw=form.get('manifest');if(!model||typeof model==='string'||typeof raw!=='string'||raw.length>4096)throw new EdgeError(400,'body.multipart','One model file and one short JSON manifest are required');
     if(model.size>BODY_LIMITS.bytes)throw new EdgeError(413,'body.too-large','Body GLB exceeds 16 MiB');
     let manifest:unknown;try{manifest=JSON.parse(raw);}catch{throw new EdgeError(400,'body.manifest','Manifest must be JSON');}
-    const bytes=Buffer.from(await model.arrayBuffer()),admitted=admitBodyGLB(bytes,manifest);
+    // G8 moderation: one gate for every upload (format, budgets, malformed files, metadata stripped, classifier)
+    const intake=await intakeUpload(moderation,Buffer.from(await model.arrayBuffer()),{surface:'body',policy:BODY_UPLOAD_POLICY,words:[model.name],actor:s.owner}).catch(e=>{if(e instanceof UploadRejected)throw new EdgeError(e.status,e.code,e.message);throw e;});
+    const bytes=Buffer.from(intake.upload.bytes),admitted=admitBodyGLB(bytes,manifest);
     const asset={...admitted,rightsConfirmed:true,modelUrl:`${prefix}/v1/edge/body/assets/${admitted.assetId}.glb`};
     // Recheck bearer after parsing/admission: revoked tokens cannot publish assets.
     const again=deps.soul(c);if(again.soulId!==s.soulId||again.owner!==s.owner)throw new EdgeError(401,'unauthorized','Body owner changed during upload');
@@ -66,7 +72,8 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
     const quota=db.prepare('SELECT COUNT(*) n,COALESCE(SUM(length(a.content)),0) bytes FROM edge_body_owners_v1 o JOIN edge_body_assets_v1 a USING(world_id,asset_id) WHERE world_id=? AND owner=?').get(world,s.owner) as {n:number;bytes:number};
     if(!existing&&(quota.n>=8||quota.bytes+bytes.length>64*1024*1024))throw new EdgeError(409,'body.storage-limit','This owner already has the maximum admitted body storage');
     db.exec('BEGIN IMMEDIATE');try{db.prepare('INSERT OR IGNORE INTO edge_body_assets_v1 VALUES(?,?,?,?)').run(world,asset.assetId,JSON.stringify(asset),bytes);db.prepare('INSERT INTO edge_body_owners_v1(world_id,owner,asset_id,descriptor) VALUES(?,?,?,?) ON CONFLICT(world_id,owner,asset_id) DO UPDATE SET descriptor=excluded.descriptor').run(world,s.owner,asset.assetId,JSON.stringify(asset));db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
-    return {asset};
+    recordIntake(moderation,intake,{surface:'body',actor:s.owner});
+    return {asset,moderation:{...moderation.state(intake.upload.sha),classifier:intake.verdict.classifier,labels:intake.verdict.labels,stripped:intake.upload.stripped}};
   }));
   app.put('/v1/edge/body',wrap(async c=>{const s=deps.soul(c);return assign(s,await c.req.json().catch(()=>null),true);}));
   // The owner's look editor (SoulCard): the same look request for one of the signed-in owner's Souls.

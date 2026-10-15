@@ -27,6 +27,9 @@ import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
+import { intakeUpload, recordIntake } from '../moderation/intake.ts';
+import { moderationFor } from '../moderation/store.ts';
+import { assetPolicy, UploadRejected } from '../moderation/validate.ts';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const CORE_ASSET_INDEX = join(REPO_ROOT, 'worlds/core-assets/index.json');
@@ -553,7 +556,13 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     if (!bytes?.byteLength) throw new ApiError(400, 'invalid', 'send the file as multipart field `file` (or as the raw body with content-type model/gltf-binary)');
     if (bytes.byteLength > budget().bytes + 1024) throw new ApiError(413, 'asset.budget', `${bytes.byteLength} bytes > ${budget().bytes}`);
     const name = field.name?.trim() || undefined;
+    // G8 moderation: one gate for every upload (format, budgets, malformed files, metadata stripped, classifier)
+    const moderation = moderationFor(d.god.db.db, d.god.opts.worldId);
+    const intake = await intakeUpload(moderation, bytes, { surface: 'asset', policy: assetPolicy(budget()), words: [name, field.source, field.license, field.description, field.tags], actor: 'god' })
+      .catch((e) => { if (e instanceof UploadRejected) throw new ApiError(e.status, e.code, e.message); throw e; });
+    bytes = intake.upload.bytes;
     const meta = store.put(bytes, { name, license: field.license, source: field.source, by: 'god', budget: budget(), footprint });
+    recordIntake(moderation, intake, { surface: 'asset', actor: 'god' });
     const warnings: string[] = [];
     if (meta.kind === 'mesh') { const v = await validateGlb(bytes); if (v) throw new ApiError(400, 'asset.invalid', `the GLB does not parse: ${v}`); }
     const height = field.height ? Number(field.height) : undefined;
@@ -573,7 +582,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
       `${meta.kind} ${meta.sha.slice(0, 12)}… ${meta.bytes} bytes${meta.kind === 'mesh' ? `, ${meta.tris} tris, ${meta.textures} textures (max ${meta.texPx} px), box ${meta.box.join(' × ')} m, clips ${meta.animations?.join(', ') || 'none'}` : ''}`,
       ...(fpMeta?.baked?.notes ?? []), ...(def ? [`def ${def.name}@1: size ${def.size.box.join(' × ')} m, layer ${def.layer}${def.slots ? `, ${def.slots.length} room slots` : ''}`] : []), ...warnings,
     ];
-    return c.json({ ok: true, asset: { ...meta, url: `/assets/${meta.sha}.${meta.ext}` }, footprint: fpMeta ? { sha: fpMeta.sha, rooms: fpMeta.baked?.rooms?.length ?? 0, openings: fpMeta.baked?.openings?.length ?? 0, links: fpMeta.baked?.links?.length ?? 0, colliders: fpMeta.baked?.colliders.length ?? 0 } : null, def: def ?? null, defined: defined ?? null, warnings, report: report.join('\n') }, 200, noStore);
+    return c.json({ ok: true, moderation: { ...moderation.state(meta.sha), classifier: intake.verdict.classifier, labels: intake.verdict.labels, stripped: intake.upload.stripped }, asset: { ...meta, url: `/assets/${meta.sha}.${meta.ext}` }, footprint: fpMeta ? { sha: fpMeta.sha, rooms: fpMeta.baked?.rooms?.length ?? 0, openings: fpMeta.baked?.openings?.length ?? 0, links: fpMeta.baked?.links?.length ?? 0, colliders: fpMeta.baked?.colliders.length ?? 0 } : null, def: def ?? null, defined: defined ?? null, warnings, report: report.join('\n') }, 200, noStore);
   });
   app.get('/v1/god/assets', (c) => { d.requireGod(c); const strip = (m: AssetMeta) => { const { baked: _b, ...rest } = m; return { ...rest, url: `/assets/${m.sha}.${m.ext}` }; }; return c.json({ assets: store.listWorld().map(strip), ...(c.req.query('core') ? { core: store.coreAssets().map(strip) } : {}) }, 200, noStore); });
   app.get('/v1/god/assets/:sha{[0-9a-f]{64}}', (c) => { const m = store.info(c.req.param('sha')); if (!m) throw new ApiError(404, 'not-found', 'no such asset'); const { baked, ...rest } = m; return c.json({ asset: { ...rest, url: `/assets/${m.sha}.${m.ext}` }, ...(baked ? { baked } : {}) }, 200, noStore); });
