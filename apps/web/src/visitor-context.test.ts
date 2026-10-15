@@ -22,3 +22,10 @@ test('empty and factual return windows distinguish updates without creating a st
  assert.equal(awayHasUpdates(report),false);report.world.changes.push({id:1,at:2,kind:'weather',text:'Weather changed to cloudy.'});assert.equal(awayHasUpdates(report),true);
  report.world.changes=[];report.residents=[{id:'s',name:'Sam',events:[],places:[],conversations:1,incomplete:false}];assert.equal(awayHasUpdates(report),true);
 });
+
+test('interpolated drawn ticks use the preceding whole simulation tick accepted by the feedback API',()=>{
+ const state=(tick:number)=>({selection:{soulId:null,entityId:null},shownTick:tick}) as never;
+ assert.equal(feedbackMoment(null,state(125.75)).tick,125);
+ assert.equal(feedbackMoment(null,state(0.1)).tick,0);
+ for(const tick of [NaN,Infinity,-1,Number.MAX_SAFE_INTEGER+1])assert.equal(feedbackMoment(null,state(tick)).tick,null);
+});
