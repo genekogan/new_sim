@@ -15,8 +15,9 @@ import { deferredOp } from './layers.ts';
 import { RegistryCatalog } from '@sim/catalog';
 import { registryCatalog } from './registry-catalog.ts';
 import { submissionSchema, type Expectations } from './submission.ts';
-import { GodBuilds, buildFieldSchema, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
+import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
 import { Parts } from './parts.ts';
+import { buildReceipt } from './build-integrity.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -111,6 +112,7 @@ export class GodMode {
     }
     this.builds = new GodBuilds(this.store, { model: () => this.model, now: () => this.now(), pauseMs: opts.buildPauseMs, closureMs: opts.buildClosureMs,
       emit: m => { try { this.opts.emit(m); } catch { /* viewers are best effort */ } },
+      receipt: (id, body) => this.checkBuild(id, body)?.receipt,
       notice: e => { this.push('build', e); for (const fn of this.buildListeners) { try { fn(e); } catch { /* listeners must not turn a committed edit into a refusal */ } } },
     });
     this.parts = new Parts(this.store, { model: () => this.model, now: () => this.now() });
@@ -222,7 +224,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
-    return this.commitBatch(batch, note);
+    const result = this.commitBatch(batch, note);
+    if (!result.accepted) {
+      const input = batch as { build?: BuildField; preview?: string } | null;
+      this.builds.recordRefusal(input?.build ?? (input?.preview ? this.getPreview(input.preview)?.build : this.caller.build), result.failures);
+    }
+    return result;
   }
   /** Only server-owned genesis import can request trusted library adoption; request JSON cannot enable it. */
   private commitBatch(batch: unknown, note?: string, trusted = false): Result {
@@ -276,6 +283,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
     const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made, journalNote);
     if (updates.failures) return { accepted: false, failures: updates.failures };
+    for (const w of updates.writes) if (w.status === 'done' && w.next.done) {
+      const pending: EditRow = { seq: result.seq, by: 'god', at, note: journalNote ?? null, grp: normalized.group ?? null, ops: normalized.ops, inverse: r.inverse!, kind: 'edit', undone: 0, undo_of: null };
+      const targets = [pending, ...this.store.groupEditsUnder(w.id, false, 2_147_483_647)], undo = this.preflightUndo(targets, next, false);
+      w.next.done.receipt = buildReceipt(next.fork(), { ...this.builds.body(w.id)!, ...w.next }, targets, undo.ok ? { ok: true, baseline: undo.model } : undo, at); w.receipt = w.next.done.receipt;
+      const durable = structuredClone(w.next); delete durable.done!.receipt; w.body = JSON.stringify(durable);
+    }
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
     result.warnings.push(...this.parts.warnings(normalized.ops));
     if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
@@ -315,7 +328,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     let made: string[] = [];
     const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
       const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
-      const check = this.builds.check(admission, this.model, after, diff, ops); if ('failure' in check) return check.failure; made = check.made; return null;
+      const check = this.builds.check(admission, this.model, after, diff, ops, true); if ('failure' in check) return check.failure; made = check.made; return null;
     } });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true, made);
@@ -351,25 +364,63 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return r.result;
   }
 
-  /** Undo every edit of a group (newest first). Stops at the first conflict and reports how far it got. */
-  undoGroup(group: string): { accepted: boolean; reverted: number[]; notReverted: number[]; failed?: number; failures?: Failure[] } {
-    // A build owns its lead group and every claim/subgroup, including after finish.
-    if (this.store.build(group)) return this.undoGroupUnder(group);
-    const reverted: number[] = [];
-    const targets = this.store.groupEdits(group);
-    for (const [index, target] of targets.entries()) {
-      const r = this.revert(target, 'undo');
-      if (!r.accepted) return { accepted: false, reverted, notReverted: targets.slice(index).map(e => e.seq), failed: target.seq, failures: r.failures };
-      reverted.push(target.seq);
+  /** Shared inverse-chain preflight for atomic undo and checked build receipts. No live writes or events. */
+  preflightUndo(targets: EditRow[], source = this.model, withCaller = true, releaseClaims?: string) {
+    let model = source.fork(), rev = this.store.buildsRev();
+    const builds = this.builds.fork(() => model, releaseClaims), entries = [];
+    const field = withCaller ? this.caller.build : undefined, tick = this.opts.tick(), at = this.now();
+    for (const target of targets) {
+      const admission = builds.admit(field, {}, this.caller.identity);
+      if (admission.failures) return { ok: false as const, failed: target.seq, failures: admission.failures };
+      const next = model.fork(); let made: string[] = [];
+      const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
+        const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+        const check = builds.check(admission, model, after, diff, ops, true);
+        if ('failure' in check) return check.failure; made = check.made; return null;
+      } });
+      if (!r.result.accepted) return { ok: false as const, failed: target.seq, failures: r.result.failures.map(f => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
+      const roots = builds.rootsDelta(model, next, r.diff!, 'undo', field);
+      const updates = builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true, made);
+      if (updates.failures) return { ok: false as const, failed: target.seq, failures: updates.failures };
+      // Mirror SQL's global revision sequence so each later planned row expects the preceding write.
+      for (const w of updates.writes) w.rev = ++rev;
+      r.result.warnings.push(...roots.warnings, ...updates.warnings);
+      entries.push({ model: next, diff: r.diff!, edit: { seq: r.result.seq, by: 'god', at, note: `undo of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind: 'undo' as const, undoOf: target.seq, builds: updates.writes }, updates, tick });
+      model = next; builds.accepted(updates.writes);
     }
-    return { accepted: reverted.length > 0, reverted, notReverted: [], ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
+    return { ok: true as const, entries, model };
   }
-  /** Abandon must cover every subgroup, with no 200/500-entry truncation of the undo stack. */
-  undoGroupUnder(group: string) {
-    const targets = this.store.groupEditsUnder(group, false, 2_147_483_647), reverted: number[] = [];
-    for (const [i, target] of targets.entries()) { const r = this.revert(target, 'undo'); if (!r.accepted) return { accepted: false, reverted, notReverted: targets.slice(i).map(e => e.seq), failures: r.failures }; reverted.push(target.seq); }
-    return { accepted: true, reverted, notReverted: [] as number[] };
+  checkBuild(id: string, override?: BuildBody) {
+    const status = this.builds.status(id), saved = this.builds.body(id), body = saved && override ? { ...saved, ...override } : saved; if (!status || !body) return null;
+    const targets = this.store.groupEditsUnder(id, false, 2_147_483_647), undo = this.preflightUndo(targets, this.model, false, override && !override.claims.some(c => c.status === 'held') ? id : undefined);
+    const receipt = buildReceipt(this.model.fork(), body, targets, undo.ok ? { ok: true, baseline: undo.model } : undo, this.now());
+    return { ...status, receipt };
   }
+  private undoTargets(targets: EditRow[], emptyOK: boolean, releaseClaims?: string) {
+    const notReverted = targets.map(e => e.seq), preflight = this.preflightUndo(targets, this.model, true, releaseClaims);
+    if (!preflight.ok) return { accepted: false, reverted: [] as number[], notReverted, failed: preflight.failed, failures: preflight.failures };
+    if (!targets.length && !emptyOK) return { accepted: false, reverted: [], notReverted, failures: [{ op: -1, code: 'undo.conflict', detail: 'no edits in group' }] };
+    const refusal = this.store.commitSequence(this.owner, preflight.entries);
+    if (refusal) return { accepted: false, reverted: [] as number[], notReverted, ...(!refusal.accepted ? { failures: refusal.failures } : {}) };
+    // Make the complete result visible before invoking observers; an observer cannot expose a half-reverted world.
+    const frames = preflight.entries.map(entry => ({ entry, deltas: this.builds.accepted(entry.updates.writes) }));
+    if (preflight.entries.length) Object.assign(this.model, preflight.model);
+    const warnings: string[] = [];
+    for (const { entry, deltas } of frames) {
+      try { this.notify(entry.edit.seq, entry.diff, 'undo', entry.edit.group); } catch (error) { warnings.push(`Undo committed; observer failed: ${String(error).slice(0, 200)}`); }
+      this.publish(entry.edit.seq, entry.tick, entry.diff, 'undo', deltas, entry.model);
+      this.builds.announceCommitted(entry.updates.writes);
+    }
+    const echoed = [...preflight.entries].reverse().find(e => e.updates.echo), echo = echoed?.updates.echo;
+    if (echo) echo.rev = echoed!.updates.writes.find(w => w.echo)!.rev!;
+    return { accepted: true, reverted: notReverted, notReverted: [] as number[], ...(echo ? { build: echo } : {}), ...(warnings.length ? { warnings } : {}) };
+  }
+  undoGroup(group: string) {
+    // A build owns its lead group and every claim/subgroup, including after finish.
+    return this.store.build(group) ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
+  }
+  /** No 200/500-entry truncation, and no prefix collision with a neighbouring build/chapter. */
+  undoGroupUnder(group: string, force = false) { return this.undoTargets(this.store.groupEditsUnder(group, false, 2_147_483_647), true, force ? group : undefined); }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
     this.builds.sweep();
@@ -445,11 +496,11 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
     for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
   }
-  private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by'], builds: SiteDelta[] = []) {
+  private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by'], builds: SiteDelta[] = [], source = this.model) {
     const referenced = new Map<string, StoredDef>();
-    for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
+    for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = source.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
     const now = this.now();
-    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: now, now, diff, by, defs: [...referenced.values()].map(publicDef), ...(builds.length ? { builds } : {}), ...(diff.tiles.length || diff.constants ? { ground: this.model.ground() } : {}) };
+    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: now, now, diff, by, defs: [...referenced.values()].map(publicDef), ...(builds.length ? { builds } : {}), ...(diff.tiles.length || diff.constants ? { ground: source.ground() } : {}) };
     try { this.opts.emit(m); } catch { /* viewers are best-effort */ }
     this.push('diff', m);
   }

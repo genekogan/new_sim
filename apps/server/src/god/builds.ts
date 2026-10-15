@@ -2,11 +2,13 @@
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldModel, type OBB, type Op } from '@sim/world-compiler';
+import type { BuildReceipt } from './build-integrity.ts';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
-export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete'] as const;
+export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside'] as const;
 const fixes: Record<typeof buildCodes[number], string> = {
+  'build.outside': 'Name the existing entity with build start --include <ref> or build step --include <ref>, then retry.',
   'build.unknown': '`build` lists open builds; use `build start <id>`.',
   'build.closed': 'Start a new build with a new id.',
   'build.exists': 'Pick a new id (church-2), or use `build resume <id>`.',
@@ -31,15 +33,17 @@ const fail = (code: typeof buildCodes[number], detail: string, field?: string, e
 const schemaFailure = (error: z.ZodError) => ({ ok: false as const, failures: error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the build shapes in GET /v1/god/schema.' })) });
 const pair = z.tuple([z.number().finite(), z.number().finite()]);
 const idSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/);
+const includeSchema = z.array(z.string().min(1).max(300)).max(512);
+const asksSchema = z.array(z.string().min(1).max(500)).max(64);
 const labelSchema = z.string().min(1).max(60);
 export const buildFieldSchema = z.object({ id: idSchema, lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), claim: z.string().regex(/^c_[0-9a-f]{8}$/).optional(), step: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), done: z.boolean().optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.');
 const siteSchema = z.object({ at: pair, size: z.tuple([z.number().min(1).max(200), z.number().min(1).max(200)]), yaw: z.number().finite().default(0) }).strict();
 export const massSchema = z.object({ name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/).optional(), at: pair, size: z.tuple([z.number().positive().max(200), z.number().positive().max(200)]), h: z.number().min(.5).max(120), yaw: z.number().finite().optional(), roof: z.enum(['flat', 'gable', 'pyramid']).optional() }).strict();
-export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), root: z.string().min(1).max(300).optional(), include: z.array(z.string().min(1).max(300)).max(512).optional() }).strict();
+export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), asks: asksSchema.optional(), root: z.string().min(1).max(300).optional(), include: includeSchema.optional() }).strict();
 const STEP_CALLS = 256;
 const cleanText = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/ {2,}/g, ' ').trim();
 export const buildActionSchemas = {
-  step: z.object({ lease: buildFieldSchema.shape.lease, claim: buildFieldSchema.shape.claim, n: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), say: z.string().transform(cleanText).pipe(z.string().min(1).max(140)).optional(), masses: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/)).max(8).optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.'),
+  step: z.object({ include: includeSchema.optional(), asks: asksSchema.optional(), lease: buildFieldSchema.shape.lease, claim: buildFieldSchema.shape.claim, n: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), say: z.string().transform(cleanText).pipe(z.string().min(1).max(140)).optional(), masses: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/)).max(8).optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.'),
   pause: z.object({ lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), note: z.string().max(4000).optional() }).strict(),
   resume: z.object({ lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), take: z.boolean().optional() }).strict(),
   done: z.object({ summary: z.string().max(4000).optional(), force: z.boolean().optional() }).strict(),
@@ -55,14 +59,14 @@ export type BuildCaller = { identity?: Identity; build?: BuildField };
 export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
 type Caption = { text: string; at: number };
 export type BuildBody = {
-  id: string; title: string; plan: { steps: string[]; brief?: string }; site: Site; massing: Mass[]; roots: string[];
+  id: string; title: string; plan: { steps: string[]; brief?: string; asks?: string[] }; root?: string; chapterOf?: string; include?: string[]; initialRoots?: string[]; refusals?: { at: number; code: string; entity?: string; detail: string }[]; refusalCount?: number; site: Site; massing: Mass[]; roots: string[];
   lead: { lease: string; label: string; hash8: string; tokenHash: string; since: number };
   step: { n: number; label: string; at: number; seq: number | null };
   steps: { n: number; label: string; claim?: string; batches: number; firstSeq: number; lastSeq: number; at: number }[];
   claims: Claim[]; agents: { label: string; hash8: string; at: number }[]; pauses: number;
   firstEditAt?: number; lastEditAt?: number; paused?: { from: number; seenAt: number; explicit?: boolean; note?: string };
   lastBatchAt?: number; closureLapsedAt?: number; say?: Caption; sayAt?: number; designing?: string[]; note?: Caption; stepCalls?: string[];
-  done?: { at: number; summary?: string; byLabel: string };
+  done?: { at: number; summary?: string; byLabel: string; receipt?: BuildReceipt };
   abandoned?: { at: number; undo?: { reverted: number[]; notReverted: number[] } }; startHash: string;
 };
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
@@ -73,6 +77,7 @@ export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed'
 export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
+  chapters?: { id: string; brief?: string; asks?: string[] }[];
   status: BuildRow['status']; rev: number; createdAt: number; lastAt: number; pauseAfterMs: number; now: number; closed: boolean; reopensAt?: number;
   lead: { label: string; hash8: string; since: number; live: boolean }; roots: { id: string; path: string }[];
   claims: (Omit<Claim, 'user' | 'status'> & { status: Claim['status'] | 'stale'; rootPath?: string })[];
@@ -286,13 +291,20 @@ export class GodBuilds {
   readonly rootIndex = new Map<string, string>();
   readonly pauseMs: number; readonly closureMs: number;
   readonly store: WorldStore;
-  private host: { model: () => WorldModel; now: () => number; pauseMs?: number; closureMs?: number; emit: (message: WorldBuildMessage) => void; notice: (event: BuildNotice) => void };
+  private host: { model: () => WorldModel; now: () => number; pauseMs?: number; closureMs?: number; emit: (message: WorldBuildMessage) => void; notice: (event: BuildNotice) => void; receipt?: (id: string, body?: BuildBody) => BuildReceipt | undefined };
   constructor(store: WorldStore, host: GodBuilds['host']) {
     this.store = store; this.host = host;
     const positive = (v: number | undefined, fallback: number) => v !== undefined && Number.isFinite(v) && v > 0 ? v : fallback;
     this.pauseMs = positive(host.pauseMs ?? (process.env.GOD_BUILD_PAUSE_MS ? Number(process.env.GOD_BUILD_PAUSE_MS) : undefined), 600_000);
     this.closureMs = positive(host.closureMs ?? (process.env.GOD_BUILD_CLOSE_IDLE_MS ? Number(process.env.GOD_BUILD_CLOSE_IDLE_MS) : undefined), 1_800_000);
     for (const r of store.builds(true)) this.rows.set(r.id, decode(r)); this.index();
+  }
+  /** Detached metadata for inverse-chain preflight; never writes or publishes. */
+  fork(model: () => WorldModel, releaseClaims?: string) {
+    const fork = new GodBuilds(this.store, { ...this.host, model, emit: () => {}, notice: () => {} });
+    fork.rows = structuredClone(this.rows);
+    if (releaseClaims) for (const c of fork.rows.get(releaseClaims)?.body.claims ?? []) if (c.status === 'held') c.status = 'released';
+    fork.index(); return fork;
   }
   private index() { this.rootIndex.clear(); for (const r of this.rows.values()) for (const id of r.body.roots) this.rootIndex.set(id, r.id); }
   private row(id: string) { return this.rows.get(id) ?? (() => { const r = this.store.build(id); return r ? decode(r) : undefined; })(); }
@@ -329,7 +341,8 @@ export class GodBuilds {
   }
   private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status })), ...this.captions(r) }; }
   private view(r: Row, now: number, recent?: { seq: number; note: string | null; at: number }[]): GodBuildView {
-    const b = structuredClone(r.body), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
+    const b = structuredClone(r.body), refused = this.store.buildRefusals(r.id), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
+    if (b.done && !b.done.receipt) b.done.receipt = this.store.buildReceipt(r.id);
     const step = [...b.steps].reverse().find(s => s.n === b.step.n && !s.claim);
     const current = step ? { ...step, recent: recent ?? this.store.buildRecent(r.id, step.firstSeq, step.lastSeq) } : null;
     const model = this.host.model();
@@ -339,11 +352,15 @@ export class GodBuilds {
       const p = siteLocal(b.site, fs.length ? [fs.reduce((a, f) => a + f.c[0], 0) / fs.length, fs.reduce((a, f) => a + f.c[1], 0) / fs.length] : [wp!.x, wp!.z]);
       boxes.forEach((ms, i) => { if (inSite(ms, p)) massing[i].parts++; });
     }
-    return { ...b, ...this.captions(r), status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
+    const chapters: NonNullable<GodBuildView['chapters']> = [];
+    let parent = b.chapterOf; const seen = new Set([b.id]);
+    while (parent && !seen.has(parent) && chapters.length < 24) { seen.add(parent); const previous = this.row(parent); if (!previous) break; chapters.unshift({ id: previous.id, brief: previous.body.plan.brief, asks: previous.body.plan.asks }); parent = previous.body.chapterOf; }
+    return { ...b, ...(refused.count ? { refusalCount: refused.count, refusals: refused.recent } : {}), ...(chapters.length ? { chapters } : {}), ...this.captions(r), status: effective(r, now, this.pauseMs), rev: r.rev, createdAt: r.created_at, lastAt: r.last_at, now, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), lead: { ...lead, live: now - r.last_at <= this.pauseMs }, roots: b.roots.map(id => ({ id, path: model.pathOf(id) })), claims: b.claims.map(({ user: _user, ...c }) => ({ ...c, status: c.status === 'held' && now - c.lastAt > this.pauseMs ? 'stale' : c.status, ...(c.root ? { rootPath: model.pathOf(c.root) } : {}) })), current, next: b.step.n < b.plan.steps.length ? { n: b.step.n + 1, label: b.plan.steps[b.step.n] } : null, massing };
   }
   publicList(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), builds: [...this.rows.values()].map(r => this.public(r, now)) }; }
   list(now = this.host.now()) { this.sweep(now); return { now, rev: this.store.buildsRev(), open: [...this.rows.values()].map(r => this.view(r, now)), recent: this.store.builds().filter(r => !open(r)).slice(0, 20).map(r => { const b = decode(r); return { id: r.id, title: b.body.title, status: r.status, rev: r.rev, step: b.body.step, lastAt: r.last_at }; }) }; }
   summaries(now = this.host.now()) { this.sweep(now); return [...this.rows.values()].map(r => ({ id: r.id, status: effective(r, now, this.pauseMs), step: structuredClone(r.body.step) })); }
+  body(id: string) { const row = this.row(id); if (!row) return undefined; const b = structuredClone(row.body), refused = this.store.buildRefusals(id); if (b.done && !b.done.receipt) b.done.receipt = this.store.buildReceipt(id); return { ...b, ...(refused.count ? { refusalCount: refused.count, refusals: refused.recent } : {}) }; }
   status(id: string) {
     const now = this.host.now(); this.sweep(now); const r = this.row(id); if (!r) return null;
     const step = [...r.body.steps].reverse().find(s => s.n === r.body.step.n && !s.claim), { journal, recent } = this.store.buildJournal(id, step);
@@ -384,12 +401,18 @@ export class GodBuilds {
     if (x < x0 || x > x1 || z < z0 || z > z1) return fail('build.site', 'Site centre is outside the ground extent.', 'site');
     if ([...this.rows.values()].some(r => obbOverlap(box(input.site), box(r.body.site)))) return fail('build.site', 'Site overlaps another open build.', 'site');
     for (const m of input.massing) for (const a of [-1, 1]) for (const b of [-1, 1]) { const p = siteWorld({ at: m.at, size: m.size, yaw: m.yaw ?? 0 }, [a * m.size[0] / 2, b * m.size[1] / 2]); if (Math.abs(p[0]) > input.site.size[0] / 2 + 1e-7 || Math.abs(p[1]) > input.site.size[1] / 2 + 1e-7) return fail('build.site', 'Massing must be wholly inside the site.', 'massing'); }
-    const root = input.root ? model.get(input.root) : undefined;
-    if (input.root && !root) return { ok: false as const, failures: [{ op: -1, code: 'entity.unknown', entity: input.root, detail: `Unknown root ${input.root}.`, fix: 'Use an existing entity id or path.' }] };
+    const chapter = input.root ? this.row(input.root) : undefined;
+    if (chapter && open(chapter)) return fail('build.site', 'Finish the previous chapter before continuing it.', 'root');
+    const root = input.root && !chapter ? model.get(input.root) : undefined;
+    if (input.root && !root && !chapter) return { ok: false as const, failures: [{ op: -1, code: 'entity.unknown', entity: input.root, detail: `Unknown root ${input.root}.`, fix: 'Use an existing entity id or path.' }] };
     if (root && this.rootIndex.has(root.id)) return fail('build.site', 'Root already belongs to an open build.', 'root');
-    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief ? { brief: input.brief } : {}) }, site: input.site, massing: input.massing, roots: root ? [root.id] : [], lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
-    const { inventory, protectedThings } = this.inventory(body), included = new Set((input.include ?? []).map(id => model.get(id)?.id ?? id));
-    const missing = protectedThings.filter(e => !included.has(e.id));
+    const adopted = chapter ? chapter.body.roots.filter(id => model.entities.has(id)) : root ? [root.id] : [];
+    if (adopted.some(id => this.rootIndex.has(id))) return fail('build.site', 'A chapter root already belongs to an open build.', 'root');
+    const included: string[] = [];
+    for (const ref of input.include ?? []) { const e = model.get(ref); if (!e) return fail('build.site', `Unknown included entity ${ref}.`, 'include', { fix: 'Use an existing entity id or path.' }); included.push(e.id); }
+    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief !== undefined ? { brief: input.brief } : {}), ...(input.asks ? { asks: input.asks } : {}) }, ...(input.root ? { root: input.root } : {}), ...(chapter ? { chapterOf: chapter.id } : {}), ...(included.length ? { include: [...new Set(included)] } : {}), site: input.site, massing: input.massing, roots: adopted, ...(adopted.length ? { initialRoots: adopted } : {}), lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
+    const { inventory, protectedThings } = this.inventory(body), explicit = new Set(included);
+    const missing = protectedThings.filter(e => !explicit.has(e.id));
     if (missing.length) return { ...fail('build.site', `Closure would cover ${missing.length} protected thing(s).`, 'include', { fix: `Include ${missing.slice(0, 50).map(e => `${e.path} (${e.id})`).join(', ')}${missing.length > 50 ? `; ${missing.length - 50} more (see inventory counts)` : ''}, or move/shrink the massing or root.`, measured: missing.length }), inventory };
     const encoded = JSON.stringify(body), failure = buildBodyFailure(encoded); if (failure) return { ok: false as const, failures: [failure] };
     const inserted = this.store.insertBuild(input.id, now, encoded); if (!inserted) return fail('build.exists', `${input.id} already exists.`);
@@ -398,7 +421,8 @@ export class GodBuilds {
     return { ok: true as const, build, lease: body.lead.lease, inventory };
   }
   private save(row: Row, body: BuildBody, status: Row['status'], at: number, kind: BuildEventKind, transition = false) {
-    const w: BuildWrite = { id: row.id, expectRev: row.rev, status, lastAt: at, body: JSON.stringify(body) };
+    const durable = structuredClone(body), receipt = durable.done?.receipt; if (durable.done) delete durable.done.receipt;
+    const w: BuildWrite = { id: row.id, expectRev: row.rev, status, lastAt: at, body: JSON.stringify(durable), ...(receipt ? { receipt } : {}) };
     const failure = buildBodyFailure(w.body, !transition); if (failure) return { ok: false as const, failures: [failure] };
     const refused = this.store.saveBuild(w); if (refused && !refused.accepted) return { ok: false as const, failures: refused.failures };
     const next: Row = { ...row, body, status, rev: w.rev!, last_at: at }; this.install(next);
@@ -464,13 +488,18 @@ export class GodBuilds {
     const row = admission.row!;
     const unknown = input.masses?.filter(name => !row.body.massing.some(m => m.name === name));
     if (unknown?.length) return fail('build.site', `Unknown mass(es): ${unknown.join(', ')}.`, 'masses', { fix: 'Use mass names from this build\'s massing.' });
+    const included: string[] = [];
+    for (const ref of input.include ?? []) { const e = this.host.model().get(ref); if (!e) return fail('build.site', `Unknown included entity ${ref}.`, 'include'); included.push(e.id); }
+    if (input.claim && (input.include || input.asks)) return fail('build.claim', 'The lead records includes and owner asks.', 'include');
     const old = input.claim ? row.body.claims.find(c => c.id === input.claim)! : row.body;
-    const key = hashOf({ claim: input.claim ?? null, n: input.n ?? old.step.n, say: input.say ?? null }).slice(0, 16);
+    const key = hashOf({ claim: input.claim ?? null, n: input.n ?? old.step.n, say: input.say ?? null, ...(input.include ? { include: input.include } : {}), ...(input.asks ? { asks: input.asks } : {}) }).slice(0, 16);
     if (row.body.stepCalls?.includes(key)) {
       if (input.lease) this.touch(row.body.lead.tokenHash, now);
       return { ok: true as const, build: this.view(this.row(id)!, now), replayed: true };
     }
     const body = structuredClone(row.body), claim = input.claim ? body.claims.find(c => c.id === input.claim)! : undefined;
+    if (included.length) body.include = [...new Set([...(body.include ?? []), ...included])];
+    if (input.asks) { body.plan.asks = [...new Set([...(body.plan.asks ?? []), ...input.asks])]; if (body.plan.asks.length > 64) return fail('build.limit', 'At most 64 owner asks per chapter.', 'asks'); }
     const current = claim?.step ?? body.step, n = Math.max(current.n, input.n ?? current.n);
     const label = input.n !== undefined && input.n < current.n ? current.label : input.label ?? (n > current.n ? body.plan.steps[n - 1] ?? `step ${n}` : current.label);
     if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
@@ -556,20 +585,15 @@ export class GodBuilds {
     if (row.status === 'done') return { ok: true as const, build: this.view(row, now), replayed: true }; if (!open(row)) return fail('build.closed', id);
     if (!p.data.force && this.liveClaims(row, now).length) return fail('build.claims-open', id);
     const body = structuredClone(row.body); if (p.data.force) for (const c of body.claims) if (c.status === 'held') c.status = 'released';
-    body.done = { at: now, byLabel: caller.label, ...(p.data.summary ? { summary: p.data.summary } : {}) }; return this.savedView(this.save(row, body, 'done', row.last_at, 'done'));
+    body.done = { at: now, byLabel: caller.label, ...(this.host.receipt ? { receipt: this.host.receipt(id, body) } : {}), ...(p.data.summary ? { summary: p.data.summary } : {}) }; return this.savedView(this.save(row, body, 'done', row.last_at, 'done'));
   }
   abandon(id: string, raw: unknown, undo: () => { accepted: boolean; reverted: number[]; notReverted: number[]; failures?: Failure[] }) {
     const now = this.host.now(); this.sweep(now); const p = buildActionSchemas.abandon.safeParse(raw); if (!p.success) return schemaFailure(p.error); let row = this.row(id); if (!row) return fail('build.unknown', id);
     if (row.status === 'abandoned') return { ok: true as const, build: this.view(row, now), replayed: true }; if (!open(row)) return fail('build.closed', id);
     if (!p.data.force && this.liveClaims(row, now).length) return fail('build.claims-open', id);
-    if (p.data.force && row.body.claims.some(c => c.status === 'held')) {
-      const body = structuredClone(row.body); for (const c of body.claims) if (c.status === 'held') c.status = 'released';
-      const released = this.save(row, body, row.status, row.last_at, 'released'); if (!released.ok) return released;
-      row = released.row; this.announce(row, 'released', { added: [], removed: [] });
-    }
     const reverted = p.data.undo ? undo() : undefined;
-    if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo stopped before all build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
-    row = this.row(id)!; const body = structuredClone(row.body); body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
+    if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo preflight failed; no build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
+    row = this.row(id)!; const body = structuredClone(row.body); if (p.data.force) for (const c of body.claims) if (c.status === 'held') c.status = 'released'; body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
   }
   private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && now - c.lastAt <= this.pauseMs); }
   private overlap(scope: Scope, now: number, except?: string) {
@@ -597,9 +621,24 @@ export class GodBuilds {
     if (row.body.claims.some(c => c.status === 'held' && group === `${row.id}/${c.part}`)) return { warnings, failures: [buildFailure('build.group', `${group} belongs to a held claim.`)] };
     return { row, field, group, warnings };
   }
-  check(admission: Admission, before: WorldModel, after: WorldModel, diff: Diff, ops: Op[]) {
+  check(admission: Admission, before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], revert = false) {
     const now = this.host.now(), others: LiveClaim[] = [];
     for (const row of this.rows.values()) for (const c of this.liveClaims(row, now)) if (c.id !== admission.mine?.id) others.push(scoped(c));
+    if (admission.row && !revert) {
+      const body = admission.row.body, allowed = new Set([...body.roots, ...(body.include ?? []), ...body.claims.flatMap(c => [...(c.root ? [c.root] : []), ...c.made])]);
+      const explicit = new Map<string, number>();
+      ops.forEach((op, i) => {
+        if (['move', 'set', 'remove'].includes(op.op) && 'id' in op) { const e = before.get(op.id); if (e) for (const id of before.subtree(e.id)) explicit.set(id, i); }
+        if (op.op === 'define') for (const e of diff.upserts) { const prev = before.entities.get(e.id); if (prev && before.resolvedDef(prev.def)?.hash !== after.resolvedDef(e.def)?.hash) explicit.set(e.id, i); }
+      });
+      let created: Set<string> | undefined;
+      for (const id of [...diff.removes, ...diff.upserts.map(e => e.id)]) {
+        if (!before.entities.has(id) || !explicit.has(id) || inScope(before, id, allowed)) continue;
+        created ??= new Set(this.store.groupEditsUnder(body.id, false, 2_147_483_647).flatMap(row => row.inverse.filter(op => op.op === 'remove').flatMap(op => before.entities.has(op.id) ? before.subtree(op.id) : [op.id])));
+        if (created.has(id)) continue;
+        return { failure: buildFailure('build.outside', `${before.pathOf(id)} existed outside build ${body.id}'s roots and claims.`, 'include', { entity: id, op: explicit.get(id), fix: `Use build step --include ${before.pathOf(id) || id}, then retry; or change the design to preserve it.` }) };
+      }
+    }
     const checked = claimCheck(before, after, diff, ops, admission.mine, others);
     if ('failure' in checked) return checked;
     // Region adoption cannot acquire a new child of another build, even if that build's root has moved here.
@@ -608,6 +647,12 @@ export class GodBuilds {
       if (owner && owner !== admission.row!.id) return { failure: buildFailure('build.claim', `${after.pathOf(id)} belongs under build ${owner}, outside claim ${admission.mine.id}.`, 'in.parent', { entity: id }) };
     }
     return checked;
+  }
+  recordRefusal(field: BuildField | undefined, failures: Failure[]) {
+    if (!field) return; const row = this.row(field.id); if (!row || !open(row)) return;
+    // An invalid lease must not write another agent's private build metadata.
+    if (field.lease !== row.body.lead.lease && !row.body.claims.some(c => c.id === field.claim && c.status === 'held')) return;
+    this.store.noteBuildRefusal(row.id, failures.slice(0, 4).map(f => ({ at: this.host.now(), code: f.code.slice(0, 100), ...(f.entity ? { entity: f.entity.slice(0, 300) } : {}), detail: f.detail.slice(0, 300) })));
   }
   rootsDelta(before: WorldModel, after: WorldModel, diff: Diff, kind: 'edit' | 'undo' | 'redo' | 'engine', field?: BuildField) { return rootsDelta(before, after, diff, kind, field, [...this.rows.values()], this.rootIndex); }
   writes(admission: Admission, roots: RootsDelta, seq: number, at: number, caller?: Identity, group?: string, revert = false, made: string[] = [], note?: string): { writes: PlannedWrite[]; echo?: BuildEcho; warnings: string[]; failures?: Failure[] } {

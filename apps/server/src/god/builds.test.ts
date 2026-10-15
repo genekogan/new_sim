@@ -270,11 +270,13 @@ test('done and final-batch done are idempotent, close atomically and reopen root
   const r2 = await f.start({ id: 'other' }); assert.equal(r2.ok, true); assert.equal((await f.req('/v1/god/builds/other/done', { summary: 'complete' })).data.build.status, 'done');
 });
 
-test('abandon undo covers subgroups, stops on conflict, keeps site open and can retry', async t => {
+test('RL2: abandon undo preflights subgroups, changes nothing on conflict and can retry', async t => {
   const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
   for (let i = 0; i < 3; i++) assertAccepted((await f.req('/v1/god/act', { ops: [f.place(`bench-${i}`, i * 4)], build: f.field(s.lease), group: `part-${i}` })).data);
   let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'seated' } : null };
-  const partial = (await f.req('/v1/god/builds/church/abandon', { undo: true })).data; assert.equal(code(partial), 'build.undo-incomplete'); assert.equal(partial.reverted.length, 1); assert.equal(partial.notReverted.length, 2); assert.equal(f.god.store.build('church')!.status, 'active');
+  const before = JSON.stringify(f.god.model.snapshot()), journal = f.god.store.edits(), rev = f.god.store.buildsRev(), emitted = f.emitted.length;
+  const partial = (await f.req('/v1/god/builds/church/abandon', { undo: true })).data; assert.equal(code(partial), 'build.undo-incomplete'); assert.equal(partial.reverted.length, 0); assert.equal(partial.notReverted.length, 3); assert.equal(f.god.store.build('church')!.status, 'active');
+  assert.equal(JSON.stringify(f.god.model.snapshot()), before); assert.deepEqual(f.god.store.edits(), journal); assert.equal(f.god.store.buildsRev(), rev); assert.equal(f.emitted.length, emitted);
   f.god.bodies = null;
   const closed = (await f.req('/v1/god/builds/church/abandon', { undo: true })).data; assert.equal(closed.ok, true); assert.equal(closed.build.status, 'abandoned'); assert.equal(f.god.model.entities.size, 0);
   assert.equal((await f.req('/v1/god/builds/church/abandon', {})).data.replayed, true);
@@ -681,4 +683,136 @@ test('bench: 300 five-place build commits with two live claims versus none; 200-
   console.log('CLAIM_BENCH ' + JSON.stringify(summary));
   assert.ok(summary.overheadMs.p95 <= 1, `claims p95 overhead ${summary.overheadMs.p95}ms exceeds 1ms`);
   assert.ok(summary.twoLiveClaims.check200Ms.p95 - summary.none.check200Ms.p95 <= 1);
+});
+
+
+test('RL2: group commit failure rolls back every row and observer; successful chain retains redo', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  for (let i = 0; i < 3; i++) assertAccepted(f.god.act({ ops: [f.place(`atomic-${i}`, i * 4)], build: f.field(s.lease), group: `part-${i}` }));
+  const before = JSON.stringify(f.god.model.snapshot()), rows = f.god.store.edits(), rev = f.god.store.buildsRev(), events = f.emitted.length;
+  f.db.db.exec(`CREATE TEMP TRIGGER fail_group BEFORE INSERT ON world_edits_v1 WHEN NEW.kind='undo' AND NEW.undo_of=${rows[1].seq} BEGIN SELECT RAISE(ABORT, 'injected undo failure'); END;`);
+  assert.throws(() => f.god.undoGroup('church'), /injected undo failure/);
+  assert.equal(JSON.stringify(f.god.model.snapshot()), before); assert.deepEqual(f.god.store.edits(), rows); assert.equal(f.god.store.buildsRev(), rev); assert.equal(f.emitted.length, events);
+  assert.equal(f.god.store.load()!.model.entities.size, 3);
+  f.db.db.exec('DROP TRIGGER fail_group');
+  const undone = f.god.undoGroup('church'); assert.equal(undone.accepted, true); assert.equal(undone.reverted.length, 3); assert.equal(f.god.model.entities.size, 0);
+  for (let i = 0; i < 3; i++) assertAccepted(f.god.redo());
+  assert.equal(f.god.model.entities.size, 3); assert.equal(f.god.store.edits().filter(e => e.kind === 'undo').length, 3);
+});
+
+test('CE4: brief, later asks and linked chapters survive restart; public channels and non-creator tokens cannot read them', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const s = await f.start({ brief: 'Owner verbatim: “quiet green spires”', asks: ['Walk inside [use]', 'Keep the oak'] });
+  const step = { lease: s.lease, asks: ['Sit by the window [use]'] };
+  assert.equal((await f.req('/v1/god/builds/church/step', step)).data.ok, true);
+  assert.equal((await f.req('/v1/god/builds/church/step', step)).data.replayed, true);
+  const read = (await f.req('/v1/god/builds/church')).data;
+  assert.deepEqual(read.build.plan.asks, ['Walk inside [use]', 'Keep the oak', 'Sit by the window [use]']);
+  assertAccepted(f.god.act({ ops: [f.place('chapter-one')], build: f.field(s.lease) }));
+  const done = (await f.req('/v1/god/builds/church/done', {})).data;
+  assert.equal(done.ok, true); assert.equal(done.receipt.openAsks, 3); assert.ok(done.receipt.warnings.some((w: string) => /asks remain unverified/.test(w)));
+  const chapter = await f.start({ id: 'church-2', root: 'church', brief: 'Follow-up words: copper roof', asks: ['Copper roof'] });
+  assert.equal(chapter.ok, true); assert.equal(chapter.build.chapterOf, 'church');
+  assert.equal(chapter.build.chapters[0].brief, s.build.plan.brief);
+  const first = JSON.stringify(f.god.model.get('chapter-one'));
+  assertAccepted(f.god.act({ ops: [f.place('chapter-two', 8)], build: { id: 'church-2', lease: chapter.lease } }));
+  const undo = f.god.undoGroup('church-2'); assert.equal(undo.accepted, true); assert.equal(f.god.model.get('chapter-two'), undefined); assert.equal(JSON.stringify(f.god.model.get('chapter-one')), first);
+  const restarted = new GodMode(f.db, { worldId: 'build-test', ownerId: 'owner', tick: () => 100, now: f.now, emit() {} });
+  assert.equal(restarted.builds.status('church-2')!.build.plan.brief, 'Follow-up words: copper roof');
+  assert.equal(restarted.builds.status('church-2')!.build.chapters![0].brief, s.build.plan.brief);
+  for (const auth of [null, 'owner', 'god_another-world_fixture']) for (const path of ['/v1/god/builds', '/v1/god/builds/church', '/v1/god/builds/church-2']) assert.equal((await f.req(path, undefined, auth)).status, 401);
+  const publicData = JSON.stringify([f.god.publicSnapshot(), f.god.builds.publicList(), f.emitted]);
+  for (const word of ['quiet green spires', 'Follow-up words', 'Walk inside [use]', 'Copper roof', 'receipt', 'refusalCount', 'chapterOf']) assert.equal(publicData.includes(word), false, word);
+});
+
+test('WD4: existing outsiders refuse with a one-retry include fix; remove/reparent cannot smuggle them into the build', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [f.place('oak-4', 30), f.place('outside-seat', 25)] }));
+  const s = await f.start(), build = f.field(s.lease), seq = f.god.model.editSeq;
+  for (const op of [{ op: 'move', id: 'oak-4', p: [32, 0] }, { op: 'remove', id: 'outside-seat' }, { op: 'set', id: 'oak-4', name: 'stolen-tree' }]) {
+    const refused = f.god.act({ ops: [op], build }); assert.equal(code(refused), 'build.outside'); assert.match((refused as any).failures[0].fix, /build step --include/); assert.equal(f.god.model.editSeq, seq);
+  }
+  const step = (await f.req('/v1/god/builds/church/step', { lease: s.lease, include: ['oak-4'] })).data;
+  assert.equal(step.ok, true); assertAccepted(f.god.act({ ops: [{ op: 'move', id: 'oak-4', p: [32, 0] }], build }));
+  const receipt = (await f.req('/v1/god/builds/church/check', {})).data.receipt;
+  assert.equal(receipt.refused.count, 3); assert.ok(receipt.refused.recent.every((r: any) => r.code === 'build.outside'));
+  assert.equal(receipt.preservation.outside[0].path, 'oak-4'); assert.equal(receipt.preservation.outside[0].included, true);
+  assert.equal(receipt.undoability.ok, true);
+  assert.equal(f.god.undoGroup('church').accepted, true); assert.equal(f.god.model.get('oak-4')!.p![0], 30);
+});
+
+test('WD4: start includes are canonical, unknown includes fail before writes, engine write-backs remain exempt', async t => {
+  const f = fixture(); t.after(() => f.db.close()); assertAccepted(f.god.act({ ops: [f.place('old', 30)] }));
+  assert.equal(code(await f.start({ include: ['missing'] })), 'build.site'); assert.equal(f.god.store.build('church'), null);
+  const s = await f.start({ include: ['old'] }); assert.deepEqual(body(f).include, [f.god.model.get('old')!.id]);
+  assertAccepted(f.god.act({ ops: [{ op: 'remove', id: 'old' }], build: f.field(s.lease) }));
+  assertAccepted(f.god.engineAct([f.place('engine-part', 32) as any], 'fixture engine part'));
+  assertAccepted(f.god.engineAct([{ op: 'move', id: 'engine-part', p: [35, 0], mode: 'strict' }], 'fixture write-back'));
+  const before = JSON.stringify(body(f));
+  assert.equal(code((await f.req('/v1/god/builds/church/step', { lease: s.lease, include: ['missing'] })).data), 'build.site'); assert.equal(JSON.stringify(body(f)), before);
+});
+
+test('EF3: check is read-only, done stores a warning receipt naming an A2-class outside change and undo conflict', async t => {
+  const f = fixture(); t.after(() => f.db.close()); assertAccepted(f.god.act({ ops: [f.place('oak-4', 30)] }));
+  const s = await f.start({ include: ['oak-4'], asks: ['An open nave'] });
+  assertAccepted(f.god.act({ ops: [{ op: 'move', id: 'oak-4', p: [32, 0] }], build: f.field(s.lease) }));
+  assertAccepted(f.god.act({ ops: [f.place('receipt-seat')], build: f.field(s.lease) }));
+  // A later independent removal makes the original move inverse impossible.
+  assertAccepted(f.god.act({ ops: [{ op: 'remove', id: 'oak-4' }] }));
+  const before = JSON.stringify(f.god.model.snapshot()), journal = f.god.store.edits(), rev = f.god.store.buildsRev(), events = f.emitted.length;
+  const checked = (await f.req('/v1/god/builds/church/check', {})).data.receipt;
+  assert.equal(checked.undoability.ok, false); assert.equal(checked.undoability.edits, 2); assert.ok(checked.undoability.conflicts.length); assert.ok(checked.preservation.outside.some((p: any) => p.path === 'oak-4'));
+  assert.equal(JSON.stringify(f.god.model.snapshot()), before); assert.deepEqual(f.god.store.edits(), journal); assert.equal(f.god.store.buildsRev(), rev); assert.equal(f.emitted.length, events);
+  assert.equal((await f.req('/v1/god/builds/church/check', {}, null)).status, 401);
+  assert.equal((await f.req('/v1/god/builds/missing/check', {})).status, 404);
+  const done = (await f.req('/v1/god/builds/church/done', {})).data; assert.equal(done.ok, true); assert.deepEqual(done.receipt, checked); assert.deepEqual(f.god.builds.body('church')!.done!.receipt, checked);
+  assert.equal(checked.viewerCost.triangles.added, null); assert.equal(checked.viewerCost.draws.added, null);
+});
+
+test('EF3: done:true checks the final batch; valid receipts count compiled uses and cost shares', async t => {
+  const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
+  assertAccepted(f.god.act({ ops: [f.place('last-seat')], build: f.field(s.lease, { done: true }) }));
+  const receipt = f.god.builds.body('church')!.done!.receipt!; assert.equal(receipt.seq, f.god.model.editSeq); assert.equal(receipt.exists.count, 1); assert.equal(receipt.undoability.ok, true); assert.equal(receipt.undoability.edits, 1);
+  assert.ok(receipt.uses.some(u => u.path === 'last-seat')); assert.ok(receipt.viewerCost.triangles.world > 0); assert.equal(receipt.viewerCost.triangles.share, 1); assert.equal(receipt.viewerCost.colliders.share, 1);
+});
+
+test('EF2: start returns sampled ground, neighbour footprints and ratios, fit, closure inventory and approach in <=3KB', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [{ op: 'place', def: coreRef('cottage'), name: 'neighbour', p: [20, 0] }, f.place('inside-zone', 0)] }));
+  f.god.builds.inventoryContext = () => ({ occupied: () => false, places: [{ id: 'plaza', name: 'Meeting plaza', polygon: [[-2, -2], [2, -2], [2, 2], [-2, 2]] }], bodies: [{ name: 'Fixture resident', at: [0, 0] }] });
+  const s = await f.start({ title: 'Quiet garden' }); assert.equal(s.ok, true);
+  assert.ok(Buffer.byteLength(JSON.stringify(s.report)) <= 3072); assert.equal(s.report.ground.samples, 289); assert.ok(s.report.ground.min <= s.report.ground.max);
+  assert.ok(s.report.neighbours.some((n: any) => n.path === 'neighbour' && n.footprint.length)); assert.ok(s.report.eaves.max > 0); assert.equal(s.report.masses[0].fits, true); assert.ok(s.report.masses[0].maxRatio > 0);
+  assert.equal(s.report.closure.counts.things, 1); assert.equal(s.report.closure.counts.bodies, 1); assert.equal(s.report.approach.from, 'Meeting plaza'); assert.deepEqual(s.report.approach.line[1], [0, 0]); assert.equal(s.report.approach.checked, false); assert.ok(s.report.library.length <= 5);
+  assert.equal((await f.start({ title: 'Quiet garden' })).replayed, true);
+});
+
+test('EF3: checked receipts have a separate durable allowance, so a full legacy record can still finish', async t => {
+  const f = fixture(); t.after(() => f.db.close()); await f.start();
+  const legacy = body(f) as any; legacy.paused = { from: f.now(), seenAt: f.now(), note: 'p'.repeat(62_000) };
+  assert.ok(Buffer.byteLength(JSON.stringify(legacy)) < 65_000);
+  f.db.db.prepare('UPDATE god_builds_v1 SET body=? WHERE id=?').run(JSON.stringify(legacy), 'church');
+  const god = new GodMode(f.db, { worldId: 'build-test', ownerId: 'owner', tick: () => 100, now: f.now, emit() {} });
+  const done = god.builds.done('church', {}, god.godIdentity(f.token)!); assert.equal(done.ok, true);
+  if (!done.ok) return;
+  assert.ok(done.build.done!.receipt); assert.ok(Buffer.byteLength(JSON.stringify(done.build.done!.receipt)) <= 10_000);
+  assert.ok(god.store.buildReceipt('church'));
+  const restored = new GodMode(f.db, { worldId: 'build-test', ownerId: 'owner', tick: () => 100, now: f.now, emit() {} });
+  assert.deepEqual(restored.builds.status('church')!.build.done!.receipt, done.build.done!.receipt);
+});
+
+test('EF2: crowded closure reports bound Unicode data by bytes and retain full inventory counts', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  f.god.builds.inventoryContext = () => ({ occupied: () => false, places: Array.from({ length: 55 }, (_, i) => ({ id: `place-${i}`, name: '木'.repeat(1000), polygon: [[-1, -1], [1, -1], [1, 1], [-1, 1]] as [number, number][] })), bodies: Array.from({ length: 55 }, () => ({ name: '人'.repeat(1000), at: [0, 0] as [number, number] })) });
+  const start = await f.start(); assert.equal(start.ok, true); assert.ok(Buffer.byteLength(JSON.stringify(start.report)) <= 3072); assert.equal(start.report.truncated, true); assert.equal(start.report.closure.counts.places, 55); assert.equal(start.report.closure.counts.bodies, 55);
+});
+
+test('WD4: terrain followers are exempt, and build-created parts outside the site are still editable', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  assertAccepted(f.god.act({ ops: [f.place('follower', 45)] })); const s = await f.start();
+  assertAccepted(f.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'new-land', p: [30, 0], params: { height: 2, radius: 25 } }], build: f.field(s.lease) }));
+  assert.ok(f.god.model.get('follower')); assert.equal(f.god.model.get('follower')!.p!.length, 3);
+  assertAccepted(f.god.act({ ops: [f.place('offsite', 100)], build: f.field(s.lease) }));
+  assertAccepted(f.god.act({ ops: [{ op: 'move', id: 'offsite', p: [105, 0] }], build: f.field(s.lease) }));
+  const receipt = f.god.checkBuild('church')!.receipt; assert.ok(receipt.exists.paths.includes('offsite')); assert.ok(receipt.massingOutside!.count > 0);
 });
