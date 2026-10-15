@@ -22,7 +22,7 @@ import { resolve } from 'node:path';
 import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
 import { CREATION_LIMITS } from '@sim/generators';
-import { BUILD_LIMITS, buildFieldSchema, buildFailure, type Identity } from './builds.ts';
+import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
 
 export type GodDeps = {
   god: GodMode;
@@ -129,7 +129,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id))), 200, noStore); });
-  for (const path of ['/v1/god/builds/:id/claims', '/v1/god/builds/:id/claims/:cid/release']) app.post(path, async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); await body(c); return c.json({ ok: false, failures: [buildFailure('build.claim-unknown', 'Claims are not enabled yet.')] }, 200, noStore); });
+  app.post('/v1/god/builds/:id/claims', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.claim(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
+  app.post('/v1/god/builds/:id/claims/:cid/release', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.release(c.req.param('id'), c.req.param('cid'), await optionalBody(c)), 200, noStore); });
   app.get('/v1/god/schema', (c) => c.json(godSchema(d.god.model.constants.limits), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/verify-use', async (c) => {
     limitGod(c, 'verify-use', CREATION_LIMITS.verifyPerMinute);

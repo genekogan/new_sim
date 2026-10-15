@@ -213,7 +213,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
     const admission = this.builds.admit(parsed.data.build ?? this.caller.build, parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
@@ -252,8 +252,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     // Keep public state untouched until SQL succeeds. No SQL write lock is held while planning or baking.
     const next = this.model.fork();
     const lifted: string[] = [];
+    let made: string[] = [];
     const r = applyBatch(next, normalized, 'god', tick, { trusted, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
       const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+      const check = this.builds.check(admission, this.model, after, diff, ops); if ('failure' in check) return check.failure; made = check.made;
       // Warning geometry uses the same typed bake boundary as admission, before any live/SQL mutation.
       if (this.bodies?.lifted) lifted.push(...this.bodies.lifted(diff.upserts.map(e => e.id), after));
       return null;
@@ -267,7 +269,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const result = this.finalizeAct?.(r.result, next) ?? r.result;
     if (!result.accepted) return result;
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
-    const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity);
+    const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
     if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
@@ -304,9 +306,13 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (admission.failures) return { accepted: false, failures: admission.failures };
     const tick = this.opts.tick();
     const next = this.model.fork();
-    const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
-    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
-    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true);
+    let made: string[] = [];
+    const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
+      const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+      const check = this.builds.check(admission, this.model, after, diff, ops); if ('failure' in check) return check.failure; made = check.made; return null;
+    } });
+    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
+    const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true, made);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     r.result.warnings.push(...roots.warnings, ...updates.warnings);
     if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
@@ -365,7 +371,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
     const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
     const id = 'pv_' + randomBytes(6).toString('hex');
     for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
     while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);

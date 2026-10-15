@@ -509,3 +509,34 @@ test('C1b #17: empty and mixed undo stacks seek the partial index instead of sca
   f.db.db.prepare("UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND kind IN ('edit','redo')").run(f.god.store.worldId);
   reads = journalReads(f, () => { assert.equal(f.god.store.undoable(), null); }); indexedReads(f, reads, 'world_edits_v1_stack');
 });
+
+test('bench: 300 five-place build commits with two live claims versus none; 200-upsert check', { skip: process.env.CLAIM_BENCH !== '1' }, t => {
+  const summary: any = {};
+  const stats = (xs: number[]) => { const sorted = [...xs].sort((a, b) => a - b); return { p50: sorted[Math.floor(sorted.length * .5)], p95: sorted[Math.floor(sorted.length * .95)] }; };
+  const fixtures = [false, true].map(withClaims => {
+    const f = fixture({ buildPauseMs: 600_000 }); t.after(() => f.db.close());
+    const started = f.god.builds.start({ id: 'church', title: 'Claims bench', steps: ['shell'], site: { at: [0, 0], size: [200, 200] } }, f.god.godIdentity(f.token)!) as any;
+    const build = f.field(started.lease);
+    assertAccepted(f.god.act({ ops: [f.place('east-anchor', -80, 90), f.place('tower-anchor', 80, 90)], build }));
+    if (withClaims) for (const [part, root] of [['east-aisle', 'east-anchor'], ['tower', 'tower-anchor']]) assert.equal(f.god.builds.claim('church', { part, root }, f.god.godIdentity(f.other)!).ok, true);
+    return { f, build, times: [] as number[], withClaims };
+  });
+  // Interleave the two worlds so warmup, thermal drift and scheduler noise affect both modes.
+  for (let batch = 0; batch < 300; batch++) for (const { f, build, times } of batch % 2 ? [...fixtures].reverse() : fixtures) {
+    const ops = Array.from({ length: 5 }, (_, j) => { const i = batch * 5 + j; return f.place(`c-${i}`, -96 + i % 49 * 4, -96 + Math.floor(i / 49) * 4); });
+    const begin = performance.now(), r = f.god.act({ ops, build, clientRef: `claims-bench-${batch}` }); times.push(performance.now() - begin); assertAccepted(r);
+  }
+  for (const { f, build, times, withClaims } of fixtures) {
+    const before = f.god.model, after = before.fork();
+    const upserts = Array.from(before.entities.values()).slice(2, 202).map(e => ({ ...e, v: e.v + 1 }));
+    for (const e of upserts) { after.delete(e.id); after.insert(e); }
+    const diff = { upserts, removes: [], defs: [], tiles: [], answers: [] }, admission = f.god.builds.admit(build, {}, f.god.godIdentity(f.token)!);
+    const checks: number[] = [];
+    for (let i = 0; i < 1000; i++) { const begin = performance.now(), r = f.god.builds.check(admission, before, after, diff, []); checks.push(performance.now() - begin); assert.ok('made' in r); }
+    summary[withClaims ? 'twoLiveClaims' : 'none'] = { commitMs: stats(times), check200Ms: stats(checks), diff: upserts.length };
+  }
+  summary.overheadMs = { p50: summary.twoLiveClaims.commitMs.p50 - summary.none.commitMs.p50, p95: summary.twoLiveClaims.commitMs.p95 - summary.none.commitMs.p95 };
+  console.log('CLAIM_BENCH ' + JSON.stringify(summary));
+  assert.ok(summary.overheadMs.p95 <= 1, `claims p95 overhead ${summary.overheadMs.p95}ms exceeds 1ms`);
+  assert.ok(summary.twoLiveClaims.check200Ms.p95 - summary.none.check200Ms.p95 <= 1);
+});
