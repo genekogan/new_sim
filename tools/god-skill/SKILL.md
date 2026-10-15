@@ -92,8 +92,9 @@ The owner is waiting; a fast, honest, complete answer beats an endlessly polishe
    That list is your definition of done; nothing else is.
 2. **Show a first look early**: give `--mass` at `build start`; `look` and tell the owner within about 2 minutes.
    Look again after the first real step.
-3. **Check the asked-for uses with what the world tells you**: `describe` (rooms, doors, "reachable from outside",
-   seat slots and who sits there) and `where`. `verify-use` (a probe resident that walks in and sits, see *Making
+3. **Check the asked-for uses with what the world tells you**: `describe` (rooms, doors, the `walk:` line,
+   seat slots and who sits there) and `where`. `walk:` is the engine's own route check from the front door into
+   every room and back; trust it over "reachable from outside", which only reads the design's doors and stairs. `verify-use` (a probe resident that walks in and sits, see *Making
    things usable*) is an optional extra check; it is never a reason to keep rebuilding something that already works.
 4. **Stop when every listed item exists and you have checked the uses.** Report then, saying how you checked each use.
    Put further ideas (night lighting tweaks, extra furniture, colour variations) in your report as offers instead of
@@ -413,7 +414,7 @@ Souls act on **declared affordances**, not on appearance. What exists today:
 
 | Souls can | when the thing has | check |
 |---|---|---|
-| walk into a building, between rooms, upstairs | a building def's rooms, door openings, stairs | `describe <building>`: rooms, doors, "reachable from outside" |
+| walk into a building, between rooms, upstairs | a building def's rooms, door openings, stairs | `describe <building>`: rooms, doors, and its `walk:` line (the engine's route check into every room and out) |
 | sit | a `seat` slot (library chairs, benches, pews, sofas; or your def: `components: {"seat": {"height": 0.45}}` plus `slots: [{"id":"seat-1","kind":"seat","p":[0,0.45,0],"yaw":0,"accepts":{"tags":["body"]},"capacity":1}]`) | `describe <thing>` lists seat slots and who sits there |
 | put things on / pick them up | a `surface` slot / `components.carryable` | `describe` |
 | open, close, switch, light, fill, play | an actuator state (`open`, `on`, `lit`…) on its def | `defs <thing>` shows state |
@@ -421,7 +422,7 @@ Souls act on **declared affordances**, not on appearance. What exists today:
 Honest limits: **lying in a bed is not reliable today** (a Soul may lie beside the mattress); Souls do
 **not ride** anything that moves (a ferris wheel, a cart, an animated platform is scenery to them); nobody
 climbs onto roofs, kit tops or slopes without a floor or slot; a kit's look (a "bench" made of boxes)
-offers nothing unless it declares the slot. `describe` (rooms, doors, "reachable from outside", seat slots) is
+offers nothing unless it declares the slot. `describe` (rooms, doors, `walk:`, seat slots) is
 usually enough to check a use. For an extra, optional check there is `verify-use <thing> [--seat <seat>] [--from
 <place>] [--uses enter,sit]`: the server sends a temporary probe resident (it never thinks and is removed afterwards)
 that crosses the nearest door or footprint edge, sits on the nearest free seat, and answers with a receipt per use —

@@ -2223,6 +2223,13 @@ async function verifyUse(target, flags2 = {}) {
   for (const note of receipt.notes ?? []) if (/full physical walk/.test(note)) lines.push(note);
   return lines.join("\n");
 }
+function walkLine(walk) {
+  if (!walk) return "";
+  if (walk.state === "pending" || walk.state === "unchecked") return `  walk: not checked \u2014 ${walk.note}`;
+  if (walk.state === "ok") return `  walk: all ${walk.rooms.length} room${walk.rooms.length === 1 ? "" : "s"} can be walked into from the front door and out again (the engine's own route check: it overrides "reachable from outside" in the notes, which only reads the design's doors and stairs)`;
+  const why = (r) => [r.in !== true && `no way in (${r.in})`, r.out !== true && `no way out (${r.out})`].filter(Boolean).join(", ");
+  return `  walk: NOT WALKABLE \u2014 ${walk.rooms.filter((r) => r.in !== true || r.out !== true).map((r) => `${r.id} (floor ${r.floor}): ${why(r)}`).join("; ")}. This is the engine's own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; fix the stairs, doors or whatever stands in the way, then describe again.`;
+}
 async function describe(ref, flags2 = {}) {
   if (!ref) throw new Error("usage: describe <path|flag:name>");
   {
@@ -2240,7 +2247,7 @@ async function describe(ref, flags2 = {}) {
     const room = h.error ? null : (h.rooms ?? []).find((r) => r.id === ref.slice(cut + 1)) ?? (h.rooms ?? []).find((r) => r.id.replace(/[^a-z0-9]/g, "").startsWith(word));
     if (room) {
       if (flags2.json) return room;
-      return [`${h.path}/${room.id} \u2014 room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join("\xD7")} m, headroom ${room.height} m`, `  doors: ${room.doors.join(", ") || "none"}`, `  holds: ${room.occupants.map((o) => o.name).join(", ") || "nothing"}`, `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|\u2026]; furnish ${h.path}/${room.id}`].join("\n");
+      return [`${h.path}/${room.id} \u2014 room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join("\xD7")} m, headroom ${room.height} m`, `  doors: ${room.doors.join(", ") || "none"}`, `  holds: ${room.occupants.map((o) => o.name).join(", ") || "nothing"}`, ...h.walk?.rooms.find((r) => r.id === room.id) ? [walkLine({ ...h.walk, rooms: h.walk.rooms.filter((r) => r.id === room.id) })] : [], `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|\u2026]; furnish ${h.path}/${room.id}`].join("\n");
     }
   }
   if (d.error) throw new Error(d.error);
@@ -2268,6 +2275,7 @@ async function describe(ref, flags2 = {}) {
   L.push(`  ground: y ${d.ground.y}, slope ${d.ground.slopeDeg}\xB0, ${d.ground.medium}${d.ground.water ? `, water ${d.ground.water} m deep` : ""}`);
   if (d.near.length) L.push(`  near: ${d.near.map((n) => `${n.path} ${n.dist} m ${n.dir}`).join(", ")}`);
   if (d.notes.length) L.push(`  notes: ${d.notes.join(" | ")}`);
+  if (d.walk) L.push(walkLine(d.walk));
   return L.join("\n");
 }
 async function where(spec, flags2 = {}) {
@@ -3442,5 +3450,6 @@ export {
   undo,
   verifyUse,
   view,
+  walkLine,
   where
 };
