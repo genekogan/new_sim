@@ -1,15 +1,18 @@
 // /v1/god/schema: everything a god agent needs to know about the vocabulary, generated from
 // the code so it never drifts (spec 33 §2 row 1, §3.4). Owner: L1.
 import { z } from 'zod';
-import { describeGenerators, KIT_PRIMITIVES, KIT_ROLES, kitArgs, materialEnum, slotKind } from '@sim/generators';
-import { clientOpSchema, componentsSchema, constraintSchema, defSchema, refusalCodes } from '@sim/world-compiler';
+import { CREATION_LIMITS, describeGenerators, KIT_PRIMITIVES, KIT_ROLES, kitArgs, materialEnum, slotKind } from '@sim/generators';
+import { clientOpSchema, componentsSchema, constraintSchema, defSchema, refusalCodes, type WorldConstants } from '@sim/world-compiler';
 import { godVersions } from './versions.ts';
 import { submissionSchema } from './submission.ts';
 import {verifyCodes, verifyUseSchema} from './verify-use.ts';
 
-let cached: unknown = null;
-export function godSchema() {
-  if (cached) return cached;
+let cached: Record<string, unknown> | null = null;
+const limitsFor = (limits?: WorldConstants['limits']) => ({ ...CREATION_LIMITS,
+  ...(limits ? { worldEntities: Math.min(CREATION_LIMITS.worldEntities, limits.entities), defSizeMaxM: limits.sizeMax, defSizeMinM: limits.sizeMin,
+    defTris: limits.budget.tris, assetBytes: limits.budget.bytes, texturePx: limits.budget.texPx } : {}) });
+export function godSchema(limits?: WorldConstants['limits']): Record<string, unknown> {
+  if (cached) return { ...cached, limits: limitsFor(limits) };
   const js = (s: z.ZodType) => { try { return z.toJSONSchema(s, { unrepresentable: 'any', io: 'input' }); } catch (e) { return { error: String(e) }; } };
   cached = {
     contract: 'god-schema/1',
@@ -40,5 +43,5 @@ export function godSchema() {
       god: ['POST /v1/god/verify-use', 'GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act (ops and/or preview, expect?, clientRef?)', 'GET /v1/god/requests/:clientRef', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
     },
   };
-  return cached;
+  return { ...cached, limits: limitsFor(limits) };
 }

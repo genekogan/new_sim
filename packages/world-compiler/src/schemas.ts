@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { landformBodySchema } from '@sim/ground';
 import { ID, NAME, fieldSchema, fieldsSchema, materialEnum, num, slotSchema, v2, v3, value } from '@sim/generators';
 import { ACCESS, layersStateSchema, ownerRef, priceSchema, relRef, RELATIONS, scheduleSchema } from './layers.ts';
+import { CREATION_LIMITS as L } from '@sim/generators';
 
 export const ENTITY_SCHEMA = 'entity/1';
 export const DEF_SCHEMA = 'def/1';
@@ -98,7 +99,7 @@ export const partSchema = z.object({
   /** Include only when the expression is truthy: "$porch", "$floors > 1" (one comparison). */
   when: z.string().max(80).optional(),
   /** Repeat the part `count` times, stepping by [dx, dz] (and yaw) each time; ids get -1, -2, … */
-  repeat: z.object({ count: z.union([z.number().int().min(1).max(64), z.string().max(40)]), step: v2.default([1, 0]), yaw: num.default(0) }).optional(),
+  repeat: z.object({ count: z.union([z.number().int().min(1).max(L.partRepeats), z.string().max(40)]), step: v2.default([1, 0]), yaw: num.default(0) }).optional(),
   /** VOCAB-W3: LAYERS defaults the part's entity starts with (a café counter's price, a hall's opening hours). */
   owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional(),
 });
@@ -107,7 +108,7 @@ export type Part = z.infer<typeof partSchema>;
 export const makeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('mesh'), asset: z.string().regex(/^[0-9a-f]{64}$/), lod1: z.string().regex(/^[0-9a-f]{64}$/).optional(), collide: z.enum(['box', 'hull', 'mesh', 'none']).default('box'), /** sha of an lm-building-footprint/1 sidecar in the asset store (rooms, walls, openings, links) */ footprint: z.string().regex(/^[0-9a-f]{64}$/).optional() }),
   z.object({ kind: z.literal('gen'), gen: z.string().regex(/^[a-z][a-z0-9-]*\/\d+$/), args: z.record(z.string(), z.unknown()).optional() }),
-  z.object({ kind: z.literal('parts'), parts: z.array(partSchema).min(1).max(256) }),
+  z.object({ kind: z.literal('parts'), parts: z.array(partSchema).min(1).max(L.prefabParts) }),
   /** Nothing to draw or collide with: a place marker, a region, a landform-only def. */
   z.object({ kind: z.literal('none') }),
 ]);
@@ -141,7 +142,7 @@ export const defSchema = z.object({
   overlaps: z.array(z.string()).max(32).default([]),
   /** VOCAB-W3: things placed with it, each its own entity afterwards (a furnished building: the beds, tables and
    *  counters in its rooms, `slot` = the room id). Same shape as prefab parts. Optional, so other defs hash as before. */
-  contents: z.array(partSchema).max(256).optional(),
+  contents: z.array(partSchema).max(L.prefabParts).optional(),
   /** VOCAB-W3: LAYERS defaults a placed entity starts with unless the place op says otherwise (the god overrides with `set`). */
   layers: z.object({ owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional() }).optional(),
   /** Filled by the compiler at define time; never trusted from input. */
@@ -196,15 +197,15 @@ export type Entity = z.infer<typeof entitySchema>;
 // ---------- world ----------
 
 export const worldConstantsSchema = z.object({
-  extent: num.positive().max(16000),                 // side length in metres; grows only
+  extent: num.positive().max(L.worldExtentM),                 // side length in metres; grows only
   ground: z.enum(['land', 'ocean', 'void']),
   base: num.default(0),
   seaLevel: num.optional(),
   limits: z.object({
-    entities: z.number().int().default(50000),
-    sizeMax: v3.default([400, 120, 400]),
-    sizeMin: num.default(0.05),
-    budget: z.object({ tris: z.number().int().default(80000), bytes: z.number().int().default(3_000_000), texPx: z.number().int().default(2048) }).prefault({}),
+    entities: z.number().int().positive().default(L.worldEntities),
+    sizeMax: v3.default([...L.defSizeMaxM]),
+    sizeMin: num.default(L.defSizeMinM),
+    budget: z.object({ tris: z.number().int().positive().default(L.defTris), bytes: z.number().int().positive().default(L.assetBytes), texPx: z.number().int().positive().default(L.texturePx) }).prefault({}),
   }).prefault({}),
 });
 export type WorldConstants = z.infer<typeof worldConstantsSchema>;
@@ -301,7 +302,7 @@ export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, s
 
 export const batchSchema = z.object({
   schema: z.literal(EDIT_SCHEMA).default(EDIT_SCHEMA),
-  ops: z.array(clientOpSchema).min(1).max(256),
+  ops: z.array(clientOpSchema).min(1).max(L.batchOps),
   clientRef: z.string().max(100).optional(),
   note: z.string().max(400).optional(),
   /** A named edit group ("duck family"): reviewable and undoable as a whole. */
@@ -309,7 +310,7 @@ export const batchSchema = z.object({
 });
 export type Batch = z.infer<typeof batchSchema>;
 /** Server-internal: stored inverses may restore content or be empty (an accepted no-op revert). */
-export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).max(256) });
+export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).max(L.batchOps) });
 
 export type Failure = {
   op: number; code: string; detail: string;
@@ -325,8 +326,8 @@ export const refusalCodes = [
   'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid',
   'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
   'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
-  'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
+  'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture', 'architecture.sealed', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
   'wallet.insufficient', 'relation.invalid',
-  'request.conflict', 'request.budget', 'revision.stale', 'asset.invalid', 'asset.budget',
+  'request.conflict', 'request.budget', 'revision.stale', 'asset.invalid', 'asset.budget', 'budget.world', 'budget.region',
 ] as const;
 export type RefusalCode = (typeof refusalCodes)[number];

@@ -3,6 +3,7 @@
 // emits Baked; the mesh half draws the layout directly inside a group turned by `yaw`.
 // Owner: L2 (buildings). Spec <eden4>/29 WP2, 33 §2 row 3, 31 §3 rules 1–2.
 import { pointInPoly, polyArea } from './geom.ts';
+import { reachableFromOutside } from './reachability.ts';
 import type { Vec2 } from './types.ts';
 import { FLOOR0, SLAB, floorY, ngon, type PExt, type Plan, type Rect, type Side } from './building-plan.ts';
 
@@ -478,8 +479,7 @@ export function architectureChecks(L: Layout): Checks {
   const minHeadroom = L.fh - SLAB;
   if (minHeadroom < 2.0) v.push({ code: 'headroom', detail: `rooms have ${minHeadroom.toFixed(2)} m (needs ≥ 2.0)` });
   // reachability from outside
-  const seen = new Set<string>(['outside']), queue = ['outside'];
-  while (queue.length) { const x = queue.shift()!; for (const y of adj.get(x) ?? []) if (!seen.has(y)) { seen.add(y); queue.push(y); } }
+  const seen = reachableFromOutside([...adj].flatMap(([a, bs]) => [...bs].map(b => [a, b] as const)));
   const reachable: string[] = [], unreachable: string[] = [];
   for (const r of L.rooms) (seen.has(key(r.floor, r.id)) ? reachable : unreachable).push(r.id);
   for (const id of unreachable) { const r = L.rooms.find((x) => x.id === id)!; v.push({ code: 'room.unreachable', detail: `${id} (floor ${r.floor}) cannot be reached from a door to the outside` }); }

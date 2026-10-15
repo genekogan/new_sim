@@ -13,7 +13,7 @@ export type LocalOBB = { c: Vec2; half: Vec2; yaw: number; y0: number; y1: numbe
 /** A walkable floor at a level (Stage B feeds these into Spatial). */
 export type Surface = { level: number; y: number; polygon: Vec2[]; material?: string; tag?: string; /** world-frame (path/area) bakes: y is absolute, not above the ground */ abs?: boolean };
 /** A gap in a wall: door, window, gate, arch. `wall` indexes the generator's wall list. */
-export type Opening = { id: string; kind: 'door' | 'window' | 'gate' | 'arch'; wall?: number; at: Vec2; yaw: number; width: number; height: number; sill?: number; level: number; state?: 'open' | 'closed' | 'always' };
+export type Opening = { id: string; kind: 'door' | 'window' | 'gate' | 'arch'; wall?: number; at: Vec2; yaw: number; width: number; height: number; sill?: number; level: number; state?: 'open' | 'closed' | 'always'; /** Building design graph, preserved for admission (windows never connect rooms). */ from?: string; to?: string; exterior?: boolean };
 /** A connection between levels: stairs, ramps, ladders, float shafts. Path in the def frame. */
 export type Link = { id: string; kind: 'stairs' | 'ramp' | 'ladder' | 'float'; from: number; to: number; path: Vec2[]; width: number; y0: number; y1: number };
 /** A room: floor index, polygon and frame in the def frame. Exposed as a `room` slot of the same id. */

@@ -23,11 +23,13 @@ import type { Context, Hono } from 'hono';
 import type { Baked, LocalOBB, Link, Opening, Room, Slot, Surface, Vec2, Vec3 } from '@sim/generators';
 import type { AssetInfo, AssetLookup, StoredDef } from '@sim/world-compiler';
 import { vocab } from '@sim/world-compiler';
+import { CREATION_LIMITS as L } from '@sim/generators';
 import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
 import { FOOTPRINT_BYTES, godBodyLimit } from './ingestion.ts';
+import { godTokenLimiter } from './rate-limit.ts';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const CORE_ASSET_INDEX = join(REPO_ROOT, 'worlds/core-assets/index.json');
@@ -45,7 +47,7 @@ export type AssetMeta = AssetInfo & {
   path?: string;
 };
 export type Budget = { tris: number; bytes: number; texPx: number };
-export const DEFAULT_BUDGET: Budget = { tris: 80_000, bytes: 3_000_000, texPx: 2048 };
+export const DEFAULT_BUDGET: Budget = { tris: L.defTris, bytes: L.assetBytes, texPx: L.texturePx };
 
 const SHA = /^[0-9a-f]{64}$/;
 const EXT_TYPES: Record<AssetMeta['ext'], string> = { glb: 'model/gltf-binary', png: 'image/png', jpg: 'image/jpeg', json: 'application/json' };
@@ -396,7 +398,7 @@ export function inspectAsset(bytes: Uint8Array, opts: Pick<AssetOptions, 'budget
   const s = imageSize(bytes);
   if (s.type !== 'png' && s.type !== 'jpg') throw refuse(415, 'asset.type', 'accepted: GLB (binary glTF 2.0), PNG, JPEG, footprint JSON (lm-building-footprint/1)', { measured: { bytes: bytes.byteLength }, allowed: { formats: ['glb', 'png', 'jpg', 'lm-building-footprint/1'] } });
   if (!(s.w > 0 && s.h > 0)) throw refuse(400, 'asset.invalid', 'image has no valid dimensions', { measured: s, allowed: { width: '> 0', height: '> 0' } });
-  if (bytes.byteLength > Math.min(budget.bytes, 2_000_000)) throw refuse(413, 'asset.budget', `image ${bytes.byteLength} bytes > ${Math.min(budget.bytes, 2_000_000)}`, { field: 'bytes', measured: { bytes: bytes.byteLength }, allowed: { bytes: Math.min(budget.bytes, 2_000_000) } });
+  if (bytes.byteLength > Math.min(budget.bytes, L.imageBytes)) throw refuse(413, 'asset.budget', `image ${bytes.byteLength} bytes > ${Math.min(budget.bytes, L.imageBytes)}`, { field: 'bytes', measured: { bytes: bytes.byteLength }, allowed: { bytes: Math.min(budget.bytes, L.imageBytes) } });
   if (Math.max(s.w, s.h) > budget.texPx) throw refuse(413, 'asset.budget', `image ${s.w}×${s.h} > ${budget.texPx} px`, { field: 'texPx', measured: { texPx: Math.max(s.w, s.h) }, allowed: { texPx: budget.texPx } });
   return { sha, ext: s.type, kind: 'image', tris: 0, bytes: bytes.byteLength, textures: 1, texPx: Math.max(s.w, s.h), box: [s.w, s.h, 0] };
 }
@@ -446,9 +448,10 @@ export class AssetStore {
   put(bytes: Uint8Array, opts: AssetOptions = {}): AssetMeta {
     let meta = inspectAsset(bytes, opts);
     const sha = meta.sha;
+    const fpBytes = opts.footprint && meta.kind === 'mesh' ? opts.footprint instanceof Uint8Array ? opts.footprint : new TextEncoder().encode(JSON.stringify(opts.footprint)) : undefined;
+    this.checkWorldBudget([meta, ...(fpBytes ? [inspectAsset(fpBytes, { ...opts, kind: 'footprint' })] : [])]);
     if (opts.footprint && meta.kind === 'mesh') {
-      const fpBytes = opts.footprint instanceof Uint8Array ? opts.footprint : new TextEncoder().encode(JSON.stringify(opts.footprint));
-      const fp = this.put(fpBytes, { ...opts, footprint: null, kind: 'footprint', name: opts.name ? `${opts.name}-footprint` : undefined });
+      const fp = this.put(fpBytes!, { ...opts, footprint: null, kind: 'footprint', name: opts.name ? `${opts.name}-footprint` : undefined });
       meta.footprint = fp.sha;
     }
     const prior = this.info(sha);
@@ -464,6 +467,18 @@ export class AssetStore {
     if (this.db && this.worldId) this.db.db.prepare('INSERT INTO world_assets_v1 (world_id, sha, kind, ext, bytes, tris, textures, box, name, license, source, by, at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(world_id, sha) DO UPDATE SET name=coalesce(excluded.name, name), license=coalesce(excluded.license, license), source=coalesce(excluded.source, source)')
       .run(this.worldId, sha, meta.kind, meta.ext, meta.bytes, meta.tris, meta.textures, JSON.stringify(meta.box), meta.name ?? null, meta.license ?? null, meta.source ?? null, opts.by ?? null, meta.at ?? Date.now());
     return { ...meta, sha };
+  }
+  /** Check the entire upload (including sidecars) before any file or provenance write. */
+  checkWorldBudget(incoming: Pick<AssetMeta, 'sha' | 'bytes'>[]): void {
+    if (!this.db || !this.worldId) return;
+    const rows = this.db.db.prepare('SELECT sha,bytes FROM world_assets_v1 WHERE world_id=?').all(this.worldId) as { sha: string; bytes: number }[];
+    const sizes = new Map(rows.map(r => [r.sha, r.bytes]));
+    for (const m of incoming) sizes.set(m.sha, m.bytes);
+    const bytes = [...sizes.values()].reduce((a, b) => a + b, 0);
+    for (const [field, measured, limit] of [['assets', sizes.size, L.worldAssets], ['assetBytes', bytes, L.worldAssetBytes]] as const) {
+      if (measured > limit && measured > (field === 'assets' ? rows.length : rows.reduce((n, r) => n + r.bytes, 0)))
+        throw refuse(413, 'budget.world', `${field}: ${measured} > ${limit}`, { field, measured, limit, fix: 'Reuse an existing uploaded asset or reduce the upload; this world has reached its asset budget.' });
+    }
   }
   /** Assets this world uploaded (newest first). */
   listWorld(limit = 100): AssetMeta[] {
@@ -481,7 +496,7 @@ export class AssetStore {
   putThumb(defHash: string, png: Uint8Array) {
     const s = imageSize(png);
     if (s.type !== 'png') throw refuse(415, 'asset.type', 'thumbnails are PNG');
-    if (s.w > 512 || s.h > 512 || png.byteLength > 400_000) throw refuse(413, 'asset.budget', 'thumbnail ≤ 512 px and ≤ 400 KB');
+    if (s.w > L.thumbnailPx || s.h > L.thumbnailPx || png.byteLength > L.thumbnailBytes) throw refuse(413, 'asset.budget', `thumbnail ≤ ${L.thumbnailPx} px and ≤ ${L.thumbnailBytes} bytes`);
     mkdirSync(join(this.dir, 'thumbs'), { recursive: true });
     const f = join(this.dir, 'thumbs', `${defHash}.png`); writeFileSync(f + '.tmp', png); renameSync(f + '.tmp', f);
   }
@@ -628,6 +643,7 @@ const noStore = { 'cache-control': 'no-store' };
  *   POST /v1/god/defs/<ref>/thumb.png        god: store a rendered thumbnail (PNG ≤ 512 px)
  */
 export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
+  const limitGod = godTokenLimiter(d.requireGod);
   const store = d.store ?? (d.god as { assets?: AssetStore }).assets ?? new AssetStore({ dir: d.dir ?? defaultAssetDir(), db: d.god.db, worldId: d.god.opts.worldId });
   d.god.model.assets = store.lookup;
   const budget = (): Budget => ({ ...DEFAULT_BUDGET, ...d.god.model.constants.limits.budget });
@@ -653,7 +669,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
   });
 
   app.post('/v1/god/assets', godBodyLimit(budget), async (c) => {
-    d.requireGod(c);
+    limitGod(c, 'asset-upload', L.assetUploadsPerMinute);
     const ct = c.req.header('content-type') ?? '';
     const q = (k: string) => c.req.query(k);
     let bytes: Uint8Array | null = null, footprint: Uint8Array | null = null;
@@ -691,6 +707,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
         inspectAsset(scaledFootprint, { kind: 'footprint' });
       }
     }
+    store.checkWorldBudget([admitted, ...(footprint ? [inspectAsset(footprint, { kind: 'footprint' })] : []), ...(scaledFootprint ? [inspectAsset(scaledFootprint, { kind: 'footprint' })] : [])]);
     if (admitted.kind === 'mesh') { const v = await validateGlb(bytes); if (v) throw new ApiError(400, 'asset.invalid', `the GLB does not parse: ${v}`, { field: 'file', measured: { problem: v, bytes: bytes.byteLength }, allowed: { format: 'valid self-contained GLB 2.0' }, fix: 'Export a valid self-contained binary glTF 2.0 file.' }); }
     const meta = store.put(bytes, { name, license: field.license, source: field.source, by: 'god', budget: budget(), footprint });
     const warnings: string[] = [];
@@ -767,7 +784,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     }, 200, noStore);
   });
   app.post('/v1/god/defs/*', async (c) => {
-    d.requireGod(c);
+    limitGod(c, 'thumbnail-upload', L.thumbnailUploadsPerMinute);
     const rest = decodeURIComponent(c.req.path.replace(/^.*\/v1\/god\/defs\//, ''));
     if (!rest.endsWith('/thumb.png')) throw new ApiError(404, 'not-found', 'POST /v1/god/defs/<ref>/thumb.png with a PNG body');
     const def = findDef(rest.slice(0, -'/thumb.png'.length));

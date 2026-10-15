@@ -36,7 +36,15 @@ function world(t: TestContext, options: {durableClockV1?: boolean; district?: bo
       ...(seat ? [{op: 'place', def: coreRef('chair'), name: 'chair', in: {parent: '$h', slot: 'ground'}, p: [-2, 0, -1]}] : []),
       ...(blocked ? [{op: 'place', def: coreRef('wall'), name: 'door-blocker', p: [10, 3.75], params: {w: 5, h: 3, d: 1}}] : []),
     ]});
-    assert.equal(r.accepted, true, JSON.stringify(r)); await settle();
+    if (blocked) {
+      // New construction must fail admission. Keep the verifier's negative coverage by explicitly
+      // seeding a legacy sealed world after checking the new refusal (no production bypass).
+      assert.equal(r.accepted, false); if (!r.accepted) assert.equal(r.failures[0].code, 'architecture.sealed');
+      await build(seat, false);
+      const e = { id: 'e_legacywall', def: coreRef('wall'), name: 'door-blocker', in: { parent: 'world' }, p: [10, 0, 3.75] as [number, number, number], params: { w: 5, h: 3, d: 1 }, by: 'legacy-fixture', born: 0, v: 1 };
+      god.model.insert(e); god.model.index(e.id, god.model.footprint(e)); bridge.reconcile();
+    } else assert.equal(r.accepted, true, JSON.stringify(r));
+    await settle();
   };
   const drive = async <T>(work: Promise<T>): Promise<T> => {
     let done = false; void work.then(() => {done = true;}, () => {done = true;});

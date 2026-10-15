@@ -4,9 +4,10 @@
 // file store (M5). Tables carry world_id first and a composite key.
 import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity, type Accepted, type Result } from '@sim/world-compiler';
+import { CREATION_LIMITS as L } from '@sim/generators';
 
-export const GOD_EDIT_RECEIPTS = 1000;
-export const GOD_EDIT_OUTCOME_BYTES = 256 * 1024;
+export const GOD_EDIT_RECEIPTS = L.requestReceipts;
+export const GOD_EDIT_OUTCOME_BYTES = L.requestOutcomeBytes;
 export type EditRequest = { clientRef: string; requestHash: string; payloadHash: string; result: Accepted };
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
 type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number };
@@ -23,8 +24,14 @@ export function ensureWorldSchema(db: Db) {
     CREATE TABLE IF NOT EXISTS world_edits_v1 (world_id TEXT NOT NULL, seq INTEGER NOT NULL, by TEXT NOT NULL, at INTEGER NOT NULL, note TEXT, ops TEXT NOT NULL, inverse TEXT NOT NULL, undone INTEGER NOT NULL DEFAULT 0, undo_of INTEGER, kind TEXT NOT NULL DEFAULT 'edit', PRIMARY KEY (world_id, seq)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_tokens_v1 (world_id TEXT NOT NULL, token_hash TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL, last_used INTEGER, PRIMARY KEY (world_id, token_hash)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_prayers_v1 (world_id TEXT NOT NULL, id TEXT NOT NULL, soul_id TEXT NOT NULL, soul_name TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, answer TEXT, answered_at INTEGER, PRIMARY KEY (world_id, id)) WITHOUT ROWID;
-    CREATE TABLE IF NOT EXISTS god_edit_receipts_v1 (world_id TEXT NOT NULL, client_ref TEXT NOT NULL CHECK(length(client_ref)<=100), request_hash TEXT NOT NULL, payload_hash TEXT NOT NULL, seq INTEGER NOT NULL, result TEXT NOT NULL CHECK(json_valid(result) AND length(CAST(result AS BLOB))<=262144), PRIMARY KEY(world_id,client_ref)) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS god_edit_receipts_v1 (world_id TEXT NOT NULL, client_ref TEXT NOT NULL CHECK(length(client_ref)<=100), request_hash TEXT NOT NULL, payload_hash TEXT NOT NULL, seq INTEGER NOT NULL, result TEXT NOT NULL CHECK(json_valid(result) AND length(CAST(result AS BLOB))<=${L.requestOutcomeBytes}), PRIMARY KEY(world_id,client_ref)) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS god_edit_receipts_v1_seq ON god_edit_receipts_v1(world_id,seq DESC);
+    CREATE TABLE IF NOT EXISTS world_edit_usage_v1 (world_id TEXT PRIMARY KEY, entries INTEGER NOT NULL, bytes INTEGER NOT NULL) WITHOUT ROWID;
+    INSERT OR IGNORE INTO world_edit_usage_v1 SELECT world_id,count(*),sum(length(CAST(ops AS BLOB))+length(CAST(inverse AS BLOB))+coalesce(length(CAST(note AS BLOB)),0)) FROM world_edits_v1 WHERE world_id NOT IN (SELECT world_id FROM world_edit_usage_v1) GROUP BY world_id;
+    CREATE TRIGGER IF NOT EXISTS world_edit_usage_insert_v1 AFTER INSERT ON world_edits_v1 BEGIN
+      INSERT INTO world_edit_usage_v1(world_id,entries,bytes) VALUES(new.world_id,1,length(CAST(new.ops AS BLOB))+length(CAST(new.inverse AS BLOB))+coalesce(length(CAST(new.note AS BLOB)),0))
+      ON CONFLICT(world_id) DO UPDATE SET entries=entries+1,bytes=bytes+excluded.bytes;
+    END;
   `);
   const cols = (db.db.prepare('PRAGMA table_info(world_edits_v1)').all() as { name: string }[]).map((c) => c.name);
   if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
@@ -68,6 +75,7 @@ export class WorldStore {
       // Recheck under the write lock: another connection may have committed while this owner planned.
       if (request) { const replay = this.retry(request.clientRef, request.requestHash); if (replay) return replay; }
       if (this.meta()?.editSeq !== edit.seq - 1) return { accepted: false, failures: [{ op: -1, code: 'revision.stale', detail: 'The durable world changed while this owner planned. Reload the world before submitting another edit.', field: 'editSeq', fix: 'Reload the current world and re-plan the edit.' }] } as Result;
+      const journal = this.journalBudgetFailure(edit, diff); if (journal) return journal;
       for (const d of diff.defs) this.writeDef(d);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
       for (const e of diff.upserts) up.run(this.worldId, e.id, e.in.parent, JSON.stringify(e));
@@ -87,6 +95,21 @@ export class WorldStore {
       }
       return null;
     });
+  }
+  /** Durable aggregate avoids rescanning the append-only journal on each construction edit. */
+  private journalBudgetFailure(edit: CommitEdit, diff: Diff): Result | null {
+    if (!edit.ops.length && edit.kind === 'edit') return null;
+    const old = this.db.db.prepare('SELECT entries,bytes FROM world_edit_usage_v1 WHERE world_id=?').get(this.worldId) as { entries: number; bytes: number } | undefined;
+    const bytes = Buffer.byteLength(JSON.stringify(edit.ops)) + Buffer.byteLength(JSON.stringify(edit.inverse)) + Buffer.byteLength(edit.note ?? '');
+    // An exhausted creation budget must not strand a retired body/probe. Reserve a bounded amount
+    // for engine edits that strictly remove existing entities, without creating entities or defs.
+    const existing = this.db.db.prepare('SELECT 1 FROM world_entities_v1 WHERE world_id=? AND id=?');
+    const cleanup = edit.kind === 'engine' && diff.removes.length > 0 && !diff.defs.length && diff.upserts.every(e => existing.get(this.worldId, e.id));
+    const entryLimit = L.journalEntries + (cleanup ? L.journalCleanupEntries : 0), byteLimit = L.journalBytes + (cleanup ? L.journalCleanupBytes : 0);
+    for (const [field, measured, limit] of [['journal.entries', (old?.entries ?? 0) + 1, entryLimit], ['journal.bytes', (old?.bytes ?? 0) + bytes, byteLimit]] as const) {
+      if (measured > limit) return { accepted: false, failures: [{ op: -1, code: 'budget.world', field, measured, limit, detail: `${field}: ${measured} > ${limit}`, fix: 'This world has reached its retained authoring journal budget. Preserve its history and ask the owner to provision an archive before more edits.' }] };
+    }
+    return null;
   }
   receipt(clientRef: string): CommittedReceipt | null {
     const row = this.db.db.prepare('SELECT payload_hash,seq,result FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref=?').get(this.worldId, clientRef) as { payload_hash: string; seq: number; result: string } | undefined;

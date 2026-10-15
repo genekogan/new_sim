@@ -3,13 +3,17 @@
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
 import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
-import { GENERATORS, prepareFor, queryOf } from '@sim/generators';
+import { CREATION_LIMITS, GENERATORS, prepareFor, queryOf } from '@sim/generators';
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
 import { BakeError, WorldModel, definitionRefs, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema, SKY_PALETTES } from './schemas.ts';
 import { layersStateSchema, type LayersState, type Schedule } from './layers.ts';
+import { sealedRouteFailure } from './architecture.ts';
+import { overlapNotWorse } from './overlap.ts';
+import { worldBudgetFailure } from './budgets.ts';
+import { creationInputFailure } from './input.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
@@ -102,6 +106,8 @@ export function checkFields(fields: Record<string, Field>, values: Record<string
 }
 
 export function plan(world: WorldModel, input: unknown, by: string, tick: number, opts: PlanOptions = {}): Plan {
+  const inputFailure = creationInputFailure(input);
+  if (inputFailure) return { ok: false, failures: [inputFailure] };
   const parsed = (opts.trusted ? trustedBatchSchema : batchSchema).safeParse(input);
   if (!parsed.success) return { ok: false, failures: [fail(-1, 'schema', parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '))] };
   const batch: Batch = parsed.data as Batch;
@@ -116,7 +122,10 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const touchedAt = new Map<string, number>(), tileAt = new Map<string, number>(), removedAt = new Map<string, number>();
   let activeOp = 0;
   let layersTouched = false;
-  const upsert = (e: Entity) => { touched.add(e.id); touchedAt.set(e.id, activeOp); };
+  const upsert = (e: Entity) => {
+    touched.add(e.id); touchedAt.set(e.id, activeOp);
+    if (touched.size > CREATION_LIMITS.batchEntityChanges) throw new PlanningFailure({ ...fail(activeOp, 'budget.world', 'batch expansion exceeds the entity-change budget'), field: 'batch.entities', measured: touched.size, limit: CREATION_LIMITS.batchEntityChanges, fix: 'Split the construction into smaller batches.' });
+  };
   const resolveId = (ref: string, opIndex: number): string | null => {
     if (ref === 'world') return 'world';
     if (ref.startsWith('$')) { const id = ids[ref]; if (!id) failures.push(fail(opIndex, 'entity.unknown', `${ref} is not placed in this batch`)); return id ?? null; }
@@ -169,7 +178,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       if (def.form !== 'point' && !next.shape) throw new PlanningFailure(repair({ ...fail(i, 'params.invalid', `${def.form} form needs a shape`), field: 'shape' }));
       try {
         prepareEntity(scratch, def, next, next.params);
-        const problem = admit(scratch, next, def, i, 'strict', false);
+        const problem = admit(scratch, next, def, i, 'strict', false, world);
         if (problem) throw new PlanningFailure(repair(problem));
         const fields = (['p', 'r', 'shape', 'params'] as const).filter(field => hashOf(e[field] ?? null) !== hashOf(next[field] ?? null));
         if (fields.length) back.push({ entity: e, fields });
@@ -242,7 +251,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const stateOk = checkFields(def.state, op.state, true);
         if (!stateOk.ok) { failures.push(fail(i, 'state.invalid', stateOk.detail)); return; }
         if (def.form !== 'point' && !op.shape) { failures.push(fail(i, 'params.invalid', `${def.form} form needs a shape`)); return; }
-        if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
+        if (scratch.entities.size >= Math.min(CREATION_LIMITS.worldEntities, scratch.constants.limits.entities)) { failures.push({ ...fail(i, 'budget.world', 'entity count exceeds the world limit'), field: 'entities', measured: scratch.entities.size + 1, limit: Math.min(CREATION_LIMITS.worldEntities, scratch.constants.limits.entities), fix: 'Remove entities or reuse existing construction.' }); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
         contextDef = def; entity = id;
@@ -255,7 +264,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           if (schedule !== undefined) e.schedule = schedule;
           if (price !== undefined) e.price = price; }
         prepareEntity(scratch, def, e, op.params);
-        const problem = admit(scratch, e, def, i, op.mode, true);
+        const problem = admit(scratch, e, def, i, op.mode, true, world);
         if (problem) { failures.push(problem); return; }
         scratch.insert(e); indexAndGround(scratch, e, def, diff);
         if (op.tmp) ids[op.tmp] = id;
@@ -296,7 +305,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (op.constraints) next.constraints = op.constraints;
         scratch.delete(id); clearGround(scratch, prev, diff);
         if (op.shape) prepareEntity(scratch, def, next, undefined);
-        const problem = admit(scratch, next, def, i, op.mode, false);
+        const problem = admit(scratch, next, def, i, op.mode, false, world);
         if (problem) { failures.push(problem); return; }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         upsert(next);
@@ -334,7 +343,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         }
         scratch.delete(id); clearGround(scratch, prev, diff);
         if (op.params) prepareEntity(scratch, def, next, op.params);
-        if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false); if (problem) { failures.push(problem); return; } }
+        if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false, world); if (problem) { failures.push(problem); return; } }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         upsert(next);
         // children in slots the new params no longer have (a room that went away) move to the ground floor
@@ -379,7 +388,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
               if (copy.seed !== undefined) copy.seed = (copy.seed + k + 1) | 0;
               const cdef = scratch.resolvedDef(copy.def)!;
               if (copy.shape) prepareEntity(scratch, cdef, copy, undefined);
-              const problem = admit(scratch, copy, cdef, i, op.mode, true);
+              const problem = admit(scratch, copy, cdef, i, op.mode, true, world);
               if (problem) { failures.push(problem); return; }
             }
             scratch.insert(copy); indexAndGround(scratch, copy, scratch.resolvedDef(copy.def)!, diff); upsert(copy);
@@ -472,7 +481,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const e = op.entity; const def = scratch.resolvedDef(e.def);
         if (!def) { failures.push(fail(i, 'def.unknown', e.def)); return; }
         if (e.in.parent !== 'world' && !scratch.entities.has(e.in.parent)) { failures.push(fail(i, 'parent.unknown', e.in.parent)); return; }
-        const problem = admit(scratch, e, def, i, 'strict', false);
+        const problem = admit(scratch, e, def, i, 'strict', false, world);
         if (problem) { failures.push({ ...problem, code: 'undo.conflict' }); return; }
         scratch.insert(e); indexAndGround(scratch, e, def, diff); upsert(e);
         inverse.unshift({ op: 'remove', id: e.id, cascade: true });
@@ -529,7 +538,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
   let refused: Failure | null | undefined;
-  try { refused = opts.refuse?.(scratch, diff, ops); }
+  try { refused = worldBudgetFailure(world, scratch, ops.length - 1) ?? sealedRouteFailure(world, scratch, ops.length - 1) ?? opts.refuse?.(scratch, diff, ops); }
   catch (error) {
     if (!(error instanceof BakeError)) throw error;
     const entity = [...scratch.entities.values()].find((e) => scratch.def(e.def)?.hash === error.def.hash);
@@ -589,6 +598,8 @@ function isBody(w: WorldModel, e: Entity): boolean { return !!w.resolvedDef(e.de
 
 function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i: number): Failure | null {
   const lim = w.constants.limits;
+  const bytes = new TextEncoder().encode(JSON.stringify(def)).byteLength;
+  if (bytes > CREATION_LIMITS.defBytes) return { ...fail(i, 'def.budget', `definition ${bytes} bytes > ${CREATION_LIMITS.defBytes}`), field: 'def', measured: bytes, limit: CREATION_LIMITS.defBytes, fix: 'Simplify the definition or reuse library parts.' };
   const box = def.size?.box;
   if (!box) return fail(i, 'def.invalid', 'size.box required');
   if (box[0] > lim.sizeMax[0] || box[1] > lim.sizeMax[1] || box[2] > lim.sizeMax[2]) return fail(i, 'size.range', `box ${box.join('×')} exceeds world limit ${lim.sizeMax.join('×')}`);
@@ -603,9 +614,9 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
   if (def.make.kind === 'parts') {
     let total = 0;
     const walk = (parts: typeof def.make.parts, depth: number): string | null => {
-      if (depth > 4) return 'prefab nesting deeper than 4';
+      if (depth > CREATION_LIMITS.prefabDepth) return `prefab nesting deeper than ${CREATION_LIMITS.prefabDepth}`;
       for (const p of parts) {
-        total++; if (total > 256) return 'prefab expands to more than 256 parts';
+        total++; if (total > CREATION_LIMITS.prefabParts) return `prefab expands to more than ${CREATION_LIMITS.prefabParts} parts`;
         const d = w.resolvedDef(p.def); if (!d) return `part ${p.id}: def ${p.def} unknown`;
         if (d.make.kind === 'parts') { const r = walk(d.make.parts, depth + 1); if (r) return r; }
       }
@@ -631,7 +642,8 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
       const params = checkFields(resolved.params, undefined, true);
       const shape: Entity['shape'] = resolved.form === 'path' ? { path: [[0, 0], [1, 0]] }
         : resolved.form === 'area' ? { area: [[0, 0], [1, 0], [0, 1]] } : undefined;
-      trial.bake(resolved, params.ok ? params.values : {}, 0, shape);
+      const baked = trial.bake(resolved, params.ok ? params.values : {}, 0, shape);
+      if (baked.tris > lim.budget.tris) return { ...fail(i, 'def.budget', `${baked.tris} tris > ${lim.budget.tris}`), field: 'make', measured: baked.tris, limit: lim.budget.tris, fix: 'Simplify the generated definition.' };
     }
   } catch (error) {
     return { ...generatorFailure(i, error, resolved), def: resolved?.ref ?? `${def.name}@${def.version ?? 1}` };
@@ -650,7 +662,7 @@ function prepareEntity(w: WorldModel, def: StoredDef, e: Entity, explicit: Recor
 }
 
 /** Physical admission of an entity at its (new) pose: size, extent, support/settle, slot, overlap. May adjust `e.p` (settle y, nudge). */
-function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'strict' | 'nudge', creating: boolean): Failure | null {
+function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'strict' | 'nudge', creating: boolean, baseline?: WorldModel): Failure | null {
   const s = e.s ?? 1;
   if (s < def.size.scale[0] || s > def.size.scale[1]) return fail(i, 'size.range', `scale ${s} outside [${def.size.scale.join(', ')}]`);
   const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
@@ -744,8 +756,9 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
         const pb = w.bake(pd, pe.params ?? {}, pe.seed ?? 0, pe.shape);
         if (pb.rooms?.length) {
           const fp = w.footprint(pe, pd);
+          if (overlapNotWorse(baseline, e, pe.id, boxes, fp)) { pid = pe.in.parent; continue; }
           for (const a of boxes) for (let k = 0; k < fp.length; k++) if (obbOverlap(a, fp[k])) {
-            if (mode === 'nudge') { const nudged = nudge(w, e, def, boxes, fp[k]); if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating); } }
+            if (mode === 'nudge') { const nudged = nudge(w, e, def, boxes, fp[k]); if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating, baseline); } }
             return fail(i, 'overlap.solid', `crosses ${w.pathOf(pe.id)} ${pb.colliders[k]?.tag ?? 'wall'}`, localSuggest(w, e, envelope(boxes), suggestFrom(envelope(boxes), fp[k])));
           }
         }
@@ -760,10 +773,11 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const od = w.resolvedDef(oe.def); if (!od) continue;
       if (def.overlaps.some((t) => od.tags.includes(t) || od.name === t) || od.overlaps.some((t) => def.tags.includes(t) || def.name === t)) continue;
       if (w.ancestors(other).has(e.id)) continue;
+      if (overlapNotWorse(baseline, e, other, boxes, w.footprintsOf(other))) continue;
       for (const a of boxes) for (const b of w.footprintsOf(other)) if (obbOverlap(a, b)) {
         if (mode === 'nudge') {
           const nudged = nudge(w, e, def, boxes, b);
-          if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating); }
+          if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating, baseline); }
         }
         const label = oe.name ? w.pathOf(other) : `${od.name} ${other}`;
         return fail(i, 'overlap.solid', `overlaps ${label}`, localSuggest(w, e, envelope(boxes), suggestFrom(envelope(boxes), b)));
@@ -856,7 +870,7 @@ function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, ti
     if (part.when !== undefined && !truthy(evaluate(part.when, rp))) continue;
     const placedRef = w.library?.placementRef?.(part.def);
     const pdef = placedRef === null ? undefined : w.resolvedDef(placedRef ?? part.def); if (!pdef) continue;
-    const count = part.repeat ? Math.max(0, Math.min(64, Math.round(Number(typeof part.repeat.count === 'number' ? part.repeat.count : evaluate(part.repeat.count, rp)) || 0))) : 1;
+    const count = part.repeat ? Math.max(0, Math.min(CREATION_LIMITS.partRepeats, Math.round(Number(typeof part.repeat.count === 'number' ? part.repeat.count : evaluate(part.repeat.count, rp)) || 0))) : 1;
     for (let k = 0; k < count; k++) {
       const params = Object.fromEntries(Object.entries(part.params ?? {}).map(([key, v]) => [key, substitute(v, rp)]));
       const state = Object.fromEntries(Object.entries(part.state ?? {}).map(([key, v]) => [key, substitute(v, rp)]));
@@ -870,9 +884,9 @@ function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, ti
       if (w.library?.placementRef || part.def.startsWith('sha:')) e.def = 'sha:' + pdef.hash;
       { const L = pdef.layers ?? {}; for (const k of ['owner', 'access', 'schedule', 'price'] as const) { const v = part[k] ?? L[k]; if (v !== undefined) (e as Record<string, unknown>)[k] = v; } }
       w.insert(e); indexAndGround(w, e, pdef, diff); upsert(e);
-      if (pdef.make.kind !== 'parts' && pdef.contents?.length && depth < 4) expandParts(w, e, { ...pdef, make: { kind: 'parts', parts: pdef.contents } } as StoredDef, by, tick, diff, inverse, upsert, depth + 1);
+      if (pdef.make.kind !== 'parts' && pdef.contents?.length && depth < CREATION_LIMITS.prefabDepth) expandParts(w, e, { ...pdef, make: { kind: 'parts', parts: pdef.contents } } as StoredDef, by, tick, diff, inverse, upsert, depth + 1);
       if (k === 0) local[part.id] = e.id;
-      if (pdef.make.kind === 'parts' && depth < 4) expandParts(w, e, pdef, by, tick, diff, inverse, upsert, depth + 1);
+      if (pdef.make.kind === 'parts' && depth < CREATION_LIMITS.prefabDepth) expandParts(w, e, pdef, by, tick, diff, inverse, upsert, depth + 1);
     }
   }
 }

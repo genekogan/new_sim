@@ -316,7 +316,12 @@ function layOut(name, def, params, recipe) {
   const bad = (baked.notes ?? []).filter((n) => n.startsWith('violation'));
   if (bad.length) throw new Error(`${name}: ${bad.join('; ')}`);
   const ent = { id: 'B', def: ref, params };
-  const model = { get: (id) => (id === 'B' ? ent : undefined), resolvedDef: (r) => (r === ref ? def : KIT.get(r)), bake: (d) => (d === def ? baked : { box: d.size.box }),
+  const bakeItem = (d, values = {}) => {
+    const g = d.make?.kind === 'gen' && GENERATORS[d.make.gen];
+    const defaults = Object.fromEntries(Object.entries({ ...g?.params, ...d.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
+    return g ? g.physics({ params: { ...defaults, ...values }, args: d.make.args ?? {}, seed: 0 }) : { box: d.size.box };
+  };
+  const model = { get: (id) => (id === 'B' ? ent : undefined), resolvedDef: (r) => (r === ref ? def : KIT.get(r)), bake: (d, values) => (d === def ? baked : bakeItem(d, values)),
     children: new Map(), entities: new Map(), pathOf: () => name };
   const f = furnishBatch(model, 'B', name, { recipe });
   const byTmp = {}, parts = [], roomOf = new Map(f.placed.map((x) => [x.name, x.room]));
@@ -491,7 +496,7 @@ types.push(
     description: 'A furnished bar (10 × 9 m): a long bar with beer taps (a pint costs 4) and stools, tables and chairs, a pool table and a dartboard, a cellar of barrels and a washroom. Open 16–01.',
     params: { w: 10, d: 9, floors: 1, floorHeight: 3, roof: 'gable', roofPitch: 34, material: 'brick', wall: '#6b3a2e', trim: '#d9a63a', roofColor: '#3f4446', windows: 0.45 },
     plan: plan([{ rooms: [['bar', 0, 3, 10, 9], ['cellar', 0, 0, 6, 3], ['washroom', 6, 0, 10, 3]], doors: [['bar', 'cellar', 0.2], ['bar', 'washroom', 0.5]], ext: [['bar', 's', 0.3, 1.2]] }]),
-    recipe: { bar: [counter('bar', 'bar', '0.55,0,s 0.55,0.1,s', { amount: 4, service: 'a pint' }), ...row('stool', 'stool', 3, 0.3, 's', 0.42, 0.68), it('pool', 'pool-table', '0.75,0.75,s 0.7,0.8,s'), it('darts', 'dartboard', '0,0.4,e'), ...dining(2, 0.1, 0.3, 0.55, 0.9, 1), it('jukebox', ['arcade-cabinet', 'radio'], '1,0.25,w')],
+    recipe: { bar: [counter('bar', 'bar', '0.55,-0.01,s 0.55,0.1,s', { amount: 4, service: 'a pint' }), ...row('stool', 'stool', 3, 0.3, 's', 0.42, 0.68), it('pool', 'pool-table', '0.75,0.75,s 0.7,0.8,s'), it('darts', 'dartboard', '0,0.4,e'), ...dining(2, 0.1, 0.3, 0.55, 0.9, 1), it('jukebox', ['arcade-cabinet', 'radio'], '1,0.25,w')],
       cellar: [...row('barrel', 'barrel', 4, 0, 's', 0.1, 0.9), it('crate-1', 'crate', '0.6,1,s 0.6,0.6,s'), it('crate-2', 'crate', '0.8,1,s 0.8,0.6,s')], washroom: [it('toilet', 'toilet', '0.3,0,s'), it('basin', 'washbasin', '0.85,0,s')] },
     layers: { owner: 'god', schedule: { open: [{ from: '16:00', to: '01:00' }] } } }),
   furnished({ ...COM, name: 'bank', synonyms: ['bank branch', 'savings bank', 'building society', 'credit union', 'bureau de change', 'treasury'],

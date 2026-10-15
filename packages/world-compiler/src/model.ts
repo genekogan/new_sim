@@ -2,7 +2,7 @@
 // terrain. Pure data + lookups; no I/O. The server persists it; the god skill
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
-import { GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
+import { CREATION_LIMITS, GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
@@ -263,7 +263,8 @@ export class WorldModel {
 
   private cellKeys(o: OBB): string[] {
     const r = Math.sqrt(o.half[0] ** 2 + o.half[1] ** 2);
-    const x0 = Math.floor((o.c[0] - r) / 16), x1 = Math.floor((o.c[0] + r) / 16), z0 = Math.floor((o.c[1] - r) / 16), z1 = Math.floor((o.c[1] + r) / 16);
+    const size = CREATION_LIMITS.regionSizeM;
+    const x0 = Math.floor((o.c[0] - r) / size), x1 = Math.floor((o.c[0] + r) / size), z0 = Math.floor((o.c[1] - r) / size), z1 = Math.floor((o.c[1] + r) / size);
     const out: string[] = [];
     for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) out.push(`${x},${z}`);
     return out;
@@ -285,6 +286,8 @@ export class WorldModel {
     return out;
   }
   footprintsOf(id: string): OBB[] { return this.footprints.get(id) ?? []; }
+  /** Same conservative cells as collision lookup; count each solid entity once per cell. */
+  solidRegionCounts(): Map<string, number> { return new Map([...this.cells].filter(([, ids]) => ids.size).map(([cell, ids]) => [cell, ids.size])); }
 
   // ---------- ground ----------
 

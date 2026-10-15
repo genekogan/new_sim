@@ -1,6 +1,7 @@
 // Shared value/field/slot vocabulary (contract for every generator and def).
 // Owner: L1. Spec <eden4>/33 §4, 29 §4.
 import { z } from 'zod';
+import { CREATION_LIMITS } from './creation-limits.ts';
 
 export const num = z.number().finite();
 export const v2 = z.tuple([num, num]);
@@ -10,9 +11,9 @@ export const v3 = z.tuple([num, num, num]);
 export const ID = /^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/;
 export const NAME = /^[a-z0-9][a-z0-9._-]{0,47}$/;
 
-const JSON_MAX = 8192;
+const JSON_MAX = CREATION_LIMITS.fieldJSONBytes;
 /** Any JSON value up to 8 KB serialised (plans, shape lists, palettes). */
-export const jsonValue = z.json().refine((v) => JSON.stringify(v).length <= JSON_MAX, `json value over ${JSON_MAX} bytes`);
+export const jsonValue = z.json().refine((v) => new TextEncoder().encode(JSON.stringify(v)).byteLength <= JSON_MAX, `json value over ${JSON_MAX} bytes`);
 /** A parameter or state value: primitives, small arrays, or JSON objects. */
 export const value = z.union([z.string().max(2000), num, z.boolean(), z.null(), jsonValue]);
 export type Value = z.infer<typeof value>;

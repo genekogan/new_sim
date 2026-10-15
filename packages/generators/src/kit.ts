@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { materialEnum, num, slotSchema, v2, v3 } from './fields.ts';
 import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
+import { CREATION_LIMITS } from './creation-limits.ts';
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -50,7 +51,7 @@ const shape = z.object({
 export type KitShape = z.infer<typeof shape>;
 
 export const kitArgs = z.object({
-  shapes: z.array(shape).min(1).max(96),
+  shapes: z.array(shape).min(1).max(CREATION_LIMITS.kitShapes),
   slots: z.array(slotSchema).max(64).optional(),
   /** Override the computed bounds (rarely needed). */
   box: v3.optional(),
@@ -94,6 +95,27 @@ function rotatedHalf(h: Vec3, yaw = 0, pitch = 0, roll = 0): Vec3 {
   return [x, y, z];
 }
 
+/** Engine boxes support yaw plus a vertical interval, so slice a tilted primitive along its
+ *  greatest vertical span. Keep every slice: merging them recreates the original empty-space box. */
+function tiltedColliders(sh: KitShape, c: Vec3, h: Vec3): LocalOBB[] {
+  const yaw = sh.yaw ?? 0, pitch = sh.pitch ?? 0, roll = sh.roll ?? 0;
+  const rotate = ([x, y, z]: Vec3): Vec3 => {
+    [x, y] = [x * Math.cos(roll) - y * Math.sin(roll), x * Math.sin(roll) + y * Math.cos(roll)];
+    [y, z] = [y * Math.cos(pitch) - z * Math.sin(pitch), y * Math.sin(pitch) + z * Math.cos(pitch)];
+    return [x * Math.cos(yaw) + z * Math.sin(yaw), y, -x * Math.sin(yaw) + z * Math.cos(yaw)];
+  };
+  const rises = h.map((v, i) => { const axis: Vec3 = [0, 0, 0]; axis[i] = v; return 2 * Math.abs(rotate(axis)[1]); });
+  const axis = rises.indexOf(Math.max(...rises));
+  const n = Math.min(CREATION_LIMITS.kitColliderSlices, Math.max(1, Math.ceil(rises[axis] / CREATION_LIMITS.kitColliderSliceRiseM)));
+  const half: Vec3 = [...h]; half[axis] /= n;
+  const rh = rotatedHalf(half, 0, pitch, roll);
+  return Array.from({ length: n }, (_, i) => {
+    const offset: Vec3 = [0, 0, 0]; offset[axis] = -h[axis] + half[axis] * (2 * i + 1);
+    const p = rotate(offset);
+    return { c: [c[0] + p[0], c[2] + p[2]], half: [rh[0], rh[2]], yaw, y0: c[1] + p[1] - rh[1], y1: c[1] + p[1] + rh[1] };
+  });
+}
+
 /** VOCAB-MECH: does a shape's `when` hold? `params` = instance params (defaults filled); `state` = entity state (viewer only;
  *  undefined in physics, where a state condition counts as "maybe": the shape bounds the box but never collides). */
 export function kitWhen(when: string | undefined, params: Record<string, unknown> = {}, state?: Record<string, unknown>): boolean {
@@ -115,6 +137,7 @@ export function kitWhen(when: string | undefined, params: Record<string, unknown
 export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}): Baked {
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const colliders: LocalOBB[] = [];
+  let tilted = false;
   let tris = 0;
   for (const sh of args.shapes) {
     if (!kitWhen(sh.when, params)) continue;
@@ -127,12 +150,15 @@ export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}):
     tris += sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
     const tall = 2 * h[1] >= 0.3;
     const collide = !sh.when?.includes('@') && (sh.collide ?? ((sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'cyl' || sh.kind === 'extrude') && tall && !sh.role));
-    if (collide) colliders.push({ c: [c[0], c[2]], half: [rh[0], rh[2]], yaw: 0, y0: c[1] - rh[1], y1: c[1] + rh[1] });
+    if (collide) {
+      if (Math.abs(sh.pitch ?? 0) > 1e-8 || Math.abs(sh.roll ?? 0) > 1e-8) { tilted = true; colliders.push(...tiltedColliders(sh, c, h)); }
+      else colliders.push({ c: [c[0], c[2]], half: [rh[0], rh[2]], yaw: 0, y0: c[1] - rh[1], y1: c[1] + rh[1] });
+    }
   }
   if (!Number.isFinite(x0)) { x0 = y0 = z0 = -0.5; x1 = y1 = z1 = 0.5; }
   const box: Vec3 = args.box ?? [Math.max(0.01, x1 - x0), Math.max(0.01, y1 - Math.min(0, y0)), Math.max(0.01, z1 - z0)];
   // merge colliders into one when there are many small ones (keeps the spatial index lean)
-  const merged = colliders.length > 12 ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: Math.max(0, y0), y1 }] : colliders;
+  const merged = !tilted && colliders.length > CREATION_LIMITS.uprightKitMergeThreshold ? [{ c: [(x0 + x1) / 2, (z0 + z1) / 2] as [number, number], half: [(x1 - x0) / 2, (z1 - z0) / 2] as [number, number], yaw: 0, y0: Math.max(0, y0), y1 }] : colliders;
   return { box, colliders: merged, slots: args.slots ?? [], tris };
 }
 

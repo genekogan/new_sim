@@ -23,6 +23,11 @@ const RECIPES = resolve(here, '../recipes/furnish');
 const FRONT_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const FACE_YAW = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
 const r3 = (v) => Math.round(v * 1000) / 1000;
+const itemBoxes = (baked, p, y, yaw) => {
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  const boxes = baked.colliders ?? [{ c: [0, 0], half: [baked.box[0] / 2, baked.box[2] / 2], yaw: 0, y0: 0, y1: baked.box[1] }];
+  return boxes.map(b => ({ c: [p[0] + b.c[0] * c + b.c[1] * s, p[1] - b.c[0] * s + b.c[1] * c], half: b.half, yaw: b.yaw + yaw, y0: y + b.y0, y1: y + b.y1 }));
+};
 
 export function loadRecipe(style) {
   const file = resolve(RECIPES, `${style}.json`);
@@ -66,7 +71,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
     const cd = model.resolvedDef(ch.def); if (!cd || cd.layer !== 'solid') continue;
     const cb = model.bake(cd, ch.params ?? {}, ch.seed ?? 0), lp = ch.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1];
     const yaw = typeof ch.r === 'number' ? ch.r : Array.isArray(ch.r) ? ch.r[0] : 0;
-    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, box: { c: [room.origin[0] + lx, room.origin[1] + lz], half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0: room.y, y1: room.y + cb.box[1] } });
+    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, boxes: itemBoxes(cb, [room.origin[0] + lx, room.origin[1] + lz], room.y + (lp.length === 3 ? lp[1] : 0), yaw) });
   }
   for (const room of baked.rooms) {
     if (want && !want.has(room.id)) continue;
@@ -89,12 +94,12 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         placed.push({ name, def: ref, room: room.id, on: it.on });
         continue;
       }
-      const ib = model.bake(idef, {}, 0);
+      const ib = model.bake(idef, it.params ?? {}, 0);
       const k = round ? 0.7 : 1, cxm = (x0 + x1) / 2, czm = (z0 + z1) / 2;
       const ax0 = cxm - ((cxm - x0) * k), ax1 = cxm + ((x1 - cxm) * k), az0 = czm - ((czm - z0) * k), az1 = czm + ((z1 - czm) * k);
       // candidate poses: `try` lists [fx, fz, face] in order of preference; the first clear one wins
       const tries = it.try ?? [[...(it.at ?? [0.5, 0.5]), it.face ?? 's']];
-      let why = 'no pose fits', box = null, at = null, yaw = 0;
+      let why = 'no pose fits', box = null, boxes = [], at = null, yaw = 0;
       for (const [fx, fz, face = 's'] of tries) {
         const fyaw = FACE_YAW[face] ?? 0, turned = face === 'e' || face === 'w';
         const hx = (turned ? ib.box[2] : ib.box[0]) / 2 + 0.04, hz = (turned ? ib.box[0] : ib.box[2]) / 2 + 0.04;
@@ -102,18 +107,22 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         const cc = [ax0 + hx + fx * (ax1 - ax0 - 2 * hx), az0 + hz + fz * (az1 - az0 - 2 * hz)];
         const p = R(cc);
         const bx = { c: p, half: [hx - 0.04, hz - 0.04], yaw: th, y0: room.y + 0.01, y1: room.y + Math.max(0.05, ib.box[1]) };
+        // Admission rotates the actual collider offsets too. Round the pose exactly as the returned op
+        // so a recipe cannot pass here then overlap when re-admitted (e.g. asymmetric pew backs).
+        const pose = [room.origin[0] + r3(p[0] - room.origin[0]), room.origin[1] + r3(p[1] - room.origin[1])];
+        const actual = itemBoxes(ib, pose, room.y, r3(fyaw + th)), candidate = [...actual, bx];
         const solid = ib.box[1] > 0.06;
-        const hit = baked.colliders.find((o) => obbOverlap(bx, o));
+        const hit = baked.colliders.find((o) => actual.some(a => obbOverlap(a, o)));
         if (hit) { why = `would cross ${hit.tag ?? 'a wall'}`; continue; }
         // keep a clear zone 0.8 m deep either side of every doorway, and 0.9 m round the ends of the stairs
         const zone = (d) => ({ c: d.at, half: [d.width / 2 + 0.1, 0.8], yaw: d.yaw, y0: room.y, y1: room.y + 2 });
         if (solid && doors.some((d) => d.level === room.floor && obbOverlap(bx, zone(d)))) { why = 'in a doorway'; continue; }
         if (ends.some((e) => e.level === room.floor && obbOverlap(bx, { c: e.p, half: [0.9, 0.9], yaw: 0, y0: room.y, y1: room.y + 2 }))) { why = 'at the foot or head of the stairs'; continue; }
-        if (solid && taken.some((t) => t.floor === room.floor && t.solid && obbOverlap(bx, t.box))) { why = 'overlaps another piece'; continue; }
-        box = bx; at = p; yaw = fyaw + th; break;
+        if (solid && taken.some((t) => t.floor === room.floor && t.solid && candidate.some(a => t.boxes.some(b => obbOverlap(a, b))))) { why = 'overlaps another piece'; continue; }
+        box = bx; boxes = candidate; at = p; yaw = fyaw + th; break;
       }
       if (!box) { dropped.push({ name, why }); continue; }
-      taken.push({ floor: room.floor, box, solid: ib.box[1] > 0.06 });
+      taken.push({ floor: room.floor, boxes, solid: ib.box[1] > 0.06 });
       const tmp = `$f${ops.length}`.slice(0, 25);
       named[it.name ?? 'item'] = { tmp };
       ops.push({ op: 'place', tmp, def: ref, name, in: { parent: b.id, slot: room.id }, p: [r3(at[0] - room.origin[0]), 0, r3(at[1] - room.origin[1])], r: r3(yaw), ...(it.params ? { params: it.params } : {}), ...(it.price ? { price: it.price } : {}) });

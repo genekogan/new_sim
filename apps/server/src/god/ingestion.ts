@@ -2,10 +2,11 @@
 // Hono's standard limiter trusts Content-Length; God uploads also count the stream.
 import type { MiddlewareHandler } from 'hono';
 import { ApiError } from '../souls.ts';
+import { CREATION_LIMITS as L } from '@sim/generators';
 
-export const GOD_JSON_BYTES = 2 * 1024 * 1024;
-export const FOOTPRINT_BYTES = 1_000_000;
-export const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
+export const GOD_JSON_BYTES = L.jsonBodyBytes;
+export const FOOTPRINT_BYTES = L.footprintBytes;
+export const MULTIPART_OVERHEAD_BYTES = L.multipartOverheadBytes;
 const bounded = new WeakMap<Request, number>();
 
 export function godBodyLimit(budget: () => { bytes: number }): MiddlewareHandler {

@@ -128,7 +128,7 @@ export function buildingPhysics(params: Record<string, unknown>, args: Record<st
     const wall = o.wall >= 0 ? L.walls[o.wall] : undefined;
     const outN: Vec2 = wall?.out ?? (wall ? normalOf(wall) : (Math.abs(o.at[1]) >= Math.abs(o.at[0]) ? [0, Math.sign(o.at[1]) || 1] : [Math.sign(o.at[0]), 0]));
     const heading = Math.atan2(outN[0], outN[1]) + L.yaw;
-    return { id: o.id, kind: o.kind, ...(o.wall >= 0 ? { wall: o.wall } : {}), at: rr(R(o.at)), yaw: r2(heading), width: r2(o.width), height: r2(o.height), ...(o.sill ? { sill: r2(o.sill) } : {}), level: o.floor, ...(o.kind !== 'window' ? { state: o.kind === 'arch' ? 'always' as const : 'open' as const } : {}) };
+    return { id: o.id, kind: o.kind, from: o.from, to: o.to, exterior: o.exterior, ...(o.wall >= 0 ? { wall: o.wall } : {}), at: rr(R(o.at)), yaw: r2(heading), width: r2(o.width), height: r2(o.height), ...(o.sill ? { sill: r2(o.sill) } : {}), level: o.floor, ...(o.kind !== 'window' ? { state: o.kind === 'arch' ? 'always' as const : 'open' as const } : {}) };
   });
   const links: Link[] = L.stairs.map((st) => ({ id: st.id, kind: 'stairs', from: st.from, to: st.to, path: st.path.map(R).map(rr), width: r2(st.width), y0: r2(st.y0), y1: r2(st.y1) }));
 

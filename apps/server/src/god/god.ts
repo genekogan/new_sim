@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
+import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -197,6 +197,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** Only server-owned genesis import can request trusted library adoption; request JSON cannot enable it. */
   private commitBatch(batch: unknown, note?: string, trusted = false): Result {
+    const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false, failures: [inputFailure] };
     const parsed = submissionSchema.safeParse(batch);
     if (!parsed.success) return { accepted: false, failures: parsed.error.issues.map((i) => ({ op: typeof i.path[1] === 'number' ? i.path[1] : -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the operation shape in GET /v1/god/schema.' })) };
     const input = parsed.data;
@@ -298,6 +299,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
+    const inputFailure = creationInputFailure(batch); if (inputFailure) return { id: null, accepted: false as const, failures: [inputFailure] };
     const parsed = batchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };

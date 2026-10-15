@@ -20,6 +20,8 @@ import { schemaMarkdown } from '../../../../tools/god-skill/lib/schema-md.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type {VerifyUse} from './verify-use.ts';
+import { godTokenLimiter } from './rate-limit.ts';
+import { CREATION_LIMITS } from '@sim/generators';
 
 export type GodDeps = {
   god: GodMode;
@@ -42,6 +44,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.use('/v1/god/*', godBodyLimit(() => d.god.model.constants.limits.budget));
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const requireGod = (c: Context) => { if (!d.god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start'); };
+  const limitGod = godTokenLimiter(requireGod);
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets });
@@ -75,7 +78,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     try { return c.body(new Uint8Array(readFileSync(resolve(skillDir, 'reference/kit-primitives.png'))), 200, { 'content-type': 'image/png', 'cache-control': 'no-cache' }); }
     catch { throw new ApiError(404, 'not-found', 'kit-primitives.png is not available on this server'); }
   });
-  app.get('/god/SCHEMA.md', (c) => c.body(schemaMarkdown(godSchema()), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }));
+  app.get('/god/SCHEMA.md', (c) => c.body(schemaMarkdown(godSchema(d.god.model.constants.limits)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }));
   app.get('/god/examples/:file{[a-z0-9-]+\\.(mjs|log)}', (c) => { const f = c.req.param('file'); return serveFile(`examples/${f.endsWith('.mjs') ? '' : 'shots/'}${f}`, f.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'text/plain; charset=utf-8')(c); });
   app.get('/v1/god/status', async (c) => {
     let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
@@ -103,20 +106,20 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/mint', async (c) => { const u = await d.requireUser(c); const b = await body(c).catch(() => ({})); return c.json({ ok: true, token: d.god.mintFor(u, typeof b?.label === 'string' ? b.label : 'owner'), world: d.god.opts.worldId }, 200, noStore); });
 
   // ---- god
-  app.get('/v1/god/schema', (c) => c.json(godSchema(), 200, { 'cache-control': 'public, max-age=60' }));
+  app.get('/v1/god/schema', (c) => c.json(godSchema(d.god.model.constants.limits), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/verify-use', async (c) => {
-    requireGod(c);
+    limitGod(c, 'verify-use', CREATION_LIMITS.verifyPerMinute);
     if (!d.verifyUse) return c.json({ok: false, target: '', uses: [], probe: {created: false, removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: [], reason: {code: 'verify.refused', engineCode: 'unavailable', message: 'Resident verification is unavailable in this world.'}}, 200, noStore);
     const raw = await c.req.json().catch(() => null);
     return c.json(await d.verifyUse.run(raw), 200, noStore);
   });
-  app.post('/v1/god/query', async (c) => c.json(runQuery(d.god.model, await body(c)), 200, noStore));
-  app.post('/v1/god/preview', async (c) => { requireGod(c); return c.json(d.god.preview(await body(c)), 200, noStore); });
-  app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
+  app.post('/v1/god/query', async (c) => { if (d.god.godFromToken(bearer(c))) limitGod(c, 'query', CREATION_LIMITS.godQueriesPerMinute); else d.limitIp(c, 'godquery', CREATION_LIMITS.queriesPerMinute, CREATION_LIMITS.rateWindowMs); return c.json(runQuery(d.god.model, await body(c)), 200, noStore); });
+  app.post('/v1/god/preview', async (c) => { limitGod(c, 'preview', CREATION_LIMITS.previewsPerMinute); return c.json(d.god.preview(await body(c)), 200, noStore); });
+  app.get('/v1/god/preview/:id', (c) => { requireGod(c); const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
-  app.post('/v1/god/dryrun', async (c) => { requireGod(c); return c.json(d.god.dryrun(await body(c)), 200, noStore); });
-  app.post('/v1/god/act', async (c) => { requireGod(c); const b = await body(c); const r = d.god.act(b, typeof b?.note === 'string' ? b.note : undefined); return c.json(r, 200, noStore); });
+  app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); return c.json(d.god.dryrun(await body(c)), 200, noStore); });
+  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const b = await body(c); const r = d.god.act(b, typeof b?.note === 'string' ? b.note : undefined); return c.json(r, 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
   app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });
   app.post('/v1/god/undo', (c) => { requireGod(c); const g = c.req.query('group'); return c.json(g ? d.god.undoGroup(g) : d.god.undo(), 200, noStore); });

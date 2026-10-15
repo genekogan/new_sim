@@ -222,11 +222,13 @@ test('raw footprint coordinates and dimensions reject null, strings and wrong ve
     for (const segment of path.slice(0, -1)) parent = parent[segment] as Record<string, unknown>;
     parent[path.at(-1)!] = value;
     const source = JSON.stringify(footprint);
+    // Independent parser cases use separate authenticated buckets; throttling is covered in route-safety.test.
+    const token = f.god.mintFor({ id: 'dev:gene', role: 'user' }, `invalid-${field}`), headers = { authorization: `Bearer ${token}` };
     // A direct JSON footprint and a mesh sidecar both use strict admission.
-    const raw = await f.req('/v1/god/assets', { method: 'POST', body: source, headers: { 'content-type': 'application/json' } });
+    const raw = await f.req('/v1/god/assets', { method: 'POST', body: source, headers: { ...headers, 'content-type': 'application/json' } });
     assert.equal(raw.status, 400, field); assert.equal(raw.data.code, 'asset.invalid', field); assert.match(raw.data.message, /invalid footprint/); assert.ok(raw.data.message.includes(field), raw.data.message);
     const form = new FormData(); form.set('file', new Blob([syntheticGlb()]), 'mesh.glb'); form.set('footprint', source); form.set('height', '2');
-    const sidecar = await f.req('/v1/god/assets', { method: 'POST', body: form });
+    const sidecar = await f.req('/v1/god/assets', { method: 'POST', body: form, headers });
     assert.equal(sidecar.status, 400, field); assert.equal(sidecar.data.code, 'asset.invalid', field); assert.ok(sidecar.data.measured); assert.ok(sidecar.data.allowed);
   }
   const malformed = { schema: 'lm-building-footprint/1', bounds: { min: [0, 0, 0], max: [1, 1, null] } };

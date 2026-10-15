@@ -22,6 +22,8 @@
 import type { Context, Hono } from 'hono';
 import { applyBatch, boundsOf, type Entity, type WorldModel } from '@sim/world-compiler';
 import { TILE_M } from '@sim/ground';
+import { CREATION_LIMITS } from '@sim/generators';
+import { godTokenLimiter } from './rate-limit.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
 
@@ -221,8 +223,9 @@ function describe(verb: string, cmp: ReturnType<typeof compare>, grew: LandRepor
 }
 
 export function mountLandRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => void }) {
+  const limitGod = godTokenLimiter(d.requireGod);
   app.post('/v1/god/land', async (c) => {
-    d.requireGod(c);
+    limitGod(c, 'land', CREATION_LIMITS.landEditsPerMinute);
     let b: LandInput; try { b = await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); }
     return c.json(land(d.god, b), 200, { 'cache-control': 'no-store' });
   });
