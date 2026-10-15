@@ -43,7 +43,7 @@ rs(f'{RT}/mars-web/', f'{out}/mars-web/')
 for m in ('CONTENT-MANIFEST.json', 'WEB-MANIFEST.json', 'STATIC-MANIFEST.json', 'PREPARED.json'): shutil.copy2(f'{RT}/{m}', f'{out}/manifests/')
 for p in (proxy['artifactOverlay']['webManifest'], PROXY, PLAN, LIVE,
           json.load(open(PLAN))['qualification']['path']): shutil.copy2(p, f'{out}/manifests/')
-for f in ('run-world.mjs', 'port-map.mjs', 'parity.py', 'online-backup.py', 'compact-copy.py', 'verify-release.py'): shutil.copy2(f'{KIT}/{f}', f'{out}/bin/')
+for f in ('run-world.mjs', 'port-map.mjs', 'parity.py', 'online-backup.py', 'compact-copy.py', 'verify-release.py', 'install-deps.sh'): shutil.copy2(f'{KIT}/{f}', f'{out}/bin/')
 for f in ('sim-old@.service', 'sim-old-proxy.service'): shutil.copy2(f'{KIT}/{f}', f'{out}/deploy/')
 
 def rebase(v, key):
