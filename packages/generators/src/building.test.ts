@@ -102,6 +102,26 @@ test('lighthouse: a helix up five floors, a lantern room with glass all round an
   assert.equal(violations(b).length, 0, violations(b).join('; '));
 });
 
+test('spiral stairs: no rail fences the arrival, whatever floor the flight arrives on (the flight into floor 3 was walled in by six rails)', () => {
+  const BODY = 0.28;
+  for (const [label, args] of [['lighthouse', { round: true, lantern: true }], ['tower', { round: false }]] as const) {
+    for (const w of [5, 6, 8, 10]) for (let floors = 2; floors <= 6; floors++) {
+      const b = buildingPhysics({ style: 'tower', w, d: w, floors, floorHeight: 3, roof: 'dome' }, args);
+      if (violations(b).length) continue; // too narrow for stairs: the design check refuses it before any resident could try
+      for (const l of b.links!) {
+        const head = l.path[l.path.length - 1], len = Math.hypot(head[0], head[1]);
+        const rails = b.colliders.filter((o) => o.tag === 'rail' && Math.abs(o.y0 - l.y1) < 0.2);
+        // walk from the landing in to the middle of the well (stop short of the lamp): a body must not touch a rail
+        for (let d = 0; d <= len - 0.9; d += 0.05) {
+          const x = head[0] * (1 - d / len), z = head[1] * (1 - d / len);
+          const hit = rails.find((o) => { const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = x - o.c[0], dz = z - o.c[1]; return Math.abs(dx * c - dz * s) <= o.half[0] + BODY && Math.abs(dx * s + dz * c) <= o.half[1] + BODY; });
+          assert.equal(hit, undefined, `${label} w=${w} floors=${floors}: a rail fences the landing of ${l.id} (into floor ${l.to}) ${d.toFixed(2)} m from it`);
+        }
+      }
+    }
+  }
+});
+
 test('explicit plan: rooms and doors as given; a sealed room is a violation the compiler can refuse', () => {
   const plan = { floors: [{ rooms: [{ id: 'kitchen', rect: [0, 0, 4, 6] }, { id: 'living', rect: [4, 0, 10, 6] }, { id: 'store', rect: [0, 6, 4, 8] }], doors: [{ between: ['kitchen', 'living'] }], exterior: [{ room: 'living', wall: 's', kind: 'door' }] }] };
   const b = buildingPhysics({ w: 10, d: 8, plan });

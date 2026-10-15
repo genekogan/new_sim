@@ -15,6 +15,9 @@ export type ReachEnd = string | [number, number] | [number, number, number];
 export type ReachFn = (from: ReachEnd, to: ReachEnd) => unknown;
 /** Reachability needs the Soul engine; the engine bridge (engine-bridge.ts, lane L9) registers it per world model. */
 export const reachProviders = new WeakMap<WorldModel, ReachFn>();
+/** Whether the engine already holds the latest physics of the model (false while the last edit is still on its way);
+ *  registered by the engine bridge. Without it `describe` assumes the engine is current. */
+export const syncProviders = new WeakMap<WorldModel, () => boolean>();
 /** Who is using an entity right now (a Soul seated on it, holding it); registered by the engine bridge. */
 export const usesProviders = new WeakMap<WorldModel, (id: string) => unknown>();
 /** F1: Souls sitting on a thing's seat slots now ({slot, soul}); registered by the engine bridge. */
@@ -214,6 +217,32 @@ function behaviours(def: StoredDef): { supported: string[]; missing: Record<stri
 
 // ---------------------------------------------------------------- describe / where
 
+/** What the Soul engine's own route planner says about walking into every room of a building from the stand outside
+ *  its front door and back out. The generator's "reachable from outside" note is a graph of doors and stairs; this is the
+ *  answer a resident gets, so the two can never silently disagree (a 4-floor lighthouse whose upper floors the graph
+ *  called reachable and no resident could climb to). `in`/`out` are true or the engine's refusal code. */
+export type WalkReport = { state: 'ok' | 'failed' | 'pending' | 'unchecked'; from?: [number, number]; rooms: { id: string; floor: number; in: true | string; out: true | string }[]; note: string };
+const WALK_ROOMS = 24;
+
+function walkReport(w: WorldModel, e: Entity, slots: ReturnType<typeof slotWorld>, rooms: { id: string; floor: number; polygon: Vec2[] }[]): WalkReport | undefined {
+  const reach = reachProviders.get(w);
+  if (!reach || !rooms.length) return undefined;
+  if (syncProviders.get(w)?.() === false) return { state: 'pending', rooms: [], note: 'the engine is still taking in the last edit; describe again in a moment for its walk check' };
+  const front = slots.find((s) => s.id === 'front');
+  if (!front) return { state: 'unchecked', rooms: [], note: 'no stand outside a front door to walk in from' };
+  const from: [number, number] = [front.p[0], front.p[2]], path = w.pathOf(e.id);
+  type Route = { reachable?: boolean; code?: string; from?: { p: Vec2 }; to?: { p: Vec2 } };
+  const out = rooms.slice(0, WALK_ROOMS).map((r) => {
+    const into = reach(from, `${path}:${r.id}`) as Route, back = reach(`${path}:${r.id}`, from) as Route;
+    const verdict = (x: Route) => (x.reachable ? true as const : x.code ?? 'route.unreachable');
+    // the engine stands a resident on the nearest free spot to the room's middle: it must still be in this room
+    const inside = (x: Route, end?: { p: Vec2 }) => !x.reachable || !end || pointInPoly(end.p[0], end.p[1], r.polygon);
+    return { id: r.id, floor: r.floor, in: inside(into, into.to) ? verdict(into) : 'room.no-standing-room', out: inside(back, back.from) ? verdict(back) : 'room.no-standing-room' };
+  });
+  const bad = out.filter((r) => r.in !== true || r.out !== true);
+  return { state: bad.length ? 'failed' : 'ok', from, rooms: out, note: rooms.length > WALK_ROOMS ? `first ${WALK_ROOMS} of ${rooms.length} rooms checked` : '' };
+}
+
 function describe(w: WorldModel, ref: string) {
   const e = getRef(w, ref);
   if (!e) return { error: `no such entity ${ref}` };
@@ -250,6 +279,7 @@ function describe(w: WorldModel, ref: string) {
     constraints: (e.constraints ?? []).map((c) => checkConstraint(w, e, c)),
     behaviours: behaviours(def),
     ground, near, notes: baked.notes ?? [],
+    ...((walk) => (walk ? { walk } : {}))(walkReport(w, e, slots, rooms as { id: string; floor: number; polygon: Vec2[] }[])),
   };
 }
 

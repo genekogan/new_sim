@@ -13,7 +13,7 @@ import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
-import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
+import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd } from './query.ts';
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -46,6 +46,23 @@ const MAX_LEVEL = 20;          // walk_to's level schema
 const NEAR = 60;               // capabilities: god things within this many metres
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
+
+/** A helix flight (lighthouse, tower) bakes as a landing, ~17 points round the stair well and a landing; a straight
+ *  flight is a 2-4 point line. The planner treats a flight as the chord between its two landings and looks for the
+ *  place to stand 0.7 m back along that chord: for a helix that is inside a wall, a rail or the next flight's treads
+ *  (the flight into floor 3 or 4 had no standable approach, so the floor could not be reached or left). The way on
+ *  and off a helix is straight in from the well's axis, so the landings are nudged 0.2 m that way (off the first
+ *  tread) and the planner is told to stand 0.7 m further in. Null for a straight flight. */
+const HELIX_INSET = 0.2, HELIX_STAND = 0.7;
+export function helixEnds(path: Vec2[]): { foot: Vec2; head: Vec2; stepFrom: Vec2; stepTo: Vec2 } | null {
+  const n = path.length;
+  if (n < 5) return null;
+  const [a, b] = [path[0], path[n - 1]], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  if (!path.some((p) => Math.abs(((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / len) > 0.25)) return null;
+  const into = (from: Vec2, to: Vec2, by: number): Vec2 => { const d = Math.hypot(to[0] - from[0], to[1] - from[1]) || 1; return [to[0] + ((to[0] - from[0]) / d) * by, to[1] + ((to[1] - from[1]) / d) * by]; };
+  const foot = into(path[1], path[0], HELIX_INSET), head = into(path[n - 2], path[n - 1], HELIX_INSET);
+  return { foot, head, stepFrom: into(path[1], foot, HELIX_STAND), stepTo: into(path[n - 2], head, HELIX_STAND) };
+}
 
 export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
 
@@ -89,6 +106,7 @@ export class EngineBridge {
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
+    syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
     seatProviders.set(this.god.model, (id) => { const f = (this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] }).seatOccupantsV1; return f ? f.call(this.engine, id).map((x) => ({ slot: x.slot, soul: this.soulName(x.body) })) : []; });
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
     // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
@@ -234,13 +252,15 @@ export class EngineBridge {
     }
     // stairs, ramps, ladders: links between levels
     if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
-      const a = toWorld(l.path[0][0], l.path[0][1]), b = toWorld(l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
+      const helix = helixEnds(l.path);
+      const a = toWorld(...(helix?.foot ?? l.path[0])), b = toWorld(...(helix?.head ?? l.path[l.path.length - 1]));
       const ya = heightAt(l.y0, a), yb = heightAt(l.y1, b);
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
       const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
-      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
+      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true,
+        ...(helix ? { approach: { from: toWorld(...helix.stepFrom), to: toWorld(...helix.stepTo) } } : {}) };
     });
     // each flight's ends: its under-stair block stops short of the foot (the first tread is stepped onto, not walked
     // under) and a head tread on the upper level bridges the stairwell edge, so both ends have standing room

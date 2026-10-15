@@ -239,9 +239,15 @@ export function realize(p: Plan): Layout {
     const path: Vec2[] = [at(s.a0, s.r - s.width / 2 - 0.35), ...Array.from({ length: n + 1 }, (_, i) => at(s.a0 + (s.sweep * i) / n, s.r)), at(s.a0 + s.sweep, s.r - s.width / 2 - 0.35)];
     const rIn = s.r - s.width / 2 - 0.02;
     L.stairs.push({ id: s.id, kind: 'spiral', from: s.from, to: s.to, room: p.rooms.find((r) => r.floor === s.from)?.id ?? '', width: s.width, risers: s.risers, y0, y1, c: s.c, r: s.r, a0: s.a0, sweep: s.sweep, path, hole: annulus(s.c, rIn, s.r + s.width / 2 + 0.05, 24) });
-    // the inner disc of the upper floor gets a rail round its edge, open where the helix arrives
+    // the inner disc of the upper floor gets a rail round its edge, open where the helix arrives. Each flight turns
+    // 320°, so the arrival moves round the hexagon by -40° a floor and for the flight into floor 3 it falls between two
+    // edges, further than 0.45 rad from both midpoints: no edge was left open and the landing sat inside six rails.
+    // Open the two nearest edges then (the other floors keep the one edge they always had).
     const disc = ngon(rIn, 6), arrive = s.a0 + s.sweep;
-    disc.forEach((a, i) => { const b = disc[(i + 1) % disc.length]; const m = Math.atan2((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); if (Math.abs(angDiff(m, arrive)) < 0.45) return; L.rails.push({ a, b, y0: y1, y1: y1 + 1.0 }); });
+    const off = disc.map((a, i) => { const b = disc[(i + 1) % disc.length]; return Math.abs(angDiff(Math.atan2((a[0] + b[0]) / 2, (a[1] + b[1]) / 2), arrive)); });
+    const open = new Set(off.flatMap((d, i) => (d < 0.45 ? [i] : [])));
+    if (!open.size) off.map((d, i) => [d, i]).sort((x, y) => x[0] - y[0]).slice(0, 2).forEach(([, i]) => open.add(i));
+    disc.forEach((a, i) => { if (!open.has(i)) L.rails.push({ a, b: disc[(i + 1) % disc.length], y0: y1, y1: y1 + 1.0 }); });
   }
 
   // ---- floors: room polygons minus stairwells

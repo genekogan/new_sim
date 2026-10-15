@@ -107,7 +107,9 @@ const AGENT_R = 0.34;
  * Stairs whose foot or head sits close to a wall (a cottage flight along its north wall, a landing beside the
  * stairwell) cannot be entered straight along their heading: the planner's default approach point (0.7 m back)
  * lands in the wall. For such an end, pick a side approach on that end's own floor, clear of this part's solids,
- * and record it on the link (`approach`). Ends whose straight approach is clear keep the default (no field).
+ * and record it on the link (`approach`). Ends whose straight approach is clear keep the default (no field). A link may
+ * arrive with `approach` points already set by the builder (a helix flight: where a body stands straight in from the
+ * stair well's axis); those give the direction to try first.
  */
 export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
   if (!part.links?.length) return part;
@@ -118,10 +120,12 @@ export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
     const fl = floorsOf(level);
     return [[0, 0], [AGENT_R, 0], [-AGENT_R, 0], [0, AGENT_R], [0, -AGENT_R]].every(([dx, dz]) => fl.some((s) => pointInObb([p[0] + dx, p[1] + dz], s.obb)));
   };
-  const clear = (a: Vec2, b: Vec2, y: number, level: number) => {
+  // `pad`: extra room to keep from solids. The planner's grid reads about 0.1 m tighter than these point tests (cells
+  // are marked blocked whole), so a place that passes with no pad can still be one it will not stand a body on.
+  const clear = (a: Vec2, b: Vec2, y: number, level: number, pad = 0) => {
     const ss = solidsAt(y);
     for (let k = 0; k <= 4; k++) {
-      const t = k / 4, q: Vec2 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], r = k === 4 ? AGENT_R + 0.04 : AGENT_R * 0.9;
+      const t = k / 4, q: Vec2 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], r = (k === 4 ? AGENT_R + 0.04 : AGENT_R * 0.9) + pad;
       if (ss.some((o) => pointInObb(q, o.obb, r))) return false;
       if (k === 4 && !onFloor(q, level)) return false;
     }
@@ -130,18 +134,25 @@ export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
   const r3 = (v: number) => Math.round(v * 1000) / 1000;
   for (const l of part.links) {
     const dir: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)];
-    const pick = (end: { level: number; p: Vec2; y: number }, out: Vec2): Vec2 | null => {
-      const straight: Vec2 = [end.p[0] + out[0] * 0.7, end.p[1] + out[1] * 0.7];
-      if (clear(end.p, straight, end.y, end.level)) return null;
-      for (const d of [0.7, 0.9, 1.1]) for (const deg of [30, -30, 60, -60, 90, -90, 120, -120]) {
+    // `toward`: the builder knows the way on or off this end (a helix flight is entered straight in from the stair well's
+    // axis, not along the chord of its heading). A clear approach that way is then recorded, with the nearer places and
+    // the sides tried when it is not; without it the default 0.7 m back along the heading stays.
+    const pick = (end: { level: number; p: Vec2; y: number }, out: Vec2, toward = false, pad = 0): Vec2 | null => {
+      const straight: Vec2 = [r3(end.p[0] + out[0] * 0.7), r3(end.p[1] + out[1] * 0.7)];
+      if (clear(end.p, straight, end.y, end.level, pad)) return toward ? straight : null;
+      for (const d of toward ? [0.7, 0.5, 0.9, 1.1] : [0.7, 0.9, 1.1]) for (const deg of [30, -30, 60, -60, 90, -90, 120, -120]) {
         const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
         const q: Vec2 = [r3(end.p[0] + (out[0] * c - out[1] * s) * d), r3(end.p[1] + (out[0] * s + out[1] * c) * d)];
-        if (clear(end.p, q, end.y, end.level)) return q;
+        if (clear(end.p, q, end.y, end.level, pad)) return q;
       }
       return null;
     };
-    const from = pick(l.from, [-dir[0], -dir[1]]), to = pick(l.to, dir);
+    const towards = (end: { p: Vec2 }, at?: Vec2): Vec2 | null => { if (!at) return null; const dx = at[0] - end.p[0], dz = at[1] - end.p[1], n = Math.hypot(dx, dz); return n > 0.05 ? [dx / n, dz / n] : null; };
+    const hint = l.approach, hf = towards(l.from, hint?.from), ht = towards(l.to, hint?.to);
+    const from = (hf && (pick(l.from, hf, true, 0.12) || pick(l.from, hf, true))) || pick(l.from, [-dir[0], -dir[1]]);
+    const to = (ht && (pick(l.to, ht, true, 0.12) || pick(l.to, ht, true))) || pick(l.to, dir);
     if (from || to) l.approach = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+    else delete l.approach;
   }
   return part;
 }
