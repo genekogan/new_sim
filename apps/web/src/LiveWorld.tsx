@@ -211,7 +211,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   useEffect(() => { if (selected) setThing(null); }, [selected]);
 
   useEffect(() => {
-    if (!mount.current) return;
+    // The first welcome supplies the world/epoch that owns this scene. Starting
+    // before it arrives immediately tears the scene down and downloads its people twice.
+    if (!mount.current || !sim.conn.welcome) return;
     // Recorded ticks and scene assets belong to one world/epoch. A restarted
     // connection must not keep a paused take or let its pending seek refill it.
     seeking.current?.abort(); seeking.current = null;

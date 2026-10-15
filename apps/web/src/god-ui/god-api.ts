@@ -5,7 +5,8 @@
 import { BASE } from '../base-path.ts';
 import { apiPath, worldKey } from '../world-path.ts';
 import { isFlagDef } from './checklist.ts';
-import { userAuthHeaders } from '../auth-session.ts';
+import { userAuthHeaders, watchSession } from '../auth-session.ts';
+import { statusPoll } from './status-poll.ts';
 export { isFlagDef };
 
 export type Pending = { code: string; agent: string; expiresIn: number };
@@ -49,9 +50,14 @@ export function forgetToken() { try { localStorage.removeItem(TOKEN_KEY); if (!t
 
 async function json<T>(r: Response): Promise<T> { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error((d as { message?: string }).message ?? `HTTP ${r.status}`); return d as T; }
 
-export async function getStatus(): Promise<Status | null> {
+const status = statusPoll<Status | null>(async () => {
   try { const r = await fetch(apiPath('/v1/god/status'), { headers: await authHeaders(), cache: 'no-store' }); return r.ok ? await r.json() : null; } catch { return null; }
-}
+});
+// Owner-only pending codes belong to the current account, including during
+// sign-out and same-label account switches. Old requests cannot refill this cache.
+watchSession(() => status.reset(null));
+export const getStatus = status.refresh;
+export const watchStatus = status.subscribe;
 export async function getWelcome(): Promise<string | null> {
   try { const r = await fetch(apiPath('/v1/god/welcome'), { headers: await authHeaders(), cache: 'no-store' }); return r.ok ? await r.text() : null; } catch { return null; }
 }

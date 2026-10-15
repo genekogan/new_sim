@@ -24,7 +24,7 @@ export function GodBolt() {
   const owner = status?.you === 'owner' || status?.you === 'god';
 
   const refresh = useCallback(async () => { const s = await G.getStatus(); if (s) setStatus(s); }, []);
-  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [refresh]);
+  useEffect(() => G.watchStatus(setStatus), []);
   // a new pairing request opens the panel (the agent tells its human to approve it here)
   useEffect(() => { const n = status?.pending.length ?? 0; if (owner && n > pendingSeen.current) setOpen(true); pendingSeen.current = n; }, [status, owner]);
   useEffect(() => {
