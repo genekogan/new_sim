@@ -3,10 +3,10 @@
 // SOURCE of the downloadable single file eden-god.mjs (built by build.mjs: `node build.mjs`).
 // State: ./.eden-god.json (world URL + god token + current group; private), ./.eden-god.cache.json
 // (the world mirror). Commands print short human text; add --json for machine output.
-import { catalog, find, recommend, taxonomy } from './lib/catalog.mjs';
+import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
+import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withoutBuild } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
@@ -50,12 +50,59 @@ const fmtP = (p) => (p ? `(${p.map((v) => r2(v)).join(', ')})` : '');
 const dxdz = (x, what) => { const a = String(x).split(',').map(Number); if (a.length !== 2 || !a.every(Number.isFinite)) throw new Error(`${what} takes dx,dz (two numbers), got ${x}`); return a; };
 const yawWord = (y) => (typeof y === 'number' ? `facing ${compassOfYaw(y)}` : '');
 
+// Reuse wire shapes live here: parts rows have `from`; search rows have `usedIn` (also aliased `used`).
+const oneLine = (s) => String(s ?? '').replace(/\s+/g, ' ').trim();
+const doneDate = (at) => {
+  if (at === undefined || at === null) return '';
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+};
+const usedIn = (d) => d.usedIn ?? d.used ?? [];
+const useText = (u) => {
+  const b = typeof u.build === 'object' ? u.build : { id: u.build, title: u.title, doneAt: u.doneAt };
+  const date = doneDate(b.doneAt);
+  return `${oneLine(b.title || b.id)} (done${date ? ' ' + date : ''}${u.placedNow !== undefined ? `; ${u.placedNow} standing` : ''})`;
+};
+const usedBadge = (d) => usedIn(d).length ? ` · used in: ${usedIn(d).map(useText).join('; ')}` : '';
+const placePart = (p) => `place sha:${p.sha} --at …`;
+function partChecks(c) {
+  if (!c) return 'checks: none recorded';
+  const checks = [...(c.buildDone === true ? ['build done'] : []), ...(c.kept !== undefined ? [`${c.kept} kept at done`] : [])];
+  for (const [label, receipts] of [['build-use', c.buildUse], ['part-use', c.partUse]]) {
+    checks.push(`${label}: ${Array.isArray(receipts) && receipts.length ? receipts.map(r => `${oneLine(r.uses)} at ${oneLine(r.target)} ${r.ok === true ? 'passed' : 'FAILED'}`).join(', ') : receipts === 'n/a' ? 'n/a' : 'none recorded'}`);
+  }
+  return 'checks: ' + checks.join('; ');
+}
+function partLine(p) {
+  // The server's compact parts rows omit a description; their ref still names the kind of part.
+  const what = p.description || p.doc || p.ref.replace(/@\d+$/, '').replace(/[-_]/g, ' ');
+  return `${oneLine(p.ref)} · sha:${p.sha} — ${oneLine(what)} · used in: ${(p.from ?? []).map(useText).join('; ')} · ${p.placedNow === 0 ? 'no copies standing' : `${p.placedNow} standing`} · ${partChecks(p.checks)} · ${placePart(p)}`;
+}
+const searchDefs = async (q, flags = {}) => {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries({ q, ...flags })) for (const x of [].concat(v ?? [])) if (x !== '' && x !== undefined) qs.append(k, x);
+  return ok(await call(`/v1/god/defs?${qs}`), 'defs');
+};
+export async function parts(words = '', flags = {}) {
+  const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), 'parts');
+  return flags.json ? d : d.parts.length ? d.parts.map(partLine).join('\n') : `no parts from finished builds${words ? ` matching "${words}"` : ''}`;
+}
+// Keep the shared catalogue module unchanged: this CLI adds the reuse badge to its normal manifest lines.
+export async function find(words, flags = {}) {
+  if (!words && !flags.category && !flags.has) throw new Error('find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]');
+  const d = await searchDefs(words, { category: flags.category, has: flags.has, tag: flags.tag, compact: 1, limit: flags.all ? 500 : 25 });
+  if (flags.json) return d.defs;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  return [`${d.defs.length} match${words ? ` "${words}"` : ''}:`, ...d.defs.map(r => `${catalogLine(r)}${usedBadge(r)}${r.why?.length ? `  ‹${r.why.join(' ')}›` : ''}`)].join('\n');
+}
+
 /** map: the whole world as structure — extent, terrain, water, every root thing with pose and children, flags, prayers. */
 export async function map(opts = {}) {
   const m = await mirror(); const v = view(m); const s = m.snapshot;
   const lines = [];
   lines.push(`# ${s.worldId} — ${s.constants.extent} m square (±${s.constants.extent / 2}), ground ${s.constants.ground}, seq ${s.seq}${m.offline ? ' (OFFLINE: cached)' : ''}`);
   lines.push(`sky ${s.state.sky.palette}, ${s.entities.length} entities, ${s.library.length} defs, ${s.prayers.length} prayers waiting, undo ${s.undoable ?? '-'} / redo ${s.redoable ?? '-'}${load().group ? `, group "${load().group}"` : ''}`);
+  if (load().build) lines.push(buildHeader(load().build, s.builds?.find((b) => b.id === load().build.id)));
   const land = s.ground.landforms.filter((l) => !l.id.endsWith(':pad'));
   const nameOf = (id) => v.byId.get(id)?.path ?? id;
   if (land.length) { lines.push('## terrain'); for (const l of land) lines.push(`- ${nameOf(l.id)}: ${l.kind}${l.kind === 'bump' ? ` at (${r2(l.c[0])}, ${r2(l.c[1])}) r ${r2(l.r)} h ${r2(l.h)}` : l.kind === 'ridge' ? ` along ${l.path.length} pts w ${l.w} h ${l.h}` : l.h !== undefined ? ` h ${l.h}` : ''}`); }
@@ -91,7 +138,7 @@ const fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join('|')}
 /** defs <one def's name or full ref>: that def in full (params with ranges and defaults, size, slots, rooms). */
 async function defDetail(d, others) {
   const ref = d.ref.replace(/^core-/, 'core/');
-  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.form === 'point' ? `, ${scaleText(d)}` : ''}${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}`];
+  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.form === 'point' ? `, ${scaleText(d)}` : ''}${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}${usedBadge(d)}`];
   if (d.description) L.push(`  ${d.description}`);
   const ps = Object.entries(d.params ?? {});
   if (ps.length) { L.push(`  params (--param k=v):`); for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`); }
@@ -125,10 +172,10 @@ export async function defs(q, flags = {}) {
     const seen = new Set(r.defs.map((d) => d.ref));
     for (const syn of [...new Set(q.toLowerCase().split(/\s+/).filter(Boolean).flatMap(synonymsOf))]) for (const d of (await get(syn)).slice(0, 3)) if (!seen.has(d.ref)) { seen.add(d.ref); r.defs.push(d); }
   }
-  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
+  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description, ...(usedIn(d).length ? { usedIn: usedIn(d) } : {}) }));
   if (flags.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ''}". Try a broader word, or define one: define-kit (see SKILL.md).`;
-  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m${d.form === 'point' && d.scale ? `, ${d.scale[0] === d.scale[1] ? 'fixed size' : `scale ${d.scale[0]}–${d.scale[1]}`}` : ''})${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
+  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m${d.form === 'point' && d.scale ? `, ${d.scale[0] === d.scale[1] ? 'fixed size' : `scale ${d.scale[0]}–${d.scale[1]}`}` : ''})${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}${usedBadge(d)}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
 }
 
 export async function schema(flags = {}) { const s = ok(await call('/v1/god/schema', { as: 'none' }), 'schema'); return flags.md ? schemaMarkdown(s) : s; }
@@ -165,6 +212,15 @@ export async function verifyUse(target, flags = {}) {
   return lines.join('\n');
 }
 
+/** The engine's own route check of a building (server `describe.walk`): can a resident walk into each room from the front door, and out again? */
+export function walkLine(walk) {
+  if (!walk) return '';
+  if (walk.state === 'pending' || walk.state === 'unchecked') return `  walk: not checked — ${walk.note}`;
+  if (walk.state === 'ok') return `  walk: all ${walk.rooms.length} room${walk.rooms.length === 1 ? '' : 's'} can be walked into from the front door and out again (the engine's own route check: it overrides "reachable from outside" in the notes, which only reads the design's doors and stairs)`;
+  const why = (r) => [r.in !== true && `no way in (${r.in})`, r.out !== true && `no way out (${r.out})`].filter(Boolean).join(', ');
+  return `  walk: NOT WALKABLE — ${walk.rooms.filter((r) => r.in !== true || r.out !== true).map((r) => `${r.id} (floor ${r.floor}): ${why(r)}`).join('; ')}. This is the engine's own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; fix the stairs, doors or whatever stands in the way, then describe again.`;
+}
+
 /** describe <ref>: rooms, doors, stairs, slots, occupants, constraints (satisfied or not), behaviours, ground, neighbours. */
 export async function describe(ref, flags = {}) {
   if (!ref) throw new Error('usage: describe <path|flag:name>');
@@ -174,7 +230,7 @@ export async function describe(ref, flags = {}) {
     // a room of a building: house/<room> (rooms are slots, not entities)
     const cut = ref.lastIndexOf('/'), h = (await query({ describe: ref.slice(0, cut) })).describe, word = ref.slice(cut + 1).toLowerCase().replace(/[^a-z0-9]/g, '');
     const room = h.error ? null : (h.rooms ?? []).find((r) => r.id === ref.slice(cut + 1)) ?? (h.rooms ?? []).find((r) => r.id.replace(/[^a-z0-9]/g, '').startsWith(word));
-    if (room) { if (flags.json) return room; return [`${h.path}/${room.id} — room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join('×')} m, headroom ${room.height} m`, `  doors: ${room.doors.join(', ') || 'none'}`, `  holds: ${room.occupants.map((o) => o.name).join(', ') || 'nothing'}`, `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|…]; furnish ${h.path}/${room.id}`].join('\n'); }
+    if (room) { if (flags.json) return room; return [`${h.path}/${room.id} — room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join('×')} m, headroom ${room.height} m`, `  doors: ${room.doors.join(', ') || 'none'}`, `  holds: ${room.occupants.map((o) => o.name).join(', ') || 'nothing'}`, ...(h.walk?.rooms.find((r) => r.id === room.id) ? [walkLine({ ...h.walk, rooms: h.walk.rooms.filter((r) => r.id === room.id) })] : []), `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|…]; furnish ${h.path}/${room.id}`].join('\n'); }
   }
   if (d.error) throw new Error(d.error);
   if (flags.json) return d;
@@ -197,6 +253,7 @@ export async function describe(ref, flags = {}) {
   L.push(`  ground: y ${d.ground.y}, slope ${d.ground.slopeDeg}°, ${d.ground.medium}${d.ground.water ? `, water ${d.ground.water} m deep` : ''}`);
   if (d.near.length) L.push(`  near: ${d.near.map((n) => `${n.path} ${n.dist} m ${n.dir}`).join(', ')}`);
   if (d.notes.length) L.push(`  notes: ${d.notes.join(' | ')}`);
+  if (d.walk) L.push(walkLine(d.walk));
   return L.join('\n');
 }
 
@@ -204,12 +261,43 @@ export async function describe(ref, flags = {}) {
 export async function where(spec, flags = {}) {
   const m = await mirror(); const v = view(m);
   const p = refPoint(v, spec, flags.offset);
-  const d = (await query({ where: [p.x, p.z] })).where;
+  // Ask the existing clearance query for a point's standing-height column in the
+  // same request. Bounds alone cannot tell whether an open gate's passage is blocked.
+  const result = await query({ where: [p.x, p.z], clearance: { at: [p.x, p.z], size: [0, 0] } });
+  const d = result.where, colliders = new Set(result.clearance?.blockedBy ?? []);
   if (flags.json) return d;
   return [`(${d.x}, ${d.z}): ground y ${d.y}, slope ${d.slopeDeg}°, ${d.medium}${d.water ? `, water level ${d.water.level} (${d.water.depth} m deep)` : ''}`,
     d.room ? `  inside ${d.room.building}, room ${d.room.room} (floor ${d.room.floor})` : '',
-    d.inside.length ? `  within: ${d.inside.map((x) => `${x.path} [${x.layer}]`).join(', ')}` : '  nothing built here',
+    d.inside.length ? `  within: ${d.inside.map((x) => `${x.path} [${colliders.has(x.path) ? 'collider' : 'bounds'}] (${x.layer})`).join(', ')}` : '  nothing built here',
     d.near.length ? `  nearest: ${d.near.map((n) => `${n.path} ${n.dist} m ${n.dir}`).join(', ')}` : ''].filter(Boolean).join('\n');
+}
+
+/** reach <from> <to>: the server's engine route check; refs (including path:room) stay server-side. */
+export async function reach(from, to, flags = {}) {
+  const end = (s) => {
+    if (typeof s !== 'string' || !s.trim()) throw new Error('reach needs <from> <to> (refs or x,z / x,y,z)');
+    if (!s.includes(',')) return s;
+    const parts = s.split(',');
+    if (![2, 3].includes(parts.length) || parts.some(x => !x.trim() || !Number.isFinite(Number(x)))) throw new Error('reach coordinates need x,z or x,y,z');
+    return parts.map(Number);
+  };
+  const d = (await query({ reach: { from: end(from), to: end(to) } })).reach;
+  if (flags.json) return d;
+  if (d.supported === false) return `reach: not checked — ${d.note}`;
+  return `reach: ${d.reachable ? 'OK' : 'FAILED'}${d.length !== undefined ? ` (${d.length} m)` : ''}${d.code ? ` — ${d.code}` : ''}${d.detail ? ` — ${d.detail}` : ''}${d.note ? ` — ${d.note}` : ''}`;
+}
+
+/** clear <x,z|ref> --size WxD: the existing footprint-clearance query, without editing. */
+export async function clear(spec, flags = {}) {
+  if (typeof spec !== 'string' || !spec.trim()) throw new Error('clear needs <x,z|ref> --size WxD');
+  if (typeof flags.size !== 'string') throw new Error('clear needs --size WxD');
+  const size = buildPair(flags.size.replace(/[x×]/i, ','), '--size');
+  if (size.some(x => x <= 0)) throw new Error('--size must be positive');
+  let point;
+  if (spec.includes(',')) point = buildPair(spec, 'clear position');
+  else { const p = refPoint(view(await mirror()), spec); point = [p.x, p.z]; }
+  const d = (await query({ clearance: { at: point, size } })).clearance;
+  return flags.json ? d : d.clear ? `clear: ${size.join('×')} m at ${point.join(',')}` : `blocked: ${d.blockedBy.join(', ')}`;
 }
 
 /** free WxD [--near ref] [--radius r] [--count n]: flat dry plots nobody occupies. */
@@ -222,11 +310,10 @@ export async function freePlots(size, flags = {}) {
 }
 
 // ---------------------------------------------------------------- writing
-const withGroup = (batch) => { const g = load().group; return g && !batch.group ? { ...batch, group: g } : batch; };
-export async function act(batch, note) { const r = ok(await call('/v1/god/act', { body: withGroup({ ...batch, ...(note ? { note } : {}) }) }), 'act'); invalidate(); return r; }
-export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: withGroup(batch) }), 'dryrun'); }
+export async function act(batch, note) { const r = ok(await call('/v1/god/act', { body: { ...batch, ...(note ? { note } : {}) } }), 'act'); invalidate(); return r; }
+export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: batch }), 'dryrun'); }
 export async function preview(batch) {
-  const r = ok(await call('/v1/god/preview', { body: withGroup(typeof batch === 'string' ? JSON.parse(batch) : batch) }), 'preview');
+  const r = ok(await call('/v1/god/preview', { body: typeof batch === 'string' ? JSON.parse(batch) : batch }), 'preview');
   return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
 }
 export async function commit(id) { if (!id) throw new Error('usage: commit <preview-id>'); const r = ok(await call('/v1/god/act', { body: { preview: id } }), 'commit'); invalidate(); return r; }
@@ -239,6 +326,23 @@ export async function planBatch(batch) {
   return `would be accepted: ${r.diff.upserts} things placed/changed, ${r.diff.removes} removed${r.diff.defs.length ? `, defines ${r.diff.defs.join(', ')}` : ''}${r.diff.tiles ? `, ${r.diff.tiles} terrain tiles` : ''}${r.warnings.length ? `; warnings: ${r.warnings.join('; ')}` : ''}`;
 }
 const HINTS = {
+  'build.unknown': '`build` lists sites; start a new build or check its id',
+  'build.closed': 'start a new build with a new id',
+  'build.exists': 'pick a new id or `build resume <id>`',
+  'build.limit': 'finish or abandon a build, or release a claim',
+  'build.site': 'move or shrink the site or mass',
+  'build.group': 'drop the subgroup or carry the build',
+  'build.lease': 'the lease changed; run `build resume <id>` before editing',
+  'build.leased': 'the lead is live; wait or ask it to stop; --take only when it has stopped',
+  'build.claim': 'edit only under the claim root / inside its region',
+  'build.claimed': 'another live claim owns this part; wait or ask for release',
+  'build.claim-unknown': '`build show` lists claims; the claim was released or taken',
+  'build.claims-open': 'release live claims, or use --force',
+  'build.undo-incomplete': 'the build stays open; inspect notReverted before trying again',
+  'site.under-construction': 'finish the build before residents use it',
+  'architecture.sealed': 'preserve another entrance or clear the named approach',
+  'budget.world': 'use field/measured/limit/fix to reduce or spread construction',
+  'budget.region': 'use field/measured/limit/fix to reduce or spread construction',
   'overlap.solid': 'something solid is there; the server suggests a spot (suggest.p) — the solver already tried it; try --near with --dist, --free, or remove the blocker',
   'support.none': 'nothing to rest on; give a parent or a 2-D p so it settles on the ground',
   'extent.outside': 'outside the world; `expand <metres>` grows it, or place nearer the centre',
@@ -260,7 +364,7 @@ const HINTS = {
   'constraint.unsatisfied': 'the constraint cannot hold (its ref is gone or impossible)',
   'undo.conflict': 'the world changed since; undo the later edit first or fix by hand',
 };
-export const explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` — field ${f.field}` : ''}${f.fix ? ` — fix: ${f.fix}` : ''}${f.suggest?.p ? ` — suggest p ${JSON.stringify(f.suggest.p)}` : ''}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ''}`;
+export const explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` — field ${f.field}` : ''}${f.fix ? ` — fix: ${f.fix}` : ''}${f.suggest?.p ? ` — suggest p ${JSON.stringify(f.suggest.p)}` : ''}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ''}${f.code === 'build.lease' && load().build ? `; run \`build resume ${load().build.id}\` before editing` : ''}`;
 
 const parseKV = (list) => Object.fromEntries([].concat(list ?? []).map((kv) => { const i = kv.indexOf('='); const k = kv.slice(0, i), v = kv.slice(i + 1); return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : /^[[{]/.test(v) ? JSON.parse(v) : v]; }));
 const bakeCache = new Map();
@@ -497,10 +601,232 @@ export async function constitution(text) { return act({ ops: [{ op: 'world', sta
 export async function expand(extent) { return act({ ops: [{ op: 'expand', extent: num(extent) }] }); }
 
 // ---------------------------------------------------------------- groups, undo, history
+// Wire assumptions for construction live here (DESIGN-CONSTRUCTION §2). The
+// batch field/echo are handled centrally in state.mjs, including direct acts.
+export const BUILD_API = {
+  path: (id, action) => `/v1/god/builds${id ? '/' + encodeURIComponent(id) : ''}${action ? '/' + action : ''}`,
+  unknown: (r) => r.status === 404 || r.data?.failures?.some((f) => f.code === 'build.unknown'),
+  resumable: (b) => b.status === 'paused' || (b.status === 'active' && b.lead?.live === false),
+  local: (r) => {
+    const b = r.build, step = r.current ?? b.current ?? b.step;
+    return { id: b.id, lease: r.lease, n: step?.n || 1, label: step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status };
+  },
+  claim: (b, c) => ({ id: b.id, claim: c.id, part: c.part, n: c.step?.n || 1, label: c.step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status }),
+  stepBody: (b, n, label, say, masses) => ({ ...(b.claim ? { claim: b.claim } : { lease: b.lease }), n, label, say, ...(masses ? { masses } : {}) }),
+  stepEcho: (b, local) => local.claim ? b.claims.find(c => c.id === local.claim)?.step : b.step,
+  say: (b) => typeof b.say === 'string' ? b.say : b.say?.text,
+};
+const buildPair = (s, what) => {
+  if (typeof s !== 'string' || s.split(',').some((v) => !v.trim())) throw new Error(`${what} needs two numbers`);
+  return dxdz(s, what);
+};
+export function parseMassing(text) {
+  if (text === undefined) return [];
+  if (typeof text !== 'string' || !text.trim()) throw new Error('--mass needs volumes: nave 0,0 22x10 h12 gable');
+  const masses = text.split(';').map((s) => {
+    const fields = s.trim().split(/\s+/), name = fields[0]?.includes(',') ? undefined : fields.shift();
+    if (name && !/^[a-z0-9][a-z0-9-]{0,18}$/.test(name)) throw new Error('mass names must be slugs of at most 19 characters');
+    const [at, size, height, roof, ...extra] = fields;
+    if (!size || !/^h.+/.test(height ?? '') || extra.length || (roof && !['flat', 'gable', 'pyramid'].includes(roof))) throw new Error('mass: use name x,z wxd h12 [flat|gable|pyramid]');
+    const box = buildPair(size.replace(/[x×]/, ','), 'mass size'), h = num(height.slice(1));
+    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error('mass size must be positive; wall/eave height h is 0.5..120 m');
+    return { ...(name ? { name } : {}), at: buildPair(at, 'mass at'), size: box, h, ...(roof ? { roof } : {}) };
+  });
+  if (masses.length > 8) throw new Error('at most 8 massing volumes');
+  return masses;
+}
+async function buildSite(f) {
+  if (f.at === undefined || f.size === undefined) throw new Error('build needs --at <ref|x,z> --size w,d');
+  const size = buildPair(f.size, '--size');
+  if (size.some((n) => n < 1 || n > 200)) throw new Error('site size is 1..200 m on each side');
+  if (f.offset !== undefined) buildPair(f.offset, '--offset');
+  // Numeric sites need no mirror reads: start is exactly one HTTP request.
+  const numeric = typeof f.at === 'string' && f.at.includes(',');
+  const [x, z] = numeric ? buildPair(f.at, '--at') : [];
+  const [dx, dz] = f.offset ? buildPair(f.offset, '--offset') : [0, 0];
+  const p = numeric ? { x: x + dx, z: z + dz } : refPoint(view(await mirror()), f.at, f.offset);
+  return { at: [p.x, p.z], size, yaw: f.yaw === undefined ? 0 : num(f.yaw) };
+}
+const buildOutline = (b) => [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join('×')} m, yaw ${b.site.yaw ?? 0}`, `steps: ${b.plan.steps.map((s, i) => `${i + 1} ${s}`).join('; ')}`];
+const buildListLine = (b) => `${b.id}: ${b.title} (${b.status}); step ${b.step?.n ?? 1}/${b.plan?.steps.length ?? '?'} ${b.step?.label ?? ''}`;
+async function buildChoices(sub, reason, f, list) {
+  const r = list ?? ok(await call(BUILD_API.path()), 'build list');
+  const message = [reason, ...(r.open.length ? ['open builds:', ...r.open.map(buildListLine), `choose an id: build ${sub} <id>${sub === 'resume' ? ' [--take]' : ''}`] : ['no open builds; build start <id> to start one'])].join('\n');
+  return f.json ? { ...r, ok: false, message } : message;
+}
+function buildStartReport(b, suggestions = []) {
+  const masses = b.massing.map((m, i) => {
+    const roof = m.roof ?? 'flat', total = m.h + (roof === 'flat' ? 0 : Math.min(...m.size) / 2);
+    return `${m.name ?? i + 1} ${m.size.map(r2).join('×')} m, walls ${r2(m.h)} m + ${roof} roof ≈ ${r2(total)} m total`;
+  });
+  return [...buildOutline(b), `massing: ${masses.join('; ') || 'none'}`, ...(suggestions.length ? ['parts from earlier builds you can reuse:', ...suggestions.slice(0, 8).map(partLine)] : []), `every edit now carries build ${b.id}, step 1/${b.plan.steps.length} ${b.plan.steps[0]}`].join('\n');
+}
+const reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(', ') || 'none'}${r.recorded === false ? `; not fully recorded${r.code ? ' (' + r.code + ')' : ''}` : ''}` : '';
+function buildReport(r) {
+  if (r.open) return [...r.open.map(buildListLine), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
+  const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
+  const lines = buildOutline(b);
+  if (current) {
+    lines.push(`step ${current.n}/${steps.length} ${current.label}${open ? ' IN PROGRESS' : ''}: ${current.batches} batches, last seq ${current.lastSeq ?? 'none'}${open ? ' — finish it first' : ''}`);
+    for (const e of current.recent ?? []) lines.push(`  seq ${e.seq}: ${e.note ?? ''}`);
+  } else lines.push(`step ${b.step?.n ?? 1}/${steps.length} ${b.step?.label ?? steps[0]}: no committed batches reported${open ? '; inspect and finish it first' : ''}`);
+  lines.push(`roots: ${b.roots.map((x) => x.path ?? x.id ?? x).join(', ') || 'none yet'}`);
+  lines.push(`massing: ${(r.massing ?? b.massing).map((m, i) => `${m.name ?? i + 1} ${m.parts ?? 0} parts`).join(', ') || 'none'}`);
+  lines.push(`claims: ${b.claims.map((c) => `${c.id} ${c.part} (${c.status}${c.holder?.label ? ', ' + c.holder.label : ''})`).join('; ') || 'none'}`);
+  const next = r.next ?? b.next;
+  if (next && open) lines.push(`next: ${next.n}/${steps.length} ${next.label}`);
+  const root = b.roots[0]; if (root) lines.push(`first: describe ${root.path ?? root.id ?? root}`);
+  if (load().build?.id === b.id) lines.push(`local: ${buildHeader()}`);
+  const reuse = reuseReport(r.reuse ?? b.reuse); if (reuse) lines.push(reuse);
+  return lines.join('\n');
+}
+const waitTimeout = (value = '15m') => {
+  const m = typeof value === 'string' && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
+  const ms = m && Number(m[1]) * { ms: 1, s: 1000, m: 60_000, h: 3_600_000 }[m[2]];
+  if (!Number.isSafeInteger(ms) || ms <= 0) throw new Error('build wait --timeout needs a positive duration, e.g. 15m or 30s');
+  return ms;
+};
+/** Read only; injected time/sleep let stub-server tests exercise the full backoff without waiting minutes. */
+export async function buildWait(id, flags = {}, runtime = {}) {
+  const timeout = waitTimeout(flags.timeout), now = runtime.now ?? Date.now, wait = runtime.sleep ?? sleep;
+  const print = runtime.print ?? (line => console.error(line)), start = now(), deadline = start + timeout;
+  let previous, last, delay = 2000;
+  const summary = (b) => b ? `${b.status}; claims: ${b.claims.map(c => `${c.part} ${c.status}${c.step ? ` ${c.step.n} ${c.step.label}` : ''}`).join('; ') || 'none'}` : 'claim state not received';
+  const finish = (reason) => {
+    const result = { ok: reason !== 'timeout', reason, build: last, waitedMs: now() - start };
+    return flags.json ? result : `${id}: ${reason === 'timeout' ? 'timed out' : reason === 'abandoned' ? 'claim abandoned' : reason === 'closed' ? 'build ended' : 'all claims released'}; ${summary(last)}`;
+  };
+  for (;;) {
+    const response = await call(BUILD_API.path(id), { timeoutMs: Math.max(1, Math.min(180_000, deadline - now())) });
+    if (response.status === 0 && response.data?.code === 'slow') return finish('timeout');
+    const r = ok(response, 'build wait');
+    if (r.ok === false) return flags.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+    last = r.build;
+    const line = summary(last), changed = line !== previous;
+    if (changed && !flags.json) print(`${id}: ${line}`);
+    previous = line;
+    if (['done', 'abandoned'].includes(last.status)) return finish('closed');
+    if (last.claims.some(c => c.status === 'abandoned')) return finish('abandoned');
+    if (last.claims.every(c => ['released', 'done', 'taken'].includes(c.status))) return finish('released');
+    const remaining = deadline - now();
+    if (remaining <= 0) return finish('timeout');
+    if (changed) delay = 2000;
+    await wait(Math.min(delay, remaining));
+    if (now() >= deadline) return finish('timeout');
+    delay = Math.min(15_000, delay * 1.5);
+  }
+}
+export async function build(sub = 'show', args = [], f = {}) {
+  const s = load(), b = s.build, arg = args[0];
+  const options = { start: 'title steps at offset size yaw mass brief root', step: 'say mass', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
+  if (!Object.hasOwn(options, sub)) throw new Error('build: start|step|show|wait|resume|claim|release|pause|done|abandon');
+  if (args.length > (['release', 'abandon', 'wait'].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
+  for (const [k, v] of Object.entries(f)) {
+    if (!['json', 'no-build', ...options[sub].split(' ')].includes(k)) throw new Error(`build ${sub} has no option --${k}`);
+    if (Array.isArray(v)) throw new Error(`build ${sub} --${k} takes one value`);
+  }
+  if (sub === 'resume' && f.take !== undefined && f.take !== true) throw new Error('build resume --take takes no value');
+  if ((process.env.EDEN_GOD_CLAIM || b?.claim) && ['start', 'resume', 'claim', 'done', 'abandon'].includes(sub)) throw new Error(`claim holders cannot build ${sub}${sub === 'resume' ? ': it would take the lead lease' : '; edit your claim, then build release --done'}`);
+  if (sub === 'step') {
+    if (!b) throw new Error('no current build; build start or build resume first');
+    if (b.n >= 999) throw new Error('build step cannot exceed 999');
+    const n = b.n + 1, label = arg ?? b.steps[n - 1] ?? `step ${n}`;
+    if (typeof label !== 'string' || !label.trim() || label.length > 60) throw new Error('step label is 1..60 characters');
+    if (f.mass !== undefined && f.say === undefined) throw new Error('build step --mass needs --say');
+    if (f.say !== undefined) {
+      if (typeof f.say !== 'string') throw new Error('--say needs 1..140 characters');
+      const say = f.say.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+      if (!say.trim() || say.length > 140) throw new Error('--say needs 1..140 characters');
+      const masses = f.mass === undefined ? undefined : typeof f.mass === 'string' ? f.mass.split(',').map(x => x.trim()) : [];
+      if (masses && (!masses.length || masses.length > 8 || masses.some(x => !/^[a-z0-9][a-z0-9-]{0,18}$/.test(x)))) throw new Error('--mass needs at most 8 mass names, e.g. nave,tower');
+      if (!b.claim && !b.lease) throw new Error('no build lease; build resume first');
+      const r = ok(await call(BUILD_API.path(b.id, 'step'), { body: BUILD_API.stepBody(b, n, label, say, masses) }), 'build step');
+      if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+      const step = BUILD_API.stepEcho(r.build, b);
+      if (!step) throw new Error('build step response is missing the server step; build show before continuing');
+      save({ build: { ...b, n: step.n, label: step.label, status: r.build.status } });
+      invalidate();
+      return f.json ? r : `step ${step.n}/${b.steps.length}: ${step.label}${BUILD_API.say(r.build) ? ` — designing: ${BUILD_API.say(r.build)}` : ''}`;
+    }
+    save({ build: { ...b, n, label } });
+    return `step ${n}/${b.steps.length}: ${label} (rides on your next edit)`;
+  }
+  if (sub === 'wait') {
+    if (!b) throw new Error('no current build; build resume <id> first');
+    return buildWait(b.id, f);
+  }
+  if (sub === 'show') {
+    const response = await call(BUILD_API.path(arg));
+    if (arg && BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${arg}`, f);
+    const r = ok(response, 'build show');
+    if (r.ok === false) return `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+    return f.json ? r : buildReport(r);
+  }
+  let id, action, body;
+  if (sub === 'start') {
+    if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(arg ?? '')) throw new Error('build start needs an id (slug, at most 40 characters)');
+    if (typeof f.title !== 'string' || !f.title.trim() || f.title.length > 80) throw new Error('build start needs --title (1..80 characters)');
+    if (typeof f.steps !== 'string') throw new Error('build start needs --steps shell,roof,interior');
+    const steps = f.steps.split(',').map((x) => x.trim());
+    if (steps.length > 24 || steps.some((x) => !x || x.length > 60)) throw new Error('--steps needs 1..24 labels, each 1..60 characters');
+    const massing = parseMassing(f.mass), site = await buildSite(f);
+    const brief = f.brief === undefined ? undefined : existsSync(f.brief) ? readFileSync(f.brief, 'utf8') : f.brief;
+    if (brief !== undefined && (typeof brief !== 'string' || brief.length > 4000)) throw new Error('--brief is at most 4000 characters');
+    body = { id: arg, title: f.title, steps, site, massing, ...(brief !== undefined ? { brief } : {}), ...(f.root ? { root: f.root } : {}) };
+  } else if (sub === 'resume') {
+    id = arg;
+    if (!id) {
+      const list = ok(await call(BUILD_API.path()), 'build list');
+      if (list.open.length !== 1 || !BUILD_API.resumable(list.open[0])) return buildChoices(sub, list.open.length > 1 ? 'several open builds; specify one to resume' : list.open.length ? 'the only open build has a live or unknown lead; specify its id to resume' : 'no build to resume', f, list);
+      id = list.open[0].id;
+    }
+    action = 'resume'; body = { ...(b?.id === id && b.lease ? { lease: b.lease } : {}), ...(f.take ? { take: true } : {}) };
+  } else {
+    id = b?.id;
+    if (!id) throw new Error('no current build; build resume <id> first');
+    if (sub === 'claim') {
+      if (!/^[a-z0-9][a-z0-9-]{0,18}$/.test(arg ?? '')) throw new Error('build claim needs a part slug (at most 19 characters)');
+      if (f.take !== undefined && (typeof f.take !== 'string' || !/^c_[0-9a-f]{8}$/.test(f.take))) throw new Error('build claim --take needs a claim id');
+      const region = f.at !== undefined || f.size !== undefined ? await buildSite(f) : undefined;
+      if (!f.root && !region) throw new Error('build claim needs --root <path> or --at <ref> --size w,d');
+      action = 'claims'; body = { part: arg, ...(f.root ? { root: f.root } : {}), ...(region ? { region } : {}), ...(f.take ? { take: f.take } : {}) };
+    } else if (sub === 'release') {
+      if (!b.claim) throw new Error('build release needs EDEN_GOD_CLAIM or a local claim');
+      action = `claims/${encodeURIComponent(b.claim)}/release`; body = f.done ? { done: true } : {};
+    } else if (sub === 'pause') { action = sub; body = { ...(b.lease ? { lease: b.lease } : {}), ...(arg ? { note: arg } : {}) }; }
+    else if (sub === 'done') { action = sub; body = { ...(arg ? { summary: arg } : {}), ...(f.force ? { force: true } : {}) }; }
+    else if (sub === 'abandon') { action = sub; body = { ...(f.undo ? { undo: true } : {}), ...(f.force ? { force: true } : {}) }; }
+    else throw new Error('build: start|step|show|resume|claim|release|pause|done|abandon');
+  }
+  const response = await call(BUILD_API.path(id, action), { body });
+  if (sub === 'resume' && BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${id}`, f);
+  const r = ok(response, `build ${sub}`);
+  if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}${r.notReverted ? `; undone edits: ${r.reverted?.join(', ') || 'none'}; not undone edits: ${r.notReverted.join(', ')}` : ''}`;
+  if (sub === 'start' || sub === 'resume') save({ build: BUILD_API.local(r), group: undefined, buildEchoWarned: undefined, buildPreviews: undefined });
+  if (sub === 'claim') {
+    const file = claimFile(r.claim.id), previous = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null;
+    // A replay returns the same claim. Never reset an active helper's local step.
+    if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + '\n');
+    return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
+  }
+  if (['release', 'done', 'abandon'].includes(sub)) save({ build: undefined, group: undefined, buildPreviews: undefined });
+  invalidate();
+  if (f.json) return r;
+  if (sub === 'start') return buildStartReport(r.build, r.parts);
+  if (sub === 'resume') return buildReport(r);
+  return `${id}: ${sub === 'release' ? 'claim released' : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(', ') || 'none'}; not undone edits: ${r.build.abandoned.undo.notReverted.join(', ') || 'none'}` : ''}${sub === 'done' && (r.reuse ?? r.build.reuse) ? '\n' + reuseReport(r.reuse ?? r.build.reuse) : ''}`;
+}
 /** group <name>: label every following edit (until `group --off`); `undo --group <name>` reverts them all. */
-export async function group(name, flags = {}) { if (flags.off || name === 'off' || name === '-') { save({ group: undefined }); return 'no current group'; } if (!name) return load().group ? `current group: ${load().group}` : 'no current group'; save({ group: String(name).slice(0, 60) }); return `current group: ${name} (every edit until \`group --off\`; undo it all with \`undo --group ${name}\`)`; }
+export async function group(name, flags = {}) {
+  const b = load().build;
+  if (flags.off || name === 'off' || name === '-') { save({ group: undefined }); return b ? `no subgroup; edits still carry build ${b.id}` : 'no current group'; }
+  if (!name) return load().group ? `current group: ${load().group}` : 'no current group';
+  const g = (b ? (String(name) === b.id || String(name).startsWith(b.id + '/') ? name : `${b.id}/${name}`) : String(name)).slice(0, 60);
+  save({ group: g }); return `current group: ${g} (every edit until \`group --off\`; undo it all with \`undo --group ${g}\`)`;
+}
 export async function undo(flags = {}) {
   const g = flags.group === true ? load().group : flags.group;
+  if ((process.env.EDEN_GOD_CLAIM || load().build?.claim) && !g) { const b = load().build; throw new Error(`a plain undo reverts anyone's newest edit; use \`undo --group ${b?.id ?? '<build>'}/${b?.part ?? '<part>'}\``); }
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ''}`, { method: 'POST' }), 'undo'); invalidate();
   if (g) {
     if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(', ')}`;
@@ -574,16 +900,30 @@ export function lookFrame(v, extent, flags = {}) {
     tight: explicitSpan && dist === undefined && !flags.inside };
 }
 /** look [--at ref|x,z] [--from n|e|s|w|ne…|above] [--dist m] [--span m] [--inside] [--out file]: a screenshot to read. */
-export async function look(flags = {}) {
+export function lookOverrides(flags = {}) {
+  const out = {};
+  if (flags.hour !== undefined) {
+    if (typeof flags.hour !== 'string' || !/^(?:[01]?\d|2[0-3])(?::[0-5]\d)?$/.test(flags.hour)) throw new Error('look --hour takes HH[:MM], from 00:00 to 23:59');
+    const [hour, minute = '00'] = flags.hour.split(':');
+    out.hour = `${hour.padStart(2, '0')}:${minute}`;
+  }
+  if (flags.weather !== undefined) {
+    if (typeof flags.weather !== 'string' || !/^[a-z][a-z-]{0,31}$/.test(flags.weather)) throw new Error('look --weather takes one weather name, e.g. rain or clear');
+    out.weather = flags.weather;
+  }
+  return out;
+}
+export async function look(flags = {}, runtime = {}) {
   if (flags.stop) return stopKeeper();
+  const overrides = lookOverrides(flags);
   const m = await mirror(); const v = view(m);
   const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags);
   if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
   const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
-  if (!flags.keep) shot = await shoot(args);
+  if (!flags.keep) shot = await (runtime.shoot ?? shoot)(args);
   else {
     // a kept browser: the shot runs in a child process so its browser connection does not keep this one alive
     const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
@@ -606,7 +946,7 @@ export async function exportWorld(file, flags = {}) {
 }
 const pathOf = (byId, e) => { const parts = []; for (let c = e; c; c = byId.get(c.in.parent)) parts.unshift(c.name ?? c.id); return parts.join('/'); };
 /** import <genesis.json>: apply a template's batches to this world, each atomic (group "import" unless the batch says). */
-export async function importWorld(file, flags = {}) {
+export const importWorld = (file, flags = {}) => withoutBuild(async () => {
   const g = JSON.parse(readFileSync(file, 'utf8'));
   if (g.schema !== 'genesis/1') throw new Error('import: file must be genesis/1');
   const out = [];
@@ -619,7 +959,7 @@ export async function importWorld(file, flags = {}) {
     if (!r.accepted) break;
   }
   return out.join('\n');
-}
+});
 export async function define(json) {
   const def = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   // a generator-made def exposes the generator's params (ranges, defaults) unless it declares its own
@@ -629,15 +969,18 @@ export async function define(json) {
 export async function defineKit(json, flags = {}) {
   const k = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error('define-kit needs {name, shapes:[…]} (see SKILL.md, kit primitives in SCHEMA.md)');
-  // search before define: say what already exists
-  const similar = ok(await call(`/v1/god/defs?q=${encodeURIComponent(k.name.replace(/[-_.]/g, ' '))}`), 'defs').defs.slice(0, 5).map((d) => d.ref.replace(/^core-/, 'core/'));
+  // Search name and tags before the write, and surface kept parts before unused defs.
+  const matches = (await searchDefs([k.name.replace(/[-_.]/g, ' '), ...(k.tags ?? [])].join(' '))).defs;
+  const picks = [...matches.filter(d => usedIn(d).length), ...matches.filter(d => !usedIn(d).length)].slice(0, 5);
+  const similar = picks.map(d => d.ref.replace(/^core-/, 'core/'));
   const ext = (sh) => { const [x, y, z] = sh.at; const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)]; return [x - sz[0] / 2, y - (sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'sphere' || sh.kind === 'capsule' ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2]; };
   const e = k.shapes.map(ext);
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, r2(v)));
   const def = { schema: 'def/1', name: k.name, version: k.version ?? 1, description: k.description ?? '', tags: k.tags ?? [], form: 'point', layer: k.layer ?? 'solid', make: { kind: 'gen', gen: 'kit/2', args: { shapes: k.shapes, ...(k.gait ? { gait: k.gait } : {}), ...(k.slots ? { slots: k.slots } : {}), ...(k.round !== undefined ? { round: k.round } : {}) } }, size: { box, scale: k.scale ?? [0.5, 2] }, ...(k.components ? { components: k.components } : {}), ...(k.anchor ? { anchor: k.anchor } : {}), ...(k.state ? { state: k.state } : {}), ...(k.params ? { params: k.params } : {}) };
   if (flags.dry) return { def, similar };
+  if (picks.length) console.error(`similar defs already in the library: ${picks.map(d => oneLine(d.ref.replace(/^core-/, 'core/')) + usedBadge(d) + (usedIn(d).length && d.hash ? ' · ' + placePart({ sha: d.hash }) : '')).join('; ')} — prefer them when they fit`);
   const r = await define(def);
-  return `${r}${similar.length ? `\n  (similar defs already in the library: ${similar.join(', ')} — prefer them when they fit)` : ''}`;
+  return r;
 }
 
 // ---------------------------------------------------------------- furnish / gallery (other lanes' libs)
@@ -677,11 +1020,11 @@ export async function flag(label, f) { const v = view(await mirror()); const p =
 export async function prayers(flags = {}) { return ok(await call(`/v1/god/prayers${flags.all ? '?all=1' : ''}`), 'prayers'); }
 export async function answer(prayer, text) { return act({ ops: [{ op: 'answer', prayer, text }] }); }
 export async function stream(seconds = 60) { return follow(seconds, (e) => console.log(JSON.stringify(e))); }
-export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); const v = st.versions; return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ''}`; }
+export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); const v = st.versions; return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ''}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ''}`; }
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -703,26 +1046,27 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
+  build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
-  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
+  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop hour weather', defs: 'tag all', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
-  catalog: 'category has tag page per', find: 'category has tag all', recommend: 'per', taxonomy: '',
+  catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
-  const allowed = new Set(['json', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
+  const allowed = new Set(['json', 'no-build', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
   for (const [k, v] of Object.entries(f)) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}…": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => '--' + x).join(' ')}`);
     for (const x of [].concat(v)) {
-      if (x === true && !BOOL.has(k) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
-      if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (x === true && !BOOL.has(k) && !(cmd === 'build' && k === 'take') && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
+      if (NUMERIC.has(k) && !(cmd === 'build' && k === 'steps') && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (cmd === 'look' && ['dist', 'span'].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === '' || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === 'by' || k === 'step') && cmd !== 'land' && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
@@ -734,16 +1078,17 @@ export function checkArgs(cmd, f, rest) {
 }
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = {
+  build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
-  describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
+  describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), reach: (r, f) => reach(r[0], r[1], f), clear: (r, f) => clear(r[0], f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
-  catalog: (r, f) => catalog(f), find: (r, f) => find(r.join(' ') || undefined, f), recommend: (r, f) => recommend(r.join(' '), f), taxonomy: (r, f) => taxonomy(f),
+  catalog: (r, f) => catalog(f), find: (r, f) => find(r.join(' ') || undefined, f), parts: (r, f) => parts(r.join(' '), f), recommend: (r, f) => recommend(r.join(' '), f), taxonomy: (r, f) => taxonomy(f),
   sky: (r, f) => sky(f), weather: (r, f) => envWeather(f), time: (r, f) => envTime(r, f), strike: (r, f) => envStrike(f), land: (r, f) => envLand(r, f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
   flags, flag: (r, f) => flag(r.join(' '), f), prayers: (r, f) => prayers(f), answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
@@ -751,19 +1096,24 @@ export const COMMANDS = {
   give: (r) => give(r[0], r[1]), pay: (r) => pay(r[0], r[1], r[2]), zone: (r, f) => zone(r[0], r[1], f), 'zone-suggest': (r) => zoneSuggest(r[0]), relate: (r, f) => relate(r[0], r[1], r[2], f), layers: (r, f) => layers(f),
   help: () => HELP,
 };
+for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
-read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
-look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane.
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
+look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] · build step [label] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
+mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
+parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
 ${LAYERS_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
@@ -778,6 +1128,6 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
   if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
-  Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else console.log(JSON.stringify(out, null, 2)); if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
+  Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else { console.log(JSON.stringify(out, null, 2)); if (!f.json && out?.[OUTPUT_SUFFIX]) console.error(out[OUTPUT_SUFFIX]); } if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
 }
 export { mirror, view, solve, refPoint, compassKey, COMPASS, mkdirSync };

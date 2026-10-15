@@ -3,15 +3,15 @@
 // tiny request); an unchanged seq means the cache is exact and nothing else is fetched. Offline
 // (server unreachable) the cache is used as is and the command says so. `follow` keeps it fresh
 // from the god SSE stream.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { call, load, ok } from './state.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { atomicWrite, call, load, ok } from './state.mjs';
 import { isFlagDef } from './solver.mjs';
 
 export const CACHE = '.eden-god.cache.json';
 let memo = null;
 
 function readCache() { try { return existsSync(CACHE) ? JSON.parse(readFileSync(CACHE, 'utf8')) : null; } catch { return null; } }
-function writeCache(c) { try { writeFileSync(CACHE, JSON.stringify(c), { mode: 0o600 }); } catch { /* read-only folder: memory only */ } }
+function writeCache(c) { try { atomicWrite(CACHE, JSON.stringify(c)); } catch { /* read-only folder: memory only */ } }
 
 /** The mirror, fresh unless the server is unreachable. `{ fresh: true }` refetches regardless. */
 export async function mirror({ fresh = false } = {}) {
@@ -19,7 +19,7 @@ export async function mirror({ fresh = false } = {}) {
   if (memo && memo.world === world && !fresh) {
     const s = await call('/v1/world/seq', { as: 'none', timeoutMs: 5000 });
     if (s.status === 0) return { ...memo, offline: true };
-    if (s.data.seq === memo.seq) return memo;
+    if (s.data.seq === memo.seq && s.data.builds === memo.buildsRev) return memo;
   }
   const cached = memo?.world === world ? memo : readCache();
   const seqR = await call('/v1/world/seq', { as: 'none', timeoutMs: 5000 });
@@ -27,7 +27,7 @@ export async function mirror({ fresh = false } = {}) {
     if (cached && cached.world === world) { memo = cached; return { ...cached, offline: true }; }
     throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
   }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) { memo = cached; return cached; }
+  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq && cached.buildsRev === seqR.data.builds) { memo = cached; return cached; }
   const [snap, lay] = await Promise.all([call('/v1/god/snapshot'), call('/v1/god/query', { body: { layout: { obbs: true } } })]);
   const snapshot = ok(snap, 'snapshot'), layout = ok(lay, 'layout').layout;
   memo = build(world, snapshot, layout);
@@ -37,7 +37,7 @@ export async function mirror({ fresh = false } = {}) {
 export function invalidate() { memo = null; }
 
 function build(world, snapshot, layout) {
-  return { world, seq: snapshot.seq, at: Date.now(), extent: snapshot.constants.extent, snapshot, rows: layout.entities };
+  return { world, seq: snapshot.seq, buildsRev: snapshot.buildsRev, at: Date.now(), extent: snapshot.constants.extent, snapshot, rows: layout.entities };
 }
 
 /** Index helpers over a mirror. */
