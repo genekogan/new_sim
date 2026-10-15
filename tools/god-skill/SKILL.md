@@ -87,13 +87,14 @@ The owner is waiting; a fast, honest, complete answer beats an endlessly polishe
 1. **List what was asked** before you build: each named thing, each material or colour, each use ("walk in", "sit").
    That list is your definition of done; nothing else is.
 2. **Show a first look early**: as soon as the main form stands, `look` and tell the owner.
-3. **Verify the uses with the world, not by inspection**: `verify-use <thing> [--seat <seat>] [--from <place>]`
-   sends a temporary probe resident to walk in and sit, and returns a receipt (ok, or what failed and why). `describe`
-   and `where` only show bounding boxes; they cannot tell you whether a body fits through a door.
-4. **Stop when every listed item exists and `verify-use` is ok** for every asked-for use. Report then. Put further
-   ideas (night lighting tweaks, extra furniture, colour variations) in your report as offers instead of doing them.
+3. **Check the asked-for uses with what the world tells you**: `describe` (rooms, doors, "reachable from outside",
+   seat slots and who sits there) and `where`. `verify-use` (a probe resident that walks in and sits, see *Making
+   things usable*) is an optional extra check; it is never a reason to keep rebuilding something that already works.
+4. **Stop when every listed item exists and you have checked the uses.** Report then, saying how you checked each use.
+   Put further ideas (night lighting tweaks, extra furniture, colour variations) in your report as offers instead of
+   doing them.
 5. **Never wait for the world clock** (a service, nightfall, residents arriving): it runs in real time. To see night
-   lighting, `time 21:00`, look, then set the time back; to prove use, run `verify-use`.
+   lighting, `time 21:00`, look, then set the time back.
 6. If something asked for cannot be done here, say so and stop; do not substitute silently.
 
 ## Choosing how to make something
@@ -325,8 +326,8 @@ day is a Saturday.
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
   before judging the build: `look --keep` (a kept browser) has been seen to capture the default view
   instead of the requested one; if so, look again without `--keep` (`look --stop` closes the browser).
-- `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; ok/failed receipt
-  (about 10–60 s; one probe per world at a time).
+- `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; optional ok/failed receipt
+  (about 15 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
@@ -410,12 +411,13 @@ Souls act on **declared affordances**, not on appearance. What exists today:
 Honest limits: **lying in a bed is not reliable today** (a Soul may lie beside the mattress); Souls do
 **not ride** anything that moves (a ferris wheel, a cart, an animated platform is scenery to them); nobody
 climbs onto roofs, kit tops or slopes without a floor or slot; a kit's look (a "bench" made of boxes)
-offers nothing unless it declares the slot. `describe` and reachability are good signs, not proof. **Proof is
-`verify-use <thing> [--seat <seat>] [--from <place>] [--uses enter,sit]`**: the server sends a temporary probe
-resident (it never thinks and is removed afterwards) to walk in from `--from` (default: just outside the main door)
-and sit, and answers with a receipt per use — ok, or what failed and why (`verify.no-seat`, `verify.timeout`,
-`verify.refused` with the engine's reason). When you report a build, quote the receipt, and name any requested use
-that is only decorative.
+offers nothing unless it declares the slot. `describe` (rooms, doors, "reachable from outside", seat slots) is
+usually enough to check a use. For an extra, optional check there is `verify-use <thing> [--seat <seat>] [--from
+<place>] [--uses enter,sit]`: the server sends a temporary probe resident (it never thinks and is removed afterwards)
+that crosses the nearest door or footprint edge, sits on the nearest free seat, and answers with a receipt per use —
+ok, or what failed and why (`verify.no-seat`, `verify.timeout`, `verify.refused` with the engine's reason). It takes
+about 15 s (`--from` walks the whole way and takes longer); one probe per world at a time. If it fails while
+`describe` shows the use, say so in your report rather than rebuilding. Name any requested use that is only decorative.
 
 ## Submitting, previewing and recovering
 

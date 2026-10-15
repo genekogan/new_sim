@@ -2,7 +2,7 @@
 // invitation or owner credential is involved in verification.
 import {z} from 'zod';
 import type {Entity} from '@sim/world-compiler';
-import type {WorldHost} from '../world.ts';
+import type {WorldHost, HostListener} from '../world.ts';
 import type {Souls} from '../souls.ts';
 import type {SoulRow} from '../db.ts';
 import type {EdgeSoul} from '../edge/contract.ts';
@@ -21,16 +21,20 @@ export const verifyUseSchema = z.object({
   uses: z.array(z.enum(['enter', 'sit'])).min(1).max(2).refine(a => new Set(a).size === a.length, 'uses must be unique').default(['enter', 'sit']),
   from: z.union([z.string().min(1).max(200), z.tuple([z.number().finite(), z.number().finite()])]).optional(),
   seat: z.string().min(1).max(200).optional(),
-  timeoutMs: z.number().int().min(1).max(180_000).default(150_000),
+  timeoutMs: z.number().int().min(1).max(180_000).default(90_000),
 }).strict();
 type Input = z.infer<typeof verifyUseSchema>;
 type Reason = {code: typeof verifyCodes[number]; message: string; engineCode?: string};
-type UseResult = {use: Use; ok: boolean; door?: string; crossing?: {at: V2; distToDoor?: number}; room?: string; seat?: string; occupant?: string; distanceToSlot?: number; reason?: Reason};
-export type VerifyReceipt = {ok: boolean; target: string; uses: UseResult[]; probe: {removed: boolean}; ms: number; notes: string[]; reason?: Reason};
-type Description = {id: string; path: string; rooms: {id: string; floor: number; polygon: V2[]}[]; slots: {id: string; kind: string; p: [number, number, number]; capacity: number; used: number; occupants: string[]}[]};
+type Point = {p: V2; level: number};
+type Reach = {ok: true; length: number; legs: number; levels: number[]} | {ok: false; code: string; message: string};
+type Proof = {kind: 'room' | 'footprint' | 'seat'; at: V2; tick: number; ms: number; room?: string; seat?: string};
+type UseResult = {use: Use; ok: boolean; door?: string; crossing?: {at: V2; distToDoor?: number}; proof?: Proof; room?: string; seat?: string; occupant?: string; distanceToSlot?: number; interiorRoute?: {from: Point; to: Point; reach: Reach; relocatedTo?: V2; finalApproach: 'physical'}; reason?: Reason};
+type Timings = Record<'birth' | 'start' | 'enter' | 'sit' | 'retire', number>;
+export type VerifyReceipt = {ok: boolean; target: string; uses: UseResult[]; probe: {removed: boolean; removal: 'done' | 'pending'; entityId?: string}; timings: Timings; ms: number; notes: string[]; reason?: Reason};
+type Description = {id: string; path: string; aabb: [number, number, number, number]; rooms: {id: string; floor: number; polygon: V2[]}[]; slots: {id: string; kind: string; p: [number, number, number]; capacity: number; used: number; occupants: string[]}[]};
 type Door = {id: string; at: V2; outward: V2; level: number};
 type Body = {pose: {p: [number, number, number]}; human?: {activity?: string; level?: number}};
-type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null};
+type Engine = {world: {entities: Record<string, Body>}; standableNearV1(at: V2, level?: number, except?: string, minClear?: number, maxRing?: number): V2 | null; reachV1(from: Point, to: Point): Reach};
 const active = new WeakSet<WorldHost>();
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const dist = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -46,15 +50,18 @@ export class VerifyUse {
 
   async run(raw: unknown): Promise<VerifyReceipt> {
     const started = performance.now();
-    const receipt: VerifyReceipt = {ok: false, target: typeof (raw as Input)?.target === 'string' ? (raw as Input).target : '', uses: [], probe: {removed: true}, ms: 0, notes: []};
+    const receipt: VerifyReceipt = {ok: false, target: typeof (raw as Input)?.target === 'string' ? (raw as Input).target : '', uses: [], probe: {removed: true, removal: 'done'}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: []};
     const parsed = verifyUseSchema.safeParse(raw);
     const fail = (reason: Reason, uses: Use[] = []) => { receipt.reason = reason; receipt.uses = uses.map(use => ({use, ok: false, reason})); receipt.ms = round(performance.now() - started); return receipt; };
     if (!parsed.success) return fail({code: 'verify.refused', message: parsed.error.issues.map(i => i.message).join('; '), engineCode: 'invalid'});
     const input = parsed.data;
     if (active.has(this.host) || [...this.host.minds.keys()].some(isVerificationProbe)) return fail({code: 'verify.busy', message: 'This world already has a verifier probe.'}, input.uses);
     active.add(this.host);
-    let probe: SoulRow | undefined, listener: WorldHost['listeners'][number] | undefined;
+    let retired = false, probe: SoulRow | undefined, listener: WorldHost['listeners'][number] | undefined;
     const deadline = started + input.timeoutMs;
+    const phase = async <T>(name: keyof Timings, work: () => Promise<T>): Promise<T> => {
+      const at = performance.now(); try { return await work(); } finally { receipt.timings[name] = round(performance.now() - at); }
+    };
     try {
       const target = this.god.model.get(input.target);
       if (!target) throw new Failure('verify.no-target', `No such target: ${input.target}`);
@@ -62,31 +69,37 @@ export class VerifyUse {
       const bridge = engineBridges.get(this.god.model);
       if (!bridge || !this.edge) throw new Failure('verify.refused', 'The resident engine bridge and edge ledger are required.', 'unavailable');
       const engine = this.host.engine as unknown as Engine;
-      const desc = this.describe(target.id), footprint = this.footprint(target), doors = this.doors(target);
+      const desc = this.describe(target.id), footprint = this.footprint(target, desc), doors = this.doors(target);
       const version = target.v;
       const unchanged = () => { if (this.god.model.entities.get(target.id)?.v !== version) throw new Failure('verify.refused', 'The target changed during verification; retry against its current geometry.', 'revision.stale'); };
       const inside = (p: V2, level: number) => desc.rooms.length
         ? desc.rooms.find(r => (bridge.nav.thing(`${receipt.target}/${r.id}`)?.level ?? r.floor) === level && inPoly(p[0], p[1], r.polygon))?.id
-        : level === (bridge.nav.thing(receipt.target)?.level ?? 0) && inPoly(p[0], p[1], footprint) ? receipt.target : undefined;
-      const start = this.start(input, target, footprint, doors, bridge, engine);
-      const created = this.souls.createVerificationProbe(); probe = created.soul;
-      receipt.probe.removed = false;
-      // Accept the normal lifecycle queue without advancing the world's clock.
-      this.host.drainInputs(); await created.ready;
+        : level === (bridge.nav.thing(receipt.target)?.level ?? 0) && this.within(p, footprint) ? receipt.target : undefined;
+      const startAt = performance.now();
+      let entry: ReturnType<VerifyUse['entry']>;
+      try { entry = this.entry(input, footprint, doors, bridge, engine, inside, !desc.rooms.length); }
+      finally { receipt.timings.start = round(performance.now() - startAt); }
+      const created = await phase('birth', async () => {
+        const born = this.souls.createVerificationProbe(); probe = born.soul;
+        receipt.probe = {removed: false, removal: 'pending', entityId: probe.entity_id};
+        this.host.drainInputs(); await born.ready; return born;
+      });
+      probe = created.soul;
       const soul: EdgeSoul = {soulId: probe.id, entityId: probe.entity_id, name: probe.name, owner: probe.owner};
-      const relocated = this.host.enqueue('edge-relocate', `verify-use:${probe.id}`, {soulId: probe.id, entityId: probe.entity_id, to: start, why: 'verifier probe: start use verification'});
-      this.host.drainInputs(); await relocated;
+      const relocateAt = performance.now(); await this.relocate(soul, entry.start, 'start use verification');
+      receipt.timings.start = round(receipt.timings.start + performance.now() - relocateAt);
       const body = () => engine.world.entities[soul.entityId];
       if (!body()) throw new Failure('verify.refused', 'Probe birth produced no engine body.', 'not-in-world');
       const position = (): V2 => [body().pose.p[0], body().pose.p[2]];
-      if (dist(position(), start) > 6.4) throw new Failure('verify.refused', 'The engine could not relocate the probe to the requested start.', 'route.no-start');
-      if (dist(position(), start) > 0.05) receipt.notes.push(`The engine chose clear standing ground ${round(dist(position(), start))} m from the requested start.`);
+      if (dist(position(), entry.start) > 6.4) throw new Failure('verify.refused', 'The engine could not relocate the probe to the requested start.', 'route.no-start');
+      if (dist(position(), entry.start) > 0.05) receipt.notes.push(`The engine chose clear standing ground ${round(dist(position(), entry.start))} m from the requested start.`);
       let previous = position(), previousInside = inside(previous, body().human?.level ?? 0);
-      let crossing: UseResult['crossing'], crossingDoor: string | undefined;
+      let crossing: UseResult['crossing'], crossingDoor: string | undefined, proof: Proof | undefined;
       listener = {afterTick: () => {
         if (!body()) return;
         const p = position(), room = inside(p, body().human?.level ?? 0);
-        if (!crossing && !previousInside && room) {
+        if (!proof && !previousInside && room) {
+          proof = {kind: desc.rooms.length ? 'room' : 'footprint', at: p.map(round) as V2, tick: this.host.engine.world.tick, ms: round(performance.now() - started), ...(desc.rooms.length ? {room} : {})};
           // Refine the first outside→inside engine step to the polygon boundary.
           let lo = 0, hi = 1;
           for (let i = 0; i < 16; i++) { const mid = (lo + hi) / 2, q: V2 = [previous[0] + (p[0] - previous[0]) * mid, previous[1] + (p[1] - previous[1]) * mid]; if (inside(q, body().human?.level ?? 0)) hi = mid; else lo = mid; }
@@ -98,7 +111,25 @@ export class VerifyUse {
         previous = p; previousInside = room;
       }};
       this.host.listeners.push(listener);
-      receipt.notes.push(`Temporary ${probe.name}; birth and retirement are journaled under ${probe.id}.`, 'Actions use the existing edge ledger; positions and seat occupants are engine reads.');
+      receipt.notes.push(`Temporary ${probe.name}; birth and retirement are journaled under ${probe.id}.`, 'Entry uses logged native programs; positions and seat occupants are engine reads.');
+      if (!desc.rooms.length) receipt.notes.push('Footprint proof uses the authored area or collider AABB, inset by 0.15 m.');
+      receipt.notes.push(input.from ? 'Explicit from: full physical walk, including the interior route; this can be slower.' : 'Short physical entry crossing; distant seats may use a reported, engine-planned interior relocation after entry proof.');
+      let enteredSeat: Entity | undefined;
+      const confirmSeat = (seat: Entity, result: UseResult) => {
+        const slots = this.describe(seat.id).slots.filter(s => s.kind === 'seat' && s.occupants.includes(soul.name));
+        const distance = slots.length ? Math.min(...slots.map(s => dist(position(), [s.p[0], s.p[2]]))) : Infinity;
+        if (Number.isFinite(distance)) result.distanceToSlot = round(distance);
+        if (slots.length) result.occupant = soul.name;
+        return body().human?.activity === 'sit' && slots.length > 0 && distance <= 0.6;
+      };
+      const takeSeat = async (seat: Entity, result: UseResult) => {
+        if (confirmSeat(seat, result)) return;
+        await this.action(soul, `sit:${seat.id}`, deadline, () => confirmSeat(seat, result));
+      };
+      const seatedProof = (seat: Entity) => {
+        if (proof) return;
+        proof = {kind: inside(position(), body().human?.level ?? 0) ? 'footprint' : 'seat', at: position().map(round) as V2, tick: this.host.engine.world.tick, ms: round(performance.now() - started), seat: this.god.model.pathOf(seat.id)};
+      };
       for (const use of (['enter', 'sit'] as const).filter(use => input.uses.includes(use))) {
         const result: UseResult = {use, ok: false}; receipt.uses.push(result);
         try {
@@ -106,29 +137,63 @@ export class VerifyUse {
           unchanged();
           if (use === 'enter') {
             if (previousInside) throw new Failure('verify.refused', 'The start position is already inside; no entry crossing can be proved.', 'verify.start-inside');
-            // Prefer a real room goal: a closed building walk can stop outside.
-            const roomRef = desc.rooms.map(r => `${receipt.target}/${r.id}`).find(ref => this.edge!.capabilities(soul).some(c => c.id === `walk:${ref}`));
-            await this.action(soul, `walk:${roomRef ?? receipt.target}`, deadline);
+            const at = performance.now();
+            try {
+              if (entry.goal) await this.walk(soul, entry.goal, deadline);
+              else {
+                // Large seat-bearing kits can be one native fixture obstacle.
+                // The normal sit walks its approach and physically claims a slot.
+                const seat = this.seat(input.seat, target, entry.start), seated: UseResult = {use: 'sit', ok: false};
+                await takeSeat(seat, seated); seatedProof(seat); enteredSeat = seat;
+                result.seat = this.god.model.pathOf(seat.id); result.occupant = seated.occupant; result.distanceToSlot = seated.distanceToSlot;
+                if (proof) proof.seat = result.seat;
+                receipt.notes.push('Room-less entry proved by physical sitting on a seat in the target subtree.');
+              }
+            } catch (e) {
+              // Entry is proved at the first ENGINE position inside, even when
+              // the same walk later leaves the footprint or is interrupted.
+              if (!proof) throw e;
+              receipt.notes.push(`Entry position was proved before the action ended: ${reasonOf(e).message}`);
+            } finally { receipt.timings.enter = round(performance.now() - at); }
             unchanged();
-            const room = inside(position(), body().human?.level ?? 0);
-            result.ok = !!room && !!crossing;
-            if (room) result.room = room;
+            result.ok = !!proof;
+            if (proof) { result.proof = proof; if (proof.room) result.room = proof.room; }
             if (crossing) result.crossing = crossing;
             if (crossingDoor) result.door = crossingDoor;
-            if (!result.ok) throw new Failure('verify.refused', 'The walk finished without a proved crossing and engine position inside the target.', 'route.outside');
+            if (!result.ok) throw new Failure('verify.refused', 'The walk finished without an engine position proved inside the target.', 'route.outside');
           } else {
-            const seat = this.seat(input.seat, target, position());
-            result.seat = this.god.model.pathOf(seat.id);
-            await this.action(soul, `sit:${seat.id}`, deadline, () => {
-              const obs = this.edge!.observe(soul, new Set()) as {self: {activity: string}};
-              const slots = this.describe(seat.id).slots.filter(s => s.kind === 'seat' && s.occupants.includes(soul.name));
-              const distance = slots.length ? Math.min(...slots.map(s => dist(position(), [s.p[0], s.p[2]]))) : Infinity;
-              if (Number.isFinite(distance)) result.distanceToSlot = round(distance);
-              if (slots.length) result.occupant = soul.name;
-              return obs.self.activity === 'sit' && body().human?.activity === 'sit' && slots.length > 0 && distance <= 0.6;
-            });
-            unchanged();
-            result.ok = true;
+            const sitAt = performance.now();
+            try {
+              const seat = enteredSeat ?? this.seat(input.seat, target, entry.goal?.p ?? entry.start);
+              result.seat = this.god.model.pathOf(seat.id);
+              // Only shortcut AFTER physical entry, and never for an explicit from.
+              const thing = bridge.nav.thing(result.seat), goal = thing && bridge.nav.goal(thing, position(), soul.entityId);
+              if (!input.from && proof && body().human?.activity !== 'sit' && goal && goal.level === 0 && dist(position(), goal.p) > 4) {
+                const from: Point = {p: position(), level: body().human?.level ?? 0}, reach = engine.reachV1(from, goal);
+                result.interiorRoute = {from, to: goal, reach, finalApproach: 'physical'};
+                if (!reach.ok) throw new Failure('verify.refused', reach.message, reach.code);
+                const d = dist(position(), goal.p), near: V2 = [goal.p[0] + (position()[0] - goal.p[0]) / d * 1.25, goal.p[1] + (position()[1] - goal.p[1]) / d * 1.25];
+                const to = engine.standableNearV1(near, goal.level, soul.entityId, 0.4, 3);
+                if (to && inside(to, goal.level)) {
+                  const finalReach = engine.reachV1({p: to, level: goal.level}, goal);
+                  if (finalReach.ok && finalReach.length <= 3) {
+                    await this.relocate(soul, to, 'engine-planned interior route; final metres walked physically');
+                    if (dist(position(), to) > 0.1) throw new Failure('verify.refused', 'The engine refused the interior relocation.', 'route.no-start');
+                    result.interiorRoute.relocatedTo = position().map(round) as V2;
+                  }
+                }
+              }
+              await takeSeat(seat, result);
+              unchanged();
+              result.ok = true;
+              // A room-less fixture may also prove entry while physically seated
+              // on a seat in its subtree, never from a floor-pose label alone.
+              if (!desc.rooms.length && !proof) {
+                seatedProof(seat);
+                const enter = receipt.uses.find(r => r.use === 'enter');
+                if (enter && enter.reason?.engineCode === 'route.outside') { enter.ok = true; enter.proof = proof; delete enter.reason; }
+              }
+            } finally { receipt.timings.sit = round(performance.now() - sitAt); }
           }
         } catch (e) { result.ok = false; result.reason = reasonOf(e); }
       }
@@ -137,15 +202,18 @@ export class VerifyUse {
       if (listener) { const i = this.host.listeners.indexOf(listener); if (i >= 0) this.host.listeners.splice(i, 1); }
       if (probe) {
         try {
-          const retired = this.souls.retire(probe); this.host.drainInputs(); await retired;
+          const retireAt = performance.now();
+          const retirement = this.souls.retire(probe); this.host.drainInputs(); await retirement; retired = true;
           // Native retirement safely releases a sit controller over subsequent
-          // ticks. Wait for that normal path; never delete a supported body.
-          const cleanupDeadline = performance.now() + 5000;
+          // ticks. Briefly observe it, then finish asynchronously if still pending.
+          const cleanupDeadline = performance.now() + 100;
           while (this.host.engine.world.entities[probe.entity_id] && performance.now() < cleanupDeadline) await this.wait(cleanupDeadline);
           if (!this.host.engine.world.entities[probe.entity_id]) engineBridges.get(this.god.model)?.bodyRetired({entityId: probe.entity_id});
           receipt.probe.removed = !this.host.minds.has(probe.id) && !this.host.engine.world.entities[probe.entity_id] && !this.god.model.entities.has(probe.entity_id);
-          if (!receipt.probe.removed) receipt.notes.push('Probe retirement was accepted but removal could not be confirmed.');
-        } catch (e) { receipt.probe.removed = false; receipt.notes.push(`Probe cleanup failed: ${reasonOf(e).message}`); }
+          receipt.probe.removal = receipt.probe.removed ? 'done' : 'pending';
+          receipt.timings.retire = round(performance.now() - retireAt);
+          if (!receipt.probe.removed) receipt.notes.push('Native retirement accepted; removal pending normal engine ticks. The world remains verify.busy until cleanup is done.');
+        } catch (e) { receipt.probe.removed = false; receipt.probe.removal = 'pending'; receipt.notes.push(`Probe cleanup failed: ${reasonOf(e).message}`); }
       }
       if (receipt.probe.removed) active.delete(this.host);
       else if (probe) {
@@ -155,21 +223,24 @@ export class VerifyUse {
           if (this.host.engine.world.entities[entityId]) return;
           engineBridges.get(this.god.model)?.bodyRetired({entityId});
           if (this.god.model.entities.has(entityId)) return;
+          receipt.probe.removed = true; receipt.probe.removal = 'done';
           active.delete(this.host); const i = this.host.listeners.indexOf(cleanup); if (i >= 0) this.host.listeners.splice(i, 1);
         }};
         this.host.listeners.push(cleanup);
       }
-      receipt.ok = receipt.uses.length > 0 && receipt.uses.every(r => r.ok) && receipt.probe.removed;
+      receipt.ok = receipt.uses.length > 0 && receipt.uses.every(r => r.ok) && retired;
       receipt.ms = round(performance.now() - started);
     }
     return receipt;
   }
 
   private describe(ref: string) { return runQuery(this.god.model, {describe: ref}).describe as Description; }
-  private footprint(e: Entity): V2[] {
+  private footprint(e: Entity, desc: Description): V2[] {
     if (e.shape && 'area' in e.shape) return e.shape.area;
-    const m = this.god.model, def = m.resolvedDef(e.def)!, baked = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
-    return ([[-1, -1], [1, -1], [1, 1], [-1, 1]] as V2[]).map(([x, z]) => this.worldPoint(e, [x * baked.box[0] / 2, z * baked.box[2] / 2]));
+    // The collider bounds may be asymmetric (porches, offset kit parts). The
+    // collider description supplies the actual world AABB.
+    const [x0, z0, x1, z1] = desc.aabb;
+    return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
   }
   private worldPoint(e: Entity, [x, z]: V2): V2 {
     const p = this.god.model.worldPose(e), c = Math.cos(p.yaw), s = Math.sin(p.yaw);
@@ -180,33 +251,81 @@ export class VerifyUse {
     return (baked.openings ?? []).filter(o => o.kind === 'door' && !baked.rooms?.some(r => r.floor === o.level && inPoly(o.at[0] + Math.sin(o.yaw), o.at[1] + Math.cos(o.yaw), r.polygon as V2[])))
       .map(o => ({id: o.id, at: this.worldPoint(e, o.at as V2), outward: [Math.sin(wp.yaw + o.yaw), Math.cos(wp.yaw + o.yaw)] as V2, level: o.level ?? 0}));
   }
-  private start(input: Input, target: Entity, footprint: V2[], doors: Door[], bridge: EngineBridge, engine: Engine): V2 {
+  /** Conservative footprint interior: at least 15 cm from every boundary.
+   * Navigation still supplies the physical collision/door-gap proof. */
+  private within(p: V2, poly: V2[]) {
+    return inPoly(p[0], p[1], poly) && poly.every((a, i) => {
+      const b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dz = b[1] - a[1], l = dx * dx + dz * dz;
+      const t = l ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dz) / l)) : 0;
+      return dist(p, [a[0] + t * dx, a[1] + t * dz]) >= 0.15;
+    });
+  }
+  private entry(input: Input, footprint: V2[], doors: Door[], bridge: EngineBridge, engine: Engine, inside: (p: V2, level: number) => string | undefined, allowSeat: boolean): {start: V2; goal?: Point} {
+    let from: V2 | undefined;
     if (input.from) {
-      if (Array.isArray(input.from)) return input.from;
-      const e = this.god.model.get(input.from), thing = bridge.nav.thing(input.from);
-      if (e) { const p = this.god.model.worldPose(e); return [p.x, p.z]; }
-      if (thing) return thing.at;
-      throw new Failure('verify.no-target', `No such start reference: ${input.from}`);
-    }
-    const exterior = (p: V2) => !inPoly(p[0], p[1], footprint);
-    const groundDoors = doors.filter(d => d.level === 0);
-    const main = groundDoors.find(d => /front|main|entr/.test(d.id)) ?? groundDoors[0];
-    if (main) for (const distance of [2.5, 3.5, 5]) {
-      const p: V2 = [main.at[0] + main.outward[0] * distance, main.at[1] + main.outward[1] * distance], q = engine.standableNearV1(p, 0, undefined, 0.35, 4);
-      if (q && exterior(q)) return q;
-    }
-    const p = this.god.model.worldPose(target), candidates: V2[] = [];
-    for (let i = 0; i < footprint.length; i++) {
-      const a = footprint[i], b = footprint[(i + 1) % footprint.length];
-      const count = Math.max(1, Math.min(128, Math.ceil(dist(a, b))));
-      for (let n = 0; n <= count; n++) {
-        const at: V2 = [a[0] + (b[0] - a[0]) * n / count, a[1] + (b[1] - a[1]) * n / count];
-        const q = engine.standableNearV1(at, 0, undefined, 0.35, 8); if (q && exterior(q)) candidates.push(q);
+      if (Array.isArray(input.from)) from = input.from;
+      else {
+        const e = this.god.model.get(input.from), thing = bridge.nav.thing(input.from);
+        if (e) { const p = this.god.model.worldPose(e); from = [p.x, p.z]; }
+        else if (thing) from = thing.at;
+        else throw new Failure('verify.no-target', `No such start reference: ${input.from}`);
       }
     }
-    candidates.sort((a, b) => dist(a, [p.x, p.z]) - dist(b, [p.x, p.z]) || a[0] - b[0] || a[1] - b[1]);
-    if (candidates[0]) return candidates[0];
-    throw new Failure('verify.refused', 'No walkable start outside the target footprint.', 'route.no-start');
+    const origin = from ?? [0, 0] as V2;
+    const candidates: {at: V2; outward: V2}[] = doors.filter(d => d.level === 0);
+    if (!candidates.length) {
+      const centre: V2 = [footprint.reduce((s, p) => s + p[0], 0) / footprint.length, footprint.reduce((s, p) => s + p[1], 0) / footprint.length];
+      for (let i = 0; i < footprint.length; i++) {
+        const a = footprint[i], b = footprint[(i + 1) % footprint.length], length = dist(a, b);
+        if (!length) continue;
+        let outward: V2 = [(b[1] - a[1]) / length, -(b[0] - a[0]) / length];
+        if ((centre[0] - a[0]) * outward[0] + (centre[1] - a[1]) * outward[1] > 0) outward = [-outward[0], -outward[1]];
+        const count = Math.min(64, Math.max(1, Math.ceil(length)));
+        for (let n = 0; n < count; n++) candidates.push({at: [a[0] + (b[0] - a[0]) * (n + 0.5) / count, a[1] + (b[1] - a[1]) * (n + 0.5) / count], outward});
+      }
+    }
+    candidates.sort((a, b) => dist(a.at, origin) - dist(b.at, origin));
+    let seatStart: V2 | undefined;
+    for (const c of candidates) {
+      const outside: V2 = [c.at[0] + c.outward[0] * 0.9, c.at[1] + c.outward[1] * 0.9];
+      const inward: V2 = [c.at[0] - c.outward[0] * 0.9, c.at[1] - c.outward[1] * 0.9];
+      const start = from ?? engine.standableNearV1(outside, 0, undefined, 0.4, 3);
+      const goal = engine.standableNearV1(inward, 0, undefined, 0.4, 3);
+      if (!start || (!from && (allowSeat ? inPoly(start[0], start[1], footprint) : inside(start, 0)))) continue;
+      seatStart ??= start;
+      if (goal && inside(goal, 0)) return {start, goal: {p: goal, level: 0}};
+    }
+    if (allowSeat && seatStart) return {start: seatStart};
+    throw new Failure('verify.refused', 'No clear exterior approach and interior standing point at the target boundary.', 'route.no-entry');
+  }
+  private async relocate(soul: EdgeSoul, to: V2, why: string) {
+    const moved = this.host.enqueue('edge-relocate', `verify-use:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: `verifier probe: ${why}`});
+    this.host.drainInputs(); await moved;
+  }
+  /** Same engine verbs as GodNav, admitted through the normal logged decision.
+   * No target capability, name, place or edge vocabulary lookup is involved. */
+  private async walk(soul: EdgeSoul, goal: Point, deadline: number) {
+    this.checkTime(deadline);
+    const engine = this.host.engine as unknown as Engine, b = engine.world.entities[soul.entityId];
+    const reach = engine.reachV1({p: [b.pose.p[0], b.pose.p[2]], level: b.human?.level ?? 0}, goal);
+    if (!reach.ok) throw new Failure('verify.refused', reach.message, reach.code);
+    let admitted: {programId?: string; programOk?: boolean; programCode?: string} | undefined;
+    let terminal: {kind: string; code?: string} | undefined;
+    const listener: HostListener = {
+      onDecision: (e, r) => {if (e.payload.soulId === soul.soulId && e.payload.trigger === 'verify-use:enter') admitted = r;},
+      onProgram: e => {if (e.id === admitted?.programId && e.kind !== 'step') terminal = e;},
+    };
+    this.host.listeners.push(listener);
+    try {
+      const step = goal.level === 0 && (b.human?.level ?? 0) === 0
+        ? {verb: 'walk_to', params: {to: goal.p, standoff: 0}}
+        : {verb: 'mars:walk_to', params: {x: goal.p[0], z: goal.p[1], level: goal.level}};
+      const queued = this.host.enqueue('decision', `verify-use:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: 'verify-use:enter', label: 'verifier probe: cross target boundary', steps: [step], reevalTicks: 1e9, fallback: false, trigger: 'verify-use:enter'});
+      this.host.drainInputs(); await queued;
+      if (!admitted?.programOk) throw new Failure('verify.refused', 'The engine refused the entry walk.', admitted?.programCode ?? 'program.refused');
+      while (!terminal) {this.checkTime(deadline); await this.wait(deadline);}
+      if (terminal.kind !== 'completed') throw new Failure('verify.refused', 'The physical entry walk did not complete.', terminal.code ?? terminal.kind);
+    } finally { const i = this.host.listeners.indexOf(listener); if (i >= 0) this.host.listeners.splice(i, 1); }
   }
   private seat(ref: string | undefined, target: Entity, at: V2): Entity {
     const m = this.god.model, ids = new Set([target.id, ...m.subtree(target.id)]);
@@ -222,12 +341,14 @@ export class VerifyUse {
   private checkTime(deadline: number) { if (performance.now() >= deadline) throw new Failure('verify.timeout', 'Verification reached its real-time deadline.'); }
   private async action(soul: EdgeSoul, capability: string, deadline: number, success?: () => boolean) {
     this.checkTime(deadline);
-    let settled = false, outcome: Awaited<ReturnType<EdgeLedger['act']>> | undefined, fault: unknown;
-    // The act promise may await a normal sequencer acceptance. Keep the wait
-    // bounded even when the world is paused; retirement drains queued inputs.
-    void this.edge!.act(soul, {capability, ...(success ? {params: {seconds: 600}} : {})}).then(r => {outcome = r; settled = true;}, e => {fault = e; settled = true;});
-    while (!settled) { this.checkTime(deadline); await this.wait(deadline); }
-    if (fault) throw fault;
+    // Wait on acceptance itself, rather than polling or spending idle ticks
+    // after an immediate refusal. Paused sequencers remain deadline bounded.
+    const pending = this.edge!.act(soul, {capability, ...(success ? {params: {seconds: 600}} : {})});
+    this.host.drainInputs();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const outcome = await Promise.race([pending, new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new Failure('verify.timeout', 'Verification reached its real-time deadline.')), Math.max(1, deadline - performance.now()));
+    })]).finally(() => clearTimeout(timer));
     if (!outcome?.accepted) throw new Failure('verify.refused', outcome?.reason ?? 'The edge action was refused.', outcome?.code);
     for (;;) {
       this.checkTime(deadline);
@@ -241,5 +362,11 @@ export class VerifyUse {
       await this.wait(deadline);
     }
   }
-  private wait(deadline: number) { return new Promise<void>(resolve => setTimeout(resolve, Math.max(1, Math.min(20, deadline - performance.now())))); }
+  private wait(deadline: number) {
+    return new Promise<void>(resolve => {
+      const done = () => {clearTimeout(timer); const i = this.host.listeners.indexOf(listener); if (i >= 0) this.host.listeners.splice(i, 1); resolve();};
+      const listener = {afterTick: done}, timer = setTimeout(done, Math.max(1, deadline - performance.now()));
+      this.host.listeners.push(listener);
+    });
+  }
 }

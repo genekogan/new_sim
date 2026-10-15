@@ -32,6 +32,15 @@ test('verify-use prints each verdict, engine refusal, and cleanup state', async 
   assert.match(output, /enter: OK.*nave via main-door/); assert.match(output, /sit: FAILED.*verify.refused.*route.blocked.*No passage/); assert.match(output, /probe removed; 12 ms/);
 });
 
+test('verify-use prints phase timings, position proof, planned interior route and pending removal', async t => {
+  fixture(t, {ok: true, uses: [{use: 'enter', ok: true, proof: {kind: 'footprint', at: [2, 3], tick: 42, ms: 500}}, {use: 'sit', ok: true, interiorRoute: {reach: {ok: true, length: 22}, relocatedTo: [4, 5], finalApproach: 'physical'}}], probe: {removed: false, removal: 'pending'}, timings: {birth: 10, start: 20, enter: 500, sit: 1000, retire: 100}, ms: 1630, notes: ['Explicit from: full physical walk; this can be slower.']});
+  const output = await verifyUse('gazebo');
+  assert.match(output, /timings \(ms\): birth 10; start 20; enter 500; sit 1000; retire 100/);
+  assert.match(output, /footprint at 2,3; tick 42; 500 ms/);
+  assert.match(output, /engine planner OK \(22 m\); relocated to 4,5; final approach physical/);
+  assert.match(output, /removal pending \(native retirement accepted\)/); assert.match(output, /full physical walk.*slower/);
+});
+
 test('verify-use validates options before contacting the server', async t => {
   const calls = fixture(t, {});
   await assert.rejects(verifyUse(), /usage: verify-use/);

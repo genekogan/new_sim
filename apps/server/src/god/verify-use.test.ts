@@ -45,8 +45,8 @@ function world(t: TestContext) {
   const request = (body: unknown, auth = true) => app.request('/v1/god/verify-use', {method: 'POST', headers: {'content-type': 'application/json', ...(auth ? {authorization: `Bearer ${token}`} : {})}, body: JSON.stringify(body)});
   const removed = () => {
     assert.equal([...w.host.minds.keys()].some(isVerificationProbe), false);
-    assert.equal(Object.keys(w.host.engine.world.entities).some(id => id.startsWith('h_verify_')), false);
-    assert.equal([...god.model.entities.keys()].some(id => id.startsWith('h_verify_')), false);
+    assert.equal(Object.keys(w.host.engine.world.entities).some(id => id.startsWith('h_vp')), false);
+    assert.equal([...god.model.entities.keys()].some(id => id.startsWith('h_vp')), false);
     const rows = w.db.db.prepare('SELECT * FROM souls WHERE owner=?').all(PROBE_OWNER) as {retired_at: number | null; token_hash: string | null}[];
     for (const row of rows) {assert.notEqual(row.retired_at, null); assert.equal(row.token_hash, null);}
     return rows;
@@ -122,6 +122,118 @@ test('a roomless area uses its actual footprint and supports a reference start',
   assert.equal(result.ok, true, JSON.stringify(result)); assert.ok(result.uses[0].crossing); assert.equal(result.uses[0].door, undefined); assert.equal(result.probe.removed, true); w.removed();
   const fallback = await w.drive(w.verify.run({target: 'court', uses: ['enter'], timeoutMs: 10_000}));
   assert.equal(fallback.ok, true, JSON.stringify(fallback)); w.removed();
+});
+
+// A bespoke structural kit: no rooms, no place component, real posts, roof and
+// seat geometry. Its usual walk goal is a seat approach, not an entrance.
+async function gazebo(w: ReturnType<typeof world>) {
+  const r = w.god.act({ops: [
+    {op: 'define', def: {schema: 'def/1', name: 'verify-gazebo', size: {box: [6, 3.2, 6]},
+      make: {kind: 'gen', gen: 'kit/2', args: {shapes: [
+        ...[-2.8, 2.8].flatMap(x => [-2.8, 2.8].map(z => ({kind: 'box', at: [x, 1.5, z], size: [0.2, 3, 0.2]}))),
+        {kind: 'box', at: [0, 3.1, 0], size: [6, 0.2, 6]},
+        {kind: 'box', at: [0, 0.25, 0], size: [1.5, 0.5, 0.6]},
+      ]}}, components: {seat: {height: 0.5}}, slots: [{id: 'bench', kind: 'seat', p: [0, 0.5, 0], yaw: 0, height: 0.5, accepts: {tags: ['body']}, capacity: 1}]}},
+    {op: 'place', def: 'verify-gazebo@1', name: 'gazebo', p: [10, 0]},
+  ]});
+  assert.equal(r.accepted, true, JSON.stringify(r)); await w.settle();
+}
+
+function timings(r: Awaited<ReturnType<VerifyUse['run']>>) {
+  assert.deepEqual(Object.keys(r.timings).sort(), ['birth', 'enter', 'retire', 'sit', 'start']);
+  for (const ms of Object.values(r.timings)) assert.ok(Number.isFinite(ms) && ms >= 0, JSON.stringify(r.timings));
+  assert.ok(r.timings.enter > 0); assert.ok(r.timings.sit > 0);
+}
+
+test('room-less bespoke kit enters via an engine footprint position and physically sits', async t => {
+  const w = world(t); await gazebo(w);
+  assert.equal(w.bridge.nav.thing('gazebo')?.rooms, undefined);
+  const r = await w.drive(w.verify.run({target: 'gazebo', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.uses[0].proof?.kind, 'footprint');
+  assert.equal(r.uses[0].proof?.seat, 'gazebo'); assert.match(r.uses[0].occupant!, /^verifier probe /);
+  const proof = r.uses[0].proof!;
+  assert.ok(proof.at[0] > 7.15 && proof.at[0] < 12.85 && Math.abs(proof.at[1]) < 2.85);
+  assert.ok(proof.tick > 0 && proof.ms > 0 && proof.ms <= r.ms);
+  assert.equal(r.uses[1].ok, true); assert.ok(r.uses[1].distanceToSlot! <= 0.6);
+  timings(r); w.removed();
+});
+
+test('entry needs no walk capability, named place, or GodNav entry', async t => {
+  const w = world(t); await gazebo(w);
+  const act = w.edge.act.bind(w.edge);
+  t.mock.method(w.edge, 'act', async (soul: Parameters<EdgeLedger['act']>[0], input: Parameters<EdgeLedger['act']>[1]) => {
+    assert.ok(!String(input.capability).startsWith('walk:'), 'no walk capability may be requested');
+    return act(soul, input);
+  });
+  t.mock.method(w.edge, 'capabilities', () => []);
+  t.mock.method(w.bridge.nav, 'thing', () => undefined);
+  const r = await w.drive(w.verify.run({target: 'gazebo', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.uses[0].proof?.kind, 'footprint'); w.removed();
+  // The house exercises the explicit point-walk; the large fixture can use a physical seat proof.
+  const h = world(t); await h.build(false);
+  t.mock.method(h.bridge.nav, 'capabilities', () => {});
+  t.mock.method(h.edge, 'act', async () => {throw Error('entry must not ask for an edge capability');});
+  const entered = await h.drive(h.verify.run({target: 'house', uses: ['enter'], timeoutMs: 8000}));
+  assert.equal(entered.ok, true, JSON.stringify(entered));
+  const decisions = h.db.events(h.host.worldId, 0, 1000).filter(e => e.kind === 'decision' && e.payload.trigger === 'verify-use:enter');
+  assert.equal(decisions.length, 1); assert.equal(decisions[0].payload.steps[0].verb, 'walk_to');
+  assert.ok(Array.isArray(decisions[0].payload.steps[0].params.to));
+});
+
+test('library church enters and sits with phase timings', async t => {
+  const w = world(t), r = w.god.act({ops: [{op: 'place', def: coreRef('church'), name: 'church', p: [15, 0]}]});
+  assert.equal(r.accepted, true, JSON.stringify(r)); await w.settle();
+  const checked = await w.drive(w.verify.run({target: 'church', timeoutMs: 8000}));
+  assert.equal(checked.ok, true, JSON.stringify(checked)); assert.equal(checked.uses[0].proof?.kind, 'room');
+  assert.equal(checked.uses[1].ok, true); timings(checked); w.removed();
+});
+
+test('far interior seat reports the engine route before relocation and walks the final metres', async t => {
+  const w = world(t);
+  const built = w.god.act({ops: [
+    {op: 'define', def: {schema: 'def/1', name: 'verify-long-hall', version: 1, size: {box: [8, 3, 30]}, make: {kind: 'gen', gen: 'building/1', args: {style: 'shed'}}, params: {w: {type: 'number', default: 8}, d: {type: 'number', default: 30}, floors: {type: 'int', min: 1, max: 6, default: 1}}, components: {foundation: {kind: 'none'}}}},
+    {op: 'place', tmp: '$h', def: 'verify-long-hall@1', name: 'hall', p: [10, 0]},
+    {op: 'place', def: coreRef('chair'), name: 'far-chair', in: {parent: '$h', slot: 'ground'}, p: [0, 0, -11]},
+  ]}); assert.equal(built.accepted, true, JSON.stringify(built)); await w.settle();
+  const r = await w.drive(w.verify.run({target: 'hall', timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const route = r.uses[1].interiorRoute;
+  assert.equal(route?.reach.ok, true); assert.ok(route!.reach.ok && route!.reach.length > 10);
+  assert.ok(route?.relocatedTo); assert.equal(route.finalApproach, 'physical');
+  const log = w.db.events(w.host.worldId, 0, 1000), relocation = log.find(e => e.kind === 'edge-relocate' && /interior route/.test(e.payload.why));
+  assert.ok(relocation); assert.ok(relocation.tick >= r.uses[0].proof!.tick);
+  assert.ok(r.uses[1].occupant); assert.ok(r.uses[1].distanceToSlot! <= 0.6); w.removed();
+  const full = await w.drive(w.verify.run({target: 'hall', from: [10, 17], timeoutMs: 8000}));
+  assert.equal(full.ok, true, JSON.stringify(full)); assert.equal(full.uses[1].interiorRoute, undefined);
+  assert.ok(full.notes.some(n => /full physical walk.*slower/.test(n))); w.removed();
+});
+
+test('door-adjacent church and bespoke gazebo complete in seconds at normal 20 Hz', {timeout: 30_000}, async t => {
+  const w = world(t); await gazebo(w);
+  const built = w.god.act({ops: [{op: 'place', def: coreRef('church'), name: 'church', p: [-15, 0]}]});
+  assert.equal(built.accepted, true, JSON.stringify(built)); await w.settle();
+  const clock = setInterval(() => w.host.tickOnce(), 50); t.after(() => clearInterval(clock));
+  for (const target of ['gazebo', 'church']) {
+    const r = await w.verify.run({target, timeoutMs: 10_000});
+    t.diagnostic(JSON.stringify({target, ok: r.ok, ms: r.ms, timings: r.timings, uses: r.uses, removalAtReturn: r.probe.removal}));
+    assert.equal(r.ok, true, JSON.stringify(r)); assert.ok(r.ms <= 10_000); timings(r);
+    const until = performance.now() + 3000;
+    while (!r.probe.removed && performance.now() < until) await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(r.probe.removal, 'done'); w.removed();
+  }
+});
+
+test('entry retains a proved ENGINE footprint position when the same walk finishes outside', async t => {
+  const w = world(t);
+  const built = w.god.act({ops: [{op: 'place', def: coreRef('plaza'), name: 'court', shape: {area: [[-16, -8], [-8, -8], [-8, 0], [-16, 0]]}}]});
+  assert.equal(built.accepted, true, JSON.stringify(built)); await w.settle();
+  // Real native walk crosses the entire area; only the explicit goal is beyond
+  // its far edge. Endpoint-only containment would falsely refuse this proof.
+  t.mock.method(w.verify as any, 'entry', () => ({start: [-18, -4], goal: {p: [-6, -4], level: 0}}));
+  const r = await w.drive(w.verify.run({target: 'court', uses: ['enter'], timeoutMs: 8000}));
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.uses[0].proof?.kind, 'footprint');
+  assert.ok(r.uses[0].proof!.at[0] < -8 && r.uses[0].proof!.at[0] > -16); w.removed();
 });
 
 test('a changed target refuses a stale geometric receipt and still removes the probe', async t => {
