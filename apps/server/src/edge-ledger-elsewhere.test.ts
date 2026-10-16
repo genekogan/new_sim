@@ -50,3 +50,16 @@ test('ledger: CN5 Eden (no dock, no swing anywhere) refuses terminally; the Worl
     assert.equal(r.accepted, true, words + ' ' + JSON.stringify(r));
   }
 });
+
+test('"pick up a book and give it to X" does the pick-up and says to act again for the give (case 35)', () => {
+  const book: EdgeCapability = {id: 'pick-up:book', verb: 'pick-up', label: 'Pick up a book (a shelf in Library stacks, 57 m)', available: true};
+  const c: VocabContext = {...ctx(), caps: [walk, book]};
+  for (const words of ['pick up a book and give it to Liora Venn', 'pick up a book, and hand it to Liora Venn']) {
+    const r = resolveCapability(words, c);
+    assert.notEqual(r.kind, 'unknown', words); if (r.kind === 'unknown') continue;
+    assert.equal(r.cap.id, 'pick-up:book'); assert.match((r as {note: string}).note, /Doing the first part now; act again for "(give|hand) it to Liora Venn" when its receipt completes/);
+  }
+  // an "and" that is not a second give step is untouched
+  const one = resolveCapability('pick up a book and a pen', c);
+  assert.ok(one.kind === 'unknown' || !/act again/.test((one as {note?: string}).note ?? ''));
+});

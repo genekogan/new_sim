@@ -201,7 +201,8 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
   // CN5 (acceptance): "A, then B" is two things. Walks and strolls chain (the earlier ones become `via` legs of the last);
   // anything else does the first and says to act again for the rest (never a mix-up of the two).
-  const clauses = input.includes(':') ? [input] : input.split(/\s*(?:,|;)?\s+(?:and\s+)?then\s+|\s*;\s*|\s*,\s*and\s+then\s+/i).map(x => x.trim()).filter(Boolean);
+  // r3 quality case 35: "pick up a book and give it to X" is two steps too (the give is offered only once holding it).
+  const clauses = input.includes(':') ? [input] : input.split(/\s*(?:,|;)?\s+(?:and\s+)?then\s+|\s*;\s*|\s*,\s*and\s+then\s+|\s*,?\s+and\s+(?=(?:give|hand|pass|offer|bring)\s)/i).map(x => x.trim()).filter(Boolean);
   if (clauses.length > 1) {
     const parts = clauses.map(c => resolveCapability(c, ctx)), moves = ['walk', 'stroll'];
     if (parts[0].kind === 'unknown') return parts[0];
