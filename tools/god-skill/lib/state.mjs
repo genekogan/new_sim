@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { fetchWithRetry } from './retry.mjs';
 
 export const STATE = '.eden-god.json';
 const read = (file) => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
@@ -90,21 +91,15 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   const clientRef = as === 'god' && verb !== 'GET' && EDIT_PATHS.has(pathname) ? randomUUID() : undefined;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : undefined;
   const recoverable = clientRef && pathname === '/v1/god/act' && verb === 'POST';
-  let waited = 0;
-  async function send(requestPath, requestMethod, requestBody, deadline = timeoutMs) {
+  const retryBudget = { waited: 0, retries: 0 };
+  async function send(requestPath, requestMethod, requestBody, attemptMs = timeoutMs) {
     const t0 = Date.now();
-    const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.timeout(deadline) });
+    // Each 429 retry gets its own attemptMs signal (as release 1's recursive send did).
+    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs }, {}, retryBudget);
     // Reading a response can also lose the connection after the edit committed.
     const text = await r.text(); let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ''}`);
     try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 400) }; }
-    if (r.status === 429 && requestMethod !== 'GET' && EDIT_PATHS.has(requestPath.split('?')[0])) {
-      const delay = Number(data.retryAfterMs);
-      if (Number.isFinite(delay) && delay >= 0 && waited < 60_000) {
-        const ms = Math.max(1, Math.min(delay, 30_000, 60_000 - waited));
-        waited += ms; await sleep(ms); return send(requestPath, requestMethod, requestBody, deadline);
-      }
-    }
     return { status: r.status, data };
   }
   const finish = (r) => {

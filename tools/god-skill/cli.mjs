@@ -314,7 +314,7 @@ export async function act(batch, note) { const r = ok(await call('/v1/god/act', 
 export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: batch }), 'dryrun'); }
 export async function preview(batch) {
   const r = ok(await call('/v1/god/preview', { body: typeof batch === 'string' ? JSON.parse(batch) : batch }), 'preview');
-  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
+  return r.accepted ? { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
 }
 export async function commit(id) { if (!id) throw new Error('usage: commit <preview-id>'); const r = ok(await call('/v1/god/act', { body: { preview: id } }), 'commit'); invalidate(); return r; }
 export async function request(clientRef) { if (!clientRef) throw new Error('usage: request <clientRef>'); return ok(await call(`/v1/god/requests/${encodeURIComponent(clientRef)}`), 'request'); }

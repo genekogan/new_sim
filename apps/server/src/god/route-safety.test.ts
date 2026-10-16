@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono } from 'hono';
+import { CREATION_LIMITS } from '@sim/generators';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
@@ -25,7 +26,7 @@ test('expensive endpoints reject missing/wrong-world tokens and rate limits are 
   assert.equal(refused.status, 429); assert.equal((await refused.json() as { code: string }).code, 'rate-limited'); assert.equal(f.verifications(), 6);
   assert.equal((await f.request('/v1/god/verify-use', f.b, { target: 'x' })).status, 200);
   assert.equal((await f.request('/v1/god/preview', f.a, { ops: [{ op: 'world', state: { constitution: 'draft' } }] })).status, 200);
-  for (const [path, max] of [['/v1/god/assets', 12], ['/v1/god/preview', 30], ['/v1/god/dryrun', 60]] as const) {
+  for (const [path, max] of [['/v1/god/assets', CREATION_LIMITS.assetUploadsPerMinute], ['/v1/god/preview', CREATION_LIMITS.previewsPerMinute], ['/v1/god/dryrun', CREATION_LIMITS.dryrunsPerMinute]] as const) {
     // Malformed requests still consume a slot, before any parser/compiler work.
     for (let i = 0; i < max; i++) await f.request(path, f.b, {});
     assert.equal((await f.request(path, f.b, {})).status, 429, path);

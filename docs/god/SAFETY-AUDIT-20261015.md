@@ -50,9 +50,9 @@ Rate windows below are real 60-second sliding windows using the existing `RateLi
 | POST `/v1/god/verify-use` | G; 401 missing/wrong-world; engine absent returns typed unavailable verification receipt | 2 MiB; strict schema, refs 200 chars, timeout <=180 s | 6/token; also one active probe/world |
 | POST `/v1/god/query` | Public; returns public world geometry/vocabulary | 2 MiB; query-specific validation | 60/IP |
 | POST `/v1/god/preview` | G; 401 missing/wrong-world | 2 MiB + compiler limits; 100 previews retained, 10-minute expiry | 30/token |
-| GET `/v1/god/preview/:id`, `/v1/god/previews` | G; 401 before lookup; unknown/expired id 404 | No normal body; list <=20 | None |
+| GET `/v1/god/preview/:id`, `/v1/god/previews` | G; 401 before lookup; unknown/expired id 404. Release 1.1: `/preview/:id` alone also accepts that preview's own `x-preview-key` (256-bit random, stored hashed, expires with the preview, sent from the link's `#previewKey=` fragment); the list never does | No normal body; list <=20 | None |
 | GET `/v1/god/snapshot` | G; 401 missing/wrong-world | No normal body | None |
-| POST `/v1/god/dryrun` | G; 401 missing/wrong-world | 2 MiB + compiler limits | 60/token |
+| POST `/v1/god/dryrun` | G; 401 missing/wrong-world | 2 MiB + compiler limits | 180/token (release 1.1: covers ten 12-candidate `place` searches a minute) |
 | POST `/v1/god/act` | G; 401 missing/wrong-world | 2 MiB + compiler limits; typed failures use HTTP 200 | 120/token |
 | GET `/v1/god/requests/:clientRef`, `/v1/god/requests/` | G; 401 missing/wrong-world, 404 absent/evicted receipt; every G in this world can read it | Last 1,000 accepted client refs, outcome <=256 KiB | None |
 | POST `/v1/god/undo`, `/v1/god/redo` | G; 401 missing/wrong-world | No body fields used; undo group in query | None |

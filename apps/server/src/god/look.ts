@@ -3,7 +3,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import { ApiError } from '../souls.ts';
 import { godTokenLimiter } from './rate-limit.ts';
-import { renderLook, pngSize } from './look-renderer.ts';
+import { renderLook, pngSize, sweepLookProfiles, lookAdvice } from './look-renderer.ts';
 
 export const LOOK_LIMITS = { perMinute: 20, queued: 4, timeoutMs: 60_000 } as const;
 const coord = z.number().finite().min(-1_000_000).max(1_000_000);
@@ -12,7 +12,7 @@ export const lookSchema = z.object({
   eye: point, at: point,
   hideRoofs: z.boolean().default(false), cut: z.number().finite().min(-1000).max(1000).nullable().default(null),
   span: z.number().finite().min(0).max(1_000_000).default(0),
-  hour: z.string().regex(/^(?:[01]?\d|2[0-3])(?::[0-5]\d)?$/).optional(),
+  hour: z.string().regex(/^(?:[01]?\d|2[0-3])(?::[0-5]\d)?$/).transform(h => { const [hour, minute = '00'] = h.split(':'); return `${hour.padStart(2, '0')}:${minute}`; }).optional(),
   weather: z.string().regex(/^[a-z][a-z-]{0,31}$/).optional(),
   width: z.number().int().min(1).max(1600).default(1024),
   height: z.number().int().min(1).max(1000).default(640),
@@ -65,15 +65,17 @@ export function mountLookRoutes(app: Hono, d: {
   queue?: LookQueue;
 }) {
   const limit = godTokenLimiter(d.requireGod), queue = d.queue ?? new LookQueue();
+  // Startup housekeeping is asynchronous and finishes before the first real render.
+  const swept = d.renderer ? Promise.resolve() : sweepLookProfiles().catch((e: NodeJS.ErrnoException) => { console.warn('[god.look] profile sweep failed:', e.code); });
   app.use('/v1/god/look', async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   app.post('/v1/god/look', async c => {
     try { limit(c, 'look', LOOK_LIMITS.perMinute); }
     catch (e) { if (e instanceof ApiError && e.status === 429) e.extra = { ...e.extra, retryAfterMs: Number(e.extra?.retry_after ?? 1) * 1000 }; throw e; }
     const parsed = lookSchema.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) throw new ApiError(400, 'look.invalid', 'look needs finite eye/at triples and valid shot parameters (maximum 1600×1000)', { issues: parsed.error.issues.map(i => ({ field: i.path.join('.'), message: i.message })) });
-    if (!d.worldUrl) throw new ApiError(503, 'look.unavailable', 'world renderer URL is not configured; set the server loopback URL when mounting god routes');
+    if (!d.worldUrl) throw new ApiError(503, 'look.unavailable', `world renderer URL is not configured. ${lookAdvice}`);
     const started = Date.now();
-    const png = await queue.run(signal => (d.renderer ?? renderLook)(d.worldUrl!, parsed.data, d.entities(), signal), c.req.raw.signal);
+    const png = await queue.run(async signal => { await swept; return (d.renderer ?? renderLook)(d.worldUrl!, parsed.data, d.entities(), signal); }, c.req.raw.signal);
     return c.body(png as never, 200, { 'content-type': 'image/png', 'cache-control': 'no-store', 'x-look-ms': String(Date.now() - started), 'x-look-size': pngSize(png) });
   });
 }

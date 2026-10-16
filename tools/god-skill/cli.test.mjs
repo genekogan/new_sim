@@ -100,10 +100,10 @@ test('request looks up an escaped receipt ref without writing', async (t) => {
 });
 
 test('status exposes the local skill and server version tuple', async (t) => {
-  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.2', source: 'abc123' } });
-  assert.equal(SKILL_VERSION, '1.2');
+  fixture(t, { you: 'god', entities: 3, seq: 8, versions: { protocol: 'god/1', schema: 'god-schema/1', skill: '1.3', source: 'abc123' } });
+  assert.equal(SKILL_VERSION, '1.3');
   const text = await status();
-  for (const part of ['skill 1.2', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
+  for (const part of ['skill 1.3', 'protocol god/1', 'schema god-schema/1', 'source abc123']) assert.ok(text.includes(part), part);
 });
 
 test('answer and layer commands use receipt-protected acts with fresh refs', async (t) => {
@@ -1052,4 +1052,42 @@ test('skill preserves stopping/use evidence and teaches the C7 construction work
   const skill = readFileSync(new URL('./SKILL.md', import.meta.url), 'utf8');
   for (const expected of ["owner's words as `--brief`", '`build start <id>-2 --root <id>`', '`build step <label> --say', '`look --hour 21`', "never change the world's clock for a picture", 'trust', '`walk:`', '"reachable from outside"', '>3 minutes', 'first minute', 'about 5 minutes, ≤ 30 shapes', 'Lead takes the largest part', 'Never poll: `build wait', '`reach <from> <to>`', '`clear <x,z|ref> --size WxD`', 'Stop when every listed item exists', 'offers instead of']) assert.ok(skill.toLowerCase().includes(expected.toLowerCase()), expected);
   assert.doesNotMatch(skill, /time 21:00|set the time back/);
+});
+
+test('preview preserves the server capability fragment in the human link', async t => {
+  fixture(t, { accepted: true, id: 'pv_view', url: '?preview=pv_view#previewKey=unguessable-read-key', summary: {} });
+  const result = await preview({ ops: [{ op: 'remove', id: 'bench' }] });
+  assert.equal(result.url, 'https://world.invalid?preview=pv_view#previewKey=unguessable-read-key'); assert.ok(result.tell.includes(result.url));
+});
+
+test('dryrun, preview, query, env, land, strike and asset GET/POST calls back off on 429', async t => {
+  fixture(t, {});
+  for (const path of ['dryrun', 'preview', 'query', 'env', 'land', 'strike', 'assets']) for (const method of ['GET', 'POST']) {
+    const sent = [];
+    globalThis.fetch = async (url, options) => { sent.push({ url, ...options }); return sent.length === 1 ? Response.json({ retryAfterMs: 1 }, { status: 429 }) : Response.json({ ok: true }); };
+    assert.equal((await call(`/v1/god/${path}`, { method, ...(method === 'POST' ? { body: { verb: 'test' } } : {}) })).status, 200, `${method} ${path}`);
+    assert.equal(sent.length, 2); assert.equal(sent[0].body, sent[1].body); assert.deepEqual(sent[0].headers, sent[1].headers);
+  }
+});
+
+test('measure dryruns for a first-choice place and blocked candidate search', async t => {
+  fixture(t, {}); invalidate(); let dryruns = 0, successAt = 1; const poses = [];
+  globalThis.fetch = async (url, options) => {
+    if (url.endsWith('/seq')) return Response.json({ seq: 0 });
+    if (url.endsWith('/snapshot')) return Response.json({ seq: 0, constants: { extent: 400 }, state: {}, entities: [], defs: [] });
+    if (url.endsWith('/query')) {
+      const body = JSON.parse(options.body);
+      if (body.bake) return Response.json({ bake: { form: 'point', layer: 'solid', box: [2, 1, 1], gen: 'kit/2' } });
+      if (body.layout) return Response.json({ layout: { entities: [] } });
+      return Response.json({ points: [{ y: 0, water: 0 }] });
+    }
+    if (url.endsWith('/dryrun')) { dryruns++; poses.push(JSON.parse(options.body).ops[0].p); return Response.json({ accepted: dryruns === successAt, failures: [{ op: 0, code: 'overlap.solid', detail: 'candidate blocked', suggest: { p: [30, 30] } }] }); }
+    if (url.endsWith('/act')) return Response.json({ accepted: true, seq: 1, ids: {} });
+    throw Error(`unhandled fixture ${url}`);
+  };
+  await COMMANDS.place(['core/h1-measured@1'], { near: '0,0', json: true }); assert.equal(dryruns, 1);
+  dryruns = 0; poses.length = 0; successAt = 6;
+  const result = await COMMANDS.place(['core/h1-measured@1'], { near: '0,0', json: true });
+  assert.equal(dryruns, 6, JSON.stringify(result)); assert.equal(new Set(poses.map(JSON.stringify)).size, 5, 'four spatial candidates, server suggestion, then nudge');
+  console.log('H1 place measurement: first choice 1 dryrun; blocked near search 6 (four candidates + suggestion + nudge); command loop hard cap 12.');
 });

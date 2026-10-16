@@ -9,7 +9,7 @@ import { Markdown } from './god-ui/markdown.tsx';
 import * as G from './god-ui/god-api.ts';
 import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
-import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
+import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
@@ -18,6 +18,9 @@ import './god-ui/god-panel.css';
 type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 const shotMode = query.get('shot') === '1';
+// Read at module load: Shell rewrites the landing fragment to its tab (#watch) before the scene is ready.
+// Taking it also strips it from the URL, so the view key does not stay in browser history.
+const landingPreviewKey = typeof location === 'undefined' ? null : takePreviewKey({ location, history });
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
 const OPEN_KEY = 'sim.godPanel.open';
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
@@ -65,7 +68,10 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
     let g = previewGhost(apiPath);
     for (let i = 0; !g && i < 100; i++) { await new Promise((r) => setTimeout(r, 300)); g = previewGhost(apiPath); }
     if (!g) { setNote({ text: 'The world view is not ready for a preview.', bad: true }); return; }
-    const s = await g.show(id); previewGhost(apiPath); setGhost(s);
+    const viewKey = query.get('preview') === id ? landingPreviewKey : null;
+    // Never mint here: minting claims an unowned world, and a visitor opening a link must not do that.
+    const token = G.storedToken();
+    const s = await g.show(id, { token, viewKey }); previewGhost(apiPath); setGhost(s);
     if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6, aside: 0.3 }); }
   }, []);
   const hideGhost = () => { previewGhost(apiPath)?.clear(); setGhost(null); const q = new URLSearchParams(location.search); if (q.has('preview')) { q.delete('preview'); history.replaceState(null, '', `${location.pathname}${q.size ? '?' + q : ''}${location.hash}`); } };

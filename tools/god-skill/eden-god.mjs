@@ -6,6 +6,33 @@
 import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
+
+// lib/retry.mjs
+async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, retries: 0 }) {
+  const send = runtime.fetch ?? fetch, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms))), clock = runtime.now ?? Date.now;
+  const { timeoutMs, ...init } = options ?? {};
+  const deadline = timeoutMs === void 0 ? Infinity : clock() + timeoutMs;
+  for (; ; ) {
+    const response = await send(url, timeoutMs === void 0 ? options : { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    if (response.status !== 429 || budget.retries >= 4) return response;
+    const data = await response.clone().json().catch(() => ({}));
+    const header = response.headers.get("retry-after"), now = clock();
+    const numeric = header === null ? NaN : Number(header);
+    const delays = [
+      data.retryAfterMs,
+      data.retry_after == null ? NaN : Number(data.retry_after) * 1e3,
+      Number.isFinite(numeric) ? numeric * 1e3 : header ? Date.parse(header) - now : NaN
+    ].filter((v) => v !== null && v !== void 0 && Number.isFinite(Number(v)) && Number(v) >= 0).map(Number);
+    const delay = Math.max(1, delays.length ? Math.max(...delays) : 250 * 2 ** budget.retries);
+    if (budget.waited + delay > 6e4 || now + delay >= deadline) return response;
+    await response.body?.cancel();
+    budget.waited += delay;
+    budget.retries++;
+    await wait(delay);
+  }
+}
+
+// lib/state.mjs
 var STATE = ".eden-god.json";
 var read = (file) => existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
 var claimFile = (id) => {
@@ -100,10 +127,10 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
-  let waited = 0;
-  async function send(requestPath, requestMethod, requestBody, deadline = timeoutMs) {
+  const retryBudget = { waited: 0, retries: 0 };
+  async function send(requestPath, requestMethod, requestBody, attemptMs = timeoutMs) {
     const t0 = Date.now();
-    const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.timeout(deadline) });
+    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs }, {}, retryBudget);
     const text = await r.text();
     let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ""}`);
@@ -111,15 +138,6 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
       data = JSON.parse(text);
     } catch {
       data = { raw: text.slice(0, 400) };
-    }
-    if (r.status === 429 && requestMethod !== "GET" && EDIT_PATHS.has(requestPath.split("?")[0])) {
-      const delay = Number(data.retryAfterMs);
-      if (Number.isFinite(delay) && delay >= 0 && waited < 6e4) {
-        const ms = Math.max(1, Math.min(delay, 3e4, 6e4 - waited));
-        waited += ms;
-        await sleep(ms);
-        return send(requestPath, requestMethod, requestBody, deadline);
-      }
     }
     return { status: r.status, data };
   }
@@ -1378,19 +1396,19 @@ import { fileURLToPath } from "node:url";
 
 // lib/remote-look.mjs
 import { existsSync as existsSync3, writeFileSync as writeFileSync2 } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, win32 } from "node:path";
 async function remoteLook(args, runtime = {}) {
   const now = runtime.now ?? Date.now, t0 = now();
   const token = (runtime.load ?? load)().token;
   if (!token) throw Error("look: remote rendering needs a god token; run pair (or mint on a local dev world)");
   const body = Object.fromEntries(["eye", "at", "hideRoofs", "cut", "span", "hour", "weather", "width", "height"].filter((k) => args[k] !== void 0).map((k) => [k, args[k]]));
-  const r = await (runtime.fetch ?? fetch)(`${args.worldUrl.replace(/\/$/, "")}/v1/god/look`, {
+  const r = await fetchWithRetry(`${args.worldUrl.replace(/\/$/, "")}/v1/god/look`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: JSON.stringify(body),
     redirect: "error",
-    signal: AbortSignal.timeout(args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 9e4))
-  });
+    timeoutMs: args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 9e4)
+  }, runtime);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
     throw Error(`look: ${e.code ?? r.status}: ${e.message ?? "world renderer refused the screenshot"}${e.retry_after ? `; retry in ${e.retry_after}s` : ""}`);
@@ -1400,16 +1418,33 @@ async function remoteLook(args, runtime = {}) {
   writeFileSync2(resolve(args.out), png);
   return { file: resolve(args.out), ms: now() - t0, via: "remote", size: r.headers.get("x-look-size") ?? void 0 };
 }
+function chromeCandidates(platform = process.platform, env2 = process.env) {
+  if (platform === "darwin") return ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"];
+  if (platform === "linux") return ["/opt/google/chrome/chrome", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable"];
+  if (platform !== "win32") return null;
+  const prefixes = [env2.LOCALAPPDATA, env2.PROGRAMFILES, env2["PROGRAMFILES(X86)"], ...env2.HOMEDRIVE ? [`${env2.HOMEDRIVE}\\Program Files`, `${env2.HOMEDRIVE}\\Program Files (x86)`] : [], "C:\\Program Files", "C:\\Program Files (x86)"];
+  return [...new Set(prefixes.filter(Boolean).map((p) => win32.join(p, "Google\\Chrome\\Application\\chrome.exe")))];
+}
 async function withRemoteLook(args, runtime, local) {
   if (args.remote || process.env.EDEN_GOD_LOOK === "remote") return remoteLook(args, runtime);
-  const candidates = process.platform === "darwin" ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"] : process.platform === "win32" ? [String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`, String.raw`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`] : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/opt/google/chrome/chrome"];
-  if (runtime.pw === void 0 && !(runtime.chromeExists ?? (() => candidates.some(existsSync3)))()) return remoteLook(args, runtime);
+  const candidates = (runtime.chromeCandidates ?? chromeCandidates)();
+  if (runtime.pw === void 0 && candidates && !(runtime.chromeExists ?? (() => candidates.some(existsSync3)))()) {
+    try {
+      return await remoteLook(args, runtime);
+    } catch (remote) {
+      throw new Error(`look: local: no Google Chrome where Playwright looks (${candidates.join(", ")}); remote: ${remote.message}`, { cause: remote });
+    }
+  }
   const now = runtime.now ?? Date.now, started = now();
   try {
     return await local();
   } catch (e) {
     if (!/cannot start Chrome|no Playwright|browserType\.launch|executable doesn't exist|browser keeper did not start/i.test(String(e.message))) throw e;
-    return { ...await remoteLook(args, runtime), ms: now() - started };
+    try {
+      return { ...await remoteLook(args, runtime), ms: now() - started };
+    } catch (remote) {
+      throw new Error(`look: local: ${e.message}; remote: ${remote.message}`, { cause: remote });
+    }
   }
 }
 
@@ -2081,7 +2116,7 @@ var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, 
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/version.mjs
-var SKILL_VERSION = "1.2";
+var SKILL_VERSION = "1.3";
 
 // cli.mjs
 var SELF = (() => {
@@ -2446,7 +2481,7 @@ async function dryrun(batch) {
 }
 async function preview(batch) {
   const r = ok(await call("/v1/god/preview", { body: typeof batch === "string" ? JSON.parse(batch) : batch }), "preview");
-  return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
+  return r.accepted ? { ...r, url: `${load().world}${r.url ?? `?preview=${r.id}`}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}${r.url ?? `?preview=${r.id}`} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
 }
 async function commit(id) {
   if (!id) throw new Error("usage: commit <preview-id>");
