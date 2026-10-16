@@ -64,7 +64,7 @@ export class Governance {
       CREATE TABLE IF NOT EXISTS gov_settings_v1 (world_id TEXT PRIMARY KEY, residents_decide INTEGER NOT NULL DEFAULT 0, at INTEGER NOT NULL) WITHOUT ROWID;
     `);
     // every god edit, undo and redo: a constitution that changed is a new version (engine edits: our own calls sync)
-    god.onCommit(() => this.sync());
+    god.onCommit((c) => this.sync(this.pendingMeta ? null : this.editNote(c.seq, c.kind)));
     // the god's answers reach the Soul that prayed (god.ts pushes 'prayer' on pray and on answer)
     god.subscribe(god.head, (e) => {
       const p = e.event === 'prayer' ? (e.data as { id: string; soul_id: string; text: string; answer: string | null; answered_at: number | null }) : null;
@@ -83,14 +83,19 @@ export class Governance {
   // ---------------------------------------------------------------- versions
 
   /** Record the world's constitution as a new version when it differs from the newest one. */
-  sync(): VersionRow | null {
+  sync(editNote: string | null = null): VersionRow | null {
     const text = String(this.god.model.state.constitution ?? '');
     const last = this.latest();
     if (last ? last.text === text : !text.trim()) return null;
     const meta = this.pendingMeta;
-    const row: VersionRow = { version: (last?.version ?? 0) + 1, text, at: this.now(), by: meta?.by ?? 'god', note: meta?.note ?? (this.booting && !last ? 'the constitution as the world began' : text.trim() ? null : 'cleared'), amendment: meta?.amendment ?? null };
+    const row: VersionRow = { version: (last?.version ?? 0) + 1, text, at: this.now(), by: meta?.by ?? 'god', note: meta?.note ?? editNote ?? (this.booting && !last ? 'the constitution as the world began' : text.trim() ? null : 'cleared'), amendment: meta?.amendment ?? null };
     this.db.prepare('INSERT INTO gov_versions_v1 (world_id, version, text, at, by, note, amendment) VALUES (?,?,?,?,?,?,?)').run(this.wid, row.version, row.text, row.at, row.by, row.note, row.amendment);
     return row;
+  }
+  /** The god's own note on the edit that changed the text (`act --note`), so visitors read why it changed. */
+  private editNote(seq: number, kind: 'edit' | 'undo' | 'redo'): string | null {
+    if (kind !== 'edit') return kind === 'undo' ? 'the god undid an edit' : 'the god redid an edit';
+    try { const n = this.god.store.edits(10).find((e) => e.seq === seq)?.note; return n ? clip(n, 200) : null; } catch { return null; }
   }
   latest(): VersionRow | null { return (this.db.prepare('SELECT version, text, at, by, note, amendment FROM gov_versions_v1 WHERE world_id=? ORDER BY version DESC LIMIT 1').get(this.wid) as VersionRow | undefined) ?? null; }
   version(n: number): VersionRow | null { return (this.db.prepare('SELECT version, text, at, by, note, amendment FROM gov_versions_v1 WHERE world_id=? AND version=?').get(this.wid, n) as VersionRow | undefined) ?? null; }

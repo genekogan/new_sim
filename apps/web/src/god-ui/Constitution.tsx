@@ -11,6 +11,8 @@ import './constitution.css';
 
 const shotMode = typeof location !== 'undefined' && new URLSearchParams(location.search).get('shot') === '1';
 const ago = (t: number | null) => { if (!t) return ''; const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
+/** Supporters other than the proposer (who always supports their own). */
+const others = (a: V.Amendment) => a.supporters.filter((n) => n !== a.by.name);
 const STATUS_WORD: Record<V.Amendment['status'], string> = { open: 'open', accepted: 'accepted', declined: 'declined', withdrawn: 'withdrawn' };
 
 export function ConstitutionCard() {
@@ -83,7 +85,7 @@ export function ConstitutionCard() {
       {changed && before && (
         <div className="cn-changed" data-changed="1">
           <div className="cn-row"><b>Changed since your last visit</b><span className="cn-dim">v{before.version || '–'} → v{version}</span>
-            <button className="cn-link" onClick={() => setShowChange(!showChange)}>{showChange ? 'hide' : 'show'} what changed</button></div>
+            <button className="cn-link" onClick={() => setShowChange(!showChange)} title={showChange ? 'Hide the changed lines' : 'Show the changed lines'}>{showChange ? 'hide' : 'show'}</button></div>
           {g.history.filter((h) => h.version > before.version).slice(0, 3).map((h) => h.note && <div key={h.version} className="cn-dim cn-why">v{h.version}: {h.note}</div>)}
           {showChange && diff && (
             <pre className="cn-diff" data-diff="1">{diff.map((l, i) => l.kind === 'gap' ? <span key={i} className="cn-gap">⋯{'\n'}</span> : <span key={i} className={'cn-' + l.kind}>{l.kind === 'added' ? '+ ' : l.kind === 'removed' ? '− ' : '  '}{l.text}{'\n'}</span>)}</pre>
@@ -103,7 +105,7 @@ export function ConstitutionCard() {
             <li key={a.id} data-amendment={a.id} data-status={a.status}>
               <div className="cn-row"><b className="cn-title">{a.title}</b><span className="cn-support" title={a.supporters.join(', ')}>{a.support} support</span></div>
               <div className="cn-body">{a.text}</div>
-              <div className="cn-dim cn-small">proposed by {a.by.name} · {ago(a.at)} · {a.supporters.join(', ')}{a.stale ? <span className="cn-stale"> · written for v{a.baseVersion}</span> : null}</div>
+              <div className="cn-dim cn-small">proposed by {a.by.name} · {ago(a.at)}{others(a).length ? <> · supported by {others(a).join(', ')}</> : null}{a.stale ? <span className="cn-stale" title="The constitution changed after this was proposed"> · written for v{a.baseVersion}, now v{version}</span> : null}</div>
               {owner && (declining === a.id ? (
                 <form className="cn-act" onSubmit={(e) => { e.preventDefault(); if (reason.trim()) void decline(a); }}>
                   <input data-decline-reason={a.id} autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="why (the residents read this)" maxLength={600} />

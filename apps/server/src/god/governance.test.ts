@@ -48,6 +48,7 @@ test('every constitution change is a numbered version (god edits, undo); the pub
   assert.equal(g.constitution.version, 3);
   assert.equal(g.constitution.text, '# Test Hill\n\nBe kind. Build slowly.');
   assert.deepEqual(g.history.map((h: any) => h.version), [3, 2, 1]);
+  assert.deepEqual(g.history.map((h: any) => h.note), ['the god undid an edit', 'constitution', 'constitution'], "a version carries the god's own edit note");
   assert.equal((await f.req('/v1/world/constitution/versions/2')).data.text.includes('Quiet after dark'), true);
   assert.equal((await f.req('/v1/world/constitution/versions/9')).status, 404);
   // an edit that leaves the text alone is not a version
