@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "worlds/eden/activity-spots.v1.json",
-      "sha256": "c25914c09b878a2440638e0ef688094d5691e16361cb84201e5234a678494946"
+      "sha256": "17efd76e6401389a45c4cbb0ebe4b890ee6828e627c15f42d9c18a216be3b7da"
     },
     {
       "path": "mars/viewer/app/engine-view/content/assets/eden-regions/north.ts",
@@ -11,7 +11,7 @@
     },
     {
       "path": "mars/viewer/app/engine-view/content/assets/eden-regions/south.ts",
-      "sha256": "ae79192847a6ee559d7a217118e8e483d4ab5c7df50659e920f65c9a5985bc39"
+      "sha256": "fced5d58f56bcab3a15317ed51e2cc429e00491d74b17446655b3d40d701fae7"
     }
   ],
   "descriptorSource": {
