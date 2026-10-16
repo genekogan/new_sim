@@ -73,3 +73,19 @@ test('without a simplifier everything is drawn as before', async () => {
   const lod=new WorldMeshLod(PHONE_MESH_LOD,async()=>null);await new Promise(r=>setTimeout(r,0));
   const base=mesh.geometry;frame(lod,scene,camera);assert.equal(mesh.geometry,base);assert.equal(lod.stats.coarser,0);
 });
+
+test('an off-thread simplifier: originals are drawn until levels arrive, at most two jobs at once, stale results dropped', async () => {
+  const {simplifyLevels}=await import('./mesh-lod-core.ts');
+  let calls=0,maxInFlight=0,inFlight=0;
+  const asyncS={isAsync:true as const,levels:(input:Parameters<typeof simplifyLevels>[1],ratios:readonly number[],maxError:number)=>{calls++;inFlight++;maxInFlight=Math.max(maxInFlight,inFlight);
+    return new Promise<ReturnType<typeof simplifyLevels>>(ok=>setTimeout(()=>{inFlight--;ok(simplifyLevels(simplifier,input,ratios,maxError));},5));}};
+  const scene=new THREE.Scene(),meshes=[0,1,2].map(()=>new THREE.Mesh(terrain(),new THREE.MeshBasicMaterial()));scene.add(...meshes);
+  const camera=new THREE.PerspectiveCamera(45,390/844,0.1,2400);camera.position.set(0,40,900);camera.lookAt(0,0,0);scene.updateMatrixWorld(true);
+  const lod=new WorldMeshLod({...PHONE_MESH_LOD,rescanFrames:1},async()=>asyncS);await new Promise(r=>setTimeout(r,0));
+  const base0=meshes[0].geometry;frame(lod,scene,camera,1);assert.equal(meshes[0].geometry,base0,'nothing swapped before the levels arrive');assert.ok(calls<=2);
+  meshes[2].geometry=terrain();   // replaced while its job may be running
+  for(let i=0;i<40&&lod.stats.ready<3;i++){await new Promise(r=>setTimeout(r,10));frame(lod,scene,camera,1);}
+  assert.equal(lod.stats.ready,3);assert.ok(maxInFlight<=2,`in flight ${maxInFlight}`);
+  frame(lod,scene,camera,1);assert.equal(lod.stats.coarser,3);
+  lod.restore();lod.dispose();
+});

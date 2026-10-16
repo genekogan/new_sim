@@ -25,6 +25,10 @@ export type DistanceDetailOptions = {
   rescanFrames: number;
 };
 export const PHONE_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 1.25, shadowNear: 24, shadowPerMetre: 14, shadowMaxRadius: 6, standInDistance: 38, rescanFrames: 90 });
+/** Release 3.1: desktops get only the invisible part of distance detail — meshes under half a CSS pixel of radius are
+ *  not drawn, small casters far away stop casting — and mesh LOD at half a pixel of error. No flat cards, same pixel
+ *  ratio and shadow map. `?desktopDetail=0` turns it off. */
+export const DESKTOP_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 0.5, shadowNear: 60, shadowPerMetre: 30, shadowMaxRadius: 6, standInDistance: 80, rescanFrames: 90 });
 
 export type QualityEnvironment = { search: string; coarsePointer: boolean; screen: readonly [number, number]; deviceMemory?: number };
 export function pickQualityTier(env: QualityEnvironment): QualitySettings {
@@ -36,7 +40,7 @@ export function pickQualityTier(env: QualityEnvironment): QualitySettings {
     : ['full', 'desktop or large screen'];
   return tier === 'phone'
     ? { tier, reason, maxPixelRatio: 1.5, shadowMapSize: 1024, detail: PHONE_DETAIL }
-    : { tier, reason, maxPixelRatio: 2, shadowMapSize: 2048, detail: null };
+    : { tier, reason, maxPixelRatio: 2, shadowMapSize: 2048, detail: new URLSearchParams(env.search).get('desktopDetail') === '0' ? null : DESKTOP_DETAIL };
 }
 
 /** The page's tier (browser only). */

@@ -12,7 +12,9 @@ test('quality tier: phones get the phone tier, desktops and overrides as asked',
   assert.equal(pickQualityTier({search:'?quality=full',coarsePointer:true,screen:[390,844]}).tier,'full');
   assert.equal(pickQualityTier({search:'?quality=phone',coarsePointer:false,screen:[2560,1440]}).tier,'phone');
   const full=pickQualityTier({search:'',coarsePointer:false,screen:[1440,900]});
-  assert.deepEqual([full.maxPixelRatio,full.shadowMapSize,full.detail],[2,2048,null]);   // desktop unchanged
+  assert.deepEqual([full.maxPixelRatio,full.shadowMapSize],[2,2048]);   // desktop: same pixels and shadows
+  assert.ok(full.detail&&full.detail.minRadiusPx<=0.5,'desktop: only sub-pixel distance detail');
+  assert.equal(pickQualityTier({search:'?desktopDetail=0',coarsePointer:false,screen:[1440,900]}).detail,null);
 });
 
 function scene(){

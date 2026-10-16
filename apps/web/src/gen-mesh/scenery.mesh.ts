@@ -457,7 +457,8 @@ function buildPanorama(ctx: MeshCtx): THREE.Object3D | null {
     const layer = li + 1, span = r.to - r.from, ang = (2200 / r.d) / DEG;   // a ridge every ~2.2 km, as an angle
     const n = Math.max(8, Math.ceil(span / 0.3)), bAt = (i: number) => r.from + (span * i) / n;
     const height = (b: number) => {
-      const t = (b - r.from) / span, env = sstep(0, 0.06, t) * sstep(0, 0.06, 1 - t);
+      // clamp: facet jitter can push a bearing just past either end, where a profile lookup would read outside its array (NaN facets)
+      const t = Math.max(0, Math.min(1, (b - r.from) / span)), env = sstep(0, 0.06, t) * sstep(0, 0.06, 1 - t);
       let prof: number;
       if (r.profile && r.profile.length > 1) { const u = t * (r.profile.length - 1), k = Math.min(r.profile.length - 2, Math.floor(u)); prof = r.profile[k] + (r.profile[k + 1] - r.profile[k]) * (u - k); }
       else prof = 0.5 + 0.5 * vn1(b / (ang * 3), r.seed);

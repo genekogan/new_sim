@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { componentsSchema } from '@sim/world-compiler';
-import { ambienceAt, DEFAULT_SETTINGS, emittersOf, loadSettings, Movement, saveSettings, SETTINGS_KEY, specsOf, variantOf, VARIANTS, KINDS, MASTER_DEFAULT } from './sound-plan.ts';
+import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, impliedSpecs, treeIndex, treesOf, loadSettings, Movement, saveSettings, SETTINGS_KEY, specsOf, variantOf, VARIANTS, KINDS, MASTER_DEFAULT } from './sound-plan.ts';
 
 test('a def may carry one sound or a list; unknown kinds are dropped; the schema accepts both', () => {
   assert.equal(specsOf({ components: { sound: { kind: 'water', radius: 10, volume: 0.5 } } } as never).length, 1);
@@ -69,4 +69,71 @@ test('settings: quiet by default, music opt-in, remembered, robust to junk and t
   assert.deepEqual(loadSettings(store), { muted: true, volume: 0.2, music: true });
   mem.set(SETTINGS_KEY, '{bad'); assert.deepEqual(loadSettings(store), { ...DEFAULT_SETTINGS });
   saveSettings({ getItem: () => null, setItem: () => { throw new Error('quota'); } }, DEFAULT_SETTINGS);   // must not throw
+});
+
+// ---- release 3.1: a fuller soundscape
+const fakeModel = (ents: [string, string, [number, number]][], defs: Record<string, unknown>) => ({
+  entities: new Map(ents.map(([id, def, p]) => [id, { id, def, in: { parent: 'world' }, params: {}, p }])),
+  resolvedDef: (d: string) => defs[d], worldPose: (e: { p: [number, number] }) => ({ x: e.p[0], y: 0, z: e.p[1], s: 1 }), terrain: { sample: () => 0 },
+});
+
+test('implied sounds: things sound like what they are; sounding things gain a second sound; no phantom work', () => {
+  const kinds = (d: unknown) => impliedSpecs(d as never).map((s) => `${s.kind}${s.when ? '@' + s.when : ''}`);
+  assert.deepEqual(kinds({ name: 'core-tree', form: 'point', tags: ['plant', 'tree', 'oak'] }), ['leaves']);
+  assert.equal(impliedSpecs({ name: 'core-pine', tags: ['tree', 'pine'] } as never)[0].variant, 1);
+  assert.deepEqual(kinds({ name: 'core-woodland', form: 'area', tags: ['cover', 'forest', 'plant'] }), ['leaves']);
+  assert.deepEqual(kinds({ name: 'core-log', tags: ['log', 'wood', 'forest'] }), []);
+  assert.deepEqual(kinds({ name: 'core-flower-bed', tags: ['plant', 'flowers', 'garden'] }), ['bees@day']);
+  assert.deepEqual(kinds({ name: 'core-reedbed', form: 'area', tags: ['cover', 'water', 'plant'] }), ['frogs@night', 'leaves']);
+  assert.deepEqual(kinds({ name: 'core-duck', tags: ['creature', 'duck', 'bird', 'water'] }), ['waterfowl@day']);
+  assert.deepEqual(kinds({ name: 'core-flag', tags: [] }), ['flag']);
+  assert.deepEqual(kinds({ name: 'core-mars-white-fridge', tags: ['mars', 'kitchen', 'fridge'] }), ['hum']);
+  assert.deepEqual(kinds({ name: 'core-mars-kitchen', tags: ['mars', 'building', 'kitchen'] }), [], 'a kitchen with nobody in it is silent');
+  assert.deepEqual(kinds({ name: 'core-fountain', tags: ['fountain', 'water'], components: { sound: { kind: 'water', radius: 14, volume: 0.5 } } }), ['water', 'birds@day']);
+  assert.deepEqual(kinds({ name: 'core-watermill', tags: ['water', 'mill'], components: { sound: { kind: 'water', radius: 22, volume: 0.5, when: 'on' } } }), ['stream']);
+  // and the fountain sounds as three emitters: its own water, the drip and the pigeons
+  const fountain = { name: 'core-fountain', form: 'point', tags: ['fountain'], size: { box: [2, 2, 2] }, components: { sound: { kind: 'water', radius: 14, volume: 0.5 } } };
+  const em = emittersOf(fakeModel([['f', 'fo', [0, 0]]], { fo: fountain }) as never);
+  assert.deepEqual(em.map((e) => `${e.id}:${e.spec.kind}`), ['f#0:water', 'f#1:water', 'f#2:birds']);
+});
+
+test('a wood rustles as one voice per cluster, louder than a single tree; the distance is to the nearest tree', () => {
+  const tree = { name: 'core-tree', form: 'point', tags: ['tree'], size: { box: [4, 8, 4] } };
+  const ents: [string, string, [number, number]][] = [['lone', 't', [100, 100]]];
+  for (let i = 0; i < 12; i++) ents.push([`w${i}`, 't', [2 + (i % 4) * 4, 2 + Math.floor(i / 4) * 5]]);
+  const em = emittersOf(fakeModel(ents, { t: tree }) as never).filter((e) => e.spec.kind === 'leaves');
+  assert.equal(em.length, 2, 'one cluster for the wood, one for the lone tree');
+  const wood = em.find((e) => e.pts.length === 12)!, lone = em.find((e) => e.pts.length === 1)!;
+  assert.ok(wood.cloud && wood.spec.volume > lone.spec.volume && wood.spec.volume <= 0.3);
+  assert.ok(distanceTo(wood, 2, 4, 2) < 0.01);
+  // the trees index puts birds in the wood, not in the open
+  const idx = treeIndex(treesOf(fakeModel(ents, { t: tree }) as never));
+  assert.equal(idx.count, 13);
+  const base = { y: 1.7, ground: 0, night: 0, covered: false, waters: [] as never[], trees: idx };
+  const inWood = ambienceAt({ ...base, x: 8, z: 8 }).filter((e) => e.spec.kind === 'birds');
+  assert.ok(inWood.some((e) => e.id === 'amb:birds:0,0' && e.pts[0][1] > 2), 'a singer up in a tree of the wood');
+  const far = ambienceAt({ ...base, x: 400, z: 400 }).filter((e) => e.spec.kind === 'birds');
+  assert.ok(far.every((e) => e.spec.volume <= 0.1 + 1e-9), 'beside a wooded world, open ground has only rare quiet birds');
+});
+
+test('wind rises on open, high ground and gusts when exposed; sheltered ground is calm', () => {
+  const crowd: [number, number, number][] = Array.from({ length: 10 }, (_, i) => [i, 2, 0] as [number, number, number]);
+  const sheltered = exposureAt(0, 0, 0, 0, crowd), open = exposureAt(0, 0, 0, 0, []), hill = exposureAt(0, 0, 14, 0, []);
+  assert.ok(sheltered < open && open < hill && hill === 1, `${sheltered} ${open} ${hill}`);
+  const base = { x: 0, y: 1.7, z: 0, ground: 0, night: 0, covered: false, waters: [] as never[] };
+  const calm = ambienceAt({ ...base, exposure: sheltered }), windy = ambienceAt({ ...base, exposure: hill });
+  const vol = (a: ReturnType<typeof ambienceAt>, id: string) => a.find((e) => e.id === id)?.spec.volume ?? 0;
+  assert.ok(vol(windy, 'amb:wind') > vol(calm, 'amb:wind'));
+  assert.ok(vol(windy, 'amb:gusts') > 0 && vol(calm, 'amb:gusts') === 0);
+});
+
+test('day/night conditions follow the world clock; frogs at ponds by night, gulls over the sea by day', () => {
+  assert.equal(condition('night', {}, 0.9), true); assert.equal(condition('day', {}, 0.9), false); assert.equal(condition('!night', {}, 0.1), true);
+  assert.equal(condition('night', { night: false }, 0.9), false, "an entity's own state wins");
+  const base = { x: 2, y: 1.7, z: 2, ground: 0, covered: false, waters: [{ area: [[0, 0], [5, 0], [5, 5], [0, 5]] as [number, number][], level: 0 }] };
+  assert.ok(ambienceAt({ ...base, night: 1 }).some((e) => e.spec.kind === 'frogs' && e.area));
+  assert.ok(!ambienceAt({ ...base, night: 0 }).some((e) => e.spec.kind === 'frogs'));
+  const sea = { x: 0, y: 1.7, z: 0, ground: 0.5, covered: false, waters: [], seaLevel: 0 };
+  assert.ok(ambienceAt({ ...sea, night: 0 }).some((e) => e.id === 'amb:gulls' && e.spec.kind === 'waterfowl'));
+  assert.ok(!ambienceAt({ ...sea, night: 1 }).some((e) => e.id === 'amb:gulls'));
 });

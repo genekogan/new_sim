@@ -1,8 +1,10 @@
 // VOCAB-W2 + W7: the soundscape. Procedural WebAudio only (no audio files, nothing to license or download).
 //
 // Sources (planned in sound-plan.ts, pure and tested): every def's `components.sound` (one spec or a list; each
-// instance gets a variant of its kind), the ambience around the listener (wind, birds by day, crickets by night,
-// water near water), residents (chatter where they gather, footsteps where they walk) and the visitor's own feet.
+// instance gets a variant of its kind) plus sounds implied by what a thing is (trees rustle, flags flap, bees at flowers,
+// ducks, fridges; a fountain also drips and draws pigeons), the ambience around the listener (wind rising on open and
+// high ground, birds by day in the world's trees, crickets and pond frogs by night, water near water, gulls over the sea),
+// residents (chatter where they gather, footsteps where they walk) and the visitor's own feet.
 // Loops are built from filtered noise and oscillators; events (song phrases, steps, syllables) are scheduled each tick.
 // Gain falls off with distance to the thing; at most MAX_VOICES loudest sources sound at once.
 //
@@ -11,7 +13,7 @@
 // Quiet by default; a small speaker button (bottom right) mutes it and toggles ambient music, remembered per browser.
 // `window.__edenSound.state()` reports emitters and voices; `.log()` lists which sources started where (tests, proof).
 import type { WorldModel } from '@sim/world-compiler';
-import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, falloff, loadSettings, Movement, saveSettings, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source } from './sound-plan.ts';
+import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { CoverProbe } from '../world-env.ts';
 import type * as THREE from 'three';
@@ -22,7 +24,7 @@ export type { SoundKind, SoundSpec } from './sound-plan.ts';
 type Cam = { position: { x: number; y: number; z: number } };
 type Host = { layer: { model?: WorldModel | null; group?: THREE.Object3D; groundAt?(x: number, z: number): number | null }; camera: Cam; residents?: () => Resident[] };
 
-const MAX_VOICES = 10, TICK_MS = 100;
+const MAX_VOICES = 12, TICK_MS = 100;
 
 // ------------------------------------------------------------------ synthesis (procedural, no files)
 
@@ -122,6 +124,25 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
         let a = at; const n = 2 + Math.floor(r() * 5); for (let k = 0; k < n; k++) { const d = 0.09 + r() * 0.14; syllable(c, out, a, f0 * (0.95 + r() * 0.15), d, 0.22); a += d + 0.02; }
         return a - at + 0.15 + r() * (variant === 1 ? 0.3 : 0.7); });
       break; }
+    case 'leaves':
+      if (variant === 1) { const a = bed('bandpass', 1300, 0.5, 0.45); nodes.push(lfo(c, 0.06, 0.25, a.g.gain)); }   // pine whisper (and reeds)
+      else { const a = bed('highpass', 2600, 0.6, 0.35); nodes.push(lfo(c, 0.09, 0.3, a.g.gain)); nodes.push(lfo(c, 0.23, 900, a.b.frequency));   // broadleaf rustle, gusting
+        every((at) => { burst(c, out, at, 0.12 + r() * 0.25, 0.12 + r() * 0.16, 3200 + r() * 1800); return 0.25 + r() * 1.4; }); }
+      break;
+    case 'flag': {
+      // cloth flapping: a fast flutter riding slow gusts; variant 1 adds the halyard tapping the pole
+      const a = bed('bandpass', variant ? 650 : 850, 1.1, 0.3); nodes.push(lfo(c, 9 + r() * 4, 0.22, a.g.gain)); nodes.push(lfo(c, 0.12, 0.15, a.g.gain));
+      every((at) => { burst(c, out, at, 0.05, 0.35, 1400, 'bandpass'); if (variant === 1 && r() < 0.35) tone(c, out, at + 0.1, 2300 + r() * 200, 2250, 0.12, 0.08, 'triangle'); return 0.8 + r() * 2.4; });
+      break; }
+    case 'waterfowl':
+      if (variant === 1) every((at) => { const n = 2 + Math.floor(r() * 3); for (let i = 0; i < n; i++) { const b = filt(c, 'bandpass', 950, 2.5), o = c.createOscillator(), g = c.createGain(), t0 = at + i * 0.22; o.type = 'square'; o.frequency.setValueAtTime(330, t0); o.frequency.exponentialRampToValueAtTime(240, t0 + 0.13); g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.14); o.connect(b).connect(g).connect(out); o.start(t0); o.stop(t0 + 0.2); } return 3 + r() * 6; });   // ducks quacking
+      else every((at) => { tone(c, out, at, 1900, 1150, 0.42, 0.12, 'sawtooth'); for (let i = 0; i < 2 + Math.floor(r() * 3); i++) tone(c, out, at + 0.55 + i * 0.16, 1500, 1250, 0.09, 0.09, 'sawtooth'); return 4 + r() * 7; });   // a gull's cry
+      break;
+    case 'bees': {
+      // a few bees around flowers: detuned buzzes that come and go
+      const base = variant ? 240 : 205;
+      for (const d of [0, 7, -11]) { const o = c.createOscillator(), g = c.createGain(), bp = filt(c, 'bandpass', 450, 1.5); o.type = 'sawtooth'; o.frequency.value = base + d; g.gain.value = 0; o.connect(bp).connect(g).connect(out); o.start(); nodes.push(o, lfo(c, 3 + r() * 4, 6, o.frequency), lfo(c, 0.15 + r() * 0.3, 0.16, g.gain)); }
+      break; }
     case 'footsteps': every((at, e) => { const sp = Math.max(0.5, Math.min(5, Number(e.state.speed) || 1.3));
       // soft earth thud, or gravel crunch; cadence follows the walker's speed
       if (variant === 1) { burst(c, out, at, 0.07, 0.5, 2400); burst(c, out, at + 0.015, 0.05, 0.3, 4200); } else { burst(c, out, at, 0.09, 0.9, 260, 'lowpass'); tone(c, out, at, 90, 60, 0.07, 0.25); }
@@ -149,13 +170,28 @@ const voices = new Map<string, Voice>();
 const movement = new Movement();
 let objects: Emitter[] = [], ambient: Emitter[] = [], people: Emitter[] = [], lastScan = 0, lastSeq = -1, lastAmb = 0, lastHeard: Heard[] = [];
 let probe: CoverProbe | null = null, probeLayer: unknown = null, covered = false;
+// what the world is like around the listener: its trees (birds), its typical ground and its obstacles (wind)
+let trees: TreeIndex = { count: 0, cells: new Map() }, obstacles: [number, number, number][] = [], typicalGround = 0, exposure = 0, night = 0;
+function scanWorld(model: WorldModel) {
+  trees = treeIndex(treesOf(model));
+  obstacles = []; const ys: number[] = [];
+  for (const e of model.entities.values()) {
+    if (e.in.parent !== 'world') continue;
+    const def = model.resolvedDef(e.def); if (!def || def.form !== 'point') continue;
+    const p = model.worldPose(e), b = def.size?.box ?? [1, 1, 1], tall = (b[1] ?? 1) * p.s, wide = Math.max(b[0] ?? 1, b[2] ?? 1) * p.s;
+    if (tall > 1.8) obstacles.push([p.x, Math.min(3, (tall * wide) / 12), p.z]);   // weight: how much wind it blocks
+    try { ys.push(model.terrain.sample(p.x, p.z)); } catch { /* no terrain */ }
+  }
+  ys.sort((a, b) => a - b); typicalGround = ys.length ? ys[Math.floor(ys.length / 2)] : 0;
+}
 const lastValue = new Map<string, unknown>();
+let meter: AnalyserNode | null = null;
 const log: LogRow[] = [];
 
 function applyMaster() { if (master) master.gain.value = settings.muted ? 0 : settings.volume; }
 function unlock() {
   if (ctx || typeof AudioContext === 'undefined') return;
-  try { ctx = new AudioContext(); master = ctx.createGain(); applyMaster(); master.connect(ctx.destination); noise(ctx).stop(); } catch { ctx = null; }
+  try { ctx = new AudioContext(); master = ctx.createGain(); applyMaster(); master.connect(ctx.destination); meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); noise(ctx).stop(); } catch { ctx = null; }
 }
 /** The opt-in ambient piece: a slow pad that follows the listener (off unless the visitor turns music on). */
 function musicBed(x: number, y: number, z: number): Emitter[] {
@@ -164,7 +200,7 @@ function musicBed(x: number, y: number, z: number): Emitter[] {
 function step(host: Host) {
   const model = host.layer.model; if (!model) return;
   const now = performance.now(), seq = (model as unknown as { editSeq?: number }).editSeq ?? -2;
-  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); lastScan = now; lastSeq = seq; }
+  if (now - lastScan > 2000 || seq !== lastSeq) { objects = emittersOf(model); if (seq !== lastSeq || now - lastScan > 10000 || !trees.count) scanWorld(model); lastScan = now; lastSeq = seq; }
   const { x, y, z } = host.camera.position;
   const ground = host.layer.groundAt?.(x, z) ?? null;
   if (now - lastAmb > 500) {
@@ -173,7 +209,9 @@ function step(host: Host) {
     covered = !!probe && probe.test(x, y, z);
     let waters: { area?: [number, number][]; path?: [number, number][]; w?: number; level: number }[] = [], seaLevel: number | undefined;
     try { const g = model.ground() as { waters?: typeof waters; seaLevel?: number }; waters = g.waters ?? []; seaLevel = g.seaLevel; } catch { /* no ground yet */ }
-    ambient = [...ambienceAt({ x, y, z, ground, night: nightOf(model), covered, waters, seaLevel }), ...musicBed(x, y, z)];
+    night = nightOf(model);
+    exposure = ground === null ? 0 : exposureAt(x, z, ground, typicalGround, obstacles);
+    ambient = [...ambienceAt({ x, y, z, ground, night, covered, waters, seaLevel, trees, exposure }), ...musicBed(x, y, z)];
   }
   people = movement.emitters(host.residents?.() ?? [], { x, y, z, ground }, now / 1000);
   const heard: Heard[] = [];
@@ -182,10 +220,10 @@ function step(host: Host) {
     if (e.spec.mode === 'change') {
       const k = (e.spec.when ?? '').replace(/^!/, ''), v = e.state[k], prev = lastValue.get(e.id);
       lastValue.set(e.id, v);
-      if (prev !== undefined && prev !== v && condition(e.spec.when, e.state) && ctx) { const g = falloff(d, e.spec.radius, e.spec.volume); if (g > 0.001) oneShot(ctx, e.spec.kind, g); }
+      if (prev !== undefined && prev !== v && condition(e.spec.when, e.state, night) && ctx) { const g = falloff(d, e.spec.radius, e.spec.volume); if (g > 0.001) oneShot(ctx, e.spec.kind, g); }
       continue;
     }
-    if (!condition(e.spec.when, e.state)) continue;
+    if (!condition(e.spec.when, e.state, night)) continue;
     // indoors, the outside world is muffled; things in the room are not
     const g = falloff(d, e.spec.radius, e.spec.volume) * (covered && e.source === 'object' && d > 8 ? 0.4 : 1);
     if (g > 0.001) heard.push({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, gain: g, d, e });
@@ -243,10 +281,13 @@ export function startSoundLayer() {
   const w = window as unknown as { __simEntity?: Host; __edenSound?: unknown };
   w.__edenSound = {
     state: () => ({ ctx: ctx?.state ?? 'none', muted: settings.muted, music: settings.music, volume: settings.volume, covered,
-      emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state) })),
+      world: { trees: trees.count, exposure: +exposure.toFixed(2), night: +night.toFixed(2), typicalGround: +typicalGround.toFixed(1) },
+      emitters: [...objects, ...ambient, ...people].map((e) => ({ id: e.id, kind: e.spec.kind, variant: e.spec.variant ?? 0, source: e.source, when: e.spec.when ?? null, on: condition(e.spec.when, e.state, night) })),
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
       voices: [...voices.entries()].map(([id, v]) => ({ id, kind: v.kind, variant: v.variant, source: v.source, gain: +v.gain.toFixed(3) })) }),
     log: () => log.slice(),
+    /** RMS of what is actually coming out (after the master gain), for proof that sound plays and that mute silences it. */
+    level: () => { if (!ctx || !master) return 0; if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); } const d = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return +Math.sqrt(q / d.length).toFixed(5); },
     mute: (m: boolean) => setSettings({ muted: m }),
     music: (m: boolean) => setSettings({ music: m }),
     unlock,

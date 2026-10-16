@@ -61,4 +61,6 @@ test('panorama/1: every range drawn, layered far to near, within budget; sea bea
   const far = mesh.geometry.attributes.far as THREE.BufferAttribute;
   let layers = 0, waterVerts = 0; for (let i = 0; i < far.count; i++) { layers = Math.max(layers, far.getZ(i)); if (far.getZ(i) < -1.4) waterVerts++; }
   assert.equal(layers, st.ranges, 'one depth layer per range'); assert.ok(waterVerts > 1000, `water skirt vertices ${waterVerts}`);
+  // no NaN vertices where facet jitter steps past a range's profile (they were dropped facets and a NaN bounding-box warning)
+  for (const name of ['position', 'color'] as const) { const arr = mesh.geometry.attributes[name].array as Float32Array; assert.ok(!arr.some(Number.isNaN), `${name} has NaN`); }
 });
