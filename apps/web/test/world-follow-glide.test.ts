@@ -70,3 +70,10 @@ test('VF6: a wall behind the camera while dragging pulls it in, and the asked-fo
   for(let i=0;i<30;i++){const dragged=offset.clone().applyAxisAngle(new THREE.Vector3(0,1,0),Math.PI/30);offset=follow.resolve(target,dragged,[g],1/60);}
   assert.ok(offset.length()>7.5,`back out of the wall the asked-for distance returns (r=${offset.length().toFixed(2)})`);
 });
+
+test('Follow ignores speech-bubble sprites: no raycast errors and they never pull the camera in', () => {
+  const root=street(),bubble=new THREE.Sprite(new THREE.SpriteMaterial());bubble.position.set(0,2,3);root.add(bubble);root.updateWorldMatrix(true,true);
+  const errors:unknown[][]=[],orig=console.error;console.error=(...a:unknown[])=>{errors.push(a);};
+  try{const follow=new WorldFollow();let offset=new THREE.Vector3(0,3,9);for(let i=0;i<30;i++)offset=follow.resolve(new THREE.Vector3(0,1,0),offset,[root],1/60);}finally{console.error=orig;}
+  assert.deepEqual(errors,[]);
+});
