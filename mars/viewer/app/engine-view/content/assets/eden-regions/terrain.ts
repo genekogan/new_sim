@@ -143,6 +143,10 @@ export class Terrain{
  ribbon(b:Builder,pts:[number,number][],w:number,color:string,k:'path'|'stone'='path',lift=.04,step=1.5){
   const cc=new THREE.Color(color);
   for(let s=1;s<pts.length;s++){const [ax,az]=pts[s-1],[bx,bz]=pts[s],L=Math.hypot(bx-ax,bz-az),n=Math.max(1,Math.ceil(L/step)),ux=(bx-ax)/L,uz=(bz-az)/L,px=-uz*w/2,pz=ux*w/2;
-   for(let i=0;i<n;i++){const t0=i/n*L,t1=(i+1)/n*L+(i+1<n||s+1<pts.length?w*.25:0);if(this.rivers.length&&this.riverAt(ax+ux*(t0+t1)/2,az+uz*(t0+t1)/2,1.5))continue;const P=(t:number,sd:number)=>{const x=ax+ux*t+px*sd,z=az+uz*t+pz*sd;return [x,this.height(x,z)+lift,z];};
-    b.quad(k,P(t0,-1),P(t0,1),P(t1,1),P(t1,-1),cc.clone().offsetHSL(0,0,(noise(ax+t0,az)-.5)*.04));}}}
+   // E2 #9: quads along a straight run meet edge to edge (they overlapped by w/4 in the same plane with slightly different
+   // shades, which flickered as stripes along every path); only the last quad before a bend reaches past the corner,
+   // 3 mm lower so the next run's own surface stays on top.
+   for(let i=0;i<n;i++){const bend=i+1===n&&s+1<pts.length,t0=i/n*L,t1=(i+1)/n*L;if(this.rivers.length&&this.riverAt(ax+ux*(t0+t1)/2,az+uz*(t0+t1)/2,1.5))continue;const P=(t:number,sd:number,dy=0)=>{const x=ax+ux*t+px*sd,z=az+uz*t+pz*sd;return [x,this.height(x,z)+lift+dy,z];};
+    const shade=cc.clone().offsetHSL(0,0,(noise(ax+t0,az)-.5)*.04);b.quad(k,P(t0,-1),P(t0,1),P(t1,1),P(t1,-1),shade);
+    if(bend)b.quad(k,P(t1,-1,-.003),P(t1,1,-.003),P(t1+w*.25,1,-.003),P(t1+w*.25,-1,-.003),shade);}}}
 }

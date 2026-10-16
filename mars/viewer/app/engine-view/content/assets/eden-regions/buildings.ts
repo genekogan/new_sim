@@ -33,7 +33,9 @@ export function footprint(b:Builder,w:number,d:number,kind:string){const v=new T
 export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'house');
  const fh=s.fh??2.9,H=s.floors*fh,wall=s.wall??'plaster',wc=s.wallC??pick(r,PLASTER),rc=s.roofC??pick(r,ROOFS),trim=s.trim??pick(r,TRIM),pl=s.plinth??1.6,roof=s.roof??'gable';
  // Plinth reaches below the pad so sloping ground never shows a gap.
- b.box('stone',0,-pl,0,s.w+.25,pl+.35,s.d+.25,pick(r,STONE));
+ // E2 #9: plinth and floor bands stand only 2 cm proud at the sides: row houses sit 4 cm apart, and wider ones overlapped
+ // their neighbours' in the same planes (different stone colours flickering along a terrace front).
+ b.box('stone',0,-pl,0,s.w+.04,pl+.35,s.d+.25,pick(r,STONE));
  const balconies=s.balconyLayout??(s.balcony&&s.floors>1?[{x:0,floorY:fh+.04,width:Math.min(s.w-.8,3.2),depth:1.2,index:'first-floor'}]:[]);
  const buildingId='region-house:'+b.m.elements.slice(12,15).map(v=>v.toFixed(3)).join(':');
  const wallBox=(x:number,y:number,z:number,w:number,h:number,d:number,id:string)=>{b.box(wall,x,y,z,w,h,d,wc);b.boundary('wall',x,y,z,w,h,d,buildingId,id);};
@@ -47,14 +49,14 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
   const ys=[...new Set([.35,H,...balconies.flatMap(v=>[v.floorY,v.floorY+2.3])])].filter(y=>y>=.35&&y<=H).sort((a,c)=>a-c);
   for(let ix=0;ix<xs.length-1;ix++)for(let iy=0;iy<ys.length-1;iy++){const x=(xs[ix]+xs[ix+1])/2,y=(ys[iy]+ys[iy+1])/2;if(balconies.some(v=>Math.abs(x-v.x)<.6&&y>v.floorY&&y<v.floorY+2.3))continue;wallBox(x,ys[iy],s.d/2-thickness/2,xs[ix+1]-xs[ix],ys[iy+1]-ys[iy],thickness,'front:'+ix+':'+iy);}
  }else b.authoredBox(wall,0,.35,0,s.w,H-.35,s.d,wc,buildingId,'body');
- if(s.band)for(let f=1;f<s.floors;f++)b.box('stone',0,f*fh-.05,0,s.w+.1,.14,s.d+.1,trim);
+ if(s.band)for(let f=1;f<s.floors;f++)b.box('stone',0,f*fh-.05,0,s.w+.04,.14,s.d+.1,trim);
  // Facades: front and back, then the sides.
  if(!s.noWindows){lightAt(b,'window',0,0,0,Math.min(1.6,Math.max(.6,(s.w+s.d)/14)));windows(b,s.w,0,s.floors,fh,s.d/2,trim,{shutters:s.shutters,box:s.flowerbox,skipDoor:s.door!==false,openings:balconies,r});
  b.push(0,0,0,Math.PI);windows(b,s.w,0,s.floors,fh,s.d/2,trim,{r});b.pop();
  for(const side of [1,-1]){b.push(0,0,0,side*Math.PI/2);windows(b,s.d,0,s.floors,fh,s.w/2,trim,{shutters:s.shutters,r});b.pop();}}
  if(s.barnDoor){const dw=Math.min(s.w*.4,4.2),dh=Math.min(H*.6,4);b.panel('timber',0,.35+dh/2,s.d/2+.04,dw,dh,'#5b2a20');b.box('timber',0,.35+dh/2,s.d/2+.07,dw*1.05,.16,.06,trim);
   b.quad('timber',[-dw/2,.35,s.d/2+.07],[-dw/2+.16,.35,s.d/2+.07],[dw/2,.35+dh,s.d/2+.07],[dw/2-.16,.35+dh,s.d/2+.07],trim);b.panel('glass',0,H-.2,s.d/2+.04,1.2,1,'#2d3c46');}
- if(s.door!==false){b.panel('timber',0,1.05+.35,s.d/2+.035,1.05,2.1,pick(r,DOOR));b.box('stone',0,-.2,s.d/2+.45,1.6,.55,.7,pick(r,STONE));
+ if(s.door!==false){b.panel('timber',0,1.05+.35,s.d/2+.035,1.05,2.1,pick(r,DOOR));b.box('stone',0,-.2,s.d/2+.45,1.6,.56,.7,pick(r,STONE));
   b.box('stone',0,2.55,s.d/2+.08,1.35,.1,.16,trim);}
  if(s.awning){b.quad('cloth',[-s.w/2+.3,2.9,s.d/2+.02],[s.w/2-.3,2.9,s.d/2+.02],[s.w/2-.3,2.35,s.d/2+1.3],[-s.w/2+.3,2.35,s.d/2+1.3],s.awning);}
  const rh=s.roofH??Math.min(s.w,s.d)*.42;
