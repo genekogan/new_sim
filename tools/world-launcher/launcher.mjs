@@ -366,7 +366,10 @@ export async function openLauncher(cfg = {}) {
   const inside = (base, rel) => { const p = normalize(join(base, rel)); return p === base || p.startsWith(base + sep) ? p : null; };
 
   // ---------- proxy
-  const anyRunning = () => registry.worlds.map((w) => pool.status(w.slug)).find((s) => s.status === 'running')?.port ?? null;
+  // Shared static files (/modular, /engine, …) come from a running world on this release's server. An old-world fork
+  // (fork-world.mjs, the old engine) doesn't serve this release's /modular/humanoid kit, so it answers only when no
+  // release world runs (release 3 walk: with the eden fork first awake, every page's humanoid kit.json was a 404).
+  const anyRunning = () => { const up = registry.worlds.filter((w) => pool.status(w.slug).status === 'running'); const w = up.find((x) => !x.fork) ?? up[0]; return w ? pool.status(w.slug).port ?? null : null; };
   function observe(slug, req, url) {
     const s = seenOf(slug), rest = url.pathname.slice(wp(slug).length) || '/';
     // `god look` loads the page with ?shot=1 (29 WP0): count it as a look.
@@ -537,6 +540,9 @@ export async function openLauncher(cfg = {}) {
       if (req.method === 'GET' || req.method === 'HEAD') {
         if (path === '/' || path === '/index.html') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
         if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
+        // this release's humanoid kit (the server's own /modular/humanoid, release.sh links it into mars-web): served here, so
+        // composed bodies never depend on which world happens to be awake (an old-world fork has no such kit)
+        if (path.startsWith('/modular/humanoid/') && marsWebDir && !/[\\%]|\.\./.test(path)) { const f = inside(join(marsWebDir, 'modular', 'humanoid'), path.slice('/modular/humanoid'.length)); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
         if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
       }
       // Anything else a world page asks for (Mars assets, engine files, …): any running world serves it (base stripped).
