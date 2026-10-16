@@ -1264,6 +1264,10 @@ function relocate(v, row, wx, wz, wy) {
     const [lx, lz] = toLocal(F, wx, wz);
     return { F, lx, lz, r: wy === void 0 ? void 0 : r22(wy - F.RY) };
   };
+  if (parent && row.slot && (parent.slots ?? []).some((x) => x.id === row.slot && x.kind === "wall")) {
+    const L = local(parent, row.slot);
+    return { in: { parent: parent.path, slot: row.slot }, p: [r22(L.lx), r22(L.lz)], r: L.r, note: `on ${parent.path}/${row.slot}` };
+  }
   if (parent && row.slot && !(parent.slots ?? []).some((x) => x.id === row.slot && x.kind === "room")) {
     const L = local(parent, row.slot), hx = (parent.box?.[0] ?? 1) / 2, hz = (parent.box?.[2] ?? 1) / 2;
     const [ox, oz] = toLocal(frameOf(parent), L.F.O[0], L.F.O[1]);
