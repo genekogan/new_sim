@@ -123,7 +123,7 @@ export function ambienceAt(L: Listener): Emitter[] {
     if (h % 3 === 0) continue;   // a third of cells are quiet
     const x = (cx + i + ((h >>> 4) % 97) / 97) * CELL, z = (cz + j + ((h >>> 12) % 89) / 89) * CELL;
     if (day > 0.15) out.push({ id: `amb:birds:${key}`, source: 'ambient', state: {}, area: false, pts: at(x, z, hy + 5), spec: { kind: 'birds', radius: 38, volume: 0.22 * day * indoor, variant: variantOf('birds', key) } });
-    if (L.night > 0.3 && h % 2 === 0) out.push({ id: `amb:crickets:${key}`, source: 'ambient', state: {}, area: false, pts: at(x, z), spec: { kind: 'crickets', radius: 30, volume: 0.18 * L.night * indoor, variant: variantOf('crickets', key) } });
+    if (L.night > 0.3) out.push({ id: `amb:crickets:${key}`, source: 'ambient', state: {}, area: false, pts: at(x, z), spec: { kind: 'crickets', radius: 42, volume: 0.18 * L.night * indoor, variant: variantOf('crickets', key) } });
   }
   // the nearest water shore (lakes, rivers) and the sea
   for (const [k, w] of L.waters.entries()) {

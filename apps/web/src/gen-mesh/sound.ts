@@ -8,7 +8,7 @@
 //
 // New worlds only: it starts when the page publishes `window.__simEntity` (LiveWorld does that only for world-engine
 // worlds), and the AudioContext is created on the first pointer/key gesture (browsers refuse audio before one).
-// Quiet by default; a small speaker button (bottom left) mutes it and toggles ambient music, remembered per browser.
+// Quiet by default; a small speaker button (bottom right) mutes it and toggles ambient music, remembered per browser.
 // `window.__edenSound.state()` reports emitters and voices; `.log()` lists which sources started where (tests, proof).
 import type { WorldModel } from '@sim/world-compiler';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, falloff, loadSettings, Movement, saveSettings, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source } from './sound-plan.ts';
@@ -228,7 +228,7 @@ function renderUi() {
 function mountUi() {
   if (ui || typeof document === 'undefined' || !document.body) return;
   ui = document.createElement('div'); ui.className = 'eden-sound-toggle';
-  ui.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:30;display:flex;gap:6px;';
+  ui.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:30;display:flex;gap:6px;';
   const btn = () => { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'width:34px;height:34px;border-radius:17px;border:1px solid rgba(255,255,255,.35);background:rgba(20,22,26,.55);color:#f4efe2;display:grid;place-items:center;cursor:pointer;padding:0;backdrop-filter:blur(4px);'; return b; };
   const mute = btn(), music = btn(); mute.dataset.sound = 'mute'; music.dataset.sound = 'music';
   mute.addEventListener('click', (e) => { e.stopPropagation(); unlock(); setSettings({ muted: !settings.muted }); });

@@ -34,7 +34,8 @@ export function displayOf(def: StoredDef | undefined): { slots: number; withMake
   return { slots: Math.max(1, Math.min(8, d.slots ?? 1)), withMaker: def.state.maker?.type === 'string' && def.state.title?.type === 'string' };
 }
 export function makerOf(c: Caller): string {
-  return c.kind === 'soul' ? `soul:${c.id}:${clean(c.name, 60)}` : `creator:${c.owner ?? ''}:${clean(c.label ?? '', 60)}`;
+  // ids are URI-encoded so the record splits on ':' cleanly (dev owners look like `dev:gene`)
+  return c.kind === 'soul' ? `soul:${encodeURIComponent(c.id)}:${clean(c.name, 60)}` : `creator:${encodeURIComponent(c.owner ?? '')}:${clean(c.label ?? '', 60)}`;
 }
 /** Does the caller's Soul own this display (owner `soul:<id>` or `soul:<name>`)? */
 const ownsIt = (e: Entity, c: Extract<Caller, { kind: 'soul' }>) => e.owner === `soul:${c.id}` || e.owner === `soul:${c.name}`;
@@ -52,7 +53,7 @@ export function planHang(model: WorldModel, caller: Caller, req: HangRequest): A
   if (!clear && !mediaKind(req.media!)) return fail(400, 'art.media', 'media must be an https URL or a same-site path (images, or .mp4/.webm/.mov/.m4v video), at most 480 characters, no spaces');
   const st = e.state ?? {}, media = lines(st.media, disp.slots), title = lines(st.title, disp.slots), maker = lines(st.maker, disp.slots);
   if (caller.kind === 'soul' && !ownsIt(e, caller)) {
-    const mine = maker[slot].startsWith(`soul:${caller.id}:`);
+    const mine = maker[slot].startsWith(`soul:${encodeURIComponent(caller.id)}:`);
     if (media[slot].trim() && !mine) return fail(403, 'art.not-yours', `slot ${slot} of ${req.frame} holds someone else's art; residents may fill empty slots and change their own`);
     if (clear && !mine) return fail(403, 'art.not-yours', 'you may only clear art you hung');
   }

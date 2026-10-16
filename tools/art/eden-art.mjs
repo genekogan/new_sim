@@ -43,7 +43,7 @@ export async function run(argv, { fetch: f = fetch, env = process.env, log = con
   if (cmd === 'hang') {
     let [frame, media] = rest;
     if (!frame || !media) throw new Error('hang <frame> <media> [--title …] [--slot n]');
-    if (!/^(https?:\/\/|\/)/.test(media) && existsSync(media)) media = (await upload(media)).url;
+    if (!/^https?:\/\//.test(media) && existsSync(media)) media = (await upload(media)).url;   // a local file wins over a same-site path
     const r = await call('/v1/art/hang', json({ frame, media, title, slot }));
     log(`hung ${media} in ${r.frame} slot ${r.slot} (edit ${r.seq})`); return r;
   }

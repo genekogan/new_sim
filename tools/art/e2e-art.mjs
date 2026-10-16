@@ -69,7 +69,7 @@ try {
     const a = await hang('ana', 'gallery-north', 'mandel.mp4', 'Mandelbrot Zoom', 2), b = await hang('ana', 'gallery-north', 'study.png', 'Red Sun', 3), c = await hang('ana', 'cinema', 'life.mp4', 'Life, large');
     return { codes: [a.code, b.code, c.code], out: [a.out, b.out, c.out].map((s) => s.slice(0, 140)) };
   }, (r) => r.codes.every((c) => c === 0));
-  await step('the resident is refused the creator\'s slot', async () => { const r = await hang('ana', 'gallery-north', 'study.png', 'Mine now', 0); return { code: r.code, out: r.out.slice(0, 200) }; }, (r) => r.code !== 0 && /art\.not-yours/.test(r.out));
+  await step('the resident is refused the creator\'s slot', async () => { const r = await hang('ana', 'gallery-north', 'study.png', 'Mine now', 0); return { code: r.code, out: (r.out + r.err).slice(0, 300) }; }, (r) => r.code !== 0 && /art\.not-yours/.test(r.out));
   const listed = await step('GET /v1/art lists every piece with its maker', async () => (await api('/v1/art')).data.displays, (d) => d?.find((x) => x.name === 'gallery-north')?.art.length === 4);
   report.art = listed;
 
@@ -86,8 +86,10 @@ try {
         await page.goto(`${base}?dev=1`, { waitUntil: 'domcontentloaded' });
         await page.waitForFunction(() => window.__simEntity?.layer?.active && window.__edenArt?.state().faces.length >= 4, null, { timeout: 180_000 });
         await page.waitForTimeout(4000);
-        await look([0, 2.0, 1.6], [0, 1.55, -5]);
         await page.mouse.click(640, 700);   // a real gesture: unlocks audio
+        await page.keyboard.down('w'); await page.waitForTimeout(250); await page.keyboard.up('w');   // deliberate movement takes the camera over from Broadcast
+        await page.waitForTimeout(1200);
+        await look([0, 2.0, 1.6], [0, 1.55, -5]);
         await page.waitForTimeout(5000);
         const st = await step(`dpr ${dpr}: the north gallery shows 4 pieces; both videos play`, () => page.evaluate(() => window.__edenArt.state()), (s) => s.videos.filter((v) => v.playing).length >= 2 && s.faces.filter((f) => f.frame && f.url).length >= 4);
         if (dpr === 2) report.videos = st?.videos;
@@ -108,7 +110,7 @@ try {
         const where = async (name, eye, at, wait = 4000) => { await look(eye, at); await page.mouse.move(5, 5); await page.waitForTimeout(wait); const s = await page.evaluate(() => window.__edenSound.state()); report.sound[name] = { at: eye, ctx: s.ctx, muted: s.muted, voices: s.voices }; log(`   sound @${name}: ${s.voices.map((v) => `${v.kind}/${v.variant}(${v.source})`).join(' ')}`); return s; };
         await step('sound: in the gallery — wind, birds and the fountain behind, quiet master', () => where('gallery', [0, 1.7, 1], [0, 1.5, -5]), (s) => s.ctx === 'running' && s.voices.some((v) => v.kind === 'wind') && s.voices.some((v) => v.kind === 'birds') && s.volume <= 0.35);
         await step('sound: at the fountain — the fountain is the loudest object', () => where('fountain', [0, 1.7, 11.5], [0, 1, 14]), (s) => s.voices.some((v) => v.source === 'object' && v.kind === 'water'));
-        await step('sound: walking at eye height — the visitor\'s own footsteps', async () => { await look([0, 1.7, 2], [0, 1.6, -5]); const s0 = await page.evaluate(async () => { const s = window.__simEntity; for (let i = 0; i < 20; i++) { s.camera.position.z -= 0.15; s.controls.target.z -= 0.15; s.controls.update?.(); await new Promise((r) => setTimeout(r, 100)); } return window.__edenSound.state(); }); report.sound.walking = { voices: s0.voices }; return s0; }, (s) => s.heard.some((h) => h.id === 'me:steps'));
+        await step('sound: walking at eye height — the visitor\'s own footsteps', async () => { await look([0, 1.7, 2], [0, 1.6, -5]); await page.keyboard.down('w'); await page.waitForTimeout(1500); const s0 = await page.evaluate(() => window.__edenSound.state()); await page.keyboard.up('w'); report.sound.walking = { voices: s0.voices }; return s0; }, (s) => s.heard.some((h) => h.id === 'me:steps'));
         await step('sound: at night — crickets instead of birds', async () => { await god('time', '23:30'); await page.waitForTimeout(6000); return where('night', [0, 1.7, 1], [0, 1.5, -5], 3000); }, (s) => s.voices.some((v) => v.kind === 'crickets') && !s.voices.some((v) => v.kind === 'birds'));
         await god('time', '11:00');
         report.soundLog = await page.evaluate(() => window.__edenSound.log());

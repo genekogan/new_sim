@@ -41,7 +41,7 @@ export function hoverText(a: Pick<ArtInfo, 'title' | 'maker' | 'kind'>): string 
 // ------------------------------------------------------------------ shared videos
 
 const PLAY_M = 30, MAX_PLAYING = 4, RELEASE_MS = 20_000;
-type Entry = { url: string; video: HTMLVideoElement; texture: THREE.VideoTexture; meshes: Map<THREE.Mesh, number>; lastUsed: number; requesting: boolean; retryAt: number };
+type Entry = { url: string; video: HTMLVideoElement; texture: THREE.VideoTexture; meshes: Map<THREE.Mesh, number>; lastUsed: number; requesting: boolean; retryAt: number; why: string; error: string };
 const videos = new Map<string, Entry>();
 let ticking = false;
 
@@ -52,7 +52,7 @@ export function videoTexture(url: string, mesh: THREE.Mesh): THREE.Texture {
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous'; video.src = url; video.muted = true; video.loop = true; video.playsInline = true; video.preload = 'metadata';
     const texture = new THREE.VideoTexture(video); texture.colorSpace = THREE.SRGBColorSpace;
-    e = { url, video, texture, meshes: new Map(), lastUsed: performance.now(), requesting: false, retryAt: 0 };
+    e = { url, video, texture, meshes: new Map(), lastUsed: performance.now(), requesting: false, retryAt: 0, why: 'new', error: '' };
     videos.set(url, e);
   }
   e.meshes.set(mesh, performance.now()); e.lastUsed = performance.now();
@@ -67,14 +67,15 @@ export function updateVideos(camera: THREE.Camera | null, now = performance.now(
   if (camera) camera.getWorldPosition(_cam);
   const want: { e: Entry; d: number }[] = [];
   for (const e of videos.values()) {
-    let best = Infinity;
+    let best = Infinity; e.why = camera ? (page ? 'no face in the scene' : 'page hidden') : 'no camera';
     for (const [m, seen] of e.meshes) {
       if (!inScene(m)) { if (now - seen > RELEASE_MS) e.meshes.delete(m); continue; }
       e.meshes.set(m, now); e.lastUsed = now;
       if (!camera || !page) continue;
       m.getWorldPosition(_pos); const d = _pos.distanceTo(_cam);
       _n.set(0, 0, 1).transformDirection(m.matrixWorld);
-      if (d < PLAY_M && _n.dot(_cam.clone().sub(_pos)) > 0) best = Math.min(best, d);
+      const facing = _n.dot(_cam.clone().sub(_pos)) > 0;
+      if (d < PLAY_M && facing) best = Math.min(best, d); else e.why = `${d.toFixed(1)} m${facing ? '' : ', behind'}`;
     }
     if (best < Infinity) want.push({ e, d: best });
     else if (!e.meshes.size && now - e.lastUsed > RELEASE_MS) release(e);
@@ -83,7 +84,8 @@ export function updateVideos(camera: THREE.Camera | null, now = performance.now(
   const play = new Set(want.slice(0, MAX_PLAYING).map((w) => w.e));
   for (const e of videos.values()) {
     if (!play.has(e)) { if (!e.video.paused) e.video.pause(); continue; }
-    if (e.video.paused && !e.requesting && now >= e.retryAt) { e.requesting = true; void e.video.play().catch(() => { e.retryAt = performance.now() + 2000; }).finally(() => { e.requesting = false; }); }
+    e.why = 'near';
+    if (e.video.paused && !e.requesting && now >= e.retryAt) { e.requesting = true; void e.video.play().then(() => { e.error = ''; }, (err) => { e.error = String(err?.name ?? err); e.retryAt = performance.now() + 2000; }).finally(() => { e.requesting = false; }); }
   }
 }
 function release(e: Entry) { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); e.texture.dispose(); videos.delete(e.url); }
@@ -92,4 +94,4 @@ function startTicker() {
   setInterval(() => { const cam = (window as unknown as { __simEntity?: { camera?: THREE.Camera } }).__simEntity?.camera ?? null; try { updateVideos(cam); } catch { /* mid-reload */ } }, 250);
 }
 /** For tests and proof: every shared video and whether it is playing. */
-export function videoState() { return [...videos.values()].map((e) => ({ url: e.url, faces: e.meshes.size, playing: !e.video.paused, readyState: e.video.readyState, time: +e.video.currentTime.toFixed(2) })); }
+export function videoState() { return [...videos.values()].map((e) => ({ url: e.url, faces: e.meshes.size, playing: !e.video.paused, readyState: e.video.readyState, time: +e.video.currentTime.toFixed(2), why: e.why, error: e.error })); }
