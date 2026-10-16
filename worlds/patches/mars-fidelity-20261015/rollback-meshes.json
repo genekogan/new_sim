@@ -1,0 +1,18 @@
+{
+  "schema": "mars-fidelity-rollback/2",
+  "method": "POST",
+  "path": "/v1/god/undo?group=<receipt.batch.group>",
+  "body": {},
+  "executeWith": "tools/mars-fidelity/patch.mjs --base <same world URL> --receipt <same absolute receipt path> --rollback --apply",
+  "guards": [
+    "Receipt world identity matches.",
+    "Forward mesh bindings, all retained descendant poses/state and expected accepted revisions still match.",
+    "Latest non-engine authored edit is exactly receipt.appliedSeq in its unique receipt.batch.group.",
+    "The unique group has exactly one accepted, un-undone patch edit.",
+    "Release owner maintains a quiet authoring/active-use window for the final guard-to-undo interval."
+  ],
+  "verify": "Exactly [receipt.appliedSeq] is reverted; all original targeted static IDs, descendant bindings/poses and previous sky/weather return.",
+  "retained": "All accepted world and Soul history remains. Unused world-local definitions may remain.",
+  "warning": "The public undo API has no atomic compare-and-swap for the authored head; the client preflight does not replace the release-owner quiet window.",
+  "referenceChangedStaticEntityIds": 8
+}

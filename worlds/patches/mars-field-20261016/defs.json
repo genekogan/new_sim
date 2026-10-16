@@ -1,0 +1,297 @@
+[
+ {
+  "schema": "def/1",
+  "name": "mars-fire-bowl-fire",
+  "version": 1,
+  "description": "A fire in the black steel fire bowl in the Chiba field seating; flames show while it burns. Light it and put it out (\"light the fire bowl\").",
+  "tags": [
+   "public",
+   "fire",
+   "camp",
+   "mars"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "round": 0.01,
+    "shapes": [
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       0.6,
+       0
+      ],
+      "r": 0.37,
+      "h": 0.06,
+      "segments": 12,
+      "tint": "ash"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.06,
+       0.66,
+       -0.04
+      ],
+      "r": 0.05,
+      "h": 0.5,
+      "segments": 5,
+      "tint": "log",
+      "pitch": 1.5707963267948966,
+      "yaw": 0.5
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       -0.05,
+       0.67,
+       0.05
+      ],
+      "r": 0.05,
+      "h": 0.46,
+      "segments": 5,
+      "tint": "log",
+      "pitch": 1.5707963267948966,
+      "yaw": -0.7
+     },
+     {
+      "kind": "cone",
+      "at": [
+       0,
+       0.9,
+       0
+      ],
+      "r": 0.22,
+      "h": 0.5,
+      "segments": 6,
+      "tint": "flame",
+      "glow": 1,
+      "role": "flame",
+      "pivot": [
+       0,
+       0.65,
+       0
+      ]
+     },
+     {
+      "kind": "cone",
+      "at": [
+       0.1,
+       0.83,
+       0.06
+      ],
+      "r": 0.13,
+      "h": 0.34,
+      "segments": 6,
+      "tint": "flame2",
+      "glow": 1,
+      "role": "flame",
+      "pivot": [
+       0.1,
+       0.65,
+       0.06
+      ]
+     },
+     {
+      "kind": "cone",
+      "at": [
+       -0.11,
+       0.81,
+       -0.05
+      ],
+      "r": 0.11,
+      "h": 0.3,
+      "segments": 6,
+      "tint": "flame2",
+      "glow": 1,
+      "role": "flame",
+      "pivot": [
+       -0.11,
+       0.65,
+       -0.05
+      ]
+     }
+    ]
+   }
+  },
+  "params": {
+   "ash": {
+    "type": "color",
+    "default": "#2a2522",
+    "doc": "ash colour"
+   },
+   "log": {
+    "type": "color",
+    "default": "#5a3e2a",
+    "doc": "log colour"
+   },
+   "flame": {
+    "type": "color",
+    "default": "#ff9a2a",
+    "doc": "flame colour"
+   },
+   "flame2": {
+    "type": "color",
+    "default": "#ffd04a",
+    "doc": "flame2 colour"
+   }
+  },
+  "state": {
+   "lit": {
+    "type": "bool",
+    "default": false
+   }
+  },
+  "actions": [
+   {
+    "name": "light",
+    "label": "Light the fire bowl",
+    "roles": "anyone",
+    "reach": "touch",
+    "params": {},
+    "when": [
+     {
+      "field": "lit",
+      "is": false
+     }
+    ],
+    "then": [
+     {
+      "op": "set",
+      "field": "lit",
+      "value": true
+     }
+    ]
+   },
+   {
+    "name": "put-out",
+    "label": "Put out the fire bowl",
+    "roles": "anyone",
+    "reach": "touch",
+    "params": {},
+    "when": [
+     {
+      "field": "lit",
+      "is": true
+     }
+    ],
+    "then": [
+     {
+      "op": "set",
+      "field": "lit",
+      "value": false
+     }
+    ]
+   }
+  ],
+  "components": {
+   "light": {
+    "color": "#ffb060",
+    "range": 6,
+    "on": false
+   },
+   "sound": {
+    "kind": "fire",
+    "radius": 8,
+    "volume": 0.55,
+    "when": "lit",
+    "mode": "loop"
+   }
+  },
+  "palette": {
+   "ash": "#2a2522",
+   "log": "#5a3e2a",
+   "flame": "#ff9a2a",
+   "flame2": "#ffd04a"
+  },
+  "size": {
+   "box": [
+    0.74,
+    1.15,
+    0.74
+   ]
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "mars-beanbag-seat",
+  "version": 1,
+  "description": "The large gray beanbag in the Chiba field seating; one person sinks into it.",
+  "tags": [
+   "furniture",
+   "seat",
+   "outdoor",
+   "mars"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "round": 0.02,
+    "shapes": [
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       0.34,
+       0
+      ],
+      "r": 1,
+      "segments": 12,
+      "tint": "cloth",
+      "scale": [
+       0.79,
+       0.41,
+       0.73
+      ]
+     }
+    ]
+   }
+  },
+  "params": {
+   "cloth": {
+    "type": "color",
+    "default": "#817e78",
+    "doc": "cover colour"
+   }
+  },
+  "slots": [
+   {
+    "id": "seat-1",
+    "kind": "seat",
+    "p": [
+     0,
+     0.42,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.42,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.42
+   }
+  },
+  "palette": {
+   "cloth": "#817e78"
+  },
+  "size": {
+   "box": [
+    1.58,
+    0.75,
+    1.46
+   ]
+  }
+ }
+]

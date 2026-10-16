@@ -1,0 +1,1886 @@
+{
+  "referenceOnly": true,
+  "referenceWorldId": "mars-gm-proof-1",
+  "referenceSourceSeq": 10,
+  "referenceChangedStaticEntityIds": 8,
+  "executeWith": "tools/mars-fidelity/patch.mjs --base <world URL> --receipt <absolute receipt path> --apply",
+  "referenceNotice": "Fixture-only example; do not POST this file. Generate fresh entity IDs, snapshot expectations and a unique group through patch.mjs for actual application; do not reuse this reference clientRef.",
+  "group": "mars-fidelity-20261015-f1c4000a315a",
+  "clientRef": "mars-fidelity-20261015-f1c4000a315a",
+  "expect": {
+    "e_63155142": {
+      "id": "e_63155142",
+      "v": 1
+    },
+    "e_cf3846cc": {
+      "id": "e_cf3846cc",
+      "v": 1
+    },
+    "e_7b81948f": {
+      "id": "e_7b81948f",
+      "v": 1
+    },
+    "e_516ea4dc": {
+      "id": "e_516ea4dc",
+      "v": 1
+    },
+    "e_16db129a": {
+      "id": "e_16db129a",
+      "v": 1
+    },
+    "e_287e0641": {
+      "id": "e_287e0641",
+      "v": 1
+    },
+    "e_e26f1dc1": {
+      "id": "e_e26f1dc1",
+      "v": 1
+    },
+    "e_fd239c3b": {
+      "id": "e_fd239c3b",
+      "v": 1
+    },
+    "e_0488f1b0": {
+      "id": "e_0488f1b0",
+      "v": 1
+    },
+    "e_0c7579e8": {
+      "id": "e_0c7579e8",
+      "v": 1
+    },
+    "e_1ccaf030": {
+      "id": "e_1ccaf030",
+      "v": 1
+    },
+    "e_25d9c7fa": {
+      "id": "e_25d9c7fa",
+      "v": 1
+    },
+    "e_28f76507": {
+      "id": "e_28f76507",
+      "v": 1
+    },
+    "e_2d935859": {
+      "id": "e_2d935859",
+      "v": 1
+    },
+    "e_3f40021d": {
+      "id": "e_3f40021d",
+      "v": 1
+    },
+    "e_493e9aca": {
+      "id": "e_493e9aca",
+      "v": 1
+    },
+    "e_57cc9ac4": {
+      "id": "e_57cc9ac4",
+      "v": 1
+    },
+    "e_5b4fff6c": {
+      "id": "e_5b4fff6c",
+      "v": 1
+    },
+    "e_a036306f": {
+      "id": "e_a036306f",
+      "v": 1
+    },
+    "e_ac310c90": {
+      "id": "e_ac310c90",
+      "v": 1
+    },
+    "e_d6d26f33": {
+      "id": "e_d6d26f33",
+      "v": 1
+    },
+    "e_f09c3b40": {
+      "id": "e_f09c3b40",
+      "v": 1
+    },
+    "e_f4cc85b0": {
+      "id": "e_f4cc85b0",
+      "v": 1
+    },
+    "e_f7cee154": {
+      "id": "e_f7cee154",
+      "v": 1
+    },
+    "e_884d0276": {
+      "id": "e_884d0276",
+      "v": 1
+    },
+    "e_a36b5423": {
+      "id": "e_a36b5423",
+      "v": 1
+    },
+    "e_cf3dc50a": {
+      "id": "e_cf3dc50a",
+      "v": 1
+    },
+    "e_f77eeed9": {
+      "id": "e_f77eeed9",
+      "v": 1
+    },
+    "e_81357048": {
+      "id": "e_81357048",
+      "v": 1
+    },
+    "e_a07649f3": {
+      "id": "e_a07649f3",
+      "v": 1
+    },
+    "e_1950ba79": {
+      "id": "e_1950ba79",
+      "v": 1
+    },
+    "e_60d4a7d4": {
+      "id": "e_60d4a7d4",
+      "v": 1
+    },
+    "e_bf596db1": {
+      "id": "e_bf596db1",
+      "v": 1
+    },
+    "e_135d5f7d": {
+      "id": "e_135d5f7d",
+      "v": 1
+    },
+    "e_3cc0375d": {
+      "id": "e_3cc0375d",
+      "v": 1
+    },
+    "e_4bd3299c": {
+      "id": "e_4bd3299c",
+      "v": 1
+    },
+    "e_53cf7fb3": {
+      "id": "e_53cf7fb3",
+      "v": 1
+    },
+    "e_5c4e8f0f": {
+      "id": "e_5c4e8f0f",
+      "v": 1
+    },
+    "e_5f78cda3": {
+      "id": "e_5f78cda3",
+      "v": 1
+    },
+    "e_6d7c486a": {
+      "id": "e_6d7c486a",
+      "v": 1
+    },
+    "e_75da56e6": {
+      "id": "e_75da56e6",
+      "v": 1
+    },
+    "e_75df9ee5": {
+      "id": "e_75df9ee5",
+      "v": 1
+    },
+    "e_7f1d3db8": {
+      "id": "e_7f1d3db8",
+      "v": 1
+    },
+    "e_8deb1418": {
+      "id": "e_8deb1418",
+      "v": 1
+    },
+    "e_9e8d2f5d": {
+      "id": "e_9e8d2f5d",
+      "v": 1
+    },
+    "e_cda2f38d": {
+      "id": "e_cda2f38d",
+      "v": 1
+    },
+    "e_ceee0131": {
+      "id": "e_ceee0131",
+      "v": 1
+    },
+    "e_e75eed10": {
+      "id": "e_e75eed10",
+      "v": 1
+    },
+    "e_13d13a74": {
+      "id": "e_13d13a74",
+      "v": 1
+    },
+    "e_60e817c7": {
+      "id": "e_60e817c7",
+      "v": 1
+    },
+    "e_4961a7d3": {
+      "id": "e_4961a7d3",
+      "v": 1
+    },
+    "e_86d89e0f": {
+      "id": "e_86d89e0f",
+      "v": 1
+    }
+  },
+  "note": "Mars cosmetic meshes and desert dust. Replace 8 emptied static mesh entities; retain all untargeted descendant identities, room slots and world poses.",
+  "ops": [
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-mimos",
+        "version": 1,
+        "description": "Mimos, the 2026 Mars College caf\u00e9 and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained. The brown glazing cloth has a sagged upper edge and diagonal gathers up to 9 cm outward, fitted to drone f040/f117; its whole-building envelope and physical footprint are retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "building",
+          "cafe",
+          "lounge",
+          "tea",
+          "study",
+          "mimos"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "515ac21643c3e13e2cb68ac884723834b9ab0bf59a044392ae49b1d8fc11af7e",
+          "collide": "box",
+          "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
+        },
+        "size": {
+          "box": [
+            15.553,
+            6.465,
+            7.919
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          },
+          "place": {
+            "kind": "building",
+            "enclosed": true
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ],
+        "slots": [
+          {
+            "id": "main",
+            "kind": "room",
+            "p": [
+              -2.611,
+              0.7703,
+              0.647
+            ],
+            "yaw": 0,
+            "floor": 1,
+            "polygon": [
+              [
+                -5.1354,
+                -0.5998
+              ],
+              [
+                1.8696,
+                -0.5998
+              ],
+              [
+                1.8696,
+                3.1002
+              ],
+              [
+                -5.1354,
+                3.1002
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Mimos main (raised: coffee counter, MIMOS sign, study table)"
+          },
+          {
+            "id": "main-south",
+            "kind": "room",
+            "p": [
+              1.189,
+              0.2403,
+              0.597
+            ],
+            "yaw": 0,
+            "floor": 0,
+            "polygon": [
+              [
+                -1.9304,
+                -0.5498
+              ],
+              [
+                5.1996,
+                -0.5498
+              ],
+              [
+                5.1996,
+                3.1502
+              ],
+              [
+                -1.9304,
+                3.1502
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Mimos main south (ground level, the lounge by the glazing)"
+          },
+          {
+            "id": "floor",
+            "kind": "room",
+            "p": [
+              1.389,
+              0.2403,
+              -0.903
+            ],
+            "yaw": 0,
+            "floor": 0,
+            "polygon": [
+              [
+                -2.1304,
+                -2.9198
+              ],
+              [
+                4.9996,
+                -2.9198
+              ],
+              [
+                4.9996,
+                0.9502
+              ],
+              [
+                -2.1304,
+                0.9502
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Mimos floor (glazed tea room, honey sofa under the posters)"
+          }
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-chiba",
+        "version": 1,
+        "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 99 wall/solid colliders, 0 stairs. 64520 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 7 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "building",
+          "auditorium",
+          "hall",
+          "gallery",
+          "chiba",
+          "venue"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af",
+          "collide": "box",
+          "footprint": "81961faa571d8311fdb4689c50eeb6d325856ba8ef1b578b258d112c0a57dca0"
+        },
+        "size": {
+          "box": [
+            38.581,
+            7.46,
+            26.95
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          },
+          "place": {
+            "kind": "building",
+            "enclosed": false
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-kitchen",
+        "version": 1,
+        "description": "The Chiba kitchen and dining hall under the Chiba gallery, immediately west of Mimos main and as long as it (Gene's correction, true compass): the west bay is the working kitchen (perimeter counter along the west wall returning on the north with the twin sinks under the windows and on the south with the food-service window, the long stainless prep table in the middle, the commercial fridge, white fridge and chest freezer on its east side), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door on the south. 2 rooms, 16 wall/solid colliders, 1 stairs. 5877 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 3 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "building",
+          "kitchen",
+          "diner",
+          "dining",
+          "chiba"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "1dafb201c9733fe7f4c6bdad4ddca886121cafcc4890c98923c88693dbd65f92",
+          "collide": "box",
+          "footprint": "02b8be54e62818d1e124acd93a88f52b5cc2e1101c8c6627604bb3e04f73b1f6"
+        },
+        "size": {
+          "box": [
+            12.614,
+            3.291,
+            7.653
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          },
+          "place": {
+            "kind": "building",
+            "enclosed": true
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ],
+        "slots": [
+          {
+            "id": "working-kitchen",
+            "kind": "room",
+            "p": [
+              -2.572,
+              0.53,
+              2.673
+            ],
+            "yaw": 0,
+            "floor": 1,
+            "polygon": [
+              [
+                -3.735,
+                -2.7995
+              ],
+              [
+                7.5,
+                -2.7995
+              ],
+              [
+                7.5,
+                1.1005
+              ],
+              [
+                -3.735,
+                1.1005
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Working kitchen (Chiba kitchen: counters, sinks, prep table)"
+          },
+          {
+            "id": "dining-hall",
+            "kind": "room",
+            "p": [
+              -0.672,
+              0.53,
+              -1.277
+            ],
+            "yaw": 0,
+            "floor": 1,
+            "polygon": [
+              [
+                -5.635,
+                -2.5495
+              ],
+              [
+                5.6,
+                -2.5495
+              ],
+              [
+                5.6,
+                1.1505
+              ],
+              [
+                -5.635,
+                1.1505
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Dining hall (diner: blue wall, bus seats)"
+          },
+          {
+            "id": "entrance",
+            "kind": "stand",
+            "p": [
+              6.428,
+              0,
+              -2.702
+            ],
+            "yaw": 0,
+            "accepts": {},
+            "capacity": 8,
+            "label": "Outside the blue diner door, at the foot of the diner steps"
+          }
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-freeside",
+        "version": 1,
+        "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 106 wall/solid colliders, 0 stairs. 152802 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 3 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "building",
+          "compound",
+          "freeside",
+          "colab",
+          "workshop"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "bd352e4b046087331cd15faea416a277e69a3f71544131f938e23d6c35bf54bf",
+          "collide": "box",
+          "footprint": "af0278f8657efafae25834e2ad8f48ed795225646e96d1cb61877d804498c807"
+        },
+        "size": {
+          "box": [
+            22.339,
+            4.614,
+            33.691
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          },
+          "place": {
+            "kind": "building",
+            "enclosed": false
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-showers",
+        "version": 1,
+        "description": "The two wooden shower bays offset diagonally north-east of Mimos main's north-east corner, touching at a corner, doors on the south (Gene's correction; no continuous rear structure). 2 rooms, 10 wall/solid colliders, 0 stairs. 192 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 2 native recipe image nodes has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "building",
+          "shower",
+          "bath",
+          "mimos"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "198e9544236d7aed610174549e6951b00c1ca786d59df284b4ff0b4f2357bb1a",
+          "collide": "box",
+          "footprint": "9f72094b1009209bfbb949075e59a2f998324a56746c662bf2283af1f6320ac4"
+        },
+        "size": {
+          "box": [
+            4.88,
+            2.335,
+            4.88
+          ],
+          "scale": [
+            1,
+            1
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          },
+          "place": {
+            "kind": "building",
+            "enclosed": true
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ],
+        "slots": [
+          {
+            "id": "shower-1",
+            "kind": "room",
+            "p": [
+              1.22,
+              0.07,
+              1.22
+            ],
+            "yaw": 0,
+            "floor": 0,
+            "polygon": [
+              [
+                -1.22,
+                -1.22
+              ],
+              [
+                1.22,
+                -1.22
+              ],
+              [
+                1.22,
+                1.22
+              ],
+              [
+                -1.22,
+                1.22
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Shower bay 1 (south-west bay)"
+          },
+          {
+            "id": "shower-2",
+            "kind": "room",
+            "p": [
+              -1.22,
+              0.07,
+              -1.22
+            ],
+            "yaw": 0,
+            "floor": 0,
+            "polygon": [
+              [
+                -1.22,
+                -1.22
+              ],
+              [
+                1.22,
+                -1.22
+              ],
+              [
+                1.22,
+                1.22
+              ],
+              [
+                -1.22,
+                1.22
+              ]
+            ],
+            "height": 2.4,
+            "accepts": {},
+            "capacity": 64,
+            "label": "Shower bay 2 (north-east bay)"
+          }
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-toilet-1",
+        "version": 1,
+        "description": "A toilet on the Mars 2026 campus (3.972 \u00d7 1.374 m, 2.438 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 1 native recipe image node has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "site",
+          "toilet"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "d093875d81ffa5e00ce5963b67d0a452f6234d4f2764b892fd757aaf1e9088e0",
+          "collide": "box"
+        },
+        "size": {
+          "box": [
+            3.972,
+            2.438,
+            1.374
+          ],
+          "scale": [
+            0.5,
+            2
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "components": {
+          "foundation": {
+            "kind": "none"
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ]
+      }
+    },
+    {
+      "op": "define",
+      "def": {
+        "schema": "def/1",
+        "name": "mars-fidelity-tool-library-bookshelf-timber",
+        "version": 1,
+        "description": "tool library bookshelf timber from the Mars 2026 campus: a 3.065 \u00d7 0.94 m top at 1.895 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass). Cosmetic correction (2026-10-15): 1 native recipe image node has the source TextureLoader orientation restored by a V correction; original pixels, geometry and physical layout retained.",
+        "tags": [
+          "mars",
+          "mars-campus",
+          "mesh",
+          "furniture",
+          "table",
+          "surface"
+        ],
+        "form": "point",
+        "make": {
+          "kind": "mesh",
+          "asset": "88b629b4224d12c783602ebd519d362b660e6befb0ff7250c3449f0ec2d996ff",
+          "collide": "box"
+        },
+        "size": {
+          "box": [
+            3.065,
+            1.9,
+            0.94
+          ],
+          "scale": [
+            0.5,
+            2
+          ]
+        },
+        "layer": "solid",
+        "anchor": "base",
+        "slots": [
+          {
+            "id": "top",
+            "kind": "surface",
+            "p": [
+              0,
+              1.895,
+              0
+            ],
+            "yaw": 0,
+            "height": 1.895,
+            "accepts": {
+              "maxSize": [
+                1,
+                0.6,
+                1
+              ],
+              "maxMass": 20
+            },
+            "capacity": 29
+          }
+        ],
+        "components": {
+          "surface": {
+            "height": 1.895
+          },
+          "foundation": {
+            "kind": "none"
+          }
+        },
+        "overlaps": [
+          "mars-campus"
+        ]
+      }
+    },
+    {
+      "op": "move",
+      "id": "e_0488f1b0",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        3.1668830339369096,
+        0.00030000000000002247,
+        -28.504781979744607
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_0c7579e8",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        1.0312029160720837,
+        0.5303,
+        -39.8952171968097
+      ],
+      "r": -0.00019999999999997797,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_1ccaf030",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        1.601333255099858,
+        0.5303,
+        -40.53510108980911
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_25d9c7fa",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        0.08945175336361721,
+        0.00030000000000002247,
+        -31.297408827955625
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_28f76507",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        0.5513292034142405,
+        0.5303,
+        -40.515314947087816
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_2d935859",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        0.08916986964970297,
+        0.00030000000000002247,
+        -29.913408856661707
+      ],
+      "r": -3.1418,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_3f40021d",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        4.136876903621653,
+        0.00030000000000002247,
+        -28.474584417359264
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_493e9aca",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        3.9850521011804068,
+        0.00030000000000002247,
+        -34.244615459681626
+      ],
+      "r": -0.00019999999999997797,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_57cc9ac4",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        4.066760811347445,
+        0.00030000000000002247,
+        -27.904598686306112
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5b4fff6c",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        0.5514575175325684,
+        0.5303,
+        -41.145314934020746
+      ],
+      "r": -3.1418,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_a036306f",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -0.9500078800559377,
+        0.00030000000000002247,
+        -33.95062059306057
+      ],
+      "r": 1.5706,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_ac310c90",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        3.966982817213611,
+        0.00030000000000002247,
+        -28.99461903101837
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_d6d26f33",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -0.4602818306781873,
+        0.00030000000000002247,
+        -32.60552082108793
+      ],
+      "r": -0.00019999999999997797,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f09c3b40",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -0.09879706049014914,
+        0.5303,
+        -39.89544734752988
+      ],
+      "r": -0.00019999999999997797,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f4cc85b0",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -1.141051834055446,
+        0.5303,
+        -38.64465960095561
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f7cee154",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -1.1714477741411877,
+        0.5303,
+        -36.700665751472975
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_135d5f7d",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -5.8851085139042,
+        0.53,
+        -39.80508321155526
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_3cc0375d",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.4443197943875443,
+        0.53,
+        -38.76738239357016
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_4bd3299c",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.444818793736598,
+        0.53,
+        -36.31738244438656
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_53cf7fb3",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -5.979316090399959,
+        0.53,
+        -33.87610227613889
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5c4e8f0f",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.485002098790268,
+        0.53,
+        -35.41739060998196
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5f78cda3",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.484167242328321,
+        0.53,
+        -39.51639052496301
+      ],
+      "r": -0.00019999999999997797,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_6d7c486a",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.4852361193013133,
+        0.53,
+        -34.26839063381381
+      ],
+      "r": -3.1418,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_75da56e6",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -5.920639932017576,
+        0.53,
+        -32.28609029239867
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_75df9ee5",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.445148744326584,
+        0.53,
+        -34.69738247798761
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_7f1d3db8",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -7.063007060215405,
+        0.53,
+        -40.303323128260004
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_8deb1418",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -7.181956785916752,
+        0.53,
+        -35.64034725841512
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_9e8d2f5d",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -2.4845336504217688,
+        0.53,
+        -37.71739056227676
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_cda2f38d",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -7.298776497253854,
+        0.53,
+        -41.43537117165682
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_ceee0131",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -8.621696665368036,
+        0.53,
+        -36.91764052134169
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_e75eed10",
+      "in": {
+        "parent": "world"
+      },
+      "p": [
+        -7.516987365399826,
+        0.53,
+        -30.58041539021658
+      ],
+      "r": -1.571,
+      "s": 1
+    },
+    {
+      "op": "remove",
+      "id": "e_63155142",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_cf3846cc",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_7b81948f",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_516ea4dc",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_16db129a",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_287e0641",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_e26f1dc1",
+      "cascade": false
+    },
+    {
+      "op": "remove",
+      "id": "e_fd239c3b",
+      "cascade": false
+    },
+    {
+      "op": "place",
+      "tmp": "$building0",
+      "def": "mars-fidelity-mimos@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "mimos",
+      "p": [
+        2.097,
+        -0.24,
+        -33.989
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "place",
+      "tmp": "$building1",
+      "def": "mars-fidelity-chiba@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "chiba",
+      "p": [
+        -14.755,
+        0,
+        -30.23
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "place",
+      "tmp": "$building2",
+      "def": "mars-fidelity-kitchen@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "kitchen",
+      "p": [
+        -5.477,
+        0,
+        -35.428
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "place",
+      "tmp": "$building3",
+      "def": "mars-fidelity-freeside@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "freeside",
+      "p": [
+        85.198,
+        -0.154,
+        -25.453
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "place",
+      "tmp": "$building4",
+      "def": "mars-fidelity-showers@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "showers",
+      "p": [
+        4.49,
+        0,
+        -44.175
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "place",
+      "tmp": "$building5",
+      "def": "mars-fidelity-toilet-1@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "toilet-2",
+      "p": [
+        -64.985,
+        0,
+        -17.235
+      ],
+      "r": -2.799
+    },
+    {
+      "op": "place",
+      "tmp": "$building6",
+      "def": "mars-fidelity-toilet-1@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "toilet",
+      "p": [
+        38.025,
+        0,
+        -134.365
+      ],
+      "r": -2.127
+    },
+    {
+      "op": "place",
+      "tmp": "$building7",
+      "def": "mars-fidelity-tool-library-bookshelf-timber@1",
+      "in": {
+        "parent": "world"
+      },
+      "name": "tool-library-bookshelf-timber",
+      "p": [
+        57.209,
+        2.857,
+        -90.743
+      ],
+      "r": -1.571
+    },
+    {
+      "op": "move",
+      "id": "e_0488f1b0",
+      "in": {
+        "parent": "$building0",
+        "slot": "floor"
+      },
+      "p": [
+        4.095,
+        -0.168
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_0c7579e8",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -3.295,
+        0.42
+      ],
+      "r": 1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_1ccaf030",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -3.935,
+        -0.15
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_25d9c7fa",
+      "in": {
+        "parent": "$building0",
+        "slot": "main-south"
+      },
+      "p": [
+        1.503,
+        1.41
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_28f76507",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -3.915,
+        0.9
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_2d935859",
+      "in": {
+        "parent": "$building0",
+        "slot": "main-south"
+      },
+      "p": [
+        2.887,
+        1.41
+      ],
+      "r": -1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_3f40021d",
+      "in": {
+        "parent": "$building0",
+        "slot": "floor"
+      },
+      "p": [
+        4.125,
+        -1.138
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_493e9aca",
+      "in": {
+        "parent": "$building0",
+        "slot": "floor"
+      },
+      "p": [
+        -1.645,
+        -0.985
+      ],
+      "r": 1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_57cc9ac4",
+      "in": {
+        "parent": "$building0",
+        "slot": "floor"
+      },
+      "p": [
+        4.695,
+        -1.068
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5b4fff6c",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -4.545,
+        0.9
+      ],
+      "r": -1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_a036306f",
+      "in": {
+        "parent": "$building0",
+        "slot": "main-south"
+      },
+      "p": [
+        -1.15,
+        2.45
+      ],
+      "r": 3.1416,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_ac310c90",
+      "in": {
+        "parent": "$building0",
+        "slot": "floor"
+      },
+      "p": [
+        3.605,
+        -0.968
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_d6d26f33",
+      "in": {
+        "parent": "$building0",
+        "slot": "main-south"
+      },
+      "p": [
+        0.195,
+        1.96
+      ],
+      "r": 1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f09c3b40",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -3.295,
+        1.55
+      ],
+      "r": 1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f4cc85b0",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -2.044,
+        2.592
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_f7cee154",
+      "in": {
+        "parent": "$building0",
+        "slot": "main"
+      },
+      "p": [
+        -0.1,
+        2.622
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_135d5f7d",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        -1.805,
+        -2.264
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_3cc0375d",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        -2.668,
+        -1.755
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_4bd3299c",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        -0.218,
+        -1.755
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_53cf7fb3",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        4.124,
+        -2.171
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5c4e8f0f",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        0.682,
+        -1.715
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_5f78cda3",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        -3.417,
+        -1.715
+      ],
+      "r": 1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_6d7c486a",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        1.831,
+        -1.715
+      ],
+      "r": -1.5708,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_75da56e6",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        5.714,
+        -2.23
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_75df9ee5",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        1.402,
+        -1.755
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_7f1d3db8",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        -2.303,
+        -1.086
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_8deb1418",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        2.36,
+        -0.968
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_9e8d2f5d",
+      "in": {
+        "parent": "$building2",
+        "slot": "dining-hall"
+      },
+      "p": [
+        -1.618,
+        -1.715
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_cda2f38d",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        -3.435,
+        -0.85
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_ceee0131",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        1.083,
+        0.472
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "move",
+      "id": "e_e75eed10",
+      "in": {
+        "parent": "$building2",
+        "slot": "working-kitchen"
+      },
+      "p": [
+        7.42,
+        -0.634
+      ],
+      "r": 0,
+      "s": 1
+    },
+    {
+      "op": "world",
+      "state": {
+        "sky": {
+          "palette": "mars-desert"
+        },
+        "weather": {
+          "kind": "auto",
+          "clouds": 0,
+          "wind": 0.25,
+          "rain": 0,
+          "fog": 0,
+          "intensity": 0,
+          "strike": null
+        }
+      }
+    }
+  ]
+}

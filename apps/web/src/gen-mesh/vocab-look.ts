@@ -13,7 +13,7 @@ import type { MeshCtx } from './registry.ts';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const declared = (ctx: MeshCtx, k: string) => Object.hasOwn(ctx.def.params ?? {}, k);
-const STATE_LOOKS = ['open', 'lit', 'on', 'level'] as const;
+const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture'] as const;
 
 export type Look = { sx: number; sy: number; sz: number; taper: number; bend: number; skew: number; tint: string | null; vary: number; condition: string; state: Record<string, unknown> };
 export function lookOf(ctx: MeshCtx): Look | null {
@@ -29,7 +29,7 @@ export function lookOf(ctx: MeshCtx): Look | null {
 }
 /** State only changes the picture when it differs from what the plain build shows (doors closed, flames on, glow on, full). */
 function stateMatters(s: Record<string, unknown>, ctx: MeshCtx) {
-  return s.open === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1);
+  return s.open === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1);
 }
 
 const matCache = new Map<string, THREE.Material>();
@@ -94,6 +94,8 @@ function stateRoles(root: THREE.Object3D, look: Look) {
     if (role === 'lid' && s.open !== undefined) o.rotation.x = s.open === true ? -Math.PI * 0.6 : 0;
     if (role === 'flame' && s.lit !== undefined) o.visible = s.lit !== false;
     if (role === 'fill' && typeof s.level === 'number') { o.scale.y = Math.max(0.001, Math.min(1, s.level)); o.visible = s.level > 0.001; }
+    // W5: a bed's damp patch (role fill on a thing with `moisture`, no `level`) spreads across the soil as it is watered
+    else if (role === 'fill' && typeof s.moisture === 'number') { const m = Math.max(0.001, Math.min(1, s.moisture)); o.scale.set(m, 1, m); o.visible = s.moisture > 0.02; }
     if ((role === 'light' || role === 'screen') && s.on === false) o.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m?.emissive) (c as THREE.Mesh).material = lookMaterial(m, 'off', (x) => { x.emissiveIntensity = 0; }); });
   });
 }

@@ -1,0 +1,962 @@
+[
+ {
+  "schema": "def/1",
+  "name": "mars-water-tank",
+  "version": 1,
+  "description": "The camp water tank on its steel stand (about 1,500 L when full), refilled by the water truck. Residents fill a watering can they hold from it; its gauge shows what is left.",
+  "tags": [
+   "utility",
+   "water",
+   "tank",
+   "mars"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "shapes": [
+     {
+      "kind": "box",
+      "at": [
+       -0.8,
+       1.25,
+       -0.8
+      ],
+      "size": [
+       0.1,
+       2.5,
+       0.1
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.8,
+       1.25,
+       -0.8
+      ],
+      "size": [
+       0.1,
+       2.5,
+       0.1
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.8,
+       1.25,
+       0.8
+      ],
+      "size": [
+       0.1,
+       2.5,
+       0.1
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.8,
+       1.25,
+       0.8
+      ],
+      "size": [
+       0.1,
+       2.5,
+       0.1
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       0.8,
+       0.8
+      ],
+      "size": [
+       1.7,
+       0.08,
+       0.08
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       0.8,
+       -0.8
+      ],
+      "size": [
+       1.7,
+       0.08,
+       0.08
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.8,
+       0.8,
+       0
+      ],
+      "size": [
+       0.08,
+       0.08,
+       1.7
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.8,
+       0.8,
+       0
+      ],
+      "size": [
+       0.08,
+       0.08,
+       1.7
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       2.5,
+       0.8
+      ],
+      "size": [
+       1.7,
+       0.08,
+       0.08
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       2.5,
+       -0.8
+      ],
+      "size": [
+       1.7,
+       0.08,
+       0.08
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.8,
+       2.5,
+       0
+      ],
+      "size": [
+       0.08,
+       0.08,
+       1.7
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.8,
+       2.5,
+       0
+      ],
+      "size": [
+       0.08,
+       0.08,
+       1.7
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       3.45,
+       0
+      ],
+      "r": 1,
+      "h": 1.8,
+      "segments": 12,
+      "tint": "paint"
+     },
+     {
+      "kind": "torus",
+      "at": [
+       0,
+       3,
+       0
+      ],
+      "r": 1.01,
+      "r2": 0.03,
+      "segments": 12,
+      "tint": "rib",
+      "pitch": 1.5707963267948966
+     },
+     {
+      "kind": "torus",
+      "at": [
+       0,
+       3.9,
+       0
+      ],
+      "r": 1.01,
+      "r2": 0.03,
+      "segments": 12,
+      "tint": "rib",
+      "pitch": 1.5707963267948966
+     },
+     {
+      "kind": "lathe",
+      "at": [
+       0,
+       4.35,
+       0
+      ],
+      "profile": [
+       [
+        1,
+        0
+       ],
+       [
+        0.4,
+        0.25
+       ],
+       [
+        0,
+        0.28
+       ]
+      ],
+      "segments": 12,
+      "tint": "paint"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.5,
+       1.275,
+       0.9
+      ],
+      "r": 0.05,
+      "h": 2.673,
+      "segments": 5,
+      "tint": "steel",
+      "pitch": 2.838
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.5,
+       0.2,
+       1.237
+      ],
+      "size": [
+       0.35,
+       0.03,
+       0.03
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.5,
+       0.7,
+       1.08
+      ],
+      "size": [
+       0.35,
+       0.03,
+       0.03
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.5,
+       1.2,
+       0.924
+      ],
+      "size": [
+       0.35,
+       0.03,
+       0.03
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.5,
+       1.7,
+       0.767
+      ],
+      "size": [
+       0.35,
+       0.03,
+       0.03
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.5,
+       2.2,
+       0.61
+      ],
+      "size": [
+       0.35,
+       0.03,
+       0.03
+      ],
+      "round": 0,
+      "tint": "steel"
+     },
+     {
+      "kind": "box",
+      "at": [
+       1.005,
+       3.4,
+       0
+      ],
+      "size": [
+       0.01,
+       1.6,
+       0.12
+      ],
+      "round": 0,
+      "tint": "gauge",
+      "role": "fill",
+      "pivot": [
+       1,
+       2.6,
+       0
+      ]
+     }
+    ]
+   }
+  },
+  "params": {
+   "steel": {
+    "type": "color",
+    "default": "#8a8f94",
+    "doc": "steel colour"
+   },
+   "paint": {
+    "type": "color",
+    "default": "#2f5a6b",
+    "doc": "paint colour"
+   },
+   "rib": {
+    "type": "color",
+    "default": "#24485a",
+    "doc": "rib colour"
+   },
+   "gauge": {
+    "type": "color",
+    "default": "#6fc8e8",
+    "doc": "gauge colour"
+   },
+   "sx": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.6,
+    "default": 1,
+    "doc": "stretch: width factor (x)"
+   },
+   "sy": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.5,
+    "default": 1,
+    "doc": "stretch: height factor (y)"
+   },
+   "sz": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.6,
+    "default": 1,
+    "doc": "stretch: depth factor (z)"
+   },
+   "tint": {
+    "type": "color",
+    "doc": "paint: multiply every surface by this colour (any def, incl. imported meshes)"
+   },
+   "vary": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "doc": "paint: per-instance colour variation from the seed"
+   },
+   "condition": {
+    "type": "enum",
+    "values": [
+     "new",
+     "worn",
+     "damaged",
+     "construction"
+    ],
+    "default": "new",
+    "doc": "wear: new, worn, damaged or under construction (scaffold)"
+   },
+   "litres": {
+    "type": "number",
+    "min": 1,
+    "max": 100000,
+    "default": 1500,
+    "doc": "capacity in litres"
+   }
+  },
+  "state": {
+   "level": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6
+   }
+  },
+  "components": {
+   "container": {
+    "capacity": 200
+   }
+  },
+  "actions": [],
+  "palette": {
+   "steel": "#8a8f94",
+   "paint": "#2f5a6b",
+   "rib": "#24485a",
+   "gauge": "#6fc8e8"
+  },
+  "size": {
+   "box": [
+    2.08,
+    4.645,
+    2.387
+   ]
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "mars-planter",
+  "version": 1,
+  "description": "A raised wooden garden bed of desert greens (1.4 m); the soil darkens as it is watered. Residents water it from a watering can they carry from the water tank.",
+  "tags": [
+   "prop",
+   "planter",
+   "garden",
+   "plant",
+   "mars"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "shapes": [
+     {
+      "kind": "extrude",
+      "at": [
+       0,
+       0.015,
+       0
+      ],
+      "polygon": [
+       [
+        -0.685,
+        -0.285
+       ],
+       [
+        0.685,
+        -0.285
+       ],
+       [
+        0.685,
+        0.285
+       ],
+       [
+        -0.685,
+        0.285
+       ]
+      ],
+      "h": 0.47,
+      "tint": "wood"
+     },
+     {
+      "kind": "extrude",
+      "at": [
+       0,
+       0.49,
+       0
+      ],
+      "polygon": [
+       [
+        -0.715,
+        -0.315
+       ],
+       [
+        0.715,
+        -0.315
+       ],
+       [
+        0.715,
+        0.315
+       ],
+       [
+        -0.715,
+        0.315
+       ]
+      ],
+      "h": 0.02,
+      "tint": "rim"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       0.522,
+       0
+      ],
+      "size": [
+       1.34,
+       0.024,
+       0.54
+      ],
+      "round": 0,
+      "tint": "soil"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0,
+       0.539,
+       0
+      ],
+      "size": [
+       1.3,
+       0.01,
+       0.5
+      ],
+      "round": 0,
+      "tint": "wet",
+      "role": "fill",
+      "pivot": [
+       0,
+       0.539,
+       0
+      ]
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.5,
+       0.6,
+       -0.12
+      ],
+      "r": 0.11,
+      "segments": 6,
+      "tint": "leaf",
+      "scale": [
+       1,
+       0.9,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       -0.5,
+       0.53,
+       -0.12
+      ],
+      "r": 0.012,
+      "h": 0.08,
+      "segments": 4,
+      "tint": "leaf"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.17,
+       0.6,
+       0.12
+      ],
+      "r": 0.11,
+      "segments": 6,
+      "tint": "leaf2",
+      "scale": [
+       1,
+       0.9,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       -0.17,
+       0.53,
+       0.12
+      ],
+      "r": 0.012,
+      "h": 0.08,
+      "segments": 4,
+      "tint": "leaf"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.17,
+       0.6,
+       -0.12
+      ],
+      "r": 0.11,
+      "segments": 6,
+      "tint": "leaf",
+      "scale": [
+       1,
+       0.9,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.17,
+       0.53,
+       -0.12
+      ],
+      "r": 0.012,
+      "h": 0.08,
+      "segments": 4,
+      "tint": "leaf"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.5,
+       0.6,
+       0.12
+      ],
+      "r": 0.11,
+      "segments": 6,
+      "tint": "leaf2",
+      "scale": [
+       1,
+       0.9,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.5,
+       0.53,
+       0.12
+      ],
+      "r": 0.012,
+      "h": 0.08,
+      "segments": 4,
+      "tint": "leaf"
+     }
+    ],
+    "round": 0.015
+   }
+  },
+  "params": {
+   "wood": {
+    "type": "color",
+    "default": "#8a6040",
+    "doc": "wood colour"
+   },
+   "rim": {
+    "type": "color",
+    "default": "#6e4a30",
+    "doc": "rim colour"
+   },
+   "leaf": {
+    "type": "color",
+    "default": "#4f7f3a",
+    "doc": "leaf colour"
+   },
+   "leaf2": {
+    "type": "color",
+    "default": "#5f9142",
+    "doc": "leaf2 colour"
+   },
+   "soil": {
+    "type": "color",
+    "default": "#7a5a3c",
+    "doc": "dry soil colour"
+   },
+   "wet": {
+    "type": "color",
+    "default": "#3a2a1e",
+    "doc": "damp soil colour"
+   },
+   "litres": {
+    "type": "number",
+    "min": 1,
+    "max": 1000,
+    "default": 8,
+    "doc": "litres to soak the bed from dry"
+   }
+  },
+  "palette": {
+   "wood": "#8a6040",
+   "rim": "#6e4a30",
+   "leaf": "#4f7f3a",
+   "leaf2": "#5f9142",
+   "soil": "#7a5a3c",
+   "wet": "#3a2a1e"
+  },
+  "size": {
+   "box": [
+    1.445,
+    0.72,
+    0.68
+   ]
+  },
+  "state": {
+   "moisture": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.2
+   }
+  },
+  "actions": []
+ },
+ {
+  "schema": "def/1",
+  "name": "mars-watering-can",
+  "version": 1,
+  "description": "A galvanised watering can (10 L) with a long spout and a rose; fill it at the water tank, carry it and water the garden beds.",
+  "tags": [
+   "object",
+   "tool",
+   "item",
+   "garden",
+   "mars"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "shapes": [
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       0.14,
+       0
+      ],
+      "r": 0.13,
+      "h": 0.28,
+      "segments": 8,
+      "tint": "metal"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.22,
+       0.22,
+       0
+      ],
+      "r": 0.02,
+      "h": 0.339,
+      "segments": 5,
+      "tint": "metal",
+      "pitch": 0.785,
+      "yaw": 1.571
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.36,
+       0.36,
+       0
+      ],
+      "r": 0.04,
+      "h": 0.03,
+      "segments": 6,
+      "tint": "metal",
+      "roll": -0.8
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       -0.08,
+       0.305,
+       0
+      ],
+      "r": 0.012,
+      "h": 0.136,
+      "segments": 4,
+      "tint": "metal",
+      "pitch": 0.629,
+      "yaw": 1.571
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.02,
+       0.325,
+       0
+      ],
+      "r": 0.012,
+      "h": 0.139,
+      "segments": 4,
+      "tint": "metal",
+      "pitch": 2.099,
+      "yaw": 1.571
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       0.135,
+       0
+      ],
+      "r": 0.11,
+      "h": 0.24,
+      "segments": 8,
+      "tint": "water",
+      "role": "fill",
+      "pivot": [
+       0,
+       0.01,
+       0
+      ]
+     }
+    ]
+   }
+  },
+  "params": {
+   "metal": {
+    "type": "color",
+    "default": "#a8b0b4",
+    "doc": "metal colour"
+   },
+   "water": {
+    "type": "color",
+    "default": "#5a8ab0",
+    "doc": "water colour"
+   },
+   "sx": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.6,
+    "default": 1,
+    "doc": "stretch: width factor (x)"
+   },
+   "sy": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.6,
+    "default": 1,
+    "doc": "stretch: height factor (y)"
+   },
+   "sz": {
+    "type": "number",
+    "min": 0.6,
+    "max": 1.6,
+    "default": 1,
+    "doc": "stretch: depth factor (z)"
+   },
+   "tint": {
+    "type": "color",
+    "doc": "paint: multiply every surface by this colour (any def, incl. imported meshes)"
+   },
+   "vary": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "doc": "paint: per-instance colour variation from the seed"
+   },
+   "condition": {
+    "type": "enum",
+    "values": [
+     "new",
+     "worn",
+     "damaged",
+     "construction"
+    ],
+    "default": "new",
+    "doc": "wear: new, worn, damaged or under construction (scaffold)"
+   },
+   "litres": {
+    "type": "number",
+    "min": 1,
+    "max": 50,
+    "default": 10,
+    "doc": "capacity in litres"
+   }
+  },
+  "state": {
+   "level": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.5
+   }
+  },
+  "components": {
+   "carryable": {
+    "mass": 1,
+    "grips": 1
+   },
+   "container": {
+    "capacity": 1
+   }
+  },
+  "actions": [],
+  "layer": "decor",
+  "palette": {
+   "metal": "#a8b0b4",
+   "water": "#5a8ab0"
+  },
+  "size": {
+   "box": [
+    0.529,
+    0.399,
+    0.26
+   ]
+  }
+ }
+]

@@ -84,5 +84,5 @@ const T = {
 for (const b of T.batches) b.ops = b.ops.map(orientOp);
 // MARSLAND: the land around it, already in the world frame (land.mjs)
 T.batches.push({ note: 'the land: the playa, the tyre ring of the old race track west of camp, tyre tracks, creosote scrub; beyond the edge the 111, the wash, the salt flats, the Salton Sea and the mountains', group: 'land', ops: [...NEAR_OPS, ...FAR_OPS] });
-writeFileSync(join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');
+writeFileSync(process.env.MARS_TEMPLATE_OUT ?? join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');
 console.log(`mars-two.json: ${T.batches.reduce((n, b) => n + b.ops.length, 0)} ops (${Object.entries(ops).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);

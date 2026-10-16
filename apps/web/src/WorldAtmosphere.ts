@@ -9,7 +9,8 @@ import {Balloons} from './atmosphere/balloons.ts';
 import {Fireflies,Smoke} from './atmosphere/particles.ts';
 import {findAnchors,underCover} from './atmosphere/finder.ts';
 import {insideBuilding} from './atmosphere/indoors.ts';
-import {installAtmosphereChunks,ATMOS,MIST,SHEEN,NOISE_MAP} from './atmosphere/chunks.ts';
+import {installAtmosphereChunks,ATMOS,MIST,SHEEN,DUST,NOISE_MAP} from './atmosphere/chunks.ts';
+import {desertDustAt,parseDustOverride,DESERT_DUST_SEED,type DustSample} from './atmosphere/desert-dust.ts';
 import {SkyDome} from './atmosphere/sky.ts';
 import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
@@ -51,7 +52,7 @@ export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camer
  indoors?:(x:number,y:number,z:number)=>boolean};
 /** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
 export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
-export type AtmosphereInspection={profile:'eden'|'world';set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
+export type AtmosphereInspection={profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
 const SCAN_AT=[0,1.5,5,12,25,45];const RESCAN_EVERY=30;
 const WHITE=new THREE.Color(1,1,1);
 /** The kind a set weather draws as (its own name, or for 'manual' the nearest by its channels). */
@@ -65,6 +66,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  /** R4-LIVE hook (GOD-ENV: thunder sound, a bolt): called when a lightning flash starts, with its strength and sky direction. */
  onLightning:((strength:number,dir:THREE.Vector3)=>void)|null}{
  const override:WeatherOverride=typeof location!=='undefined'?parseWeatherOverride(location.search):null;
+ const dustOverride=typeof location!=='undefined'?parseDustOverride(location.search):null;
  const root=new THREE.Group();root.name='atmosphere (decorative; not a camera root)';root.userData.cameraTransparent=true;
  const fauna=new Fauna(),fireflies=new Fireflies(),smoke=new Smoke(),sky=new SkyDome(),rain=new Rain(),balloons=new Balloons(),halos=new Halos(),lighthouse=new Lighthouse(),fogBanks=new FogBanks();
  root.add(sky.mesh,fauna.mesh,fireflies.points,smoke.points,rain.lines,balloons.mesh,halos.mesh,lighthouse.group,fogBanks.mesh);
@@ -74,6 +76,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const lights:{sun:ScaledNumber|null;hemi:ScaledNumber|null;sunLight:THREE.DirectionalLight|null}={sun:null,hemi:null,sunLight:null};
  const background=new TintedColor(()=>(scene.background as THREE.Color|null)?.isColor?scene.background as THREE.Color:null);
  const cWarm=new THREE.Color(),cSky=new THREE.Color(),cGrey=new THREE.Color(),cFog=new THREE.Color(),cTmp=new THREE.Color(),sunDir=new THREE.Vector3();
+ const dustColor=new THREE.Color('#c4a57e'),dustSample=desertDustAt(0);let desert=false,dustScheduled=false;
  let driftX=0,driftZ=0;
  const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0,ferrisAngle=0;
  const own=(o:THREE.Object3D)=>o===root;
@@ -109,13 +112,13 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   scene.traverse(o=>{const p=o.userData?.edenBalloonLanding;if(!landing&&Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)){o.updateWorldMatrix(true,false);const w=new THREE.Vector3(...p as [number,number,number]).applyMatrix4(o.matrixWorld);landing=w.toArray();}});
   balloons.setLanding(landing);
   // MARSLAND-FAR: a god world's sky palette (GodWorldLiving publishes state.sky.palette on its group)
-  let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});palLook=skyLook(pal);
+  let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});palLook=skyLook(pal);desert=pal==='mars-desert';
   collectLights();
   scans++;const since=seconds-expansionSeen;nextScan=expansionSeen+(scans<SCAN_AT.length?SCAN_AT[scans]:since+RESCAN_EVERY);
  }
  function deactivate(){
   if(!active)return;active=false;WIND.value.y=0;root.visible=false;
-  lights.sun?.restore();lights.hemi?.restore();background.restore();clearGrade();halos.mesh.visible=false;fog.density=0;MIST.value.x=0;MIST.value.w=0;ATMOS.value.x=0;SHEEN.value.w=0;RIPPLE.value.y=0;SURF.value.y=0;SKY_OBJECTS.value.x=SKY_OBJECTS.value.y=0;SKY_OBJECTS.value.z=1;ROTOR.value.w=sailAngle=0;
+  lights.sun?.restore();lights.hemi?.restore();background.restore();clearGrade();halos.mesh.visible=false;fog.density=0;DUST.value.x=0;MIST.value.x=0;MIST.value.w=0;ATMOS.value.x=0;SHEEN.value.w=0;RIPPLE.value.y=0;SURF.value.y=0;SKY_OBJECTS.value.x=SKY_OBJECTS.value.y=0;SKY_OBJECTS.value.z=1;ROTOR.value.w=sailAngle=0;
  }
  /** Clouds dim the sun and grey the sky; fog/mist thicken the air; rain wets the ground. */
  function applyWeather(frame:AtmosphereFrame,day:number){
@@ -136,16 +139,22 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    sky.uniforms.uCloudShade.value.copy(cGrey).multiplyScalar(.88-.24*day);
    // MARSLAND-FAR: a palette's own sky by day (clouds and fog fade it back to the weathered default)
    if(palLook){const k=day*(1-.85*state.cloud)*(1-state.fog);sky.uniforms.uZenith.value.lerp(palLook.zenith,k);sky.uniforms.uHorizon.value.lerp(palLook.horizon,k);fog.color.lerp(palLook.horizon,k*.6);}
+   if(dustScheduled){
+    cWarm.copy(dustColor).multiplyScalar(.12+.88*day);fog.color.copy(cWarm);
+    sky.uniforms.uZenith.value.lerp(cWarm,dustSample.intensity*.55);
+    sky.uniforms.uHorizon.value.lerp(cWarm,dustSample.intensity*1.5);
+    cTmp.copy(base).lerp(cWarm,dustSample.intensity*.6);background.write(cTmp);
+   }
   }
   // Fog is a ground layer: looking down from high up (overview) passes through less of it.
   mistWanted=Math.min(1,state.mist+state.fog*.35);
   forCamera(frame.camera);
-  lights.sun?.apply(1-.72*state.cloud);lights.hemi?.apply(1-.1*state.cloud-.08*state.fog);
+  lights.sun?.apply((1-.72*state.cloud)*(1-dustSample.intensity*.85));lights.hemi?.apply((1-.1*state.cloud-.08*state.fog)*(1-dustSample.intensity*.18));
   // Cloud shadows drift downwind; fewer but crisper in fair weather, broad and faint under overcast.
   const drift=frame.reducedMotion?0:(2+6*state.wind)*.011*Math.min(frame.dt,.25);driftX=(driftX+WIND.value.z*drift)%1000;driftZ=(driftZ+WIND.value.w*drift)%1000;
-  ATMOS.value.x=day*(.28*(1-state.cloud)+.1)*(1-state.fog*.8);ATMOS.value.y=.74-state.cloud*.42;ATMOS.value.z=-driftX;ATMOS.value.w=-driftZ;
+  ATMOS.value.x=desert?0:day*(.28*(1-state.cloud)+.1)*(1-state.fog*.8);ATMOS.value.y=.74-state.cloud*.42;ATMOS.value.z=-driftX;ATMOS.value.w=-driftZ;
   MIST.value.w=state.wet;
-  sky.uniforms.uCloud.value.set(Math.min(1,.18+.82*state.cloud+state.rain*.1),driftX*2.2,driftZ*2.2,day);
+  sky.uniforms.uCloud.value.set(dustScheduled?0:Math.min(1,.18+.82*state.cloud+state.rain*.1),driftX*2.2,driftZ*2.2,day);
   const sun=lights.sunLight;if(sun){sunDir.copy(sun.position).sub(sun.target.position).normalize();sky.uniforms.uSunDir.value.copy(sunDir);}
   // A rainbow opposite the sun once rain passes while the ground is still wet.
   sky.uniforms.uBow.value.x=smooth(.3,.8,state.wet)*(1-smooth(.08,.35,state.rain))*(1-smooth(.5,.8,state.cloud))*smooth(.4,.8,day);
@@ -193,13 +202,17 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   const indoors=!ortho&&(profile==='world'?!!indoorsOf?.(camAt.x,camAt.y,camAt.z):insideBuilding(camAt.x,camAt.y,camAt.z)||underCover(covers,camAt));
   const layer=ortho?0:(indoors?.25:1)/(1+Math.max(0,camAt.y-6)/10);
   fog.density=ortho?0:.0009*(palLook?.fog??1)+(state.fog*.022+state.rain*.0055)*layer+state.cloud*.0006;
+  // The dust layer is spatially uneven and ground-biased in the shared fog chunk.
+  // Suppress it inside rooms, and omit it from map renders; a heavy episode stays navigable.
+  DUST.value.x=dustScheduled&&!ortho?dustSample.intensity*(indoors?.06:1):0;
+  const drift=frameDustDrift;DUST.value.y=drift;DUST.value.z=drift*.375;
   MIST.value.x=ortho||indoors?0:mistWanted;
   sky.uniforms.uBow.value.w=Math.min(.9,state.fog*.9*layer+state.rain*.25);
   // No rain, leaves or motes for a camera indoors / under a roof (they are camera-local and would fall through ceilings).
   rain.lines.visible=rainWanted&&!ortho&&!indoors;rain.uniforms.uCam.value.copy(camAt);
   sky.mesh.visible=skyWanted&&!ortho;if(!ortho){sky.mesh.position.copy(camAt);sky.mesh.updateMatrix();sky.mesh.updateMatrixWorld(true);}
  }
- let skyWanted=false,palLook:SkyLook|null=null;
+ let skyWanted=false,palLook:SkyLook|null=null,frameDustDrift=0;
  // Capture the callback value; disposal restores this exact function, and invocation below supplies its Scene receiver.
  const previousBeforeRender=Reflect.get(scene,'onBeforeRender') as THREE.Object3D['onBeforeRender'];
  const beforeRender:THREE.Object3D['onBeforeRender']=function(this:THREE.Object3D,renderer,s,camera,geometry,material,group){
@@ -218,19 +231,31 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    // `eden` means the expansion is in the scene this frame: scan now so wind patches compile with its pre-warm.
    if(expansionSeen<0){expansionSeen=seconds;nextScan=seconds;}
    if(seconds>=nextScan)scan(seconds);
+   // Any world can opt in using its admitted sky palette; no Mars identity special case.
+   // Explicit owner weather wins over auto, unless a dust review override was requested.
+   dustScheduled=desert&&!!(dustOverride||(!override&&!setWeather));
+   if(dustScheduled){
+    const worldMs=clockMs(frame.clock)??0;desertDustAt(worldMs,DESERT_DUST_SEED,dustOverride,dustSample);
+    frameDustDrift=frame.reducedMotion?0:((worldMs/3_600_000)%8+8)%8;
+   }else{dustSample.kind='clear';dustSample.intensity=0;}
    // Weather target from the world clock (or the review override), eased over minutes.
    // (Re)read the clock about once a second: the schedule is coarse, and this keeps frames allocation-free.
    if(!initialised||Math.abs(seconds-clockAt)>=1){clockAt=seconds;clockNow=clockMs(frame.clock)??Date.now();const hour=frame.daylight===null?null:hourOf(clockNow);
     kind=override?.kind==='cycle'?cycleKind(seconds):override?override.kind as WeatherKind:setWeather?setKind(setWeather):weatherKindAt(clockNow);targetFor(kind,hour,target);
     // a god's set weather: its channels exactly (morning mist kept from the kind; wet follows rain)
     if(setWeather&&!override){target.cloud=setWeather.clouds;target.rain=setWeather.rain;target.wind=setWeather.wind;target.fog=setWeather.fog;target.wet=setWeather.rain>.1?Math.min(1,setWeather.rain*1.2):0;}
+    if(desert){target.mist=0;target.wet=0;}
     if(!initialised&&override?.from)targetFor(override.from,hour,state);}
    const ms=clockNow;
    // a god's change shows in about 10–25 s (not the schedule's minutes): the god is watching it happen
    // ... and keeps that pace for a while after the god clears it back to the schedule (E2 #8: rain lingered for minutes)
    if(setWeatherChanged(lastSet,setWeather)){if(initialised)godChangeAt=seconds;lastSet=setWeather?{...setWeather}:null;}
-   if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*weatherEaseRate(!!setWeather,seconds-godChangeAt,override?.kind==='cycle'));
-   windDirection(seconds,ms);
+   if(dustScheduled){
+    // Clock-derived channels have no browser-session easing and never inherit dawn mist/rain/wetness.
+    kind=dustSample.kind==='heavy'?'wind':'clear';
+    state.cloud=state.rain=state.fog=state.mist=state.wet=0;state.wind=.16+dustSample.intensity*1.6;initialised=true;
+   }else if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*weatherEaseRate(!!setWeather,seconds-godChangeAt,override?.kind==='cycle'));
+   windDirection(dustScheduled?dustSample.worldMs/1000:seconds,ms);
    // Rooms behind lit windows switch on and off with the hour of the world clock.
    setWindowLife(frame.daylight===null?null:hourOf(ms),frame.reducedMotion?0:seconds);
    const day=frame.daylight===null?1:Math.max(0,Math.min(1,frame.daylight)),still=frame.reducedMotion;
@@ -239,7 +264,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    if(!active){active=true;if(!root.parent)scene.add(root);root.visible=true;}
    const t=seconds%7200;
    // Less frequent strong decorative spells; reported weather and native facts stay unchanged.
-   const visualWind=visualWindStrength(seconds,state.wind);
+   const visualWind=dustScheduled?state.wind:visualWindStrength(seconds,state.wind);
    WIND.value.x=t;WIND.value.y=still?0:.15+visualWind*.95;
    // Windmill sails turn with the wind (angle integrated, so speed changes never jump); fountain ripples.
    if(!still)sailAngle=(sailAngle+Math.min(frame.dt,.25)*(.18+state.wind*1.1))%(Math.PI*2);ROTOR.value.w=sailAngle;
@@ -259,6 +284,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    ferrisAngle=nextFerrisAngle(ferrisAngle,frame.dt,frame.daylight===null||hourOf(ms)>=7&&hourOf(ms)<19,still);
    if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}balloons.mesh.visible=profile==='eden';
    fireflies.update(t,still?0:Math.max(0,1-day*3)*(1-state.rain)*(1-state.wind*.7),fireflies.uniforms.uFly.value.z);
+   if(desert){fauna.mesh.visible=false;fireflies.points.visible=false;}
    smoke.update(t,still?0:1-state.rain*.5,smoke.uniforms.uSmoke.value.z,day,WIND.value.z,WIND.value.w,state.wind);
    // Autumn leaves blow through in wind (a few drift down on any breezy day).
    const leaves=still?0:Math.max(0,Math.min(1,(visualWind-.3)/.5))*(1-state.rain*.7)*(.15+.85*Math.min(1,day*2));
@@ -268,14 +294,14 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    const motes=still?0:smooth(.45,.8,day)*(1-smooth(.35,.7,state.cloud))*(1-smooth(.6,.9,state.wind))*(1-state.rain)*(1-state.fog);
    // ... and in a real wind the same particles become fine dust skimming low over the ground (desert setting); dry ground only.
    const dust=still?0:smooth(.65,.95,state.wind)*(1-smooth(.15,.4,state.wet));
-   rain.update2(seconds,still?0:state.rain*spell,leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,Math.max(motes,dust),dust>motes?1:0);rainWanted=rain.lines.visible;
+   rain.update2(dustScheduled?dustSample.worldMs/1000:seconds,still?0:state.rain*spell,desert?0:leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,desert?(still?0:dustSample.intensity):Math.max(motes,dust),desert?1:dust>motes?1:0);rainWanted=rain.lines.visible;
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
-  inspect(){return {profile,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
+  inspect(){return {profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.
- const review=typeof location!=='undefined'&&/[?&](weather|atmos)\b/.test(location.search);
+ const review=typeof location!=='undefined'&&/[?&](weather|dust|atmos)\b/.test(location.search);
  if(review)(globalThis as Record<string,unknown>).edenAtmosphere=api;
  return api;
 }

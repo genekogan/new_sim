@@ -1,0 +1,567 @@
+{
+ "schema": "mars-fidelity-assets/1",
+ "inventory": {
+  "recipeTexturedNodes": 22,
+  "correctedImageNodes": 19,
+  "excludedPreviouslyCorrectedNodes": 3,
+  "assetVariants": 7,
+  "clothNodes": 1,
+  "byAsset": [
+   {
+    "name": "mimos",
+    "sourceRecipeImageNodes": 5,
+    "correctedNodes": 2,
+    "excludedNodes": [
+     "Mimos photographed cutout sign",
+     "Mimos photographed framed gallery",
+     "Mimos native Portuguese love posters c49417"
+    ]
+   },
+   {
+    "name": "chiba",
+    "sourceRecipeImageNodes": 7,
+    "correctedNodes": 7,
+    "excludedNodes": []
+   },
+   {
+    "name": "kitchen",
+    "sourceRecipeImageNodes": 3,
+    "correctedNodes": 3,
+    "excludedNodes": []
+   },
+   {
+    "name": "freeside",
+    "sourceRecipeImageNodes": 3,
+    "correctedNodes": 3,
+    "excludedNodes": []
+   },
+   {
+    "name": "showers",
+    "sourceRecipeImageNodes": 2,
+    "correctedNodes": 2,
+    "excludedNodes": []
+   },
+   {
+    "name": "toilet-1",
+    "sourceRecipeImageNodes": 1,
+    "correctedNodes": 1,
+    "excludedNodes": []
+   },
+   {
+    "name": "tool-library-bookshelf-timber",
+    "sourceRecipeImageNodes": 1,
+    "correctedNodes": 1,
+    "excludedNodes": []
+   }
+  ]
+ },
+ "exceptions": [
+  {
+   "asset": "mimos",
+   "nodes": [
+    "Mimos photographed cutout sign",
+    "Mimos photographed framed gallery",
+    "Mimos native Portuguese love posters c49417"
+   ],
+   "reason": "Already geometrically V-corrected in shipped build.mjs WORLD_FIX. Retain their UVs/transforms exactly to avoid a double flip."
+  },
+  {
+   "nodes": "all original CAD material maps",
+   "reason": "Copied from original glTF with original UV convention; not recipe TextureLoader maps."
+  },
+  {
+   "asset": "showers",
+   "nodes": "non-recipe parity-added plywood maps",
+   "reason": "Do not infer flipY from wood appearance or apply a global material/image flip. Only the two named source recipe slab/roof nodes are corrected."
+  }
+ ],
+ "inputs": {
+  "worlds/core-assets/mars/mimos.glb": "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39",
+  "worlds/core-assets/mars/chiba.glb": "4b5e4508f40b98c7d30c5d7c4a45564bf09541032122104eef6c60ca209057be",
+  "worlds/core-assets/mars/kitchen.glb": "11fb51931920e868e00e4b4566508c5e25ed996b475bd5301b7abae9e1be491e",
+  "worlds/core-assets/mars/freeside.glb": "fdfa69c4f34bcca9c23cbf1edd287a414a37baef2eccbc806bdd40fdc0b30ebe",
+  "worlds/core-assets/mars/showers.glb": "938c4794f2e6aaad2d1809a386dce6d3cb59b0a6f4d92a98ece697ba6cdb26c0",
+  "worlds/core-assets/mars/toilet-1.glb": "c2035da47a57954c40112363bae662e924eff8d3d1f69e9b965bc0631c761b52",
+  "worlds/core-assets/mars/tool-library-bookshelf-timber.glb": "cc6580ffeaf1bb45be6a36fcb3e68275f68e3476642421fd5d6fee46520f7250"
+ },
+ "changes": [
+  {
+   "name": "mimos",
+   "originalAsset": "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39",
+   "asset": "515ac21643c3e13e2cb68ac884723834b9ab0bf59a044392ae49b1d8fc11af7e",
+   "affectedRecipeImageNodes": 2,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 4378,
+    "bytes": 290456
+   },
+   "after": {
+    "tris": 7446,
+    "bytes": 326996,
+    "box": [
+     20.078,
+     6.465,
+     16.925
+    ],
+    "min": [
+     -9.364,
+     0,
+     -7.057
+    ],
+    "max": [
+     10.713,
+     6.465,
+     9.869
+    ]
+   },
+   "changed": {
+    "drape": {
+     "name": "Mimos glazing brown drape",
+     "segments": [
+      64,
+      12
+     ],
+     "triangles": 3080,
+     "maxOutwardGatherDepthM": 0.09,
+     "fabricThicknessM": 0.003,
+     "material": "unchanged lit MeshStandard/PBR material, roughness 0.86; no unlit extension",
+     "sourceClothLocalEnvelope": {
+      "min": [
+       -1,
+       -0.002685628833887753,
+       -0.1424604022339549
+      ],
+      "max": [
+       1,
+       0.002685628833887753,
+       0.1424604022339549
+      ]
+     },
+     "finalClothLocalEnvelope": {
+      "min": [
+       -1,
+       -0.002685628833887753,
+       -0.1424604022339549
+      ],
+      "max": [
+       1,
+       0.02312733560378558,
+       0.1424604022339549
+      ]
+     },
+     "retained": "exact whole-building bounds and footprint; cloth attachment corners; all non-cloth geometry",
+     "reference": "team/lanes/marsland-frames/f_040.jpg and f_117.jpg; sag/diagonal gathers fitted, not surveyed"
+    },
+    "photos": [
+     {
+      "name": "Mimos photographed burgundy floor rug",
+      "material": "owner-derived-material-128",
+      "sourceImage": "/history/2026/home/mimos-rug.webp",
+      "sourceCode": "details-2026-mimos-home.ts:16,46",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Mimos main north plywood wall",
+      "material": "owner-derived-material-201",
+      "sourceImage": "/modular/textures/kitchen-plywood-sample.jpg",
+      "sourceCode": "details-2026-true-compass.ts:107,109; kit.ts:mat",
+      "vertices": 72,
+      "beforeUVHash": "ff5dd865cca0e3b8e2d3459ff2ae4f8c054442ea869b9c59292347f1c08d3584",
+      "afterUVHash": "554b5e742bd9bc1e681aa395c40a6b2b35e94ad50b7f8d69b4b9cf24f0e05588",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "chiba",
+   "originalAsset": "4b5e4508f40b98c7d30c5d7c4a45564bf09541032122104eef6c60ca209057be",
+   "asset": "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af",
+   "affectedRecipeImageNodes": 7,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 64520,
+    "bytes": 1688148
+   },
+   "after": {
+    "tris": 64520,
+    "bytes": 1690812,
+    "box": [
+     43.157,
+     7.461,
+     36.975
+    ],
+    "min": [
+     -19.29,
+     0,
+     -21.171
+    ],
+    "max": [
+     23.866,
+     7.461,
+     15.805
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "cad-3c1d436f145625016",
+      "material": "c50158 plain upper plywood above lower pixel bank",
+      "sourceImage": "/history/2026/accuracy/stair-upper-native-plywood.webp",
+      "sourceCode": "details-2026-facade.ts:123,124; selected native photo faces only",
+      "vertices": 8,
+      "beforeUVHash": "c152a1bd10e6b007be2a2a568dd5660d76acb5205b2c8091a16793a6b937c37b",
+      "afterUVHash": "f4cac57e2c498036c68bd025c3bdf05156fd57bd28a572ba79ab173668014cdd",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "cad-d298c30b11df08016",
+      "material": "c50158 native upper black abstract on plywood",
+      "sourceImage": "/history/2026/accuracy/stair-upper-abstract-native.webp",
+      "sourceCode": "details-2026-facade.ts:115,117; UV V increases with world Y",
+      "vertices": 25,
+      "beforeUVHash": "0ba481d539c227a19b6a32e0b12f790750523f5d353ea6af1a56e022a8cbdd63",
+      "afterUVHash": "21308fcce19e44697d2db2b6e22d42b51e1ce8f4b4d7283660e65cf170be28a5",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "cad-c04cdcf6976fce002_1",
+      "material": "2026 west upper wall · native t23 photograph",
+      "sourceImage": "/history/2026/review-20260929/chiba-west-upper-wall.webp",
+      "sourceCode": "details-2026-facade.ts:24,37; UV V increases with world Y",
+      "vertices": 6,
+      "beforeUVHash": "01af66618962028f7788d78e9b9e3970020816f38cbbf5c1691741b8e782ab30",
+      "afterUVHash": "fb7a2015235dac419491374008a7ddf420c7f68cf3b18526dd3aceb71e34578b",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Chiba native white black pixel fascia c50158",
+      "material": "owner-derived-material-22",
+      "sourceImage": "/history/2026/accuracy/stair-white-pixel-motif.webp",
+      "sourceCode": "details-2026-facade.ts:107",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Chiba gallery native c80 installation panel 0",
+      "material": "owner-derived-material-232",
+      "sourceImage": "/history/2026/accuracy/upper-native-black-paint.webp",
+      "sourceCode": "details-2026-auditorium.ts:125",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Chiba gallery native c80 installation panel 1",
+      "material": "owner-derived-material-234",
+      "sourceImage": "/history/2026/accuracy/upper-native-green-paint.webp",
+      "sourceCode": "details-2026-auditorium.ts:125",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "auditorium upper gallery source portrait",
+      "material": "2026 auditorium source portrait c33334",
+      "sourceImage": "/history/2026/auditorium-source-portrait.webp",
+      "sourceCode": "details-2026-auditorium.ts:102",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "kitchen",
+   "originalAsset": "11fb51931920e868e00e4b4566508c5e25ed996b475bd5301b7abae9e1be491e",
+   "asset": "1dafb201c9733fe7f4c6bdad4ddca886121cafcc4890c98923c88693dbd65f92",
+   "affectedRecipeImageNodes": 3,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 5877,
+    "bytes": 215584
+   },
+   "after": {
+    "tris": 5877,
+    "bytes": 216860,
+    "box": [
+     18.363,
+     3.292,
+     17.076
+    ],
+    "min": [
+     -9.215,
+     0,
+     -8.65
+    ],
+    "max": [
+     9.147,
+     3.291,
+     8.425
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "diner native blue wall plywood patch diner-large-wood-patch",
+      "material": "owner-derived-material-78",
+      "sourceImage": "/history/2026/accuracy/diner-large-wood-patch.webp",
+      "sourceCode": "details-2026-chiba.ts:329",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "diner native blue wall plywood patch diner-small-wood-patch",
+      "material": "owner-derived-material-79",
+      "sourceImage": "/history/2026/accuracy/diner-small-wood-patch.webp",
+      "sourceCode": "details-2026-chiba.ts:329",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "kitchen diner entry tread",
+      "material": "owner-derived-material-201",
+      "sourceImage": "/modular/textures/kitchen-plywood-sample.jpg",
+      "sourceCode": "details-2026-true-compass.ts:107,118; kit.ts:mat",
+      "vertices": 72,
+      "beforeUVHash": "ff5dd865cca0e3b8e2d3459ff2ae4f8c054442ea869b9c59292347f1c08d3584",
+      "afterUVHash": "554b5e742bd9bc1e681aa395c40a6b2b35e94ad50b7f8d69b4b9cf24f0e05588",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "freeside",
+   "originalAsset": "fdfa69c4f34bcca9c23cbf1edd287a414a37baef2eccbc806bdd40fdc0b30ebe",
+   "asset": "bd352e4b046087331cd15faea416a277e69a3f71544131f938e23d6c35bf54bf",
+   "affectedRecipeImageNodes": 3,
+   "grandfatheredSourceBudget": true,
+   "before": {
+    "tris": 152802,
+    "bytes": 4639268
+   },
+   "after": {
+    "tris": 152802,
+    "bytes": 4640544,
+    "box": [
+     26.526,
+     4.614,
+     37.881
+    ],
+    "min": [
+     -12.983,
+     0.001,
+     -21.036
+    ],
+    "max": [
+     13.543,
+     4.614,
+     16.845
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "Freeside native LOTA BREAD sign c50121",
+      "material": "owner-derived-material-323",
+      "sourceImage": "/history/2026/accuracy/freeside-native-bread-sign.webp",
+      "sourceCode": "details-2026-compound.ts:85",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "CoLab native patterned left curtain c47830",
+      "material": "owner-derived-material-383",
+      "sourceImage": "/history/2026/accuracy/colab-native-curtain.webp",
+      "sourceCode": "details-2026-compound.ts:223",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Freeside native north entry paint c22",
+      "material": "owner-derived-material-394",
+      "sourceImage": "/history/2026/accuracy/freeside-native-entry-paint.webp",
+      "sourceCode": "details-2026-compound.ts:257",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "showers",
+   "originalAsset": "938c4794f2e6aaad2d1809a386dce6d3cb59b0a6f4d92a98ece697ba6cdb26c0",
+   "asset": "198e9544236d7aed610174549e6951b00c1ca786d59df284b4ff0b4f2357bb1a",
+   "affectedRecipeImageNodes": 2,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 192,
+    "bytes": 28520
+   },
+   "after": {
+    "tris": 192,
+    "bytes": 30208,
+    "box": [
+     4.88,
+     2.335,
+     4.88
+    ],
+    "min": [
+     -2.44,
+     0,
+     -2.44
+    ],
+    "max": [
+     2.44,
+     2.335,
+     2.44
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "Shower wooden floor slab",
+      "material": "owner-derived-material-203",
+      "sourceImage": "/modular/textures/kitchen-plywood-sample.jpg",
+      "sourceCode": "details-2026-showers.ts:15,19,24-29; kit.ts:mat; merged source plywood floor/wall group",
+      "vertices": 288,
+      "beforeUVHash": "77b1b939b5c2bc302fd9d249a4e463896fd673b0333e4c842ca15d7a8948c683",
+      "afterUVHash": "9eb42defdc377254dcd168a01c1c73a08c67be5acfed25631de8a9ec6b96a29a",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     },
+     {
+      "name": "Shower timber roof",
+      "material": "owner-derived-material-203",
+      "sourceImage": "/modular/textures/kitchen-plywood-sample.jpg",
+      "sourceCode": "details-2026-showers.ts:15,30; kit.ts:mat",
+      "vertices": 48,
+      "beforeUVHash": "a8aeb62490b673ebb84bb7105b4b2a4d79e4b84edae7a8a777cf990155f793fd",
+      "afterUVHash": "d425cd3a134e65fd768cddde0a3adacedca5a0af3b410fe4b6d4be5cf76e5932",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "toilet-1",
+   "originalAsset": "c2035da47a57954c40112363bae662e924eff8d3d1f69e9b965bc0631c761b52",
+   "asset": "d093875d81ffa5e00ce5963b67d0a452f6234d4f2764b892fd757aaf1e9088e0",
+   "affectedRecipeImageNodes": 1,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 3333,
+    "bytes": 90856
+   },
+   "after": {
+    "tris": 3333,
+    "bytes": 91268,
+    "box": [
+     5.142,
+     2.438,
+     4.907
+    ],
+    "min": [
+     -2.567,
+     0,
+     -2.494
+    ],
+    "max": [
+     2.575,
+     2.438,
+     2.412
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "toilet source native sanitation label",
+      "material": "owner-derived-material-476",
+      "sourceImage": "/history/2026/accuracy/toilet-native-sign.webp",
+      "sourceCode": "details-2026-ground-life.ts:46",
+      "vertices": 12,
+      "beforeUVHash": "4fd92798987cea52cb6e20f1c72607f8bded7aa5dcf8daa0edd393e8a5bc50ff",
+      "afterUVHash": "cab1c0fefc1a698cedf955a817f4afd730f3b6544bcdd576a109ef09b5f2babf",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  },
+  {
+   "name": "tool-library-bookshelf-timber",
+   "originalAsset": "cc6580ffeaf1bb45be6a36fcb3e68275f68e3476642421fd5d6fee46520f7250",
+   "asset": "88b629b4224d12c783602ebd519d362b660e6befb0ff7250c3449f0ec2d996ff",
+   "affectedRecipeImageNodes": 1,
+   "grandfatheredSourceBudget": false,
+   "before": {
+    "tris": 86,
+    "bytes": 22588
+   },
+   "after": {
+    "tris": 86,
+    "bytes": 22976,
+    "box": [
+     3.065,
+     1.9,
+     0.94
+    ],
+    "min": [
+     -1.532,
+     0,
+     -0.47
+    ],
+    "max": [
+     1.532,
+     1.9,
+     0.47
+    ]
+   },
+   "changed": {
+    "photos": [
+     {
+      "name": "Tool library native book spines c73776",
+      "material": "owner-derived-material-285",
+      "sourceImage": "/history/2026/accuracy/tool-library-books.webp",
+      "sourceCode": "details-2026-tool-library.ts:13",
+      "vertices": 4,
+      "beforeUVHash": "347da155e7cb8e1d07a6b8d0257cd179ffa6706a740ac856f4ba5106f9f3a713",
+      "afterUVHash": "0e8027b5ace9fc92dcb0d13a082db651037d62fffa67880041740ac213615908",
+      "correction": "V = 1 - V; compensate for the recipe TextureLoader flipY omitted by manual image embed; U, positions, normals, indices, materials and image pixels unchanged"
+     }
+    ]
+   }
+  }
+ ],
+ "checks": [
+  "exact input hashes",
+  "complete explicit source recipe image inventory",
+  "deterministic lossless encoding",
+  "exact all non-drape geometry/transforms after encoding",
+  "exact all non-target UVs including 3 already-corrected Mimos photos",
+  "exact material properties and native image bytes",
+  "full asset bounds within 0.00001m",
+  "footprint refs unchanged",
+  "UV changes add zero triangles",
+  "80k triangles / 3MB default; unchanged-source Freeside grandfathered under Mars world 200k / 6MB; all textures <=2048px"
+ ],
+ "note": "defs.json contains cosmetic variant inputs for tools/mars-fidelity/patch.mjs. The patch derives world-local names; these inputs are not a public core-library redefinition batch. Source recipe/code references are under the read-only <mars-campus-repo>/viewer/app/history/."
+}
