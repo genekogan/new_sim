@@ -39,7 +39,9 @@ export const WALK_SPEED_CAP = 1.4;
 /** Explicit, stamina-free faster gaits. Legacy steps keep the walking cap. */
 export const JOG_SPEED_CAP = 2.5;
 export const RUN_SPEED_CAP = 4;
-export const GAIT_SPEED_CAPS = { walk: WALK_SPEED_CAP, jog: JOG_SPEED_CAP, run: RUN_SPEED_CAP } as const;
+/** todo (leisure): riding a bicycle taken from a dock, on the same dry routes as a jog. */
+export const CYCLE_SPEED_CAP = 4.5;
+export const GAIT_SPEED_CAPS = { walk: WALK_SPEED_CAP, jog: JOG_SPEED_CAP, run: RUN_SPEED_CAP, cycle: CYCLE_SPEED_CAP } as const;
 export type Gait = keyof typeof GAIT_SPEED_CAPS;
 /** Heading error (rad) at and above which the walker cannot walk off: it turns in place (120°). */
 export const TURN_IN_PLACE = 2.1;
@@ -94,7 +96,7 @@ type Exec = {
   goal: { level: number; p: Vec2 };
   face?: number;
   speed: number;
-  gait?: 'jog' | 'run';
+  gait?: 'jog' | 'run' | 'cycle';
   profile: AgentProfile;
   route: Route;
   leg: number;
@@ -157,8 +159,8 @@ const walkSchemaWithin = (reach: number) => z.strictObject({
   z: z.number().min(-reach).max(reach),
   level: z.number().int().min(0).max(20).optional(),
   face: z.number().min(-7).max(7).optional(),
-  speed: z.number().min(0.3).max(RUN_SPEED_CAP).optional(),
-  gait: z.enum(['walk', 'jog', 'run']).optional(),
+  speed: z.number().min(0.3).max(CYCLE_SPEED_CAP).optional(),
+  gait: z.enum(['walk', 'jog', 'run', 'cycle']).optional(),
 }).refine(p => p.speed === undefined || p.speed <= GAIT_SPEED_CAPS[p.gait ?? 'walk'], { message: 'speed exceeds the selected gait cap', path: ['speed'] });
 const walkSchema500 = walkSchemaWithin(500);
 let walkSchemaWide: typeof walkSchema500 | null = null;

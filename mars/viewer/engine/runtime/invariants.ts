@@ -10,7 +10,7 @@ import { def } from '../world/catalog.ts';
 import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
-import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP, JOG_SPEED_CAP, RUN_SPEED_CAP } from '../locomotion/walk.ts';
+import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP, JOG_SPEED_CAP, RUN_SPEED_CAP, CYCLE_SPEED_CAP } from '../locomotion/walk.ts';
 import { sleepSafetyIssue } from '../activities/sleep.ts';
 
 const TOL = 0.03;
@@ -118,7 +118,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
     const d = lin + Math.abs(angleDelta(q.yaw, cur.yaw)) * ext;
     // Explicit faster gaits retain a bounded displacement, including a supported
     // terrain slope. Ordinary walkers keep the original stricter 0.15 m bound.
-    const gaitMax = e.human?.activity === 'run' ? RUN_SPEED_CAP * DT * 1.25 : e.human?.activity === 'jog' ? JOG_SPEED_CAP * DT * 1.25 : 0;
+    const gaitMax = e.human?.activity === 'cycle' ? CYCLE_SPEED_CAP * DT * 1.25 : e.human?.activity === 'run' ? RUN_SPEED_CAP * DT * 1.25 : e.human?.activity === 'jog' ? JOG_SPEED_CAP * DT * 1.25 : 0;
     const max = human && !e.human!.riding && !e.human!.carrier ? Math.max(MAX_HUMAN_STEP_PER_TICK, gaitMax) : MAX_STEP_PER_TICK;   // a carried body (vehicles/carrier.ts) moves with its carrier
     if (d > max)
       out.push({
@@ -142,6 +142,7 @@ export const SPEED_CAPS: Readonly<Record<string, number>> = {
   walk: WALK_SPEED_CAP,
   jog: JOG_SPEED_CAP,
   run: RUN_SPEED_CAP,
+  cycle: CYCLE_SPEED_CAP,
   'climb-up': CLIMB_SPEED,
   'climb-down': CLIMB_SPEED,
   'climb-wait': WALK_MIN,

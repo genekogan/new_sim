@@ -88,3 +88,20 @@ test('leisure: swing, see-saw with a partner (alone: nobody came), hammock, picn
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
   await w.replayExact();
 });
+
+test('bicycles: ride from the park-gate dock around the park and back, or to a place and back', {timeout: 1800000}, async t => {
+  const w = await world(2); t.after(() => {w.f.host.stop(); w.f.db.close();});
+  const [a, b] = w.souls;
+  const ride = await w.act(a, 'go for a bike ride around the park'); assert.equal(ride.accepted, true, JSON.stringify(ride)); assert.match(ride.resolved?.to, /^cycle-around:/);
+  let seen = 0, fastest = 0, prev: number[] | null = null;
+  const r = await w.done(a, ride, 20 * 60 * 8, () => {const e = w.body(a); if (e.human.activity === 'cycle') {seen++; if (prev) fastest = Math.max(fastest, Math.hypot(e.pose.p[0] - prev[0], e.pose.p[2] - prev[2]) * 20);} prev = [...e.pose.p];});
+  assert.equal(r.phase, 'completed', JSON.stringify(r)); assert.ok(seen > 20 * 10, String(seen)); assert.ok(fastest > 3 && fastest <= 4.5 * 1.25 + 1e-6, String(fastest));
+  // back at the dock afterwards
+  const end = w.body(a).pose.p; assert.ok(Math.hypot(end[0] - 4.05, end[2] - 83.1) < 1, JSON.stringify(end));
+  // to a place and back; "ride a skateboard" stays refused
+  const to = await w.act(b, 'ride a bike to the commons'); assert.equal(to.accepted, true, JSON.stringify(to)); assert.match(to.resolved?.to, /^cycle:/);
+  const sk = await w.act(a, 'ride a skateboard'); assert.equal(sk.accepted, false);
+  // the seaside Ferris wheel and carousel are scenery: refused honestly, never a balloon or a walk instead
+  for (const words of ['ride the ferris wheel', 'go on the carousel']) {const r = await w.act(b, words); assert.equal(r.accepted, false, words); assert.match(r.reason ?? '', /scenery for now/);}
+  assert.deepEqual(w.f.host.engine.runtime.violations, []);
+});

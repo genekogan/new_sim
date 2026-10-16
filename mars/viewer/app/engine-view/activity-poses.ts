@@ -100,6 +100,8 @@ export function activityFrame(activity: string, base: string, seconds: number, i
     // leisure: holding the swing's chains at shoulder height, leaning back as it goes forward; the see-saw's handle in
     // front, the same rhythm for both ends (world seconds); a picnic is eating sat low on the blanket; lying in a hammock
     // with the head propped, or flat on the grass with the hands behind the head, looking up
+    // cycling (engine gait 'cycle'): hands on the bars, leaning forward a little; humans.ts puts the feet on the pedals
+    case 'cycle': f.hands = [[0.34, 0.06, -0.36], [0.34, 0.06, -0.36]]; f.lean = 0.32; f.look = -0.12; return f;
     case 'swing': { const angle = swingAngle(t), v = Math.cos((t * 2 * Math.PI) / 2.7);
       f.hands = [[0.02, 0.03, 0.14], [0.02, 0.03, 0.14]]; f.lean = -0.1 * v; f.look = -0.05 - 0.08 * v; f.ride = { kind: 'swing', angle }; return f; }
     case 'seesaw': { const angle = seesawAngle(seconds);
@@ -234,8 +236,8 @@ export function makeProp(kind: PropKind): THREE.Group {
     case 'food': // a bread roll on a napkin
       g.add(part(k.box, M.card, 0.004, 0.13, 0.13, 0.03, -0.01, 0)); g.add(part(k.cyl, M.food, 0.05, 0.05, 0.05, 0.05, 0.02, 0)); break;
     case 'frisbee': g.add(part(k.cyl, M.frisbee, 0.12, 0.018, 0.12, 0.09, 0, 0)); g.add(part(k.cyl, M.frisbee2, 0.08, 0.02, 0.08, 0.09, 0.002, 0)); break;
-    case 'rod': // a long cane tipped forward and up, with a thin line and a red float hanging from the tip
-      g.add(part(k.cyl, M.wood, 0.007, 1.5, 0.007, 0.5, 0.45, 0, -1.05)); g.add(part(k.cyl, M.stem, 0.0015, 1.0, 0.0015, 1.14, 0.3, 0)); g.add(part(k.sphere, M.red, 0.018, 0.018, 0.018, 1.14, -0.2, 0)); break;
+    case 'rod': // a 2.4 m cane held out over the water, a line from its tip down to a red float on the surface
+      g.add(part(k.cyl, M.wood, 0.009, 2.4, 0.009, 1.0, 0.49, 0, -1.15)); g.add(part(k.cyl, M.stem, 0.002, 2.3, 0.002, 2.09, -0.17, 0)); g.add(part(k.sphere, M.red, 0.025, 0.025, 0.025, 2.09, -1.32, 0)); break;
     case 'bread': // a few torn pieces of bread in the open hand
       for (let i = 0; i < 3; i++) g.add(part(k.box, M.food, 0.035, 0.02, 0.03, 0.04 + i * 0.015, 0.0 + i * 0.006, (i - 1) * 0.03, 0, i)); break;
     case 'boule': g.add(part(k.sphere,M.metal,.045,.045,.045)); break;

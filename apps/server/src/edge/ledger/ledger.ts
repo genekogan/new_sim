@@ -407,6 +407,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (this.worldProfile) try {this.worldProfile(soul, caps, plans);} catch (e) {console.error('[edge] world profile', e instanceof Error ? e.message : e);}
     // Gaits apply to ordinary native walks, including the destinations a world creator adds.
     if (me && !isRigidBody(me)) {
+      let outMemo: number | null = null;   // bicycles other Souls have out now (counted once, only when a dock is near)
+      const bikesOut = () => outMemo ??= [...this.host.minds.values()].filter(m => m.soulId !== soul.soulId && this.openReceipts(m.soulId).some(r => /^cycle(?:-around)?:/.test(r.capability))).length;
       for (const c of [...caps]) {
         if (c.verb !== 'walk' || !c.target || this.places.byId.get(c.target.id)?.kind === 'water') continue;
         const base = plans.get(c.id); if (!base || !base.steps.some(s => s.verb === 'walk_to')) continue;
@@ -430,6 +432,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
           caps.push({id, verb: `${gait}-around`, label, available: true, target: {id: place.id, kind: 'place'}});
           plans.set(id, {label, steps: closed.map(to => ({verb: 'walk_to', params: {to, gait, standoff: 0}}))});
         }
+        if (place.kind !== 'water') this.bikeRide(soul, me, caps, plans, `cycle-around:${place.id}`, 'cycle-around', place.id, `Ride a bicycle around ${place.name}`, closed.map(to => ({verb: 'walk_to', params: {to, gait: 'cycle', standoff: 0}})), bikesOut);
+      }
+      // todo (leisure): ride a dock bicycle to a place and back (the ordinary walk's route, at the cycling gait)
+      for (const c of [...caps]) {
+        if (c.verb !== 'walk' || !c.target || c.target.kind !== 'place') continue;
+        const place = this.places.byId.get(c.target.id); if (!place || place.kind === 'water' || place.enclosed) continue;
+        const legs = (plans.get(c.id)?.steps ?? []).filter(s => s.verb === 'walk_to').map(s => ({...s, params: {...s.params, gait: 'cycle'}})); if (!legs.length) continue;
+        this.bikeRide(soul, me, caps, plans, `cycle:${place.id}`, 'cycle', place.id, `Ride a bicycle to ${place.name} and back`, legs, bikesOut);
       }
     }
     // A moving carrier retains its riders until it returns, regardless of which world supplied the offer.
@@ -878,6 +888,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
     };
   }
 
+  /** todo (leisure): a bicycle ride from the nearest dock (within 120 m): fetch a bicycle, ride the legs at the cycling gait,
+   *  ride back and dock it. The docks share one fleet: when every bicycle is out the ride is offered but blocked. */
+  private bikeRide(soul: EdgeSoul, me: NonNullable<ReturnType<EdgeLedger['body']>>, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean}>, id: string, verb: string, target: string, what: string, legs: Program['steps'], out: () => number) {
+    const here: [number, number] = [me.pose.p[0], me.pose.p[2]], docks = (this.spots.docks ?? []).map(k => ({k, d: Math.hypot(k.at[0] - here[0], k.at[1] - here[1])})).filter(x => x.d <= 120).sort((a, b) => a.d - b.d || a.k.id.localeCompare(b.k.id));
+    const dock = docks[0]?.k; if (!dock || !legs.length) return;
+    // one shared fleet: every open ride of another Soul holds one bicycle out of the world's docks
+    const fleet = (this.spots.docks ?? []).reduce((n, k) => n + k.bikes, 0), left = Math.max(0, Math.min(dock.bikes, fleet - out()));
+    const label = `${what} (a bicycle from ${dock.label ?? dock.id}, ${Math.round(docks[0].d)} m away; ${left} of ${dock.bikes} there; 4.5 m/s on dry ground, returned to the dock after)`;
+    caps.push({id, verb, label, available: left > 0, ...(left > 0 ? {} : {blocked: {code: 'bike.none-left', reason: `All ${dock.bikes} bicycles of ${dock.label ?? dock.id} are out; ask again when one is back.`}}), target: {id: target, kind: 'place'}});
+    const face = dock.faceTo ? {face: dock.faceTo} : {};
+    plans.set(id, {label: what, steps: [
+      ...(me.human && (me.human.activity === 'sit' || me.human.baseActivity === 'sit') ? [{verb: 'stand', params: {}}] : []),
+      {verb: 'walk_to', params: {to: dock.at, standoff: 0}}, {verb: 'mars:pose_v1', params: {activity: 'pick-up', seconds: 2, ...face}},
+      ...legs,
+      {verb: 'walk_to', params: {to: dock.at, gait: 'cycle', standoff: 0}}, {verb: 'mars:pose_v1', params: {activity: 'put-down', seconds: 2, ...face}}]});
+  }
   /** CN5: a choreographed game this body is playing, in names (who is playing, whose turn, ends won at pétanque). */
   private gameView(b: ReturnType<EdgeLedger['body']> | undefined): {game?: unknown} {
     const g = b?.human?.game; if (!g) return {};
@@ -1159,6 +1185,7 @@ export function stateOf(host: WorldHost, entityId: string): string {
   if (a === 'walk') return 'walking';
   if (a === 'jog') return 'jogging';
   if (a === 'run') return 'running';
+  if (a === 'cycle') return 'cycling';
   if (a === 'row') return 'rowing';
   if (a === 'swim' || a === 'tread' || a === 'wade') return 'swimming';
   if (a === 'wait') return 'waiting';

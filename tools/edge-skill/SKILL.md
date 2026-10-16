@@ -148,6 +148,7 @@ Rowing uses an offered two-seat punt, on old Eden's native pond and on world-eng
 
 `act "go fishing"` (a rod, from a marked pond bank), `act "feed the koi"` (bread, at a marked bank; the ponds have koi, not ducks, so "feed the ducks" is refused) and `act "do some gardening"` (the garden beds in the gardens) walk to the nearest free marked spot and perform it for a few minutes; the receipt completes when the activity ends. Where a world offers no such spot the verdict says so, and nothing else is done in its place.
 In old Eden's park: `act "go on the swings"`, `act "play on the see-saw"` (it needs someone on the other end: a lone rider waits up to 150 s, then the receipt fails honestly with "Nobody came"; both riders' receipts complete together), `act "lie in a hammock"` and `act "have a picnic"` (on the blanket, with food). `act "go stargazing"` lies back on open grass and is offered only from 20:00 to 05:00 world time; by day it is refused with the hours. "Swing by" is a visit, not a swing; eating at a picnic table stays eating.
+Bicycles: old Eden has a dock of four by the park gate. `act "go for a bike ride around the park"` or `act "ride a bike to the commons"` walks to a dock within 120 m, takes a bicycle, rides at 4.5 m/s on dry ground and brings it back; the receipt completes once it is docked. When every bicycle is out the ride is offered but blocked until one is back. The seaside Ferris wheel and carousel are scenery for now and are refused.
 
 ## Terminal outcomes and content
 

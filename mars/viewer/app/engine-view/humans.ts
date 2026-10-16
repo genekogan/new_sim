@@ -54,6 +54,7 @@ import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placePr
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
 import {runningGaitAt} from './running-gait.ts';
 import {PLAY_MOTION, playSeatAt, rideSeat} from './play-motion.ts';
+import {BIKE_SADDLE, crankAngle, makeBicycle, pedalLocal, poseBicycle} from './bicycle.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number; sitW: number; warmW: number; expressionT: number; pose: Posture; hands: Hands; pr: ProneState | null };
@@ -118,6 +119,8 @@ type View = {
   gameDt?:number;
   groundSeat?: boolean;
   running?: boolean;
+  /** todo (leisure): the dock bicycle under a cycling body, metres ridden (turns the cranks), when it last cycled (s). */
+  bike?: THREE.Group; ridden?: number; bikeAt?: number;
   prop?: { kind: PropKind; obj: THREE.Object3D };
   /** Library clip layer (clip-library.ts): seconds since `activity` began (undefined: before the record), the activity
    *  and base before it (crossfade), the paired-gesture partner and where it is, metres walked, speaking now. */
@@ -266,7 +269,7 @@ function nearest(list: [number, number, number][], x: number, z: number) {
 }
 
 /** Base activity: what the body does under an eat / serve overlay. */
-const baseOf = (act: string, base?: string) => { const b = OVERLAYS.has(act) ? (base ?? 'idle') : act; return b === 'sit-ground' ? 'sit' : b; };
+const baseOf = (act: string, base?: string) => { if (act === 'cycle') return 'sit'; const b = OVERLAYS.has(act) ? (base ?? 'idle') : act; return b === 'sit-ground' ? 'sit' : b; };
 /** Sitting on the ground (sit-ground, or an overlay layered on it): the seat is the grass. */
 const onGround = (act: string, base?: string) => act === 'sit-ground' || (base === 'sit-ground' && OVERLAYS.has(act));
 /** Idle variety: now and then (about 6 s in every 25, per person) the Idle_Neutral clip blends in. */
@@ -430,7 +433,7 @@ export class HumanViews {
         fx ??= fixturesOf(world);
         if (seated) {
           const n = nearest(fx.seats, e.pose.p[0], e.pose.p[2]);
-          v.seat = onGround(act, e.human.baseActivity) ? GROUND_SEAT : n.f && n.d <= SEAT_MATCH ? n.f[2] - e.pose.p[1] : SEAT_DEFAULT;
+          v.seat = act === 'cycle' ? BIKE_SADDLE : onGround(act, e.human.baseActivity) ? GROUND_SEAT : n.f && n.d <= SEAT_MATCH ? n.f[2] - e.pose.p[1] : SEAT_DEFAULT;
         } else v.fire = nearest(fx.fires, e.pose.p[0], e.pose.p[2]).f;
       }
       const sitting = (base === 'sit' || base === 'sit-down') && !walking;
@@ -460,7 +463,7 @@ export class HumanViews {
         v.rig.mixer.uncacheRoot(v.rig.model);
         v.appearance?.retire();
         disposeSkeletons(v.rig.model);
-        this.group.remove(v.rig.holder);
+        this.group.remove(v.rig.holder); if (v.bike) this.group.remove(v.bike);
         this.views.delete(id);
       }
     this.trackParts((id) => world.entities[id]);
@@ -594,7 +597,7 @@ export class HumanViews {
       v.gripSlot = f.gripSlot;
       v.on = f.on;
       v.frame = frameCtx(f.on, act, (id) => parts[id], this.climbs);
-      v.seat = base==='sit'&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
+      v.seat = act==='cycle'?BIKE_SADDLE:base==='sit'&&!f.on&&!f.grip&&!f.hands?.left&&!f.hands?.right&&typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:SEAT_DEFAULT;
       v.bench = LYING.has(act)||act==='bench-press'?(typeof f.seatHeight==='number'&&Number.isFinite(f.seatHeight)&&f.seatHeight>0&&f.seatHeight<=1.2?f.seatHeight:0):0;
       v.groundSeat = onGround(act, f.baseActivity);
       if (v.groundSeat) v.seat = GROUND_SEAT;
@@ -637,7 +640,7 @@ export class HumanViews {
         v.rig.mixer.uncacheRoot(v.rig.model);
         v.appearance?.retire();
         disposeSkeletons(v.rig.model);
-        this.group.remove(v.rig.holder);
+        this.group.remove(v.rig.holder); if (v.bike) this.group.remove(v.bike);
         this.views.delete(id);
       }
     for (const f of frame) { const v = this.views.get(f.id); if (v?.partner) { const q = frame.find((g) => g.id === v.partner); v.partnerP = q ? new THREE.Vector3(...q.p) : undefined; } }
@@ -652,6 +655,8 @@ export class HumanViews {
   render(alpha: number, reach?: Reach) {
     PLAY_MOTION.value.set(0, 0, 0, 0); // empty playground seats hang at rest; riders set theirs below
     for (const v of this.views.values()) this.pose(v, alpha, reach);
+    // the dock shows one bicycle fewer for each one out under a rider (decorative-motion 'dock-bike')
+    let out = 0; for (const v of this.views.values()) if (v.bike?.visible) out++; PLAY_MOTION.value.w = out;
   }
 
   private pose(v: View, alpha: number, reach?: Reach) {
@@ -826,6 +831,25 @@ export class HumanViews {
         if (act.side) turn(v.spine.abdomen, _fwd, act.side);
       }
       h.updateMatrixWorld(true);
+    }
+    // todo (leisure): cycling — the dock bicycle under the rider along the heading, cranks turned by the distance ridden, feet
+    // on the pedals; it stays a moment between the legs of a ride (the body idles a tick between walk_to steps)
+    {
+      const cycling = v.activity === 'cycle';
+      if (cycling) v.bikeAt = tSec;
+      const show = cycling || (v.bikeAt !== undefined && tSec - v.bikeAt >= 0 && tSec - v.bikeAt < 0.6 && !['pick-up', 'put-down'].includes(v.activity));
+      if (show) {
+        if (!v.bike) { v.bike = makeBicycle(hashId(h.name) % 4); this.group.add(v.bike); }
+        const crank = crankAngle(v.dist), by = a.p[1] + (b.p[1] - a.p[1]) * alpha;
+        v.bike.visible = true; poseBicycle(v.bike, h.position.x, by, h.position.z, yaw, crank);
+        if (cycling && v.legs.length >= 2) {
+          v.legs.forEach((leg, i) => {
+            const [lx, ly, lz] = pedalLocal(crank, -leg.side), goal = V().set(h.position.x, by, h.position.z).addScaledVector(_fwd, lx).addScaledVector(UP, ly).addScaledVector(_right, lz);
+            legTo(leg, v.ankle[i], goal, V().copy(_fwd).addScaledVector(UP, .4).addScaledVector(_right, -leg.side * .1), .999, leg.foot.getWorldQuaternion(new THREE.Quaternion()));
+          });
+          h.updateMatrixWorld(true);
+        }
+      } else if (v.bike) v.bike.visible = false;
     }
     if (expression && v.spine) {
       if (expression.kind === 'planted-dance') expressionLegs(v,expression);

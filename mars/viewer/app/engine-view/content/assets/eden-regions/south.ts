@@ -52,7 +52,7 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees,motion?:DecorationSink
   // Consume the original draws even when clearing a new building, keeping all
   // later park trees, playground and kiosk decoration at their seeded positions.
   const scale=.9+r()*.6,kind=pick(r,['round','round','poplar','conifer'] as const),color=pick(r,['#6f9a4e','#5f8a46','#7fa84f','#4f7a3c','#8aa850']),yaw=r()*6;
-  if(clearsRelocatedBuildings(x,z,scale)&&!(x>16&&x<31&&z>113&&z<127))trees.add(x,G(x,z),z,scale,kind,color,yaw);}
+  if(clearsRelocatedBuildings(x,z,scale)&&!(x>-25&&x<-9&&z>123&&z<134))trees.add(x,G(x,z),z,scale,kind,color,yaw);}
  // playground (x 10..28, z 96..110): sandpit, swings, slide, climbing frame, see-saw, fence
  b.box('soil',19,0,103,16,.06,12,'#d8c79a');fence(b,[[11,97],[27,97],[27,109],[11,109],[11,101]],.9,'#e05a3a',G);
  {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');
@@ -64,11 +64,16 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees,motion?:DecorationSink
   // see-saw: plank (top 0.6 m at rest, level) and two handles turn about the pivot with its riders (play-motion.ts)
   drawDecoration(b,motion,{kind:'seesaw',pivot:[15,.55,106]},d=>{d.box('timber',0,.52,0,3.2,.08,.3,'#e05a3a');for(const x of [-1.05,1.05]){d.box('metal',x,.6,0,.04,.32,.04,'#3d5a80');d.box('metal',x,.9,0,.04,.04,.36,'#3d5a80');}});b.pop();}
  for(const [x,z,yaw] of [[12,111,0],[26,111,0]] as [number,number,number][]){b.push(x,0,z,yaw);bench(b,'#3d5a80');b.pop();}
- // the east lawn (todo leisure): two hammocks slung between posts (cloth 0.62 m at its lowest), a picnic blanket with a basket
- for(const z of [117,121]){for(const x of [25.6,28.8])b.box('timber',x,0,z,.12,1.5,.12,'#7a5a3a');
-  for(let i=0;i<12;i++){const u0=i/12,u1=(i+1)/12,sag=(u:number)=>1.25-.63*Math.sin(Math.PI*u),x0=25.7+3*u0,x1=25.7+3*u1;b.quad('cloth',[x0,sag(u0),z-.42],[x1,sag(u1),z-.42],[x1,sag(u1),z+.42],[x0,sag(u0),z+.42],i%2?'#e8a33c':'#2f6f8f');b.quad('cloth',[x0,sag(u0),z+.42],[x1,sag(u1),z+.42],[x1,sag(u1),z-.42],[x0,sag(u0),z-.42],i%2?'#e8a33c':'#2f6f8f');}}
- {b.box('cloth',20,0,124,2.2,.02,2.2,'#c84a4a');for(let i=0;i<5;i++)b.box('cloth',18.9+i*.55,.021,124,.12,.004,2.2,'#f3eee2');for(let i=0;i<5;i++)b.box('cloth',20,.021,122.9+i*.55,2.2,.004,.12,'#f3eee2');
-  b.box('timber',20.35,.02,124.3,.42,.26,.3,'#a0764e');b.box('cloth',20.35,.28,124.3,.44,.02,.32,'#e8e2d2');for(const [x,z] of [[19.15,124],[20.85,124],[20,123.15],[20,124.85]] as [number,number][])b.box('cloth',x,.02,z,.42,.16,.42,'#e8c84a');}
+ // a bicycle dock on the south lawn by the park path (todo leisure): four bicycles; one disappears for each that is out
+ {b.box('metal',4.05,0,84.35,2.9,.06,.1,'#5a6268');for(const x of [2.6,5.5])b.box('metal',x,0,84.35,.06,.75,.06,'#5a6268');b.box('metal',4.05,.72,84.35,2.96,.05,.05,'#5a6268');
+  [3,3.7,4.4,5.1].forEach((x,i)=>drawDecoration(b,motion,{kind:'dock-bike',pivot:[x,.3,84],phase:i},d=>{d.push(x,0,84,0);const c=['#c43a2a','#3d5a80','#2f6f4f','#e0b04a'][i];
+   for(const s of [-.5,.5]){d.push(s,.34,0,0);d.pushRot('z',Math.PI/2);d.cyl('dressing',0,-.02,0,.33,.04,12,'#1e1e1e',false);d.pop();d.pop();}
+   d.box('dressing',0,.55,0,.05,.05,1,c);d.box('dressing',0,.3,.05,.05,.5,.05,c);d.box('dressing',0,.8,-.38,.05,.05,.12,'#1e1e1e');d.box('dressing',0,.95,.42,.5,.03,.03,'#1e1e1e');d.pop();}));}
+ // the south-west lawn (todo leisure): two hammocks slung between posts (cloth 0.62 m at its lowest), a picnic blanket with a basket
+ for(const z of [126.5,130]){for(const x of [-21.6,-18.4])b.box('timber',x,0,z,.12,1.5,.12,'#7a5a3a');
+  for(let i=0;i<12;i++){const u0=i/12,u1=(i+1)/12,sag=(u:number)=>1.25-.63*Math.sin(Math.PI*u),x0=-21.5+3*u0,x1=-21.5+3*u1;b.quad('cloth',[x0,sag(u0),z-.42],[x1,sag(u1),z-.42],[x1,sag(u1),z+.42],[x0,sag(u0),z+.42],i%2?'#e8a33c':'#2f6f8f');b.quad('cloth',[x0,sag(u0),z+.42],[x1,sag(u1),z+.42],[x1,sag(u1),z-.42],[x0,sag(u0),z-.42],i%2?'#e8a33c':'#2f6f8f');}}
+ {b.box('cloth',-13,0,127,2.2,.02,2.2,'#c84a4a');for(let i=0;i<5;i++)b.box('cloth',-14.1+i*.55,.021,127,.12,.004,2.2,'#f3eee2');for(let i=0;i<5;i++)b.box('cloth',-13,.021,125.9+i*.55,2.2,.004,.12,'#f3eee2');
+  b.box('timber',-12.65,.02,127.3,.42,.26,.3,'#a0764e');b.box('cloth',-12.65,.28,127.3,.44,.02,.32,'#e8e2d2');for(const [x,z] of [[-13.85,127],[-12.15,127],[-13,126.15],[-13,127.85]] as [number,number][])b.box('cloth',x,.02,z,.42,.16,.42,'#e8c84a');}
  // ice-cream kiosk and a drinking fountain near the avenue
  b.push(-6,0,95.5,Math.PI);stall(b,2.6,'#f3a6c0','#ffffff',r,false);b.pop();b.cyl('stone',4,0,94.5,.3,.95,6,'#b9b0a0');
 }

@@ -16,7 +16,9 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
    *  waits for them and what happens alone (fail: "nobody came" is the honest verdict). */
   together?: {group: string; need: number; wait: number; alone: 'fail' | 'start'}};
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2};
-export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]};
+/** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
+export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
+export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[]};
 export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
 
 /** Activities a spot may offer, with their default prop and seconds. */
@@ -65,8 +67,9 @@ export function loadSpots(raw: unknown): {data: SpotsData; refused: string[]} {
   // CN5: walkable raised decks (OBSTACLES-v1 platforms[]): a box {c, half, yaw} or a round deck {c, r}, top height, optional step/ramp
   const platforms = (d.platforms ?? []).filter(q => {const good = ok(q?.id) && pt(q.c) && Number.isFinite(q.top) && q.top > 0 && q.top < 3 && ((pt(q.half) && Number.isFinite(q.yaw ?? 0)) || (Number.isFinite(q.r) && q.r! > 0.3 && q.r! < 50))
     && [q.step, q.ramp].every(a => a === undefined || (pt(a.c) && pt(a.half))); if (!good) refused.push('platform ' + String(q?.id)); return good;});
+  const docks = (d.docks ?? []).filter(k => {const good = ok(k?.id) && pt(k.at) && (k.faceTo === undefined || pt(k.faceTo)) && Number.isInteger(k.bikes) && k.bikes >= 1 && k.bikes <= 12; if (!good) refused.push('dock ' + String(k?.id)); return good;});
   if (raw !== undefined && d.contract !== 'activity-spots/1') return {data: {contract: 'activity-spots/1', spots: [], shelves: [], interiors: [], solids: [], rings: [], platforms: []}, refused: ['contract must be activity-spots/1']};
-  return {data: {contract: 'activity-spots/1', spots, shelves, interiors, solids, rings, platforms}, refused};
+  return {data: {contract: 'activity-spots/1', spots, shelves, interiors, solids, rings, platforms, ...(docks.length ? {docks} : {})}, refused};
 }
 
 export type ActivityWorld = {

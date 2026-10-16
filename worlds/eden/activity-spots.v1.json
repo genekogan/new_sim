@@ -4805,11 +4805,11 @@
    "base": "idle",
    "at": [
     -14,
-    101.6
+    103.1
    ],
    "faceTo": [
     -14,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond"
   },
@@ -4820,11 +4820,11 @@
    "base": "idle",
    "at": [
     -8,
-    101.6
+    103.1
    ],
    "faceTo": [
     -8,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond"
   },
@@ -4835,11 +4835,11 @@
    "base": "idle",
    "at": [
     -2,
-    101.6
+    103.1
    ],
    "faceTo": [
     -2,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond"
   },
@@ -4850,11 +4850,11 @@
    "base": "idle",
    "at": [
     -11,
-    101.6
+    103.1
    ],
    "faceTo": [
     -11,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond, feeding the koi"
   },
@@ -4865,11 +4865,11 @@
    "base": "idle",
    "at": [
     -5,
-    101.6
+    103.1
    ],
    "faceTo": [
     -5,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond, feeding the koi"
   },
@@ -4880,11 +4880,11 @@
    "base": "idle",
    "at": [
     1,
-    101.6
+    103.1
    ],
    "faceTo": [
     1,
-    104.6
+    106.1
    ],
    "label": "North bank of the park pond, feeding the koi"
   },
@@ -5090,15 +5090,15 @@
    "activity": "hammock",
    "base": "lie",
    "at": [
-    27.4,
-    117
+    -19.9,
+    126.5
    ],
    "faceTo": [
-    30,
-    117
+    -17.3,
+    126.5
    ],
    "seatHeight": 0.62,
-   "label": "Hammock between two posts, east lawn of the park"
+   "label": "Hammock between two posts, south-west lawn of the park"
   },
   {
    "id": "hammock-2",
@@ -5106,15 +5106,15 @@
    "activity": "hammock",
    "base": "lie",
    "at": [
-    27.4,
-    121
+    -19.9,
+    130
    ],
    "faceTo": [
-    30,
-    121
+    -17.3,
+    130
    ],
    "seatHeight": 0.62,
-   "label": "Hammock between two posts, east lawn of the park"
+   "label": "Hammock between two posts, south-west lawn of the park"
   },
   {
    "id": "picnic-blanket-w",
@@ -5122,15 +5122,15 @@
    "activity": "picnic",
    "base": "sit",
    "at": [
-    19.15,
-    124
+    -13.85,
+    127
    ],
    "faceTo": [
-    20,
-    124
+    -13,
+    127
    ],
    "seatHeight": 0.2,
-   "label": "Picnic blanket, east lawn of the park (west side)"
+   "label": "Picnic blanket, south-west lawn of the park (west side)"
   },
   {
    "id": "picnic-blanket-e",
@@ -5138,15 +5138,15 @@
    "activity": "picnic",
    "base": "sit",
    "at": [
-    20.85,
-    124
+    -12.15,
+    127
    ],
    "faceTo": [
-    20,
-    124
+    -13,
+    127
    ],
    "seatHeight": 0.2,
-   "label": "Picnic blanket, east lawn of the park (east side)"
+   "label": "Picnic blanket, south-west lawn of the park (east side)"
   },
   {
    "id": "picnic-blanket-n",
@@ -5154,15 +5154,15 @@
    "activity": "picnic",
    "base": "sit",
    "at": [
-    20,
-    123.15
+    -13,
+    126.15
    ],
    "faceTo": [
-    20,
-    124
+    -13,
+    127
    ],
    "seatHeight": 0.2,
-   "label": "Picnic blanket, east lawn of the park (north side)"
+   "label": "Picnic blanket, south-west lawn of the park (north side)"
   },
   {
    "id": "picnic-blanket-s",
@@ -5170,15 +5170,15 @@
    "activity": "picnic",
    "base": "sit",
    "at": [
-    20,
-    124.85
+    -13,
+    127.85
    ],
    "faceTo": [
-    20,
-    124
+    -13,
+    127
    ],
    "seatHeight": 0.2,
-   "label": "Picnic blanket, east lawn of the park (south side)"
+   "label": "Picnic blanket, south-west lawn of the park (south side)"
   }
  ],
  "solids": [
@@ -9129,8 +9129,8 @@
    "id": "park-hammock-post-1",
    "label": "Hammock post",
    "c": [
-    25.6,
-    117
+    -21.6,
+    126.5
    ],
    "half": [
     0.08,
@@ -9143,8 +9143,8 @@
    "id": "park-hammock-post-2",
    "label": "Hammock post",
    "c": [
-    28.8,
-    117
+    -18.4,
+    126.5
    ],
    "half": [
     0.08,
@@ -9157,8 +9157,8 @@
    "id": "park-hammock-post-3",
    "label": "Hammock post",
    "c": [
-    25.6,
-    121
+    -21.6,
+    130
    ],
    "half": [
     0.08,
@@ -9171,8 +9171,8 @@
    "id": "park-hammock-post-4",
    "label": "Hammock post",
    "c": [
-    28.8,
-    121
+    -18.4,
+    130
    ],
    "half": [
     0.08,
@@ -9180,6 +9180,20 @@
    ],
    "yaw": 0,
    "height": 1.6
+  },
+  {
+   "id": "bike-dock-park-gate-rack",
+   "label": "Bicycle dock",
+   "c": [
+    4.05,
+    84.2
+   ],
+   "half": [
+    1.5,
+    0.55
+   ],
+   "yaw": 0,
+   "height": 1.0
   }
  ],
  "rings": [
@@ -9401,6 +9415,22 @@
    ],
    "yaw": 0,
    "top": 0.55
+  }
+ ],
+ "docks": [
+  {
+   "id": "bike-dock-park-gate",
+   "place": "eden-south-lawn",
+   "at": [
+    4.05,
+    83.1
+   ],
+   "faceTo": [
+    4.05,
+    84.3
+   ],
+   "bikes": 4,
+   "label": "the bicycle dock by the park gate"
   }
  ]
 }

@@ -125,7 +125,7 @@ export const BODY_VERBS: VerbInfo[] = [
   {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
-  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run']} }, required: ['to'] } },
+  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']} }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
   { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
@@ -820,7 +820,7 @@ export class MarsEngine implements Engine {
   // ------------------------------------------------------------------ bodies
   private gaitIssue(actor:string,params:Record<string,unknown>):Diag|null {
     if(params.gait===undefined||params.gait==='walk')return null;
-    if(params.gait!=='jog'&&params.gait!=='run')return {code:'gait.invalid',message:'Choose walk, jog or run.'};
+    if(params.gait!=='jog'&&params.gait!=='run'&&params.gait!=='cycle')return {code:'gait.invalid',message:'Choose walk, jog, run or cycle.'};
     return this.ents[actor]?.body?.family==='floater'?{code:'gait.unsupported-body',message:'Jogging and running require a humanoid body; this body can glide instead.'}:null;
   }
   /** BODY-v1 owner assignments never run limb/ride/building programs. Legacy native
