@@ -31,11 +31,18 @@ const BRAKE = 2 * ACCEL; // m/s² ordinary deceleration
 /** m/s along the stair path (the horizontal ground speed on a flight is at most this). */
 export const CLIMB_SPEED = 0.45;
 /**
- * The fastest a person walks (m/s): `walk_to`'s `speed` may not exceed it, and no walker's body moves more
- * than min(its speed, this) × DT in one tick (MOVEMENT.md "No jumps"): lateral sidesteps, offsets swept
+ * The fastest ordinary walk (m/s): without an explicit faster gait, `walk_to`'s `speed` may not exceed
+ * it. Every gait keeps one speed × DT budget in each tick: lateral sidesteps, offsets swept
  * round a bend and pulling back into line all come out of that one per-tick budget, never on top of it.
  */
 export const WALK_SPEED_CAP = 1.4;
+/** Explicit, stamina-free faster gaits. Legacy steps keep the walking cap. */
+export const JOG_SPEED_CAP = 2.5;
+export const RUN_SPEED_CAP = 4;
+/** todo (leisure): riding a bicycle taken from a dock, on the same dry routes as a jog. */
+export const CYCLE_SPEED_CAP = 4.5;
+export const GAIT_SPEED_CAPS = { walk: WALK_SPEED_CAP, jog: JOG_SPEED_CAP, run: RUN_SPEED_CAP, cycle: CYCLE_SPEED_CAP } as const;
+export type Gait = keyof typeof GAIT_SPEED_CAPS;
 /** Heading error (rad) at and above which the walker cannot walk off: it turns in place (120°). */
 export const TURN_IN_PLACE = 2.1;
 const HEAD_FULL = 0.35; // rad heading error up to which full speed is allowed; linear down to 0 at TURN_IN_PLACE
@@ -78,7 +85,7 @@ const LOOK = 2.5; // m look-ahead for conflicts
 const ENC_STEP = 0.1; // m between samples of the path ahead that encounters are measured against
 const ENC_TIME = 1.0; // s: another walker's heading is the chord of its own smoothed path over this much of its walking
 
-export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number;arrivalEvidence?:'navigation-arrival/1' };
+export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number; gait?: Gait;arrivalEvidence?:'navigation-arrival/1' };
 
 type Seg = PathSeg;
 type Narrow = { res: string; s0: number; s1: number; entry: Vec2; dir: Vec2 };
@@ -89,6 +96,7 @@ type Exec = {
   goal: { level: number; p: Vec2 };
   face?: number;
   speed: number;
+  gait?: 'jog' | 'run' | 'cycle';
   profile: AgentProfile;
   route: Route;
   leg: number;
@@ -151,8 +159,9 @@ const walkSchemaWithin = (reach: number) => z.strictObject({
   z: z.number().min(-reach).max(reach),
   level: z.number().int().min(0).max(20).optional(),
   face: z.number().min(-7).max(7).optional(),
-  speed: z.number().min(0.3).max(WALK_SPEED_CAP).optional(),
-});
+  speed: z.number().min(0.3).max(CYCLE_SPEED_CAP).optional(),
+  gait: z.enum(['walk', 'jog', 'run', 'cycle']).optional(),
+}).refine(p => p.speed === undefined || p.speed <= GAIT_SPEED_CAPS[p.gait ?? 'walk'], { message: 'speed exceeds the selected gait cap', path: ['speed'] });
 const walkSchema500 = walkSchemaWithin(500);
 let walkSchemaWide: typeof walkSchema500 | null = null;
 /** GOD-ENV: a god's (entity) world can grow past ±500 m ("extend the world east"); its server widens the reach of
@@ -219,19 +228,31 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   plan(rt, p) {
     const a = actorOf(rt, p.actor);
     if ('code' in a) return { ok: false, diagnostic: a };
+    if (p.gait && p.gait !== 'walk' && a.body?.family === 'floater')
+      return { ok: false, diagnostic: { code: 'gait.unsupported-body', message: 'Jogging and running require a humanoid body; this body can glide instead.', subjects: [p.actor] } };
     if (a.human!.grip)
       return { ok: false, diagnostic: { code: 'actor.holding', message: `${p.actor} is holding ${a.human!.grip.entity} and cannot walk away until it is set down or stable`, subjects: [p.actor, a.human!.grip.entity] } };
     const sleeper = occupant(rt, a, [p.x, p.z], bodyProfile(a).radius, true, p.level ?? a.human!.level);
     if (sleeper) return { ok: false, diagnostic: { code: 'walk.goal-occupied', message: `${p.actor}'s destination overlaps ${sleeper}'s supported sleep space`, subjects: [p.actor, sleeper] } };
     const r = planWalk(rt, a, { level: p.level ?? a.human!.level, p: [p.x, p.z] });
-    return r.ok ? { ok: true, program: r.route } : { ok: false, diagnostic: { ...r.diagnostic, subjects: [p.actor, ...(r.diagnostic.subjects ?? [])] } };
+    if (!r.ok) return { ok: false, diagnostic: { ...r.diagnostic, subjects: [p.actor, ...(r.diagnostic.subjects ?? [])] } };
+    // Faster gaits are dry-ground activities. Never relabel wading as running.
+    const ground = spatial(rt, p.actor).ground;
+    if (ground && p.gait && p.gait !== 'walk') for (const leg of r.route.legs) if (leg.kind === 'walk' && leg.level === 0) {
+      for (let i = 1; i < leg.points.length; i++) {
+        const from = leg.points[i - 1], to = leg.points[i], n = Math.max(1, Math.ceil(dist2(from, to) / 0.1));
+        for (let j = 0; j <= n; j++) if (ground.field.medium(from[0] + (to[0] - from[0]) * j / n, from[1] + (to[1] - from[1]) * j / n) === G_WADE)
+          return { ok: false, diagnostic: { code: 'gait.dry-ground-required', message: 'Jogging and running need a dry route; walk or swim through the water first.', subjects: [p.actor] } };
+      }
+    }
+    return { ok: true, program: r.route };
   },
   start(rt, p, route, id) {
     const a = rt.world.entities[p.actor];
     a.human!.task = id;
     const ex: Exec = {
       id, actor: p.actor, ...(p.arrivalEvidence?{arrivalEvidence:p.arrivalEvidence}:{}), goal: { level: p.level ?? a.human!.level, p: [p.x, p.z] }, face: p.face,
-      speed: p.speed ?? bodyProfile(a).speed, profile: bodyProfile(a), route, leg: 0, segs: [], total: 0, s: 0, v: 0,
+      speed: p.speed ?? (p.gait && p.gait !== 'walk' ? GAIT_SPEED_CAPS[p.gait] : bodyProfile(a).speed), ...(p.gait && p.gait !== 'walk' ? { gait: p.gait } : {}), profile: bodyProfile(a), route, leg: 0, segs: [], total: 0, s: 0, v: 0,
       offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt,p.actor).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0, pushes: 0,
     };
     // paged ground: the walk is registered first, so the window covering its chunk is there when the leg is smoothed
@@ -777,14 +798,14 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     q = at(offset * lo);
     return { p: q, off: offset * lo };
   };
-  // No jumps (MOVEMENT.md): the body moves at most min(speed, WALK_SPEED_CAP) × dt this tick, forward
+  // No jumps (MOVEMENT.md): the body moves at most min(speed, gait cap) × dt this tick, forward
   // progress, sidestep and any pull back into line together. Over budget, the walker takes the largest
   // fraction t of this tick's corridor progress and offset change that fits (it slows down: an offset
   // swept round the outside of a bend, a sidestep while walking at full speed). If that leaves it
   // (nearly) stuck because the offset must narrow ahead (a gap the sidestep does not fit through), it
   // first steps back towards the corridor where it is; a body away from its corridor point (a walk
   // started off its route) walks straight back to it.
-  const stepMax = Math.min(ex.speed, WALK_SPEED_CAP) * dt;
+  const stepMax = Math.min(ex.speed, GAIT_SPEED_CAPS[ex.gait ?? 'walk']) * dt;
   const sNew = ex.s, offNew = ex.offset;
   const at = (t: number) => place(prevS + (sNew - prevS) * t, bodyOff + (offNew - bodyOff) * t);
   let pl = at(1);
@@ -893,12 +914,12 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   let y = gn ? gn.standY(p[0], p[1]) : g.y;
   // ground worlds: a step up/down (a deck's end, a floor slab's edge) is taken over a few ticks, never in one jump
   // (runtime/invariants.ts motion.teleport); slopes change far less than this per tick, so on them y is the tiles' exactly
-  if (gn) { const dy = y - a.pose.p[1], h = hypot(p[0] - cur[0], p[1] - cur[1]), v = Math.max(0.02, Math.sqrt(Math.max(0, 0.145 * 0.145 - h * h))); if (Math.abs(dy) > v && Math.abs(dy) < 1.5) y = a.pose.p[1] + Math.sign(dy) * v; }
+  if (gn) { const dy = y - a.pose.p[1], h = hypot(p[0] - cur[0], p[1] - cur[1]), budget = ex.gait ? Math.max(0.145, GAIT_SPEED_CAPS[ex.gait] * dt * 1.25 - 0.005) : 0.145, v = Math.max(0.02, Math.sqrt(Math.max(0, budget * budget - h * h))); if (Math.abs(dy) > v && Math.abs(dy) < 1.5) y = a.pose.p[1] + Math.sign(dy) * v; }
   a.pose.p = [p[0], y, p[1]];
   // animation signal: 'walk' only while the body actually covers ground (the renderer's Walk clip);
   // a stopped walker waits (named reason) or stands idle — it never walks on the spot
   const gs = dist2(cur, p) / dt;
-  a.human!.activity = gs >= WALK_MIN ? (gf && gf.medium(p[0], p[1]) === G_WADE ? 'wade' : 'walk') : yieldTo || personBlock || loadBlock || geoBlock ? 'wait' : 'idle';
+  a.human!.activity = gs >= WALK_MIN ? (gf && gf.medium(p[0], p[1]) === G_WADE ? 'wade' : ex.gait ?? 'walk') : yieldTo || personBlock || loadBlock || geoBlock ? 'wait' : 'idle';
 
   // decide within DECIDE_TICKS (0.5 s) of being stopped: a blocker that has not moved since (a
   // standing person, a parked load) is routed around (they become temporary obstacles); one that keeps

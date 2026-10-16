@@ -5,6 +5,11 @@ import type { AssetDef } from './catalog.ts';
 
 const dims = { confidence: 'hypothetical' as const, note: 'Eden authored commons/1; World9b6db72 dimensions, conservative bench/table walking boxes' };
 export const COMMONS_ASSETS: AssetDef[] = [
+  { id: 'rowing-punt', label: 'Rowing punt for two', category: 'fixture', size: [3.4, .55, 1.35], massKg: 0, obstacle: true,
+    capabilities: { carrier: { door: [2.6, 0], floorY: .12, transferSpeed: .6, landingClear: 1.7, seats: [
+      { id: 'rider-a', local: [-.65, 0], yaw: Math.PI, exit: [3.1, -.85] },
+      { id: 'rider-b', local: [.65, 0], yaw: Math.PI, exit: [3.1, .85] }] } },
+    dims: { confidence: 'hypothetical', note: 'todo punt/1: flat-bottomed 3.4 m punt, two rowing thwarts and a dry-bank boarding plank' } },
   { id: 'eden-commons-bench', label: 'Commons bench (3 seats)', category: 'fixture',
     size: [2, .9, .65], massKg: 25, obstacle: true,
     slots: [-.65, 0, .65].map((x, i) => ({ id: `seat${i}`, kind: 'seat' as const, local: [x, 0] as [number, number], yaw: Math.PI / 2 })), dims },

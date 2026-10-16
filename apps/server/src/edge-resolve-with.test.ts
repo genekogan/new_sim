@@ -39,6 +39,10 @@ test('things that exist nowhere in the world are refused terminally, with nothin
   const ctx: any = {caps, target: () => ({names: [], around: [], at: null}), places: [], root: [], me: null};
   for (const ask of ['go play on the swings', 'feed the ducks', 'row a boat on the pond', 'ride a bike', 'go skateboarding']) {
     const r: any = resolveCapability(ask, ctx);
-    assert.equal(r.kind, 'unknown', ask); assert.match(r.reason, /exists anywhere in this world.*will not help/, ask);
+    assert.equal(r.kind, 'unknown', ask);
+    // Integration with lane todo: swings, punts and bikes can be offered somewhere (todo's place-specific refusals);
+    // only what no world offers keeps quality's terminal NOWHERE wording.
+    if (ask === 'feed the ducks') assert.match(r.reason, /exists anywhere in this world.*will not help/, ask);
+    else assert.match(r.reason, /no swing offered|rowing punt|bicycle is offered|not possible here yet/, ask);
   }
 });

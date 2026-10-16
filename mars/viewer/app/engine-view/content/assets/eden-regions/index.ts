@@ -99,7 +99,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   district('Old town plaza and market street (scenery only)',(b,tr)=>buildOldTown(b,t,tr));
   district('Hillside village and lookout temple (scenery only)',(b,tr)=>buildHillVillage(b,t,tr));
   district('South avenue (scenery only)',(b,tr)=>buildSouthAvenue(b,t,tr));
-  district('Park with pond, gazebo and playground (scenery only)',(b,tr)=>buildPark(b,t,tr));
+  district('Park with pond, gazebo and playground (scenery only)',(b,tr)=>buildPark(b,t,tr,motion.sink));
   district('Sports ground and courts (scenery only)',(b,tr)=>buildSports(b,t,tr));
   district('Farm hamlet with silos (scenery only)',(b,tr)=>buildFarm(b,t,tr));
   district('Harbour boardwalk, beach and lighthouse (scenery only)',(b,tr)=>buildHarbour(b,t,tr));

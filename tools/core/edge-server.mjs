@@ -148,6 +148,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);
     // Seed declared objects (idempotent by id). presentation params may give startsInMinutes.
     for(const o of seedObjects??[]){const params={...(o.params??{})};if(typeof params.startsInMinutes==='number'){params.startsAtTick=host.engine.world.tick+Math.round(params.startsInMinutes*60*20);delete params.startsInMinutes;}const {carrier:_c,...object}=o;edge.comms?.objects.create({...object,params});}
+    const {installPuntActivities}=await load('apps/server/src/punt-install.ts');installPuntActivities(host,edge,m=>console.error('[activities]',m));
     server.on('request',(req,res)=>{
       if(closing){res.writeHead(503,{'Cache-Control':'no-store'}).end('Local server is draining.');return;}
       req.url=strip(req.url);

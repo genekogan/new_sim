@@ -5,12 +5,12 @@ import {humanRadius} from '../bodies/humanoid.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
-import type { Invariant, Runtime } from './runtime.ts';
+import { DT, type Invariant, type Runtime } from './runtime.ts';
 import { def } from '../world/catalog.ts';
 import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
-import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP } from '../locomotion/walk.ts';
+import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP, JOG_SPEED_CAP, RUN_SPEED_CAP, CYCLE_SPEED_CAP } from '../locomotion/walk.ts';
 import { sleepSafetyIssue } from '../activities/sleep.ts';
 
 const TOL = 0.03;
@@ -116,7 +116,10 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
     if (!q) continue;
     const lin = hypot(cur.p[0] - q.p[0], cur.p[1] - q.p[1], cur.p[2] - q.p[2]);
     const d = lin + Math.abs(angleDelta(q.yaw, cur.yaw)) * ext;
-    const max = human && !e.human!.riding && !e.human!.carrier ? MAX_HUMAN_STEP_PER_TICK : MAX_STEP_PER_TICK;   // a carried body (vehicles/carrier.ts) moves with its carrier
+    // Explicit faster gaits retain a bounded displacement, including a supported
+    // terrain slope. Ordinary walkers keep the original stricter 0.15 m bound.
+    const gaitMax = e.human?.activity === 'cycle' ? CYCLE_SPEED_CAP * DT * 1.25 : e.human?.activity === 'run' ? RUN_SPEED_CAP * DT * 1.25 : e.human?.activity === 'jog' ? JOG_SPEED_CAP * DT * 1.25 : 0;
+    const max = human && !e.human!.riding && !e.human!.carrier ? Math.max(MAX_HUMAN_STEP_PER_TICK, gaitMax) : MAX_STEP_PER_TICK;   // a carried body (vehicles/carrier.ts) moves with its carrier
     if (d > max)
       out.push({
         code: 'motion.teleport',
@@ -137,6 +140,9 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
  */
 export const SPEED_CAPS: Readonly<Record<string, number>> = {
   walk: WALK_SPEED_CAP,
+  jog: JOG_SPEED_CAP,
+  run: RUN_SPEED_CAP,
+  cycle: CYCLE_SPEED_CAP,
   'climb-up': CLIMB_SPEED,
   'climb-down': CLIMB_SPEED,
   'climb-wait': WALK_MIN,

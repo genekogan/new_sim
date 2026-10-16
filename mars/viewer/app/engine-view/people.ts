@@ -26,6 +26,7 @@ export type Template = {
   /** Ground speed (m/s) of the library locomotion clips at timeScale 1 (clip-library.ts), when present. */
   jogSpeed?: number;
   sprintSpeed?: number;
+  runSpeed?: number;
   /** Uniform body scale of a composed core/humanoid@2 look (height / 1.75; engine bodies/humanoid.ts); absent = 1. */
   bodyScale?: number;
 };
@@ -89,8 +90,8 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
 
 /** Validated owner GLBs use the same canonical rig fitting and locomotion measurements. */
 export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppearance):Template{
- const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop'),bodyScale=bodyScaleOf(gltf);
- return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
+ const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop'),run=measureWalk(gltf,'Run'),bodyScale=bodyScaleOf(gltf);
+ return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(run.found?{runSpeed:run.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
 }
 
 /** A composed body (humanoid@2 kit: one shared rig + parts) as a template: same fit/fitArms/measureWalk. */

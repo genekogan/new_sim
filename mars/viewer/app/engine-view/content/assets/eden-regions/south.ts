@@ -3,6 +3,7 @@ import {house,lampPost,bench,boat,gazebo,silo,fence,tower,stall,lightAt} from '.
 import {WATER,type Terrain} from './terrain.ts';
 import type {Trees} from './trees.ts';
 import {SPORTS_LAYOUT} from './sports-layout.ts';
+import {drawDecoration,type DecorationSink} from '../decorative-motion.ts';
 /** South of the expansion (z 85..175): park with pond, playground and sports
  * ground, farm hamlet with silos, beach + boardwalk harbour on the sea. */
 export const PARK_BOUNDS=[-42,86,32,134] as const,SPORTS_BOUNDS=[33,86,106,134] as const,FARM_BOUNDS=[-104,86,-44,136] as const,HARBOUR_BOUNDS=[-104,134,130,190] as const;
@@ -28,7 +29,7 @@ export function buildSouthAvenue(b:Builder,t:Terrain,trees:Trees){const r=rng(80
  for(let x=-92;x<104;x+=9){if(Math.abs(x)<3||Math.abs(x-26)<3||Math.abs(x+13)<3||Math.abs(x-59)<3)continue;trees.add(x,0,87.4,.95+r()*.2,'round',pick(r,['#6f9a4e','#5f8a46','#7fa84f']),r()*6);
   if((x+92)%18===0){b.push(x+4.5,0,93.6,0);lampPost(b);b.pop();}}
 }
-export function buildPark(b:Builder,t:Terrain,trees:Trees){const r=rng(1201),G=(x:number,z:number)=>t.height(x,z);
+export function buildPark(b:Builder,t:Terrain,trees:Trees,motion?:DecorationSink){const r=rng(1201),G=(x:number,z:number)=>t.height(x,z);
  // pond: water, stone edging, a little wooden jetty, reeds, ducks-as-dots
  const seg=28;for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,c=(i+1)/seg*Math.PI*2;b.tri('water',[POND.x,-.45,POND.z],[POND.x+Math.cos(c)*POND.rx*.98,-.45,POND.z+Math.sin(c)*POND.rz*.98],[POND.x+Math.cos(a)*POND.rx*.98,-.45,POND.z+Math.sin(a)*POND.rz*.98],'#5a8f8a');
   const x=POND.x+Math.cos(a)*POND.rx,z=POND.z+Math.sin(a)*POND.rz;b.push(x,0,z,-a+Math.PI/2);b.box('stone',0,-.6,0,POND.rx*Math.PI*2/seg*1.1,.72,.5,'#b9b0a0');b.pop();
@@ -51,14 +52,30 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees){const r=rng(1201),G=(
   // Consume the original draws even when clearing a new building, keeping all
   // later park trees, playground and kiosk decoration at their seeded positions.
   const scale=.9+r()*.6,kind=pick(r,['round','round','poplar','conifer'] as const),color=pick(r,['#6f9a4e','#5f8a46','#7fa84f','#4f7a3c','#8aa850']),yaw=r()*6;
-  if(clearsRelocatedBuildings(x,z,scale))trees.add(x,G(x,z),z,scale,kind,color,yaw);}
+  if(clearsRelocatedBuildings(x,z,scale)&&!(x>-25&&x<-9&&z>123&&z<134))trees.add(x,G(x,z),z,scale,kind,color,yaw);}
  // playground (x 10..28, z 96..110): sandpit, swings, slide, climbing frame, see-saw, fence
  b.box('soil',19,0,103,16,.06,12,'#d8c79a');fence(b,[[11,97],[27,97],[27,109],[11,109],[11,101]],.9,'#e05a3a',G);
- {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');for(const x of [-.7,.7]){b.box('metal',x,.9,0,.02,1.4,.02,'#999');b.box('timber',x,.5,0,.5,.06,.25,'#e0b04a');}b.pop();}
+ {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');
+  // two swings (seat top 0.5 m on two chains from the bar): each turns about the bar with its rider (play-motion.ts)
+  [-.7,.7].forEach((x,i)=>drawDecoration(b,motion,{kind:'swing-seat',pivot:[14+x,2.3,100],phase:i},d=>{for(const c of [-.22,.22])d.box('metal',x+c,.5,0,.02,1.8,.02,'#999');d.box('timber',x,.44,0,.5,.06,.25,'#e0b04a');}));b.pop();}
  {b.push(20,0,99.5,0);b.box('metal',0,0,0,1.4,1.8,1.4,'#c45a4a');b.box('timber',0,1.8,0,1.6,.1,1.6,'#e0b04a');b.quad('metal',[-.4,1.85,.8],[.4,1.85,.8],[.4,.1,3.6],[-.4,.1,3.6],'#e8c84a');b.box('metal',0,1.9,0,1.6,.8,.06,'#3d5a80');b.cone('roof',0,2.6,0,1.1,.9,4,'#c45a4a');b.pop();}
  {b.push(24,0,105,.3);for(let i=0;i<4;i++)for(let j=0;j<3;j++){b.box('metal',-1.5+i,0,-1+j,.06,2,.06,'#3a7a5a');}for(let y=.6;y<2.1;y+=.7){b.box('metal',0,y,-1,3,.05,.05,'#3a7a5a');b.box('metal',0,y,1,3,.05,.05,'#3a7a5a');}b.pop();}
- {b.push(15,0,106,0);b.box('metal',0,0,0,.3,.45,.3,'#555');b.push(0,.5,0,0);b.pushRot('z',.18);b.box('timber',0,0,0,3.2,.08,.3,'#e05a3a');b.pop();b.pop();b.pop();}
+ {b.push(15,0,106,0);b.box('metal',0,0,0,.3,.51,.3,'#555');
+  // see-saw: plank (top 0.6 m at rest, level) and two handles turn about the pivot with its riders (play-motion.ts)
+  drawDecoration(b,motion,{kind:'seesaw',pivot:[15,.55,106]},d=>{d.box('timber',0,.52,0,3.2,.08,.3,'#e05a3a');for(const x of [-1.05,1.05]){d.box('metal',x,.6,0,.04,.32,.04,'#3d5a80');d.box('metal',x,.9,0,.04,.04,.36,'#3d5a80');}});b.pop();}
  for(const [x,z,yaw] of [[12,111,0],[26,111,0]] as [number,number,number][]){b.push(x,0,z,yaw);bench(b,'#3d5a80');b.pop();}
+ // a bicycle dock on the south lawn by the park path (todo leisure): four bicycles; one disappears for each that is out
+ {b.box('metal',4.05,0,84.35,2.9,.06,.1,'#5a6268');for(const x of [2.6,5.5])b.box('metal',x,0,84.35,.06,.75,.06,'#5a6268');b.box('metal',4.05,.72,84.35,2.96,.05,.05,'#5a6268');
+  [3,3.7,4.4,5.1].forEach((x,i)=>drawDecoration(b,motion,{kind:'dock-bike',pivot:[x,.3,84],phase:i},d=>{d.push(x,0,84,0);const c=['#c43a2a','#3d5a80','#2f6f4f','#e0b04a'][i];
+   for(const s of [-.5,.5]){d.push(0,.34,s,0);d.pushRot('z',Math.PI/2);d.cyl('dressing',0,-.02,0,.33,.04,12,'#1e1e1e',false);d.pop();d.pop();}
+   d.box('dressing',0,.55,0,.05,.05,1,c);d.box('dressing',0,.3,.05,.05,.5,.05,c);d.box('dressing',0,.8,-.38,.05,.05,.12,'#1e1e1e');d.box('dressing',0,.95,.42,.5,.03,.03,'#1e1e1e');d.pop();}));}
+ // R5: yoga mats on the south lawn, the teacher's facing two rows of three
+ for(const [x,z,c] of [[-7,70.6,'#5a8a6a'],[-9,73.2,'#7a4a8a'],[-7,73.2,'#3d8ab0'],[-5,73.2,'#e88aa0'],[-9,75.6,'#e0b04a'],[-7,75.6,'#c45a4a'],[-5,75.6,'#3d5a80']] as [number,number,string][])b.box('cloth',x,0,z,.62,.012,1.8,c);
+ // the south-west lawn (todo leisure): two hammocks slung between posts (cloth 0.62 m at its lowest), a picnic blanket with a basket
+ for(const z of [126.5,130]){for(const x of [-21.6,-18.4])b.box('timber',x,0,z,.12,1.5,.12,'#7a5a3a');
+  for(let i=0;i<12;i++){const u0=i/12,u1=(i+1)/12,sag=(u:number)=>1.25-.63*Math.sin(Math.PI*u),x0=-21.5+3*u0,x1=-21.5+3*u1;b.quad('cloth',[x0,sag(u0),z-.42],[x1,sag(u1),z-.42],[x1,sag(u1),z+.42],[x0,sag(u0),z+.42],i%2?'#e8a33c':'#2f6f8f');b.quad('cloth',[x0,sag(u0),z+.42],[x1,sag(u1),z+.42],[x1,sag(u1),z-.42],[x0,sag(u0),z-.42],i%2?'#e8a33c':'#2f6f8f');}}
+ {b.box('cloth',-13,0,127,2.2,.02,2.2,'#c84a4a');for(let i=0;i<5;i++)b.box('cloth',-14.1+i*.55,.021,127,.12,.004,2.2,'#f3eee2');for(let i=0;i<5;i++)b.box('cloth',-13,.021,125.9+i*.55,2.2,.004,.12,'#f3eee2');
+  b.box('timber',-12.65,.02,127.3,.42,.26,.3,'#a0764e');b.box('cloth',-12.65,.28,127.3,.44,.02,.32,'#e8e2d2');for(const [x,z] of [[-13.85,127],[-12.15,127],[-13,126.15],[-13,127.85]] as [number,number][])b.box('cloth',x,.02,z,.42,.16,.42,'#e8c84a');}
  // ice-cream kiosk and a drinking fountain near the avenue
  b.push(-6,0,95.5,Math.PI);stall(b,2.6,'#f3a6c0','#ffffff',r,false);b.pop();b.cyl('stone',4,0,94.5,.3,.95,6,'#b9b0a0');
 }

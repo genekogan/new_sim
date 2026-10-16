@@ -4006,7 +4006,13 @@
    "seatHeight": 0.88,
    "label": "Drum kit on the performance stage",
    "instrument": "drums",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-keys",
@@ -4023,7 +4029,13 @@
    ],
    "label": "Keyboard on the performance stage",
    "instrument": "keyboard",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-guitar",
@@ -4040,7 +4052,13 @@
    ],
    "label": "Guitar on the performance stage",
    "instrument": "guitar",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-bass",
@@ -4057,7 +4075,13 @@
    ],
    "label": "Bass guitar on the performance stage",
    "instrument": "bass",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-mic-1",
@@ -4073,7 +4097,13 @@
     -26
    ],
    "label": "Lead microphone on the performance stage",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-mic-2",
@@ -4089,7 +4119,13 @@
     -26
    ],
    "label": "Second microphone on the performance stage",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "amph-mic",
@@ -4315,7 +4351,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 1 (violin)",
    "instrument": "violin",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-2",
@@ -4333,7 +4375,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 2 (violin)",
    "instrument": "violin",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-3",
@@ -4351,7 +4399,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 3 (viola)",
    "instrument": "viola",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-4",
@@ -4369,7 +4423,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 4 (cello)",
    "instrument": "cello",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "pc-office-1",
@@ -4707,6 +4767,1059 @@
     84.35
    ],
    "label": "Outdoor gym: exercise mat (push-ups)"
+  },
+  {
+   "id": "fish-shore-1",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -6.5
+   ],
+   "faceTo": [
+    -46.6,
+    -6.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-2",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -3.5
+   ],
+   "faceTo": [
+    -46.6,
+    -3.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-3",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    3.5
+   ],
+   "faceTo": [
+    -46.6,
+    3.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-4",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    6.5
+   ],
+   "faceTo": [
+    -46.6,
+    6.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "feed-shore-1",
+   "place": "shore-bank",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -8
+   ],
+   "faceTo": [
+    -46.6,
+    -8
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "feed-shore-2",
+   "place": "shore-bank",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -43.6,
+    8
+   ],
+   "faceTo": [
+    -46.6,
+    8
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-park-1",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -14,
+    103.1
+   ],
+   "faceTo": [
+    -14,
+    106.1
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "fish-park-2",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -8,
+    103.1
+   ],
+   "faceTo": [
+    -8,
+    106.1
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "fish-park-3",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -2,
+    103.1
+   ],
+   "faceTo": [
+    -2,
+    106.1
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "feed-park-1",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -11,
+    103.1
+   ],
+   "faceTo": [
+    -11,
+    106.1
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "feed-park-2",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -5,
+    103.1
+   ],
+   "faceTo": [
+    -5,
+    106.1
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "feed-park-3",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    1,
+    103.1
+   ],
+   "faceTo": [
+    1,
+    106.1
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "garden-bed-1",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    35.5,
+    46.0
+   ],
+   "faceTo": [
+    35.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-2",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    38.5,
+    46.0
+   ],
+   "faceTo": [
+    38.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-3",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    43.5,
+    46.0
+   ],
+   "faceTo": [
+    43.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-4",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    46.5,
+    46.0
+   ],
+   "faceTo": [
+    46.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-5",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    62.5,
+    46.0
+   ],
+   "faceTo": [
+    62.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-6",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    65.5,
+    46.0
+   ],
+   "faceTo": [
+    65.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-7",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    70.5,
+    46.0
+   ],
+   "faceTo": [
+    70.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-8",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    73.5,
+    46.0
+   ],
+   "faceTo": [
+    73.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "swing-1",
+   "place": "region-park.playground",
+   "activity": "swing",
+   "base": "sit",
+   "at": [
+    13.3,
+    100
+   ],
+   "faceTo": [
+    13.3,
+    103
+   ],
+   "seatHeight": 0.5,
+   "label": "Left swing, playground"
+  },
+  {
+   "id": "swing-2",
+   "place": "region-park.playground",
+   "activity": "swing",
+   "base": "sit",
+   "at": [
+    14.7,
+    100
+   ],
+   "faceTo": [
+    14.7,
+    103
+   ],
+   "seatHeight": 0.5,
+   "label": "Right swing, playground"
+  },
+  {
+   "id": "seesaw-west",
+   "place": "region-park.playground",
+   "activity": "seesaw",
+   "base": "sit",
+   "at": [
+    13.55,
+    106
+   ],
+   "faceTo": [
+    15,
+    106
+   ],
+   "seatHeight": 0.6,
+   "label": "See-saw, west end",
+   "together": {
+    "group": "seesaw-playground",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "seesaw-east",
+   "place": "region-park.playground",
+   "activity": "seesaw",
+   "base": "sit",
+   "at": [
+    16.45,
+    106
+   ],
+   "faceTo": [
+    15,
+    106
+   ],
+   "seatHeight": 0.6,
+   "label": "See-saw, east end",
+   "together": {
+    "group": "seesaw-playground",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "hammock-1",
+   "place": "region-park",
+   "activity": "hammock",
+   "base": "lie",
+   "at": [
+    -19.9,
+    126.5
+   ],
+   "faceTo": [
+    -17.3,
+    126.5
+   ],
+   "seatHeight": 0.62,
+   "label": "Hammock between two posts, south-west lawn of the park"
+  },
+  {
+   "id": "hammock-2",
+   "place": "region-park",
+   "activity": "hammock",
+   "base": "lie",
+   "at": [
+    -19.9,
+    130
+   ],
+   "faceTo": [
+    -17.3,
+    130
+   ],
+   "seatHeight": 0.62,
+   "label": "Hammock between two posts, south-west lawn of the park"
+  },
+  {
+   "id": "picnic-blanket-w",
+   "place": "region-park",
+   "activity": "picnic",
+   "base": "sit",
+   "at": [
+    -13.85,
+    127
+   ],
+   "faceTo": [
+    -13,
+    127
+   ],
+   "seatHeight": 0.2,
+   "label": "Picnic blanket, south-west lawn of the park (west side)"
+  },
+  {
+   "id": "picnic-blanket-e",
+   "place": "region-park",
+   "activity": "picnic",
+   "base": "sit",
+   "at": [
+    -12.15,
+    127
+   ],
+   "faceTo": [
+    -13,
+    127
+   ],
+   "seatHeight": 0.2,
+   "label": "Picnic blanket, south-west lawn of the park (east side)"
+  },
+  {
+   "id": "picnic-blanket-n",
+   "place": "region-park",
+   "activity": "picnic",
+   "base": "sit",
+   "at": [
+    -13,
+    126.15
+   ],
+   "faceTo": [
+    -13,
+    127
+   ],
+   "seatHeight": 0.2,
+   "label": "Picnic blanket, south-west lawn of the park (north side)"
+  },
+  {
+   "id": "picnic-blanket-s",
+   "place": "region-park",
+   "activity": "picnic",
+   "base": "sit",
+   "at": [
+    -13,
+    127.85
+   ],
+   "faceTo": [
+    -13,
+    127
+   ],
+   "seatHeight": 0.2,
+   "label": "Picnic blanket, south-west lawn of the park (south side)"
+  },
+  {
+   "id": "story-teller",
+   "place": "eden-north-woods",
+   "activity": "tell-story",
+   "base": "idle",
+   "at": [
+    15.1,
+    -32.6
+   ],
+   "faceTo": [
+    15.1,
+    -35.4
+   ],
+   "label": "Storyteller's place at the log circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "story-log-1",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    18.2,
+    -34.91
+   ],
+   "faceTo": [
+    16.25,
+    -34.91
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 1 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "story-log-2",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    14.9,
+    -38.18
+   ],
+   "faceTo": [
+    14.9,
+    -36.23
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 2 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "story-log-3",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    11.99,
+    -34.06
+   ],
+   "faceTo": [
+    13.85,
+    -34.64
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 3 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "book-club-1-north",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    71.5,
+    -7.45
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-1-south",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    71.5,
+    -5.75
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west (south side) (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-2-north",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    76.5,
+    -7.45
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-2-south",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    76.5,
+    -5.75
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east (south side) (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-a-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -22.45,
+    3.15
+   ],
+   "faceTo": [
+    -22.45,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-a-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -22.45,
+    4.85
+   ],
+   "faceTo": [
+    -22.45,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-b-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -21.55,
+    3.15
+   ],
+   "faceTo": [
+    -21.55,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-b-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -21.55,
+    4.85
+   ],
+   "faceTo": [
+    -21.55,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-a-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -16.45,
+    3.15
+   ],
+   "faceTo": [
+    -16.45,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-a-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -16.45,
+    4.85
+   ],
+   "faceTo": [
+    -16.45,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-b-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -15.55,
+    3.15
+   ],
+   "faceTo": [
+    -15.55,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-b-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -15.55,
+    4.85
+   ],
+   "faceTo": [
+    -15.55,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "bandstand-dance-1",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    37.3,
+    -24.3
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-2",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    38.5,
+    -23.85
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-3",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    39.7,
+    -24.3
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-4",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    38.5,
+    -25.0
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "yoga-class-front",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    70.6
+   ],
+   "faceTo": [
+    -7,
+    72.6
+   ],
+   "label": "Yoga class, teacher's mat, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-1",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -9,
+    73.2
+   ],
+   "faceTo": [
+    -9,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-3",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    73.2
+   ],
+   "faceTo": [
+    -7,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-5",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -5,
+    73.2
+   ],
+   "faceTo": [
+    -5,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-1",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -9,
+    75.6
+   ],
+   "faceTo": [
+    -9,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-3",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    75.6
+   ],
+   "faceTo": [
+    -7,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-5",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -5,
+    75.6
+   ],
+   "faceTo": [
+    -5,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
   }
  ],
  "solids": [
@@ -5028,15 +6141,57 @@
    "height": 2.6
   },
   {
-   "id": "playground-swings",
-   "label": "Swing frame",
+   "id": "playground-swing-post-1",
+   "label": "Swing frame post",
    "c": [
-    14,
-    100
+    12.4,
+    99.3
    ],
    "half": [
-    1.7,
-    0.7
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "playground-swing-post-2",
+   "label": "Swing frame post",
+   "c": [
+    12.4,
+    100.7
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "playground-swing-post-3",
+   "label": "Swing frame post",
+   "c": [
+    15.6,
+    99.3
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "playground-swing-post-4",
+   "label": "Swing frame post",
+   "c": [
+    15.6,
+    100.7
+   ],
+   "half": [
+    0.1,
+    0.1
    ],
    "yaw": 0,
    "height": 2.4
@@ -5701,13 +6856,13 @@
   },
   {
    "id": "playground-see-saw",
-   "label": "See-saw",
+   "label": "See-saw pivot",
    "c": [
     15,
     106
    ],
    "half": [
-    1.6,
+    0.2,
     0.2
    ],
    "yaw": 0,
@@ -8610,6 +9765,76 @@
    ],
    "yaw": 0,
    "height": 0.9
+  },
+  {
+   "id": "park-hammock-post-1",
+   "label": "Hammock post",
+   "c": [
+    -21.6,
+    126.5
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 1.6
+  },
+  {
+   "id": "park-hammock-post-2",
+   "label": "Hammock post",
+   "c": [
+    -18.4,
+    126.5
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 1.6
+  },
+  {
+   "id": "park-hammock-post-3",
+   "label": "Hammock post",
+   "c": [
+    -21.6,
+    130
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 1.6
+  },
+  {
+   "id": "park-hammock-post-4",
+   "label": "Hammock post",
+   "c": [
+    -18.4,
+    130
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 1.6
+  },
+  {
+   "id": "bike-dock-park-gate-rack",
+   "label": "Bicycle dock",
+   "c": [
+    4.05,
+    84.2
+   ],
+   "half": [
+    1.5,
+    0.55
+   ],
+   "yaw": 0,
+   "height": 1.0
   }
  ],
  "rings": [
@@ -8831,6 +10056,22 @@
    ],
    "yaw": 0,
    "top": 0.55
+  }
+ ],
+ "docks": [
+  {
+   "id": "bike-dock-park-gate",
+   "place": "eden-south-lawn",
+   "at": [
+    4.05,
+    83.1
+   ],
+   "faceTo": [
+    4.05,
+    84.3
+   ],
+   "bikes": 4,
+   "label": "the bicycle dock by the park gate"
   }
  ]
 }

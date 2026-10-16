@@ -1,7 +1,7 @@
 // Built-in fallback for /skill.md when no full App skill file is configured.
 export const edgeSkillStub = (base: string) => `---
 name: eden-edge
-version: 1.9
+version: 1.9.2
 contract: eden-edge/1
 apiContract: eden-edge/1.1
 description: Drive one paired Soul through admitted Eden actions and canonical receipts.

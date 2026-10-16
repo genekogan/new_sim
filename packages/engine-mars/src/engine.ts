@@ -16,7 +16,8 @@ import {fixtureSlots, isFree, seatApproach} from '../../../mars/viewer/engine/so
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
-import {setCarrierRoute} from '../../../mars/viewer/engine/vehicles/carrier.ts';
+import {setCarrierRoute,type CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
+import {puntCandidates,previewPunt} from './punt.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
@@ -125,7 +126,7 @@ export const BODY_VERBS: VerbInfo[] = [
   {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
-  { verb: 'walk_to', description: 'Walk to a thing or a point, stopping `standoff` metres short of it.', inputSchema: { type: 'object', properties: { to: ref, standoff: num }, required: ['to'] } },
+  { verb: 'walk_to', description: 'Go to a thing or a point, stopping `standoff` metres short of it. Optional dry-ground gait: walk (default), jog (2.5 m/s), run (4 m/s), cycle (4.5 m/s, a docked bicycle); stairs remain slow.', inputSchema: { type: 'object', properties: { to: ref, standoff: num, gait: {enum:['walk','jog','run','cycle']} }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
   { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
@@ -572,6 +573,7 @@ export class MarsEngine implements Engine {
   private raw(me: string, step: { verb: string; params: Record<string, unknown> }): { verb: string; params: Record<string, unknown> } | Diag {
     const verb = step.verb.slice(5), def = this.registry.get(verb), a = step.params ?? {};
     if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
+    if(verb==='carrier_ride'){const issue=this.puntBoardingIssue(String(a.carrier??''));if(issue)return issue;}
     const helm=['boat_take_helm','boat_release_helm'].includes(verb);
     // The fresh owned helm binding must also prevent a passenger from naming
     // another body as pilot of an ordinary travel/board/leave program.
@@ -583,6 +585,11 @@ export class MarsEngine implements Engine {
     }
     const shape = (this.m.describeVerbs(new Map([[verb, def]]))[0].inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
     return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
+  }
+  /** A logged punt stays installed across author edits, but every new boarding must qualify against today's water. */
+  private puntBoardingIssue(id:string):Diag|null{
+    const e=this.ents[id],c=e?.carrier;if(e?.def!=='rowing-punt'||!c)return null;
+    return previewPunt(this.rt,{id:e.id,def:e.def,label:e.label,at:[c.home[0],c.home[2]],y:c.home[1],yaw:c.yaw,route:c.route.id,routeKeys:c.route.keys,bank:c.bank},this.renderScene());
   }
 
   /** Read-only seat support levels, using the same native slot calculation as sit.
@@ -605,10 +612,13 @@ export class MarsEngine implements Engine {
       }
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
+        const gaitIssue = this.gaitIssue(me, a); if (gaitIssue) return gaitIssue;
         const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step)) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
-        const ops: Op[] = [{ verb: this.movementVerb(me,g.x,g.z), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x,g.z)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
+        const movement = this.movementVerb(me,g.x,g.z);
+        if (a.gait && a.gait !== 'walk' && movement !== 'walk_to') return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
+        const ops: Op[] = [{ verb: movement, params: { actor: me, x: g.x, z: g.z, level:g.level, ...(a.gait && a.gait !== 'walk' ? {gait:a.gait} : {}), ...(this.cfg.nativeArrivalWitnessV1&&movement==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
@@ -687,8 +697,10 @@ export class MarsEngine implements Engine {
     return [...ids].sort();
   }
   canPerform(program: Program): Diag | null {
+    for(const step of program.steps)if(step.verb==='mars:carrier_ride'){const issue=this.puntBoardingIssue(String(step.params.carrier??''));if(issue)return issue;}
     for(const step of program.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))return {code:'action.invalid-spread-wait-policy',message:'Only shared-water-wait/1 on a pond/1 or pond-lap/1 walk is supported.'};
     const bodyIssue=this.bodyProgramProblemV1(program); if(bodyIssue)return bodyIssue;
+    for(const step of program.steps)if(step.verb==='walk_to'){const issue=this.gaitIssue(program.actor,step.params);if(issue)return issue;}
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if ([...this.programs.values()].some(p=>p.readiedActors?.includes(program.actor)&&!p.action))return {code:'activity.readiness-committed',message:'This body has committed its explicit ready wait to a starting classroom.'};
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
@@ -746,7 +758,15 @@ export class MarsEngine implements Engine {
     if (first.verb === 'mars:take_item') { const it=this.ents[String(first.params.item)]; if (it?.support?.kind==='in-hand' && it.support.by===program.actor && (!first.params.hand || it.support.hand===first.params.hand)) return null; }
     if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
     if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
-    if (first.verb === 'walk_to') { const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread,this.sharedWaterStep(first)) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
+    if (first.verb === 'walk_to') {
+      const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread,this.sharedWaterStep(first)) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0);
+      if(g==='here')return null;if('code' in g)return g;
+      if(first.params.gait&&first.params.gait!=='walk'){
+        if(this.movementVerb(program.actor,g.x,g.z)!=='walk_to')return {code:'gait.dry-ground-required',message:'This shore or water route does not support jogging or running; return to dry ground first.'};
+        return this.plan('walk_to',{actor:program.actor,x:g.x,z:g.z,level:g.level,gait:first.params.gait});
+      }
+      return null;
+    }
     if (first.verb === 'sit') {
       const fixture = String(first.params.on ?? '');
       if (this.cfg.scene === 'eden-camp' && this.ents[fixture]?.def === 'bench-6ft') {
@@ -841,6 +861,11 @@ export class MarsEngine implements Engine {
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }
 
   // ------------------------------------------------------------------ bodies
+  private gaitIssue(actor:string,params:Record<string,unknown>):Diag|null {
+    if(params.gait===undefined||params.gait==='walk')return null;
+    if(params.gait!=='jog'&&params.gait!=='run'&&params.gait!=='cycle')return {code:'gait.invalid',message:'Choose walk, jog, run or cycle.'};
+    return this.ents[actor]?.body?.family==='floater'?{code:'gait.unsupported-body',message:'Jogging and running require a humanoid body; this body can glide instead.'}:null;
+  }
   /** BODY-v1 owner assignments never run limb/ride/building programs. Legacy native
    * descriptors keep the original named floater policy when replaying accepted history. */
   bodyProgramProblemV1(program:Program):Diag|null {
@@ -1675,11 +1700,12 @@ export class MarsEngine implements Engine {
   /** carrier/1: every carrier entity's public state (riders by entity id). */
   carriers(){return Object.values(this.ents).filter((e:any)=>e.carrier).map((e:any)=>({id:e.id as string,def:e.def as string,label:(e.label??e.id) as string,pose:structuredClone(e.pose),state:structuredClone(e.carrier)}));}
   /** carrier/1 install preview (pure): a known carrier def and route, a fresh id, home on clear level-0 ground away from bodies. */
-  previewCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}):Diag|null{
+  previewCarrierV1(spec:CarrierInstallSpec):Diag|null{
     if(!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(String(spec?.id)))return {code:'carrier.bad-id',message:'carrier id must be a place-style id'};
     if(this.ents[spec.id])return this.ents[spec.id].carrier?null:{code:'carrier.id-taken',message:`${spec.id} already names another entity`};
     if(!Array.isArray(spec.at)||!spec.at.every(Number.isFinite))return {code:'carrier.bad-home',message:'at must be [x,z]'};
     const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return e;
+    if(spec.def==='rowing-punt')return previewPunt(this.rt,spec,this.renderScene());
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[spec.at[0],spec.at[1]]);
     const need=Math.hypot(0.75,0.6)+0.3;
     if(!grid||clearanceAt(grid,spec.at)<need)return {code:'carrier.home-blocked',message:'the carrier home is not clear level-0 ground'};
@@ -1693,13 +1719,15 @@ export class MarsEngine implements Engine {
   /** CN5: the route id a carrier flies (null if no such carrier). */
   carrierRouteV1(id:string):string|null{return (this.ents[id] as any)?.carrier?.route?.id??null;}
   /** carrier/1 (logged rules fact `carrierV1`): add the carrier at its home, idempotent by id. */
-  installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}):boolean{
+  installCarrierV1(spec:CarrierInstallSpec):boolean{
     if(this.ents[spec.id]?.carrier)return true;
     if(this.previewCarrierV1(spec))return false;
     const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return false;
     this.ents[e.id]=e;this.m.canonicalEntityOrder(this.rt.world);this.out.changes.push([this.rt.tick,e.id,'present',e]);
     return true;
   }
+  /** First activity slice: only actual admitted standing water with a reachable dry bank qualifies. */
+  puntCandidatesV1():CarrierInstallSpec[]{return puntCandidates(this.rt,this.renderScene());}
   configureRuntimePolicy(policy: {sleepBlockTicks:number;walkSettleWaitV1?:boolean;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
     if(policy.walkSettleWaitV1!==undefined&&typeof policy.walkSettleWaitV1!=='boolean')throw Error('runtime-policy.walk-settle-wait');
     if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};

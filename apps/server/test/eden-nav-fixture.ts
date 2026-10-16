@@ -15,6 +15,8 @@ export const EDEN_PLACES = JSON.parse(readFileSync(new URL('./fixtures/eden-plac
 export const EDEN_SPOTS = JSON.parse(readFileSync(new URL('../../../tools/core/eden-activity-spots.v1.json', import.meta.url), 'utf8'));
 /** CN5: World's live places and activity spots (2026-10-07 snapshot), Core's provisional district solids. */
 export const CN5_PLACES = JSON.parse(readFileSync(new URL('./fixtures/eden-places-cn5.v1.json', import.meta.url), 'utf8')) as PlaceData;
+/** World's live Eden activity spots (worlds/eden/activity-spots.v1.json), for the leisure activities. */
+export const WORLD_SPOTS = JSON.parse(readFileSync(new URL('../../../worlds/eden/activity-spots.v1.json', import.meta.url), 'utf8'));
 export const CN5_SPOTS = JSON.parse(readFileSync(new URL('./fixtures/eden-activity-spots-cn5.v1.json', import.meta.url), 'utf8'));
 export const CN5_DISTRICT_SOLIDS = JSON.parse(readFileSync(new URL('../../../tools/core/eden-district-solids.v1.json', import.meta.url), 'utf8'));
 /** The descriptor's nav.ground for the preview: the lawn south of the commons and the park (never west of the shore gate). */
@@ -31,8 +33,8 @@ export function inSolid(x: number, z: number, s: Solid, shrink = 0): boolean {
   return Math.abs(lx) < s.half[0] - shrink && Math.abs(lz) < s.half[1] - shrink;
 }
 
-export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: boolean; diagnosticSoulIds?: readonly string[]} = {}) {
-  const PLACES = opts.cn5 ? CN5_PLACES : EDEN_PLACES, SPOTS = opts.cn5 ? CN5_SPOTS : EDEN_SPOTS;
+export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: boolean; spots?: unknown; diagnosticSoulIds?: readonly string[]} = {}) {
+  const PLACES = opts.cn5 ? CN5_PLACES : EDEN_PLACES, SPOTS = opts.spots ?? (opts.cn5 ? CN5_SPOTS : EDEN_SPOTS);
   const GROUND = opts.cn5 ? [...SOUTH_GROUND, ...CN5_DISTRICT_GROUND] : SOUTH_GROUND;
   const NATIVE = opts.cn5 ? [...NATIVE_PLACES, 'eden-south-lawn', ...CN5_DISTRICT_PLACES] : NATIVE_PLACES;
   const fac = await factory(), f = fixture(':memory:', fac, {durableClockV1: true});

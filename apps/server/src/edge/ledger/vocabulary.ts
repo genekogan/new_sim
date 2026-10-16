@@ -12,6 +12,8 @@ export type VocabTarget = {
   at: [number, number] | null;
 };
 export type VocabPlace = {id: string; name: string; center: [number, number];
+  /** Declared place aliases, distinct from descriptive words and fuzzy matching. */
+  aliases?: readonly string[];
   /** Optional richer facts (live ledger): parent id, kind, description words and whether a walk reaches it natively. */
   parent?: string | null; kind?: string; description?: string; walkable?: boolean};
 export type VocabContext = {
@@ -30,7 +32,7 @@ export type VocabResult =
     code?: string};
 
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some', 'through', 'thru', 'around', 'across', 'over', 'back', 'please', 'little', 'bit', 'for', 'while', 'and', 'then', 'there']);
-const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', move: 'walk', head: 'walk', travel: 'walk', 'come-back': 'walk', return: 'walk', 'go-back': 'walk', 'head-back': 'walk', 'walk-back': 'walk', 'go-over': 'walk',
+const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', move: 'walk', head: 'walk', travel: 'walk', 'come-back': 'walk', return: 'walk', 'go-back': 'walk', 'head-back': 'walk', 'walk-back': 'walk', running: 'run', sprint: 'run', sprinting: 'run', hurry: 'run', jogging: 'jog', 'go-over': 'walk',
   hangout: 'hang-out', 'hang-around': 'hang-out', linger: 'hang-out', 'go-near': 'go-near', approach: 'go-near', join: 'go-near',
   'sit-on': 'sit', 'sit-at': 'sit', 'sit-down': 'sit', 'take-a-seat': 'sit', 'have-a-seat': 'sit', 'take-seat': 'sit', 'be-seated': 'sit', seat: 'sit', relax: 'rest',
   stroll: 'stroll', 'take-a-walk': 'stroll', 'take-a-stroll': 'stroll', 'go-for-a-walk': 'stroll', 'go-for-a-stroll': 'stroll', 'walk-through': 'stroll', 'stroll-through': 'stroll', wander: 'stroll', ramble: 'stroll', meander: 'stroll', explore: 'stroll',
@@ -72,10 +74,25 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\bbench[- ]?press(?:es|ing)?\b/, 'bench-press'], [/\b(?:pull|chin)[- ]?ups?\b/, 'pull-ups'], [/\b(?:tricep )?dips\b|\bdip bars?\b/, 'dips'],
   [/\b(?:lift(?:ing)? weights|weight ?lifting|weights|dumbbells?|bicep curls?|curls|free weights|pump(?:ing)? iron)\b/, 'lift-weights'],
   [/\b(?:p[eé]tanque|boules|bocce)\b/, 'play-petanque'], [/\bfrisbee\b/, 'play-frisbee'], [/\b(?:beach )?volley ?ball\b/, 'play-volleyball'],
+  // R5 group life: storytelling, a book club, cooking together, dancing on the bandstand, a yoga class, giving a concert
+  [/\b(?:tell|telling|share|sharing) (?:a |some |the )?(?:stor(?:y|ies)|tales?)\b|\bstory ?tell\w*/, 'tell-story'],
+  [/\b(?:listen to|hear|join) (?:a |the |some )?(?:stor(?:y|ies)|storyteller|story ?(?:circle|time))\b|\bstory ?(?:circle|time)\b/, 'hear-story'],
+  [/\bbook ?club\b|\bread(?:ing)? (?:together|with (?:others|friends|the group))\b/, 'book-club'],
+  [/\bcook(?:ing)? (?:together|with (?:others|friends|everyone|the group))\b|\b(?:communal|group) cooking\b|\bcooking (?:class|club)\b/, 'cook-together'],
+  [/\bbandstand\b.*\bdanc\w*|\bdanc\w*\b.*\bbandstand\b|\b(?:barn|social|square|line|ballroom) danc\w*|\bdance (?:party|together)\b/, 'social-dance'],
+  [/\byoga (?:class|session|together|group)\b|\b(?:lead|teach|join|take) (?:a |the )?yoga\b/, 'yoga-class'],
+  [/\b(?:give|play|perform|put on|hold) (?:a |the )?(?:concert|gig)\b|\bjam session\b|\bperform (?:on|at) (?:the )?stage\b/, 'play-music'],
   [/\b(?:sing|singing|karaoke|open mic|microphone)\b/, 'sing'],
   [/\b(?:listen|listening|concert|audience|watch (?:the )?(?:show|band|performance|concert|musicians?))\b/, 'listen'],
   [/\b(?:drums?|drum kit|guitar|bass|violin|viola|cello|keyboard|keys)\b/, 'play-music', 'keep'],
   [/\bjumping[- ]?jacks?\b|\bstar[- ]?jumps?\b/, 'jumping-jacks'], [/\bpush[- ]?ups?\b|\bpress[- ]?ups?\b/, 'pushups'], [/\bsit[- ]?ups?\b|\bcrunches\b/, 'situps'],
+  [/\bfeed(?:ing)? (?:the |some |a few )?(?:koi|fish|carp)\b|\b(?:throw|toss|scatter) (?:some |the )?(?:bread|crumbs|food) (?:to|for|into|in) (?:the )?(?:koi|fish|pond)\b|\bfeed (?:the )?pond\b/, 'feed'],
+  [/\b(?:fishing|angling)\b|\b(?:go|to|let'?s) fish\b|^fish\b|\bcast (?:a |my |the )?(?:line|rod)\b|\bcatch (?:a |some )?fish\b/, 'fish'],
+  // leisure: the playground, the hammocks, a picnic blanket, the night sky ("swing by" is a visit, not a swing; a picnic table is for eating)
+  [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/, 'seesaw'], [/\b(?:swing|swings|swinging)\b(?!\s+by\b)/, 'swing'], [/\bhammocks?\b/, 'hammock'],
+  [/\bpicnic(?:king)?\b(?!\s+tables?\b)/, 'picnic'],
+  [/\bstar[- ]?gaz\w*|\b(?:watch|look at|see|count) (?:the )?(?:stars|night sky)\b/, 'stargaze'],
+  [/^(?:please\s+)?garden\b|\b(?:gardening|weed(?:ing)?|(?:tend|tending|water|watering|plant|planting) (?:the |some |my )?(?:garden )?(?:beds?|seeds?|flowers?|vegetables?|plots?|plants?|crops?))\b/, 'garden'],
   [/\byoga\b/, 'yoga'], [/\bstretch(?:es|ing)?\b/, 'stretch'], [/\bdanc(?:e|es|ing)\b|\bboogie\b/, 'dance'], [/\bjump(?:s|ing)?\b|\bhop\b/, 'jump'],
   [/\b(?:read|reading|reads)\b/, 'read'], [/\b(?:write|writing)\b/, 'write'],
   [/\bpiano\b/, 'play-piano'], [/\b(?:paint|painting|easel)\b/, 'paint'], [/\b(?:cook|cooking|bake|baking)\b/, 'cook'],
@@ -94,27 +111,41 @@ const FILLER = new Set(['find', 'somewhere', 'someplace', 'place', 'spot', 'quie
   'music', 'instrument', 'craft', 'crafts', 'game', 'games', 'cards', 'eat', 'meal', 'lunch', 'dinner', 'breakfast', 'snack', 'drink', 'coffee', 'tea', 'post', 'send', 'mail',
   'letter', 'card', 'write', 'writing', 'stroll', 'wander', 'walk', 'go', 'take', 'have', 'let', 'lets', 'me', 'i', 'want', 'like', 'would', 'could', 'can', 'you', 'we', 'he', 'she', 'they',
   'him', 'her', 'them', 'just', 'now', 'something', 'thing', 'do', 'get', 'grab', 'head', 'come', 'return', 'visit', 'travel', 'around', 'about', 'quick', 'short', 'long', 'while',
-  'use', 'using', 'check', 'work', 'game', 'round', 'throw', 'toss', 'catch', 'sing', 'song', 'songs', 'listen', 'watch', 'show', 'set', 'reps', 'exercise', 'exercises', 'workout', 'concert', 'performance', 'audience', 'band']);
+  'use', 'using', 'check', 'work', 'join', 'game', 'round', 'throw', 'toss', 'catch', 'sing', 'song', 'songs', 'listen', 'watch', 'show', 'set', 'reps', 'exercise', 'exercises', 'workout', 'concert', 'performance', 'audience', 'band']);
 
 /** "go for a X", "take a X", "have a X": X decides the verb (a swim is a swim, a balloon ride is the ride, never a stroll). */
 const GO_FOR = /^(?:let'?s\s+|i\s+want\s+to\s+|please\s+)?(?:go|going|take|have|do|try)\s+(?:for\s+|on\s+|in\s+)?(?:a|an|some|the)\s+(.+)$/i;
 const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
   [/^(?:seat|sit)\b/, 'sit'], [/^(?:dance|boogie)\b/, 'dance'], [/^(?:stretch)\b/, 'stretch'], [/^(?:read|book)\b/, 'read'], [/^(?:look|wander around)\b/, 'stroll'], [/^(?:rest|break|breather)\b/, 'rest'], [/^(?:drink|coffee|tea|cuppa)\b/, 'drink'], [/^(?:meal|bite|snack|lunch|dinner|breakfast)\b/, 'eat']];
+/** R5 group activities whose phrase decides even after a plain verb ("dance on the bandstand" is the bandstand dance). */
+const GROUP_VERBS = new Set(['tell-story', 'hear-story', 'book-club', 'cook-together', 'social-dance', 'yoga-class']);
+/** leisure: a posture or play word followed by a playground or lawn thing (the thing decides what is done there). */
+const LEISURE_LEAD = /^(?:please\s+)?(?:sit|lie|lay|rest|relax|nap|snooze|doze|play|ride|get|hop|go|have a go)\b/i;
+const LEISURE_OBJECTS: [RegExp, string][] = [[/\bhammocks?\b/, 'hammock'], [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/, 'seesaw'], [/\bswings?\b(?!\s+by\b)/, 'swing'], [/\bpicnic (?:blanket|rug)\b/, 'picnic']];
 /** Rides: the balloon (and any later carrier) is an object you join. */
-export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in the air|hot[- ]air)\b/i;
+export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in the air|hot[- ]air|row|rowing|punt|boat|boating)\b/i;
 /** Things bodies cannot do yet: refused honestly (never resolved to something else). */
-export const NOT_YET: [RegExp, string, string[]][] = [
-  [/\b(?:run|runs|running|jog|jogging|sprint|sprinting|race|hurry)\b/i, 'Bodies cannot run yet (walking only); walk or stroll instead.', ['stroll', 'wander', 'walk']],
+export const NOT_YET: [RegExp, string, string[], string?][] = [
   [/\b(?:kiss|kisses|kissing|snog)\b/i, 'Kissing is not a gesture here; hug, shake hands, high-five, bow or wave instead (hugs and handshakes ask the other Soul first).', ['hug', 'handshake', 'high-five', 'wave']],
   [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
-  // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped
-  [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish|rowing|row (?:a |the )?boat|boating|sailing|canoeing|kayaking|paddle (?:a |the )?boat)\b/i, 'Fishing and boats are not possible yet.', ['swim', 'stroll', 'sit']],
-  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'Swings, feeding animals, skateboards and bikes are not possible yet.', ['stroll', 'sit', 'dance']],
+  // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped. The
+  // optional fourth item is the verb that, when the world offers it, makes the activity real (then it is not refused).
+  [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish)\b/i, 'There is nowhere to fish from here right now: fishing is offered only at a marked pond bank.', ['swim', 'stroll', 'sit'], 'fish'],
+  [/\b(?:sailing|canoeing|kayaking)\b/i, 'Sailing, canoes and kayaks are not possible yet; an offered punt can be rowed.', ['swim', 'stroll', 'sit']],
+  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing)\b/i, 'There is no swing offered here right now.', ['stroll', 'sit', 'dance'], 'swing'],
+  [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/i, 'There is no see-saw offered here right now.', ['stroll', 'sit'], 'seesaw'],
+  [/\bhammocks?\b/i, 'There is no hammock offered here right now.', ['lie', 'nap', 'sit'], 'hammock'],
+  [/\b(?:ferris wheel|big wheel|carousel|merry[- ]go[- ]round)\b/i, 'The Ferris wheel and the carousel at the seaside resort are scenery for now: the resort cannot be walked to yet, so they cannot be ridden. Nothing else was chosen.', ['swing', 'seesaw', 'stroll'], 'ride-attraction'],
+  [/\b(?:have|having|go for|go on|for) (?:a |some )?picnic\b|^picnic\b|\bpicnicking\b/i, 'There is no picnic blanket laid out here right now; eat at a table or sit on the grass instead.', ['eat', 'sit-ground', 'sit'], 'picnic'],
+  [/\bstar[- ]?gaz\w*|\b(?:watch|look at|count) (?:the )?stars\b/i, 'Stargazing needs open grass and a world with nights.', ['lie', 'sit-ground'], 'stargaze'],
+  [/\bfeed(?:ing)? (?:the |some )?(?:ducks?|geese|goose|swans?|birds?|pigeons?|gulls?)\b/i, 'There are no ducks or birds to feed here; the ponds have koi, which can be fed from a marked bank.', ['feed', 'stroll', 'sit'], undefined],
+  [/\b(?:feed(?:ing)? (?:the |some )?(?:fish|koi|carp))\b/i, 'There is nowhere to feed the koi from here right now: it is offered at a marked pond bank.', ['stroll', 'sit'], 'feed'],
+  [/\b(?:skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance'], 'cycle'],
 ];
 /** Quality cases 22/29/30: a NOT_YET refusal is terminal. Agents walked off to look for swings or ducks after it. */
 export const NOWHERE = ' Nothing like it exists anywhere in this world, so walking somewhere else to look for it will not help: tell your owner plainly it is not possible here (the suggestions are other things to do).';
 /** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
-const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
+const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', swinging: 'swing', stargazing: 'stargaze', picnicking: 'picnic', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
@@ -125,6 +156,10 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
   const gf = GO_FOR.exec(raw);
   if (gf) {const x = gf[1].toLowerCase().trim(); for (const [re, v] of GO_FOR_X) if (re.test(x)) {if (verbs.has(v) || v === 'stroll') return {verb: v, rest: x.replace(re, ' ').trim()}; break;}}
   const words = raw.split(/\s+/);
+  // leisure: "sit on the swing", "lie in the hammock", "play on the see-saw": the named thing decides, not the posture word
+  // R5: "dance on the bandstand", "yoga class", "read with friends": the group phrase wins over its leading verb
+  {const low = raw.toLowerCase(); for (const [re, v] of INTENTS) if (GROUP_VERBS.has(v) && verbs.has(v) && re.test(low)) return {verb: v, rest: low.replace(re, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};}
+  if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (verbs.has(v) && re.test(raw.toLowerCase())) return {verb: v, rest: raw.toLowerCase().replace(re, ' ').replace(LEISURE_LEAD, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};
   for (let n = Math.min(4, words.length); n >= 1; n--) {
     const v = canon(words.slice(0, n).join('-')), rest = words.slice(n).join(' ');
     if (!verbs.has(v)) continue;
@@ -139,7 +174,8 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
 }
 
 /** Verbs whose target is a place (natural place names and the places map apply). */
-const PLACE_VERBS = new Set(['walk', 'hang-out', 'gather', 'stroll', 'read']);
+const PLACE_VERBS = new Set(['walk', 'jog', 'run', 'jog-around', 'run-around', 'cycle', 'cycle-around', 'hang-out', 'gather', 'stroll', 'read']);
+const GAIT_VERBS = new Set(['jog', 'run', 'jog-around', 'run-around', 'cycle', 'cycle-around']);
 
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
@@ -157,23 +193,56 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
     return {kind: 'alias', cap: first.cap, note: `${'note' in first ? first.note : `${clauses[0]} is ${first.cap.id}.`} Doing the first part now; act again for "${clauses.slice(1).join(', then ')}" when its receipt completes.`};
   }
   const text = input.toLowerCase(), colon = text.indexOf(':'), head = colon >= 0 ? text.slice(0, colon) : '';
+  // Gaits are distinct offers: never quietly turn a run into walking. A recreational jog is a loop.
+  const motion = /\b(jog(?:ging)?|run(?:ning)?|sprint(?:ing)?|hurry)\b/.exec(text);
+  if (motion) {
+    const gait = /^jog/.test(motion[1]) ? 'jog' : 'run';
+    const loop = /\b(?:around|round|loop)\b/.test(text) || /\b(?:go for|take|have) (?:a |an )?(?:jog|run)\b/.test(text);
+    if (head !== gait && head !== gait + '-around') {
+      const target = text.replace(motion[0], ' ').replace(/^(?:let'?s\s+|i want to\s+|please\s+)?(?:go|take|have|do)?\s*(?:for\s+)?/, '').replace(/\b(?:around|round|loop|to|a|an|the|please|go|for)\b/g, ' ').replace(/[:.!]/g, ' ').trim().replace(/\s+/g, ' ');
+      const r = resolveCapability(`${gait}${loop ? '-around' : ''}:${target || 'here'}`, ctx);
+      return r.kind === 'unknown' ? r : {kind: 'alias', cap: r.cap, note: `${input} is ${r.cap.id} (${r.cap.label}).`};
+    }
+  }
+  // todo (leisure): a bicycle from a dock: "ride a bike to the harbour", "go cycling", "go for a bike ride around the park"
+  const bike = colon < 0 ? /\b(?:cycl(?:e|es|ing)|bik(?:e|es|ing)|bicycl(?:e|es|ing)|bike ride)\b/.exec(text) : null;
+  if (bike && !/\b(?:skateboard\w*|motor ?bike|motorcycle|exercise bike)\b/.test(text)) {
+    const offered = ctx.caps.filter(c => c.verb === 'cycle' || c.verb === 'cycle-around');
+    if (!offered.length) return {kind: 'unknown', code: 'bike.no-dock', reason: 'No bicycle is offered here: a ride starts from a bicycle dock within 120 m; nothing else was chosen.', didYouMean: []};
+    const loop = /\b(?:around|round|loop)\b/.test(text);
+    const target = text.replace(/\b(?:let'?s|i want to|please|go|going|take|have|do|for|a|an|the|my|ride|riding|on|cycle|cycles|cycling|bike|bikes|biking|bicycle|bicycles|bicycling|around|round|loop|to|and|back|from|dock|rack)\b/g, ' ').replace(/[:.!,]/g, ' ').trim().replace(/\s+/g, ' ');
+    if (!target) {
+      const near = offered.filter(c => c.verb === 'cycle-around' && c.available).sort((a, b) => dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0] ?? offered.find(c => c.verb === 'cycle-around');
+      if (near) return {kind: 'alias', cap: near, note: `${input} is ${near.id} (${near.label}).`};
+    }
+    const r = resolveCapability(`${loop || !target ? 'cycle-around' : 'cycle'}:${target || 'here'}`, ctx);
+    return r.kind === 'unknown' ? r : {kind: 'alias', cap: r.cap, note: `${input} is ${r.cap.id} (${r.cap.label}).`};
+  }
+  const rideIntent = /\b(?:row|rowing|boating|ride|rides|fly|flight|flying|leave|disembark|alight|start|depart)\b/.test(text) || /^(?:punt|boat|balloon)(?::|$)/.test(text);
+  // Rowing always means a punt, and an explicit balloon always means a balloon.
+  if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|see[- ]?saw|teeter[- ]?totter|swings?|ferris|big wheel|carousel|merry[- ]go[- ]round)\b/.test(text)) {
+    const water = /\b(?:row|rowing|punt|boat|boating)\b/.test(text), air = /\b(?:balloon|fly|flight|flying|hot[- ]air)\b/.test(text);
+    const action = /\b(?:leave|disembark|alight)\b/.test(text) ? 'leave' : /\b(?:start|depart)\b/.test(text) ? 'start' : 'join';
+    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing/i.test(c.id + ' ' + c.label) : air ? /balloon/i.test(c.id + ' ' + c.label) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));
+    const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
+    const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
+    const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
+    if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
+    return {kind: 'unknown', code: water ? 'ride.no-water-route' : 'ride.unavailable', reason: water ? 'No rowing punt is offered on that water. It needs water large enough for a safe loop and a reachable bank; nothing else was chosen.' : 'No matching ride is offered here; nothing else was chosen.', didYouMean: []};
+  }
   // CN5: "go fishing", "go swimming": the doing word decides; an unknown one is refused, never taken as a place
   const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
-  if (going && !NOT_YET.some(([re]) => re.test(text))) {
+  const offeredVerbs = new Set(ctx.caps.map(c => c.verb)), notYet = NOT_YET.filter(([, , , v]) => !v || !offeredVerbs.has(v));
+  if (going && !notYet.some(([re]) => re.test(text))) {
     const [verb, ...more] = (GO_ING[going[1]] ?? '').split(' ');
     if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.${NOWHERE}`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
     const sub = resolveCapability(`${verb} ${[...more, going[2].trim()].join(' ')}`.trim(), ctx);
     return sub.kind === 'unknown' || sub.cap.verb === verb || (verb === 'stroll' && sub.cap.verb === 'wander') ? sub : {kind: 'unknown', reason: `Nothing to ${verb} is offered here right now; nothing else was chosen in its place.`, didYouMean: suggest(input, verb, '', ctx)};
   }
   // Unsupported motions are refused honestly, with the nearest real things to do.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
-  // Rides: "ride the balloon", "go for a balloon ride", "fly" → joining the ride object.
-  if ((colon < 0 || ['ride', 'fly', 'balloon'].includes(head)) && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|boat)\b/.test(text)) {
-    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === 'join' && /ride|balloon|carrier/i.test(c.id + ' ' + c.label));
-    const named = rides.filter(c => tokens(text).some(w => w.length > 3 && !['ride', 'rides'].includes(w) && tokens(c.id + ' ' + c.label).includes(w)));
-    const pick = (named.length ? named : rides).sort((a, b) => Number(b.available) - Number(a.available) || a.id.localeCompare(b.id))[0];
-    if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
-  }
+  // Quality 22/29/30: a refusal for something that exists nowhere is terminal (NOWHERE); one whose verb a world can
+  // offer (fish, swing, picnic…) may exist elsewhere, so it keeps todo's place-specific wording.
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? reason : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
@@ -189,6 +258,35 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   // "stroll" with nothing named is a stroll right here.
   if (verb === 'stroll' && !tokens(rest).length && !ctx.caps.some(c => c.id === 'stroll:here')) {const w = ctx.caps.find(c => c.id === 'wander:here'); if (w) return {kind: 'alias', cap: w, note: `${input} is ${w.id}.`};}
   if (verb === 'stroll' && !verbs.has('stroll') && verbs.has('wander')) verb = 'wander';
+  // Resolve a named gait destination before looking through capability labels.
+  // A park mentioning a pond, or a Library annex, must never replace a named
+  // place that has no faster-gait offer of its own.
+  if (GAIT_VERBS.has(verb)) {
+    const words = tokens(rest), queries = [words, words.filter(t => !ctx.root.includes(t))];
+    for (const query of queries) {
+      const q = query.join(' '); if (!q) continue;
+      const tiers = [
+        ctx.places.filter(p => norm(p.id) === q),
+        ctx.places.filter(p => norm(p.name) === q),
+        ctx.places.filter(p => p.aliases?.some(alias => norm(alias) === q)),
+      ];
+      const named = tiers.find(matches => matches.length); if (!named) continue;
+      if (named.length > 1) return {kind:'unknown',code:'place.ambiguous',reason:`Several places have that name; use an exact offered ${verb} capability. Nothing else was chosen.`,didYouMean:ctx.caps.filter(c => c.verb === verb && named.some(p => p.id === c.target?.id)).map(c => ({id:c.id,label:c.label}))};
+      const place = named[0], offered = ctx.caps.filter(c => c.verb === verb && c.target?.id === place.id).sort((a,b) => Number(b.available)-Number(a.available) || a.id.localeCompare(b.id));
+      if (offered[0]) return {kind:'alias',cap:offered[0],note:`${input} is ${offered[0].id} (${offered[0].label}).`};
+      const bank = verb.endsWith('-around') && place.kind === 'water';
+      return {kind:'unknown',code:bank?'gait.no-bank-loop':'gait.unavailable',reason:bank?`${place.name} has no full loop on reachable dry ground; nothing else was chosen.`:`No ${verb} capability is offered for ${place.name}; nothing else was chosen in its place.`,didYouMean:[]};
+    }
+  }
+  // A named pond means its bank loop, never an unrelated park that mentions ponds in its description.
+  if (verb === 'jog-around' || verb === 'run-around') {
+    const q = tokens(rest).filter(t => !ctx.root.includes(t)), water = ctx.places.filter(p => p.kind === 'water' && q.length && q.every(t => tokenHit(t, tokens(p.id + ' ' + p.name)) || (SYNONYMS[t] ?? []).some(s => tokenHit(s, tokens(p.id + ' ' + p.name)))));
+    if (water.length && q.some(t => ['pond','lake','water','pool'].includes(t))) {
+      const offered = ctx.caps.filter(c => c.verb === verb && water.some(p => p.id === c.target?.id)).sort((a,b) => dist(ctx.target(a).at,ctx.me)-dist(ctx.target(b).at,ctx.me));
+      if (offered[0]) return {kind:'alias',cap:offered[0],note:`${input} is ${offered[0].id} (${offered[0].label}).`};
+      return {kind:'unknown',code:'gait.no-bank-loop',reason:'That pond has no full loop on reachable dry ground; nothing else was chosen.',didYouMean:[]};
+    }
+  }
   const pool = ctx.caps.filter(c => c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? '')));
   const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});

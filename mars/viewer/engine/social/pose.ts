@@ -21,11 +21,17 @@ export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-mus
   // gestures (core-next4): solo, and the hand-over pair give/take; pick-up/put-down an item
   'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
   // CN5: at a desk computer, at a microphone, in an audience, with dumbbells
-  'use-computer', 'sing', 'listen', 'lift-weights'] as const;
+  'use-computer', 'sing', 'listen', 'lift-weights',
+  // todo (leisure): fishing from a bank, tossing bread, tending garden beds; on a swing or a see-saw seat, picnicking
+  'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic',
+  // R5: telling a story to a circle (standing, talking with the hands)
+  'tell-story'] as const;
 /** Whole-body postures on open ground (the body point stays; the viewer lays the body out along pose.yaw). */
 export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga',
   // CN5: lying on a gym bench (seatHeight = the bench top)
-  'bench-press'] as const;
+  'bench-press',
+  // todo (leisure): lying in a hammock (seatHeight = the cloth), lying back on the grass to watch the stars
+  'hammock', 'stargaze'] as const;
 /** Standing whole-body exercise/expression poses (cyclic; the viewer animates them from the tick). */
 export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // paired touch gestures (core-next4): both bodies face each other at `gap` and share one start and end
@@ -33,7 +39,7 @@ export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // CN5: outdoor gym bars; choreographed games (grouped: the world keeps the turns, see `game`)
   'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball'] as const;
 export const POSE_ACTIVITIES: readonly string[] = [...POSE_OVERLAYS, ...POSE_POSTURES, ...POSE_MOVES];
-export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'dumbbell', 'boule'] as const;
+export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'dumbbell', 'boule', 'rod', 'bread', 'spoon'] as const;
 /** CN5: the instrument a `play-music` body plays (World draws it at the spot; the body state names it). */
 export const POSE_INSTRUMENTS = ['drums', 'keyboard', 'guitar', 'bass', 'violin', 'viola', 'cello', 'piano', 'flute', 'ukulele'] as const;
 /** CN5 choreographed games: no physics. The world keeps whose turn it is (a pure function of the tick and the players in
@@ -50,7 +56,7 @@ export type GameState = { kind: GameKind; group: string; players: string[]; wait
 const STEP_IN_SPEED = 0.6;
 /** together/1: partners further apart than this never pair (m). */
 const PAIR_REACH = 4;
-const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga', 'bench-press']);
+const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga', 'bench-press', 'hammock', 'stargaze']);
 /** CN5: players of a game are found within this distance (a frisbee lawn's ends are 14 m apart). */
 const GAME_REACH = 30;
 /** Open ground a lying body needs around its point (m). */

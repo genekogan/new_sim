@@ -95,7 +95,7 @@ test('vocabulary (audit P0a): "go for a X" resolves X; rides join the balloon; u
  assert.equal(go('go for a swim'), 'swim:shore-water');assert.equal(go('go for a walk'), 'wander:here');assert.equal(go('take a nap'), 'nap:here');
  assert.equal(go('go for a balloon ride'), join.id);assert.equal(go('ride the balloon'), join.id);assert.equal(go('fly in the balloon'), join.id);assert.equal(go('take a ride'), join.id);
  for (const s of ['go for a run', 'run to the deck', 'jog around', 'give Moss a hug', 'go for a jog']) {const r = resolveCapability(s, c3);assert.equal(r.kind, 'unknown', s);}
- assert.match((resolveCapability('go for a run', c3) as any).reason, /cannot run yet/);
+ assert.match((resolveCapability('go for a run', c3) as any).reason, /No "run-around" capability/);
  assert.equal(go('do some sit-ups'), 'situps:here');assert.equal(go('do push ups'), 'pushups:here');assert.equal(go('jumping jacks'), 'jumping-jacks:here');assert.equal(go('dance'), 'dance:here');
 });
 test('vocabulary (CN5): computers, stage music, singing, the audience, the gym and park games in plain words; nothing named → the nearest free spot', () => {
@@ -150,4 +150,60 @@ test('real-fire qualifier keeps sit as an offered fire seat, warm as the actual 
  for(const words of ['sit by a real fire on the moon','sit by a real fountain','sit:real fire','warm-by-fire:real fire'])assert.equal(resolveCapability(words,c).kind,'unknown',words);
  const named:EdgeCapability={...seat,id:'sit:real-fire-bench',label:'Real Fire Bench',target:{id:'real-fire-bench',kind:'object'}};
  const explicit=resolveCapability(named.id,{...c,caps:[...c.caps,named]});assert.equal(explicit.kind,'exact');assert.equal(explicit.cap.id,named.id,'explicit named ID untouched');
+});
+
+
+test('todo gaits and water rides resolve only to the requested activity and named place', () => {
+ const jog = P('jog', 'commons'), run = P('run', 'commons-deck'), loop = P('jog-around', 'shore-water');
+ const punt: EdgeCapability = {id:'object:ride-eden-punt:join',verb:'object',object:'ride-eden-punt',action:'join',label:'Join ride (Pond rowing punt)',available:true};
+ const balloon: EdgeCapability = {id:'object:ride-balloon:join',verb:'object',object:'ride-balloon',action:'join',label:'Join ride (Red balloon)',available:true};
+ const c: VocabContext = {...ctx(),caps:[...caps,jog,run,loop,punt,balloon]};
+ const id=(s:string)=>{const r=resolveCapability(s,c); assert.notEqual(r.kind,'unknown',s+' '+JSON.stringify(r));return r.kind==='unknown'?'':r.cap.id;};
+ assert.equal(id('jog to the commons'),jog.id);
+ assert.equal(id('go to the deck running'),run.id);
+ assert.equal(id('run to the deck'),run.id);
+ assert.equal(id('go for a jog around the pond'),loop.id);
+ assert.equal(id('jog around pond'),loop.id);
+ for(const s of ['row a boat','go rowing','row the punt','go for a punt ride'])assert.equal(id(s),punt.id,s);
+ assert.equal(id('ride the balloon'),balloon.id);
+ for(const s of ['go to the boat','walk to the punt','sit by the boat']){const r=resolveCapability(s,c);assert.ok(r.kind==='unknown'||r.cap.id!==punt.id,s+' never boards unasked');}
+ const noWater=resolveCapability('row a boat',{...c,caps:c.caps.filter(x=>x!==punt)});
+ assert.equal(noWater.kind,'unknown');assert.equal((noWater as any).code,'ride.no-water-route');
+ assert.equal(resolveCapability('row a boat on the moon',c).kind,'unknown','unknown named water is never another ride');
+ assert.equal(resolveCapability('go fishing',c).kind,'unknown');assert.equal(resolveCapability('go sailing',c).kind,'unknown');
+ assert.equal(resolveCapability('run to the moon',c).kind,'unknown','never select another run target');
+});
+
+test('todo named gait places refuse instead of substituting a park description or Library annex', () => {
+ const pond:VocabPlace={id:'shore-water',name:'The pond (connected calm water)',aliases:['pond','the pond'],kind:'water',center:[-50,0]};
+ const park:VocabPlace={id:'region-park',name:'Park with pond',kind:'outdoor',center:[0,50]};
+ const library:VocabPlace={id:'library',name:'Library',center:[60,0]},annex:VocabPlace={id:'library-annex',name:'Library annex',center:[65,0]};
+ const known=[pond,park,library,annex];
+ for(const verb of ['jog','run','jog-around','run-around']){
+  const offers=[park,annex].map(p=>P(verb,p.id,`${verb} ${p.name}`));
+  const c:VocabContext={...ctx(),caps:offers,places:known,target:c=>{const p=known.find(p=>p.id===c.target?.id);return {names:p?[p.name]:[],around:[],at:p?.center??null};}};
+  for(const input of [`${verb}:pond`,`${verb}:the pond`,`${verb}:eden pond`,`${verb}:Library`]){
+   const r=resolveCapability(input,c);assert.equal(r.kind,'unknown',input+' '+JSON.stringify(r));if(r.kind!=='unknown')continue;
+   assert.equal(r.code,verb.endsWith('-around')&&input.toLowerCase().includes('pond')?'gait.no-bank-loop':'gait.unavailable');assert.match(r.reason,/nothing else was chosen/);
+  }
+  if(!verb.endsWith('-around')){const r=resolveCapability(`go to the pond ${verb==='run'?'running':'jogging'}`,c);assert.equal(r.kind,'unknown');}
+ }
+});
+
+test('todo around-pond aliases identify the native pond before a separately offered park pond', () => {
+ const native:VocabPlace={id:'shore-water',name:'Connected calm water',aliases:['pond','the pond'],kind:'water',center:[-50,0]};
+ const parkPond:VocabPlace={id:'region-park.pond',name:'Park pond',kind:'water',center:[0,50]},known=[native,parkPond];
+ for(const verb of ['jog-around','run-around']){
+  const park=P(verb,parkPond.id,`${verb} ${parkPond.name}`),home=P(verb,native.id,`${verb} ${native.name}`);
+  const c:VocabContext={...ctx(),caps:[park],places:known,target:c=>{const p=known.find(p=>p.id===c.target?.id);return {names:p?[p.name]:[],around:[],at:p?.center??null};}};
+  const no=resolveCapability(`${verb}:pond`,c);assert.equal(no.kind,'unknown');if(no.kind==='unknown')assert.equal(no.code,'gait.no-bank-loop');
+  const named=resolveCapability(`${verb}:park pond`,c);assert.notEqual(named.kind,'unknown');if(named.kind!=='unknown')assert.equal(named.cap.id,park.id);
+  const yes=resolveCapability(`${verb==='jog-around'?'go for a jog':'run'} around the pond`,{...c,caps:[park,home]});assert.notEqual(yes.kind,'unknown');if(yes.kind!=='unknown')assert.equal(yes.cap.id,home.id);
+ }
+});
+
+test('todo an authored world-engine Pond name still resolves its offered natural loop', () => {
+ const pond:VocabPlace={id:'god-place-pond',name:'Pond',kind:'water',center:[12,4]};
+ const loop=P('jog-around',pond.id,'Jog around Pond'),c:VocabContext={...ctx(),caps:[loop],places:[pond],target:()=>({names:['Pond'],around:[],at:pond.center})};
+ const r=resolveCapability('go for a jog around the pond',c);assert.notEqual(r.kind,'unknown');if(r.kind!=='unknown')assert.equal(r.cap.id,loop.id);
 });
