@@ -43,10 +43,13 @@ function reachOf(m: WorldModel, e: Entity): { at: Vec2; r: number } {
     const xs = pts.map(q => q[0]), zs = pts.map(q => q[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     return { at: [(x0 + x1) / 2, (z0 + z1) / 2], r: Math.hypot(x1 - x0, z1 - z0) / 2 };
   }
-  const wp = m.worldPose(e), d = m.resolvedDef(e.def);
-  let r = 0; try { if (d) { const b = m.bake(d, e.params ?? {}, e.seed ?? 0, e.shape); r = Math.hypot(b.box[0], b.box[2]) / 2 * wp.s; } } catch { /* unbakeable: a point */ }
-  return { at: [wp.x, wp.z], r };
+  // Indexed solid footprints when it has them (no bake on the request path), else the def's declared box.
+  const wp = m.worldPose(e), at: Vec2 = [wp.x, wp.z], fp = m.footprintsOf(e.id);
+  if (fp.length) return { at, r: Math.max(...fp.map(o => Math.hypot(o.c[0] - at[0], o.c[1] - at[1]) + Math.hypot(o.half[0], o.half[1]))) };
+  const box = m.resolvedDef(e.def)?.size.box;
+  return { at, r: box ? Math.hypot(box[0], box[2]) / 2 * wp.s : 0 };
 }
+const isLandform = (m: WorldModel, e: Entity) => { const d = m.resolvedDef(e.def); try { return !!d && !!m.bake(d, e.params ?? {}, e.seed ?? 0, e.shape).landform; } catch { return false; } };
 function ownersOf(m: WorldModel, id: string, out: { owners: string[]; things: string[] }) {
   for (let e = m.entities.get(id); e; e = e.in.parent === 'world' ? undefined : m.entities.get(e.in.parent)) {
     if (e.owner && !out.owners.includes(e.owner)) out.owners.push(e.owner);
@@ -75,7 +78,8 @@ export function mapChanges(before: WorldModel, after: WorldModel, diff: Diff, sk
     const d = m.resolvedDef(e.def), { at, r } = reachOf(m, e), refs = { owners: [] as string[], things: [] as string[] };
     ownersOf(m, id, refs); if (how !== 'removed' && before.entities.has(id)) ownersOf(before, id, refs);
     let verb: MapVerb, from: Vec2 | undefined;
-    let ground = false; try { const b = d && m.bake(d, e.params ?? {}, e.seed ?? 0, e.shape); ground = !!b?.landform; } catch { /* not ground */ }
+    // only an edit that re-made ground tiles can be a landform (the bake lookup is skipped otherwise)
+    const ground = diff.tiles.length > 0 && isLandform(m, e);
     if (how === 'removed') verb = ground ? 'reshaped' : 'removed';
     else if (ground) verb = 'reshaped';
     else if (how === 'added') verb = isBuilding(after, e) ? 'built' : 'placed';

@@ -35,6 +35,9 @@ test('visible changes only, outermost first, with a verb and a name', () => {
   const moved = step([{ op: 'move', id: bench, p: [24, 0] }]);
   assert.deepEqual(moved.map(c => [c.verb, c.from]), [['moved', [20, 0]]]);
   assert.deepEqual(step([{ op: 'remove', id: bench }]).map(c => [c.verb, c.name, c.at]), [['removed', 'bench', [24, 0]]]);
+  const mound = step([{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [60, 0], params: { height: 4, radius: 5 } }]);
+  assert.deepEqual(mound.map(c => [c.verb, c.name]), [['reshaped', 'the ground']]);
+  assert.equal(mapNoticeText(mound), 'The god reshaped the ground near you.');
   assert.equal(mapNoticeText(built), 'The god built a house near you.');
   assert.equal(mapNoticeText([...built, ...moved], {}, ' at the harbour'), 'The god built a house and changed 1 other thing at the harbour.');
   assert.equal(mapNoticeText(moved, { note: 'tidy the square.' }, ' by the fountain'), 'The god changed things by the fountain: tidy the square.');
