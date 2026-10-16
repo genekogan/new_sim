@@ -20,6 +20,8 @@ const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { ret
 import { selectRows } from './lib/select.mjs';
 import { PALETTE_LIST } from './lib/sky.mjs';
 import { schemaMarkdown } from './lib/schema-md.mjs';
+import { listen, ack } from './lib/inbox.mjs';
+export { listen, ack };
 import { time as envTime, weather as envWeather, strike as envStrike, land as envLand, ENV_FLAGS, ENV_BOOLS, LAND_HELP } from './lib/env.mjs';
 import { hours, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
 export { schemaMarkdown };
@@ -1144,7 +1146,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['fix', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['once', 'follow', 'fix', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1168,6 +1170,7 @@ const REL = 'at offset near around dist dir count facing yaw against between alo
 const FLAGS = {
   doctor: 'fix local',
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include',
+  listen: 'after timeout once follow', ack: '',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
@@ -1177,7 +1180,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { doctor: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { listen: 0, ack: 2, doctor: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -1200,6 +1203,7 @@ export function checkArgs(cmd, f, rest) {
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = { doctor: (r, f) => doctor(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
+  listen: (r, f) => listen(f), ack: (r) => ack(r[0], r[1]),
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
@@ -1233,6 +1237,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [\"reply up to 140 characters\"]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)

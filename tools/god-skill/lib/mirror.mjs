@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { atomicWrite, call, load, ok } from './state.mjs';
 import { isFlagDef } from './solver.mjs';
+import { noticeInboxHeader } from './inbox-notice.mjs';
 
 export const CACHE = '.eden-god.cache.json';
 let memo = null;
@@ -63,6 +64,7 @@ export const normDef = (d) => (d.includes('@') || d.startsWith('sha:') ? d : `co
 export async function follow(seconds = 3600, onEvent = () => {}) {
   const s = load();
   const r = await fetch(s.world + '/v1/god/stream', { headers: { authorization: `Bearer ${s.token}`, accept: 'text/event-stream' }, signal: AbortSignal.timeout(seconds * 1000) });
+  noticeInboxHeader(r.headers);
   const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
   try {
     for (;;) {

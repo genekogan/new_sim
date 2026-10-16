@@ -12,6 +12,7 @@ import { flyTo } from './god-ui/camera.ts';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
+import { GodAgentMessageBox } from './AgentMessageBox.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
 import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
@@ -180,6 +181,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
         )}
         {owner && (
           <>
+            <GodAgentMessageBox />
             {paired && <div className="gp-tools">
               <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
               <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>

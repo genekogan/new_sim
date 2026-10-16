@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { resolve, win32 } from 'node:path';
 import { load } from './state.mjs';
 import { fetchWithRetry } from './retry.mjs';
+import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 
 const needsLocalBrowser = args => !!args.views || args.frames > 1 || !!args.studio;
 const localBrowserError = () => Error('look: sheets (--views/--site), motion frames and kit workbench require local Playwright and Google Chrome; the remote renderer supports single views only');
@@ -19,8 +20,10 @@ export async function remoteLook(args, runtime = {}) {
     // One look deadline (E1) cancels the request through runtime.signal; 429s back off inside it (1.1).
     redirect: 'error', timeoutMs: args.timeoutMs ?? Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 120_000), deadlineAt: runtime.deadlineAt, signal: runtime.signal,
   }, runtime);
+  noticeInboxHeader(r.headers);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
+    noticeOwnerInbox(e);
     throw Error(`look: ${e.code ?? r.status}: ${e.message ?? 'world renderer refused the screenshot'}${e.retry_after ? `; retry in ${e.retry_after}s` : ''}`);
   }
   const png = Buffer.from(await r.arrayBuffer());

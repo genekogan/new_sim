@@ -254,6 +254,26 @@ async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, 
   }
 }
 
+// lib/inbox-notice.mjs
+var noticed = /* @__PURE__ */ new Set();
+function noticeOwnerInbox(data) {
+  const message = data?.inbox?.latest;
+  if (!message || typeof message.id !== "string" || !message.id || typeof message.text !== "string" || !["sent", "delivered"].includes(message.state) || noticed.has(message.id)) return false;
+  console.error("OWNER MESSAGE " + JSON.stringify(message));
+  noticed.add(message.id);
+  if (noticed.size > 256) noticed.delete(noticed.values().next().value);
+  return true;
+}
+function noticeInboxHeader(headers) {
+  try {
+    const encoded = headers?.get?.("x-sim-agent-inbox");
+    if (typeof encoded !== "string" || encoded.length > 16384 || !/^[A-Za-z0-9_-]+$/.test(encoded)) return false;
+    return noticeOwnerInbox(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(encoded, "base64url"))));
+  } catch {
+    return false;
+  }
+}
+
 // lib/state.mjs
 var STATE = ".eden-god.json";
 var read = (file) => existsSync(file) ? JSON.parse(readFileSync2(file, "utf8")) : {};
@@ -372,6 +392,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
     const t0 = Date.now();
     const store = context.getStore();
     const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, {}, retryBudget);
+    if (headers.authorization && !requestPath.startsWith("/v1/god/inbox/")) noticeInboxHeader(r.headers);
     const text = await r.text();
     let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ""}`);
@@ -384,6 +405,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   }
   const finish = (r) => {
     const b = body?.build, data = r.data;
+    if (headers.authorization && !pathname.startsWith("/v1/god/inbox/")) noticeOwnerInbox(data);
     if (as === "god" && ["/v1/god/env", "/v1/god/act"].includes(pathname)) {
       for (const w of data?.warnings ?? []) {
         if (typeof w === "string" && /^env\.shared-clock\b/.test(w)) console.error(w);
@@ -427,7 +449,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   if (response) return finish(response);
   if (!recoverable) return lost(failure);
   const lookup = async () => send(`/v1/god/requests/${encodeURIComponent(clientRef)}`, "GET", void 0, Math.min(timeoutMs, 1e4));
-  const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true } } : null;
+  const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true, ...r.data.inbox ? { inbox: r.data.inbox } : {} } } : null;
   let receipt;
   try {
     receipt = await lookup();
@@ -1540,6 +1562,7 @@ async function follow(seconds = 3600, onEvent = () => {
 }) {
   const s = load();
   const r = await fetch(s.world + "/v1/god/stream", { headers: { authorization: `Bearer ${s.token}`, accept: "text/event-stream" }, signal: AbortSignal.timeout(seconds * 1e3) });
+  noticeInboxHeader(r.headers);
   const reader = r.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -1707,8 +1730,10 @@ async function remoteLook(args, runtime = {}) {
     deadlineAt: runtime.deadlineAt,
     signal: runtime.signal
   }, runtime);
+  noticeInboxHeader(r.headers);
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));
+    noticeOwnerInbox(e);
     throw Error(`look: ${e.code ?? r.status}: ${e.message ?? "world renderer refused the screenshot"}${e.retry_after ? `; retry in ${e.retry_after}s` : ""}`);
   }
   const png = Buffer.from(await r.arrayBuffer());
@@ -2287,6 +2312,48 @@ function schemaMarkdown(s) {
   L.push("## Components", s.components.join(", "), "", "## Slot kinds", s.slotKinds.join(", "), "", "## Materials", s.materials.join(", "), "", "## Refusal codes", s.refusals.join(", "), "");
   L.push("## Endpoints", ...Object.entries(s.endpoints).map(([k, v]) => `- ${k}: ${v.join(" \xB7 ")}`), "");
   return L.join("\n");
+}
+
+// lib/inbox.mjs
+async function listen(flags2 = {}) {
+  const seconds = flags2.timeout === void 0 ? 25 : Number(flags2.timeout);
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55 || flags2.timeout === true) throw new Error("listen --timeout takes seconds from 0 to 55");
+  if (flags2.after !== void 0 && (typeof flags2.after !== "string" || !flags2.after)) throw new Error("listen --after needs a message id");
+  if (seconds === 0 && !flags2.once) throw new Error("listen --timeout 0 requires --once");
+  if (flags2.follow && flags2.once) throw new Error("listen takes --follow or --once, not both");
+  if (flags2.follow) return followInbox({ poll: (after) => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after: flags2.after });
+  const query2 = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...flags2.after ? { after: flags2.after } : {} });
+  for (; ; ) {
+    const data = ok(await call(`/v1/god/inbox/listen?${query2}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), "listen");
+    if (!data?.inbox) throw new Error("listen: this world does not serve the owner inbox yet");
+    const message = data.inbox.latest;
+    if (flags2.once || message && message.state !== "acknowledged" && message.id !== flags2.after) return data;
+    await sleep(50);
+  }
+}
+async function ack(id, reply) {
+  if (typeof id !== "string" || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"]');
+  if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
+  return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
+}
+async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false }) {
+  let last = after, delay = 0;
+  while (!stop()) {
+    const r = await poll(last);
+    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await wait(delay);
+      continue;
+    }
+    delay = 0;
+    if (r.status < 200 || r.status >= 300) throw new Error(`listen: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
+    if (!r.data?.inbox) throw new Error("listen: this world does not serve the owner inbox yet");
+    const m = r.data.inbox.latest;
+    if (m && m.state !== "acknowledged" && m.id !== last) {
+      write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
+      last = m.id;
+    } else await wait(50);
+  }
 }
 
 // lib/env.mjs
@@ -3957,7 +4024,7 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["fix", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["once", "follow", "fix", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -3982,6 +4049,8 @@ var REL = "at offset near around dist dir count facing yaw against between along
 var FLAGS = {
   doctor: "fix local",
   build: "title steps at offset size yaw mass brief root take done force undo say timeout asks include",
+  listen: "after timeout once follow",
+  ack: "",
   "verify-use": "seat from uses",
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -4019,7 +4088,7 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { doctor: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { listen: 0, ack: 2, doctor: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -4045,6 +4114,8 @@ var COMMANDS = {
     if (r[0] !== "look" || !r[1]) throw Error("usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]");
     return kitLook(readArg(r.slice(1)), f);
   },
+  listen: (r, f) => listen(f),
+  ack: (r) => ack(r[0], r[1]),
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity),
@@ -4145,6 +4216,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["reply up to 140 characters"]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
@@ -4207,6 +4279,7 @@ export {
   EXAMPLES,
   SKILL_VERSION,
   SKY_PALETTES,
+  ack,
   act,
   answer,
   bakeInfo,
@@ -4237,6 +4310,7 @@ export {
   history,
   importWorld,
   kitLook,
+  listen,
   look,
   lookFrame,
   lookOverrides,

@@ -32,10 +32,85 @@ Talk: say "<text>" \xB7 converse start <Soul ID> [text]
 Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
+Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["short reply"]
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
 Copy offered IDs exactly; unknown or ambiguous targets must not become another action.`;
+}
+
+// tools/edge-skill/client-inbox.mjs
+var noticed = /* @__PURE__ */ new Set();
+function noticeOwnerInbox(data) {
+  const message = data?.inbox?.latest;
+  if (!message || typeof message.id !== "string" || !message.id || typeof message.text !== "string" || !["sent", "delivered"].includes(message.state) || noticed.has(message.id)) return false;
+  console.error("OWNER MESSAGE " + JSON.stringify(message));
+  noticed.add(message.id);
+  if (noticed.size > 256) noticed.delete(noticed.values().next().value);
+  return true;
+}
+function noticeInboxHeader(headers) {
+  try {
+    const encoded = headers?.get?.("x-sim-agent-inbox");
+    if (typeof encoded !== "string" || encoded.length > 16384 || !/^[A-Za-z0-9_-]+$/.test(encoded)) return false;
+    return noticeOwnerInbox(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(encoded, "base64url"))));
+  } catch {
+    return false;
+  }
+}
+async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Promise((resolve9) => setTimeout(resolve9, ms)), write, stop }) {
+  let seconds = 25, after, once = false, follow = false;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--once") once = true;
+    else if (arg === "--follow") follow = true;
+    else if (arg === "--timeout") {
+      const value = args[++i];
+      seconds = value === void 0 || value === "" ? NaN : Number(value);
+    } else if (arg === "--after") {
+      after = args[++i];
+      if (!after || after.startsWith("--")) throw new Error("listen --after needs a message id");
+    } else throw new Error("usage: listen [--after message-id] [--timeout seconds] [--once|--follow]");
+  }
+  if (once && follow) throw new Error("listen takes --follow or --once, not both");
+  if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55) throw new Error("listen --timeout takes seconds from 0 to 55");
+  if (seconds === 0 && !once) throw new Error("listen --timeout 0 requires --once");
+  if (follow) return followInbox({ poll: (last) => call2(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...last ? { after: last } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after, wait: sleep2, write, stop });
+  const query = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} });
+  for (; ; ) {
+    const response = await call2(`/v1/edge/inbox/listen?${query}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 });
+    const data = inboxResult(response, "listen"), message = data.inbox.latest;
+    if (once || message && message.state !== "acknowledged" && message.id !== after) return data;
+    await sleep2(50);
+  }
+}
+async function clientAck(args, { call: call2 }) {
+  const [id3, reply] = args;
+  if (typeof id3 !== "string" || !id3.trim() || args.length > 2) throw new Error('usage: ack <message-id> ["reply up to 140 characters"]');
+  if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
+  return inboxResult(await call2(`/v1/edge/inbox/${encodeURIComponent(id3)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
+}
+function inboxResult(response, operation) {
+  if (response.status < 200 || response.status >= 300) throw new Error(`${operation}: HTTP ${response.status} ${JSON.stringify(response.data).slice(0, 300)}`);
+  if (!response.data?.inbox) throw new Error(`${operation}: this world does not serve the owner inbox yet`);
+  return response.data;
+}
+async function followInbox({ poll, after, write = (line) => process.stdout.write(line + "\n"), wait: wait2, stop = () => false }) {
+  let last = after, delay = 0;
+  while (!stop()) {
+    const r = await poll(last);
+    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await wait2(delay);
+      continue;
+    }
+    delay = 0;
+    const m = inboxResult(r, "listen").inbox.latest;
+    if (m && m.state !== "acknowledged" && m.id !== last) {
+      write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
+      last = m.id;
+    } else await wait2(50);
+  }
 }
 
 // tools/edge-skill/eden-agent.mjs
@@ -1659,6 +1734,7 @@ async function readClientStream(url, { fetcher = fetch, headers = {}, signal, on
   };
   try {
     const response = await fetcher(url, { headers, signal: controller.signal });
+    if (new Headers(headers).has("authorization")) noticeInboxHeader(response.headers);
     if (response.status !== 200 || !response.body) return { status: response.status, reason: "unavailable", hello, lastFrameAt };
     reader = response.body.getReader();
     if (controller.signal.aborted) return { status: 0, reason: reason ?? "aborted", hello, lastFrameAt };
@@ -3462,6 +3538,10 @@ async function call(path, { body: body2, method, as = "soul", timeoutMs = 9e4, s
   } catch {
     data = { raw: text3.slice(0, 200) };
   }
+  if (headers.authorization && !path.startsWith("/v1/edge/inbox/")) {
+    noticeInboxHeader(r.headers);
+    noticeOwnerInbox(data);
+  }
   const bytes = Buffer.byteLength(text3);
   telemetry?.({ fetch: { path, status: r.status, bytes } });
   return { status: r.status, data, bytes, headers: { etag: r.headers.get("etag") } };
@@ -4174,6 +4254,10 @@ async function callH(path, body2, extra, method) {
     data = JSON.parse(text3);
   } catch {
     data = { raw: text3.slice(0, 200) };
+  }
+  if (headers.authorization) {
+    noticeInboxHeader(r.headers);
+    noticeOwnerInbox(data);
   }
   return { status: r.status, data };
 }
@@ -5946,6 +6030,8 @@ async function body(cmd, ...args) {
   const state = load(), world = need(state, "world", "Register this folder first"), token = need(state, "token", "Pair your Soul first");
   const response = await fetch(world + "/v1/edge/body/uploads", { method: "POST", headers: { authorization: "Bearer " + token }, body: form, signal: AbortSignal.timeout(9e4) });
   const data = await response.json().catch(() => ({}));
+  noticeInboxHeader(response.headers);
+  noticeOwnerInbox(data);
   if (!response.ok) throw new Error((data.error?.code ?? "body.unavailable") + ": " + (data.error?.message ?? "Body upload refused"));
   return data.asset;
 }
@@ -5977,7 +6063,13 @@ async function dashboard(...args) {
   });
   return { dashboard: "closed" };
 }
-var commands = { body, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
+async function listen(...args) {
+  return clientListen(args, { call });
+}
+async function ack(...args) {
+  return clientAck(args, { call });
+}
+var commands = { listen, ack, body, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync2(process.argv[1])).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd || ["help", "--help", "-h"].includes(cmd)) {
@@ -6004,6 +6096,7 @@ export {
   CONVERSATION_MAX_INVITEES,
   SKILL_VERSION,
   accept,
+  ack,
   act,
   approval,
   attend,
@@ -6021,6 +6114,7 @@ export {
   explore,
   here,
   intentOf,
+  listen,
   live,
   liveOptions,
   map,

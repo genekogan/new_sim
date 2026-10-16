@@ -9,6 +9,7 @@ import {publicSoulLink} from './soul-link.ts';
 import {worldPath} from './world-path.ts';
 import {BASE} from './base-path.ts';
 import './SoulCard.css';
+import {SoulAgentMessageBox} from './AgentMessageBox.tsx';
 
 /** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
  * dot, what it is doing, Share. Everything else (last action, recent actions/events, public activity) sits in a
@@ -61,6 +62,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    {doing&&<span className="soul-doing">{doing}</span>}
    {energy&&<span className="soul-energy">{energy}</span>}
   </p>
+  {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id}/>}
   <div className="soul-actions">
    <button onClick={()=>requestSoulConversations(soul.id)}>Conversations</button>
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}

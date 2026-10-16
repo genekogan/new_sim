@@ -1,11 +1,24 @@
 {
   "what": "The Soul CLI and Soul guides every launcher world serves (/eden-agent.mjs, /skill.md, /instructions.md). Exact copies, never forks.",
-  "cli": { "file": "eden-agent.mjs", "version": "1.9", "sha256": "40cc21a6815f56c17a4fa70595e9ed756671ab9b38f4d766648dd5d1e94083f0",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-e2e86c12.manifest.json)", "source": "e2e86c12173a1619576cf711faac3c4aaddd3bab",
-    "note": "lane LOOKS: 1.9 + the additive `body look` command (previous pin bb53a105 from 4fdb39d2, publication-20be-001)" },
-  "skill": { "file": "skill.md", "sha256": "c286d2e311a429d7d2e569f1a5e10fd6621d0c18f101027593f6acdd1cff863d",
-    "from": "git show e2e86c12:tools/edge-skill/SKILL.md", "note": "template; the world fills {{BASE}}. Differs from publication-20be-001 only by the `body look` paragraph" },
-  "instructions": { "file": "instructions.md", "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
-    "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md", "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36…)" },
+  "cli": {
+    "file": "eden-agent.mjs",
+    "version": "1.9",
+    "sha256": "694f05d7b7ad5ac3689641545b8add3550337f579a2c96dd0a0dfc278954504b",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-fcb47049.manifest.json)",
+    "source": "fcb470499750d4efe4913bf2df8c82e625d523de",
+    "note": "lane inbox: 1.9 + owner-message listen (--once/--follow)/ack and authenticated JSON, image and event-stream receipts"
+  },
+  "skill": {
+    "file": "skill.md",
+    "sha256": "32d4514ee7dadaf13941205fcd35146742ca05d78c7281dd27bd6acc3e864f51",
+    "from": "git show fcb47049:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox listening and acknowledgement guidance."
+  },
+  "instructions": {
+    "file": "instructions.md",
+    "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
+    "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md",
+    "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36\u2026)"
+  },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
 }

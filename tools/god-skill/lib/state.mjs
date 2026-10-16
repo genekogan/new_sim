@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { acquireLock, holder } from './locks.mjs';
 import { fetchWithRetry } from './retry.mjs';
+import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 
 export const STATE = '.eden-god.json';
 const read = (file) => existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
@@ -108,6 +109,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     // command's one deadline and cancelled with it (the look deadline runs through withDeadline).
     const store = context.getStore();
     const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, {}, retryBudget);
+    if (headers.authorization && !requestPath.startsWith('/v1/god/inbox/')) noticeInboxHeader(r.headers);
     // Reading a response can also lose the connection after the edit committed.
     const text = await r.text(); let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ''}`);
@@ -116,6 +118,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   }
   const finish = (r) => {
     const b = body?.build, data = r.data;
+    if (headers.authorization && !pathname.startsWith('/v1/god/inbox/')) noticeOwnerInbox(data);
     // env.mjs formats only the applied environment. Surface the server's shared-clock
     // warning here as well, including sky's world-state act, without another call.
     if (as === 'god' && ['/v1/god/env', '/v1/god/act'].includes(pathname)) {
@@ -162,7 +165,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   // Only /act is bound durably to clientRef. A lookup failure is not proof the
   // edit is absent, so resend only after a definite 404, and at most once.
   const lookup = async () => send(`/v1/god/requests/${encodeURIComponent(clientRef)}`, 'GET', undefined, Math.min(timeoutMs, 10_000));
-  const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true } } : null;
+  const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true, ...(r.data.inbox ? { inbox: r.data.inbox } : {}) } } : null;
   let receipt;
   try { receipt = await lookup(); } catch { return lost(failure); }
   const recovered = receiptResult(receipt);
