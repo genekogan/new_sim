@@ -87,7 +87,8 @@ export function withKitPrograms(plain: z.ZodObject): z.ZodType<KitProgramArgs> {
   const vector = z.tuple([number, number, number]);
   const delta = z.record(z.string(), z.unknown());
   const shape = z.object({
-    ...Object.fromEntries(Object.entries(fields).map(([k, s]) => [k, expressions(s as z.ZodType)])),
+    // XP8 hook: faces are plain data (no $params), kept as authored so their own field checks still run.
+    ...Object.fromEntries(Object.entries(fields).map(([k, s]) => [k, k === 'faces' ? s as z.ZodType : expressions(s as z.ZodType)])),
     kind: z.union([fields.kind as z.ZodType, z.literal('arch.pointed')]), at: vector.optional(),
     repeat: z.object({ n: number, step: z.union([vector, delta, z.array(delta).min(1).max(L.kitExpandedShapes - 1)]) }).strict().optional(),
     radial: z.object({ n: number, r: number, face: z.enum(['out', 'in', 'none']).default('out'), start: number.optional(), arc: number.optional() }).strict().optional(),

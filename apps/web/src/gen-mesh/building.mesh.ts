@@ -12,6 +12,7 @@ import { GENERATORS, type Value } from '@sim/generators';
 import { buildingFacadeSlots, type BuildingLayout } from '../../../../packages/generators/src/building.ts';
 import { Builder, hashStr, mix, rng, type Col } from './building-kit.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
+import { decalGroups } from './faces.ts'; // XP8 hook
 
 type V2 = [number, number];
 type Wall = BuildingLayout['walls'][number];
@@ -50,12 +51,14 @@ registerMesh({
     const key = `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
     let tpl = templates.get(key);
     if (!tpl) {
-      // New switch defaults must not reshuffle the legacy random facade details.
-      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k)));
+      // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
+      // must leave the shutters, flower boxes and chimney where they were).
+      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k) && k !== 'decals'));
       const seed = hashStr(`${ctx.def.hash}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
       let built: { group: THREE.Group; tris: number } | null = null;
       for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }
       tpl = built!.group;
+      for (const group of decalGroups(ctx.params.decals, ctx.baked?.slots, L.yaw)) tpl.children[0].add(group); // XP8 hook: wall decals
       tpl.userData.tris = built!.tris;
       if (templates.size > 64) { for (const g of templates.values()) disposeGroup(g); templates.clear(); }
       templates.set(key, tpl);
@@ -482,6 +485,12 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
       if (!roofsOff && camLocal.y < (level + 1) * L.fh + FLOOR0 - SLAB - 0.05) keepSlab = level + 1;
     }
   };
+  // XP8 hook: one decision per building per rendered frame and camera, however many meshes (decals add up to 16) ask.
+  let decided = -1, decidedFor: THREE.Camera | null = null;
+  const decideOnce = (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => {
+    const frame = renderer?.info?.render?.frame;
+    if (frame === undefined || frame !== decided || camera !== decidedFor) { decided = frame ?? -1; decidedFor = camera; decide(camera); }
+  };
   // furniture and other children on hidden storeys follow the cut (WorldEntityLayer reads this; L1 patch 04)
   const floorOf: Record<string, number> = { ground: 0, porch: 0, roof: L.floors, ...(L.balcony ? { balcony: L.balcony.floor } : {}) };
   for (let k = 1; k < L.floors; k++) floorOf[`floor-${k}`] = k;
@@ -493,12 +502,12 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
     const gname = mesh.parent?.name ?? '';
     const slab = gname.startsWith('slab-'), level = gname === 'roof' ? Infinity : Number(gname.replace(/^(level|slab)-/, ''));
     const hidden = () => (level === Infinity ? hideRoof : slab ? level !== keepSlab && (level > hideAbove || (level === L.floors && hideRoof)) : level > hideAbove);
-    mesh.onBeforeRender = (_r, _s, camera, geometry) => {
-      mainCamera = camera; decide(camera);
+    mesh.onBeforeRender = (renderer, _s, camera, geometry) => {
+      mainCamera = camera; decideOnce(renderer, camera);
       (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
     };
-    mesh.onBeforeShadow = (_r, _o, _c, _sc, geometry) => {
-      if (mainCamera) decide(mainCamera);
+    mesh.onBeforeShadow = (renderer, _o, _c, _sc, geometry) => {
+      if (mainCamera) decideOnce(renderer, mainCamera);
       (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
     };
     mesh.onAfterRender = (_r, _s, _c, geometry) => { (geometry as THREE.BufferGeometry).setDrawRange(0, Infinity); };

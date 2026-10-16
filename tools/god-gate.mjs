@@ -21,6 +21,7 @@ const suites = [
   ['generators', test(files('packages/generators/src', '.test.ts'))],
   // K1 / NT5: offline kit semantics always run; recorded pixel captures can gate the same command.
   ['kit-mesh', test(['apps/web/src/gen-mesh/kit.mesh.test.ts'])],
+  ['faces', test(['apps/web/src/gen-mesh/faces.test.ts'])], // XP8: viewer faces/decals and their offline network log
   ['gallery-diff', test(['tools/god-skill/scripts/gallery-diff.test.mjs'])],
   ['CLI-lib', test([...files('tools/god-skill', '.test.mjs'), ...files('tools/god-skill/lib', '.test.mjs')])],
   ...['server', 'world-compiler', 'generators'].map(name => [`tsc-${name}`, ['node_modules/typescript/bin/tsc', '--noEmit', '-p', name === 'server' ? 'apps/server' : `packages/${name}`]]),
