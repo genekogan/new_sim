@@ -259,12 +259,12 @@ test('a label that changes size gets a fresh texture (the old one disposed once)
   sites.dispose(); assert.equal(disposed, 1);
 });
 
+const walkFeed = () => JSON.parse(readFileSync(new URL('../../server/src/god/fixtures/build-messages.json', import.meta.url), 'utf8')).walk as { type: string; kind: string; event?: string; now: number; rev?: number; seq?: number }[];
 // R2F: the server's own feed for the walk (apps/server/src/god/builds.test.ts "R2F", fixtures/build-messages.json `walk`):
 // started, paused after a 12-minute look, the lead's step --say (resumed + step), reads (alive) and more steps, a committed
 // batch with a note, a step. Production defaults: 10 min pause, 30 min closure. Delivered in order at server time, no reload.
 test('visitors apply the real step feed live: narration and pulse appear, "paused" never shows while narrating, and the batch moves reopensAt', () => {
-  const walk = JSON.parse(readFileSync(new URL('../../server/src/god/fixtures/build-messages.json', import.meta.url), 'utf8')).walk as { kind: string; event?: string; now: number }[];
-  const T0 = walk[0].now; let mono = 1000;
+  const walk = walkFeed(), T0 = walk[0].now; let mono = 1000;
   const sites = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => mono, createCanvas: () => fakeCanvas(), search: '?sites=ring,label' });
   const at = (serverMs: number) => { mono = 1000 + serverMs - T0; sites.update(mono); };
   const text = () => sites.inspect().sites[0]?.text ?? '';
@@ -293,6 +293,34 @@ test('visitors apply the real step feed live: narration and pulse appear, "pause
   at(lastStep + 8 * 60_000 - 1); assert.doesNotMatch(text(), /paused/); assert.match(text(), /designing: Shaping the lantern/);
   at(lastStep + 10 * 60_000); assert.equal(text(), 'Release walk lighthouse · tower 2/3 · paused 0 min · open again Thu · 9:55 pm');
   sites.dispose();
+});
+
+// R2F: a visitor receives that feed through WorldEntityLayer.applyEdge, which LiveWorld calls every frame with the whole
+// edge buffer: world-build messages pass only when rev > maxRev, the diff (and its build delta) only in seq order.
+test('the walk feed through the visitor entry point (applyEdge, the buffer re-sent every frame) gives the same labels, maxRev 12, no resync', async () => {
+  const { WorldEntityLayer } = await entityLayerFixture();
+  const walk = walkFeed(), T0 = walk[0].now; let mono = 1000;
+  const direct = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => mono, createCanvas: () => fakeCanvas(), search: '?sites=ring,label' });
+  const layer = new WorldEntityLayer(p => p); layer.sites.siteStyle('ring,label');
+  const internals = layer as unknown as { model: WorldModel; seq: number; now: number; sites: { clock: () => number; options: { createCanvas: () => HTMLCanvasElement } } };
+  internals.model = new WorldModel({ constants: { ground: 'land' }, seed: 'offline-walk-feed' }); internals.seq = 0; internals.now = 1000; layer.active = true;
+  internals.sites.clock = () => mono; internals.sites.options.createCanvas = () => fakeCanvas();
+  let resyncs = 0; layer.resync = async () => { resyncs++; };
+  for (const s of [direct, layer.sites]) s.setWorldClock('2026-10-15T21:00:00', 1);
+  const labels = { direct: [] as string[], layer: [] as string[] };
+  for (const [i, m] of walk.entries()) {
+    mono = 1000 + m.now - T0; direct.update(mono); layer.update(0, mono);
+    direct.apply(m); labels.direct.push(direct.inspect().sites[0]?.text ?? '');
+    const buffer = walk.slice(0, i + 1);
+    layer.applyEdge(buffer); const text = layer.sites.inspect().sites[0]?.text ?? ''; labels.layer.push(text);
+    layer.applyEdge(buffer); assert.equal(layer.sites.inspect().sites[0]?.text, text, `re-sending the buffer after ${m.kind === 'world-diff' ? 'the diff' : m.event} changes nothing`);
+  }
+  assert.deepEqual(labels.layer, labels.direct);
+  assert.equal(labels.layer[3], 'Release walk lighthouse · massing 1/3\ndesigning: Raising the lighthouse tower'); assert.equal(labels.layer[10].split('\n').at(-1), 'Placed the lighthouse');
+  assert.equal(layer.sites.maxRev, 12); assert.equal(layer.sites.stats.refetches, 0); assert.equal(resyncs, 0, 'no world resync');
+  assert.equal(layer.stats.edgeSeen, 1); assert.equal(layer.stats.applied, 1); assert.equal(layer.stats.lastError, null);
+  assert.ok(internals.model.entities.has('e_0df38658'), 'the diff\'s upsert reached the model');
+  direct.dispose(); layer.dispose();
 });
 
 test('one canvas per site, one texture per label size; ordinary frames and alive/claim updates do not repaint unchanged text', () => {

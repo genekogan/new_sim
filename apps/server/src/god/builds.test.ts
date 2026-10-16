@@ -202,8 +202,12 @@ test('batch echo, rev and receipt share one commit; retry does not count again; 
 });
 
 // R2F (release 1.1 walk, release-check-1015): a visitor's feed while the lead narrates after a pause, then commits.
-// Production defaults (10 min pause, 30 min closure). `walk` in fixtures/build-messages.json is exactly this feed; the
-// viewer test (apps/web/src/WorldBuildSites.test.ts) replays it. BUILD_EXPORT_FIXTURES=1 rewrites it.
+// Production defaults (10 min pause, 30 min closure). `walk` in fixtures/build-messages.json is this feed as the viewer
+// replays it (apps/web/src/WorldBuildSites.test.ts); BUILD_EXPORT_FIXTURES=1 rewrites it. Only the replay projection is
+// stored and compared: a diff's catalog defs (core-bench's description, defaults, hash) and an upsert's default params
+// belong to catalog lanes, not to the build feed, and JSON (the wire) is the comparison, not structuredClone output.
+const replayable = (feed: unknown[]) => JSON.parse(JSON.stringify(feed.map((m: any) => m.kind !== 'world-diff' ? m
+  : { ...m, defs: undefined, diff: { ...m.diff, defs: [], upserts: m.diff.upserts.map(({ id, def, in: parent, name, p }: any) => ({ id, def, in: parent, name, p })) } }))) as unknown[];
 test('R2F: a step after a pause reaches visitors live as contiguous world-build messages; only committed batches move reopensAt', async t => {
   const f = fixture({ buildPauseMs: 600_000, buildClosureMs: 1_800_000 }); t.after(() => f.db.close());
   const t0 = f.now(), MIN = 60_000, closure = 30 * MIN;
@@ -211,7 +215,7 @@ test('R2F: a step after a pause reaches visitors live as contiguous world-build 
   assert.equal(s.ok, true, JSON.stringify(s)); const build = { id: 'walk1', lease: s.lease };
   const reopens = async () => {
     const pub = (await f.req('/v1/world/builds', undefined, null)).data.builds[0], god = (await f.req('/v1/god/builds/walk1')).data.build;
-    assert.equal(pub.reopensAt, god.reopensAt, 'the public list and the god view agree'); return { reopensAt: pub.reopensAt as number, lastAt: pub.lastAt as number };
+    assert.equal(pub.reopensAt, god.reopensAt, 'the public list and the god view agree'); return { reopensAt: pub.reopensAt as number, lastAt: pub.lastAt as number, rev: pub.rev as number };
   };
   assert.equal((await reopens()).reopensAt, t0 + closure);
   // a 701 s look: nothing reaches the server for 12 minutes; the next read finds the build paused
@@ -231,19 +235,22 @@ test('R2F: a step after a pause reaches visitors live as contiguous world-build 
   f.advance(MIN); const p = (await f.req('/v1/god/preview', { ops: [f.place('lantern-bench', 26, 30)], build })).data; assert.equal(p.accepted, true);
   assert.equal((await reopens()).reopensAt, firstBatch + closure, 'a preview is not a commit');
   f.advance(MIN); assertAccepted((await f.req('/v1/god/act', { preview: p.id })).data); assert.equal((await reopens()).reopensAt, f.now() + closure, 'a sealed commit moves it');
-  f.advance(MIN); assertAccepted((await f.req('/v1/god/act', { ops: [f.place('gallery-bench', 22, 30)], build: { ...build, step: 3 } })).data); assert.equal((await reopens()).reopensAt, f.now() + closure);
+  const gallery = { ops: [f.place('gallery-bench', 22, 30)], build: { ...build, step: 3 }, clientRef: 'r2f-gallery' };
+  f.advance(MIN); const accepted = (await f.req('/v1/god/act', gallery)).data; assertAccepted(accepted); assert.equal((await reopens()).reopensAt, f.now() + closure);
   // a refused batch and a replay do not
   const last = f.now(); f.advance(MIN);
   assert.equal((await f.req('/v1/god/act', { ops: [{ op: 'remove', id: 'no-such-thing' }], build })).data.accepted, false);
-  assert.equal((await reopens()).reopensAt, last + closure);
+  const refused = await reopens(); assert.equal(refused.reopensAt, last + closure);
+  const replay = (await f.req('/v1/god/act', gallery)).data; assert.equal(replay.replayed, true, JSON.stringify(replay)); assert.deepEqual(replay.build, accepted.build);
+  r = await reopens(); assert.equal(r.reopensAt, last + closure, 'a clientRef replay is not a new commit'); assert.equal(r.rev, refused.rev, 'nor a new revision');
   // the feed a visitor's viewer applied: started, paused, resumed (the lead's request), step, then reads (alive) and steps,
   // the committed diff, a step
   assert.deepEqual(walk.map((m: any) => m.kind === 'world-diff' ? 'diff' : m.event), ['started', 'paused', 'resumed', 'step', 'alive', 'step', 'alive', 'step', 'alive', 'step', 'diff', 'step']);
   const revs = walk.map((m: any) => m.kind === 'world-diff' ? m.builds[0].rev : m.rev); assert.deepEqual(revs, revs.map((_, i) => i + 1), 'contiguous revisions: no refetch needed');
   const step = walk[3] as WorldBuildMessage; assert.equal(step.delta!.status, 'active'); assert.deepEqual(step.delta!.say, { text: 'Raising the lighthouse tower', at: t0 + 12 * MIN }); assert.deepEqual(step.delta!.designing, ['tower']);
   const fixtureFile = new URL('./fixtures/build-messages.json', import.meta.url);
-  if (process.env.BUILD_EXPORT_FIXTURES === '1') writeFileSync(fixtureFile, JSON.stringify({ ...JSON.parse(readFileSync(fixtureFile, 'utf8')), walk }, null, 2) + '\n');
-  assert.deepEqual(JSON.parse(readFileSync(fixtureFile, 'utf8')).walk, walk, 'fixtures/build-messages.json walk is stale: BUILD_EXPORT_FIXTURES=1 node --test --test-name-pattern=R2F apps/server/src/god/builds.test.ts');
+  if (process.env.BUILD_EXPORT_FIXTURES === '1') writeFileSync(fixtureFile, JSON.stringify({ ...JSON.parse(readFileSync(fixtureFile, 'utf8')), walk: replayable(walk) }, null, 2) + '\n');
+  assert.deepEqual(replayable(JSON.parse(readFileSync(fixtureFile, 'utf8')).walk), replayable(walk), 'fixtures/build-messages.json walk is stale: BUILD_EXPORT_FIXTURES=1 node --test --test-name-pattern=R2F apps/server/src/god/builds.test.ts');
 });
 
 test('preview seals build/group, checks lease and claim in preview and dryrun, and never mutates progress', async t => {
