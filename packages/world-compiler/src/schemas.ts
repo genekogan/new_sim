@@ -18,7 +18,7 @@ export const DEF_REF = /^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0
 // ---------- defs ----------
 
 /** W7 sound kinds (viewer, procedural WebAudio). */
-export const SOUND_KINDS = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps'] as const;
+export const SOUND_KINDS = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps', 'leaves', 'flag', 'waterfowl', 'bees'] as const;
 const soundSpec = z.object({ kind: z.enum(SOUND_KINDS), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop'), variant: z.number().int().min(0).max(15).optional() });
 /** More sounds on the same thing: `also` lists up to 3 further specs (a fountain splashes and hums). */
 const soundSchema = soundSpec.extend({ also: z.array(soundSpec).min(1).max(3).optional() });
