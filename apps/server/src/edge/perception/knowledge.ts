@@ -23,6 +23,7 @@ export type Known = {visits: number; firstTick: number; lastTick: number; how: '
 /** Secret places within this many metres (edge of the place) are found by looking around. */
 export const FIND_RADIUS = 25;
 const FAR_LISTED = 6;
+const area = (p: V2[]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 
 export class PlaceKnowledge {
   private readonly L: EdgeLedger;
@@ -107,13 +108,22 @@ export class PlaceKnowledge {
   find(soulId: string, placeId: string, tick: number) {if (!this.memory(soulId).has(placeId)) this.write(soulId, placeId, {visits: 0, firstTick: tick, lastTick: tick, how: 'found'});}
 
   // ------------------------------------------------------------ scales
-  /** The district: the place directly under the world's root that holds this place. */
-  districtOf(placeId: string | null): Place | null {
-    let p = placeId ? this.L.places.byId.get(placeId) : undefined; const seen = new Set<string>();
-    while (p && !seen.has(p.id)) {seen.add(p.id); const parent = p.parent ? this.L.places.byId.get(p.parent) : undefined; if (parent && parent.parent === null) return p; if (!parent) return null; p = parent;}
-    return null;
+  /** Districts: the places directly under the world's root — except a ground cover (a place spanning half the world or
+   *  more, like a god world's "Green field"), whose own children stand in for it. */
+  private tops(): {list: Place[]; covers: Set<string>} {
+    const all = [...this.L.places.byId.values()], root = all.find(p => p.parent === null); if (!root) return {list: [], covers: new Set()};
+    const kids = (id: string) => all.filter(p => p.parent === id && !p.carrier), whole = area(root.polygon), covers = new Set<string>(), list: Place[] = [];
+    for (const p of kids(root.id)) {const inner = kids(p.id); if (whole > 0 && area(p.polygon) >= whole / 2 && inner.length) {covers.add(p.id); list.push(...inner);} else list.push(p);}
+    return {list, covers};
   }
-  private districts(): Place[] {const root = [...this.L.places.byId.values()].find(p => p.parent === null); return root ? [...this.L.places.byId.values()].filter(p => p.parent === root.id && !p.carrier) : [];}
+  /** The district holding this place (on a ground cover outside any district: the cover itself). */
+  districtOf(placeId: string | null): Place | null {
+    const {list, covers} = this.tops(), ids = new Set(list.map(p => p.id));
+    let p = placeId ? this.L.places.byId.get(placeId) : undefined, cover: Place | null = null; const seen = new Set<string>();
+    while (p && !seen.has(p.id)) {seen.add(p.id); if (ids.has(p.id)) return p; if (covers.has(p.id)) cover = p; p = p.parent ? this.L.places.byId.get(p.parent) : undefined;}
+    return cover;
+  }
+  private districts(): Place[] {return this.tops().list;}
   private within(p: Place, ancestor: string): boolean {
     let q: Place | undefined = p; const seen = new Set<string>();
     while (q && !seen.has(q.id)) {if (q.id === ancestor) return true; seen.add(q.id); q = q.parent ? this.L.places.byId.get(q.parent) : undefined;}
