@@ -190,6 +190,37 @@ export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaste
   return { cell, levels };
 }
 
+/**
+ * `buildGrids(scene, cell)` (no prefix, no columns), each level rasterised and transformed only over the cells its own
+ * surfaces reach: a free cell has a floor under its centre, so every cell outside that crop is blocked in the full grid
+ * too, and the exact EDT (out-of-grid = blocked) reads the same distances on the crop. Free, clearance and blockers are
+ * bit-identical to buildGrids (grid-floor-crop.test.ts); a paged window's upper floors (a few houses in a 128–384 m
+ * window) cost their floors' area instead of the window's.
+ */
+export function buildGridsOverFloors(scene: SpatialScene, cell = 0.1): GridSet {
+  const lat = latticeOf(scene.bounds, cell), { ox, oz, nx, nz } = lat;
+  const levels = new Map<number, LevelGrid>();
+  for (const lv of scene.levels) {
+    let crop: Rect | null = null;
+    for (const s of scene.surfaces) {
+      if (s.level !== lv.id) continue;
+      const r = obbRange(s.obb, ox, oz, cell, nx, nz);
+      if (r[0] > r[1] || r[2] > r[3]) continue;
+      crop = crop ? [Math.min(crop[0], r[0]), Math.max(crop[1], r[1]), Math.min(crop[2], r[2]), Math.max(crop[3], r[3])] : r;
+    }
+    const free = new Uint8Array(nx * nz), blockers = new BlockerMap(nx * nz), clearance = new Float32Array(nx * nz);
+    if (crop) {
+      stampLevel(scene, lv, cell, lat, undefined, free, blockers, crop);
+      const [i0, i1, j0, j1] = crop, cw = i1 - i0 + 1, ch = j1 - j0 + 1, sub = new Uint8Array(cw * ch);
+      for (let j = 0; j < ch; j++) sub.set(free.subarray((j0 + j) * nx + i0, (j0 + j) * nx + i1 + 1), j * cw);
+      const c = edt(sub, cw, ch, cell);
+      for (let j = 0; j < ch; j++) clearance.set(c.subarray(j * cw, (j + 1) * cw), (j0 + j) * nx + i0);
+    }
+    levels.set(lv.id, { level: lv.id, y: lv.y, cell, nx, nz, ox, oz, x0: ox * cell, z0: oz * cell, free, clearance, blockers });
+  }
+  return { cell, levels };
+}
+
 // Only immutable raster/EDT products are retained, never a Spatial, world, route,
 // body, reservation or permission. Every caller receives independent storage.
 const STATIC_GRID_CACHE_LIMIT = 64 * 1024 * 1024;

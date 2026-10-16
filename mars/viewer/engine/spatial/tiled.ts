@@ -14,7 +14,7 @@
 //    Each hop is planned with the existing planner (findRoute) on a composite of
 //    just that hop's tiles, so a route never depends on how far the window has grown.
 import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
-import { BODY_HEIGHT, STEP, buildGrids, edt, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
+import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
 import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES, coarseMedium, type GroundField } from './ground.ts';
@@ -341,7 +341,8 @@ export class GroundNav {
     const levels = new Map<number, LevelGrid>(), b = rectBounds(r);
     levels.set(0, this.compose(r, scene.obstacles));
     const upper = scene.levels.filter((l) => l.id !== 0 && scene.surfaces.some((s) => s.level === l.id && touches(s.obb, b)));
-    if (upper.length) for (const [id, g] of buildGrids({ ...scene, bounds: b, levels: upper }, this.cell).levels) levels.set(id, g);
+    // each floor rasterised over its own surfaces only (bit-identical to buildGrids; engine P4: a window's upper floors)
+    if (upper.length) for (const [id, g] of buildGridsOverFloors({ ...scene, bounds: b, levels: upper }, this.cell).levels) levels.set(id, g);
     return { cell: this.cell, levels };
   }
 

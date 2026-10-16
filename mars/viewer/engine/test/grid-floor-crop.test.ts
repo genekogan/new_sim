@@ -1,0 +1,71 @@
+// Engine P4 (Eden 2026 capabilities freeze): a paged window's upper floors are rasterised over their own surfaces only
+// (grid.ts buildGridsOverFloors). That must be bit-identical to the full buildGrids — same `free` bytes, `clearance`
+// float32 bits and `blockers` (entries and first-cover ids) — on random multi-level scenes: rotated floors, floors past
+// the window edge, a level with no floor in the window, obstacles in and out of the body band.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { buildGrids, buildGridsOverFloors, type GridSet } from '../spatial/grid.ts';
+import type { Level, Obstacle, SpatialScene, Surface } from '../spatial/types.ts';
+import { seedRng, nextRandom } from '../core/rng.ts';
+
+function assertSameGrids(a: GridSet, b: GridSet, what: string) {
+  assert.equal(a.cell, b.cell, `${what}: cell`);
+  assert.deepEqual([...a.levels.keys()], [...b.levels.keys()], `${what}: level order`);
+  for (const [id, ga] of a.levels) {
+    const gb = b.levels.get(id)!;
+    for (const k of ['level', 'y', 'cell', 'nx', 'nz', 'ox', 'oz', 'x0', 'z0'] as const) assert.equal(ga[k], gb[k], `${what}: level ${id} ${k}`);
+    const df = ga.free.findIndex((v, i) => v !== gb.free[i]);
+    assert.equal(df, -1, `${what}: level ${id} free differs at cell ${df}`);
+    const ca = new Uint32Array(ga.clearance.buffer, ga.clearance.byteOffset, ga.clearance.length);
+    const cb = new Uint32Array(gb.clearance.buffer, gb.clearance.byteOffset, gb.clearance.length);
+    const dc = ca.findIndex((v, i) => v !== cb[i]);
+    assert.equal(dc, -1, `${what}: level ${id} clearance differs at cell ${dc} (${ga.clearance[dc]} vs ${gb.clearance[dc]})`);
+    assert.equal(ga.blockers.size, gb.blockers.size, `${what}: level ${id} blocker count`);
+    assert.deepEqual([...ga.blockers], [...gb.blockers], `${what}: level ${id} blockers`);
+  }
+}
+
+function randomScene(rand: () => number): { scene: SpatialScene; cell: number } {
+  const w = 20 + rand() * 60, d = 20 + rand() * 60, x0 = (rand() - 0.5) * 200, z0 = (rand() - 0.5) * 200;
+  const bounds: [number, number, number, number] = [x0, z0, x0 + w, z0 + d];
+  const cell = rand() < 0.75 ? 0.1 : 0.25;
+  const levels: Level[] = [], surfaces: Surface[] = [], obstacles: Obstacle[] = [];
+  const nLevels = 1 + Math.floor(rand() * 4);
+  for (let l = 0; l < nLevels; l++) {
+    const id = l + 1, y = 2.5 + l * 3;
+    levels.push({ id, y, label: `floor ${id}` });
+    // 0–4 floors per level (0: the level has no floor in this window), some past the edge, some rotated
+    const n = Math.floor(rand() * 5);
+    for (let k = 0; k < n; k++) {
+      const c: [number, number] = [x0 - 5 + rand() * (w + 10), z0 - 5 + rand() * (d + 10)];
+      surfaces.push({ id: `s${id}-${k}`, level: id, y, obb: { c, half: [1 + rand() * 6, 1 + rand() * 6], yaw: rand() < 0.4 ? rand() * Math.PI : 0 } });
+    }
+  }
+  const nObs = Math.floor(rand() * 40);
+  for (let k = 0; k < nObs; k++) {
+    const y0 = rand() * 12, y1 = y0 + 0.1 + rand() * 4;
+    const c: [number, number] = [x0 - 5 + rand() * (w + 10), z0 - 5 + rand() * (d + 10)];
+    // ids repeat sometimes: the first cover names the cell, in list order
+    obstacles.push({ id: `o${k % 30}`, obb: { c, half: [0.05 + rand() * 4, 0.05 + rand() * 4], yaw: rand() < 0.5 ? 0 : rand() * Math.PI }, y0, y1, kind: 'component' });
+  }
+  return { scene: { bounds, levels, surfaces, obstacles, links: [] }, cell };
+}
+
+test('buildGridsOverFloors is bit-identical to buildGrids on random multi-level scenes', () => {
+  const rng = seedRng('grid-floor-crop');
+  const rand = () => nextRandom(rng);
+  for (let s = 0; s < 60; s++) {
+    const { scene, cell } = randomScene(rand);
+    assertSameGrids(buildGridsOverFloors(scene, cell), buildGrids(scene, cell), `scene ${s}`);
+  }
+});
+
+test('a floor touching the window edge and a window with no floors at all', () => {
+  const bounds: [number, number, number, number] = [0, 0, 64, 64];
+  const scene: SpatialScene = { bounds, levels: [{ id: 1, y: 3, label: 'a' }, { id: 2, y: 6, label: 'b' }], links: [],
+    surfaces: [{ id: 'edge', level: 1, y: 3, obb: { c: [0, 32], half: [4, 4], yaw: 0 } }, { id: 'corner', level: 1, y: 3, obb: { c: [64, 64], half: [3, 3], yaw: 0.3 } }],
+    obstacles: [{ id: 'wall', obb: { c: [1, 32], half: [0.1, 3], yaw: 0 }, y0: 3, y1: 6, kind: 'component' }] };
+  assertSameGrids(buildGridsOverFloors(scene, 0.1), buildGrids(scene, 0.1), 'edges');
+  const g2 = buildGridsOverFloors(scene, 0.1).levels.get(2)!;
+  assert.equal(g2.free.some((v) => v), false, 'a level without floors here is all blocked');
+});
