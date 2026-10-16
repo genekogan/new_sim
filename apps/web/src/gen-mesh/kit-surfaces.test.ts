@@ -135,6 +135,20 @@ test('the god program binds no Eden textures, reads the surface attribute and ca
   assert.match(nf, /texture2D\(edenPatA/); assert.notEqual(native.customProgramCacheKey(), marble.customProgramCacheKey());
 });
 
+test('a pattern skips the class work, and the god program carries no terrain, flower, skin or water branch', () => {
+  const god = preprocess(compile(meshes(draw(kit([{ material: 'stone', pattern: 'ashlar' }])))[0].material).fragmentShader, new Set(['EDEN_GOD_SURFACE']));
+  const native = new THREE.MeshStandardMaterial(), mesh = new THREE.Mesh(new THREE.BoxGeometry(), native); mesh.name = 'stone plinth';
+  const root = new THREE.Group(); root.add(mesh); applyWorldRealism(root);
+  const nf = preprocess(compile(native).fragmentShader, new Set());
+  for (const branch of ['if(cls<1.5){', 'else if(cls<2.5){', 'else if(cls<5.5){', 'else if(cls<12.5){', 'else if(cls>14.5){']) {
+    assert.ok(!god.includes(branch), `god program has no ${branch}`); assert.ok(nf.includes(branch), `native keeps ${branch}`);
+  }
+  // The pattern block heads the class chain: `if(edenPattern>.5){…}else if(cls<3.5){…}…`.
+  const head = god.indexOf('if(edenPattern>.5){'), soil = god.indexOf('if(cls<3.5){');
+  assert.ok(head > 0 && soil > head, 'pattern block precedes the class chain');
+  assert.match(god.slice(head, soil).replace(/\/\/[^\n]*/g, ''), /}else\s*$/, 'the class chain is the else of the pattern block');
+});
+
 test('?surfaces=0 turns every god surface off', async () => {
   const saved = (globalThis as { location?: unknown }).location;
   (globalThis as { location?: unknown }).location = { search: '?surfaces=0' };

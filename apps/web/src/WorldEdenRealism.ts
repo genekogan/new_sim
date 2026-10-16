@@ -109,7 +109,7 @@ const GOD_PATTERNS=/* glsl */`
    vec3 c=diffuseColor.rgb,alt=dot(c,vec3(.3,.59,.11))>.62?c*vec3(.52,.58,.68):vec3(.93,.91,.86);
    diffuseColor.rgb=mix(alt,c,band);tint=vec3(.97+.05*(detail?mix(edenNoise(q*9.),.5,far):.5));edenRough=.95;
   }
- }
+ }else
  #endif
 `;
 const FRAGMENT_BODY=/* glsl */`
@@ -132,30 +132,31 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
  // Shared countryside macro field: lush and sun-dried patches agree between turf and blades.
  float macro=.5;if(cls<1.5||(cls>3.5&&cls<4.5))macro=edenNoise(w.xz*.045)*.65+edenNoise(w.xz*.14+7.3)*.35;
  vec3 dry=vec3(1.12,1.04,.86),lush=vec3(.88,.98,.94);
+${GOD_PATTERNS}
+ // God kit shapes never take the terrain, flower, skin or water classes: those branches stay out of the god program.
+ #ifndef EDEN_GOD_SURFACE
  if(cls<1.5){ // ground turf: strong lush/dry and warm/cool fields, textured blades and clumps, mown lawn stripes
   float temp=edenNoise(w.xz*.028+31.);
   tint=mix(vec3(.74,.97,.86),vec3(1.24,1.08,.7),smoothstep(.28,.78,macro))*(.82+.3*macro);
   tint*=mix(vec3(.94,1.,1.06),vec3(1.06,1.,.9),temp);
   float mid=edenNoise(w.xz*.43+3.1);vec3 det=vec3(.87);
-  #ifndef EDEN_GOD_SURFACE
   if(detail){vec4 G=texture2D(edenPatC,w.xz/1.6),G2=texture2D(edenPatC,w.xz/6.1+.37);float Gm=texture2D(edenPatC,w.xz/5.3+.61).r;
    vec3 d=(.68+.62*G.r)*(.74+.5*Gm)*mix(1.,.76,G2.g)*mix(vec3(1.),vec3(.9,1.05,.88),G.g);
    // Sun-bleached straw flecks in the dry patches.
    d=mix(d,d*vec3(1.25,1.12,.78),smoothstep(.6,.9,macro)*smoothstep(.55,.8,G2.a)*.8);
    det=mix(d,det,far);edenBump=G.r*.02;edenBumpAmt=near;
    tint=mix(tint,tint*vec3(.8,.9,.78),smoothstep(.68,.88,edenNoise(w.xz*.9+17.))*.7*near);}
-  #endif
   tint*=(.8+.36*mid)*det;
   if(edenStyle.x>4.5&&edenStyle.x<5.5)tint*=.93+.14*step(.5,fract(dot(w.xz,vec2(.92,.38))/3.2));
   // Banks and slopes read thinner and earthier than level turf.
   tint=mix(tint,tint*vec3(1.02,.94,.8),smoothstep(.97,.82,n.y)*.8);
  }else if(cls<2.5){ // trodden path: gravel texture over broad damp/dry tone
   float broad=edenNoise(w.xz*.15+5.),mid=edenNoise(w.xz*.6),g=.9;
-  #ifndef EDEN_GOD_SURFACE
   if(detail){vec4 G=texture2D(edenPatC,w.xz/2.3);g=mix((.72+.36*G.b)*(.9+.2*G.a),g,far);edenBump=G.b*.012;edenBumpAmt=near;}
-  #endif
   tint=vec3(.82+.28*mid)*mix(vec3(.9,.93,.94),vec3(1.08,1.02,.92),broad)*g;
- }else if(cls<3.5){ // soil
+ }else
+ #endif
+ if(cls<3.5){ // soil
   float mid=edenNoise(w.xz*1.1+4.),fine=detail?mix(edenNoise(w.xz*5.7),.5,far):.5;
   tint=vec3(.72+.36*fine)*(.88+.2*mid);
  }else if(cls<4.5){ // foliage: per-plant hue/value, shared macro, base and underside occlusion
@@ -166,9 +167,13 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
   tint*=mix(.88,1.05,clamp(n.y*.5+.5,0.,1.));
   if(detail)tint*=mix(.88+.22*edenNoise(edenPlane(w,n)*1.9+r*11.),.99,far);
   tint*=mix(vec3(.95,1.,1.03),vec3(1.04,1.02,.93),clamp(n.y*.5+.5,0.,1.));
- }else if(cls<5.5){ // flowers: restrained per-plant value only
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls<5.5){ // flowers: restrained per-plant value only
   tint=vec3(.9+.18*edenHash(seed.xz*2.3));
- }else if(cls<6.5){ // bark/stems: vertical fibres
+ }
+ #endif
+ else if(cls<6.5){ // bark/stems: vertical fibres
   vec2 p=edenPlane(w,n);float s=.5,k=.5;if(detail){s=mix(edenNoise(vec2(p.x*16.,p.y*1.1)+obj*5.),.5,far);k=mix(edenNoise(vec2(p.x*3.,p.y*2.4)+obj*7.),.5,far);}
   tint=vec3(.68+.44*s)*(.88+.2*k)*(.9+.2*obj)*mix(.72,1.,smoothstep(0.,.35,vEdenH));
  }else if(cls<7.5){ // timber: board-to-board tone, grain mottle, slightly glossier wear
@@ -193,21 +198,26 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
    tint*=mix(1.,.86+.14*course,smoothstep(.3,.45,n.y)*(1.-smoothstep(.93,.98,n.y)));}
  }else if(cls<11.5){ // metal: tarnish and roughness drift
   float m=edenNoise(edenPlane(w,n)*2.2);tint=vec3(.9+.16*m);edenRough=.82+.32*m;
- }else if(cls<12.5){ // skin: per-person warmth, faint mottling, subtle sheen
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls<12.5){ // skin: per-person warmth, faint mottling, subtle sheen
   tint=mix(vec3(.96,.97,.98),vec3(1.04,1.,.97),obj)*(.97+.05*edenNoise(w.xz*9.+w.y*7.));edenRough=.82;
- }else if(cls<13.5){ // cloth: weave/fold value, per-garment tone, never glossy
+ }
+ #endif
+ else if(cls<13.5){ // cloth: weave/fold value, per-garment tone, never glossy
   float m=detail?mix(edenNoise(edenPlane(w,n)*14.),.5,far):.5;tint=vec3(.9+.14*obj)*(.94+.1*m);edenRough=1.08;
- }else if(cls>14.5){ // open water: drifting two-scale ripple height -> bump normals, glossy sun glints; alpha untouched
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls>14.5){ // open water: drifting two-scale ripple height -> bump normals, glossy sun glints; alpha untouched
   vec2 p=w.xz;float t=edenTime;float h=.15*(sin(dot(p,vec2(.8,.6))*1.6+t*1.1)*.5+.5)+.42;
-  #ifndef EDEN_GOD_SURFACE
   if(detail){h=mix(texture2D(edenPatC,p/3.1+vec2(.031,.017)*t).a*.55+texture2D(edenPatC,p/1.2-vec2(.043,.029)*t).a*.3,.42,far)+h-.42;edenBump=h*.12;edenBumpAmt=near;}
-  #endif
   edenRough=.3;
   tint=vec3(.78+.36*h)*mix(vec3(.9,.97,1.02),vec3(1.1,1.08,1.02),smoothstep(.55,.85,h));
- }else{ // generic painted/built surfaces
+ }
+ #endif
+ else{ // generic painted/built surfaces
   vec2 p=edenPlane(w,n);tint=vec3(.94+.12*obj)*(.95+.08*edenNoise(p*.7));
  }
-${GOD_PATTERNS}
  #ifndef EDEN_GOD_SURFACE
  // Building identity: per-building finish (brick/stone/siding/limewash, tile/slate roofs, mural) from generated tiling patterns.
  // One texture tap per wall/roof pixel near; zero beyond 40 m (the pattern's mean tone instead).
