@@ -15,7 +15,7 @@ export type Op = { op: string; def?: string; name?: string; id?: string; [k: str
 export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' };
 export type FlagRef = { id: string; name: string; label: string; p: [number, number, number] };
 export type PreviewRow = { id: string; accepted: boolean; summary: Record<string, unknown> | null; at: number };
-export type LauncherWorld = { slug: string; name: string; template: string; templateName: string; createdAt: number };
+export type LauncherWorld = { slug: string; name: string; template: string; templateName: string; createdAt: number; claimable?: boolean };
 export type LauncherSeen = { looks: number; lastLookAt: number | null; agentSeenAt: number | null; previews: number };
 
 const TOKEN_KEY = `sim.godToken:${worldKey}`;

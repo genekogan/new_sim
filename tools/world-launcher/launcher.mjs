@@ -19,6 +19,15 @@
 //   POST /__sim/op/register-fork operator only: {slug: eden|mars|littlemartians, descriptor, accounts?} → serve a copy of an
 //                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
 //   POST /__sim/op/remove-fork   operator only: {slug} → stop and unregister a fork (its data stays)
+//   POST /__sim/op/set-claimable operator only: {slug, claimable} → a world with no god that nobody may claim (false)
+//   POST /__sim/op/archive-world operator only: {slug, reason?} → stop it, move <data>/worlds/<slug> to <data>/archive/<id>/world,
+//                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
+//                                audit {slug?} reads <data>/audit.jsonl
+//   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
+//   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/: owner: GET cobuilders, POST cobuilders/invite {to?},
+//   cobuilders/remove {account}, transfer {to?}, offers/cancel; anyone with the link: GET offer?code=, POST offer/accept
+//   {code} (signed in: that is the consent); a co-builder's agent: POST cobuild/pair/start|poll, approved by the co-builder
+//   (POST cobuild/pair/approve {code}).
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -55,6 +64,8 @@ import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
+import { makeHandoff } from './handoff.mjs';
+import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
   try { const h = JSON.parse(readFileSync(join(dataDir, 'host-health.json'), 'utf8')); const stale = Date.now() - Date.parse(h.at) > 30 * 60e3; return stale ? { ...h, ok: false, stale: true } : h; } catch { return null; }
@@ -68,6 +79,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; ch
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers }).end(JSON.stringify(body)); };
 const BUILD = (() => { try { return readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../BUILD'), 'utf8').trim(); } catch { return 'dev'; } })();
 /** Direct requests from this machine (not through a reverse proxy, which adds x-forwarded-for). */
+/** World routes that make someone a world's god while it has none (blocked on a world marked not claimable). */
+const CLAIM_PATHS = new Set(['/v1/god/claim', '/v1/god/mint', '/v1/god/pair/approve']);
+const sameName = (a, b) => String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
 const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
 
 /**
@@ -129,11 +143,59 @@ export async function openLauncher(cfg = {}) {
   }
   const describe = (w) => {
     const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir, { all: true }).find((x) => x.id === w.template);
-    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
+    // two worlds with the same shown name are told apart by their slug (the address people see), e.g. "Mars · my-mars-2"
+    const twin = registry.worlds.some((x) => x !== w && sameName(x.name, w.name));
+    return { nameTag: twin ? w.slug : null, claimable: w.claimable !== false, key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
     return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
+  }
+
+  /** A world the site admin marked not claimable, while it still has no god: nobody may claim it or mint for it. */
+  const claimLocked = (w) => w.claimable === false && !(safeOwner(w.slug) ?? (stats.get(w.slug)?.god || w.god));
+  const safeOwner = (slug) => { try { return worldOwner(slug); } catch { return null; } };
+  /** Worlds being archived right now: no request may wake them again. */
+  const closing = new Set();
+
+  // ---------- who is asking (for the owner's own operations)
+  /** The signed-in account behind an Authorization header: Clerk (verified here) or, locally, the world's dev sign-in. */
+  async function whoIs(w, authorization) {
+    if (!/^Bearer\s+\S+/i.test(authorization ?? '')) return null;
+    if (auth) return verifiedCreator(authorization, auth.child, publicOrigin, root);
+    try {
+      const p = await pool.ensure(worldEnv(w));
+      const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}/v1/me`, { headers: { authorization }, signal: AbortSignal.timeout(5000) });
+      const id = r.ok ? (await r.json())?.me?.userId : null; // the world's /v1/me (auth.me): { me: { userId, … } }
+      return typeof id === 'string' && id ? id : null;
+    } catch { return null; }
+  }
+  /** {account, via, cobuilder?}: a god token of this world (the owner's agent, or a co-builder's), or a signed-in person. */
+  async function actorOf(w, authorization) {
+    const tok = /^Bearer\s+(god_\S+)$/i.exec(authorization ?? '')?.[1];
+    if (tok) {
+      const label = tokenLabel(join(registry.worldDir(w.slug), 'sim.db'), `${w.slug}-1`, tok);
+      if (label === null) return null;
+      const co = /^cobuilder:([^:]+):/.exec(label);
+      return co ? { account: co[1], via: 'token', cobuilder: true } : { account: safeOwner(w.slug), via: 'token' };
+    }
+    const id = await whoIs(w, authorization);
+    return id ? { account: id, via: 'session' } : null;
+  }
+  const isOwner = (w, a) => !!a?.account && !a.cobuilder && a.account === safeOwner(w.slug);
+
+  // ---------- archive-first delete (H4): the owner (their browser or their own agent) or the operator
+  async function archive(w, by, reason) {
+    closing.add(w.slug);
+    try { const r = await archiveWorld({ registry, pool, dataDir }, w.slug, by, reason); seen.delete(w.slug); stats.delete(w.slug); log(`archived ${w.slug} → ${r.archive} (by ${by})`); return [200, { ok: true, ...r }]; }
+    finally { closing.delete(w.slug); }
+  }
+  const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log });
+  async function ownerArchive(w, body, authorization) {
+    const a = await actorOf(w, authorization);
+    if (!isOwner(w, a)) return [403, { ok: false, code: 'forbidden', message: "only this world's owner (or the site admin) may archive it" }];
+    if (body?.confirm !== w.slug) return [400, { ok: false, code: 'confirm', message: `send {"confirm":"${w.slug}"} to archive this world` }];
+    return archive(w, a.account, body?.reason);
   }
 
   // ---------- create
@@ -170,7 +232,7 @@ export async function openLauncher(cfg = {}) {
         return [409, { ok: false, code: 'god-name-taken', message: `"${godName}" is already shown as the god of someone else's world; choose another name to show.` }];
     }
     if (registry.worlds.length >= MAX_WORLDS) return [409, { ok: false, code: 'full', message: `this launcher holds at most ${MAX_WORLDS} worlds` }];
-    const slug = slugFor(name, registry.slugs());
+    const slug = slugFor(name, new Set([...registry.slugs(), ...archivedSlugs(dataDir)]));
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
     rmSync(registry.worldDir(slug), { recursive: true, force: true });
     mkdirSync(registry.worldDir(slug), { recursive: true });
@@ -261,6 +323,15 @@ export async function openLauncher(cfg = {}) {
     log(`registered fork ${slug} on :${pool.status(slug).port} in ${Math.round(performance.now() - t0)} ms`);
     return [201, { ok: true, slug, url: `${wp(slug)}/`, bootMs: Math.round(performance.now() - t0), world: describe(entry) }];
   }
+  /** Site admin: mark a world claimable or not (only matters while it has no god). */
+  function opSetClaimable(body) {
+    const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
+    if (!w) return [404, { ok: false, code: 'not-found', message: 'no world by that slug' }];
+    if (typeof body?.claimable !== 'boolean') return [400, { ok: false, code: 'invalid', message: 'claimable: true or false' }];
+    registry.update(w.slug, { claimable: body.claimable });
+    log(`${w.slug} is ${body.claimable ? 'claimable again' : 'not claimable'} (operator)`);
+    return [200, { ok: true, slug: w.slug, claimable: body.claimable, hasGod: !!safeOwner(w.slug) }];
+  }
   async function opRemoveFork(body) {
     const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
     if (!w?.fork) return [404, { ok: false, code: 'not-found', message: 'no fork by that slug' }];
@@ -305,6 +376,7 @@ export async function openLauncher(cfg = {}) {
   }
   async function toWorld(req, res, slug, url) {
     const w = registry.get(slug);
+    if (w && closing.has(slug)) { json(res, 503, { ok: false, code: 'world.closing', slug }, { 'retry-after': '5' }); return; }
     if (!w) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
@@ -313,6 +385,7 @@ export async function openLauncher(cfg = {}) {
     try { p = await pool.ensure(worldEnv(w)); }
     catch (e) { json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return; }
     const rest = observe(slug, req, url);
+    if (req.method === 'POST' && CLAIM_PATHS.has(rest) && claimLocked(w)) { json(res, 403, { ok: false, code: 'not-claimable', message: 'this world is not open for claiming' }); return; }
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
     proxyHttp(req, res, p, { tee });
   }
@@ -356,12 +429,29 @@ export async function openLauncher(cfg = {}) {
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
       }
-      const forkOp = path.match(/^\/__sim\/op\/(register|remove)-fork$/)?.[1];
+      const forkOp = path.match(/^\/__sim\/op\/(register-fork|remove-fork|set-claimable|archive-world|restore-world|list-archive|audit)$/)?.[1];
       if (forkOp && req.method === 'POST') {
         if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
         const chunks = []; for await (const c of req) chunks.push(c);
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const out = await (forkOp === 'register' ? opRegisterFork(body) : opRemoveFork(body)); json(res, out[0], out[1]); return;
+        const out = await ({ 'register-fork': opRegisterFork, 'remove-fork': opRemoveFork, 'set-claimable': opSetClaimable,
+          'archive-world': (b) => { const w = registry.get(typeof b?.slug === 'string' ? b.slug : ''); return w ? archive(w, 'operator', b?.reason) : [404, { ok: false, code: 'not-found', message: 'no world by that slug' }]; },
+          'restore-world': (b) => { const r = restoreWorld({ registry, dataDir }, b?.id, 'operator'); if (r[0] === 200) log(`restored ${r[1].slug} from ${r[1].id} (operator)`); return r; },
+          'list-archive': () => [200, { ok: true, archive: listArchive(dataDir) }],
+          'audit': (b) => [200, { ok: true, audit: readAudit(dataDir, typeof b?.slug === 'string' ? b.slug : undefined) }] })[forkOp](body); json(res, out[0], out[1]); return;
+      }
+      const own = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})\/(archive|offer|offer\/accept|offers\/cancel|transfer|cobuilders|cobuilders\/(?:invite|remove)|cobuild\/pair\/(?:start|poll|approve))$/);
+      if (own && (req.method === 'POST' || req.method === 'GET')) {
+        const w = registry.get(own[1]); if (!w || closing.has(w.slug)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
+        let body = Object.fromEntries(url.searchParams);
+        if (req.method === 'POST') {
+          const chunks = []; let n = 0;
+          for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+          try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        }
+        const out = own[2] === 'archive' ? (req.method === 'POST' ? await ownerArchive(w, body, req.headers.authorization) : null) : await handoff(w, own[2], req.method, body, req.headers.authorization);
+        if (!out) { json(res, 405, { ok: false, code: 'method' }); return; }
+        json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {
@@ -411,7 +501,7 @@ export async function openLauncher(cfg = {}) {
   server.on('upgrade', async (req, socket, head) => {
     const u = req.url ?? '', rel = !B ? u : u.startsWith(`${B}/`) ? u.slice(B.length) : '';
     const slug = rel.match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:[/?]|$)/)?.[1];
-    const w = slug && registry.get(slug);
+    const w = slug && !closing.has(slug) && registry.get(slug);
     if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
     let p; try { p = await pool.ensure(worldEnv(w)); } catch { socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
     const up = connect(p, '127.0.0.1', () => {

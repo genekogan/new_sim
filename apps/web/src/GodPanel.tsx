@@ -13,6 +13,7 @@ import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewG
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
+import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
 
 type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
@@ -33,6 +34,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const joinHash = landingHash === '#join';
   // #approve/<id> (the link the Soul CLI prints for its human): the approval card, panel open
   const [approvalId, setApprovalId] = useState(() => approvalFromHash(landingHash));
+  // #worldoffer/<code>, #cobuildpair/<code> (the launcher's co-builder and handoff links): that card first
+  const [offerLink, setOfferLink] = useState(() => offerFromHash(landingHash));
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
   const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
   const [welcome, setWelcome] = useState<string | null>(null);
@@ -135,12 +138,18 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
       <button className="gp-btn" onClick={hideGhost}>hide</button>
     </div>
   );
+  if (offerLink) return <>{ghostBar}<div data-god-panel="1" className="gp-card">
+    <OfferCard link={offerLink} signedIn={signedIn} onDone={() => { setOfferLink(null); history.replaceState(null, '', location.pathname + location.search); void refresh(); }} />
+    {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
+  </div></>;
   if (!status) return ghostBar || null;
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');
 
   // A visitor on a world that has a god sees no card, as on the old worlds (e8): the header's New Soul is the way to
   // join. Only the approval link their agent printed (#approve/<id>) opens one, to approve it.
+  // A world the site admin marked not claimable (and still godless) offers no claim card at all.
+  if (!status.hasOwner && !owner && launcher?.world.claimable === false) return ghostBar || null;
   if (status.hasOwner && !owner) return <>{ghostBar}{approvalId && (
     <div data-god-panel="1" className="gp-card">
       <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />

@@ -7,7 +7,7 @@ import './launcher-home.css';
 import { useSession, userAuthHeaders } from '../auth-session.ts';
 
 export type LauncherTemplate = { id: string; name: string; description: string; batches: number; ops?: number };
-export type LauncherWorldCard = { slug: string; name: string; basePath: string; url: string; template: string; templateName: string; createdAt: number; god: boolean; godName?: string | null; souls?: number | null; entities: number | null; seq: number | null; status: string; restarts: number };
+export type LauncherWorldCard = { slug: string; name: string; basePath: string; url: string; template: string; templateName: string; createdAt: number; god: boolean; godName?: string | null; nameTag?: string | null; claimable?: boolean; souls?: number | null; entities: number | null; seq: number | null; status: string; restarts: number };
 /** How people sign in on this launcher's worlds (the public Clerk settings; never a secret). */
 export type LauncherAuth = { provider: 'clerk' | 'dev'; clerkPublishableKey?: string; clerkIssuer?: string; authenticationOrigin?: string };
 export type LauncherList = { contract: 'local-worlds/1'; launcher: string; worlds: LauncherWorldCard[]; templates: LauncherTemplate[]; auth?: LauncherAuth };
@@ -52,9 +52,9 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
       <div className="world-cards lh-cards">
         {worlds.map((w) => (
           <a key={w.slug} href={w.url} data-world={w.slug} className="lh-card">
-            <h2>{w.name}</h2>
+            <h2>{w.name}{w.nameTag && <span className="lh-tag" data-name-tag={w.nameTag}>{w.nameTag}</span>}</h2>
             <p className="lh-world-slug" title={`World address: ${w.slug}`}>{w.slug}</p>
-            {w.god ? w.godName && <p className="lh-god">god: <b>{w.godName}</b></p> : <p className="lh-god"><span className="lh-unclaimed">no god yet: open it to claim it</span></p>}
+            {w.god ? w.godName && <p className="lh-god">god: <b>{w.godName}</b></p> : w.claimable === false ? <p className="lh-god dim" data-not-claimable="1">open to visit</p> : <p className="lh-god"><span className="lh-unclaimed">no god yet: open it to claim it</span></p>}
             <p className="lh-meta" data-world-souls={w.souls ?? ''}>{w.souls == null ? 'Souls: –' : w.souls === 0 ? 'no Souls yet' : `${w.souls} Soul${w.souls === 1 ? '' : 's'}`} · {w.entities ?? '–'} things</p>
             <p className="lh-foot dim"><span className={`lh-dot lh-${w.status}`} />made {ago(w.createdAt)}{w.status === 'running' ? null : <> · {STATUS[w.status] ?? w.status}</>}</p>
             <span className="lh-open">Open →</span>

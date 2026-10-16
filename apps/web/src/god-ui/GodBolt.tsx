@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { worldKey } from '../world-path.ts';
 import { Markdown } from './markdown.tsx';
 import * as G from './god-api.ts';
+import { WorldOwnerOps } from './WorldOwnerOps.tsx';
 import './god-panel.css';
 
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
@@ -88,6 +89,7 @@ export function GodBolt() {
             <button className="gp-btn" data-weather-kind="haze" disabled={!!busy} onClick={haze}>Haze</button>
           </div>
           {note && <p className={note.bad ? 'gp-bad' : 'gp-ok'}>{note.text}</p>}
+          {status.you === 'owner' && <WorldOwnerOps />}
         </div>
       )}
     </span>

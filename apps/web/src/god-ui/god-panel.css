@@ -113,3 +113,24 @@
 .god-bolt-weather { display: flex; gap: 6px; margin-top: 10px; }
 .god-bolt-weather .gp-btn { flex: 1; justify-content: center; }
 @media (max-width: 700px) { .god-bolt-open { width: 32px; height: 32px; } .gp-card.god-bolt-panel { position: fixed; top: 96px; left: 12px; right: 12px; transform: none; width: auto; } }
+/* WORLDOPS: the owner's folded world section in the god popover (WorldOwnerOps) */
+.gp-owner-ops { margin-top: 10px; border-top: 1px solid rgba(0, 0, 0, .1); padding-top: 8px; }
+.gp-owner-ops > summary { cursor: pointer; font-size: 12px; color: #75756d; list-style: none; }
+.gp-owner-ops > summary::-webkit-details-marker { display: none; }
+.gp-owner-ops > summary::before { content: '▸ '; }
+.gp-owner-ops[open] > summary::before { content: '▾ '; }
+.gp-ops-block { margin-top: 8px; }
+.gp-ops-block p { margin: 4px 0 0; font-size: 12px; }
+.gp-ops-link { margin-top: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(0, 0, 0, .04); font-size: 12px; }
+.gp-ops-link code { overflow-wrap: anywhere; font-size: 11px; }
+.gp-owner-ops input { flex: 1; min-width: 0; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 5px 8px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .18); }
+.gp-btn.gp-danger:not(:disabled) { border-color: #a33; color: #a33; }
+.gp-ops-link .gp-copy { flex: none; border-color: rgba(0, 0, 0, .18); background: #fff; color: #1c1c1a; }
+@media (prefers-color-scheme: dark) {
+  .gp-owner-ops { border-top-color: rgba(255, 255, 255, .12); }
+  .gp-owner-ops > summary { color: #9b9b92; }
+  .gp-ops-link { background: rgba(255, 255, 255, .06); }
+  .gp-ops-link .gp-copy { border-color: rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #ecebe4; }
+  .gp-owner-ops input { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
+  .gp-btn.gp-danger:not(:disabled) { border-color: #e88; color: #f2a0a0; }
+}
