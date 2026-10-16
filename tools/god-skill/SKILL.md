@@ -105,6 +105,12 @@ start in the first minute; pass their printed `EDEN_GOD_CLAIM=c_…`. Each brief
 ("about 5 minutes, ≤ 30 shapes"). Lead takes the largest part; helpers end `build release --done`.
 Never poll: `build wait [--timeout 15m]` when nothing remains to do.
 
+**Bigger than one plot** (a street, a square, a town): write one plan (roads, plots with each building's
+plot-local `massing`, terrain/water notes, `chapters` of plots) and record it once: `build district <id> --file plan.json`.
+Build it a chapter at a time: `build start <id>-1 --district <id> --brief "…"` takes site and massing from the plots and
+closes only that chapter's buildings, so residents keep using finished plots. Any later session: `build district <id>`
+prints `next:`. One chapter undoes as one group: `undo --group <chapter>`.
+
 ## Done means done (the stopping rule)
 
 The owner is waiting; a fast, honest, complete answer beats an endlessly polished one.

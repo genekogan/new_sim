@@ -1,0 +1,207 @@
+{
+ "id": "high",
+ "title": "High Street",
+ "brief": "Owner words: a lively six-shop street by the river",
+ "steps": [
+  "massing",
+  "shops",
+  "details"
+ ],
+ "roads": [
+  {
+   "id": "high",
+   "name": "Cobbler Lane",
+   "path": [
+    [
+     -60,
+     0
+    ],
+    [
+     60,
+     0
+    ]
+   ],
+   "width": 8
+  }
+ ],
+ "plots": [
+  {
+   "id": "p1",
+   "title": "Bakery",
+   "at": [
+    -40,
+    -14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      -2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  },
+  {
+   "id": "p2",
+   "title": "Smithy",
+   "at": [
+    -40,
+    14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  },
+  {
+   "id": "p3",
+   "title": "Inn",
+   "at": [
+    0,
+    -14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      -2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  },
+  {
+   "id": "p4",
+   "title": "Chapel",
+   "at": [
+    0,
+    14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  },
+  {
+   "id": "p5",
+   "title": "Market",
+   "at": [
+    40,
+    -14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      -2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  },
+  {
+   "id": "p6",
+   "title": "Mill",
+   "at": [
+    40,
+    14
+   ],
+   "size": [
+    16,
+    18
+   ],
+   "massing": [
+    {
+     "name": "hall",
+     "at": [
+      0,
+      2
+     ],
+     "size": [
+      10,
+      8
+     ],
+     "h": 6,
+     "roof": "gable"
+    }
+   ]
+  }
+ ],
+ "chapters": [
+  [
+   "p1",
+   "p2"
+  ],
+  [
+   "p3",
+   "p4"
+  ],
+  [
+   "p5",
+   "p6"
+  ]
+ ],
+ "terrain": "gentle fall to the south",
+ "water": "river 40 m south of the street"
+}
