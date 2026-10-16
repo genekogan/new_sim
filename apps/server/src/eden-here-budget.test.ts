@@ -8,7 +8,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
 import {accept} from '../test/native-owner-fixture.ts';
+import {existsSync} from 'node:fs';
 import {bootEden} from '../test/eden-capabilities-timing.ts';
+
+// The Eden 2026 template is lane/engine content, not in every trunk; without it this cannot be measured here.
+const NO_EDEN = existsSync(new URL('../../../worlds/templates/eden-2026.json', import.meta.url)) ? false : 'needs worlds/templates/eden-2026.json (lane/engine content)';
 import {mountEdgeRoutes} from './edge/routes.ts';
 import {inOutline, inPoly, type Place} from './edge/ledger/places.ts';
 
@@ -20,7 +24,7 @@ function oracleContaining(this: {byId: Map<string, Place>}, x: number, z: number
   return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inPoly(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || area(a.polygon) - area(b.polygon));
 }
 
-test('Eden 2026: /here in the cafe gives the same frame and capabilities, reads the place path a few times, within budget', {timeout: 600_000}, async t => {
+test('Eden 2026: /here in the cafe gives the same frame and capabilities, reads the place path a few times, within budget', {timeout: 600_000, skip: NO_EDEN}, async t => {
   const w = await bootEden();
   t.after(() => w.close());
   const L = w.edge, soul = w.soul, app = new Hono();
