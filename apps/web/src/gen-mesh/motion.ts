@@ -13,7 +13,7 @@ import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose
 /** True if this entity needs per-frame motion (the layer only calls `animate` for these). */
 export function hasMotion(def: StoredDef): boolean {
   const c = def.components;
-  if (c.spin || c.sway || c.hover || c.route || c.behavior || c.light) return true;
+  if (c.spin || c.swing || c.sway || c.hover || c.route || c.behavior || c.light) return true;
   if (def.tags.includes('creature') || def.tags.includes('moving')) return true;
   if (def.make.kind === 'gen' && def.make.gen === 'animals/1') return true;
   const gait = def.make.kind === 'gen' && def.make.gen === 'kit/2' ? (def.make.args as { gait?: string } | undefined)?.gait : undefined;
@@ -42,9 +42,34 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
     const target = c.spin.role ? obj.getObjectByName(`role:${c.spin.role}`) : obj;
     if (target) { if (c.spin.axis === 'x') target.rotation.x = ang; else if (c.spin.axis === 'z') target.rotation.z = ang; else target.rotation.y = (target === obj ? base.yaw : 0) + ang; }
   }
+  if (c.swing) swingStep(obj, entity, c.swing.parts, t);
   if (c.sway) { obj.rotation.z = Math.sin(t * (Math.PI * 2) / c.sway.period + phase) * c.sway.amount * 0.3; obj.rotation.x = Math.cos(t * (Math.PI * 2) / (c.sway.period * 1.3) + phase) * c.sway.amount * 0.2; }
   if (c.hover) obj.position.y = (c.route ? obj.position.y : base.y + c.hover.height) + Math.sin(t * (Math.PI * 2) / c.hover.period + phase) * c.hover.bob;
   if (c.light) glowStep(obj, entity, model, t);
+}
+
+type Swing = NonNullable<StoredDef['components']['swing']>['parts'][number];
+/** E2 #4: is a `when` gate (`field` or `!field`) open for this entity's state? */
+export function swingOpen(when: string | undefined, state: Record<string, unknown> | undefined): boolean {
+  if (!when) return true;
+  const neg = when.startsWith('!'), v = state?.[neg ? when.slice(1) : when];
+  return neg ? !v : !!v;
+}
+/** E2 #4: 0…1 along a working stroke at world time `t` (eased at both ends, like a hydraulic ram). */
+export function swingStroke(t: number, period: number, phase: number): number { return 0.5 - 0.5 * Math.cos(((t / period) + phase) * Math.PI * 2); }
+/** Pose each working role from its rest pose; a gated role eases back to rest when its gate closes (engine off). */
+function swingStep(obj: THREE.Object3D, entity: Entity, swings: Swing[], t: number) {
+  for (const w of swings) {
+    const target = obj.getObjectByName(`role:${w.role}`); if (!target) continue;
+    const ud = target.userData as { swingRest?: { p: [number, number, number]; r: [number, number, number] }; swingK?: number; swingAt?: number };
+    ud.swingRest ??= { p: [target.position.x, target.position.y, target.position.z], r: [target.rotation.x, target.rotation.y, target.rotation.z] };
+    const open = swingOpen(w.when, entity.state as Record<string, unknown> | undefined), dt = ud.swingAt === undefined ? 0 : Math.max(0, Math.min(0.25, t - ud.swingAt));
+    ud.swingAt = t; ud.swingK = open ? 1 : Math.max(0, (ud.swingK ?? 0) - dt / 1.5);   // settle back over 1.5 s
+    const k = open ? swingStroke(t, w.period, w.phase) : Math.min(ud.swingK, swingStroke(t, w.period, w.phase)), i = w.axis === 'x' ? 0 : w.axis === 'y' ? 1 : 2;
+    const r = ud.swingRest;
+    if (w.kind === 'slide') target.position.setComponent(i, r.p[i] + w.amount * k);
+    else target.rotation.set(r.r[0] + (i === 0 ? w.amount * k : 0), r.r[1] + (i === 1 ? w.amount * k : 0), r.r[2] + (i === 2 ? w.amount * k : 0));
+  }
 }
 
 // ---------------------------------------------------------------- world reading
