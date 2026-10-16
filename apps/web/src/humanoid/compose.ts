@@ -9,7 +9,7 @@ import {templateFromParts, type Template} from '../../../../mars/viewer/app/engi
 import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
 import {BASE} from '../base-path.ts';
-import {hatPieces, glassesPieces, bagPieces, skinned, type HeadFit} from './props.ts';
+import {hatPieces, glassesPieces, bagPieces, skinned, facialHairLayers, mustachePieces, maskLayer, scarfWrap, scarfEndPieces, gloveLayer, earringPieces, necklacePieces, type HeadFit} from './props.ts';
 
 type Landmarks = {min: number[]; max: number[]; cz?: number; rx?: number; rz?: number; top?: number; eye?: [number, number, number]; eyeX?: number; templeX?: number; back?: number; front?: number};
 type PartEntry = {label: string; native: string; tris: number; verts: number; licence: string; files: Record<string, {file: string; bytes: number; sha256: string}>; landmarks: Record<string, Landmarks>};
@@ -21,6 +21,11 @@ type Rig = {root: THREE.Object3D; ib: THREE.Matrix4[]; clips: THREE.AnimationCli
 // under the app's prefix: at sim.eden.art/worlds the root /modular/* belongs to the other release, which has no kit
 export const KIT_URL = `${BASE}/modular/humanoid/`;
 const HIDE_UNDER_HAT = 1;
+/** Faces whose helmet or visor covers the face: no facial hair or mask. */
+const COVERED_FACES = new Set(['spacesuit', 'swat']);
+const HAND_BONE = /^(Wrist|Thumb|Index|Middle|Ring|Pinky)\d?[LR]$/;
+const earrings = (look: Look) => look.jewellery === 'earrings' || look.jewellery === 'both';
+const necklace = (look: Look) => look.jewellery === 'necklace' || look.jewellery === 'both';
 const ARM_TRACK = /^(LowerArm|Wrist)[LR]\.position$/;
 
 /** Merge kit-format geometries (position f32, normal i8n, skinIndex u8, skinWeight u8n, hinfo u8) into one. */
@@ -87,6 +92,8 @@ function scaleHead(g: THREE.BufferGeometry, s: number, joint: [number, number, n
   return g;
 }
 
+const headKey = (look: Look) => ['head', look.frame, look.face, look.hair, look.hat, look.glasses, look.headSize, look.facialHair, look.mask, look.scarf, earrings(look)];
+const topKey = (look: Look) => ['top', look.frame, look.top, look.bag, look.gloves, look.scarf, necklace(look)];
 export type KitReader = (url: string) => Promise<ArrayBuffer>;
 let shared: HumanoidKit | null = null;
 /** The page's kit (one cache for the world view, the picker and portraits). */
@@ -144,7 +151,7 @@ export class HumanoidKit {
     return p;
   }
   private head(look: Look): Promise<THREE.BufferGeometry> {
-    const key = ['head', look.frame, look.face, look.hair, look.hat, look.glasses, look.headSize].join(':'); let p = this.merged.get(key);
+    const key = headKey(look).join(':'); let p = this.merged.get(key);
     if (!p) this.merged.set(key, p = (async () => {
       const m = await this.manifest(), fr = m.frames[look.frame], face = await this.part('face', look.face, look.frame);
       const hair = look.hair === 'bald' ? null : await this.part('hair', look.hair, look.frame);
@@ -153,17 +160,28 @@ export class HumanoidKit {
       // a face with its own headgear takes no extra hat or glasses (HEADGEAR_FACES); glasses need the face's eye line
       const gear = HEADGEAR_FACES.has(look.face);
       const pieces = gear ? [] : [...hatPieces(look.hat as Look['hat'], fit, fr.index.head), ...(lf.eye ? glassesPieces(look.glasses as Look['glasses'], fit, fr.index.head) : [])].map(skinned);
-      const geo = mergeParts([face, ...(hair ? [look.hat !== 'none' || gear ? withoutFlag(hair, HIDE_UNDER_HAT) : hair] : []), ...pieces]);
+      // looks v2: facial hair, mask and the scarf's wrap are layers over the face part's own skin; earrings are props
+      const layers: THREE.BufferGeometry[] = [], covered = COVERED_FACES.has(look.face) || !lf.eye;
+      if (!covered) layers.push(...facialHairLayers(look.facialHair, face, fit, fr.index.head));
+      if (!covered && look.mask !== 'none') { const m = maskLayer(face, fit, fr.index.head); if (m) layers.push(m); }
+      if (look.scarf !== 'none') { const rig = await this.rig(look.frame), w = scarfWrap(face, rig.names.indexOf('Neck'), fr.index.chest, fr.index.head, fr.joints.neck[1]); if (w) layers.push(w); }
+      if (earrings(look) && !covered) pieces.push(...earringPieces(fit, fr.index.head).map(skinned));
+      if (!covered && look.facialHair !== 'none') pieces.push(...mustachePieces(face, fit, fr.index.head).map(skinned)); // every style has one
+      const geo = mergeParts([face, ...(hair ? [look.hat !== 'none' || gear ? withoutFlag(hair, HIDE_UNDER_HAT) : hair] : []), ...pieces, ...layers]);
       return scaleHead(geo, look.headSize, fr.joints.head, fr.index.head);
     })());
     return p;
   }
   private top(look: Look): Promise<THREE.BufferGeometry> {
-    if (look.bag === 'none') return this.part('top', look.top, look.frame);
-    const key = ['top', look.frame, look.top, look.bag].join(':'); let p = this.merged.get(key);
+    if (look.bag === 'none' && look.gloves === 'none' && look.scarf === 'none' && !necklace(look)) return this.part('top', look.top, look.frame);
+    const key = topKey(look).join(':'); let p = this.merged.get(key);
     if (!p) this.merged.set(key, p = (async () => {
       const m = await this.manifest(), fr = m.frames[look.frame], top = await this.part('top', look.top, look.frame), lt = m.parts.top[look.top].landmarks[look.frame];
-      return mergeParts([top, ...bagPieces(look.bag as Look['bag'], {back: lt.back!, front: lt.front!, chestY: fr.joints.chest[1], hipsY: fr.joints.hips[1]}, fr.index, top).map(skinned)]);
+      const fit = {back: lt.back!, front: lt.front!, chestY: fr.joints.chest[1], hipsY: fr.joints.hips[1]}, neckY = fr.joints.neck[1];
+      const pieces = [...bagPieces(look.bag as Look['bag'], fit, fr.index, top), ...(look.scarf !== 'none' ? scarfEndPieces(fit, neckY, fr.index.chest, top) : []), ...(necklace(look) && look.scarf === 'none' ? necklacePieces(neckY, fr.index.chest, top) : [])].map(skinned);
+      const layers: THREE.BufferGeometry[] = [];
+      if (look.gloves !== 'none') { const rig = await this.rig(look.frame), hands = new Set(rig.names.flatMap((n, i) => HAND_BONE.test(n) ? [i] : [])), g = gloveLayer(top, hands); if (g) layers.push(g); }
+      return mergeParts([top, ...pieces, ...layers]);
     })());
     return p;
   }
@@ -178,7 +196,7 @@ export class HumanoidKit {
   private async geometries(look: Look) {
     const base = await Promise.all([this.head(look), this.top(look), this.part('bottom', look.bottom, look.frame), this.part('shoes', look.shoes, look.frame)]);
     if (look.build === 1) return base;
-    const rig = await this.rig(look.frame), keys = [['head', look.frame, look.face, look.hair, look.hat, look.glasses, look.headSize], ['top', look.frame, look.top, look.bag], ['bottom', look.frame, look.bottom], ['shoes', look.frame, look.shoes]];
+    const rig = await this.rig(look.frame), keys = [headKey(look), topKey(look), ['bottom', look.frame, look.bottom], ['shoes', look.frame, look.shoes]];
     return Promise.all(base.map((g, i) => { const key = [...keys[i], 'build', look.build].join(':'); let p = this.merged.get(key); if (!p) this.merged.set(key, p = Promise.resolve(withGirth(g, look.build, rig))); return p; }));
   }
   private async compose(look: Look, key: string): Promise<Template> {

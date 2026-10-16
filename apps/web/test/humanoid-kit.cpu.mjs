@@ -63,4 +63,12 @@ ok('every combination ≤ 20k tris',maxTris<=20000,`${n} combinations, max ${max
  ok('build 0.92 slims them (the top\'s depth is bounded by the T-pose hands)',w2.bottom[1]<w0.bottom[1]*0.97&&w2.top[1]<w0.top[1]-0.003,JSON.stringify([w0.bottom[1],w2.bottom[1],w0.top[1],w2.top[1]].map(v=>+v.toFixed(3))));
  ok('build leaves the head part\'s face width (head bone) and the shoes',Math.abs(w1.shoes[0]-w0.shoes[0])/w0.shoes[0]<0.06,JSON.stringify([w0.shoes[0],w1.shoes[0]].map(v=>+v.toFixed(3))));
  ok('head size 1.08 grows the head only',wh.head[0]>w0.head[0]*1.06&&Math.abs(wh.top[0]-w0.top[0])<1e-6,JSON.stringify([w0.head[0],wh.head[0]].map(v=>+v.toFixed(3))));}
+// looks v2 accessories: each one adds geometry (layers over the face/hands follow their bones), every face × frame with all
+// of them stays in budget, and a covered face (helmet) takes no facial hair or mask
+{const bare={frame:'masc',face:'open',hair:'short',top:'shirt'},base=await kit.tris(bare);
+ for(const [k,v] of [['facialHair','mustache'],['facialHair','goatee'],['facialHair','beard'],['mask','cloth'],['scarf','scarf'],['gloves','gloves'],['jewellery','earrings'],['jewellery','necklace']]){const t=await kit.tris({...bare,[k]:v});ok(`${k}=${v} adds geometry`,t>base,`${base} -> ${t}`);}
+ let maxV2=0,where='';for(const frame of P('frame'))for(const face of P('face')){const t=await kit.tris({frame,face,hair:'short',top:'farmer',hat:'cap',glasses:'round',bag:'backpack',facialHair:'beard',scarf:'scarf',gloves:'gloves',mask:'cloth',jewellery:'both'});if(t>maxV2){maxV2=t;where=frame+'/'+face;}}
+ ok('every face with every accessory ≤ 20k tris',maxV2<=20000,`max ${maxV2} (${where})`);
+ const helmet={frame:'masc',face:'spacesuit',hair:'bald'};ok('a helmet face takes no facial hair or mask',await kit.tris({...helmet,facialHair:'beard',mask:'cloth'})===await kit.tris(helmet));
+ const t=await kit.template({...bare,gloves:'gloves',scarf:'scarf'});const mats=new Set();let draws=0;t.gltf.scene.traverse(o=>{if(o.isMesh){mats.add(o.material);draws++;}});ok('accessories add no draw calls or materials',draws===4&&mats.size===1,String(draws));}
 console.log(JSON.stringify({bytesFetched:kit.bytes,files:kit.files}));

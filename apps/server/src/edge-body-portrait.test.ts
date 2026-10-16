@@ -18,7 +18,7 @@ test('PORTRAIT: auto portrait drawn for a look, redrawn on change, custom photo 
  await invite(f,'a');const row=await accept(f.host,f.souls.create('dev:a',{name:'Portrait A',description:'scripted portrait test'}));
  const token=f.souls.pairExchange(f.souls.pairCode(row,'http://127.0.0.1:6361').code,'scripted').token;
  const ledger=new EdgeLedger(f.host,f.db,undefined,{ambient:false}),app=new Hono();mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger,soul:edgeSoulResolver(f.host,f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
- const put=async(body:unknown)=>{const r=await accept(f.host,app.request('/v1/edge/body',{method:'PUT',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)})) as Response;assert.equal(r.status,200,await r.clone().text());return (await r.json()).body;};
+ const put=async(body:unknown)=>{const r=await accept(f.host,Promise.resolve(app.request('/v1/edge/body',{method:'PUT',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify(body)}))) as Response;assert.equal(r.status,200,await r.clone().text());return (await r.json()).body;};
  // no humanoid look yet (an unparameterised body): no automatic portrait, nothing queued
  portraits.sweep();await portraits.drain();assert.equal(f.host.profilePhoto(row.id),null);assert.equal(f.host.profilePhotoSource(row.id),null);
  // a look: the applied assignment queues a portrait; it becomes the profile photo
@@ -42,6 +42,6 @@ test('PORTRAIT: auto portrait drawn for a look, redrawn on change, custom photo 
  const reset=await accept(f.host,profiles.clearPhoto(row.owner,row.id));assert.equal(reset.photoSource,'auto');assert.equal(f.host.profilePhoto(row.id)!.hash,portraits.photo(row.id)!.hash);
  const again=await accept(f.host,profiles.clearPhoto(row.owner,row.id));assert.equal(again.revision,reset.revision,'reset is idempotent');
  // a non-humanoid body (a creature) has no automatic portrait; the viewer's own render is used
- const r=await accept(f.host,app.request('/v1/edge/body',{method:'PUT',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({preset:'duck'})})) as Response;
+ const r=await accept(f.host,Promise.resolve(app.request('/v1/edge/body',{method:'PUT',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({preset:'duck'})}))) as Response;
  if(r.status===200){assert.equal(f.host.profilePhoto(row.id),null);assert.equal(f.host.profilePhotoSource(row.id),null);}
 });

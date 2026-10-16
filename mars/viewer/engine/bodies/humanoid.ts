@@ -104,7 +104,7 @@ export function seatFitProblem(body: Body | undefined | null, seatTop: number): 
 
 /** Structural check of a humanoid look's params (bodyProblem): shape, and the physical dims in range. */
 export function humanoidParamsProblem(params: unknown): string | null {
-  if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).length > 32) return 'body.params';
+  if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).length > 48) return 'body.params';
   for (const [k, v] of Object.entries(params as Record<string, unknown>)) {
     if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/.test(k) || !(typeof v === 'string' && v.length <= 32 || typeof v === 'number' && Number.isFinite(v))) return 'body.params';
     if (k in HUMANOID_DIM_RANGES) {

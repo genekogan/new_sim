@@ -120,3 +120,93 @@ export function bagPieces(kind: Look['bag'], fit: TorsoFit, bones: {chest: numbe
   pieces.push(leather(bar(new THREE.Vector3(-0.1, cy + 0.135, zf), new THREE.Vector3(-0.1, cy + 0.135, zb), 0.028, 0.009, new THREE.Vector3(0, 1, 0)), bones.chest, 'gearDark'));
   return pieces;
 }
+
+// ---------- looks v2: facial hair, mask, scarf, gloves, jewellery ----------
+
+/** A conforming layer over part of a kit geometry (beard, mask, gloves, scarf wrap): the triangles whose three vertices
+ *  pass `keep` are copied, pushed out by `offset` along the normal averaged over coincident vertices (so the layer stays
+ *  closed over flat-shaded parts) and recoloured. They keep their skin weights, so they deform with the body exactly. */
+export function shell(g: THREE.BufferGeometry, keep: (i: number, p: THREE.Vector3, dominant: number) => boolean, offset: number, slot: (typeof SLOTS)[number], role: number, rough: number, region?: (centroid: THREE.Vector3) => boolean): THREE.BufferGeometry | null {
+  const P = g.attributes.position, N = g.attributes.normal, J = g.attributes.skinIndex, W = g.attributes.skinWeight, I = g.index!;
+  const n = P.count, ok = new Uint8Array(n), p = new THREE.Vector3();
+  for (let i = 0; i < n; i++) { let best = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = W.getComponent(i, k); if (w > bw) { bw = w; best = J.getComponent(i, k); } } p.fromBufferAttribute(P, i); ok[i] = keep(i, p, best) ? 1 : 0; }
+  // `keep` filters vertices (bone, colour slot); `region`, when given, picks the triangles by centroid (low-poly faces have big triangles)
+  const tris: number[] = [], c3 = new THREE.Vector3();
+  for (let t = 0; t < I.count; t += 3) { const a = I.getX(t), b = I.getX(t + 1), c = I.getX(t + 2); if (!(ok[a] && ok[b] && ok[c])) continue;
+    if (region) { c3.fromBufferAttribute(P, a).add(p.fromBufferAttribute(P, b)).add(p.fromBufferAttribute(P, c)).divideScalar(3); if (!region(c3)) continue; }
+    tris.push(a, b, c); }
+  if (!tris.length) return null;
+  const avg = new Map<string, THREE.Vector3>(), key = (i: number) => `${Math.round(P.getX(i) * 2e4)},${Math.round(P.getY(i) * 2e4)},${Math.round(P.getZ(i) * 2e4)}`;
+  for (const i of tris) { const k = key(i); const v = avg.get(k) ?? new THREE.Vector3(); avg.set(k, v.add(new THREE.Vector3(N.getX(i), N.getY(i), N.getZ(i)))); }
+  const remap = new Map<number, number>(), used: number[] = []; for (const i of tris) if (!remap.has(i)) { remap.set(i, used.length); used.push(i); }
+  const m = used.length, out = new THREE.BufferGeometry();
+  const pos = new Float32Array(m * 3), nor = new Int8Array(m * 3), si = new Uint8Array(m * 4), sw = new Uint8Array(m * 4), info = new Uint8Array(m * 4), S = SLOTS.indexOf(slot);
+  used.forEach((i, j) => {
+    const d = avg.get(key(i))!.clone().normalize();
+    pos.set([P.getX(i) + d.x * offset, P.getY(i) + d.y * offset, P.getZ(i) + d.z * offset], j * 3);
+    nor.set([Math.round(N.getX(i) * 127), Math.round(N.getY(i) * 127), Math.round(N.getZ(i) * 127)], j * 3);
+    for (let k = 0; k < 4; k++) { si[j * 4 + k] = J.getComponent(i, k); sw[j * 4 + k] = Math.round(W.getComponent(i, k) * 255); }
+    info.set([S, role, Math.round(rough * 255), 0], j * 4);
+  });
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3, true));
+  out.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); out.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4, true));
+  out.setAttribute('hinfo', new THREE.BufferAttribute(info, 4)); out.setIndex(tris.map(i => remap.get(i)!));
+  return out;
+}
+const isSkin = (g: THREE.BufferGeometry, i: number) => { const s = g.attributes.hinfo.getX(i); return s === 0 || s === 1; };
+
+/** A mustache: two tapered bars under the nose, on the face's own surface (low-poly faces have no lip band to follow). */
+export function mustachePieces(face: THREE.BufferGeometry, fit: HeadFit, headBone: number): Piece[] {
+  const y = fit.eye[1] - 0.08, z = (surfaceZ(face, 0, y, 1, 0.002, 0.03) ?? fit.eye[2] + 0.02);
+  return [-1, 1].map(sx => { const g = new THREE.BoxGeometry(0.042, 0.013, 0.012); g.translate(sx * 0.021, 0, 0); return {geo: at(g, sx * 0.004, y, z, 0, -sx * 0.35, -sx * 0.32), slot: 'hair' as const, role: 6, rough: .8, bone: headBone}; });
+}
+/** Facial hair over the face part's skin: goatee or full beard (with the mustache). */
+export function facialHairLayers(kind: Look['facialHair'], face: THREE.BufferGeometry, fit: HeadFit, headBone: number): THREE.BufferGeometry[] {
+  if (kind === 'none') return [];
+  const ey = fit.eye[1], front = fit.cz;
+  const lower = (p: THREE.Vector3) => p.y < ey - 0.05 && p.y > ey - 0.2;
+  const goatee = (p: THREE.Vector3) => p.y < ey - 0.098 && p.y > ey - 0.2 && Math.abs(p.x) < 0.042 && p.z > front + 0.02;
+  const beard = (p: THREE.Vector3) => lower(p) && p.z > front - 0.05 && !(p.y > ey - 0.115 && p.y < ey - 0.095 && Math.abs(p.x) < 0.028 && p.z > front + 0.05); // leaves the lips
+  if (kind === 'mustache') return [];
+  const region = kind === 'goatee' ? goatee : beard;
+  const layer = shell(face, (i, _p, bone) => bone === headBone && isSkin(face, i), kind === 'beard' ? 0.008 : 0.005, 'hair', 6, 0.8, region);
+  return layer ? [layer] : [];
+}
+/** A cloth mask over the nose, mouth and chin (accessory colour). */
+export function maskLayer(face: THREE.BufferGeometry, fit: HeadFit, headBone: number): THREE.BufferGeometry | null {
+  const ey = fit.eye[1];
+  return shell(face, (i, _p, bone) => bone === headBone && isSkin(face, i), 0.006, 'spare', 2, 0.9, p => p.y < ey - 0.03 && p.y > ey - 0.19 && p.z > fit.cz);
+}
+/** A knitted wrap around the neck (accessory colour); its hanging end is `scarfEndPieces`. */
+export function scarfWrap(face: THREE.BufferGeometry, neckBone: number, chestBone: number, headBone: number, neckY: number): THREE.BufferGeometry | null {
+  return shell(face, (i, p, bone) => isSkin(face, i) && (bone === neckBone || bone === chestBone || (bone === headBone && p.y < neckY + 0.02)), 0.024, 'spare', 2, 0.95);
+}
+/** The scarf's two ends hanging down the chest, draped over the top. */
+export function scarfEndPieces(fit: TorsoFit, neckY: number, chestBone: number, top: THREE.BufferGeometry): Piece[] {
+  const out: Piece[] = [];
+  for (const [x0, x1, len] of [[0.03, 0.05, 0.2], [0.055, 0.085, 0.15]] as const)
+    for (const g of drape(top, [[x0, neckY - 0.04], [x1, neckY - 0.04 - len]], 1, 0.055, 0.016)) out.push({geo: g, slot: 'spare', role: ROLE.cloth, rough: .95, bone: chestBone});
+  void fit; return out;
+}
+/** Gloves: a thin leather layer over the hands (gear colour), following every finger. */
+export function gloveLayer(top: THREE.BufferGeometry, handBones: ReadonlySet<number>): THREE.BufferGeometry | null {
+  return shell(top, (i, _p, bone) => isSkin(top, i) && handBones.has(bone), 0.004, 'gear', ROLE.leather, 0.7);
+}
+/** Earrings: small accent-coloured drops at the ear lobes. */
+export function earringPieces(fit: HeadFit, headBone: number): Piece[] {
+  const out: Piece[] = [];
+  for (const sx of [-1, 1]) {
+    const x = sx * (fit.templeX - 0.004), y = fit.eye[1] - 0.05, z = fit.cz - 0.012;
+    out.push({geo: at(new THREE.TorusGeometry(0.008, 0.0022, 4, 10), x, y, z, 0, Math.PI / 2, 0), slot: 'accent', role: ROLE.trinket, rough: .3, bone: headBone});
+    out.push({geo: at(new THREE.OctahedronGeometry(0.0085, 0), x, y - 0.016, z), slot: 'accent', role: ROLE.trinket, rough: .3, bone: headBone});
+  }
+  return out;
+}
+/** A necklace: a thin chain draped over the top around the neck with a small pendant (accent colour). */
+export function necklacePieces(neckY: number, chestBone: number, top: THREE.BufferGeometry): Piece[] {
+  const pts: [number, number][] = [[-0.072, neckY - 0.035], [-0.05, neckY - 0.08], [-0.022, neckY - 0.105], [0, neckY - 0.112], [0.022, neckY - 0.105], [0.05, neckY - 0.08], [0.072, neckY - 0.035]];
+  const out: Piece[] = drape(top, pts, 1, 0.007, 0.005).map(g => ({geo: g, slot: 'accent' as const, role: ROLE.trinket, rough: .3, bone: chestBone}));
+  const z = surfaceZ(top, 0, neckY - 0.125, 1) ?? 0.15;
+  out.push({geo: at(new THREE.OctahedronGeometry(0.014, 0), 0, neckY - 0.128, z + 0.008), slot: 'accent', role: ROLE.trinket, rough: .3, bone: chestBone});
+  return out;
+}

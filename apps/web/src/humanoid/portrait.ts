@@ -66,7 +66,7 @@ function trianglesOf(mesh: THREE.SkinnedMesh, out: Tri[], camera: THREE.Vector3,
 }
 
 /** A straight-on head-and-shoulders portrait of the look as an 8-bit RGB PNG (PORTRAIT_SIZE square). */
-export async function humanoidPortraitPNG(kit: HumanoidKit, params: unknown, size = PORTRAIT_SIZE): Promise<Uint8Array> {
+export async function humanoidPortraitPNG(kit: HumanoidKit, params: unknown, size = PORTRAIT_SIZE, view: 'portrait' | 'full' | 'side' = 'portrait'): Promise<Uint8Array> {
   const look = resolveLook(params), template = await kit.template(look), rig = createRig(template);
   rig.mixer.update(0.01); rig.holder.updateMatrixWorld(true);
   const meshes: THREE.SkinnedMesh[] = []; rig.model.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) meshes.push(o as THREE.SkinnedMesh); });
@@ -78,8 +78,11 @@ export async function humanoidPortraitPNG(kit: HumanoidKit, params: unknown, siz
   const ks = (neckBone ? Math.max(0.5, Math.min(2, (hp.y - neckBone.getWorldPosition(new THREE.Vector3()).y) / 0.07673)) : 1) * look.headSize;
   const span = 0.62 * ks, skull = hp.y + 0.24 * ks, cy = skull + 0.16 * span - span / 2, cz = hp.z;
   const pattern = (meshes[0]?.material as THREE.Material | undefined)?.userData.humanoid.pattern.value as number ?? 0, tris: Tri[] = [];
-  const fov = 16 * Math.PI / 180, tanH = Math.tan(fov / 2), dist = (span / 2) / tanH;
-  const cam = new THREE.Vector3(hp.x + dist, cy, cz);
+  const fov = 16 * Math.PI / 180, tanH = Math.tan(fov / 2);
+  // 'full' and 'side' (whole body, for checking outfits and body shape) frame 2.1 m around the body's middle
+  const fullSpan = 2.1, viewSpan = view === 'portrait' ? span : fullSpan, viewY = view === 'portrait' ? cy : 0.98, dist = (viewSpan / 2) / tanH;
+  const fwd = view === 'side' ? new THREE.Vector3(0, 0, -1) : new THREE.Vector3(-1, 0, 0), right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 1, 0));
+  const cam = view === 'side' ? new THREE.Vector3(hp.x, viewY, cz + dist) : new THREE.Vector3(hp.x + dist, viewY, cz);
   for (const mesh of meshes) trianglesOf(mesh, tris, cam, pattern);
   const S = size * 2, depth = new Float32Array(S * S).fill(Infinity), rgb = new Float32Array(S * S * 3);
   for (let y = 0; y < S; y++) { const f = y / (S - 1); for (let x = 0; x < S; x++) for (let k = 0; k < 3; k++) rgb[(y * S + x) * 3 + k] = BG_TOP[k] * (1 - f) + BG_BOTTOM[k] * f; }
@@ -87,9 +90,9 @@ export async function humanoidPortraitPNG(kit: HumanoidKit, params: unknown, siz
   for (const t of tris) {
     let behind = false;
     for (let k = 0; k < 3; k++) {
-      const rx = t.p[k * 3] - cam.x, ry = t.p[k * 3 + 1] - cam.y, rz = t.p[k * 3 + 2] - cam.z, d = -rx;
+      const rx = t.p[k * 3] - cam.x, ry = t.p[k * 3 + 1] - cam.y, rz = t.p[k * 3 + 2] - cam.z, d = rx * fwd.x + rz * fwd.z;
       if (d < 0.05) { behind = true; break; }
-      sx[k] = ((-rz / d) / tanH * 0.5 + 0.5) * S; sy[k] = (0.5 - (ry / d) / tanH * 0.5) * S; sz[k] = d;
+      sx[k] = (((rx * right.x + rz * right.z) / d) / tanH * 0.5 + 0.5) * S; sy[k] = (0.5 - (ry / d) / tanH * 0.5) * S; sz[k] = d;
     }
     if (behind) continue;
     const area = (sx[1] - sx[0]) * (sy[2] - sy[0]) - (sx[2] - sx[0]) * (sy[1] - sy[0]); if (Math.abs(area) < 1e-9) continue;
