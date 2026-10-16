@@ -158,6 +158,13 @@ const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'her
 export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null;bodyLocation?:(runtime:any,actor:string)=>BodyLocationV1|null};
 /** nav/1 install spec (Core derives it from place data): flat ground rectangles and solid oriented boxes. */
 export type NavSpecV1={version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[]};
+/** E2 #1: the level-0 grid for each point of a polygon read. Paged ground answers per 64 m tile (a place over ~100 m
+ *  spans several nav windows, and the centre's window reads its far parts as blocked); other worlds keep their one grid. */
+function levelGridsFor(spatial:Spatial,centre:ReturnType<Spatial['levelAt']>){
+  const paged=(spatial as unknown as {ground?:{paged?:boolean}}).ground?.paged===true,tiles=new Map<string,ReturnType<Spatial['levelAt']>>();
+  return (x:number,z:number)=>{if(!paged)return centre;const k=Math.floor(x/64)+','+Math.floor(z/64);if(!tiles.has(k))tiles.set(k,spatial.levelAt(0,[x,z]));return tiles.get(k);};
+}
+
 export class MarsEngine implements Engine {
   get nativeArrivalWitnessEnabledV1(){return this.cfg.nativeArrivalWitnessV1===true;}
   readonly dt = 1 / TPS;
@@ -1544,8 +1551,8 @@ export class MarsEngine implements Engine {
     if(typeof r.label!=='string'||!r.label||r.label.length>100)return {code:'region.bad-label',message:'label 1..100 characters'};
     if(!Array.isArray(r.polygon)||r.polygon.length<3||r.polygon.length>64||!r.polygon.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)))return {code:'region.bad-polygon',message:'3..64 [x,z] points'};
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[r.polygon.reduce((s,v)=>s+v[0],0)/r.polygon.length,r.polygon.reduce((s,v)=>s+v[1],0)/r.polygon.length]);if(!grid)return {code:'region.no-ground',message:'no level-0 ground'};
-    const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]);let clear=0;
-    for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1)if(inPoly(x,z,r.polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.07)clear++;
+    const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]),gridOf=levelGridsFor(spatial,grid);let clear=0;
+    for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const g=gridOf(x,z);if(g&&clearanceAt(g,[x,z])>=HUMAN_RADIUS+.07)clear++;}
     return clear>=3?null:{code:'region.unsupported',message:`${r.id} has ${clear} clear standing spots on admitted native ground (needs 3)`};
   }
   /** placeRegionsV1 (logged rules fact `placeRegionsV1`): W1 places become native destination regions (walk/hang-out/gather offers);
@@ -1692,8 +1699,8 @@ export class MarsEngine implements Engine {
   /** nav/1 read: up to `n` clear standing points spread over a polygon (2 m lattice, farthest-point order from its centre), for strolls. */
   clearSpotsV1(polygon:[number,number][],n:number):[number,number][]{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(!Array.isArray(polygon)||polygon.length<3)return [];const grid=spatial.levelAt(0,[polygon.reduce((s,v)=>s+v[0],0)/polygon.length,polygon.reduce((s,v)=>s+v[1],0)/polygon.length]);if(!grid)return [];
-    const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[];
-    for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2)if(inPoly(x,z,polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.4)cand.push([x,z]);
+    const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[],gridOf=levelGridsFor(spatial,grid);
+    for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2){if(!inPoly(x,z,polygon))continue;const g=gridOf(x,z);if(g&&clearanceAt(g,[x,z])>=HUMAN_RADIUS+.4)cand.push([x,z]);}
     if(!cand.length)return [];
     const cx=xs.reduce((a,b)=>a+b,0)/xs.length,cz=zs.reduce((a,b)=>a+b,0)/zs.length;
     const out:[number,number][]=[cand.reduce((b,p)=>hypot(p[0]-cx,p[1]-cz)<hypot(b[0]-cx,b[1]-cz)?p:b)];
