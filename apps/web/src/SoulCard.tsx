@@ -10,6 +10,7 @@ import {worldPath} from './world-path.ts';
 import {BASE} from './base-path.ts';
 import './SoulCard.css';
 import {SoulAgentMessageBox} from './AgentMessageBox.tsx';
+import {SoulTravel,VisitorFrom} from './SoulTravel.tsx';
 
 /** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
  * dot, what it is doing, Share. Everything else (last action, recent actions/events, public activity) sits in a
@@ -61,6 +62,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    {fade&&<span className="soul-status"><i style={{background:fade.colour}} aria-hidden="true"/>{fade.word}</span>}
    {doing&&<span className="soul-doing">{doing}</span>}
    {energy&&<span className="soul-energy">{energy}</span>}
+   <VisitorFrom soulId={soul.id}/>
   </p>
   {ownerAction&&<SoulAgentMessageBox api={api} soulId={soul.id}/>}
   <div className="soul-actions">
@@ -72,6 +74,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
    <span className="soul-copied" role="status" aria-live="polite">{copied==='ok'?'Link copied':copied==='failed'?'Copy unavailable':''}</span>
    <button className="soul-more" onClick={()=>setView('activity')}>Activity<span aria-hidden="true">›</span></button>
   </div>
+  {ownerAction&&<SoulTravel api={api} soulId={soul.id} name={soul.name}/>}
  </article>;
 }
 

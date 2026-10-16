@@ -1,0 +1,14 @@
+/* TRAVEL (M3): the owner's "Travel to…" on the Soul card, "Visiting from …", and the visitors line. */
+.soul-visiting{color:color-mix(in srgb,var(--fg) 78%,var(--dim))}
+.soul-travel{margin-top:12px;padding-top:10px;border-top:1px solid color-mix(in srgb,var(--fg) 10%,transparent);font-size:13.5px}
+.human-world .soul-card .soul-travel-open{display:inline-flex;align-items:center;min-height:34px;padding:6px 15px;border:1.5px solid var(--fg);border-radius:999px;background:transparent;color:var(--fg);font:600 13.5px/1 system-ui,sans-serif}
+.human-world .soul-card .soul-travel-open:hover{background:color-mix(in srgb,var(--fg) 8%,transparent)}
+.soul-travel-form{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.soul-travel-form select{width:auto;min-width:130px;max-width:100%;min-height:34px;border-radius:8px}
+.human-world .soul-card .soul-travel-form button[type=submit]{min-height:34px;padding:6px 16px;border:0;border-radius:999px;background:var(--fg);color:var(--bg);font:600 13.5px/1 system-ui,sans-serif}
+.human-world .soul-card .soul-travel-form button[type=submit]:disabled{opacity:.6}
+.human-world .soul-card .soul-travel-cancel{border:0;background:transparent;color:var(--dim);font:600 13px/1 system-ui,sans-serif;padding:6px 4px}
+.soul-travel-follow{font-weight:650;color:var(--accent);text-decoration:none;white-space:nowrap}
+.soul-travel-follow:hover{text-decoration:underline}
+.soul-travel-err{margin:8px 0 0;color:#b3261e;font-size:13px}
+.soul-visitors{margin:-4px 0 12px;font-size:13.5px}
