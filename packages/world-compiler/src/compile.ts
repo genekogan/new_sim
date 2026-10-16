@@ -357,6 +357,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const problem = admit(scratch, next, def, i, op.mode, false, world);
         if (problem) { failures.push(problem); return; }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
+        reindexDescendants(scratch, id);
         upsert(next);
         inverse.unshift({ op: 'move', id, in: prev.in, p: prev.p ?? [0, 0], r: prev.r ?? 0, s: prev.s ?? 1, ...(prev.shape ? { shape: prev.shape } : {}), mode: 'strict' });
         return;
@@ -899,6 +900,17 @@ function nudge(w: WorldModel, e: Entity, _def: StoredDef, mine: OBB[], other: OB
   const p = e.p ?? [0, 0];
   const moved = Math.hypot(s.p[0] - p[0], s.p[1] - p[p.length - 1]);
   return moved <= 6 ? [s.p[0], s.p[1]] : null;
+}
+
+/** A moved parent carries its parent-local children: re-index their solid footprints at the new world pose. Without
+ *  this, later checks in the same batch and later edits (overlap, sealed entrances) measured the children where they
+ *  stood before the move (seen turning the Mars campus: Mimos's stale furniture "blocked" the showers' door). */
+function reindexDescendants(w: WorldModel, id: string) {
+  for (const cid of w.subtree(id)) {
+    if (cid === id) continue;
+    const c = w.entities.get(cid), d = c && w.resolvedDef(c.def); if (!c || !d) continue;
+    if (d.layer === 'solid' && w.bake(d, c.params ?? {}, c.seed ?? 0, c.shape).colliders.length) w.index(cid, w.footprint(c, d));
+  }
 }
 
 /** After admission: index solids, and install any landform / water / foundation pad the entity brings. */

@@ -119,13 +119,18 @@ export function verifyPatch(snapshot,receipt,rollback=false){
 
 /** Client preflight guard plus unique group targeting. Automatic engine rows
  * may advance the sequence during a walk; any later authored edit refuses undo. */
+/** Latest authored edit that still has an effect: skips engine rows, undone edits, undo records, and add-patch pairs (a patch
+ *  group whose guarded '-rollback' removal came later), so patches can be rolled back in strict reverse order. */
+export function latestEffectiveEdit(edits){const paired=new Set(edits.filter(e=>/-rollback$/.test(e.grp??'')).flatMap(e=>[e.grp,e.grp.replace(/-rollback$/,'')]));return edits.find(e=>e.by!=='engine'&&e.kind!=='engine'&&!e.undone&&e.kind!=='undo'&&!paired.has(e.grp));}
 export function guardRollback(edits,receipt,snapshot){
  assert(Number.isInteger(receipt.appliedSeq),'receipt has no accepted patch sequence');
  if(snapshot){
   verifyPatch(snapshot,receipt);assert(receipt.appliedVersions,'post-apply versions unavailable; use --recover to verify the accepted patch first');
-  for(const [id,v]of Object.entries(receipt.appliedVersions))assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
+  // versions may only drift through later edits that have no net effect (undone, undo records, rolled-back pairs); verifyPatch above proved the exact state
+  const drift=edits.some(e=>e.seq>receipt.appliedSeq&&e.by!=='engine'&&e.kind!=='engine')&&latestEffectiveEdit(edits)?.seq===receipt.appliedSeq;
+  if(!drift)for(const [id,v]of Object.entries(receipt.appliedVersions))assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
  }
- const authored=edits.find(e=>e.by!=='engine'&&e.kind!=='engine');
+ const authored=latestEffectiveEdit(edits);
  assert(authored&&authored.seq===receipt.appliedSeq&&authored.grp===receipt.batch.group&&authored.kind==='edit'&&!authored.undone,'rollback refused: an authored edit intervened, or patch is not the latest authored edit');
  assert.equal(edits.filter(e=>e.grp===receipt.batch.group&&!e.undone&&(e.kind==='edit'||e.kind==='redo')).length,1,'rollback must target exactly one accepted patch edit');return receipt.rollback.path;
 }

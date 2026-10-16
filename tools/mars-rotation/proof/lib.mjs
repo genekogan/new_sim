@@ -1,10 +1,11 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { resolve } from 'node:path';
-import { startWorld } from '<worktrees>/lane-mars/tools/god-skill/dev-world.mjs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { startWorld } from '../../god-skill/dev-world.mjs';
 const exec = promisify(execFile);
-export const ROOT = '<worktrees>/lane-mars';
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..'); // this checkout, whichever worktree
 export const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function boot({ slug = 'mars-rot', port, template, out, noGenesis }) {
   mkdirSync(out, { recursive: true, mode: 0o700 });

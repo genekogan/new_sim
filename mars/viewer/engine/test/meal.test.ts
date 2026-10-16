@@ -414,3 +414,28 @@ test('take_item: an item out of reach behind a wall is refused item.unreachable 
   // the world set-up helper is what scenarios use too
   assert.ok(mealWorld().entities.pot.contents?.fraction === 1);
 });
+
+test('a long item put on the ground leaves room for the body that put it down, facing any way', () => {
+  // A god thing longer than any built-in item (Mars's watering can with its spout, 0.53 × 0.26 m). At the fixed 0.55 m the
+  // body overlapped it after the put (collision.human-static) and the world set the step aside, so it stayed in the hand.
+  CATALOG['test-long-can'] ??= { ...CATALOG.pot, id: 'test-long-can', label: 'test watering can', size: [0.53, 0.4, 0.26] };
+  for (let k = 0; k < 16; k++) {
+    const rt = setup({}, human('a', -6, -9.2, { yaw: (k * Math.PI) / 8 + 0.2 }));
+    inHandOf(rt, 'a', 'can', 'test-long-can', 'right');
+    const g = rt.submit('put_item', { actor: 'a', item: 'can', surfaceSlot: 'ground' });
+    assert.equal(g.status, 'executing', g.diagnostic?.message);
+    rt.runUntilIdle(100, [g.id]);
+    assert.equal(g.status, 'completed', `heading ${k}: ${g.diagnostic?.message}`);
+    assert.deepEqual(rt.world.entities.can.support, { kind: 'ground' });
+    for (let i = 0; i < 5; i++) rt.step();
+    assert.deepEqual(msgs(rt), [], `heading ${k}`);
+  }
+  // built-in items keep their exact 0.55 m (historical replay unchanged)
+  const rt = setup({}, human('b', -6, -9.2, { yaw: 0 }));
+  inHandOf(rt, 'b', 'bowlB', 'bowl', 'right');
+  const g = rt.submit('put_item', { actor: 'b', item: 'bowlB', surfaceSlot: 'ground' });
+  rt.runUntilIdle(100, [g.id]);
+  assert.equal(g.status, 'completed', g.diagnostic?.message);
+  const p = rt.world.entities.bowlB.pose.p, a = rt.world.entities.b.pose.p;
+  assert.ok(Math.abs(Math.hypot(p[0] - a[0], p[2] - a[2]) - 0.55) < 0.06, `bowl ${Math.hypot(p[0] - a[0], p[2] - a[2])} m ahead`);
+});

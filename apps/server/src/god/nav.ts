@@ -44,6 +44,8 @@ export type Thing = {
   room?: string;
   name: string;
   kind: ThingKind;
+  /** A stand-alone structure big enough to head for from anywhere nearby, like a building. */
+  big?: boolean;
   /** e.g. "a cottage", "a bench", "Living room of rose-house". */
   what: string;
   /** Words it answers to (names, def name, tags, parent's name). */
@@ -78,6 +80,7 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
 const BUILDINGS_WITHIN = 150;
+const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
 const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
@@ -210,7 +213,14 @@ export class GodNav {
       ...seats.map((x) => toWorld(x.p[0] + Math.sin(x.yaw) * 0.75, x.p[2] + Math.cos(x.yaw) * 0.75)),
       ...standSlots.map((x) => toWorld(x.p[0], x.p[2])),
     ];
-    return [{ ...base, ref, kind: seats.length ? 'seat' : 'thing', what: `${article(kind0)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}`, at: [r3(wp.x), r3(wp.z)], level, ...(stands.length ? { stands } : {}), ...(seats.length ? { seat: true } : {}) }];
+    // a big structure standing on its own (a mesh camp with no rooms: Mars's Freeside) is a landmark like a building
+    let big = false;
+    if (!parent && baked.colliders.length) { // the extent its solids cover (a camp of thin walls counts by its whole spread)
+      const r = (o: { half: number[] }) => Math.hypot(o.half[0], o.half[1]);
+      const xs = baked.colliders.flatMap((o) => [o.c[0] - r(o), o.c[0] + r(o)]), zs = baked.colliders.flatMap((o) => [o.c[1] - r(o), o.c[1] + r(o)]);
+      big = (Math.max(...xs) - Math.min(...xs)) * (Math.max(...zs) - Math.min(...zs)) * wp.s * wp.s >= BIG_THING_M2;
+    }
+    return [{ ...base, ref, kind: seats.length ? 'seat' : 'thing', what: `${article(kind0)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}`, at: [r3(wp.x), r3(wp.z)], level, ...(stands.length ? { stands } : {}), ...(seats.length ? { seat: true } : {}), ...(big ? { big } : {}) }];
   }
 
   /** Metres from a point to a thing (0 inside an area; to the line of a path; to its outline for a room). */
@@ -310,7 +320,8 @@ export class GodNav {
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
     // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
     // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
-    for (const x of ranked.slice(SHOW)) if (x.t.kind === 'building' && x.d <= BUILDINGS_WITHIN) pick.push(x);
+    // (and big stand-alone structures, so a Soul in a furnished room can still head for Freeside across the camp)
+    for (const x of ranked.slice(SHOW)) if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;

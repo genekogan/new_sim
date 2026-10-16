@@ -13,10 +13,15 @@ import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { CATALOG } from '../world/catalog.ts';
-import { CONTAINERS } from '../world/catalog-items.ts';
+import { CONTAINERS, ITEM_ASSETS } from '../world/catalog-items.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
+import { humanRadius } from '../bodies/humanoid.ts';
+/** Clear ground left between a body and a long thing it puts down (covers the grid's rasterising). */
+const PUT_CLEAR_M = 0.15;
+/** Built-in catalogue items keep the historical 0.55 m exactly (their logged puts replay unchanged). */
+const BUILT_IN_ITEMS: ReadonlySet<string> = new Set(ITEM_ASSETS.map((d) => d.id));
 import { checkStations, childrenState, walkCrew, type Children } from '../construction/children.ts';
 import { holdingDiagnostic } from '../construction/rules.ts';
 import { SIT_TRANSITION } from '../social/actions.ts';
@@ -182,6 +187,14 @@ function planTake(rt: Runtime, p: TransferParams) {
   return { ok: true as const, program: { hand, station: st, target } as TransferProgram };
 }
 
+/** Clear radius a thing needs on the ground (half its footprint diagonal). */
+export function groundPutNeed(def: string): number { const d = CATALOG[def]; return d ? Math.sqrt(d.size[0] * d.size[0] + d.size[2] * d.size[2]) / 2 : 0; }
+/** How far ahead put_item sets a thing on the ground: 0.55 m; a thing too long for that (a god-made watering can) goes far
+ *  enough out that the body that put it down stays clear of it (else collision.human-static and the step is set aside). */
+export function groundPutDistance(def: string, actor: Entity): number {
+  return BUILT_IN_ITEMS.has(def) ? 0.55 : Math.max(0.55, humanRadius(actor) + groundPutNeed(def) + PUT_CLEAR_M);
+}
+
 function planPut(rt: Runtime, p: TransferParams) {
   const a = personOf(rt, p.actor);
   if ('code' in a) return { ok: false as const, diagnostic: a };
@@ -192,13 +205,12 @@ function planPut(rt: Runtime, p: TransferParams) {
   const hand = s.hand;
   if (p.surfaceSlot === 'ground') {
     if (!STILL_ACTIVITIES.has(a.human!.activity) || a.human!.activity === 'sit') return fail('item.not-standing', `${p.actor} must be standing still to put ${it.id} on the ground (activity ${a.human!.activity})`, [p.actor, it.id]);
-    const f = rot2([0.55, 0], a.pose.yaw);
+    const d = CATALOG[it.def], need = groundPutNeed(it.def);
+    const f = rot2([groundPutDistance(it.def, a), 0], a.pose.yaw);
     const g: Vec3 = [a.pose.p[0] + f[0], a.pose.p[1], a.pose.p[2] + f[1]];
     const sp = rt.services.spatial as Spatial | undefined;
     sp?.sync(rt.world);
     const grid = sp?.level(a.human!.level);
-    const d = CATALOG[it.def];
-    const need = Math.sqrt(d.size[0] * d.size[0] + d.size[2] * d.size[2]) / 2;
     const cl = grid ? clearanceAt(grid, [g[0], g[2]]) : Infinity;
     if (cl < need) return fail('item.no-room', `no room for ${it.id} on the ground in front of ${p.actor} at (${g[0].toFixed(2)}, ${g[2].toFixed(2)}): ${cl.toFixed(2)} m clear, needs ${need.toFixed(2)} m`, [p.actor, it.id], { at: g });
     const gl = d.handling!.grips[1][0].local, go = rot2([gl[0], gl[2]], a.pose.yaw); // grip offset, world
