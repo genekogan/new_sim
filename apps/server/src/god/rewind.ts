@@ -74,10 +74,11 @@ export function rewindDependents(build: string, to: number, model: WorldModel, a
     if (!hits.length) continue;
     const [first] = hits, on = Math.min(...first.t.map(x => x.seq)), step = first.t.find(x => x.seq === on)!.n, keep = Math.max(...hits.flatMap(h => h.t.map(x => x.n)));
     const who = ours(r.grp) ? `kept edit ${r.seq} of this build (${r.grp})` : `edit ${r.seq} (${r.grp ? `group ${r.grp}` : 'ungrouped'})`;
-    const undo = r.grp ? `undo --group ${r.grp}` : '`undo` while it is the newest edit';
+    // An undo row is reversed by redo; group undo only reverts edits and redos.
+    const remedy = r.kind === 'undo' ? `redo edit ${r.undo_of} first (\`redo\` while undo ${r.seq} is the newest undo)` : `undo edit ${r.seq} first (${r.grp ? `undo --group ${r.grp}` : '`undo` while it is the newest edit'})`;
     failures.push({ op: -1, code: 'build.depends', field: 'to', ...(first.id === '#world' ? {} : { entity: first.id }),
       detail: `${who} changed ${path(first.id)} after edit ${on} (step ${step}); rewinding to step ${to} would ${verb(first.id)} it${hits.length > 1 ? ` (and ${hits.length - 1} more thing(s) it touched)` : ''}.`,
-      fix: `${keep > to ? `Rewind to step ${keep} or later, or ` : ''}${keep > to ? 'u' : 'U'}ndo edit ${r.seq} first (${undo}), then retry.`,
+      fix: keep > to ? `Rewind to step ${keep} or later, or ${remedy}, then retry.` : `${remedy[0].toUpperCase()}${remedy.slice(1)}, then retry.`,
       measured: { seq: r.seq, group: r.grp, kind: r.kind, dependsOn: on, things: hits.length }, ...(keep > to ? { limit: { to: keep } } : {}) });
   }
   const resident = new Set<string>();

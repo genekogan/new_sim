@@ -143,7 +143,7 @@ test('Y5: an outside undo of an edit made before a reverted edit refuses; the re
   const undone = f.god.undoGroup('misc'); assert.equal(undone.accepted, true); assert.ok(f.god.model.get('oak'), 'the outside undo restored the first name');
   const before = f.state(), r = await f.rewind({ to: 3 });
   assert.equal(code(r), 'build.depends'); assert.equal(f.state(), before);
-  assert.equal(r.failures[0].measured.kind, 'undo'); assert.equal(r.failures[0].measured.dependsOn > early, true); assert.match(r.failures[0].fix, /undo --group misc/);
+  assert.equal(r.failures[0].measured.kind, 'undo'); assert.equal(r.failures[0].measured.dependsOn > early, true); assert.match(r.failures[0].fix, new RegExp(`redo edit ${early} first \\(\`redo\` while undo \\d+ is the newest undo\\)`));
 });
 
 test('Y5: a kept later edit of the build that builds on rewound work refuses with the subgroup to undo', async t => {
