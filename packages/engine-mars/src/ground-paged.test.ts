@@ -50,3 +50,37 @@ test('paged: a snapshot taken mid far-walk restores and continues identically', 
   assert.deepEqual(b.world.entities.h_ana.pose.p, a.world.entities.h_ana.pose.p);
   assert.equal(b.stateHash(), a.stateHash());
 });
+
+// A god world on the empty plain (the launcher's "Empty plain"): no bodies and no obstacle fixtures, so nothing but the
+// world-edit changes. A new floor height re-bases the planner (refreshForWorld); the windows it already faced must be
+// rebuilt with the new level and the new walls, not kept from before (release 1.1: every upper floor of a lighthouse and
+// a cottage had "no standing room" until the world restarted, and the ground-floor walls were not there either).
+test('paged: a world-edit that adds an upper floor to an empty world rebuilds the faced windows (floor standable, walls solid)', async () => {
+  const { nextEntityPhysics } = await import('./entity-physics.ts');
+  type Ev = Parameters<typeof nextEntityPhysics>[1];
+  const e = factory.create(factory.genesis('empty-plain')) as never as Eng & {
+    applyWorldEditV1(ev: Ev): { hash: string }; standableNearV1(at: [number, number], level?: number, except?: string, minClear?: number, maxRing?: number): [number, number] | null;
+    reachV1(a: { p: [number, number]; level?: number }, b: { p: [number, number]; level?: number }): { ok: boolean; code?: string; message?: string };
+  };
+  e.installGroundV1(groundFact(emptyGround(1000), 1, { paged: true }));
+  assert.equal(Object.keys(e.world.entities).length, 0, 'an empty plain');
+  assert.equal(e.standableNearV1([20, 30], 0, undefined, 0.4, 0)?.join(), '20,30', 'the window is faced before the edit');
+  const [cx, cz] = [20, 30];
+  const wall = (id: string, c: [number, number], half: [number, number]) => ({ id, obb: { c, half, yaw: 0 }, y0: 0, y1: 5.6, kind: 'fixture' as const, label: 'house wall' });
+  const set: Ev['set'] = { e_house1: {
+    surfaces: [{ id: 'house:floor-1', level: 1, y: 2.85, obb: { c: [cx, cz], half: [3.9, 2.9], yaw: 0 } }],
+    solids: [wall('house:n', [cx, cz - 3], [4, 0.11]), wall('house:e', [cx + 4, cz], [0.11, 3]), wall('house:w', [cx - 4, cz], [0.11, 3]), wall('house:s1', [cx - 2.275, cz + 3], [1.725, 0.11]), wall('house:s2', [cx + 2.275, cz + 3], [1.725, 0.11])],
+    links: [{ id: 'house:stairs', kind: 'stairs', from: { level: 0, p: [cx + 3.2, cz + 1.6], y: 0 }, to: { level: 1, p: [cx + 3.2, cz - 1.6], y: 2.85 }, width: 1.1, heading: -Math.PI / 2, path: Array.from({ length: 17 }, (_, i) => [cx + 3.2, (2.85 * i) / 16, cz + 1.6 - (3.2 * i) / 16] as [number, number, number]), usable: true }],
+  } };
+  const ev: Ev = { contract: 'world-edit/1', seq: 1, hash: '', levels: [{ id: 1, y: 2.85, label: 'floor at 2.85 m' }], set, assets: {} };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  assert.equal(e.applyWorldEditV1(ev).hash, ev.hash);
+  // the same answers as a world restored from a snapshot (which builds its windows fresh)
+  const fresh = factory.restore(e.snapshot()) as never as typeof e;
+  for (const w of [e, fresh]) {
+    assert.ok(w.standableNearV1([cx - 2, cz - 1], 1, undefined, 0.4, 40), 'standing room on the new upper floor');
+    assert.equal(w.standableNearV1([cx, cz - 3], 0, undefined, 0.4, 0), null, 'the north wall is solid on the ground');
+    const up = w.reachV1({ p: [cx, cz + 8] }, { p: [cx - 2, cz - 1], level: 1 });
+    assert.equal(up.ok, true, JSON.stringify(up));
+  }
+});

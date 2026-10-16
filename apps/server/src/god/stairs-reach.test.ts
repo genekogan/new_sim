@@ -12,14 +12,17 @@ import {fixture, factory} from '../../test/native-owner-fixture.ts';
 import {EdgeLedger} from '../edge/ledger/ledger.ts';
 import {GodMode} from './god.ts';
 import {installEngineBridge, helixEnds} from './engine-bridge.ts';
+import {GroundHost} from './ground-host.ts';
 import {VerifyUse} from './verify-use.ts';
 import {runQuery, type WalkReport} from './query.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-function world(t: TestContext) {
+/** `ground`: the world stands on its ground recipe (paged navigation), as every launcher world does (main.ts GroundHost). */
+function world(t: TestContext, {ground = false} = {}) {
   const w = fixture(':memory:', factory, {durableClockV1: true});
   w.brain.quiesce();
   const god = new GodMode(w.db, {worldId: w.host.worldId, ownerId: 'owner', tick: () => w.host.engine.world.tick, emit() {}});
+  if (ground) new GroundHost(w.db, w.host, god);
   const edge = new EdgeLedger(w.host, w.db), bridge = installEngineBridge({host: w.host, god, edge, log() {}, worldClock: false, worldLore: false});
   const verify = new VerifyUse(w.host, w.souls, god, edge);
   t.after(() => {w.brain.quiesce(); w.host.stop(); edge.comms?.close(); w.db.close();});
@@ -85,6 +88,24 @@ test('taller towers, turned and off the grid: every room of 2 to 6 floors walks 
     const d = w.describe(x.name);
     assert.ok(designSaysReachable(d, x.floors), `${x.name}: ${d.notes.join(' | ')}`);
     assert.ok(walkable(d.walk, x.floors), `${x.name} (${x.def}, ${x.floors} floors, yaw ${x.yaw}): ${JSON.stringify(d.walk)}`);
+  }
+});
+
+// Release 1.1 walk (world release-check-1015, launcher "+ New world", template "Empty plain"): every upper floor of a
+// 4-floor lighthouse and a 2-floor cottage had "no standing room" (walk: NOT WALKABLE, reach.bad-to / bad-from) until the
+// world restarted. An empty world on paged ground has no static entities, so the planner kept its pre-edit windows when a
+// new floor height re-based it (mars/viewer/engine/spatial/service.ts syncPaged). Each building in its own edit, as the god does.
+test('an empty plain on its ground (a new launcher world): a lighthouse and a cottage placed one by one walk on every floor', {timeout: 60_000}, async t => {
+  const w = world(t, {ground: true}); await w.settle(2);
+  assert.ok((w.host.engine as any).rt.services.spatial.ground?.paged, 'paged ground, as on /worlds');
+  for (const [name, def, floors, p] of [['lighthouse', 'core/lighthouse@1', 4, [24, 30]], ['cottage', 'core/cottage@1', 2, [24, 41]]] as const) {
+    assert.equal((w.god.act({ops: [{op: 'place', def, name, p: [...p], params: {floors}}]}) as any).accepted, true);
+    await w.settle();
+    const d = w.describe(name), rooms = d.rooms.length;
+    assert.ok(rooms > floors - 1 && walkable(d.walk, rooms), `${name}: ${JSON.stringify(d.walk)}`);
+    const top = d.rooms.at(-1);
+    const up = runQuery(w.god.model, {reach: {from: d.walk.from, to: `${name}:${top.id}`}}).reach as any;
+    assert.equal(up.reachable, true, `${name} ${top.id} (floor ${top.floor}): ${JSON.stringify(up)}`);
   }
 });
 
