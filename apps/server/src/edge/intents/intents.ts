@@ -22,6 +22,7 @@ export type Resolution =
   | {ok: true; kind: 'attention'; capability: string; gaze: Gaze; yaw?: number; chosen: Chosen}
   | {ok: true; kind: 'setting'; capability: string; apply: () => void; chosen: Chosen}
   | {ok: false; code: string; reason: string; did_you_mean?: {id: string; label: string}[];resolvedIfName?:{input:string;placeId:string;name:string};ambiguous?:string[]};
+import {classWords} from './class-words.ts';
 export type IntentInput = {verb?: unknown; target?: unknown; params?: unknown; clientRef?: unknown; [k: string]: unknown};
 type Refused = {accepted: false; code: string; reason: string; capability: string; did_you_mean?: {id: string; label: string}[];resolvedIfName?:{input:string;placeId:string;name:string};ambiguous?:string[]};
 
@@ -335,6 +336,7 @@ export class Intents {
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
       const plain = attentionWords(asked); if (plain) return this.dryRun(soul, plain);
+      const cls = classWords(asked, this.L.places.byId.values()); if (cls) return this.dryRun(soul, cls);
       const strict = strictCheck(this.L, soul, asked, caps); if (strict) return {ok: false, ...strict};
       // quality cases 21/28: resolve reads social phrasing exactly as act does ("ride the balloon with X" invites X; "hug X")
       const social = caps.some(c => c.id === asked) ? null : this.L.together.resolve(soul, asked, caps);
