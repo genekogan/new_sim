@@ -65,7 +65,7 @@ import { newWorld } from './world-kind.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
-import { WorldWaterDetail } from './WorldWaterDetail.ts';
+import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
 import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { setFleeSources } from './gen-mesh/motion.ts';
@@ -796,7 +796,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       ring.visible = !!focus;
       if (!following) {followed = null;followView.reset();followMotion.reset();followTick=null;followEpoch=null;}
       if (focus) {
-        ring.position.set(focus.x, (thingId?.startsWith('kin:') ? 0 : focus.y) + 0.03, focus.z);
+        ring.position.set(focus.x, markHeight(waterDetail.regions, focus.x, thingId?.startsWith('kin:') ? 0 : focus.y, focus.z) + 0.03, focus.z);  // on the water around a swimmer
         if (following) {
           const target = new THREE.Vector3(focus.x, (thingId?.startsWith('kin:') ? 0 : focus.y) + 1, focus.z);
           const offset = camera.position.clone().sub(controls.target);
@@ -929,7 +929,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     // click (not drag) to select a Soul, a thing, or a kin
     const inspectHover=(t:HoverTarget)=>{if(t.kind==='soul'){setPlaceCard(null);context.current.setThing(null);context.current.onSelect(t.id);}else if(t.kind==='object'){setPlaceCard(null);context.current.onSelect(null);context.current.setThing(t.id);}else setPlaceCard(t);};
-    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[entityLayer.sites.group,floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const site=entityLayer.sites.hoverTarget(id);if(site)return site;const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul)return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>(entityLayer.active||drawnTick.current!==null)&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
+    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[entityLayer.sites.group,floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const site=entityLayer.sites.hoverTarget(id);if(site)return site;const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul){const q=shown.current.entities[id]?.p??[0,0,0];return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(q[0],markHeight(waterDetail.regions,q[0],q[1],q[2]),q[2]),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};}const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>(entityLayer.active||drawnTick.current!==null)&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
     const onDown = (e: PointerEvent) => { groupSelection.clear(); orbitPivot.cancel(); down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; };
     const onMove = (e: PointerEvent) => {
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) context.current.setCameraMode(cameraModeAfterGesture(context.current.cameraMode));

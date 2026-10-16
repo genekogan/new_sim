@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
 import {waterMaterial,waterMesh} from './gen-mesh/water.ts';
-import {WorldWaterDetail,WATER_DETAIL,SWIMMERS,findWaterRegions,patchUnderwaterBody,patchWaterSurface,waterUnder} from './WorldWaterDetail.ts';
+import {WorldWaterDetail,WATER_DETAIL,SWIMMERS,findWaterRegions,patchUnderwaterBody,patchWaterSurface,waterUnder,markHeight} from './WorldWaterDetail.ts';
 
 const row=[-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.5,-3.2,-2.9,-2.6,-2.3,-2,-1.87,-1.74,-1.6099999999999999,-1.48,-1.35,-1.22,-1.0899999999999999,-0.96,-0.8300000000000001,-0.7,-0.5700000000000001,-0.43999999999999995,-0.31000000000000005,-0.17999999999999994,-0.050000000000000044,0,0,0];
 const shore=()=>createConnectedNativeShore({id:'commons-shore-terrain/1',diagonal:'min-min/max-max',originXZ:[-62,-12],spacingMetres:1,columns:35,rows:25,heightMetres:Array.from({length:25},()=>[...row])},{id:'commons-shore-water/1',datumY:-2,wetBoundsXZ:[-62,-12,-46,12]});
@@ -73,4 +73,12 @@ void test('swimmers: only recorded contact makes ripples; fixed slots; same disp
  // nobody in the water: every slot empty
  w.update(scene,camera,[souls[1]],103,1,4);assert.equal(w.stats.swimmers,0);assert.ok(meta.every(v=>v.z===0));
  o.dispose();
+});
+
+void test('selection ring height: on the water surface over a swimmer whose root is under it, else the point itself',()=>{
+ const regions=[{minX:0,minZ:0,maxX:10,maxZ:10,level:-2}];
+ assert.equal(markHeight(regions,5,-3.2,5),-2);   // a duck's root 1.2 m under the surface: the ring lies on the water
+ assert.equal(markHeight(regions,5,-1.5,5),-1.5); // on the bank above the water
+ assert.equal(markHeight(regions,12,-3.2,5),-3.2);// outside the water
+ assert.equal(markHeight([],5,-3.2,5),-3.2);      // ?water=0 scans no regions: unchanged
 });
