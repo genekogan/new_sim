@@ -99,7 +99,7 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync5, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync5, existsSync as existsSync5, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
 // lib/mirror.mjs
@@ -1754,6 +1754,75 @@ var LAYERS_BOOLS = ["clear", "private", "public", "off"];
 var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
+// lib/governance.mjs
+import { existsSync as existsSync4, readFileSync as readFileSync4 } from "node:fs";
+var clip = (s, n) => {
+  const t = String(s ?? "").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1) + "\u2026" : t;
+};
+var when = (ms) => ms ? new Date(ms).toISOString().slice(0, 16).replace("T", " ") : "";
+var switchLine = (g) => `residents decide: ${g.residentsDecide ? `ON (an amendment passes with ${g.needed} of ${g.residents} active residents)` : `off (you decide; on would need ${g.needed} of ${g.residents} active residents)`}`;
+function amendmentLines(a) {
+  const tags = [`support ${a.support}${a.activeSupport !== a.support ? ` (${a.activeSupport} active)` : ""}`, a.replacesWholeText ? "replaces the whole text" : "", a.stale ? `written for v${a.baseVersion}` : ""].filter(Boolean);
+  const head = `- ${a.id} \u201C${a.title}\u201D by ${a.by?.name ?? "?"} \xB7 ${a.status === "open" ? tags.join(" \xB7 ") : `${a.status}${a.decided?.version ? ` \u2192 v${a.decided.version}` : ""}${a.decided?.by ? ` by ${a.decided.by}` : ""}`}`;
+  const out = [head, `    ${clip(a.text, 300)}`];
+  if (a.supporters?.length > 1) out.push(`    supporters: ${a.supporters.join(", ")}`);
+  if (a.status !== "open" && a.decided?.reason) out.push(`    reason: ${clip(a.decided.reason, 200)}`);
+  return out;
+}
+function amendmentsText(g) {
+  const open = g.amendments.filter((a) => a.status === "open");
+  const lines = [`constitution v${g.version} \xB7 ${open.length} open amendment${open.length === 1 ? "" : "s"} \xB7 ${switchLine(g)}`];
+  for (const a of g.amendments) lines.push(...amendmentLines(a));
+  if (open.length) lines.push(`decide: decide <id> accept [--text <md|file>]  \xB7  decide <id> decline --reason "<why>"`);
+  else if (!g.amendments.length) lines.push("no amendments yet (residents propose them; amendments --all shows decided ones)");
+  return lines.join("\n");
+}
+function governanceText(g) {
+  const p = g.prayers ?? { total: 0, answered: 0, waiting: 0 };
+  const lines = [`constitution v${g.version} \xB7 ${switchLine(g)}`, `prayers: ${p.waiting} waiting, ${p.answered} answered (${p.total} in all)`, `amendments open: ${g.amendments.filter((a) => a.status === "open").length}`];
+  if (g.history?.length) {
+    lines.push("versions:");
+    for (const v of g.history) lines.push(`  v${v.version} ${when(v.at)} by ${v.by}${v.note ? ` \u2014 ${clip(v.note, 120)}` : ""}`);
+  }
+  return lines.join("\n");
+}
+async function amendments(f = {}) {
+  const g = ok(await call(`/v1/god/amendments${f.all ? "?all=1" : ""}`), "amendments");
+  return f.json ? g : amendmentsText(g);
+}
+function decideBody(id, decision, f = {}) {
+  if (!id || !/^am_[a-z0-9]+$/i.test(id) || !["accept", "decline"].includes(decision)) throw new Error('usage: decide <amendment id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>"');
+  const reason = typeof f.reason === "string" ? f.reason.trim() : "";
+  if (f.reason !== void 0 && typeof f.reason !== "string") throw new Error("--reason needs one text");
+  if (decision === "decline" && !reason) throw new Error('decline needs --reason "<why>" (the residents read it)');
+  if (decision === "decline" && f.text !== void 0) throw new Error("--text is only for accept (your own wording of the new constitution)");
+  let text;
+  if (f.text !== void 0) {
+    if (typeof f.text !== "string" || !f.text.trim()) throw new Error("--text needs the new constitution (markdown, or a file holding it)");
+    text = existsSync4(f.text) && !f.text.includes("\n") ? readFileSync4(f.text, "utf8") : f.text;
+  }
+  return { decision, ...reason ? { reason } : {}, ...text !== void 0 ? { text } : {} };
+}
+async function decide(id, decision, f = {}) {
+  const r = ok(await call(`/v1/god/amendments/${encodeURIComponent(id)}/decide`, { body: decideBody(id, decision, f) }), "decide");
+  if (f.json) return r;
+  const a = r.amendment;
+  return a.status === "accepted" ? `accepted ${a.id} \u201C${a.title}\u201D: the constitution is now version ${r.version} (the proposer and supporters are told)` : `declined ${a.id} \u201C${a.title}\u201D: ${a.decided?.reason ?? ""}`;
+}
+async function governance(f = {}) {
+  let g;
+  if (f["residents-decide"] !== void 0) {
+    const v = String(f["residents-decide"]).toLowerCase();
+    if (!["on", "off"].includes(v)) throw new Error("--residents-decide takes on or off");
+    g = ok(await call("/v1/god/governance", { body: { residentsDecide: v === "on" } }), "governance");
+  } else g = ok(await call("/v1/god/governance"), "governance");
+  return f.json ? g : governanceText(g);
+}
+var GOV_FLAGS = { amendments: "all", decide: "reason text", governance: "residents-decide" };
+var GOV_POS = { amendments: 0, decide: 2, governance: 0 };
+var GOV_HELP = `govern: amendments [--all] \xB7 decide <id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>" \xB7 governance [--residents-decide on|off] (off by default)`;
+
 // cli.mjs
 var SELF = (() => {
   try {
@@ -2525,7 +2594,7 @@ async function exportWorld(file, flags2 = {}) {
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
 async function importWorld(file, flags2 = {}) {
-  const g = JSON.parse(readFileSync4(file, "utf8"));
+  const g = JSON.parse(readFileSync5(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
   const out = [];
   const s = await snapshot();
@@ -2545,7 +2614,7 @@ async function importWorld(file, flags2 = {}) {
   return out.join("\n");
 }
 async function define(json2) {
-  const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
+  const def = typeof json2 === "string" ? JSON.parse(existsSync5(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -2554,7 +2623,7 @@ async function define(json2) {
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function defineKit(json2, flags2 = {}) {
-  const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
+  const k = typeof json2 === "string" ? JSON.parse(existsSync5(json2) ? readFileSync5(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   const similar = ok(await call(`/v1/god/defs?q=${encodeURIComponent(k.name.replace(/[-_.]/g, " "))}`), "defs").defs.slice(0, 5).map((d) => d.ref.replace(/^core-/, "core/"));
   const ext = (sh) => {
@@ -2683,9 +2752,10 @@ var FLAGS = {
   find: "category has tag all",
   recommend: "per",
   taxonomy: "",
-  ...LAYERS_FLAGS
+  ...LAYERS_FLAGS,
+  ...GOV_FLAGS
 };
-var POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { ...LAYERS_POS, ...GOV_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -2703,7 +2773,7 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
-var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync4(r[0], "utf8") : r[0] : readFileSync4(0, "utf8");
+var readArg = (r) => r[0] !== void 0 ? existsSync5(r[0]) && !r[0].trim().startsWith("{") ? readFileSync5(r[0], "utf8") : r[0] : readFileSync5(0, "utf8");
 var COMMANDS = {
   register: (r, f) => register(r[0], r[1] ?? f.identity),
   pair: (r) => pair(r[0]),
@@ -2780,6 +2850,9 @@ var COMMANDS = {
   "zone-suggest": (r) => zoneSuggest(r[0]),
   relate: (r, f) => relate(r[0], r[1], r[2], f),
   layers: (r, f) => layers(f),
+  amendments: (r, f) => amendments(f),
+  decide: (r, f) => decide(r[0], r[1], f),
+  governance: (r, f) => governance(f),
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
@@ -2794,6 +2867,7 @@ pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
 ${LAYERS_HELP}
+${GOV_HELP}
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
