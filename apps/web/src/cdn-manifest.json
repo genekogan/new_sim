@@ -1825,5 +1825,149 @@
       "bytes": 39576,
       "licence": "CC0-1.0"
     }
+  },
+  "worlds": {
+    "/w/mars": {
+      "/browser/campus.glb?v=20260922b": {
+        "key": "assets/w/mars/675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4.glb",
+        "sha256": "675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4",
+        "bytes": 70772556,
+        "licence": "world-scoped"
+      },
+      "/blobs/assets/64/64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034.glb": {
+        "key": "assets/w/mars/64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034.glb",
+        "sha256": "64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034",
+        "bytes": 41803240,
+        "licence": "world-scoped"
+      }
+    },
+    "/w/littlemartians": {
+      "/world-assets/littlemartians/characters/verdelis.glb": {
+        "key": "assets/w/littlemartians/881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa.glb",
+        "sha256": "881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa",
+        "bytes": 2076432,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kalama.glb": {
+        "key": "assets/w/littlemartians/753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73.glb",
+        "sha256": "753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73",
+        "bytes": 1386044,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kweku.glb": {
+        "key": "assets/w/littlemartians/9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5.glb",
+        "sha256": "9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5",
+        "bytes": 1014384,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/mycos.glb": {
+        "key": "assets/w/littlemartians/411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf.glb",
+        "sha256": "411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf",
+        "bytes": 939644,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/ada.glb": {
+        "key": "assets/w/littlemartians/d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c.glb",
+        "sha256": "d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c",
+        "bytes": 952780,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/shuijing.glb": {
+        "key": "assets/w/littlemartians/b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c.glb",
+        "sha256": "b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c",
+        "bytes": 916388,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/nyx.glb": {
+        "key": "assets/w/littlemartians/ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb.glb",
+        "sha256": "ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb",
+        "bytes": 1041840,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/green-patterns-blue.glb": {
+        "key": "assets/w/littlemartians/261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb.glb",
+        "sha256": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+        "bytes": 927776,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/green-patterns-blue.glb": {
+        "key": "assets/w/littlemartians/261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb.glb",
+        "sha256": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+        "bytes": 927776,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/chebel.glb": {
+        "key": "assets/w/littlemartians/eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a.glb",
+        "sha256": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+        "bytes": 759124,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/chebel.glb": {
+        "key": "assets/w/littlemartians/eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a.glb",
+        "sha256": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+        "bytes": 759124,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/colors-lemuet.glb": {
+        "key": "assets/w/littlemartians/0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b.glb",
+        "sha256": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+        "bytes": 1148980,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/colors-lemuet.glb": {
+        "key": "assets/w/littlemartians/0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b.glb",
+        "sha256": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+        "bytes": 1148980,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/crystal-freeman.glb": {
+        "key": "assets/w/littlemartians/e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae.glb",
+        "sha256": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+        "bytes": 892012,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/crystal-freeman.glb": {
+        "key": "assets/w/littlemartians/e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae.glb",
+        "sha256": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+        "bytes": 892012,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/dark-blue.glb": {
+        "key": "assets/w/littlemartians/5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9.glb",
+        "sha256": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+        "bytes": 1101080,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/dark-blue.glb": {
+        "key": "assets/w/littlemartians/5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9.glb",
+        "sha256": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+        "bytes": 1101080,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/kin/green-brains-out.glb": {
+        "key": "assets/w/littlemartians/c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb.glb",
+        "sha256": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+        "bytes": 1107956,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/characters/green-brains-out.glb": {
+        "key": "assets/w/littlemartians/c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb.glb",
+        "sha256": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+        "bytes": 1107956,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/buildings/ceramic-tower.glb": {
+        "key": "assets/w/littlemartians/658f17cb0d2fd323c194f30f1a1c7f0150d5a68f5401bdb03732516751517875.glb",
+        "sha256": "658f17cb0d2fd323c194f30f1a1c7f0150d5a68f5401bdb03732516751517875",
+        "bytes": 1093356,
+        "licence": "world-scoped"
+      },
+      "/world-assets/littlemartians/buildings/minaret-temple.glb": {
+        "key": "assets/w/littlemartians/78446d149b6d4ef4156b9ee90c4fb046e9c0c7275ef4e88dc3154b9450d15ac7.glb",
+        "sha256": "78446d149b6d4ef4156b9ee90c4fb046e9c0c7275ef4e88dc3154b9450d15ac7",
+        "bytes": 830800,
+        "licence": "world-scoped"
+      }
+    }
   }
 }
