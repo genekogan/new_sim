@@ -113,3 +113,30 @@ export async function runLegacyLookMaintenance(host:WorldHost,db:Db,ledger:Ledge
   if (!['0','1'].includes(env.LEGACY_LOOKS_SOCIAL_PRESETS??'')) throw Error('legacy-looks.explicit-viewer-palette-required');
   return migrateLegacyLooks(host,db,ledger,{dryRun:mode==='plan',socialPresets:env.LEGACY_LOOKS_SOCIAL_PRESETS==='1'});
 }
+
+/** The per-world one-shot maintenance file `<DATA_DIR>/legacy-looks.env`, for worlds run by the world launcher (whose
+ *  children's environment the operator cannot set per world). Only LEGACY_LOOKS_MODE and LEGACY_LOOKS_SOCIAL_PRESETS are
+ *  read from it; the process environment wins when it sets LEGACY_LOOKS_MODE. */
+export const LEGACY_LOOKS_FILE='legacy-looks.env';
+export function legacyLooksOptions(dataDir:string|undefined,env:Record<string,string|undefined>,read:(f:string)=>string|null):{options:Record<string,string|undefined>;file:string|null}{
+  if (env.LEGACY_LOOKS_MODE) return {options:{LEGACY_LOOKS_MODE:env.LEGACY_LOOKS_MODE,LEGACY_LOOKS_SOCIAL_PRESETS:env.LEGACY_LOOKS_SOCIAL_PRESETS},file:null};
+  if (!dataDir) return {options:{},file:null};
+  const file=dataDir.replace(/\/$/,'')+'/'+LEGACY_LOOKS_FILE,text=read(file);if (text===null) return {options:{},file:null};
+  const options:Record<string,string>={};
+  for (const raw of text.split('\n')) {const line=raw.trim();if (!line||line.startsWith('#')) continue;const m=line.match(/^(LEGACY_LOOKS_MODE|LEGACY_LOOKS_SOCIAL_PRESETS)=([a-z0-9-]+)$/);if (!m) throw Error('legacy-looks.env: only LEGACY_LOOKS_MODE and LEGACY_LOOKS_SOCIAL_PRESETS lines are allowed');options[m[1]]=m[2];}
+  return {options,file};
+}
+/** Boot hook shared by main.ts and the old-world servers: runs the requested mode once, prints `[legacy-looks] <json>`,
+ *  writes `<DATA_DIR>/legacy-looks-<mode>-<time>.json`, and renames a maintenance file it ran from to
+ *  `legacy-looks.env.done-<mode>-<time>` (an apply that deferred residents keeps the file, so the next boot retries them). */
+export async function legacyLookBootHook(host:WorldHost,db:Db,ledger:Ledger|undefined,dataDir:string|undefined,env:Record<string,string|undefined>,log:(line:string)=>void=console.log){
+  const fs=await import('node:fs');
+  const {options,file}=legacyLooksOptions(dataDir,env,f=>{try{return fs.readFileSync(f,'utf8');}catch{return null;}});
+  if (!options.LEGACY_LOOKS_MODE) return null;
+  const result=await runLegacyLookMaintenance(host,db,ledger,options) as {deferred?:unknown[]}|undefined;
+  log('[legacy-looks] '+JSON.stringify(result));
+  const at=new Date().toISOString().replace(/[:.]/g,'-'),mode=options.LEGACY_LOOKS_MODE;
+  if (dataDir) {try{fs.writeFileSync(dataDir.replace(/\/$/,'')+`/legacy-looks-${mode}-${at}.json`,JSON.stringify({mode,socialPresets:options.LEGACY_LOOKS_SOCIAL_PRESETS??null,worldId:host.worldId,result},null,1));}catch(e){log('[legacy-looks] result file not written: '+(e as Error).message);}}
+  if (file&&!((mode==='apply'||mode==='rollback')&&(result?.deferred?.length??0)>0)) fs.renameSync(file,file+`.done-${mode}-${at}`);
+  return result;
+}
