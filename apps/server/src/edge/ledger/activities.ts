@@ -43,7 +43,7 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
   // R5 group life: done together at shared places (see Spot.together); the verdict says when nobody came
   'tell-story': {seconds: 240, label: 'Tell a story to the circle'}, 'hear-story': {pose: 'listen', seconds: 240, label: 'Listen to the storyteller'},
   'book-club': {pose: 'read', prop: 'book', seconds: 600, label: 'Book club: read and talk it over together'},
-  'cook-together': {pose: 'cook', prop: 'tool', seconds: 300, label: 'Cook together at a preparation table'},
+  'cook-together': {pose: 'cook', prop: 'spoon', seconds: 300, label: 'Cook together at a preparation table'},
   'social-dance': {pose: 'dance', seconds: 180, label: 'Dance on the bandstand'}, 'yoga-class': {pose: 'yoga', seconds: 600, label: 'Join the yoga class'},
   'play-frisbee': {seconds: 300, label: 'Throw a frisbee'}, 'play-petanque': {seconds: 600, label: 'Play pétanque'}, 'play-volleyball': {seconds: 300, label: 'Play beach volleyball'},
 };

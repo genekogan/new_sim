@@ -16,7 +16,7 @@ export const FACE_DOWN: ReadonlySet<string> = new Set(['pushups']);
 export const CYCLES: ReadonlySet<string> = new Set(['dance', 'jumping-jacks', 'jump', 'stretch', 'yoga', 'pull-ups', 'dips', 'lift-weights', 'play-volleyball', 'play-frisbee', 'play-petanque']);
 /** Seat height used for sitting on the ground (pelvis on the grass). */
 export const GROUND_SEAT = 0.04;
-export const PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'boule', 'dumbbell', 'rod', 'bread', 'guitar', 'bass', 'violin', 'viola', 'cello', 'flute', 'drumsticks'] as const;
+export const PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'boule', 'dumbbell', 'rod', 'bread', 'spoon', 'guitar', 'bass', 'violin', 'viola', 'cello', 'flute', 'drumsticks'] as const;
 export type PropKind = (typeof PROPS)[number];
 const DEFAULT_PROP: Record<string, PropKind> = { read: 'book', browse: 'book', write: 'pen', paint: 'brush', eat: 'plate', drink: 'cup', cook: 'tool', 'play-game': 'cards', craft: 'tool', 'post-letter': 'letter', fish: 'rod', feed: 'bread', garden: 'tool', picnic: 'food' };
 
@@ -231,6 +231,8 @@ export function makeProp(kind: PropKind): THREE.Group {
     case 'brush': g.add(part(k.cyl, M.wood, 0.008, 0.26, 0.008, 0.06, 0.06, 0, -0.9)); g.add(part(k.cyl, M.paint, 0.012, 0.04, 0.012, 0.16, 0.13, 0, -0.9)); break;
     case 'pen': g.add(part(k.cyl, M.metal, 0.006, 0.15, 0.006, 0.02, 0.03, 0, -0.6)); break;
     case 'letter': g.add(part(k.box, M.card, 0.005, 0.12, 0.22, 0.06, 0.02, 0)); g.add(part(k.box, M.red, 0.007, 0.02, 0.02, 0.063, 0.02, 0)); break;
+    case 'spoon': // a long wooden stirring spoon, bowl down
+      g.add(part(k.cyl, M.wood, 0.01, 0.34, 0.01, 0.12, -0.02, 0, -1.2)); g.add(part(k.sphere, M.wood, 0.035, 0.012, 0.025, 0.27, -0.08, 0)); break;
     case 'tool': g.add(part(k.cyl, M.wood, 0.014, 0.24, 0.014, 0.05, 0.04, 0, -0.7)); g.add(part(k.box, M.metal, 0.05, 0.05, 0.1, 0.13, 0.12, 0)); break;
     case 'cards': for (let i = -1; i <= 1; i++) g.add(part(k.box, M.card, 0.004, 0.11, 0.075, 0, 0.02, i * 0.03, 0, i * 0.25)); break;
     case 'flower': // a stem with leaves and a bloom of petals, held upright
