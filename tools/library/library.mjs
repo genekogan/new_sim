@@ -15,7 +15,7 @@
 // item and its dependencies, then place it).
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { SharedLibrary, LibraryError } from '../../packages/catalog/src/library.ts';
+import { SharedLibrary, LibraryError } from '../../packages/library/src/index.ts';
 
 const argv = process.argv.slice(2), cmd = argv[0], flags = {}, pos = [];
 for (let i = 1; i < argv.length; i++) { const a = argv[i]; if (a.startsWith('--')) { const k = a.slice(2); const v = argv[i + 1] !== undefined && !argv[i + 1].startsWith('--') ? argv[++i] : true; flags[k] = v; } else pos.push(a); }

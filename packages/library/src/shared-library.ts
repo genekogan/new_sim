@@ -9,7 +9,7 @@
 //     (`lib-<world>-<dep>-<h8>@1`), so two versions can never disagree about what a dependency means.
 //   - Author and licence recorded on every version (who, which world, when; SPDX id, attribution, source; per-asset
 //     licence text as uploaded).
-//   - Restricted art is never offered. Gene's answer 2 (CATALOG-PROGRAM): the registry enforces redistribution limits.
+//   - Restricted art is never offered. Gene (2026-10-11, licences): every item records licence and source; only redistribution is limited.
 //     A def that uses a restricted core asset (Little Martians, Mars College internal), extends or contains a
 //     non-redistributable core def, or carries a model whose licence text is not CC0/CC-BY is refused at publish
 //     (`library.restricted`) and therefore never stored, found or placed elsewhere; `offered()` re-checks on every read.
@@ -24,9 +24,9 @@
 //   ledger.jsonl                             publish / yank / refuse, append-only
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync, linkSync, unlinkSync, rmdirSync, renameSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { WorldModel, aliasRef, coreLibrary, definitionRefs, hashOf, stableStringify, categoryOf, type DefInput, type StoredDef } from '@sim/world-compiler';
-import { licenceOf } from './import-core.ts';
-import { idOf } from './ids.ts';
+// Built only on what stays in the tree: the world compiler (its core library and world-local defs) and the core asset
+// indexes' licence text. Imported by path so this package needs no workspace link.
+import { WorldModel, aliasRef, coreLibrary, definitionRefs, hashOf, stableStringify, categoryOf, type DefInput, type StoredDef } from '../../world-compiler/src/index.ts';
 import { ASSET_POLICY, DEF_POLICY, validateUpload, type UploadGate } from './library-gate.ts';
 
 export const SHARE1 = 'share/1' as const;
@@ -83,12 +83,6 @@ export function restrictedCoreAssets(): Map<string, string> {
       for (const [sha, m] of Object.entries(assets)) if (!openLicence(m.license)) { restricted.set(sha, m.license ?? 'no licence recorded'); if (m.footprint) restricted.set(m.footprint, m.license ?? 'no licence recorded'); }
     } catch { /* a broken index file: its assets stay unknown, and unknown core shas are checked again below */ }
   }
-  // belt and braces: every mesh def in the core library that the catalogue marks non-redistributable
-  for (const d of coreLibrary().all()) {
-    if (d.make.kind !== 'mesh') continue;
-    const l = licenceOf(d, idOf(d.name));
-    if (!l.redistribute) for (const s of [d.make.asset, d.make.lod1, d.make.footprint]) if (s) restricted.set(s, `${l.spdx} (${l.attribution ?? d.name})`);
-  }
   return restricted;
 }
 /** A licence text that permits redistribution to other owners' worlds. */
@@ -96,6 +90,22 @@ export function openLicence(text: string | undefined): boolean {
   if (!text) return false;
   if (/\bNC\b|non-?commercial|\bND\b|no-?deriv|all rights reserved|private|internal|Little Martians|Vanessa Rosa/i.test(text)) return false;
   return /\bCC0\b|CC[- ]?BY(?:[- ]4\.0)?\b|public domain/i.test(text);
+}
+const coreRestriction = new Map<string, string | null>();
+/**
+ * Why a core def may not leave its pack (null = redistributable): it draws a restricted model, or anything it extends,
+ * is made of or contains does (an LM set of LM meshes is restricted even though the set itself is authored kit).
+ */
+export function coreRestricted(ref: string, depth = 0): string | null {
+  const d = coreLibrary().get(aliasRef(ref));
+  if (!d) return null;
+  if (coreRestriction.has(d.hash)) return coreRestriction.get(d.hash)!;
+  coreRestriction.set(d.hash, null);   // cycle guard
+  let why: string | null = null;
+  for (const s of assetsOf(d)) { const l = restrictedCoreAssets().get(s); if (l) { why = `${d.ref} draws ${l.slice(0, 60)}`; break; } }
+  if (!why && depth < 8) for (const r of definitionRefs(bodyOf(d))) { const w = coreRestricted(r, depth + 1); if (w) { why = w; break; } }
+  coreRestriction.set(d.hash, why);
+  return why;
 }
 const RESTRICTED_TEXT = /Little Martians|Vanessa Rosa|all rights reserved|non-?commercial/i;
 
@@ -202,7 +212,7 @@ export class SharedLibrary {
     const fail = (code: string, msg: string): never => { this.log({ op: 'refuse', world, ref, code, msg }); throw new LibraryError(code, msg); };
     if (!(SHARE_LICENCES as readonly string[]).includes(opts.licence.spdx)) fail('library.licence', `licence ${opts.licence.spdx}: the shared library takes ${SHARE_LICENCES.join(' or ')} (restricted work stays in its own world)`);
     if (opts.licence.spdx === 'CC-BY-4.0' && !opts.licence.attribution?.trim()) fail('library.licence', 'CC-BY-4.0 needs an attribution');
-    if (isCoreRef(ref)) fail('library.core', `${ref} is already in the core catalogue every world has`);
+    if (isCoreRef(ref)) fail('library.core', `${ref} is already in the core library every world has`);
 
     // 1. the local closure (post-order: dependencies first)
     const order: StoredDef[] = [], core = new Set<string>(), seen = new Map<string, StoredDef>(), active = new Set<string>();
@@ -216,9 +226,9 @@ export class SharedLibrary {
       for (const dep of definitionRefs(bodyOf(def))) {
         if (isCoreRef(dep)) {
           const c = coreLibrary().get(aliasRef(dep));
-          if (!c) fail('library.missing', `${r} uses ${dep}, which is not in the core catalogue`);
-          const l = licenceOf(c!, idOf(c!.name));
-          if (!l.redistribute) fail('library.restricted', `${r} uses ${c!.ref} (${l.spdx}, ${l.attribution ?? 'restricted'}), which may not leave its pack`);
+          if (!c) fail('library.missing', `${r} uses ${dep}, which is not in the core library`);
+          const why = coreRestricted(c!.ref);
+          if (why) fail('library.restricted', `${r} uses ${c!.ref} (${why}), which may not leave its pack`);
           core.add(c!.ref);
         } else await visit(dep, depth + 1);
       }

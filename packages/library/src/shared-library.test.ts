@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { WorldModel, applyBatch, coreLibrary, type StoredDef } from '@sim/world-compiler';
-import { SharedLibrary, LibraryError, restrictedCoreAssets, openLicence, portableName, type WorldSource } from './shared-library.ts';
+import { WorldModel, applyBatch, coreLibrary, type StoredDef } from '../../world-compiler/src/index.ts';
+import { SharedLibrary, LibraryError, restrictedCoreAssets, coreRestricted, openLicence, portableName, type WorldSource } from './shared-library.ts';
 import { validateUpload, LibraryUploadRejected, type UploadGate } from './library-gate.ts';
 
 const tmp = () => mkdtempSync(join(tmpdir(), 'shared-lib-'));
@@ -120,6 +120,13 @@ test('restricted art is never offered: Little Martians models, LM/Mars core part
     assert.equal(existsSync(join(root, 'entries')), false, 'nothing stored');
     assert.equal(lib.find('', { forWorld: 'beta' }).length, 0);
     assert.ok(lib.ledger().filter((l) => l.op === 'refuse').length >= 5, 'refusals are on the ledger');
+    // a core def that is authored kit but made of restricted models (a set/preset of LM meshes) is restricted too
+    const set = coreLibrary().all().find((d) => d.make.kind !== 'mesh' && coreRestricted(d.ref));
+    if (set) {
+      a.act([{ op: 'define', def: { schema: 'def/1', name: 'via-set', version: 1, description: 'Uses a restricted set.', form: 'point', make: { kind: 'parts', parts: [{ id: 's', def: set.ref, at: [0, 0, 0] }] }, size: { box: [3, 3, 3] }, layer: 'solid', anchor: 'base' } }]);
+      await assert.rejects(lib.publish(a.src, 'via-set@1', { by: 'god:a', licence: CC0 }), (e: LibraryError) => e.code === 'library.restricted');
+    }
+    assert.equal(coreRestricted('core-bench@1'), null); assert.ok(coreRestricted(lmDef.ref));
     assert.ok(restrictedCoreAssets().size > 300 && !openLicence('Vanessa Rosa (Little Martians); private') && openLicence('CC0 1.0') && openLicence('CC-BY-4.0') && !openLicence('CC-BY-NC-4.0'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });

@@ -13,6 +13,7 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { startWorld } from '../god-skill/dev-world.mjs';
+import { totemGlb } from './fixture-glb.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const out = resolve(process.argv[2] ?? `${root}/.lane/library-e2e`);
@@ -59,6 +60,11 @@ try {
   check('alpha.redefine', r.data.accepted, r.data.failures);
   c = cli('publish', '--from', alpha.base, '--dev', '--ref', 'reading-corner@1', '--author-name', 'Ana (alpha owner)', '--title', 'Reading corner');
   step('publish v2 from alpha', c); check('publish.v2', c.code === 0 && /published alpha\/reading-corner@2/.test(c.stdout));
+  // a model the creator made themselves (CC0): uploaded to alpha, defined, published; the GLB travels with it
+  const up = await fetch(`${alpha.base}/v1/god/assets?${new URLSearchParams({ name: 'totem', height: '1.8', license: 'CC0-1.0', source: 'made by Ana in alpha', define: '1', description: 'A painted three-block totem. A landmark to meet at.', tags: 'totem,landmark' })}`, { method: 'POST', headers: { authorization: `Bearer ${(await (await fetch(`${alpha.base}/v1/god/mint`, { method: 'POST', headers: { authorization: 'Bearer dev:admin', 'content-type': 'application/json' }, body: '{}' })).json()).token}`, 'content-type': 'model/gltf-binary' }, body: totemGlb() });
+  const upj = await up.json(); check('alpha.model-upload', up.status === 200 && upj.asset?.sha, upj.error ?? upj.asset?.sha?.slice(0, 12));
+  c = cli('publish', '--from', alpha.base, '--dev', '--ref', 'totem@1', '--author-name', 'Ana (alpha owner)', '--title', 'Painted totem');
+  step('publish a self-made model from alpha', c); check('publish.model', c.code === 0 && /published alpha\/totem@1/.test(c.stdout) && /1 model\(s\)/.test(c.stdout));
   await stop(alpha);
   check('alpha.stopped', alpha.child.exitCode !== null || alpha.child.signalCode !== null);
 
@@ -74,6 +80,8 @@ try {
   step('place latest (v2) into beta', c); check('place.v2', c.code === 0);
   c = cli('place', 'alpha/reading-corner@1', '--into', beta.base, '--dev', '--name', 'corner-v1b', '--at', '-5,-8');
   check('place.v1-again-reuses-def', c.code === 0 && /0 define\(s\)/.test(c.stdout), c.stdout.trim());
+  c = cli('place', 'alpha/totem', '--into', beta.base, '--dev', '--name', 'totem', '--at', '0,-5');
+  step('place the totem (uploads its model) into beta', c); check('place.model', c.code === 0 && /1 model\(s\) uploaded/.test(c.stdout));
   const gb = await god(beta), snap = (await gb('/v1/god/snapshot')).data;
   const lib = JSON.parse(readFileSync(join(libDir, 'entries/alpha/reading-corner/1.json'), 'utf8')), lib2 = JSON.parse(readFileSync(join(libDir, 'entries/alpha/reading-corner/2.json'), 'utf8'));
   const byName = (n) => snap.entities.find((e) => e.name === n), defOf = (e) => snap.library.find((d) => d.ref === e.def || 'sha:' + d.hash === e.def);
@@ -82,6 +90,8 @@ try {
   check('beta.v2-pinned', v2 && defOf(v2)?.hash === lib2.hash, { def: v2?.def, hash: defOf(v2)?.hash?.slice(0, 12), want: lib2.hash.slice(0, 12) });
   check('beta.parts-expanded', snap.entities.filter((e) => e.in?.parent === v2?.id).length === 4, snap.entities.filter((e) => e.in?.parent === v2?.id).map((e) => e.def));
   check('record.author+licence', lib2.author.world === 'alpha' && lib2.author.name === 'Ana (alpha owner)' && lib2.licence.spdx === 'CC0-1.0', { author: lib2.author, licence: lib2.licence });
+  const totem = byName('totem'), tlib = JSON.parse(readFileSync(join(libDir, 'entries/alpha/totem/1.json'), 'utf8'));
+  check('beta.model-pinned', totem && defOf(totem)?.hash === tlib.hash && defOf(totem)?.make?.asset === tlib.assets[0].sha && (await fetch(`${beta.base}/assets/${tlib.assets[0].sha}.glb`)).status === 200, { asset: tlib.assets[0].sha.slice(0, 12), licence: tlib.assets[0].licence });
   report.ledger = readFileSync(join(libDir, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 
   // ---------------------------------------------------------------- what a visitor sees in beta (real Chrome)

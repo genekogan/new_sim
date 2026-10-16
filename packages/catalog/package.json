@@ -5,8 +5,7 @@
   "type": "module",
   "description": "The Eden catalogue (CATALOG-PROGRAM P0): item/1 + def/2 records, the def/1 upgrader, a content-addressed append-only registry with channels, gates G1-G3, hot/cold tiers and embedding retrieval.",
   "exports": {
-    ".": "./src/index.ts",
-    "./library": "./src/library.ts"
+    ".": "./src/index.ts"
   },
   "bin": { "catalog": "./bin/catalog.mjs" },
   "scripts": {
