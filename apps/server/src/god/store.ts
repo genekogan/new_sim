@@ -15,8 +15,9 @@ export type EditRequest = { clientRef: string; requestHash: string; payloadHash:
 export type CommittedReceipt = { world: string; clientRef: string; payloadHash: string; seq: number; result: Accepted };
 export type BuildRow = { id: string; status: 'active' | 'paused' | 'done' | 'abandoned'; rev: number; created_at: number; last_at: number; body: string };
 export type BuildWrite = { id: string; expectRev: number; status: BuildRow['status']; lastAt: number; body: string; echo?: true; rev?: number; receipt?: BuildReceipt };
-/** WD7 slice 2: who made a journal row (token hash8 + label; engine/genesis/server rows carry a label without a hash). */
-export type JournalWho = { hash8: string | null; label: string };
+/** WD7 slice 2: who made a journal row (token hash8 + label; engine/genesis/server rows carry a label without a hash).
+ *  Y4b `acct`: `cobuilder:<account>` for a co-builder's row (or its helper's); null on the owner's side. */
+export type JournalWho = { hash8: string | null; label: string; acct?: string | null };
 type CommitEdit = { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number; builds?: BuildWrite[]; origins?: DefOrigin[]; who?: JournalWho };
 class StaleBuild extends Error {}
 class BuildLimit extends Error {
@@ -27,7 +28,7 @@ const buildLimitResult = (failure: NonNullable<ReturnType<typeof buildBodyFailur
 const buildConstraint = (e: unknown) => ((e as { code?: string }).code === 'SQLITE_CONSTRAINT_CHECK' || (e as { errcode?: number }).errcode === 275) && /body|god_builds_v1/.test(String(e));
 const staleBuild = (): Result => ({ accepted: false, failures: [{ op: -1, code: 'revision.stale', field: 'build', detail: 'The durable build changed while this edit was planned.', fix: 'Read the build and re-plan the edit.' }] });
 
-export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine'; hash8?: string | null; label?: string | null };
+export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine'; hash8?: string | null; label?: string | null; acct?: string | null };
 export type PrayerRow = { id: string; soul_id: string; soul_name: string; text: string; at: number; answer: string | null; answered_at: number | null };
 
 export function ensureWorldSchema(db: Db) {
@@ -53,6 +54,8 @@ export function ensureWorldSchema(db: Db) {
   // WD7 slice 2: attribution columns (older rows stay NULL: written before attribution existed).
   if (!cols.includes('hash8')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN hash8 TEXT');
   if (!cols.includes('label')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN label TEXT');
+  // Y4b: the co-builder account of a row (NULL: the owner's side, or written before co-builder scope existed).
+  if (!cols.includes('acct')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN acct TEXT');
   db.db.exec(`
     CREATE INDEX IF NOT EXISTS world_edits_v1_grp ON world_edits_v1(world_id,grp);
     CREATE INDEX IF NOT EXISTS world_edits_v1_grp_seq ON world_edits_v1(world_id,grp,seq);
@@ -145,8 +148,8 @@ export class WorldStore {
       const del = this.db.db.prepare('DELETE FROM world_entities_v1 WHERE world_id=? AND id=?');
       for (const id of diff.removes) del.run(this.worldId, id);
       this.writeMeta(model, owner);
-      if (edit.ops.length || edit.kind !== 'edit') this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)')
-        .run(this.worldId, edit.seq, edit.by, edit.at, edit.note ?? null, edit.group ?? null, JSON.stringify(edit.ops), JSON.stringify(edit.inverse), edit.undoOf ?? null, edit.kind, edit.who?.hash8 ?? null, edit.who?.label ?? (edit.by === 'engine' ? 'engine' : null));
+      if (edit.ops.length || edit.kind !== 'edit') this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label, acct) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)')
+        .run(this.worldId, edit.seq, edit.by, edit.at, edit.note ?? null, edit.group ?? null, JSON.stringify(edit.ops), JSON.stringify(edit.inverse), edit.undoOf ?? null, edit.kind, edit.who?.hash8 ?? null, edit.who?.label ?? (edit.by === 'engine' ? 'engine' : null), edit.who?.acct ?? null);
       if (edit.kind === 'undo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       if (edit.kind === 'redo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       // a fresh edit clears the redo stack: pending undos can no longer be redone
@@ -202,7 +205,7 @@ export class WorldStore {
   setOwner(model: WorldModel, owner: string) { this.tx(() => this.writeMeta(model, owner)); }
 
   edits(limit = 50): EditRow[] {
-    return (this.db.db.prepare('SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label FROM world_edits_v1 WHERE world_id=? ORDER BY seq DESC LIMIT ?').all(this.worldId, limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
+    return (this.db.db.prepare('SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label, acct FROM world_edits_v1 WHERE world_id=? ORDER BY seq DESC LIMIT ?').all(this.worldId, limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
   /** W1: include undone edits and removed entities; cleanup means never placed, not absent now. */
@@ -220,12 +223,12 @@ export class WorldStore {
   private stackHead(kinds: EditRow['kind'][]): EditRow | null {
     const seqs = kinds.map(kind => (this.db.db.prepare('SELECT seq FROM world_edits_v1 INDEXED BY world_edits_v1_stack WHERE world_id=? AND undone=0 AND kind=? ORDER BY seq DESC LIMIT 1').get(this.worldId, kind) as { seq: number } | undefined)?.seq ?? -1);
     const seq = Math.max(...seqs); if (seq < 0) return null;
-    const r = this.db.db.prepare('SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind,hash8,label FROM world_edits_v1 WHERE world_id=? AND seq=?').get(this.worldId, seq) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
+    const r = this.db.db.prepare('SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind,hash8,label,acct FROM world_edits_v1 WHERE world_id=? AND seq=?').get(this.worldId, seq) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
     return r ? { ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) } : null;
   }
   /** Snapshot the complete group stack before undo starts; newly journaled undos cannot hide older group edits. */
   groupEdits(group: string): EditRow[] {
-    return (this.db.db.prepare("SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label FROM world_edits_v1 WHERE world_id=? AND grp=? AND undone=0 AND kind IN ('edit','redo') ORDER BY seq DESC").all(this.worldId, group) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
+    return (this.db.db.prepare("SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label, acct FROM world_edits_v1 WHERE world_id=? AND grp=? AND undone=0 AND kind IN ('edit','redo') ORDER BY seq DESC").all(this.worldId, group) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
       .map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
 
@@ -238,7 +241,7 @@ export class WorldStore {
     };
   }
   groupEditsUnder(group: string, journal = false, limit = 200): EditRow[] {
-    const q = this.groupQuery(group, 'seq,by,at,note,grp,ops,inverse,undone,undo_of,kind,hash8,label', journal ? '' : "AND undone=0 AND kind IN ('edit','redo')", limit);
+    const q = this.groupQuery(group, 'seq,by,at,note,grp,ops,inverse,undone,undo_of,kind,hash8,label,acct', journal ? '' : "AND undone=0 AND kind IN ('edit','redo')", limit);
     const rows = this.db.db.prepare(q.sql).all(...q.args) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[];
     return rows.map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }

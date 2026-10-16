@@ -11,6 +11,7 @@ import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { WorldStore, GOD_EDIT_OUTCOME_BYTES, type EditRow, type JournalWho, type PrayerRow } from './store.ts';
 import { HelperTokens, HELPER_LIMITS, helperFailure, helperMintSchema, helperScopeFailure } from './helpers.ts';
+import { accountKey, cobuilderFailure, cobuilderOf, cobuilderOpFailure, COBUILDER_PREFIX, whose } from './cobuilders.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
 import { RegistryCatalog } from '@sim/catalog';
@@ -141,9 +142,11 @@ export class GodMode {
   }
   godIdentity(token: string | undefined): Identity | null {
     if (!token?.startsWith('god_')) return null;
-    const hash = hashToken(token); if (this.store.hasToken(hash)) return { hash, label: this.store.tokenLabel(hash) ?? 'an agent' };
+    // Y4b: a co-builder token (label `cobuilder:<account>:…`, set by the launcher) and its helpers carry their account.
+    const scoped = (identity: Identity, rootLabel: string | null) => { const account = cobuilderOf(rootLabel); return account === null ? identity : { ...identity, cobuilder: account }; };
+    const hash = hashToken(token); if (this.store.hasToken(hash)) { const label = this.store.tokenLabel(hash); return scoped({ hash, label: label ?? 'an agent' }, label); }
     const helper = this.helpers.scope(hash, this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent));
-    return helper ? { hash, label: helper.label, child: helper.scope } : null;
+    return helper ? scoped({ hash, label: helper.label, child: helper.scope }, helper.scope.parentLabel) : null;
   }
   /** Why a helper token is refused (expired, claim no longer held, lead token gone); null for any other token. */
   helperRefusal(token: string | undefined): string | null {
@@ -153,6 +156,7 @@ export class GodMode {
   /** WD7 slice 3: a root token mints a helper token for a claim it holds. The lead's token is never echoed. */
   mintHelper(build: string, claim: string, raw: unknown, caller: Identity) {
     if (caller.child) return { ok: false as const, failures: [helperFailure('helper.scope', 'Helper tokens cannot mint tokens.')] };
+    if (caller.cobuilder !== undefined) return { ok: false as const, failures: [cobuilderFailure('Co-builder tokens cannot mint tokens; give a sub-agent EDEN_GOD_CLAIM instead, or ask the world owner.')] };
     const p = helperMintSchema.safeParse(raw ?? {});
     if (!p.success) return { ok: false as const, failures: p.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: `{ label?: 1..60 chars, ttlMs?: ${HELPER_LIMITS.minTtlMs}..${HELPER_LIMITS.maxTtlMs}, verify?: 0..${HELPER_LIMITS.maxVerifyBudget} }` })) };
     this.builds.sweep();
@@ -168,15 +172,23 @@ export class GodMode {
     const child = this.caller.identity?.child;
     return explicit ?? this.caller.build ?? (child ? { id: child.build, claim: child.claim } : undefined);
   }
-  /** Helper authorisation runs before any other admission rule, so its refusal is the same on every path. */
+  /** Helper (and Y4b co-builder) authorisation runs before any other admission rule, so its refusal is the same on every path. */
   private helperGate(field: BuildField | undefined, ops: readonly Op[]): Failure | null {
-    const child = this.caller.identity?.child; return child ? helperScopeFailure(child, field, ops) : null;
+    const id = this.caller.identity, child = id?.child;
+    return (child ? helperScopeFailure(child, field, ops) : null) ?? (id?.cobuilder !== undefined ? cobuilderOpFailure(ops) : null);
   }
-  /** WD7 slice 2: every journal row names the token (hash8 + label) or the system that made it. */
-  private who(): JournalWho { const id = this.caller.identity; return id ? { hash8: id.hash.slice(0, 8), label: id.label } : { hash8: null, label: this.system ?? 'server' }; }
+  /** WD7 slice 2: every journal row names the token (hash8 + label) or the system that made it; Y4b adds the co-builder account. */
+  private who(): JournalWho { const id = this.caller.identity; return id ? { hash8: id.hash.slice(0, 8), label: id.label, acct: accountKey(id.cobuilder) } : { hash8: null, label: this.system ?? 'server' }; }
   /** Helpers undo and redo only their own journal rows inside their own claim group. */
   private foreignEdit(targets: EditRow[]) {
-    const id = this.caller.identity, child = id?.child; if (!child) return null;
+    const id = this.caller.identity, child = id?.child;
+    // Y4b: a co-builder undoes and redoes only its own account's rows (never the owner's, another co-builder's or the system's).
+    if (id?.cobuilder !== undefined) {
+      // Rows written before accounts were journaled still count as its own when its own token made them.
+      const mine = accountKey(id.cobuilder), other = targets.find(t => (t.acct ?? null) !== mine && t.hash8 !== id.hash.slice(0, 8));
+      if (other) return cobuilderFailure(`Edit ${other.seq} is ${whose(other.acct ?? null)} work (by ${other.label ? `${other.label}${other.hash8 ? '#' + other.hash8 : ''}` : 'an earlier agent'}); a co-builder undoes and redoes only its own account's edits.`, { measured: { seq: other.seq } });
+    }
+    if (!child) return null;
     const group = `${child.build}/${child.part}`;
     const foreign = targets.find(t => t.hash8 !== id.hash.slice(0, 8) || t.grp !== group);
     return foreign ? helperFailure('helper.scope', `Edit ${foreign.seq} was made by ${foreign.label ? `${foreign.label}${foreign.hash8 ? '#' + foreign.hash8 : ''}` : 'another agent'}${foreign.grp !== group ? ` in group ${foreign.grp ?? '(none)'}` : ''}; helper tokens undo only their own edits in ${group}.`, { measured: { seq: foreign.seq } }) : null;
@@ -185,7 +197,9 @@ export class GodMode {
 
   pairStart(agent: string | undefined, base: string) {
     const code = humanCode(), poll = randomBytes(24).toString('base64url');
-    this.pairings.set(code, { code, poll, agent: agent?.slice(0, 60) || 'an agent', expires: Date.now() + PAIR_TTL });
+    // Y4b: `cobuilder:` labels come only from the launcher's co-builder pairing, never from an agent naming itself.
+    const name = agent?.startsWith(COBUILDER_PREFIX) ? `agent-${agent.slice(COBUILDER_PREFIX.length)}` : agent;
+    this.pairings.set(code, { code, poll, agent: name?.slice(0, 60) || 'an agent', expires: Date.now() + PAIR_TTL });
     return { user_code: code, approve_url: `${base}/#godpair/${code}`, poll_token: poll, interval_s: 3, expires_in: PAIR_TTL / 1000, tell_your_human: `Open ${base}/#godpair/${code} , sign in as this world's owner, and approve me as its god.` };
   }
   pairInfo(codeRaw: string) {

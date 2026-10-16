@@ -27,6 +27,7 @@ import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
 import { HELPER_LIMITS, helperRoute } from './helpers.ts';
+import { cobuilderRoute } from './cobuilders.ts';
 import { mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
 
@@ -61,7 +62,28 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
       const identity = identityOf(c);
       if (identity?.child) { const denied = helperRoute(c.req.method, c.req.path, identity.child); if (denied) throw new ApiError(403, 'helper.scope', denied, { build: identity.child.build, claim: identity.child.claim }); }
       else if (!identity) { const ended = d.god.helperRefusal(token); if (ended) throw new ApiError(401, 'helper.expired', ended); }
+      // Y4b: co-builder tokens (and their helpers) never reach env, weather or lightning, and never mint.
+      if (identity?.cobuilder !== undefined) { const denied = cobuilderRoute(c.req.method, c.req.path); if (denied) throw new ApiError(403, 'cobuilder.scope', denied); }
     }
+    await next();
+  });
+  // Y4b: a co-builder pauses, resumes, finishes and abandons only builds its account leads, and takes or releases only its
+  // account's claims. Refused like any other build action ({ok:false, failures}); owner tokens pass untouched.
+  const lifecycle = { pause: 'pause', resume: 'resume', done: 'finish', abandon: 'abandon' } as const;
+  app.use('/v1/god/builds/:id/:action{pause|resume|done|abandon|claims}', async (c, next) => {
+    const who = c.req.method === 'POST' ? identityOf(c) : null;
+    if (who?.cobuilder !== undefined) {
+      const id = c.req.param('id'), action = c.req.param('action') as keyof typeof lifecycle | 'claims';
+      const take = action === 'claims' ? (await c.req.json().catch(() => null) as { take?: unknown } | null)?.take : undefined;
+      const refused = action === 'claims' ? (typeof take === 'string' ? d.god.builds.foreignTo(who, id, take, 'take') : null) : d.god.builds.foreignTo(who, id, undefined, lifecycle[action]);
+      if (refused) return c.json({ ok: false, failures: [refused] }, 200, noStore);
+    }
+    await next();
+  });
+  app.use('/v1/god/builds/:id/claims/:cid/release', async (c, next) => {
+    const who = c.req.method === 'POST' ? identityOf(c) : null;
+    const refused = who?.cobuilder !== undefined ? d.god.builds.foreignTo(who, c.req.param('id'), c.req.param('cid'), 'release') : null;
+    if (refused) return c.json({ ok: false, failures: [refused] }, 200, noStore);
     await next();
   });
   const requireGod = (c: Context) => {
@@ -121,7 +143,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/status', async (c) => {
     let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
     const god = identityOf(c); if (god) d.god.builds.touch(god.hash);
-    const you = god?.child ? 'helper' : god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
+    const you = god?.child ? 'helper' : god?.cobuilder !== undefined ? 'cobuilder' : god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
     const owner = you === 'owner' || you === 'god';
     return c.json({ versions: godVersions, worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length, builds: d.god.builds.summaries() } : {}) }, 200, noStore);
   });

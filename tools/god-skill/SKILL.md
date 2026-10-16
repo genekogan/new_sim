@@ -495,6 +495,7 @@ Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` befor
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
 | `build.claim` · `build.claimed` | stay in your scope; `build wait` for others |
 | `helper.scope` · `helper.expired` | a helper token: stay in its claim; when it ends, ask the lead |
+| `cobuilder.scope` | a co-builder token: no env, weather or strike; act only on your account's builds, claims and edits; ask the owner |
 | `build.lease` · `build.leased` | `build resume <id>`; `--take` only after the lead stops |
 | other `build.*` | follow `fix`; `build show <id>` for state |
 | `site.under-construction` | finish the build before residents use it |

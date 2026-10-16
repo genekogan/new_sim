@@ -6,6 +6,7 @@ import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldMode
 import type { BuildReceipt } from './build-integrity.ts';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
 import { helperScopeFailure, type ClaimState, type HelperScope } from './helpers.ts';
+import { accountKey, cobuilderFailure, labelAccount, whose } from './cobuilders.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
 export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside'] as const;
@@ -56,8 +57,9 @@ export const buildActionSchemas = {
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
 export type Site = z.infer<typeof siteSchema>;
-/** `child`: a helper token minted for one claim (WD7 slice 3); its rate limits and claim custody pool with `child.parent`. */
-export type Identity = { hash: string; label: string; holder?: Holder; child?: HelperScope };
+/** `child`: a helper token minted for one claim (WD7 slice 3); its rate limits and claim custody pool with `child.parent`.
+ *  `cobuilder`: the co-builder account of the token (or of a helper's lead), Y4b; absent for owner tokens. */
+export type Identity = { hash: string; label: string; holder?: Holder; child?: HelperScope; cobuilder?: string };
 /** The token whose claim custody and rate limits a caller shares: the lead for a helper, otherwise itself. */
 export const poolOf = (caller: Identity) => caller.child?.parent ?? caller.hash;
 export const isIdentity = (v: unknown): v is Identity => !!v && typeof v === 'object' && typeof (v as Identity).hash === 'string';
@@ -640,6 +642,20 @@ export class GodBuilds {
     const row = this.rows.get(id); if (!row) return this.store.build(id) ? 'closed' : 'unknown';
     return row.body.claims.find(c => c.id === cid)?.status ?? 'unknown';
   }
+  /** Y4b: why a co-builder may not act on this build (lead account) or this claim (holder account); null for owner tokens,
+   *  its own account's work, and unknown ids (the action itself reports those). */
+  foreignTo(caller: Identity | undefined, id: string, cid?: string, verb = 'act on'): Failure | null {
+    if (caller?.cobuilder === undefined) return null;
+    const row = this.rows.get(id); if (!row) return null;
+    const mine = accountKey(caller.cobuilder);
+    if (cid === undefined) {
+      const owner = labelAccount(row.body.lead.label);
+      return owner === mine ? null : cobuilderFailure(`${id} is ${whose(owner)} build (led by ${row.body.lead.label}); a co-builder cannot ${verb} it.`, { limit: { build: id } });
+    }
+    const claim = row.body.claims.find(c => c.id === cid); if (!claim) return null;
+    const owner = labelAccount(claim.holder.label);
+    return owner === mine ? null : cobuilderFailure(`Claim ${cid} (${claim.part}) is ${whose(owner)} (held by ${claim.holder.label}); a co-builder cannot ${verb} it.`, { limit: { build: id, claim: cid } });
+  }
   /** The claim a root token holds (directly or through its helpers), for minting. */
   heldClaim(id: string, cid: string, caller: Identity): { claim: Claim } | { failure: Failure } {
     const row = this.rows.get(id); if (!row) return { failure: buildFailure(this.store.build(id) ? 'build.closed' : 'build.unknown', id) };
@@ -660,6 +676,8 @@ export class GodBuilds {
     if (caller?.child) { const refused = helperScopeFailure(caller.child, field, batch.ops); if (refused) return { warnings, failures: [refused] }; }
     if (!field) { const owned = [...this.rows.values()].find(r => batch.group === r.id || batch.group?.startsWith(r.id + '/')); return { group: batch.group, warnings, ...(owned ? { failures: [buildFailure('build.group', `${batch.group} belongs to open build ${owned.id}.`)] } : {}) }; }
     const row = this.row(field.id); if (!row) return { warnings, failures: [buildFailure('build.unknown', field.id)] }; if (!open(row)) return { warnings, failures: [buildFailure('build.closed', field.id)] };
+    // Y4b: a co-builder edits only through builds it leads and claims it holds.
+    const foreign = this.foreignTo(caller, row.id, field.claim, 'edit through'); if (foreign) return { warnings, failures: [foreign] };
     if (field.claim) {
       const claim = row.body.claims.find(c => c.id === field.claim);
       if (!claim || claim.status !== 'held') return { warnings, failures: [buildFailure('build.claim-unknown', `${field.claim}${claim?.takenBy ? ` was taken by ${claim.takenBy.label} at ${claim.takenBy.at}` : ' is unknown or released'}.`)] };
