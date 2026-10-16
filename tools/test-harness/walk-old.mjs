@@ -2,7 +2,7 @@
 // Real Chrome (GPU), under the Chrome lease; dpr 1 and 2; drag, wheel, hold W, double-click, New Soul click.
 //   node walk-old.mjs <outDir>
 import {mkdirSync,writeFileSync} from 'node:fs';import {resolve} from 'node:path';import {createRequire} from 'node:module';
-import {chromeLease} from '../god-skill/lib/chrome-lease.mjs';
+const {chromeLease}=await import(process.env.CHROME_LEASE_MODULE??'../god-skill/lib/chrome-lease.mjs');
 const out=resolve(process.argv[2]);mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(new URL('../../mars/viewer/package.json', import.meta.url).pathname)('@playwright/test');
 const builds=JSON.parse(process.env.WALK_BUILDS??'{"main":5411,"rec":5401}');  // label → first port of that build's eden/mars/littlemartians

@@ -2,7 +2,7 @@
 // fresh data dirs, ports in 5400-5449 only. node old-worlds.mjs <tree> <firstPort> <label>
 import {spawn} from 'node:child_process';import {mkdirSync,openSync,rmSync} from 'node:fs';import {resolve} from 'node:path';
 const [tree,first,label]=process.argv.slice(2);const p0=Number(first);
-if(!(p0>=5400&&p0+2<=5449))throw Error('ports 5400-5449 only');
+if(!((p0>=5400&&p0+2<=5449)||(p0>=5870&&p0+2<=5879)))throw Error('ports 5400-5449 or 5870-5879 only');
 const scratch=resolve(process.env.OLD_WORLDS_OUT??'/tmp/sim-old-worlds');
 const kids=[];
 ['eden','mars','littlemartians'].forEach((key,i)=>{const port=p0+i,dataDir=resolve(scratch,label,key);rmSync(dataDir,{recursive:true,force:true});mkdirSync(dataDir,{recursive:true});

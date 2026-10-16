@@ -2,7 +2,7 @@
 // Home → New world (real clicks/typing) → world page: canvas geometry at dpr 1 and 2, drag/wheel/W/double-click,
 // God panel, Join as a Soul line. Chrome lease, real GPU. node walk-new.mjs <origin> <outDir>
 import {mkdirSync,writeFileSync} from 'node:fs';import {resolve} from 'node:path';import {createRequire} from 'node:module';
-import {chromeLease} from '../god-skill/lib/chrome-lease.mjs';
+const {chromeLease}=await import(process.env.CHROME_LEASE_MODULE??'../god-skill/lib/chrome-lease.mjs');
 const [origin,outArg]=process.argv.slice(2);const out=resolve(outArg);mkdirSync(out,{recursive:true});
 const {chromium}=createRequire(new URL('../../mars/viewer/package.json', import.meta.url).pathname)('@playwright/test');
 const W=1352,H=780,report={origin,runs:[]};
