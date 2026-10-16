@@ -39,3 +39,5 @@ Branch `cloud/y4b-cobuilder-scope-20261016`, built on Y4 at `8efdeac`. Head comm
 - Rows written before this change have no `acct`. A co-builder can still undo them when its own token made them (hash8 match).
 - **Before shipping:** merge with `lane/worldops-20261015` and confirm its label format (`cobuilder:<account>:<agent>`, accounts
   with no `:`), then run the full `node tools/god-gate.mjs` locally. The cloud rules limited me to focused tests.
+- **Merge hazard with Y5 (rewind)**: rewind bypasses these undo checks. Merge `cloud/y5-on-y4b-20261016` (`f54c2b2`), which
+  closes that and includes this branch, instead of Y5 alone.
