@@ -3,18 +3,16 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "The Eden catalogue (CATALOG-PROGRAM P0): item/1 + def/2 records, the def/1 upgrader, a content-addressed append-only registry with channels, gates G1-G3, hot/cold tiers and embedding retrieval.",
+  "description": "EF4 library conformance sweep only (measure + conformance). The registry catalogue itself is archived: docs/ARCHIVED.md.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/conformance.ts"
   },
-  "bin": { "catalog": "./bin/catalog.mjs" },
   "scripts": {
     "test": "node --test src/*.test.ts"
   },
   "dependencies": {
     "@sim/world-compiler": "workspace:*",
-    "@sim/generators": "workspace:*",
-    "zod": "^4.6.5"
+    "@sim/generators": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.19.19"

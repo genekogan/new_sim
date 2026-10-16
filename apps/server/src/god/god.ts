@@ -12,8 +12,6 @@ import { ApiError } from '../souls.ts';
 import { WorldStore, GOD_EDIT_OUTCOME_BYTES, type EditRow, type PrayerRow } from './store.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
-import { RegistryCatalog } from '@sim/catalog';
-import { registryCatalog } from './registry-catalog.ts';
 import { submissionSchema, type Expectations } from './submission.ts';
 import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type BuildCaller, type BuildNotice, type BuildEcho, type Identity, type SiteDelta, type WorldBuildMessage } from './builds.ts';
 import { Parts } from './parts.ts';
@@ -79,7 +77,6 @@ export class GodMode {
   as<T>(caller: BuildCaller, fn: () => T): T { const previous = this.caller; this.caller = caller; try { return fn(); } finally { this.caller = previous; } }
   now(): number { return (this.opts.now ?? Date.now)(); }
   model: WorldModel;
-  catalog: RegistryCatalog | null;
   owner: string | null;
   private pairings = new Map<string, Pairing>();
   private commitListeners: CommitListener[] = [];
@@ -113,8 +110,7 @@ export class GodMode {
     // time something is placed from them; its own stored hashes always win, so old worlds resolve exactly as before and
     // new core types appear in every world at zero cost.
     const meta = this.store.meta(), owner = meta ? meta.owner : opts.ownerId;
-    const library = opts.library === undefined ? registryCatalog(owner) ?? coreLibrary() : opts.library;
-    this.catalog = library instanceof RegistryCatalog ? library : null;
+    const library = opts.library === undefined ? coreLibrary() : opts.library;
     const loaded = this.store.load(this.assets.lookup, library);
     if (loaded) { this.model = loaded.model; this.owner = loaded.owner; }
     else {
@@ -141,9 +137,6 @@ export class GodMode {
   claim(user: { id: string }) {
     if (!this.owner) {
       this.owner = user.id; this.store.setOwner(this.model, this.owner);
-      if (this.opts.library === undefined && this.catalog) {
-        this.catalog = registryCatalog(this.owner); this.model.library = this.catalog;
-      }
     }
   }
   godIdentity(token: string | undefined): Identity | null { if (!token?.startsWith('god_')) return null; const hash = hashToken(token); return this.store.hasToken(hash) ? { hash, label: this.store.tokenLabel(hash) ?? 'an agent' } : null; }
@@ -600,7 +593,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const state = s.state.layers ? { ...s.state, layers: { ...s.state.layers, wallets: {} } } : s.state;
     return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes, builds: builds.builds, buildsRev: builds.rev, now: builds.now };
   }
-  /** Demand logging is outside the catalogue registry. Keep only a bounded set of misses in this world's DB. */
+  /** Demand logging: keep only a bounded set of `find` misses in this world's DB. */
   recordFindMiss(query: string) {
     this.db.db.exec('CREATE TABLE IF NOT EXISTS god_find_misses_v1 (world_id TEXT NOT NULL, at INTEGER NOT NULL, query TEXT NOT NULL, PRIMARY KEY(world_id, at, query)) WITHOUT ROWID');
     this.db.db.prepare('INSERT OR IGNORE INTO god_find_misses_v1 VALUES (?,?,?)').run(this.opts.worldId, Date.now(), query.slice(0, 400));
@@ -610,7 +603,6 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   godSnapshot() {
     const pub = this.publicSnapshot();
     return { ...pub, library: this.model.allDefs().map(publicDef), libraryRef: this.model.library ? libraryRef(this.model.library) : null,
-      ...(this.catalog ? { exportBlockedHashes: pub.defs.filter((d) => !this.catalog!.canExport(d.hash)).map((d) => d.hash) } : {}),
       owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
   }
   tileHashes(): Record<string, string> {

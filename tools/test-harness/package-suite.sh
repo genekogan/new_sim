@@ -3,7 +3,7 @@
 set -u
 rc=0
 packages=(engine-mars world-compiler generators ground kernel brain engine-toy engine-contract protocol engine-native)
-[ ! -d packages/catalog/src ] || packages+=(catalog)
+[ ! -d packages/catalog/src ] || packages+=(catalog)   # EF4 conformance only (registry archived)
 for p in "${packages[@]}"; do
   echo "## $p"
   (

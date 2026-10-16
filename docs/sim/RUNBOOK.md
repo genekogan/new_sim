@@ -6,9 +6,8 @@ Use the exact qualified source/artifact receipt under `<team>/reviews/` for curr
 worlds remain laptop-hosted behind the existing eden2 SSH proxy; `/worlds` uses `sim-worlds@production` on eden2.
 Both surfaces must select artifacts from the same Git commit. Do not infer deployment from a checkout HEAD.
 
-Catalogue entity-world services opt in with `CATALOG_REGISTRY_DIR` pointing to a sealed published registry,
-`CATALOG_CHANNEL=stable` and the explicitly verified `CATALOG_GENE_OWNER_ID`. These are public configuration,
-not credentials. Pass existing Clerk settings by env-file path; never copy credentials into Git or reports.
+Entity worlds use the core kit only (the catalogue registry was archived 2026-10-16; see `docs/ARCHIVED.md`).
+Pass existing Clerk settings by env-file path; never copy credentials into Git or reports.
 Stage the exact source before production; check every registered world boots and preserve previous code links.
 
 For the three original writers, preserve descriptors, databases, accepted events, current/retired Soul IDs,

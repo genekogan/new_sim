@@ -547,15 +547,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
   const budget = (): Budget => ({ ...DEFAULT_BUDGET, ...d.god.model.constants.limits.budget });
   // a def that extends another (a preset of a generator: corner-shop of shop) is listed as it resolves (its make, slots, params)
   const library = () => d.god.model.allDefs().map((x) => (x.extends ? d.god.model.resolvedDef(x.ref) ?? x : x)) as StoredDef[];
-  const ownDefs = () => [...new Set(d.god.model.defs.values())].filter((def) => !d.god.catalog?.manages(def.ref))
-    .map((def) => d.god.model.resolvedDef(def.ref) ?? def);
-  const findDef = (ref: string): StoredDef | undefined => {
-    if (d.god.catalog?.manages(ref)) {
-      const current = d.god.catalog.get(ref);
-      return current && d.god.model.resolvedDef('sha:' + current.hash);
-    }
-    return d.god.model.resolvedDef(ref) ?? d.god.model.def(ref.replace(/^core\//, 'core-'));
-  };
+  const findDef = (ref: string): StoredDef | undefined => d.god.model.resolvedDef(ref) ?? d.god.model.def(ref.replace(/^core\//, 'core-'));
 
   app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', (c) => {
     const [sha, ext] = c.req.param('file').split('.');
@@ -637,25 +629,6 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     const q = c.req.query('q') ?? '', tag = c.req.query('tag'), limit = Math.min(500, Math.max(1, Number(c.req.query('limit') ?? 200) || 200)), offset = Math.max(0, Number(c.req.query('offset') ?? 0) || 0);
     // VOCAB-MECH facets: &category=building.commercial &has=slot:sit (repeatable or comma list) &form=area; `compact=1` = manifest rows
     const facets = { category: c.req.query('category') || undefined, form: c.req.query('form') || undefined, has: c.req.queries('has')?.flatMap((h) => h.split(',')).filter(Boolean) };
-    if (d.god.catalog) {
-      const hits = d.god.catalog.find(q, { k: offset + limit, facets: { ...facets, tag } });
-      const localHits = searchDefs(ownDefs().map((def) => ({ ...def, by: undefined })), q, { ...facets, tag, limit: offset + limit });
-      const coreStart = Math.max(0, offset - localHits.length), coreEnd = Math.max(0, offset + limit - localHits.length);
-      const coreDefs = hits.slice(coreStart, coreEnd).flatMap<unknown>((h) => {
-        if (c.req.query('compact') === '1') return [{ ...h.row, ...(q ? { score: h.score, why: h.why } : {}) }];
-        const def = findDef(h.row.ref); if (!def) return [];
-        const { by: _by, ...pub } = def;
-        return [{ ...pub, publicRef: h.row.ref, catalogue: { text: h.item.text, itemHash: h.entry.itemHash, licence: h.item.licence },
-          interfaces: vocab.interfacesOf(def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(def.hash) ? `/thumbs/${def.hash}.png` : null }];
-      });
-      const localDefs = localHits.slice(offset, offset + limit).map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(c.req.query('compact') === '1'
-        ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) }
-        : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }), ...(used.length ? { used, usedIn: used } : {}) }; });
-      const defs = [...localDefs, ...coreDefs];
-      if (q.trim() && !localHits.length && !hits.length && offset === 0) d.god.recordFindMiss(q);
-      return c.json({ defs, count: defs.length, offset, query: q || null, ...(facets.category || facets.has?.length || facets.form ? { facets } : {}),
-        ...(q && !defs.length ? { hint: 'nothing in the catalogue matches; define it in this world or import a mesh' } : {}) }, 200, noStore);
-    }
     const all = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit: offset + limit, ...facets, used: hash => d.god.parts.used(hash) }), hits = all.slice(offset);
     const compact = c.req.query('compact') === '1';
     const defs = hits.map((h) => { const used = d.god.parts.badge(h.def.hash); return { ...(compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : { ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }), ...(used.length ? { used, usedIn: used } : {}) }; });
@@ -675,13 +648,11 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     }
     d.requireGod(c);
     const { by: _by, ...pub } = def;
-    const catalogue = d.god.catalog?.details('sha:' + def.hash);
     const asset = def.make.kind === 'mesh' ? store.info(def.make.asset) : undefined;
     const extendsChain: string[] = []; for (let e = def.extends; e && extendsChain.length < 8; e = d.god.model.def(e)?.extends) extendsChain.push(e);
     return c.json({
-      def: pub, publicRef: catalogue?.row.ref ?? publicRef(def), example: { ops: [exampleOp(def)] },
+      def: pub, publicRef: publicRef(def), example: { ops: [exampleOp(def)] },
       parts: d.god.parts.details(def.hash),
-      ...(catalogue ? { catalogue: { text: catalogue.item.text, itemHash: catalogue.entry.itemHash, licence: catalogue.item.licence } } : {}),
       slots: def.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, ...(s.label ? { label: s.label } : {}) })),
       components: Object.keys(def.components ?? {}), extends: extendsChain,
       category: vocab.categoryOf(def as never), interfaces: vocab.interfacesOf(def as never), manifest: vocab.manifestLine(vocab.manifestRow(def as never, { bytes: assetBytesOf(def, store), publicRef: publicRef(def) })),
@@ -702,6 +673,6 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     store.putThumb(def.hash, png);
     return c.json({ ok: true, thumb: `/v1/god/defs/${publicRef(def)}/thumb.png`, immutable: `/thumbs/${def.hash}.png` }, 200, noStore);
   });
-  mountCatalogRoutes(app, { god: d.god, requireGod: d.requireGod, store, library, ownDefs });
+  mountCatalogRoutes(app, { god: d.god, requireGod: d.requireGod, store, library });
   return store;
 }

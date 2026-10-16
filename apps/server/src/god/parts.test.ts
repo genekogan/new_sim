@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { Hono } from 'hono';
 import { coreLibrary, coreRef } from '@sim/world-compiler';
-import { Registry, RegistryCatalog, makeItem, writeCore, loadContract } from '@sim/catalog';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode, type GodOptions } from './god.ts';
@@ -63,14 +62,6 @@ test('adoption and identical library define have no origin; undo and redo author
   accepted(f.act([define(libraryDef as never)])); assert.equal(f.query('god_def_origins_v1').length, 0);
   accepted(f.act([define()])); const before = f.query('god_def_origins_v1');
   accepted(f.god.undo()); accepted(f.god.redo()); assert.deepEqual(f.query('god_def_origins_v1'), before);
-});
-test('registry adoption is never world-authored', async t => {
-  const f = fixture(t), registry = new Registry(join(f.dir, 'registry')), d = coreLibrary().get(coreRef('bench'))!;
-  const { item, up } = await makeItem(d, { at: '2026-10-15T00:00:00Z', run: 'test', author: 'test', contract: loadContract() });
-  writeCore(registry, [{ def: d, item, up }], 'test');
-  f.god.catalog = new RegistryCatalog(registry, { hot: 0 }); f.god.model.library = f.god.catalog;
-  const b = f.start(); accepted(f.act([place('eden/bench@1', 'registry-bench')], b)); f.done();
-  assert.equal(f.query('god_def_origins_v1').length, 0); assert.deepEqual(uses(f), []);
 });
 test('genesis defines have null identity and never become parts', t => {
   const f = fixture(t, { genesis: { schema: 'genesis/1', batches: [{ ops: [define(), place()] }] } });
@@ -295,18 +286,11 @@ test('search tie favors a standing used part over core, while higher scores alwa
   assert.equal(searchDefs([core, part], '', { used: h => h === 'part' })[0].def.hash, 'part');
   assert.equal(searchDefs([core, part], 'brick', { used: h => h === 'part' })[0].def.hash, 'core');
 });
-test('used badges appear on compact and full find rows in registry and non-registry branches', async t => {
+test('used badges appear on compact and full find rows', async t => {
   const f = fixture(t), b = f.start(); accepted(f.act([define(), place()], b)); f.done();
-  for (const registry of [false, true]) {
-    if (registry) {
-      const reg = new Registry(join(f.dir, 'badge-registry')), d = coreLibrary().get(coreRef('bench'))!;
-      const { item, up } = await makeItem(d, { at: '2026-10-15T00:00:00Z', run: 'test', author: 'test', contract: loadContract() });
-      writeCore(reg, [{ def: d, item, up }], 'test'); f.god.catalog = new RegistryCatalog(reg, { hot: 0 });
-    }
-    for (const compact of ['', '&compact=1']) {
-      const r = (await f.req('/v1/god/defs?q=gothic' + compact)).data;
-      assert.equal(r.defs[0].used[0].build, 'first'); assert.equal(r.defs[0].usedIn[0].placedNow, 1);
-    }
+  for (const compact of ['', '&compact=1']) {
+    const r = (await f.req('/v1/god/defs?q=gothic' + compact)).data;
+    assert.equal(r.defs[0].used[0].build, 'first'); assert.equal(r.defs[0].usedIn[0].placedNow, 1);
   }
 });
 test('start parts are bounded to eight and 2KB, empty before a done build, parts needs god token', async t => {
