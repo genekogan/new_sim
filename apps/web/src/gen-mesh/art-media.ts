@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { frameMediaKind } from '@sim/world-compiler';
 
 export type MediaKind = 'image' | 'video';
-export type ArtInfo = { frame: string; slot: number; url: string; kind: MediaKind; title: string; maker: string };
+export type ArtInfo = { frame: string; slot: number; url: string; kind: MediaKind; title: string; maker: string; broken?: boolean };
 
 /** Accepted media references: http(s) URLs and same-site paths (the shared frame-media rule); never data: or //. */
 export const mediaKind = (url: string): MediaKind | null => frameMediaKind(url);
@@ -60,23 +60,52 @@ export function coverWhenReady(texture: THREE.Texture, geometry: THREE.PlaneGeom
 // ------------------------------------------------------------------ shared videos
 
 const PLAY_M = 30, MAX_PLAYING = 4, RELEASE_MS = 20_000;
-type Entry = { url: string; video: HTMLVideoElement; texture: THREE.VideoTexture; meshes: Map<THREE.Mesh, number>; lastUsed: number; requesting: boolean; retryAt: number; why: string; error: string };
+type Entry = { url: string; video: HTMLVideoElement; texture: THREE.VideoTexture; meshes: Map<THREE.Mesh, number>; lastUsed: number; requesting: boolean; retryAt: number; why: string; error: string; failed: boolean; onFail: Set<() => void> };
 const videos = new Map<string, Entry>();
 let ticking = false;
 
-/** A looping, muted video texture for `url`, shared by every face that shows it. */
-export function videoTexture(url: string, mesh: THREE.Mesh): THREE.Texture {
+/** A looping, muted video texture for `url`, shared by every face that shows it. `onFail` runs (once) if the video
+ *  cannot be loaded — most often a web host that sends no CORS header, which WebGL needs — so the face can say so
+ *  instead of staying black. */
+export function videoTexture(url: string, mesh: THREE.Mesh, onFail?: () => void): THREE.Texture {
   let e = videos.get(url);
   if (!e) {
     const video = document.createElement('video');
     video.crossOrigin = 'anonymous'; video.src = url; video.muted = true; video.loop = true; video.playsInline = true; video.preload = 'metadata';
     const texture = new THREE.VideoTexture(video); texture.colorSpace = THREE.SRGBColorSpace;
-    e = { url, video, texture, meshes: new Map(), lastUsed: performance.now(), requesting: false, retryAt: 0, why: 'new', error: '' };
-    videos.set(url, e);
+    const entry: Entry = { url, video, texture, meshes: new Map(), lastUsed: performance.now(), requesting: false, retryAt: 0, why: 'new', error: '', failed: false, onFail: new Set() };
+    video.addEventListener('error', () => { entry.failed = true; entry.error = entry.error || 'load failed'; for (const f of entry.onFail) f(); entry.onFail.clear(); });
+    e = entry; videos.set(url, e);
   }
+  if (onFail) { if (e.failed) queueMicrotask(onFail); else e.onFail.add(onFail); }
   e.meshes.set(mesh, performance.now()); e.lastUsed = performance.now();
   startTicker();
   return e.texture;
+}
+
+// ------------------------------------------------------------------ images that cannot be shown
+const brokenImages = new Set<string>(), loadedImages = new Set<string>();
+const imageWaiters = new Map<string, Set<() => void>>();
+/** Whether an image link already failed to load in this page (no CORS header, gone, not an image). */
+export const imageBroken = (url: string) => brokenImages.has(url);
+/** Call `onFail` once if the image at `url` fails to load (now or later). */
+export function whenImageFails(url: string, onFail: () => void) {
+  if (brokenImages.has(url)) { queueMicrotask(onFail); return; }
+  if (loadedImages.has(url)) return;
+  let w = imageWaiters.get(url); if (!w) imageWaiters.set(url, (w = new Set())); w.add(onFail);
+}
+/** The image loader's error callback for `url`: remember it and tell every face waiting on it. */
+export function imageFailed(url: string) {
+  brokenImages.add(url);
+  const w = imageWaiters.get(url); imageWaiters.delete(url);
+  for (const f of w ?? []) f();
+}
+/** The image loader's success callback: nothing waits on `url` any more. */
+export function imageLoaded(url: string) { loadedImages.add(url); imageWaiters.delete(url); }
+/** What a face shows instead of a link it cannot load: two short lines naming the host. */
+export function brokenLinkLines(url: string): string[] {
+  let host = ''; try { host = new URL(url, 'http://same-site.invalid').hostname; } catch { /* keep empty */ }
+  return ['Can\'t show this link here', host && host !== 'same-site.invalid' ? host : 'not found'];
 }
 function inScene(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; while (p) { if (!p.visible) return false; if ((p as THREE.Scene).isScene) return true; p = p.parent; } return false; }
 const _cam = new THREE.Vector3(), _pos = new THREE.Vector3(), _n = new THREE.Vector3();
@@ -86,6 +115,7 @@ export function updateVideos(camera: THREE.Camera | null, now = performance.now(
   if (camera) camera.getWorldPosition(_cam);
   const want: { e: Entry; d: number }[] = [];
   for (const e of videos.values()) {
+    if (e.failed) { if (!e.meshes.size) release(e); else for (const [m, seen] of e.meshes) if (!inScene(m) && now - seen > RELEASE_MS) e.meshes.delete(m); continue; }
     let best = Infinity; e.why = camera ? (page ? 'no face in the scene' : 'page hidden') : 'no camera';
     for (const [m, seen] of e.meshes) {
       if (!inScene(m)) { if (now - seen > RELEASE_MS) e.meshes.delete(m); continue; }
@@ -102,15 +132,17 @@ export function updateVideos(camera: THREE.Camera | null, now = performance.now(
   want.sort((a, b) => a.d - b.d);
   const play = new Set(want.slice(0, MAX_PLAYING).map((w) => w.e));
   for (const e of videos.values()) {
-    if (!play.has(e)) { if (!e.video.paused) e.video.pause(); continue; }
+    if (!play.has(e) || e.failed) { if (!e.video.paused) e.video.pause(); continue; }
     e.why = 'near';
     if (e.video.paused && !e.requesting && now >= e.retryAt) { e.requesting = true; void e.video.play().then(() => { e.error = ''; }, (err) => { e.error = String(err?.name ?? err); e.retryAt = performance.now() + 2000; }).finally(() => { e.requesting = false; }); }
   }
 }
-function release(e: Entry) { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); e.texture.dispose(); videos.delete(e.url); }
+function release(e: Entry) { e.onFail.clear(); e.failed = true; e.video.pause(); e.video.removeAttribute('src'); e.video.load(); e.texture.dispose(); videos.delete(e.url); }
 function startTicker() {
   if (ticking || typeof window === 'undefined') return; ticking = true;
   setInterval(() => { const cam = (window as unknown as { __simEntity?: { camera?: THREE.Camera } }).__simEntity?.camera ?? null; try { updateVideos(cam); } catch { /* mid-reload */ } }, 250);
 }
 /** For tests and proof: every shared video and whether it is playing. */
-export function videoState() { return [...videos.values()].map((e) => ({ url: e.url, faces: e.meshes.size, playing: !e.video.paused, readyState: e.video.readyState, time: +e.video.currentTime.toFixed(2), why: e.why, error: e.error })); }
+export function videoState() { return [...videos.values()].map((e) => ({ url: e.url, faces: e.meshes.size, playing: !e.video.paused, readyState: e.video.readyState, time: +e.video.currentTime.toFixed(2), why: e.why, error: e.error, failed: e.failed })); }
+/** For proof: image links that failed to load in this page. */
+export const brokenImageState = () => [...brokenImages];
