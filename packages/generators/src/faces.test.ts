@@ -97,7 +97,7 @@ test('a kit carries at most 32 faces after programs expand', () => {
 
 test('building decals are an optional json param with today\'s look by default; the physics ignore them', () => {
   assert.equal(buildingParams.decals.type, 'json');
-  const plain = buildingPhysics({ style: 'shop' }), decorated = buildingPhysics({ style: 'shop', decals: fixtures.shopDecals });
+  const shop = { style: 'shop', w: 8, d: 9, floors: 2 }, plain = buildingPhysics(shop), decorated = buildingPhysics({ ...shop, decals: fixtures.shopDecals });
   assert.deepEqual(decorated, plain);
   for (const d of fixtures.shopDecals) { assert.equal(decalSchema.safeParse(d).success, true); assert.deepEqual(faceContentIssues(d, true), []); assert.ok(plain.slots.some(s => s.id === d.slot && s.kind === 'wall'), d.slot); }
   assert.match(faceContentIssues({ slot: 'facade-f0-s-1', w: 1, h: 1, text: 'x', side: 'front' }, true)[0].message, /not a face field/);

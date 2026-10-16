@@ -15,6 +15,7 @@ import { overlapNotWorse } from './overlap.ts';
 import { worldBudgetFailure } from './budgets.ts';
 import { creationInputFailure } from './input.ts';
 import { signMediaFailure } from './sign-media.ts';
+import { decalFailure, kitFaceFailure } from './faces.ts'; // XP8 hook
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
@@ -555,7 +556,8 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   for (const e of diff.upserts) {
     const def = scratch.resolvedDef(e.def)!;
-    const failure = signMediaFailure(scratch, def, e.state?.media ?? def.state.media?.default, touchedAt.get(e.id) ?? sourceOp(e), e.id);
+    const failure = signMediaFailure(scratch, def, e.state?.media ?? def.state.media?.default, touchedAt.get(e.id) ?? sourceOp(e), e.id)
+      ?? decalFailure(scratch, def, e.params?.decals ?? (def.params.decals as { default?: unknown } | undefined)?.default, () => scratch.slotsOf(e), touchedAt.get(e.id) ?? sourceOp(e), e.id); // XP8 hook
     if (failure) return { ok: false, failures: [failure] };
   }
   // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
@@ -669,7 +671,7 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
   try {
     const trial = w.fork(), stored = trial.defineDef(def, 'admission', 0);
     resolved = trial.resolvedDef(stored.ref)!;
-    const mediaFailure = signMediaFailure(trial, resolved, resolved.state.media?.default, i);
+    const mediaFailure = signMediaFailure(trial, resolved, resolved.state.media?.default, i) ?? kitFaceFailure(trial, resolved, i); // XP8 hook
     if (mediaFailure) return mediaFailure;
     if (resolved.make.kind === 'gen') {
       const g = GENERATORS[resolved.make.gen];
@@ -681,6 +683,8 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
       const shape: Entity['shape'] = resolved.form === 'path' ? { path: [[0, 0], [1, 0]] }
         : resolved.form === 'area' ? { area: [[0, 0], [1, 0], [0, 1]] } : undefined;
       const baked = trial.bake(resolved, params.ok ? params.values : {}, 0, shape);
+      const decals = decalFailure(trial, resolved, params.ok ? params.values.decals : undefined, () => baked.slots, i); // XP8 hook
+      if (decals) return decals;
       if (baked.tris > lim.budget.tris) return { ...fail(i, 'def.budget', `${baked.tris} tris > ${lim.budget.tris}`), field: 'make', measured: baked.tris, limit: lim.budget.tris, fix: 'Simplify the generated definition.' };
     }
   } catch (error) {
