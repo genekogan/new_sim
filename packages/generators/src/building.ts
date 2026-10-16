@@ -195,13 +195,15 @@ export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []):
     const w = L.walls[o.wall], out = w?.out ?? normalForPoint(o.at), d = (w?.thick ?? L.t) / 2 + 0.02;
     add(`opening-${o.id}`, 'wall', o.at[0] + out[0] * d, FLOOR0 + o.floor * L.fh + o.sill, o.at[1] + out[1] * d, Math.atan2(out[0], out[1]), o.floor, `${o.kind} ${o.id} facade`);
   }
-  const counts = new Map<string, number>();
-  for (const w of L.walls) {
-    if (!w.exterior || !w.out) continue;
+  const counts = new Map<string, number>(), centres = facadeCentres(L);
+  L.walls.forEach((w, wi) => {
+    if (!w.exterior || !w.out) return;
+    // numbering counts every run, so a frame keeps its id when a neighbour has no solid wall to sit on
     const key = `facade-f${w.floor}-${w.side ?? 'wall'}`, n = (counts.get(key) ?? 0) + 1; counts.set(key, n);
+    const at = centres[wi]; if (!at) return;
     const d = w.thick / 2 + 0.02;
-    add(`${key}-${n}`, 'wall', (w.a[0] + w.b[0]) / 2 + w.out[0] * d, (w.y0 + w.y1) / 2, (w.a[1] + w.b[1]) / 2 + w.out[1] * d, Math.atan2(w.out[0], w.out[1]), w.floor, `${w.side ?? 'Outer'} wall, storey ${w.floor}`);
-  }
+    add(`${key}-${n}`, 'wall', at[0] + w.out[0] * d, (w.y0 + w.y1) / 2, at[1] + w.out[1] * d, Math.atan2(w.out[0], w.out[1]), w.floor, `${w.side ?? 'Outer'} wall, storey ${w.floor}`);
+  });
   if (!L.round && (L.roof === 'gable' || L.roof === 'hip')) {
     const alongX = L.W >= L.D, short = Math.min(L.W, L.D), long = Math.max(L.W, L.D), ov = L.open ? 0.4 : 0.35;
     if (L.roof === 'gable' && !L.open) for (const sign of [-1, 1]) {
@@ -214,6 +216,52 @@ export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []):
   return slots;
 }
 function normalForPoint([x, z]: Vec2): Vec2 { return Math.abs(z) >= Math.abs(x) ? [0, Math.sign(z) || 1] : [Math.sign(x), 0]; }
+
+export const FACADE_MOUNT_HALF = 0.2, FACADE_CORNER_CLEAR = 0.5, FACADE_MOUNT_GAP = 0.8;
+/** How far the mesh half may dress beyond an opening's edge (apps/web gen-mesh/building.mesh.ts dressOpening): shutters
+ *  reach 0.54 m past a window that can carry them, the door lamp 0.46 m and the hood brackets 0.25 m past a door; sills,
+ *  lintels and jambs about 0.12 m. A facade mount (half-width up to FACADE_MOUNT_HALF) stays clear of all of them. */
+export function facadeReach(L: BuildingLayout, o: Layout['openings'][number]): number {
+  // the ornament switches stay purely visual (physics never depends on them), so this is the reach with them on
+  const glass = L.material === 'glass';
+  if (o.kind === 'window') return !glass && L.material !== 'stone' && !L.round && o.width <= 1.4 && o.height <= 1.9 ? 0.55 : 0.15;
+  if (o.kind === 'door') return glass ? 0.15 : 0.5;
+  return 0.2;
+}
+
+/** Where each exterior run's facade frame sits (canonical frame, on the wall centreline), or null for none. A frame
+ *  starts at its run's centre and moves along its facade (the collinear runs of one storey and side) to the nearest
+ *  solid wall clear of every door and window with its dressing, of the building's corners, and of frames already
+ *  placed; runs that need to move least choose first. A facade with no such wall left gives that run no frame. */
+export function facadeCentres(L: BuildingLayout): (Vec2 | null)[] {
+  const out: (Vec2 | null)[] = L.walls.map(() => null), groups = new Map<string, number[]>();
+  L.walls.forEach((w, i) => {
+    if (!w.exterior || !w.out) return;
+    const key = w.axis === 'r' ? `r${i}` : `${w.floor}|${w.side}|${w.axis}|${(w.axis === 'x' ? w.a[1] : w.a[0]).toFixed(3)}`;
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+  for (const runs of groups.values()) {
+    const w0 = L.walls[runs[0]], len = Math.hypot(w0.b[0] - w0.a[0], w0.b[1] - w0.a[1]) || 1;
+    const u: Vec2 = [(w0.b[0] - w0.a[0]) / len, (w0.b[1] - w0.a[1]) / len];
+    const t = (p: Vec2) => (p[0] - w0.a[0]) * u[0] + (p[1] - w0.a[1]) * u[1];
+    const at = (s: number): Vec2 => [w0.a[0] + u[0] * s, w0.a[1] + u[1] * s];
+    const ends = runs.flatMap((i) => [t(L.walls[i].a), t(L.walls[i].b)]);
+    // round-tower chords meet at shallow angles, not corners: they only keep the mount on their own chord
+    const corner = w0.axis === 'r' ? FACADE_MOUNT_HALF + 0.05 : FACADE_CORNER_CLEAR;
+    let free: [number, number][] = [[Math.min(...ends) + corner, Math.max(...ends) - corner]];
+    const cut = (lo: number, hi: number) => { free = free.flatMap(([a, b]): [number, number][] => (hi <= a || lo >= b ? [[a, b]] : [...(lo > a ? [[a, lo] as [number, number]] : []), ...(hi < b ? [[hi, b] as [number, number]] : [])])); };
+    for (const o of L.openings) if (o.exterior && runs.includes(o.wall)) { const c = t(o.at), r = o.width / 2 + facadeReach(L, o) + FACADE_MOUNT_HALF; cut(c - r, c + r); }
+    const nearest = (want: number): number | null => { let best: number | null = null; for (const [a, b] of free) { if (b < a) continue; const p = Math.min(b, Math.max(a, want)); if (best === null || Math.abs(p - want) < Math.abs(best - want)) best = p; } return best; };
+    const left = new Set(runs);
+    while (left.size) {
+      let pick: { i: number; p: number; d: number } | null = null;
+      for (const i of left) { const want = (t(L.walls[i].a) + t(L.walls[i].b)) / 2, p = nearest(want); if (p !== null && (!pick || Math.abs(p - want) < pick.d)) pick = { i, p, d: Math.abs(p - want) }; }
+      if (!pick) break;
+      out[pick.i] = at(pick.p); left.delete(pick.i); cut(pick.p - FACADE_MOUNT_GAP, pick.p + FACADE_MOUNT_GAP);
+    }
+  }
+  return out;
+}
 
 /** Outer outline of the footprint (canonical). */
 function outline(L: Layout): Vec2[] {
@@ -233,7 +281,7 @@ export function estimateTris(L: Layout): number {
 
 export const buildingGen: Generator & { layout: typeof buildingLayout } = {
   id: 'building/1', form: 'point', owner: 'L2', params: buildingParams as never,
-  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`); floors are slots `ground`, `floor-1`…; `front` stands outside the door. Styles plan rooms; `plan` overrides. Optional chimney/shutters/flowerBoxes/quoins/hood/doorLamp switches preserve the preset when true. Changing trim recolours sills/lintels. Facade slots: opening-<opening-id> at each exterior sill, facade-f<floor>-<side>-<n> at wall centres, gable-<side> at gable apexes, ridge above the roof. Facades face out (+z); mount kits with place --on house/<slot>. Existing wall-<side>-<n> slots remain.',
+  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`); floors are slots `ground`, `floor-1`…; `front` stands outside the door. Styles plan rooms; `plan` overrides. Optional chimney/shutters/flowerBoxes/quoins/hood/doorLamp switches preserve the preset when true. Changing trim recolours sills/lintels. Facade slots: opening-<opening-id> at each exterior sill, facade-f<floor>-<side>-<n> on solid wall nearest the centre of each wall run, clear of doors and windows (a run with no clear wall has none), gable-<side> at gable apexes, ridge above the roof. Facades face out (+z); mount kits with place --on house/<slot>. Existing wall-<side>-<n> slots remain.',
   physics({ params, args }) { return buildingPhysics(params, args); },
   layout: buildingLayout,
 };

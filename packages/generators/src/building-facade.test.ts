@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildingLayout, buildingPhysics, buildingParams, buildingFacadeSlots } from './building.ts';
+import { buildingLayout, buildingPhysics, buildingParams, buildingFacadeSlots, FACADE_MOUNT_HALF } from './building.ts';
 import { slotSchema } from './fields.ts';
 import fixtures from './fixtures/building-dress.json' with { type: 'json' };
 
@@ -28,10 +28,11 @@ test('every exterior opening gets an outward-facing sill anchor, on every storey
   }
 });
 
-test('each exterior wall run has a facade frame on every storey, including round towers', () => {
+test('each exterior wall run has at most one facade frame and every storey has one, including round towers', () => {
   for (const style of ['cottage', 'townhouse', 'tower']) {
     const p = { style, floors: 3, w: 10, d: 8 }, L = buildingLayout(p), b = buildingPhysics(p);
-    assert.equal(b.slots.filter(s => s.id.startsWith('facade-')).length, L.walls.filter(w => w.exterior).length);
+    const frames = b.slots.filter(s => s.id.startsWith('facade-')).length;
+    assert.ok(frames > 0 && frames <= L.walls.filter(w => w.exterior).length);
     for (let floor = 0; floor < 3; floor++) assert.ok(b.slots.some(s => s.id.startsWith(`facade-f${floor}-`) && s.floor === floor));
     for (const s of b.slots) slotSchema.parse(s);
   }
@@ -62,4 +63,35 @@ test('facade ids avoid authored room ids and preserve the existing wall hang slo
   const all = buildingPhysics({ floors: 2 }).slots;
   assert.equal(new Set(all.map(s => s.id)).size, all.length);
   assert.ok(all.some(s => /^wall-[snew]-\d+$/.test(s.id)));
+});
+
+// r2.1 walk: on the dressed cottage facade-f0-s-1 / -s-2 sat on a window and the front door, so mounted lanterns hung
+// in the openings. A frame now sits on solid wall: clear of every door and window on its facade plus their dressing.
+const along = (slot: { p: number[]; yaw: number }, o: { at: number[]; yaw: number }) => Math.abs((slot.p[0] - o.at[0]) * Math.cos(o.yaw) - (slot.p[2] - o.at[1]) * Math.sin(o.yaw));
+const onFacade = (slot: { p: number[]; yaw: number; floor?: number }, o: { at: number[]; yaw: number; level: number }) =>
+  slot.floor === o.level && Math.abs(Math.sin(slot.yaw - o.yaw)) < 1e-3 && Math.cos(slot.yaw - o.yaw) > 0
+  && Math.abs((slot.p[0] - o.at[0]) * Math.sin(o.yaw) + (slot.p[2] - o.at[1]) * Math.cos(o.yaw)) < 0.5;
+
+test('facade frames sit on solid wall, clear of doors, windows and their dressing, on every style and front', () => {
+  for (const style of ['cottage', 'townhouse', 'hall', 'barn', 'tower', 'shop', 'chapel', 'shed', 'greenhouse'])
+    for (const front of ['s', 'e']) {
+      const b = buildingPhysics({ style, front, floors: style === 'shed' ? 1 : 2 });
+      for (const slot of b.slots.filter(s => s.id.startsWith('facade-')))
+        for (const o of b.openings!.filter(o => o.exterior && onFacade(slot, o as never)))
+          assert.ok(along(slot, o as never) >= o.width / 2 + FACADE_MOUNT_HALF + 0.15 - 2e-3, `${style}/${front} ${slot.id} is ${along(slot, o as never).toFixed(2)} m from ${o.id} (half-width ${o.width / 2})`);
+    }
+});
+
+test('the dressed cottage keeps facade-f0-s-1 and -s-2 beside the front door, clear of its lamp and the windows', () => {
+  const b = buildingPhysics({ style: 'cottage' }), slots = b.slots.filter(s => /^facade-f0-s-[12]$/.test(s.id));
+  assert.deepEqual(slots.map(s => s.id), ['facade-f0-s-1', 'facade-f0-s-2']);
+  const door = b.openings!.find(o => o.id === 'front-door')!;
+  for (const s of slots) {
+    assert.ok(along(s, door as never) >= door.width / 2 + 0.5 + FACADE_MOUNT_HALF - 2e-3, `${s.id} clears the door lamp`);
+    for (const w of b.openings!.filter(o => o.kind === 'window' && onFacade(s, o as never))) assert.ok(along(s, w as never) >= w.width / 2 + 0.55 + FACADE_MOUNT_HALF - 2e-3, `${s.id} clears ${w.id} and its shutters`);
+  }
+  assert.ok(Math.abs(slots[0].p[0] - slots[1].p[0]) >= 0.8 - 1e-6, 'two frames on one stretch of wall stay apart');
+  // a 3 m plaster shed has no wall clear of a shuttered window, so it has no frames; stone windows carry no shutters
+  assert.equal(buildingPhysics({ style: 'shed', w: 3, d: 3 }).slots.some(s => s.id.startsWith('facade-')), false);
+  assert.ok(buildingPhysics({ style: 'shed', w: 3, d: 3, material: 'stone' }).slots.some(s => s.id.startsWith('facade-')));
 });
