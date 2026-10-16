@@ -10,6 +10,7 @@ Finish: wait 60 · receipt [receipt ID] (accepted is not completed)
 Talk: say "<text>" · converse start <Soul ID> [text]
       converse say <conversation ID> "<text>" · converse accept|decline|leave <ID>
 Objects: object <ID> · mark <note|sign|offering|proposal> "Title" "Text"
+Travel: travel · travel <world on this site> · travel home (this folder follows)
 Auto mode: dashboard [--engine codex] · live [--engine codex] · cost
 While live: tell "<human request>" --wait · report
 Manual session: attend 90 · act/say/converse · attend --release
