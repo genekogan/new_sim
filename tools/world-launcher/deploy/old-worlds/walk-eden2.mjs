@@ -1,10 +1,10 @@
-// Lane CLOUD2: real-input walk of the eden2 old-worlds proxy through an SSH tunnel (copy of tools/test-harness/walk-old.mjs, one proxy port for all worlds).
+// Lane CLOUD2 (refreshed by lane KIT 2026-10-15): real-input walk of the eden2 old-worlds proxy through an SSH tunnel (copy of tools/test-harness/walk-old.mjs, one proxy port for all worlds).
 // Real Chrome (GPU), under the Chrome lease; dpr 1 and 2; drag, wheel, hold W, double-click, New Soul click.
-//   node walk-old.mjs <outDir>
+//   node walk-eden2.mjs <outDir>   (WALK_BUILDS='{"eden2":5771}' = label -> tunnel port; WALK_LEASE = Chrome lease holder)
 import {mkdirSync,writeFileSync} from 'node:fs';import {resolve} from 'node:path';import {createRequire} from 'node:module';
-import {chromeLease} from '<worktrees>/root-world-engine/tools/test-harness/../god-skill/lib/chrome-lease.mjs';
+import {chromeLease} from '<worktrees>/lane-kit/tools/god-skill/lib/chrome-lease.mjs';
 const out=resolve(process.argv[2]);mkdirSync(out,{recursive:true});
-const {chromium}=createRequire('<worktrees>/root-world-engine/mars/viewer/package.json')('@playwright/test');
+const {chromium}=createRequire('<worktrees>/lane-kit/mars/viewer/package.json')('@playwright/test');
 const builds=JSON.parse(process.env.WALK_BUILDS??'{"eden2":5771}');  // label → first port of that build's eden/mars/littlemartians
 const worlds=['eden','mars','littlemartians'];const W=1352,H=780;
 const geometry=()=>{const c=document.querySelector('canvas[aria-label="Live 3D view of the world"]');const r=c?.getBoundingClientRect();return {window:[innerWidth,innerHeight],dpr:devicePixelRatio,canvasCss:r&&[Math.round(r.width),Math.round(r.height)],buffer:c&&[c.width,c.height]};};
@@ -15,7 +15,7 @@ const ui=()=>{const vis=e=>{const r=e.getBoundingClientRect();return r.width>0&&
   title:document.title};};
 const cam=()=>globalThis.__simCamera??null;
 const moved=(a,b,k)=>!!(a&&b)&&a[k].some((v,i)=>Math.abs(v-b[k][i])>0.01);
-const release=await chromeLease('cloud2-eden2-walk');const report=[];
+const release=await chromeLease(process.env.WALK_LEASE??'kit');const report=[];
 try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
  try{for(const world of worlds)for(const [build,port0] of Object.entries(builds)){
   const port=port0,tag=`${world}-dpr${dpr}-${build}`;const ctx=await browser.newContext({viewport:{width:W,height:H},deviceScaleFactor:dpr});const page=await ctx.newPage();

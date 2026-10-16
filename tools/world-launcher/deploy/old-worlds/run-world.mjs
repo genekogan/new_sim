@@ -1,8 +1,11 @@
-// eden2 boot-only runner for the old worlds (eden, mars, littlemartians).
-// Same server entry points and option mapping as Codex's laptop runner
-// (runtime-modern-context-prep-001/successor-world-run.mjs); the laptop-only gates
-// (laptop PIDs, paths, git checkout, closure receipts) are replaced by: exact descriptor,
-// Clerk + account-registry env, accepted history never shrinks, Soul rows unchanged by boot.
+// eden2 / relaunch runner for the old worlds (eden, mars, littlemartians). Lane CLOUD2 2026-10-11, refreshed by lane
+// KIT 2026-10-15 for source 1080cfa9.
+// Same server entry points and option mapping as the live laptop runner
+// (team/reviews/convergence-world-run.mjs, PIDs 14604/14605/14606). Its laptop-only gates (prior writer PIDs, GO
+// receipts with a 5-minute expiry, write-once READY files, laptop paths) are replaced by: exact descriptor, Clerk +
+// account-registry env, no dev auth, accepted history never shrinks and its raw-payload prefix hash is unchanged by
+// boot, Soul rows unchanged by boot, sole 127.0.0.1 listener on the (port-mapped) descriptor port.
+// usage: node [--import=port-map.mjs] --experimental-transform-types --env-file=<clerk env> run-world.mjs <descriptor.json>
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
@@ -13,15 +16,23 @@ const hash=s=>createHash('sha256').update(s).digest('hex');
 const path=process.argv[2];check(path,'usage: run-world.mjs <descriptor.json>');
 const d=JSON.parse(readFileSync(path,'utf8'));const key=d.worldKey??'eden';
 check(process.env.AUTH_PROVIDER==='clerk'&&process.env.ACCOUNT_REGISTRY_PATH===d.accountRegistryPath,'Provider/account registry differs');
+check(process.env.DEV_AUTH!=='1','production dev authentication forbidden');
+const portMap=new Map((process.env.SIM_PORT_MAP??'').split(',').filter(Boolean).map(p=>p.split(':').map(Number)));
+const expectedPort=portMap.get(d.port)??d.port;
 const {accountRegistryPath,...desc}=d;
-const souls=db=>db.prepare('SELECT id,entity_id,retired_at FROM souls WHERE world_id=? ORDER BY id').all(d.worldId);
-const cold=new DatabaseSync(join(d.dataDir,'sim.db'),{readOnly:true});
-const before={events:cold.prepare('SELECT count(*) n, max(seq) m FROM events WHERE world_id=?').get(d.worldId),soulsSHA256:hash(JSON.stringify(souls(cold)))};cold.close();
-console.log(JSON.stringify({phase:'pre-boot',world:key,worldId:d.worldId,...before}));
-let app,ready=false;
+// Same fact shapes as convergence-world-run.mjs databaseFacts(): raw-payload/1 event prefix + Soul rows.
+const facts=(db,count)=>{const ev=db.prepare('SELECT seq,tick,kind,author,payload,at FROM events WHERE world_id=? ORDER BY seq').all(d.worldId);
+ const rows=db.prepare('SELECT id,entity_id,retired_at FROM souls WHERE world_id=? ORDER BY id').all(d.worldId);
+ return{count:ev.length,maxSeq:ev.at(-1)?.seq??null,prefixSHA256:hash(JSON.stringify(ev.slice(0,count??ev.length))),soulsSHA256:hash(JSON.stringify(rows)),activeSouls:rows.filter(r=>r.retired_at==null).length};};
+const cold=new DatabaseSync(join(d.dataDir,'sim.db'),{readOnly:true});const before=facts(cold);cold.close();
+console.log(JSON.stringify({phase:'pre-boot',world:key,worldId:d.worldId,events:before.count,maxSeq:before.maxSeq,prefixSHA256:before.prefixSHA256,soulsSHA256:before.soulsSHA256,activeSouls:before.activeSouls}));
+let app;
 const close=()=>app.close();
+// A relaunched laptop writer must survive its launching Terminal closing (Node resets inherited SIG_IGN at startup).
+process.on('SIGHUP',()=>console.log(JSON.stringify({phase:'sighup-ignored',world:key,atUTC:new Date().toISOString()})));
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{if(!app)process.exit(1);void close().then(()=>process.exit(0)).catch(e=>{console.error(e);process.exit(1);});});
 if(key==='eden'){
+ check(desc.flags?.accountAuth===true,'Eden account authorization disabled');
  const {openEdgeServerV1}=await import(pathToFileURL(join(desc.input,'tools/core/edge-server.mjs')));const f=desc.flags??{};
  app=await openEdgeServerV1({...desc,accountAuth:true,seedObjects:desc.objects,localBudget:0,autonomous:false,quiesceThought:true,officeStairGuards:f.officeStairGuards??false,ambient:desc.ambient!==false,humanRest:f.humanRest??true,provisions:f.provisions??true,sequences:f.sequences??true,floorGoals:f.floorGoals??true,kitchen:f.kitchen??true,shore:f.shore??true,foodDeliveryId:f.foodDeliveryId,quietLandingCourtesy:f.quietLandingCourtesy??true,social:f.social??true,approachRetention:f.approachRetention??true,closedGoals:f.closedGoals??true,activateExpansion:f.activateExpansion??true});
 }else{
@@ -30,8 +41,10 @@ if(key==='eden'){
  check(app.lifecycleFact?.alreadyAccepted===true&&app.souls.lifecycle,'Existing native lifecycle not preserved');
 }
 try{
- check(app.cfg.authProvider==='clerk'&&app.auth.ready&&!app.auth.devAuth&&app.host.worldId===d.worldId,'Configured authority/readiness differs');
- const events=app.db.events(d.worldId);check(events.length>=before.events.n,'Accepted history shrank during boot');
- check(hash(JSON.stringify(souls(app.db.db)))===before.soulsSHA256,'Current or retired Souls changed during boot');
- ready=true;console.log(JSON.stringify({phase:'ready',world:key,worldId:d.worldId,port:d.port,build:d.build,pid:process.pid,events:events.length,maxSeq:events.at(-1)?.seq,activeSouls:app.db.liveSouls(d.worldId).length,readyAtUTC:new Date().toISOString()}));
+ check(app.cfg.authProvider==='clerk'&&app.auth.ready&&!app.auth.devAuth&&app.cfg.accountAuthRequired&&app.host.worldId===d.worldId,'Configured authority/readiness differs');
+ const bound=app.server.address();check(bound&&bound.port===expectedPort&&bound.address==='127.0.0.1','Listener identity differs');
+ const now=facts(app.db.db,before.count);
+ check(now.count>=before.count&&now.prefixSHA256===before.prefixSHA256,'Accepted history shrank or changed during boot');
+ check(now.soulsSHA256===before.soulsSHA256&&now.activeSouls===before.activeSouls,'Current or retired Souls changed during boot');
+ console.log(JSON.stringify({phase:'ready',world:key,worldId:d.worldId,port:bound.port,descriptorPort:d.port,build:d.build,pid:process.pid,events:now.count,maxSeq:now.maxSeq,activeSouls:now.activeSouls,prefixSHA256:before.prefixSHA256,readyAtUTC:new Date().toISOString()}));
 }catch(error){await close();throw error;}
