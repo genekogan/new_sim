@@ -280,6 +280,7 @@ test('Soul bodies: a hidden body upload is served as a valid stand-in (never a 4
   const store = mountModeration(app, { db: db.db, worldId: 'w-1', bearer: () => undefined, requireUser: async () => { throw new ApiError(401, 'unauthorized', 'x'); }, siteLog: join(dir, 'site.jsonl') });
   app.get('/v1/edge/body/assets/:file', (c) => c.body(new Uint8Array(rigidGLB()), 200, { 'Cache-Control': 'public, max-age=31536000, immutable' }));
   app.put('/v1/edge/body', (c) => c.json({ ok: true }));
+  app.get('/v1/souls/:id/profile-photo/:hash', (c) => c.body(new Uint8Array(png(2, 2)), 200));
   const get = (sha: string, h: Record<string, string> = {}) => app.request(`/v1/edge/body/assets/body_${sha}.glb`, { headers: h });
   const open = await get(ceramic);
   assert.equal(open.status, 200); assert.equal(open.headers.get('cache-control'), 'public, no-cache'); assert.equal(open.headers.get('etag'), `"body_${ceramic}"`);
@@ -294,4 +295,9 @@ test('Soul bodies: a hidden body upload is served as a valid stand-in (never a 4
   const wear = await app.request('/v1/edge/body', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ assetId: `body_${ceramic}` }) });
   assert.equal(wear.status, 409); assert.equal((await wear.json()).error.code, 'body.moderated');
   assert.equal((await app.request('/v1/edge/body', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ preset: 'humanoid' }) })).status, 200);
+  // profile photos are addressed by their sha too
+  const photo = '9'.repeat(64);
+  assert.equal((await app.request(`/v1/souls/s_1/profile-photo/${photo}`)).status, 200);
+  store.append({ sha: photo, action: 'hide', actor: 'dev:owner', role: 'creator' });
+  assert.equal((await app.request(`/v1/souls/s_1/profile-photo/${photo}`)).status, 404);
 });

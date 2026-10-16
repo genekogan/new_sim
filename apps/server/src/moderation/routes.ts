@@ -16,6 +16,7 @@
 //   404: a Soul wearing it must still render), and revalidation instead of a year of immutable caching,
 //   so a veto reaches browsers that already loaded the file.
 // - `PUT /v1/edge/body` with a hidden assetId: refused.
+// - `GET /v1/souls/<id>/profile-photo/<sha>`: 404 while hidden.
 // - `GET /v1/world/snapshot`: entities whose definitions use a hidden file are left out (with their
 //   children); `x-moderation-version` tells the viewer which veto state it saw.
 // - `GET /v1/world/seq`: carries `moderation: {version, hidden}`, so open viewers redraw within one heartbeat.
@@ -92,6 +93,12 @@ export function mountModeration(app: Hono, d: ModerationDeps): ModerationStore {
     await next();
     if (c.res.status === 200) { c.res.headers.set('cache-control', 'public, no-cache'); c.res.headers.set('etag', etag); }
   });
+  // Soul profile photos (already validated and metadata-free at upload): addressed by their sha, so a veto applies
+  app.use('/v1/souls/:id/profile-photo/:hash', async (c, next) => {
+    const sha = c.req.param('hash');
+    if (sha && store.isHidden(sha)) return c.json({ ok: false, code: 'not-found', message: 'no such photo' }, 404, { ...noStore, 'x-moderation': 'hidden' });
+    return next();
+  });
   app.use('/v1/edge/body', async (c, next) => {
     if (c.req.method !== 'PUT') return next();
     const raw = await c.req.raw.clone().json().catch(() => null) as { assetId?: unknown } | null;
@@ -140,6 +147,10 @@ export function mountModeration(app: Hono, d: ModerationDeps): ModerationStore {
           rows.push({ sha: r.asset_id.slice(5), kind: `body:${desc.type ?? 'unknown'}`, url: desc.modelUrl ?? `/v1/edge/body/assets/${r.asset_id}.glb`, name: null, by: r.owner, at: null });
         }
       } catch { /* no Soul body uploads here */ }
+      try {
+        for (const r of d.db.prepare('SELECT soul_id, hash FROM soul_profile_photos_v1 WHERE world_id=? LIMIT 200').all(d.worldId) as { soul_id: string; hash: string }[])
+          rows.push({ sha: r.hash, kind: 'profile-photo', url: `/v1/souls/${r.soul_id}/profile-photo/${r.hash}`, name: null, by: r.soul_id, at: null });
+      } catch { /* no profile photos here */ }
       return c.json({ uploads: rows.map((r) => ({ ...r, ...view(r.sha) })), version: store.version() }, 200, noStore);
     } catch (e) { return fail(c, e); }
   });
