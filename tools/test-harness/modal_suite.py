@@ -18,7 +18,9 @@ NODE = os.environ.get("REMOTE_SUITE_NODE", "22")
 image = (
     modal.Image.from_registry(f"node:{NODE}-bookworm", add_python="3.12")
     .apt_install("git", "perl", "bsdextrautils", "lsof", "procps", "curl", "build-essential")
-    .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version")
+    # Node 25+ images ship no corepack: install the same pnpm with npm there (the Node 22 image command is unchanged)
+    .run_commands("corepack enable && corepack prepare pnpm@10.27.0 --activate && pnpm --version" if int(NODE.split(".")[0]) < 25
+                  else "npm install -g pnpm@10.27.0 && pnpm --version")
 )
 if SRC:
     image = image.add_local_dir(SRC, "/in")

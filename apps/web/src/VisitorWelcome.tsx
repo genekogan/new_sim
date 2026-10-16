@@ -5,11 +5,13 @@ import {discoverVisitorWorlds} from './visitor-worlds.ts';
 import './visitor-welcome.css';
 type Api=(path:string,body?:unknown,method?:string)=>Promise<{status:number;data:any}>;
 type Props={api:Api;siteApi:Api;worldPath:string;ownerId:string|null;worldId:string;worldName:string;build?:string;handle:WorldViewerHandle|null;state:WorldViewerState|null};
+/** Owner|world pairs whose return card this page already offered automatically. */
+const autoOpened=new Set<string>();
 type Window={path:string;name:string;report:AwayReport};
 export function VisitorWelcome({api,siteApi,worldPath,ownerId,worldId,worldName,build,handle,state}:Props){
  const [moment,setMoment]=useState<FeedbackMoment|null>(null),[windows,setWindows]=useState<Window[]|null>(null),[showAway,setShowAway]=useState(false),[awayError,setAwayError]=useState(''),[missing,setMissing]=useState<string[]>([]),[visitWarning,setVisitWarning]=useState(false);
  const epoch=useRef(0),request=useRef(0),loaded=useRef<string[]>([]);
- async function loadReturn(automatic=false){
+ async function loadReturn(automatic=false,quiet=false){
   if(!ownerId||document.visibilityState==='hidden')return;const generation=epoch.current,id=++request.current;setAwayError('');
   const current=()=>epoch.current===generation&&id===request.current&&document.visibilityState!=='hidden';
   const discovery=await discoverVisitorWorlds({path:worldPath,name:worldName,worldId},fetch,ownerId);if(!current())return;
@@ -25,12 +27,15 @@ export function VisitorWelcome({api,siteApi,worldPath,ownerId,worldId,worldName,
   results.sort((a,b)=>a.path===worldPath?-1:b.path===worldPath?1:a.name.localeCompare(b.name));
   setWindows(results);setMissing([...unavailable,...discovery.paused.map(n=>n+' (not running)'),...(discovery.capped?['More worlds beyond this sixty-world window']:[])]);loaded.current=results.map(w=>w.path);
   if(!results.length)setAwayError('Your return history could not be loaded. Try again.');
-  if(!automatic||results.some(w=>!w.report.firstVisit))setShowAway(true);
+  if(!automatic||!quiet&&results.some(w=>!w.report.firstVisit))setShowAway(true);
   // Acknowledge only source cutoffs actually loaded into this owner's panel.
   setVisitWarning(false);for(const w of results){if(!current())return;const ack=await siteApi(w.path+'/v1/me/visit',{through:w.report.through});if(current()&&ack.status!==200)setVisitWarning(true);}
  }
  useEffect(()=>{
-  epoch.current++;if(ownerId)void loadReturn(true);
+  // A reconnect (a release handover, a network blip) remounts this panel with a new authority generation: that is not a
+  // return, so only the page's first automatic load per owner and world may open the card (a hidden tab coming back still does).
+  const key=`${ownerId}|${worldPath}`,first=!autoOpened.has(key);if(ownerId)autoOpened.add(key);
+  epoch.current++;if(ownerId)void loadReturn(true,!first);
   const markVisited=()=>{if(ownerId&&loaded.current.includes(worldPath))void siteApi(worldPath+'/v1/me/visit',{});};
   const timer=setInterval(()=>{if(document.visibilityState==='visible')markVisited();},60_000);
   const visibility=()=>{if(document.visibilityState==='hidden')markVisited();else if(ownerId)void loadReturn(true);};

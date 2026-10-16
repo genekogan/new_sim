@@ -14,6 +14,10 @@
 //   4 take over one world at a time: the old generation stops it (snapshot saved, process gone), the new one boots it on
 //               the same data. Requests and viewer sockets for that world wait for it instead of failing.
 //   5 exit      the old generation finishes its last responses and exits
+// Canary (step 4, first world): one world moves first, pre-warmed, and must answer /v1/config. If it cannot, nothing
+// else moves: the old generation serves again and boots that world on its own code, the new one exits, and keeper.json
+// says `rolled-back` (activate.sh then points the stage link back; no reload). Pre-warm: each world's new process loads
+// its code in standby while the old one still serves, so a world's pause is only stop + open (children.mjs standby()).
 // If the new generation fails before step 3, the old one resumes as if nothing happened (nothing was touched).
 // A world that cannot be taken over is reported and stays down (never booted twice); release.sh rolls back.
 //
@@ -44,6 +48,8 @@ const dataDir = di >= 0 ? rest[di + 1] : join(realpathSync(link), '.lane/launche
 mkdirSync(dataDir, { recursive: true });
 const STATUS = join(dataDir, 'keeper.json');
 const CONCURRENCY = Number(process.env.SIM_HANDOVER_CONCURRENCY ?? 1);
+// canary take-over (default on; SIM_HANDOVER_CANARY=0 moves every world without a first proof, as before)
+const CANARY = process.env.SIM_HANDOVER_CANARY !== '0';
 
 const status = { keeper: { pid: process.pid, sha: keeperSha(), startedAt: new Date().toISOString(), link, port }, active: null, handover: null };
 function writeStatus() {
@@ -155,10 +161,28 @@ async function handover() {
   activate(next); h.switchedAt = Date.now() - t0;
   try { old.child.send({ t: 'retire' }); } catch { /* gone */ }
   h.state = 'taking-over'; writeStatus();
+  let canaryFailed = null;
   try {
-    const r = await ask(next, { t: 'take-over' }, 30 * 60_000);
-    h.worlds = r.worlds;
+    const r = await ask(next, { t: 'take-over', canary: CANARY }, 30 * 60_000);
+    h.worlds = r.worlds ?? {}; canaryFailed = r.canaryFailed ?? null;
   } catch (e) { h.error = e.message; }
+  // canary: the first world could not run on the new release, and nothing else has moved. The old generation serves
+  // again (it boots that world on its own code), then the new one goes. No reload, no further world blinks.
+  if (canaryFailed && !old.exited) {
+    h.state = 'handing-back'; h.canary = canaryFailed; writeStatus();
+    try {
+      await ask(old, { t: 'unretire', slug: canaryFailed }, 180_000);
+      activate(old); h.switchedBackAt = Date.now() - t0;
+      // the new generation forwards what it still holds (requests waiting for the canary world) to the old one, then goes
+      try { next.child.send({ t: 'retire' }); next.child.send({ t: 'exit' }); } catch { /* gone */ }
+      await withTimeout(new Promise((r) => (next.exited ? r() : next.child.once('exit', r))), 45_000, 'new generation exit').catch(() => { log(`generation ${next.n} did not exit; killing it`); next.child.kill('SIGKILL'); });
+      h.state = 'rolled-back'; h.endedAt = new Date().toISOString(); h.ms = Date.now() - t0;
+      log(`handover ${h.from} → ${h.to}: canary ${canaryFailed} failed (${h.worlds[canaryFailed]?.error ?? '?'}); generation ${old.n} (${old.build}) serves on, in ${h.ms} ms`);
+      handing = null; writeStatus();
+      if (again) { again = false; void handover(); }
+      return;
+    } catch (e) { h.error = `hand back: ${e.message}`; log(`could not hand back to generation ${old.n}: ${e.message}`); }
+  }
   const failed = Object.entries(h.worlds).filter(([, w]) => !w.ok).map(([s]) => s);
   // step 5: the old generation goes (its worlds are all stopped by now, or reported above)
   if (!old.exited) {

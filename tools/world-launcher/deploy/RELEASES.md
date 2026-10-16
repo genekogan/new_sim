@@ -14,9 +14,19 @@
      idle connections.
    - **take over**: one world at a time, the old launcher stops the world (it saves a snapshot and its process exits),
      then the new launcher boots it on the same data. Requests and viewer sockets for that world wait for it; they do
-     not fail. A world never has two processes.
+     not fail. A world never has two writers.
+     - **pre-warm**: before the old process stops, the new launcher starts the world's next process in standby
+       (`SIM_STANDBY=1`, `apps/server/src/standby.ts`): it loads all its code, then waits for SIGUSR2 without opening
+       its database or port. The world keeps serving from the old process meanwhile. After the stop, SIGUSR2 makes it
+       open the data and listen, so the pause is the stop plus opening (measured locally 0.3-0.6 s per world instead
+       of 1.1-1.7 s). If standby fails, that world boots cold, as before. `SIM_PREWARM=0` (keeper env) turns it off.
+     - **canary**: the first world (not an old-world fork) moves first and must also answer `/v1/config`. If it cannot,
+       nothing else moves: the old launcher serves again and boots that world on its own code, requests that waited
+       for it are forwarded there, the new launcher exits, and `keeper.json` says `rolled-back`. Only that world paused
+       (about 1.5 s locally); no reload, no error page. `SIM_HANDOVER_CANARY=0` (keeper env) turns it off.
    - **exit**: the old launcher finishes its last responses and exits.
-3. Then the same checks as before run: the health check must report the new build, and every registered world must
+3. On `rolled-back` (canary failed) `activate.sh` points the stage link back to `<stage>.previous`, prints the canary
+   world's log tail and exits 1: the previous release never stopped serving. Otherwise the same checks as before run: the health check must report the new build, and every registered world must
    answer. If either fails, the stage link goes back to `<stage>.previous` and the unit is reloaded again, which runs
    the same handover in reverse. If that reload fails, the unit is restarted.
 
@@ -27,6 +37,10 @@ The keeper writes its state to `<data>/keeper.json`: keeper pid and sha, the act
 each world's time.
 
 ## When it is a restart instead
+`release.sh --reload` (and `activate.sh … --reload`) hands over even when the release carries a changed `keeper.mjs`:
+the running keeper stays and runs the new launcher (pre-warm works; the canary needs the new keeper, which takes effect
+at the next restart). Use it to ship a keeper change without a full restart.
+
 `activate.sh` restarts the unit (all worlds blink, as before) on the first install of the keeper, when the release
 carries a changed `keeper.mjs`, or when given `release.sh --restart`. A change to the unit file or to
 `/etc/sim-worlds/<stage>.conf` (port, data, caps) also needs `--restart`, because the keeper keeps the arguments it

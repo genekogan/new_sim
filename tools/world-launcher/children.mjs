@@ -7,6 +7,9 @@ import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, wri
 import { join, resolve } from 'node:path';
 import { memAvailableMb, rotateLog } from './production.mjs';
 
+/** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
+export const STANDBY_MARK = '[standby] ready';
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const backoffMs = (n) => Math.min(30_000, 500 * 2 ** Math.max(0, n));
 
@@ -49,18 +52,44 @@ export class ChildPool {
   }
   /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
    *  then it boots here on the same data. Requests that arrive meanwhile wait on `ready` instead of failing. */
-  takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
+  async takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
     const k = this.kids.get(slug);
-    if (!k?.adopted) return Promise.resolve(k?.port ?? null);
+    if (!k?.adopted) return k?.port ?? null;
+    // pre-warm: the next process loads its code while the previous one still serves (no database, no port yet); until
+    // it is ready the world stays 'running' on the old process, so visitors' requests do not wait for the warm-up
+    const warm = !this.o.prewarm ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
     k.status = 'handover'; this.o.onChange?.(slug);
     k.ready = (async () => {
+      k.pauseStart = Date.now();   // from here the world does not answer until the new process does
       try { await release(slug); }
-      catch (e) { k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
+      catch (e) { warm?.child.kill('SIGTERM'); k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
       k.adopted = null; this.savePids();
-      if (this.closing || this.fenced) { k.status = 'stopped'; throw new Error(`world ${slug}: this launcher is closing`); }
-      return this.boot(k, timeoutMs);
+      if (this.closing || this.fenced) { warm?.child.kill('SIGTERM'); k.status = 'stopped'; throw new Error(`world ${slug}: this launcher is closing`); }
+      if (warm && warm.child.exitCode === null && warm.child.signalCode === null) {
+        k.status = 'starting'; k.port = warm.port; k.asleep = false; this.attach(k, warm);
+        warm.child.kill('SIGUSR2');   // open the data and the port now
+        const run = this.healthy(k, warm, timeoutMs);
+        this.inflight.add(run); run.then(() => this.inflight.delete(run), () => this.inflight.delete(run));
+        return run;
+      }
+      return this.boot(k, timeoutMs);   // no standby process (old release, or it failed): a cold boot, as before
     })().finally(() => { k.ready = null; });
     return k.ready;
+  }
+  /** Start the world's next process in standby (SIM_STANDBY=1, apps/server/src/standby.ts) on its current port, which
+   *  is free again once the previous process is released; resolves when it reports its code loaded. */
+  async standby(k, timeoutMs = 60_000) {
+    const t0 = Date.now(), run = this.launch(k, k.port, { SIM_STANDBY: '1' }, { rotate: false });
+    await new Promise((yes, no) => {
+      let buf = '';
+      const t = setTimeout(() => done(new Error(`no standby mark in ${timeoutMs / 1000}s`)), timeoutMs);
+      const onData = (d) => { buf = (buf + d).slice(-4096); if (buf.includes(STANDBY_MARK)) done(null); };
+      const onExit = () => done(new Error('exited while loading'));
+      const done = (e) => { clearTimeout(t); run.child.stdout.off('data', onData); run.child.off('exit', onExit); if (e) { run.child.kill('SIGKILL'); no(e); } else yes(); };
+      run.child.stdout.on('data', onData); run.child.once('exit', onExit);
+    });
+    k.lastWarm = { ok: true, ms: Date.now() - t0 };
+    return run;
   }
   /** Preparing a handover: hold every new boot at the gate (unpause() lets them go on; fence() refuses them). */
   pause() { if (!this.gate) { let open; const p = new Promise((r) => { open = r; }); this.gate = { p, open }; } }
@@ -69,6 +98,11 @@ export class ChildPool {
   async settled() { await Promise.allSettled([...this.inflight]); }
   /** After a handover: refuse every start and restart; children that exit stay stopped. */
   fence() { this.fenced = true; for (const k of this.kids.values()) if (k.timer) { clearTimeout(k.timer); k.timer = null; } this.unpause(); }
+  /** This pool's canary failed (keeper.mjs hands back to the previous launcher): the world is never started here again
+   *  and the pid file is the previous launcher's alone. */
+  handBack(slug) { const k = this.kids.get(slug); if (k) k.handedBack = true; this.o.pidFile = null; }
+  /** The next launcher's canary failed (keeper.mjs): this pool runs its worlds again. */
+  unfence() { this.fenced = false; }
   /** The running children, for the next launcher to adopt. */
   handoverList() { return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
 
@@ -125,6 +159,7 @@ export class ChildPool {
   ensure(world, { timeoutMs = 90_000 } = {}) {
     if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
+    if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
     if (k) k.lastUsed = Date.now();
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
@@ -171,27 +206,39 @@ export class ChildPool {
       for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
     }
     k.port = port; k.asleep = false;
+    const run = this.launch(k, port);
+    this.attach(k, run);
+    return this.healthy(k, run, timeoutMs);
+  }
+  /** Spawn one world process on `port` (its log appended to the world's log file); not yet the world's child. */
+  launch(k, port, extraEnv = {}, { rotate = true } = {}) {
     const base = (this.o.command ?? defaultCommand)(k.world, port, this.o);
     const { cmd, args, env } = this.o.decorate ? this.o.decorate(base) : base;
     const logFile = join(this.o.logDir, `${k.slug}.log`);
-    rotateLog(logFile);
+    if (rotate) rotateLog(logFile);
     const log = createWriteStream(logFile, { flags: 'a' });
-    log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})\n`);
-    const child = spawn(cmd, args, { cwd: this.o.root, env, stdio: ['ignore', 'pipe', 'pipe'] });
-    k.child = child; k.script = args.find((a) => !a.startsWith('-')) ?? args[0]; this.savePids();
+    log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})${extraEnv.SIM_STANDBY ? ' standby' : ''}\n`);
+    const child = spawn(cmd, args, { cwd: this.o.root, env: { ...env, ...extraEnv }, stdio: ['ignore', 'pipe', 'pipe'] });
+    const run = { child, port, script: args.find((a) => !a.startsWith('-')) ?? args[0], exited: false };
     child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
-    let exited = false;
-    child.once('exit', (code, signal) => { exited = true; log.end(`--- exit ${code ?? signal}\n`); this.onExit(k, child, code, signal); });
+    child.once('exit', (code, signal) => { run.exited = true; log.end(`--- exit ${code ?? signal}\n`); this.onExit(k, child, code, signal); });
     child.once('error', (e) => { log.write(`--- spawn error ${e.message}\n`); });
+    return run;
+  }
+  /** The process becomes this world's child (crash restarts, stop, pid file). */
+  attach(k, run) { k.child = run.child; k.script = run.script; this.savePids(); }
+  /** Resolve with the port once the world answers /healthz; a process that exits or never answers fails the boot. */
+  async healthy(k, run, timeoutMs) {
+    const { child, port } = run;
     const health = `http://127.0.0.1:${port}${(this.o.healthPath ?? ((s) => `/w/${s}/healthz`))(k.slug)}`;
     const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline && !exited && !k.stopped) {
+    while (Date.now() < deadline && !run.exited && !k.stopped) {
       try { const r = await fetch(health, { signal: AbortSignal.timeout(1500) }); if (r.ok) { k.status = 'running'; k.upSince = Date.now(); this.o.onChange?.(k.slug); return port; } } catch { /* booting */ }
       await sleep(150);
     }
-    if (!exited) child.kill('SIGKILL');
+    if (!run.exited) child.kill('SIGKILL');
     k.status = 'failed'; this.o.onChange?.(k.slug);
-    throw new Error(exited ? `world ${k.slug} exited while booting (see ${join(this.o.logDir, k.slug + '.log')})` : `world ${k.slug} did not answer /healthz within ${timeoutMs / 1000}s`);
+    throw new Error(run.exited ? `world ${k.slug} exited while booting (see ${join(this.o.logDir, k.slug + '.log')})` : `world ${k.slug} did not answer /healthz within ${timeoutMs / 1000}s`);
   }
 
   onExit(k, child, code, signal) {

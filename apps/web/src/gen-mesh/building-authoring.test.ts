@@ -32,13 +32,18 @@ function draw(name: string, extra: Record<string, unknown> = {}, entity?: Entity
   const ctx = { def, entity: e, params, args: def.make.kind === 'gen' ? def.make.args ?? {} : {}, baked: w.bake(def, params as Record<string, Value>, 7), model: w, materials: new MaterialLib(), tint: (_k: string, f: string) => f } as MeshCtx;
   return meshFor(def)!.build(ctx)!;
 }
+// hash: the exact float bytes, pinned on the authoring platform (macOS arm64). grid: the same values on a 1e-3 grid, which
+// every platform must match: Linux x64 rounds a few lighthouse trig results one float32 ulp differently (Modal V4, Node 22
+// and 26 alike), which changes exact bytes but no shape.
+const EXACT = process.platform === 'darwin' && process.arch === 'arm64';
 function stats(g: THREE.Object3D) {
-  const h = createHash('sha256'); let tris = 0, draws = 0;
+  const h = createHash('sha256'), q = createHash('sha256'); let tris = 0, draws = 0;
   g.traverse(o => { const m = o as THREE.Mesh; if (!m.isMesh) return;
-    h.update(m.name); for (const k of ['position', 'normal', 'color']) h.update(new Uint8Array((m.geometry.attributes[k].array as Float32Array).buffer));
+    h.update(m.name); q.update(m.name);
+    for (const k of ['position', 'normal', 'color']) { const a = m.geometry.attributes[k].array as Float32Array; h.update(new Uint8Array(a.buffer)); q.update(new Uint8Array(Int32Array.from(a, (v) => Math.round(v * 1000)).buffer)); }
     tris += m.geometry.attributes.position.count / 3; draws++;
   });
-  return { hash: h.digest('hex'), tris, draws };
+  return { hash: h.digest('hex'), grid: q.digest('hex'), tris, draws };
 }
 function triangles(g: THREE.Object3D) {
   const out: string[] = [];
@@ -51,7 +56,11 @@ function triangles(g: THREE.Object3D) {
 
 test('all 40 library buildings retain exact pre-XP3 positions, normals, colours and draw counts', () => {
   assert.equal(defaults.length, CORE_KIT.filter(d => d.make.kind === 'gen' && d.make.gen === 'building/1').length);
-  for (const { name, ...expected } of defaults) assert.deepEqual(stats(draw(name.replace(/^core-/, ''))), expected, name);
+  for (const { name, hash, ...expected } of defaults) {
+    const { hash: actual, ...rest } = stats(draw(name.replace(/^core-/, '')));
+    assert.deepEqual(rest, expected, name);
+    if (EXACT) assert.equal(actual, hash, `${name}: exact bytes on the authoring platform`);
+  }
 });
 
 test('each ornament switch removes only its own triangles, without changing the remaining seeded facade', () => {

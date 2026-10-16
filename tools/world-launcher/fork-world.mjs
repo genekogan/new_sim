@@ -50,6 +50,13 @@ async function main() {
   check(process.env.AUTH_PROVIDER === 'clerk' && process.env.ACCOUNT_REGISTRY_PATH, 'a fork signs in with Clerk and its own account registry (AUTH_PROVIDER, ACCOUNT_REGISTRY_PATH)');
   check(process.env.BRAIN_MODE === 'fake' && !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.TYPESAFE_API_KEY, 'a fork runs no model (fake brain, no keys)');
   const key = d.worldKey;
+  // load the entry point's code first: under a release handover (SIM_STANDBY=1) the process waits here, nothing opened
+  const entry = await import(pathToFileURL(join(d.input, key === 'eden' ? 'tools/core/edge-server.mjs' : 'tools/core/multiworld/world-server.mjs')).href);
+  const { standby } = await import(pathToFileURL(join(ROOT, 'apps/server/src/standby.ts')).href);
+  await standby(async () => {   // the server modules the entry point loads while it boots (same env, so the same config)
+    const mods = ['db', 'world', 'auth', 'brain', 'souls', 'hub', 'http', 'mcp', 'living', 'world-request-path', 'edge/ledger/ledger', ...(key === 'eden' ? ['eden-bootstrap', 'intent-control'] : [])];
+    for (const m of [...mods.map((x) => `apps/server/src/${x}.ts`), 'packages/engine-mars/src/index.ts']) await import(pathToFileURL(join(d.input, m)).href);
+  });
   const souls = (db) => db.prepare('SELECT id,entity_id,retired_at FROM souls WHERE world_id=? ORDER BY id').all(d.worldId);
   const cold = new DatabaseSync(join(d.dataDir, 'sim.db'), { readOnly: true });
   const before = { events: cold.prepare('SELECT count(*) n, max(seq) m FROM events WHERE world_id=?').get(d.worldId), soulsSHA256: hash(JSON.stringify(souls(cold))) };
@@ -60,11 +67,11 @@ async function main() {
   const close = () => app.close();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { if (!app) process.exit(1); void close().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); }); });
   if (key === 'eden') {
-    const { openEdgeServerV1 } = await import(pathToFileURL(join(d.input, 'tools/core/edge-server.mjs')).href); const f = d.flags ?? {};
+    const { openEdgeServerV1 } = entry; const f = d.flags ?? {};
     app = await openEdgeServerV1({ ...d, accountAuth: true, seedObjects: d.objects, localBudget: 0, autonomous: false, quiesceThought: true, officeStairGuards: f.officeStairGuards ?? false, ambient: d.ambient !== false, humanRest: f.humanRest ?? true, provisions: f.provisions ?? true, sequences: f.sequences ?? true, floorGoals: f.floorGoals ?? true, kitchen: f.kitchen ?? true, shore: f.shore ?? true, foodDeliveryId: f.foodDeliveryId, quietLandingCourtesy: f.quietLandingCourtesy ?? true, social: f.social ?? true, approachRetention: f.approachRetention ?? true, closedGoals: f.closedGoals ?? true, activateExpansion: f.activateExpansion ?? true });
   } else {
     check(d.accountAuth === true && d.authMode === 'configured' && d.seedCast === false && d.nativeCast === false && d.runtimePolicies === false && d.nativeLifecycleV1 === true, 'native create/cast/policy settings differ from the old world');
-    const { openWorldServer } = await import(pathToFileURL(join(d.input, 'tools/core/multiworld/world-server.mjs')).href);
+    const { openWorldServer } = entry;
     app = await openWorldServer(d);
     check(app.lifecycleFact?.alreadyAccepted === true && app.souls.lifecycle, 'existing native lifecycle not preserved');
   }

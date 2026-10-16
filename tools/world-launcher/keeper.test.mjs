@@ -11,16 +11,17 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const PORT = 6017, RANGE = '6018-6019';
+const PORT = Number(process.env.KEEPER_TEST_PORT ?? 6017), RANGE = `${PORT + 1}-${PORT + 2}`;   // a lane may move it into its own range
 const dir = mkdtempSync(join(tmpdir(), 'keeper-test-'));
 const data = join(dir, 'data'), link = join(dir, 'current');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-function release(name, { brokenLauncher = false, brokenWorlds = false } = {}) {
+function release(name, { brokenLauncher = false, brokenWorlds = false, loadMs = 0 } = {}) {
   const r = join(dir, name);
   mkdirSync(join(r, 'apps/server/src'), { recursive: true }); mkdirSync(join(r, 'worlds/templates'), { recursive: true });
   mkdirSync(join(r, 'apps/web/dist'), { recursive: true }); writeFileSync(join(r, 'apps/web/dist/index.html'), `<!doctype html><title>${name}</title>`);
   cpSync(here, join(r, 'tools/world-launcher'), { recursive: true, filter: (f) => !f.includes('/deploy/') && !f.endsWith('.test.mjs') });
-  writeFileSync(join(r, 'apps/server/src/main.ts'), brokenWorlds ? 'process.exit(5);\n' : readFileSync(join(here, 'fake-world.mjs')));
+  // loadMs: the release's code takes that long to load (the part a pre-warmed take-over hides)
+  writeFileSync(join(r, 'apps/server/src/main.ts'), brokenWorlds ? 'process.exit(5);\n' : `process.env.FAKE_LOAD_MS ??= '${loadMs}';\n` + readFileSync(join(here, 'fake-world.mjs')));
   if (brokenLauncher) writeFileSync(join(r, 'tools/world-launcher/launcher.mjs'), 'process.exit(3);\n');
   writeFileSync(join(r, 'BUILD'), `we-${name}`);
   return r;
@@ -31,7 +32,7 @@ const status = () => JSON.parse(readFileSync(join(data, 'keeper.json'), 'utf8'))
 async function handover(target) {
   const before = status().handover?.startedAt ?? null;
   point(target); keeper.kill('SIGHUP');
-  for (let i = 0; i < 300; i++) { const h = status().handover; if (h && h.startedAt !== before && (h.state === 'done' || h.state === 'failed')) return h; await sleep(50); }
+  for (let i = 0; i < 300; i++) { const h = status().handover; if (h && h.startedAt !== before && (h.state === 'done' || h.state === 'failed' || h.state === 'rolled-back')) return h; await sleep(50); }
   throw new Error('handover did not finish');
 }
 /** GETs every 20 ms while `during` runs: any refused connection or 5xx is what a visitor would see as an error page. */
@@ -43,7 +44,7 @@ async function watch(slugs, during) {
 }
 let keeper, A, B;
 before(async () => {
-  A = release('a'); B = release('b');
+  A = release('a'); B = release('b', { loadMs: 800 });
   point(A);
   keeper = spawn(process.execPath, [join(A, 'tools/world-launcher/keeper.mjs'), '--link', link, '--port', String(PORT), '--range', RANGE, '--data', data, '--base', '/worlds', '--eager', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
   let logs = ''; keeper.stdout.on('data', (d) => { logs += d; }); keeper.stderr.on('data', (d) => { logs += d; }); keeper.logs = () => logs;
@@ -63,6 +64,9 @@ test('reload hands every world to the new release with no refused connection and
   const { out: h, bad, slowest } = await watch(['one', 'two'], () => handover(B));
   assert.equal(h.state, 'done', JSON.stringify(h)); assert.equal(h.from, 'we-a'); assert.equal(h.to, 'we-b');
   assert.deepEqual(Object.keys(h.worlds).sort(), ['one', 'two']); assert.ok(Object.values(h.worlds).every((w) => w.ok));
+  // canary first, then the rest; every new process was pre-warmed, so a world's pause is shorter than B's 800 ms code load
+  assert.equal(Object.values(h.worlds).filter((w) => w.canary).length, 1, JSON.stringify(h.worlds));
+  for (const [s, w] of Object.entries(h.worlds)) { assert.equal(w.warm?.ok, true, `${s} pre-warmed`); assert.ok(w.warm.ms >= 700, `${s} loaded its code in standby (${w.warm.ms} ms)`); assert.ok(w.ms < 700, `${s} paused ${w.ms} ms, under the code load`); }
   assert.deepEqual(bad, [], 'a visitor saw an error');
   assert.ok(slowest < 5000, `a request waited ${slowest} ms`);
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
@@ -78,13 +82,22 @@ test('a new release whose launcher cannot start changes nothing: the running one
   assert.deepEqual(bad, []);
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
 });
-test('a release whose worlds cannot boot is reported per world, never boots a world twice, and reloading back restores it', async () => {
-  const h = await handover(release('noboot', { brokenWorlds: true }));
-  assert.equal(h.state, 'failed'); assert.deepEqual(h.failed.sort(), ['one', 'two']);
-  const back = await handover(B);
-  assert.equal(back.state, 'done');
-  for (const s of ['one', 'two']) { let ok = false; for (let i = 0; i < 50 && !ok; i++) { ok = (await api(`/w/${s}/healthz`)).ok; if (!ok) await sleep(100); } assert.ok(ok, `${s} is back`); }
+test('a release whose worlds cannot boot fails its canary: only that world pauses (no error), the running release serves on, no reload', async () => {
+  const pids = Object.fromEntries((await Promise.all(['one', 'two'].map(async (s) => [s, (await (await api(`/w/${s}/healthz`)).json()).pid]))));
+  const { out: h, bad } = await watch(['one', 'two'], () => handover(release('noboot', { brokenWorlds: true })));
+  assert.equal(h.state, 'rolled-back', JSON.stringify(h)); assert.ok(['one', 'two'].includes(h.canary));
+  assert.deepEqual(Object.keys(h.worlds), [h.canary], 'nothing but the canary moved'); assert.equal(h.worlds[h.canary].ok, false);
+  const other = h.canary === 'one' ? 'two' : 'one';
+  assert.equal((await (await api(`/w/${other}/healthz`)).json()).pid, pids[other], 'the other world kept its process');
+  assert.deepEqual(bad, [], 'requests for the canary world wait for it to come back instead of failing');
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
+  assert.equal(status().active.build, 'we-b');
+  let ok = false; for (let i = 0; i < 50 && !ok; i++) { ok = (await api(`/w/${h.canary}/healthz`)).ok; if (!ok) await sleep(100); }
+  assert.ok(ok, 'the canary world runs again on the previous release');
+  // and the next good release still hands over normally from the generation that served on
+  const next = await handover(release('c'));
+  assert.equal(next.state, 'done', JSON.stringify(next)); assert.equal(next.to, 'we-c');
+  assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-c');
 });
 test('SIGTERM stops the keeper, its launcher and every world', async () => {
   const kids = (await (await api('/__sim/launcher')).json()).children.map((c) => c.pid).filter(Boolean);

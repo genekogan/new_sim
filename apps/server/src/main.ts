@@ -32,6 +32,10 @@ import {installPuntActivities} from './punt-install.ts';
 import {readFileSync} from 'node:fs';
 import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
+import { standby } from './standby.ts';
+
+// Release pre-warm (SIM_STANDBY=1, launcher handover): all code is loaded here; the database and port open only after SIGUSR2.
+await standby(async () => { if (config.engine === 'mars') await import('@sim/engine-mars'); await import('./edge/body/migrate-looks.ts'); });
 
 // K1 / NT5: new kit fields are admitted only with the viewer that can draw them.
 try { setKitViewerContract(JSON.parse(readFileSync(join(config.webDir, 'kit-contract.json'), 'utf8'))); }
