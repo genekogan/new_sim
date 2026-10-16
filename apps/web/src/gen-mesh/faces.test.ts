@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { GENERATORS, kitArgs, type Value } from '@sim/generators';
 import { CORE_KIT, WorldModel, type Entity } from '@sim/world-compiler';
 import { buildKit } from './kit.mesh.ts';
-import { decalGroups, faceImagePath, patternPixels, patternSize, shapeFaceMeshes } from './faces.ts';
+import { FACE_TEXTURE_BUDGET, decalGroups, faceImagePath, faceTextureCache, patternPixels, patternSize, shapeFaceMeshes, textCanvasSize } from './faces.ts';
 import { MaterialLib } from './materials.ts';
 import { meshFor, type MeshCtx } from './registry.ts';
 import './building.mesh.ts';
@@ -203,15 +203,42 @@ test('decals never reshuffle the building: adding one or editing its text leaves
   }
 });
 
-test('face textures are cached per content and bounded: past the cap they are released, never leaked', () => {
+test('face textures are budgeted by bytes, least recently used first; only the evicted texture and its materials go', () => {
   const box = sandbox();
   try {
     const board = (text: string) => shapeFaceMeshes({ kind: 'box', at: [0, 0, 0], size: [1, 0.5, 0.05], faces: [{ text }] } as never, 0)[0].material as THREE.MeshStandardMaterial;
-    const first = board('cap-0'), disposed: string[] = [];
-    assert.equal(board('cap-0').map, first.map, 'same content, same texture');
-    first.map!.addEventListener('dispose', () => disposed.push('texture'));
-    for (let i = 1; i < 400; i++) board(`cap-${i}`);
-    assert.deepEqual(disposed, ['texture'], 'the oldest texture was released once the cache filled');
-    assert.notEqual(board('cap-0').map, first.map, 'and is rebuilt on demand');
+    const first = board('lru-0'), drawn = board('lru-drawn'), disposed: string[] = [];
+    assert.equal(board('lru-0').map, first.map, 'same content, same texture');
+    first.map!.addEventListener('dispose', () => disposed.push('first')); first.addEventListener('dispose', () => disposed.push('first material'));
+    drawn.map!.addEventListener('dispose', () => disposed.push('drawn'));
+    // 512×256 canvases (~0.7 MB with mipmaps): 400 of them overflow the budget; `drawn` is asked for now and then.
+    for (let i = 1; i < 400; i++) { board(`lru-${i}`); if (i % 40 === 0) board('lru-drawn'); assert.ok(faceTextureCache().bytes <= FACE_TEXTURE_BUDGET.bytes, `${faceTextureCache().bytes} bytes`); }
+    assert.deepEqual(disposed.sort(), ['first', 'first material'], 'the least recently used went, with its material; the one in use stayed');
+    assert.equal(board('lru-drawn').map, drawn.map);
+    assert.notEqual(board('lru-0').map, first.map, 'and is rebuilt on demand');
+    assert.ok(faceTextureCache().textures < 400);
   } finally { box.restore(); }
+  // Text canvases follow the face's size and aspect, at most 1024 wide: a 20 m banner gets a short canvas, not 2048.
+  assert.deepEqual(textCanvasSize(1, 1.05, 0.2), [672, 128]);
+  assert.deepEqual(textCanvasSize(1, 20, 0.36), [1024, 18]);
+  assert.deepEqual(textCanvasSize(6, 1, 1), [512, 512]);
+  assert.deepEqual(textCanvasSize(1, 0.3, 0.05), [384, 64]);
+});
+
+test('decals hide with their storey in the interior view, and a building decides that once per frame', () => {
+  const { root } = building(coreWorld('interior'), 'core/shop@1', { decals: [...fixtures.shopDecals, { slot: 'facade-f1-s-1', w: 1, h: 0.5, text: 'ROOMS' }] });
+  const decals = faces(root, 'building-decal'), upper = decals.find(d => d.parent?.name === 'level-1')!, sign = decals.find(d => d.parent?.name === 'level-0')!;
+  assert.ok(upper && sign);
+  const camera = new THREE.PerspectiveCamera(), matrix = camera.matrixWorld; let reads = 0;
+  Object.defineProperty(camera, 'matrixWorld', { get: () => { reads++; return matrix; } });
+  const meshes: THREE.Mesh[] = []; root.traverse(o => { if ((o as THREE.Mesh).isMesh) meshes.push(o as THREE.Mesh); });
+  assert.ok(meshes.length > 10);
+  const frame = (n: number, eye: [number, number, number]) => {
+    matrix.makeTranslation(...eye); reads = 0;
+    const renderer = { info: { render: { frame: n } } } as unknown as THREE.WebGLRenderer, shown = new Map<THREE.Mesh, boolean>();
+    for (const m of meshes) { m.onBeforeRender(renderer, new THREE.Scene(), camera, m.geometry, m.material as THREE.Material, null as never); shown.set(m, m.geometry.drawRange.count > 0); m.onAfterRender(renderer, new THREE.Scene(), camera, m.geometry, m.material as THREE.Material, null as never); }
+    return { reads, upper: shown.get(upper), sign: shown.get(sign) };
+  };
+  assert.deepEqual(frame(1, [0, 1.6, 2]), { reads: 1, upper: false, sign: true }, 'inside on the ground floor: the upper storey and its decal hide');
+  assert.deepEqual(frame(2, [0, 3, 20]), { reads: 1, upper: true, sign: true }, 'from the street everything shows');
 });

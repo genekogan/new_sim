@@ -485,6 +485,12 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
       if (!roofsOff && camLocal.y < (level + 1) * L.fh + FLOOR0 - SLAB - 0.05) keepSlab = level + 1;
     }
   };
+  // XP8 hook: one decision per building per rendered frame and camera, however many meshes (decals add up to 16) ask.
+  let decided = -1, decidedFor: THREE.Camera | null = null;
+  const decideOnce = (renderer: THREE.WebGLRenderer, camera: THREE.Camera) => {
+    const frame = renderer?.info?.render?.frame;
+    if (frame === undefined || frame !== decided || camera !== decidedFor) { decided = frame ?? -1; decidedFor = camera; decide(camera); }
+  };
   // furniture and other children on hidden storeys follow the cut (WorldEntityLayer reads this; L1 patch 04)
   const floorOf: Record<string, number> = { ground: 0, porch: 0, roof: L.floors, ...(L.balcony ? { balcony: L.balcony.floor } : {}) };
   for (let k = 1; k < L.floors; k++) floorOf[`floor-${k}`] = k;
@@ -496,12 +502,12 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
     const gname = mesh.parent?.name ?? '';
     const slab = gname.startsWith('slab-'), level = gname === 'roof' ? Infinity : Number(gname.replace(/^(level|slab)-/, ''));
     const hidden = () => (level === Infinity ? hideRoof : slab ? level !== keepSlab && (level > hideAbove || (level === L.floors && hideRoof)) : level > hideAbove);
-    mesh.onBeforeRender = (_r, _s, camera, geometry) => {
-      mainCamera = camera; decide(camera);
+    mesh.onBeforeRender = (renderer, _s, camera, geometry) => {
+      mainCamera = camera; decideOnce(renderer, camera);
       (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
     };
-    mesh.onBeforeShadow = (_r, _o, _c, _sc, geometry) => {
-      if (mainCamera) decide(mainCamera);
+    mesh.onBeforeShadow = (renderer, _o, _c, _sc, geometry) => {
+      if (mainCamera) decideOnce(renderer, mainCamera);
       (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
     };
     mesh.onAfterRender = (_r, _s, _c, geometry) => { (geometry as THREE.BufferGeometry).setDrawRange(0, Infinity); };

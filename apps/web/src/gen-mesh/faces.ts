@@ -10,13 +10,31 @@ const LIFT = 0.004;
 /** Text-up of each local side (front/back/left/right read upright; a top reads from the front; a bottom from below the front). */
 const UP: Record<FaceSide, V3> = { front: [0, 1, 0], back: [0, 1, 0], left: [0, 1, 0], right: [0, 1, 0], top: [0, 0, -1], bottom: [0, 0, 1] };
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-const textures = new Map<string, THREE.Texture>();
+/** Face textures are budgeted by bytes (RGBA with mipmaps), least recently used first out. An evicted texture that is
+ *  still drawn re-uploads on its next draw; only the evicted texture and its materials are released. */
+export const FACE_TEXTURE_BUDGET = Object.freeze({ bytes: 192 * 2 ** 20, count: 1024 });
+const textures = new Map<string, { t: THREE.Texture; bytes: number }>(); // insertion order = recency
 const materials = new Map<string, THREE.MeshStandardMaterial>();
-let loader: THREE.TextureLoader | undefined;
-/** Bounded caches: past the cap everything is released (a texture still in use re-uploads on its next draw). */
-function remember(key: string, t: THREE.Texture): THREE.Texture {
-  if (textures.size >= 384) { for (const x of textures.values()) x.dispose(); for (const m of materials.values()) m.dispose(); textures.clear(); materials.clear(); }
-  textures.set(key, t); return t;
+let loader: THREE.TextureLoader | undefined, cachedBytes = 0;
+const rgbaBytes = (w: number, h: number) => Math.round(w * h * 4 * 4 / 3);
+/** The face texture cache as it stands (tests and probes). */
+export const faceTextureCache = () => ({ textures: textures.size, bytes: cachedBytes, materials: materials.size });
+function cached(key: string): THREE.Texture | undefined {
+  const hit = textures.get(key); if (!hit) return undefined;
+  textures.delete(key); textures.set(key, hit); return hit.t;
+}
+function resize(key: string, bytes: number) { const e = textures.get(key); if (e) { cachedBytes += bytes - e.bytes; e.bytes = bytes; evict(key); } }
+function evict(keep: string) {
+  for (const [key, e] of textures) {
+    if (cachedBytes <= FACE_TEXTURE_BUDGET.bytes && textures.size <= FACE_TEXTURE_BUDGET.count) break;
+    if (key === keep) continue;
+    textures.delete(key); cachedBytes -= e.bytes;
+    for (const [k, m] of materials) if (m.map === e.t) { m.dispose(); materials.delete(k); }
+    e.t.dispose();
+  }
+}
+function remember(key: string, t: THREE.Texture, bytes: number): THREE.Texture {
+  textures.set(key, { t, bytes }); cachedBytes += bytes; evict(key); return t;
 }
 
 /** Same rule as world-path.ts, resolved per call so offline meshers (no `location`) can import this module. */
@@ -117,10 +135,10 @@ function patternTexture(face: FaceContent, wM: number, hM: number, outline: [num
   const long = patternSize(face.pattern, wM, hM), w = wM >= hM ? long : Math.max(32, Math.round(long * wM / hM)), h = wM >= hM ? Math.max(32, Math.round(long * hM / wM)) : long;
   const pxOutline = outline?.map(([u, v]) => [u * w, v * h] as [number, number]);
   const key = JSON.stringify(['pattern', face.pattern, face.seed ?? 1, face.palette ?? null, face.cells ?? null, w, h, pxOutline?.map(p => p.map(Math.round)) ?? null]);
-  const hit = textures.get(key); if (hit) return hit;
+  const hit = cached(key); if (hit) return hit;
   const t = new THREE.DataTexture(patternPixels(face.pattern!, w, h, { seed: face.seed, palette: face.palette, cells: face.cells, outline: pxOutline }), w, h, THREE.RGBAFormat);
   t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
-  return remember(key, t);
+  return remember(key, t, rgbaBytes(w, h));
 }
 
 // ---------------------------------------------------------------- text and images
@@ -131,11 +149,19 @@ const FONTS: Record<string, string> = {
   mono: "500 {s}px Menlo, Consolas, 'Courier New', monospace",
   hand: "500 {s}px 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive",
 };
+/** Text canvas pixels from the face's size: 640 px per metre of height (64..256, or 512 past four lines), the face's
+ *  aspect kept, and at most 1024 wide (a long sign gets a shorter canvas rather than a stretched one). */
+export function textCanvasSize(lines: number, wM: number, hM: number): [number, number] {
+  const aspect = wM / Math.max(hM, 0.01);
+  let ch = Math.max(64, Math.min(lines > 4 ? 512 : 256, Math.round(hM * 640))), cw = Math.round(ch * aspect);
+  if (cw > 1024) { cw = 1024; ch = Math.max(16, Math.round(1024 / aspect)); }
+  return [Math.max(32, cw), ch];
+}
 function textTexture(face: FaceContent, wM: number, hM: number): THREE.Texture | null {
   if (typeof document === 'undefined') return null;
   const lines = faceLines(face.text), key = JSON.stringify(['text', lines, face.font, face.ink, face.bg, face.align, Math.round(wM * 100), Math.round(hM * 100)]);
-  const hit = textures.get(key); if (hit) return hit;
-  const ch = lines.length > 4 ? 512 : 256, cw = Math.max(32, Math.min(2048, Math.round(ch * wM / Math.max(hM, 0.01))));
+  const hit = cached(key); if (hit) return hit;
+  const [cw, ch] = textCanvasSize(lines.length, wM, hM);
   const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d')!;
   if (face.bg !== 'none') { g.fillStyle = face.bg ?? '#f3ead7'; g.fillRect(0, 0, cw, ch); }
   const margin = Math.max(cw * 0.05, ch * 0.05), font = (s: number) => FONTS[face.font ?? 'serif'].replace('{s}', String(s));
@@ -150,15 +176,19 @@ function textTexture(face: FaceContent, wM: number, hM: number): THREE.Texture |
     else if (face.align === 'left') { g.textAlign = 'left'; g.fillText(cells[0], margin, y); }
     else { g.textAlign = 'center'; g.fillText(cells[0], cw / 2, y); }
   });
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return remember(key, t);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return remember(key, t, rgbaBytes(cw, ch));
 }
 function imageTexture(image: unknown): THREE.Texture | null {
   const url = faceImagePath(image);
   if (!url) return null;
   if (typeof document === 'undefined') return null;
   loader ??= new THREE.TextureLoader();
-  let t = textures.get(url);
-  if (!t) { t = loader.load(url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; remember(url, t); }
+  let t = cached(url);
+  if (!t) {
+    // Counted at 1 MB until the image arrives, then at its real size.
+    t = loader.load(url, loaded => { const img = loaded.image as { width?: number; height?: number } | undefined; if (img?.width && img.height) resize(url, rgbaBytes(img.width, img.height)); });
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; remember(url, t, 2 ** 20);
+  }
   return t;
 }
 
