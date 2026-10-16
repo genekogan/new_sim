@@ -445,7 +445,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (build && (build.status === 'active' || build.status === 'paused')) {
       const r = this.rewind(group, { to: 0 });
       if (!r.ok) return { accepted: false, reverted: [] as number[], notReverted: 'edits' in r ? r.edits ?? [] : [], failures: r.failures, ...('failed' in r ? { failed: r.failed } : {}) };
-      return { accepted: true, reverted: r.rewind.edits, notReverted: [] as number[], rewound: r.rewind, ...('echo' in r && r.echo ? { build: r.echo } : {}), ...('warnings' in r && r.warnings?.length ? { warnings: r.warnings } : {}) };
+      return { accepted: true, reverted: r.rewind.edits, notReverted: [] as number[], rewound: { ...r.rewind, step: { n: r.build.step.n, label: r.build.step.label } }, ...('echo' in r && r.echo ? { build: r.echo } : {}), ...('warnings' in r && r.warnings?.length ? { warnings: r.warnings } : {}) };
     }
     return build ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
   }
