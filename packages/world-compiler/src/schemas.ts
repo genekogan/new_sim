@@ -16,6 +16,10 @@ export const DEF_REF = /^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0
 
 // ---------- defs ----------
 
+/** W7 sound kinds (viewer, procedural WebAudio). */
+export const SOUND_KINDS = ['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music', 'waves', 'crickets', 'chatter', 'footsteps'] as const;
+const soundSpec = z.object({ kind: z.enum(SOUND_KINDS), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop'), variant: z.number().int().min(0).max(15).optional() });
+
 /** Closed component set; each is a config object the engine understands. New components are level-3 code work. */
 export const componentsSchema = z.object({
   seat: z.object({ height: num.default(0.45) }).optional(),
@@ -31,7 +35,7 @@ export const componentsSchema = z.object({
   landform: landformBodySchema.optional(),
   scatter: z.object({ of: z.array(z.object({ def: z.string().regex(DEF_REF), weight: num.positive().default(1) })).min(1).max(16), density: num.positive().max(10), minSpacing: num.positive().default(1.5), except: z.array(v2).max(256).default([]) }).optional(),
   light: z.object({ color: z.string().regex(/^#[0-9a-f]{6}$/).default('#ffe9c4'), range: num.positive().default(8), on: z.boolean().default(true) }).optional(),
-  display: z.object({ w: num.positive(), h: num.positive() }).optional(),
+  display: z.object({ w: num.positive(), h: num.positive(), slots: z.number().int().min(1).max(8).optional() }).optional(),
   paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
   plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),
   instrument: z.object({ kind: z.string() }).optional(),
@@ -53,7 +57,8 @@ export const componentsSchema = z.object({
   behavior: z.object({ kind: z.enum(['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle']), speed: num.positive().default(1), radius: num.positive().default(8), ref: z.string().optional() }).optional(),
   /** VOCAB-W2 sound layer (viewer, procedural WebAudio, new worlds): a loop while state `when` holds ('on', '!open', 'lit'),
    *  or a one-shot each time that field changes (mode 'change'); heard within `radius` m of the thing (path/area: its outline). */
-  sound: z.object({ kind: z.enum(['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music']), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop') }).optional(),
+  //  W7: one spec or a list of up to 4 (a fountain splashes and hums); `variant` pins one voicing of the kind.
+  sound: z.union([soundSpec, z.array(soundSpec).min(1).max(4)]).optional(),
   /** Text on a sign or board (state `text` overrides). */
   sign: z.object({ lines: z.array(z.string().max(80)).max(6).default([]) }).optional(),
   body: z.object({
