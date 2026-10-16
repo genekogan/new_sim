@@ -60,7 +60,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   const trace = d.god.trace, traced = new WeakMap<Context, { build?: string; step?: number }>();
   app.use('/v1/god/*', async (c, next) => {
     if (!trace.enabled) return next();
-    if (c.req.path === '/v1/god/stream' || c.req.path === '/v1/god/trace') { await next(); if (bearer(c)?.startsWith('god_')) trace.skip(); return; }
+    // CE8 attention hints are not authoring calls: the god never sees them, so they stay out of rows and loop hints.
+    if (c.req.path === '/v1/god/stream' || c.req.path === '/v1/god/trace' || /^\/v1\/god\/builds\/[^/]+\/attention$/.test(c.req.path)) { await next(); if (bearer(c)?.startsWith('god_')) trace.skip(); return; }
     const t0 = performance.now(), json = c.json; let result: unknown;
     c.json = ((o: unknown, ...rest: unknown[]) => { result = o; return (json as (...a: unknown[]) => Response)(o, ...rest); }) as typeof c.json;
     await next();

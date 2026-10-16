@@ -96,3 +96,15 @@ test('CE8: the schema advertises the attention endpoint and its body shape', asy
   assert.ok(JSON.stringify(schema).includes('POST /v1/god/builds/:id/attention'));
   assert.deepEqual(Object.keys(schema.builds.actions.attention.properties).sort(), ['at', 'eye', 'lease']);
 });
+
+test('CE8: hints stay out of the god trace: no rows and no loop hints, even when refused again and again', async t => {
+  const f = fixture(); t.after(() => f.db.close()); await f.start();
+  if (!f.god.trace.enabled) return t.skip('GOD_TRACE=0');
+  const before = f.god.trace.rows({ limit: 1000 }).length;
+  for (let i = 0; i < 4; i++) { await f.req('/v1/god/builds/church/attention', { at: [0, 0, 0] }); await f.req('/v1/god/builds/church/attention', { at: [9999, 0, 0] }); }
+  assert.equal(f.god.trace.rows({ limit: 1000 }).length, before);
+  assert.deepEqual(f.god.trace.loops({ build: 'church' }), []);
+  // An authoring call is still traced.
+  await f.req('/v1/god/builds/church/check', {});
+  assert.equal(f.god.trace.rows({ limit: 1000 }).length, before + 1);
+});
