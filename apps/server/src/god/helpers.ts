@@ -90,7 +90,8 @@ export function helperRoute(method: string, rawPath: string, scope: HelperScope)
     if (WRITES.some(r => r.test(path))) return null;
     const m = path.match(/^\/v1\/god\/builds\/([^/]+)\/(step|check|claims\/([^/]+)\/release)$/);
     if (m) {
-      const build = decodeURIComponent(m[1]), claim = m[3] ? decodeURIComponent(m[3]) : undefined;
+      let build: string, claim: string | undefined;
+      try { build = decodeURIComponent(m[1]); claim = m[3] ? decodeURIComponent(m[3]) : undefined; } catch { return `helper tokens cannot use a malformed path ${path.slice(0, 120)}`; }
       if (build !== scope.build) return `helper tokens act only on build ${scope.build}, not ${build}`;
       if (claim !== undefined && claim !== scope.claim) return `helper tokens release only their own claim ${scope.claim}`;
       return null;

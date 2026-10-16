@@ -94,8 +94,7 @@ test('Y4 scope: a helper edits inside its claim; every out-of-scope edit is refu
     const r = await f.post(path, helper, body); assert.equal(r.accepted, false, `${what} via ${path}: ${JSON.stringify(r)}`);
     assert.equal(code(r), 'helper.scope', `${what} via ${path} must be refused at authorisation: ${JSON.stringify(r.failures)}`);
   }
-  // Geometric escapes that only planning can see stay refused by the claim itself.
-  assert.equal(code(await f.post('/v1/god/act', helper, { ops: [place('loose', 60, 60)] })), 'build.claim');
+  assert.equal(code(await f.post('/v1/god/act', helper, { ops: [place('loose', 60, 60)] })), 'helper.scope', 'a root claim adopts no world-root things');
   // A helper step may name only its own claim.
   assert.equal(code(await f.post('/v1/god/builds/church/step', helper, { lease: f.leadField.lease, n: 2 })), 'helper.scope');
   assert.equal(code(await f.post('/v1/god/builds/church/step', helper, { claim: west, n: 2 })), 'helper.scope');
@@ -103,6 +102,46 @@ test('Y4 scope: a helper edits inside its claim; every out-of-scope edit is refu
   assert.equal(f.god.model.editSeq, seq, 'no refused attempt entered the journal');
   assert.ok(f.god.store.build('church')!.rev > version);
   assert.equal(f.god.store.edits(1)[0].seq, seq);
+  // Geometric escapes that only planning can see (moving into another claim's region) stay refused by the claims themselves.
+  const regional = await f.post('/v1/god/builds/church/claims', f.lead, { part: 'yard', region: { at: [-60, -60], size: [20, 20], yaw: 0 } }); assert.equal(regional.ok, true, JSON.stringify(regional));
+  assert.equal((await f.post('/v1/god/builds/church/claims', f.rival, { part: 'lawn', region: { at: [-30, -60], size: [20, 20], yaw: 0 } })).ok, true);
+  const yard = (await f.mint(regional.claim.id)).token;
+  assert.equal((await f.post('/v1/god/act', yard, { ops: [place('bench', -60, -60)] })).accepted, true);
+  assert.equal(code(await f.post('/v1/god/act', yard, { ops: [{ op: 'move', id: 'bench', p: [-30, -60] }] })), 'build.claimed');
+});
+
+test('Y4 measure: seeded fuzz of helper edits — every out-of-scope edit refused before planning', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const east = await f.claim('east', 'shell/east'), { token: helper } = await f.mint(east);
+  assert.equal((await f.post('/v1/god/act', helper, { ops: [place('pew', 1, 0, 'shell/east')] })).accepted, true);
+  let seed = 11; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const pick = <T>(xs: readonly T[]) => xs[Math.floor(rnd() * xs.length)];
+  const inside = ['shell/east', 'shell/east/pew'], outside = ['shell', 'shell/west', 'outside'];
+  const inScopeCodes = new Set<string>();
+  const counts = { outOfScope: 0, refused: 0, authorisation: 0, planning: 0, inScope: 0, inScopeAccepted: 0 };
+  for (let i = 0; i < 240; i++) {
+    const kind = pick(['set', 'move', 'remove', 'place', 'place-root', 'world', 'undefine', 'economy', 'lease', 'other-build'] as const);
+    let target = rnd() < 0.4 ? pick(inside) : pick(outside);
+    if (kind === 'remove' && target === 'shell/east') target = 'shell/east/pew'; // removing the claim root itself is left to the lead
+    const scoped = inside.includes(target) && !['place-root', 'world', 'undefine', 'economy', 'lease', 'other-build'].includes(kind);
+    const n = `n${i}`;
+    const op = kind === 'set' ? { op: 'set', id: target, params: {} } : kind === 'move' ? { op: 'move', id: target, p: [rnd() * 2, rnd() * 2] } : kind === 'remove' ? { op: 'remove', id: target }
+      : kind === 'place' ? place(n, rnd(), rnd(), target) : kind === 'place-root' ? place(n, 60 + rnd() * 20, 60 + rnd() * 20) : kind === 'world' ? { op: 'world', state: { weather: { kind: 'rain' } } }
+      : kind === 'undefine' ? { op: 'undefine', ref: 'part@1' } : kind === 'economy' ? { op: 'economy', currency: 'shell' } : place(n, rnd(), rnd(), 'shell/east');
+    const build = kind === 'lease' ? f.leadField : kind === 'other-build' ? { id: 'chapel', claim: east } : undefined;
+    const before = f.god.model.editSeq;
+    // In process (the act route is allowed for helpers); avoids spending the pooled per-minute act window.
+    const as = <T>(fn: () => T) => f.god.as({ identity: f.god.godIdentity(helper)! }, fn);
+    const r = as(() => f.god.act({ ops: [op], ...(build ? { build } : {}) })) as any;
+    if (scoped) { counts.inScope++; if (r.accepted) counts.inScopeAccepted++; else { assert.notEqual(code(r), 'helper.scope', `in-scope ${kind} ${target}: ${JSON.stringify(r.failures)}`); inScopeCodes.add(code(r)); } if (r.accepted && kind === 'remove') assert.equal(as(() => f.god.undo()).accepted, true); continue; }
+    counts.outOfScope++;
+    if (!r.accepted) { counts.refused++; if (code(r) === 'helper.scope') counts.authorisation++; else if (['build.claim', 'build.claimed'].includes(code(r))) counts.planning++; else assert.fail(`unexpected refusal ${JSON.stringify(r.failures)}`); }
+    assert.equal(r.accepted, false, `out-of-scope ${kind} ${target} was accepted`); assert.equal(f.god.model.editSeq, before);
+  }
+  t.diagnostic(`measure ${JSON.stringify(counts)} in-scope refusals ${[...inScopeCodes].join(',')}`);
+  assert.equal(counts.refused, counts.outOfScope); assert.ok(counts.outOfScope > 100);
+  assert.equal(counts.authorisation, counts.outOfScope, 'a root claim refuses every out-of-scope edit before planning');
+  assert.ok(counts.inScopeAccepted > 0);
 });
 
 test('Y4 routes: helper tokens never reach env, land, strike, prayers, lifecycle, minting, pairing or the doctor', async t => {

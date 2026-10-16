@@ -204,6 +204,8 @@ function overlappingClaim(model: WorldModel, scope: Scope, others: readonly Live
 /** WD7 slice 3: explicit existing targets (move/set/remove ids, place parents) must already lie inside the claim. */
 function outsideClaim(model: WorldModel, mine: LiveClaim, ops: readonly Op[]): Failure | null {
   for (const [i, op] of ops.entries()) {
+    // A root-only claim cannot adopt a new world-root thing; only a region claim can (decided geometrically in claimCheck).
+    if (op.op === 'place' && (op.in?.parent ?? 'world') === 'world' && !mine.region) return { op: i, code: 'helper.scope', field: 'in.parent', detail: `A new thing at the world root is outside claim ${mine.id} (${mine.part}); place it under ${mine.root ?? 'the claim root'}.`, limit: { claim: mine.id, root: mine.root }, fix: 'Place under the claim root, or ask the lead.' };
     const ref = op.op === 'move' || op.op === 'set' || op.op === 'remove' ? op.id : op.op === 'place' && op.in?.parent && op.in.parent !== 'world' ? op.in.parent : undefined;
     if (!ref || ref.startsWith('$')) continue;
     const e = model.get(ref); if (!e || inScope(model, e.id, mine.scope.roots)) continue;
