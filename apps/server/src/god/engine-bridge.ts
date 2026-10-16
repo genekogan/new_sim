@@ -7,7 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
-import { applyBatch, plan, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { applyBatch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -24,7 +24,9 @@ import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
-import { inClosure, siteLocal, siteWorld } from './builds.ts';
+import { planWalkouts, dropReleased, unhand, stuckWarning, type StuckResident } from './walkout.ts';
+import { GodNotices } from './notices.ts';
+import type { WalkoutPrep } from './god.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -38,8 +40,16 @@ type EngineV1 = {
   reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string };
   standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
   programOf(id: string): string | null;
+  godWalkoutRouteV1(id: string, to: Vec2, level?: number): boolean;
+  godWalkoutLandableV1(id: string, to: Vec2, level?: number): boolean;
+  walkGoalV1(id: string): { level: number; p: Vec2 } | null;
+  levelsV1(): { id: number; y: number }[];
 };
 
+const EVACUATE_RETRY_TICKS = 400; // a closure walk-out the engine could not land is retried after this many ticks
+/** `sent` marker for a thing a walk-out took out of a resident's hands: whatever the entity world says next (a place on
+ *  the ground, or nothing: removed) differs from it, so it is always sent. */
+const RELEASED = '"released"';
 const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
 const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
 const MAX_LEVEL = 20;          // walk_to's level schema
@@ -90,6 +100,8 @@ export class EngineBridge {
   readonly places: GodPlaces;
   /** LAYERS: schedules, ownership, zones, relationships, economy for Souls (layers.ts). */
   readonly layers: GodLayers;
+  /** G1/R8: what residents perceive about god edits (the walk-out reason; later "the god changed something near you"). */
+  readonly notices: GodNotices;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
@@ -117,11 +129,20 @@ export class EngineBridge {
     syncProviders.set(this.god.model, () => { this.flush(); return this.physics?.hash === this.engine.world.entityPhysicsV1?.hash; });
     seatProviders.set(this.god.model, (id) => { const f = (this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] }).seatOccupantsV1; return f ? f.call(this.engine, id).map((x) => ({ slot: x.slot, soul: this.soulName(x.body) })) : []; });
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
-    // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
-    const hooked = 'bodies' in (this.god as object);
-    if (hooked) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[], after?: WorldModel) => this.buried(ids, after), refuse: (after: WorldModel, diff: Diff, ops: unknown[]) => this.pinnedCheck(after, diff, ops) };
-    else this.guardGod();
-    this.guardPinned(hooked);
+    // G1 "god rules": god edits are never refused for residents; the ones in the way are walked out (walkout.ts).
+    // prepare plans on the would-be world before the commit and moves nobody, so a refused batch, a failed SQL write,
+    // a preview or a receipt retry never moves a resident; apply logs and folds the planned moves after the commit,
+    // before the new geometry reaches the engine, in the same request. Only body entities themselves are refused.
+    this.notices = new GodNotices(this.god.db, this.host.worldId, () => this.god.now());
+    this.notices.streams = () => this.edge?.comms?.streams;
+    // A native mind hears a notice through the log (folded into its recent memory, deterministic on replay).
+    this.notices.native = (soulId, text) => { try { void this.host.enqueue('rules', 'god:notice', { godNoticeV1: { soulId, text } }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ } };
+    this.god.bodies = {
+      uses: id => this.usesOne(id),
+      refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
+      prepare: (before, after, diff, _ops, o) => this.prepareWalkouts(before, after, diff, o?.dry === true),
+      apply: moved => this.applyWalkouts(moved, this.stuckPlanned.splice(0)),
+    };
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
     if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
@@ -169,7 +190,9 @@ export class EngineBridge {
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
       const part = e ? this.derive(e, assets, known) : null;
       const key = part ? JSON.stringify(normPart(part)) : null;
-      if ((this.sent.get(id) ?? null) === key) continue;
+      // A removed thing the engine still has (one a Soul held when it went: `sent` forgot it) is removed there too.
+      const lingering = !e && (this.engine.world.entities[id]?.tags?.includes('entity-world') || !!this.physics?.byEntity[id]);
+      if ((this.sent.get(id) ?? null) === key && !lingering) continue;
       set[id] = part;
       if (key) this.sent.set(id, key); else this.sent.delete(id);
     }
@@ -345,29 +368,98 @@ export class EngineBridge {
   }
 
   private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
-  /** Logged relocation of idle residents only. Busy/seated/sleeping residents are retried on the 40-tick cadence. */
+  /** Construction closure (C1): residents inside a closing zone get the same polite walk-out as an edit, seated,
+   *  asleep or busy included (verification probes may enter closures and are left alone). Runs after each god edit
+   *  and on the 40-tick cadence. */
+  private evacuated = new Map<string, { tick: number; from: Vec2 }>();
   evacuateSites() {
     const sites = this.god.builds.closingSites(); if (!sites.length) return;
-    const E = this.engine;
-    for (const m of this.host.minds.values()) {
-      if (isVerificationProbe(m.soulId)) continue;
-      const b = E.world.entities[m.entityId], h = b?.human;
-      if (!h || (h.level ?? 0) !== 0 || h.activity === 'sit' || h.baseActivity === 'sit' || h.sleepPose || h.carrier || E.programOf(m.entityId)) continue;
-      const p: Vec2 = [b.pose.p[0], b.pose.p[2]];
-      const site = sites.find(s => inClosure(s, p));
-      if (!site) continue;
-      const clamp = (x: number, radius: number) => Math.max(-radius, Math.min(radius, x));
-      // Project off the actual zone union, leaving room for the resident's body. The plot is only a marker.
-      const candidates = site.zones.flatMap(zone => {
-        const local = siteLocal(zone, p), half = zone.size.map(x => x / 2) as Vec2, gap = .6;
-        const qs: Vec2[] = [[-half[0] - gap, clamp(local[1], half[1])], [half[0] + gap, clamp(local[1], half[1])], [clamp(local[0], half[0]), -half[1] - gap], [clamp(local[0], half[0]), half[1] + gap]];
-        for (const x of [-1, 1]) for (const z of [-1, 1]) qs.push([x * (half[0] + gap), z * (half[1] + gap)]);
-        return qs.map(q => siteWorld(zone, q));
-      });
-      const world = candidates.filter(q => !sites.some(s => inClosure(s, q))).sort((a, b) => Math.hypot(a[0] - p[0], a[1] - p[1]) - Math.hypot(b[0] - p[0], b[1] - p[1]));
-      const goal = world.find(q => E.reachV1({ p, level: 0 }, { p: q, level: 0 }).ok); if (!goal) continue;
-      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: goal, why: 'the god started building here: stepped off the site' }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ }
+    const diff: Diff = { upserts: [], removes: [], defs: [], tiles: [], answers: [] }, avoid = sites.flatMap(s => s.zones), done = new Set<string>(), tick = this.engine.world.tick;
+    // A resident the engine could not land at its exit (still where it stood) is retried after a while, not told again
+    // every cadence; one that did move and is inside a closure again is walked out at once.
+    const waiting = (soulId: string, entityId: string) => {
+      const last = this.evacuated.get(soulId), p = this.engine.world.entities[entityId]?.pose?.p;
+      if (!last || tick - last.tick >= EVACUATE_RETRY_TICKS || !p) { this.evacuated.delete(soulId); return false; }
+      return Math.hypot(p[0] - last.from[0], p[2] - last.from[1]) < .5;
+    };
+    // Each resident hears about the site it stands in; every exit is clear of all closing sites.
+    for (const site of sites) try {
+      const residents = [...this.host.minds.values()].filter(m => !isVerificationProbe(m.soulId) && !done.has(m.soulId) && !waiting(m.soulId, m.entityId));
+      const { moved, stuck } = planWalkouts(this.engine, this.model, this.model, diff, residents, { zones: site.zones, avoid, title: this.god.builds.body(site.id)?.title ?? site.id });
+      for (const m of moved) { done.add(m.soulId); this.evacuated.set(m.soulId, { tick, from: m.from }); }
+      for (const x of stuck) { done.add(x.soulId); this.evacuated.set(x.soulId, { tick, from: this.posOf(x.body) }); this.log(`evacuate: ${x.name} stays inside ${site.id}: no clear ground to step to`); }
+      this.applyWalkouts(moved);
+    } catch (e) { this.log(`evacuate: ${(e as Error).message}`); }
+  }
+  /** Plan who walks out of an accepted edit's way (pure). A planning fault never refuses the edit: it is logged, and
+   *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
+  private prepareWalkouts(before: WorldModel, after: WorldModel, diff: Diff, dry = false): WalkoutPrep {
+    try {
+      if (!dry) { this.flush(); this.host.drainInputs(); this.stuckPlanned = []; }
+      // Nothing goes into a resident's hands (an undo of a take): set down first, so the plan sees where it lands.
+      const kept = dry ? { warnings: [], touched: [] } : unhand(this.engine, before, after, diff);
+      const { moved, stuck } = planWalkouts(this.engine, before, after, diff, this.host.minds.values());
+      const warnings = [...kept.warnings, ...stuck.map(stuckWarning)], touched = [...kept.touched];
+      if (!dry) { this.stuckPlanned = stuck; touched.push(...dropReleased(after, diff, moved)); }
+      return { moved, warnings, touched };
+    } catch (e) { this.log(`walk-out planning: ${(e as Error).message}`); return { moved: [], warnings: [], touched: [] }; }
+  }
+  /** Log and fold each planned move now (no tick, no animation wait), interrupt the resident's act, tell it why. A
+   *  resident the engine could not land at its planned exit is told so and named in the returned warnings. */
+  /** Residents the last edit's plan found no clear ground for (told why when that edit applies). */
+  private stuckPlanned: StuckResident[] = [];
+  private applyWalkouts(moved: ResidentMove[], stuck: StuckResident[] = []): string[] {
+    const late: string[] = [];
+    // Residents in the way with nowhere clear to go: they stay, and are told why.
+    for (const x of stuck) this.notices.notify(x.soulId, { text: x.reason, tick: this.engine.world.tick, salience: 3, ...(x.place ? { place: x.place } : {}) });
+    for (const m of moved) {
+      try {
+        const carried = m.released.filter(id => ['in-hand', 'held'].includes(this.engine.world.entities[id]?.support?.kind));
+        if (m.how === 'stopped') {
+          void this.host.enqueue('edge-stop', 'god:walkout', { soulId: m.soulId, entityId: m.body, why: m.reason }).catch(() => { /* best effort */ });
+        } else {
+          const payload = { soulId: m.soulId, entityId: m.body, to: m.to, ...(m.level ? { level: m.level } : {}), released: m.released, ...(m.dropAt ? { dropAt: m.dropAt } : {}), why: m.reason, ...(m.how === 'relocated' ? { godWalkout: true } : {}) };
+          void this.host.enqueue(m.how === 'walked' ? 'edge-god-walkout' : 'edge-relocate', 'god:walkout', payload).catch(() => { /* logged or refused: the notice still stands */ });
+        }
+        this.host.drainInputs();
+        const b = this.engine.world.entities[m.body], at = b?.pose?.p, landed = m.how === 'stopped' || (!!at && Math.hypot(at[0] - m.to[0], at[2] - m.to[1]) < .05 && (b.human?.level ?? 0) === (m.level ?? 0));
+        if (landed) {
+          // What it carried re-enters the engine from the entity world at the next flush (or leaves it, if removed).
+          for (const id of carried) this.sent.set(id, RELEASED);
+          this.edge?.godInterrupted(m.soulId, m.reason);
+          this.notices.notify(m.soulId, { text: m.reason, tick: this.engine.world.tick, ...(m.how === 'stopped' ? { salience: 3 as const } : { moved: m.how }), ...(m.place ? { place: m.place } : {}) });
+          this.log(`${m.name} ${m.how} out of the god's way: ${m.reason}`);
+        } else {
+          const text = m.reason.replace(/;.*$/, '; you could not step clear, so you stayed where you were.');
+          this.notices.notify(m.soulId, { text, tick: this.engine.world.tick, salience: 3, ...(m.place ? { place: m.place } : {}) });
+          late.push(`body.stuck: ${m.name} (${m.body}) could not be ${m.how === 'walked' ? 'walked' : 'moved'} to (${m.to.join(', ')}): the engine refused the landing; still at (${at ? `${r3(at[0])}, ${r3(at[2])}` : '?'})`);
+          this.log(`walk-out of ${m.name} refused by the engine at (${m.to.join(', ')})`);
+        }
+      } catch (e) { this.log(`walk-out of ${m.name}: ${(e as Error).message}`); }
     }
+    return late;
+  }
+  private posOf(body: string): Vec2 { const p = this.engine.world.entities[body]?.pose?.p; return p ? [p[0], p[2]] : [0, 0]; }
+  /** Only a resident's body is protected from god edits: never removed, edited or re-made as a thing, and nothing is put
+   *  into its hands (an undo that would is set down at its feet instead: walkout.ts unhand). */
+  private protectedBody(after: WorldModel, diff: Diff, ops: Op[], undo = false): Failure | null {
+    for (const [i, op] of ops.entries()) {
+      const raw = op as { id?: string; entity?: Entity };
+      const e = raw.id ? this.model.get(raw.id) : raw.entity;
+      if (e && this.model.resolvedDef(e.def)?.components.body) return { op: i, code: 'body.protected', entity: e.id, detail: `${this.model.pathOf(e.id)} is a resident's body; bodies move themselves` };
+    }
+    for (const id of diff.removes) {
+      const e = this.model.entities.get(id);
+      if (e && this.model.resolvedDef(e.def)?.components.body) return { op: 0, code: 'body.protected', entity: id, detail: 'A god edit cannot remove a resident body.' };
+    }
+    for (const e of diff.upserts) if (after.resolvedDef(e.def)?.components.body && (!this.model.entities.has(e.id) || diff.defs.some(d => d.ref === after.resolvedDef(e.def)?.ref))) return { op: 0, code: 'body.protected', entity: e.id, detail: 'Resident bodies are managed by their Souls.' };
+    if (!undo) for (const e of diff.upserts) {
+      const holder = e.in.parent !== 'world' ? after.entities.get(e.in.parent) : undefined;
+      if (!holder || !after.resolvedDef(holder.def)?.components.body || this.model.entities.get(e.id)?.in.parent === holder.id) continue;
+      const i = ops.findIndex(o => { const x = o as { id?: string; tmp?: string; in?: { parent?: string } }; return x.id === e.id || (typeof x.id === 'string' && this.model.get(x.id)?.id === e.id) || !!x.in?.parent && (x.in.parent === holder.id || this.model.get(x.in.parent)?.id === holder.id); });
+      return { op: Math.max(0, i), code: 'body.protected', entity: e.id, field: 'in.parent', detail: `${this.soulName(holder.id)}'s hands are theirs: a god edit cannot put ${after.pathOf(e.id) || e.id} into them`, fix: 'Place it beside the resident instead; residents pick things up themselves.' };
+    }
+    return null;
   }
   /** LAYERS: the world clock drives schedules (states that follow them, calendar items); a new day re-derives places. */
   private layerDay = '';
@@ -414,8 +506,9 @@ export class EngineBridge {
     for (const op of ops as any[]) { if (typeof op.id === 'string') ids.add(op.id); if (op.entity?.id) ids.add(op.entity.id); }
     for (const id of ids) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) {
       const e = this.model.entities.get(sid)!;
-      const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {});
-      if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {})));
+      // A thing in a body's hands is the engine's: forget what it was last told, so the god placing it again is sent.
+      if (this.engineOwned(e)) { this.sent.delete(e.id); continue; }
+      this.sent.set(e.id, JSON.stringify(normPart(this.derive(e, {}, this.physics?.assets ?? {}) ?? {})));
     }
   }
 
@@ -521,203 +614,11 @@ export class EngineBridge {
     return null;
   }
   /** The compiler hook (one entity, no subtree walk): a body, a thing in a body's hands, a seat or item in use. */
-  usesOne(id: string): { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null {
-    const e = this.model.entities.get(id); if (!e) return null;
-    if (this.model.resolvedDef(e.def)?.components.body) { this.stats.refusals++; return { code: 'occupied.by-body', detail: `${this.model.pathOf(id)} is ${this.soulName(id)}'s body; bodies move themselves` }; }
-    const holder = e.in.parent !== 'world' && this.model.resolvedDef(this.model.entities.get(e.in.parent)?.def ?? '')?.components.body ? e.in.parent : null;
-    const u = holder ? { body: holder, how: 'held' as const } : this.engine.bodyUsesV1(id);
-    if (!u) return null;
-    this.stats.refusals++;
-    const soul = this.soulName(u.body), what = this.model.pathOf(id);
-    return { code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${soul} (${u.body}) is ${u.how === 'held' ? 'holding' : 'sitting on'} ${what}; wait until they are done (or ask them in a prayer answer)` };
+  usesOne(id: string): { code: 'body.protected'; detail: string } | null {
+    const e = this.model.entities.get(id);
+    return e && this.model.resolvedDef(e.def)?.components.body ? { code: 'body.protected', detail: `${this.model.pathOf(id)} is ${this.soulName(id)}'s body; bodies move themselves` } : null;
   }
   private soulName(body: string) { return String(this.engine.world.entities[body]?.label ?? body); }
-
-  /** Refusals for a batch whose ops would move or remove something a Soul is using (null = fine). */
-  bodyRefusal(ops: unknown[]): Result | null {
-    if (!Array.isArray(ops)) return null;
-    for (const [i, raw] of ops.entries()) {
-      const op = raw as { op?: string; id?: string; params?: unknown; entity?: Entity };
-      if (!op || (op.op !== 'remove' && op.op !== 'move' && !(op.op === 'set' && op.params))) continue;
-      const target = typeof op.id === 'string' && !op.id.startsWith('$') ? this.model.get(op.id) : undefined;
-      if (!target) continue;
-      if (this.model.resolvedDef(target.def)?.components.body) { this.stats.refusals++; return { accepted: false, failures: [{ op: i, code: 'occupied.by-body', detail: `${this.model.pathOf(target.id)} is ${this.soulName(target.id)}'s body; bodies move themselves` }] }; }
-      const u = this.usesOf(target.id);
-      if (!u) continue;
-      this.stats.refusals++;
-      const what = this.model.pathOf(u.id);
-      const detail = u.how === 'held' ? `${u.soul} (${u.body}) is holding ${what}` : `${u.soul} (${u.body}) is sitting on ${what}${u.id !== target.id ? ` inside ${this.model.pathOf(target.id)}` : ''}`;
-      return { accepted: false, failures: [{ op: i, code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }] };
-    }
-    return null;
-  }
-
-  /** Bodies standing where newly placed/moved solids now are: the engine lifts them clear (warned, never refused). */
-  private buried(ids: string[], model = this.model): string[] {
-    const out: string[] = [], seen = new Set<string>();
-    for (const id of new Set(ids)) for (const sid of model.entities.has(id) ? model.subtree(id) : []) for (const o of model.footprintsOf(sid)) {
-      for (const b of Object.values(this.engine.world.entities) as any[]) {
-        if (!b.human || seen.has(b.id)) continue;
-        const y = b.pose.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.8) continue;
-        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.pose.p[0] - o.c[0], dz = b.pose.p[2] - o.c[1];
-        const lx = dx * c - dz * s, lz = dx * s + dz * c; // into the box frame (entity convention)
-        if (Math.abs(lx) <= o.half[0] + 0.28 && Math.abs(lz) <= o.half[1] + 0.28) { seen.add(b.id); out.push(`body.lifted: ${this.soulName(b.id)} (${b.id}) stood where ${model.pathOf(sid)} now is; they step clear to the nearest open ground`); }
-      }
-    }
-    return out;
-  }
-
-  /** Bodies that cannot step clear of an edit: seated, standing on an upper floor, lying down, carried or aboard.
-   *  (Idle bodies on the ground are lifted/stepped clear instead — `buried` warns, the engine relocates them.) */
-  private pinnedBodies(): { id: string; p: [number, number, number]; doing: string }[] {
-    const out: { id: string; p: [number, number, number]; doing: string }[] = [];
-    for (const b of Object.values(this.engine.world.entities) as any[]) {
-      const h = b.human; if (!h) continue;
-      const seated = h.activity === 'sit' || h.baseActivity === 'sit', level = h.level ?? 0;
-      if (!seated && level === 0 && !h.on && !h.carrier && !h.sleepPose) continue;
-      const seat = seated ? this.seatOf(b.id) : null;
-      out.push({ id: b.id, p: [b.pose.p[0], b.pose.p[1], b.pose.p[2]], doing: seated ? `sitting${seat ? ` on ${this.model.pathOf(seat)}` : ''}` : level !== 0 ? `standing on floor ${level}` : 'busy' });
-    }
-    return out;
-  }
-  private seatOf(body: string): string | null {
-    for (const id of this.model.entities.keys()) { const u = this.engine.bodyUsesV1(id); if (u?.body === body && u.how === 'occupied') return id; }
-    return null;
-  }
-
-  /** 31 §3 rule 8 (R2): a god edit that would bury or unseat a body that cannot step clear is refused, naming the body —
-   *  the ground rising over it, a new solid where it is, or the thing it sits on (or the house around it) moved as a
-   *  side effect (re-settled on new ground, re-solved constraints). Direct removes/moves/param edits of a used thing
-   *  are refused by the compiler's `uses` hook; this covers what only the would-be world shows. It runs as the compiler's
-   *  `refuse` hook on the plan's own scratch (`after`), once per plan, after the plan succeeds. Null = fine. */
-  pinnedCheck(after: WorldModel, diff: Diff, ops: unknown[]): Failure | null {
-    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
-    const name = (b: { id: string; doing: string }) => `${this.soulName(b.id)} (${b.id}), ${b.doing}`;
-    const no = (i: number, detail: string, entity?: string): Failure => { this.stats.refusals++; return { op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)`, ...(entity ? { entity, field: 'def', fix: 'Adjust the definition so this instance clears the body, or wait until the body is done.' } : {}) }; };
-    const opOf = (id: string) => {
-      const refs = new Set<string>();
-      for (const eid of [id, ...this.model.ancestors(id)]) {
-        let d = this.model.def(this.model.entities.get(eid)?.def ?? '');
-        for (let depth = 0; d && depth <= 8; depth++) { refs.add(d.ref); d = d.extends ? this.model.def(d.extends) : undefined; }
-      }
-      const k = ops.findIndex((o) => {
-        const x = o as { op?: string; id?: string; name?: string; ref?: string; def?: { name: string; version?: number } };
-        return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id)
-          || (x?.op === 'define' && x.def && refs.has(`${x.def.name}@${x.def.version ?? 1}`)) || (x?.op === 'restore-def' && x.ref && refs.has(x.ref));
-      });
-      return k < 0 ? 0 : k;
-    };
-    for (const e of diff.upserts) {
-      const live = this.model.entities.get(e.id); if (!live || this.model.resolvedDef(live.def)?.components.body) continue;
-      // 1. the seat (or anything around it) moved as a side effect
-      const a = this.model.worldPose(live), w = after.worldPose(e);
-      if (Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) > 1e-3 || Math.abs(a.yaw - w.yaw) > 1e-4) for (const sid of this.model.subtree(e.id)) {
-        const u = this.engine.bodyUsesV1(sid); const b = u && pinned.find((x) => x.id === u.body);
-        if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`, e.id);
-      }
-    }
-    // 2. the ground rising over a pinned body
-    if (diff.tiles.length) for (const b of pinned) {
-      const g = after.terrain.sample(b.p[0], b.p[2]);
-      if (g > b.p[1] + 0.25) {
-        const source = diff.upserts.find(e => { const d = after.resolvedDef(e.def); return d && after.bake(d, e.params ?? {}, e.seed ?? 0, e.shape).landform; });
-        const i = source ? opOf(source.id) : Math.max(0, ops.findIndex((o) => ['place', 'move', 'set', 'define', 'restore-def'].includes((o as { op: string })?.op)));
-        return no(i, `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`, source?.id);
-      }
-    }
-    // 3. a new or changed solid where a pinned body is
-    for (const e of diff.upserts) {
-      const def = after.resolvedDef(e.def); if (!def || def.layer !== 'solid' || def.components.body) continue;
-      const fp = after.footprint(e, def); if (!fp.length) continue;
-      const live = this.model.entities.get(e.id);
-      if (live && JSON.stringify(this.model.footprint(live)) === JSON.stringify(fp)) continue;
-      for (const o of fp) for (const b of pinned) {
-        const y = b.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.6) continue;
-        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.p[0] - o.c[0], dz = b.p[2] - o.c[1];
-        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${after.pathOf(e.id)}`, e.id);
-      }
-    }
-    return null;
-  }
-  /** A refused plan whose overlap is with a pinned body's seat: a solid dropped onto a seated body overlaps its seat
-   *  first, so name the body, not just the seat (null = leave the refusal as it is). */
-  buryRefusal(failures: readonly Failure[], codes: readonly string[] = ['overlap.solid']): Result | null {
-    if (!failures.some((fl) => codes.includes(fl.code))) return null;
-    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
-    for (const fl of failures) {
-      if (!codes.includes(fl.code)) continue;
-      const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
-      const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
-      if (b) { this.stats.refusals++; return { accepted: false, failures: [{ ...fl, code: 'occupied.by-body', detail: `would bury ${this.soulName(b.id)} (${b.id}), ${b.doing}: ${fl.detail}; wait until they are done (or ask them in a prayer answer)` }] }; }
-    }
-    return null;
-  }
-  /** The same check for a god without the compiler hook: plans the batch on a fork (a second plan). */
-  pinnedRefusal(batch: unknown, trusted = false): Result | null {
-    if (!this.pinnedBodies().length) return null;
-    const ops = batch && typeof batch === 'object' ? ((batch as { ops?: unknown[] }).ops ?? []) : [];
-    let pinned: Failure | null = null;
-    const p = plan(this.model.fork(), batch, 'god', this.engine.world.tick, { trusted, refuse: (after, diff) => (pinned = this.pinnedCheck(after, diff, ops)) });
-    if (p.ok) return null;
-    return pinned ? { accepted: false, failures: [pinned] } : this.buryRefusal(p.failures);
-  }
-
-  /** Body checks on the god's edit entry points. With the compiler's `refuse` hook installed (GodMode.bodies) each batch
-   *  is planned once: the check runs on the plan's own scratch, and a refused plan's overlap with a seat is renamed to
-   *  the body; without it, each batch is first planned on a fork. Only costs anything while some body is pinned. */
-  private guardPinned(hooked: boolean) {
-    const g = this.god as any;
-    const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
-    if (hooked) {
-      const named = <T extends { accepted: boolean; failures?: Failure[] }>(r: T, codes?: string[], extra: object = {}): T => {
-        if (r.accepted || !r.failures) return r;
-        const b = this.buryRefusal(r.failures, codes); return b ? ({ ...extra, accepted: false, failures: (b as { failures: Failure[] }).failures } as unknown as T) : r;
-      };
-      if ('finalizeAct' in g) {
-        const finalize = g.finalizeAct;
-        g.finalizeAct = (r: Result, after: WorldModel) => named(finalize?.(r, after) ?? r);
-      } else g.act = (batch: unknown, note?: string) => named(act(batch, note));
-      g.dryrun = (batch: unknown) => named(dryrun(batch));
-      g.preview = (batch: unknown) => { const r = preview(batch); return named(r, undefined, { id: r.id }); };
-      // a revert reports an overlap as undo.conflict (same detail)
-      g.undo = () => named(undo(), ['overlap.solid', 'undo.conflict']);
-      g.redo = () => named(redo(), ['overlap.solid', 'undo.conflict']);
-      return;
-    }
-    if ('actGuard' in g) {
-      const guard = g.actGuard;
-      g.actGuard = (batch: unknown) => this.pinnedRefusal(batch) ?? guard?.(batch) ?? null;
-    } else g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
-    g.dryrun = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
-    g.preview = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
-    g.undo = () => { const t = this.god.store.undoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? undo(); };
-    g.redo = () => { const t = this.god.store.redoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? redo(); };
-  }
-
-  /** Wrap the god's edit entry points with body-aware refusals (L1: replace with a compiler hook, see status file). */
-  private guardGod() {
-    const g = this.god as any;
-    const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
-    const opsOf = (b: unknown) => (b && typeof b === 'object' ? (b as { ops?: unknown[] }).ops ?? [] : []);
-    if ('actGuard' in g) {
-      const guard = g.actGuard, finalize = g.finalizeAct;
-      g.actGuard = (batch: unknown) => this.bodyRefusal(opsOf(batch)) ?? guard?.(batch) ?? null;
-      g.finalizeAct = (r: Result, after: WorldModel) => {
-        const result = finalize?.(r, after) ?? r;
-        if (result.accepted) result.warnings.push(...this.buried(Object.values(result.ids), after));
-        return result;
-      };
-    } else g.act = (batch: unknown, note?: string) => {
-      const no = this.bodyRefusal(opsOf(batch)); if (no) return no;
-      const r = act(batch, note) as Result;
-      if (r.accepted) for (const w of this.buried(Object.values(r.ids))) r.warnings.push(w);
-      return r;
-    };
-    g.dryrun = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
-    g.preview = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
-    g.undo = () => { const t = this.god.store.undoable(); const r = t ? this.bodyRefusal(t.inverse) : null; return r ?? undo(); };
-    g.redo = () => { const t = this.god.store.redoable(); const r = t ? this.bodyRefusal(t.inverse) : null; return r ?? redo(); };
-  }
 
   // ------------------------------------------------------------------ reach
 
@@ -765,6 +666,13 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
+    // G1/R8: a resident's next observation carries what the god just did around it (newest first).
+    const observe = L.observe.bind(L);
+    L.observe = (soul, include) => {
+      const out = observe(soul, include), notices = this.notices.recent(soul.soulId);
+      if (notices.length) out.notices = notices;
+      return out;
+    };
     L.intents.planRefusal = (soul, steps, target) => this.layers.constructionRefusal(soul, steps, target);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);

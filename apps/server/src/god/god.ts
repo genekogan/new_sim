@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
+import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -58,6 +58,16 @@ export type GodOptions = {
 /** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
 export type Genesis = { schema: 'genesis/1'; name?: string; description?: string; constants?: Partial<WorldModel['constants']>; state?: Record<string, unknown>; batches: { note?: string; group?: string; ops: unknown[] }[] };
 
+/** G1: the god's line for a resident its edit walked out of the way (the resident's own reason, quoted). */
+const movedWarning = (m: ResidentMove) => m.how === 'stopped' ? `body.stopped: ${m.name} stopped on the way to what the edit changes (at (${m.to.join(', ')})); told "${m.reason}"`
+  : `body.${m.how === 'walked' ? 'walked-out' : 'relocated'}: ${m.name} ${m.how === 'walked' ? 'walked' : 'was moved (no walking route)'} to (${m.to.join(', ')}${m.level ? `, floor level ${m.level}` : ''}); told "${m.reason}"`;
+/** G1: who an edit would walk out, for a dry run or preview (nobody is moved). */
+const wouldMove = (moved: ResidentMove[]) => moved.map(m => ({ name: m.name, soulId: m.soulId, how: m.how, to: m.to, ...(m.level ? { level: m.level } : {}), reason: m.reason }));
+/** G1: what the walk-out planner made of an accepted edit: who moves, warnings (no clear ground; a thing set down
+ *  instead of put into a resident's hands) and the would-be world's entities it rewrote. */
+export type WalkoutPrep = { moved: ResidentMove[]; warnings: string[]; touched: string[] };
+const NO_WALKOUTS: WalkoutPrep = { moved: [], warnings: [], touched: [] };
+
 export class GodMode {
   readonly store: WorldStore;
   readonly assets: AssetStore;
@@ -77,9 +87,11 @@ export class GodMode {
   template: string | null = null;
   private previews = new Map<string, Preview>();
   /** Subscribe to committed batches (ordered, synchronous). Returns an unsubscribe. */
-  /** Body-aware edits (installed by the engine bridge): who uses an entity, and the warnings for bodies an
-   *  accepted edit buries (the engine lifts them clear). Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: PlanOptions['refuse'] } | null = null;
+  /** Body-aware edits (installed by the engine bridge). `uses`/`refuse` refuse only edits of a resident's body itself;
+   *  G1 "god rules": `prepare` plans, on the would-be world, the residents an accepted edit/undo/redo walks out of its
+   *  way (listed as `moved` in the durable receipt), and `apply` moves them after the SQL commit in the same request.
+   *  Null in worlds without the engine. */
+  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[]) => string[] | void } | null = null;
   /** Bridge admission/decoration must run before the accepted receipt is persisted, and never on replay. */
   actGuard: ((batch: unknown) => Result | null) | null = null;
   finalizeAct: ((result: Result, after: WorldModel) => Result) | null = null;
@@ -232,8 +244,11 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
     const admission = this.builds.admit(parsed.data.build ?? this.caller.build, parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
-    return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
+    let scratch: WorldModel | undefined;
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
+    if (!p.ok) return { accepted: false as const, failures: p.failures };
+    const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
+    return { accepted: true as const, ids: p.ids, warnings: [...p.warnings, ...moving.warnings], diff: summarize(p.diff), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
   }
   act(batch: unknown, note?: string): Result {
     const result = this.commitBatch(batch, note);
@@ -293,6 +308,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (r.result.accepted) r.result.warnings.push(...lifted);
     const result = this.finalizeAct?.(r.result, next) ?? r.result;
     if (!result.accepted) return result;
+    const walkouts = this.bodies?.prepare?.(this.model, next, r.diff!, normalized.ops) ?? NO_WALKOUTS, moved = walkouts.moved;
+    if (moved.length) result.moved = moved;
+    result.warnings.push(...moved.map(movedWarning), ...walkouts.warnings);
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, 'edit', field);
     const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made, journalNote);
     if (updates.failures) return { accepted: false, failures: updates.failures };
@@ -311,6 +329,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const { ops, group, clientRef } = normalized;
     const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes, origins: this.parts.origins(ops, next, this.caller.identity) }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
     if (concurrent) return concurrent;
+    // A resident the engine could not land where planned is named in the receipt too (best effort: never unsends it).
+    const late = this.bodies?.apply?.(moved) ?? [];
+    if (late.length) { result.warnings.push(...late); if (clientRef !== undefined) this.store.amendReceipt(clientRef, result); }
     if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     Object.assign(this.model, next); // preserve bridge/nav references and WeakMap keys
     const deltas = this.builds.accepted(updates.writes);
@@ -340,16 +361,20 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const next = this.model.fork();
     let made: string[] = [];
     const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
-      const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+      const refused = this.bodies?.refuse?.(after, diff, ops, { undo: true }); if (refused) return refused;
       const check = this.builds.check(admission, this.model, after, diff, ops, true); if ('failure' in check) return check.failure; made = check.made; return null;
     } });
-    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
+    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('body.') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
+    const walkouts = this.bodies?.prepare?.(this.model, next, r.diff!, target.inverse) ?? NO_WALKOUTS, moved = walkouts.moved;
+    if (moved.length) r.result.moved = moved;
+    r.result.warnings.push(...moved.map(movedWarning), ...walkouts.warnings);
     const at = this.now(), roots = this.builds.rootsDelta(this.model, next, r.diff!, kind, field), updates = this.builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true, made);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     r.result.warnings.push(...roots.warnings, ...updates.warnings);
     if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
     const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes });
     if (refused) return refused;
+    r.result.warnings.push(...this.bodies?.apply?.(moved) ?? []);
     Object.assign(this.model, next);
     if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     const deltas = this.builds.accepted(updates.writes);
@@ -387,11 +412,11 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       if (admission.failures) return { ok: false as const, failed: target.seq, failures: admission.failures };
       const next = model.fork(); let made: string[] = [];
       const r = applyBatch(next, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: (after, diff, ops) => {
-        const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused;
+        const refused = this.bodies?.refuse?.(after, diff, ops, { undo: true }); if (refused) return refused;
         const check = builds.check(admission, model, after, diff, ops, true);
         if ('failure' in check) return check.failure; made = check.made; return null;
       } });
-      if (!r.result.accepted) return { ok: false as const, failed: target.seq, failures: r.result.failures.map(f => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
+      if (!r.result.accepted) return { ok: false as const, failed: target.seq, failures: r.result.failures.map(f => ({ ...f, code: f.code.endsWith('.by-body') || f.code.startsWith('body.') || f.code.startsWith('build.') ? f.code : 'undo.conflict' })) };
       const roots = builds.rootsDelta(model, next, r.diff!, 'undo', field);
       const updates = builds.writes(admission, roots, r.result.seq, at, this.caller.identity, target.grp ?? undefined, true, made);
       if (updates.failures) return { ok: false as const, failed: target.seq, failures: updates.failures };
@@ -413,8 +438,19 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const notReverted = targets.map(e => e.seq), preflight = this.preflightUndo(targets, this.model, true, releaseClaims);
     if (!preflight.ok) return { accepted: false, reverted: [] as number[], notReverted, failed: preflight.failed, failures: preflight.failures };
     if (!targets.length && !emptyOK) return { accepted: false, reverted: [], notReverted, failures: [{ op: -1, code: 'undo.conflict', detail: 'no edits in group' }] };
+    // Clear residents once for the complete inverse chain, after every conflict check has passed.
+    const combined: Diff = { upserts: [...new Set(preflight.entries.flatMap(e => e.diff.upserts.map(x => x.id)))].flatMap(id => preflight.model.entities.has(id) ? [preflight.model.entities.get(id)!] : []), removes: [...new Set(preflight.entries.flatMap(e => e.diff.removes))].filter(id => !preflight.model.entities.has(id)), defs: [], tiles: [...new Set(preflight.entries.flatMap(e => e.diff.tiles))], answers: [] };
+    const walkouts = this.bodies?.prepare?.(this.model, preflight.model, combined, targets.flatMap(e => e.inverse)) ?? NO_WALKOUTS, moved = walkouts.moved;
+    // What the planner set down in the would-be world (released by a walk-out, or kept out of a resident's hands) is
+    // journaled with the chain's last entry.
+    const last = preflight.entries.at(-1);
+    if (last) for (const id of new Set([...moved.flatMap(m => m.released), ...walkouts.touched])) {
+      const e = preflight.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
+      const i = last.diff.upserts.findIndex(x => x.id === id); if (i >= 0) last.diff.upserts[i] = e; else last.diff.upserts.push(e);
+    }
     const refusal = this.store.commitSequence(this.owner, preflight.entries);
     if (refusal) return { accepted: false, reverted: [] as number[], notReverted, ...(!refusal.accepted ? { failures: refusal.failures } : {}) };
+    const late = this.bodies?.apply?.(moved) ?? [];
     // Make the complete result visible before invoking observers; an observer cannot expose a half-reverted world.
     const frames = preflight.entries.map(entry => ({ entry, deltas: this.builds.accepted(entry.updates.writes) }));
     if (preflight.entries.length) Object.assign(this.model, preflight.model);
@@ -426,7 +462,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     }
     const echoed = [...preflight.entries].reverse().find(e => e.updates.echo), echo = echoed?.updates.echo;
     if (echo) echo.rev = echoed!.updates.writes.find(w => w.echo)!.rev!;
-    return { accepted: true, reverted: notReverted, notReverted: [] as number[], ...(echo ? { build: echo } : {}), ...(warnings.length ? { warnings } : {}) };
+    warnings.unshift(...moved.map(movedWarning), ...walkouts.warnings, ...late);
+    return { accepted: true, reverted: notReverted, notReverted: [] as number[], ...(moved.length ? { moved } : {}), ...(echo ? { build: echo } : {}), ...(warnings.length ? { warnings } : {}) };
   }
   undoGroup(group: string) {
     // A build owns its lead group and every claim/subgroup, including after finish.
@@ -444,7 +481,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
     const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
-    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
+    let scratch: WorldModel | undefined;
+    const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
     const id = 'pv_' + randomBytes(6).toString('hex');
     for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
     while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);
@@ -454,7 +492,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
     this.previews.set(id, { at: Date.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
-    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), url: `?preview=${id}` };
+    const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
+    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), url: `?preview=${id}`, ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
   }
   getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
   /** Revision guards check only referenced/touched entities, never the world's global edit sequence. */

@@ -77,6 +77,13 @@ export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
 }
 /** Synchronous writes to this host's Db, in the event acceptance transaction. */
 export type AcceptanceJournal = (event: LogEvent) => true;
+/** G1/R8: a native mind perceives what the god did around it (a line in its recent memory) and re-thinks next tick;
+ *  `interrupted`: its act ended (walked out or stopped), so it stands where it was put. Deterministic (folded). */
+function godNoticed(m: Mind, text: string, tick: number, interrupted: boolean) {
+  m.recent = [...m.recent.slice(-3), text];
+  if (interrupted) { m.doing = 'standing around'; m.pending = null; }
+  m.nextEvalTick = Math.min(m.nextEvalTick, tick + 1); m.evalTrigger = 'god-change'; m.lastFingerprint = '';
+}
 type PurposeRef = { intentId: string; version: number };
 type ActivityBinding = { admissionSeq:number; payload:Extract<IntentAdmissionPayloadV2,{phase:'accepted'}> };
 export class StaleIntentAttempt extends Error { constructor() { super('purpose attempt became stale'); } }
@@ -841,6 +848,18 @@ export class WorldHost {
         if(payload.phase!=='started')delete this.intentBindings()[payload.attemptId];
         break;
       }
+      case 'edge-god-walkout':
+      case 'edge-relocate':
+      case 'edge-stop': {
+        // G1: the reason is a durable part of a resident's next native observation too, and the resident re-thinks at
+        // once (a walked-out or stopped native mind must not wait out its old timer standing where it was put).
+        if (e.author === 'god:walkout') {
+          const p = e.payload as { soulId: string; why: string }, m = this.minds.get(p.soulId);
+          if (m) godNoticed(m, p.why, tick, true);
+          if (m) this.acc.dirty.add(m.soulId);
+        }
+        break;
+      }
       case 'birth': {
         const p = e.payload as BirthPayload;
         if (!this.minds.has(p.soulId)) this.addMind({
@@ -966,6 +985,8 @@ export class WorldHost {
           ((this.extra.soulProfilesV1??={}) as Record<string,SoulProfileFactV1>)[profile.soulId]=structuredClone(profile);
           this.acc.dirty.add(m.soulId);this.kernelDirty=true;
         }
+        // G1/R8: "the god changed something near you" for a native mind (GodNotices.notify with native: true).
+        if(p?.godNoticeV1){const n=p.godNoticeV1 as {soulId?:unknown;text?:unknown},m=typeof n.soulId==='string'?this.minds.get(n.soulId):undefined;if(m&&typeof n.text==='string'&&n.text){godNoticed(m,n.text.slice(0,300),tick,false);this.acc.dirty.add(m.soulId);}}
         if(p?.intentNativeSequenceCompletionV1===true)this.extra.intentNativeSequenceCompletionV1=true;
         if(p?.intentExecutionRetentionV1===true)this.extra.intentExecutionRetentionV1=true;
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;

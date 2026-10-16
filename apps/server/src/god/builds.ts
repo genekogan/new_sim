@@ -388,7 +388,8 @@ export class GodBuilds {
       let owner: string | undefined, access: string | undefined;
       for (let p: typeof e | undefined = e; p; p = model.entities.get(p.in.parent)) if (p.owner || p.access) { owner = p.owner; access = p.access; break; }
       if (owner || access === 'private') add('owned', { id: e.id, path, owner: owner ?? null });
-      if (owner?.startsWith('soul:') || access === 'private' || occupied) protectedThings.push({ id: e.id, path });
+      // G1: occupancy is informational; residents are walked out when the site closes.
+      if (owner?.startsWith('soul:') || access === 'private') protectedThings.push({ id: e.id, path });
     }
     for (const p of context?.places ?? []) if (closureMeetsPolygon(zones, p.polygon)) add('places', { id: p.id, name: p.name });
     for (const b of context?.bodies ?? []) if (zones.some(z => inSite(z, b.at))) add('bodies', { name: b.name, ...(b.soulId ? { soulId: b.soulId } : {}) });

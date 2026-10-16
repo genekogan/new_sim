@@ -189,6 +189,11 @@ export class WorldStore {
     const row = this.db.db.prepare('SELECT payload_hash,seq,result FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref=?').get(this.worldId, clientRef) as { payload_hash: string; seq: number; result: string } | undefined;
     return row ? { world: this.worldId, clientRef, payloadHash: row.payload_hash, seq: row.seq, result: JSON.parse(row.result) as Accepted } : null;
   }
+  /** G1: add what was learnt after the commit (a resident the engine could not land) to a committed receipt, so a client
+   *  retry returns it too. Best effort: a receipt over its byte limit keeps its committed form. */
+  amendReceipt(clientRef: string, result: Accepted) {
+    try { this.db.db.prepare('UPDATE god_edit_receipts_v1 SET result=? WHERE world_id=? AND client_ref=?').run(JSON.stringify(result), this.worldId, clientRef); } catch { /* the edit stands; the response still carries it */ }
+  }
   retry(clientRef: string, requestHash: string): Result | null {
     const row = this.db.db.prepare('SELECT request_hash,seq,result FROM god_edit_receipts_v1 WHERE world_id=? AND client_ref=?').get(this.worldId, clientRef) as { request_hash: string; seq: number; result: string } | undefined;
     if (!row) return null;

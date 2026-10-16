@@ -61,6 +61,18 @@ export const MAX_DECK = 80;
 
 export type FoldResult = { play?: PlayView; programId?: string; programOk?: boolean; programCode?: string };
 
+type GodWalkoutV1 = (id: string, to: [number, number], released: string[], how: 'walked' | 'relocated', dropAt?: [number, number, number], level?: number) => boolean;
+/** G1 walk-out of a god edit's way. Deterministic and never a fault: a walk the engine no longer admits lands as a
+ *  relocation at the same point; a body that cannot land there (or a payload for someone else's body) is left as is.
+ *  `level` (default 0): an upstairs resident whose floor the edit leaves standing steps aside on that floor. */
+function godWalkout(engine: Engine, k: KState, payload: unknown, how: 'walked' | 'relocated'): void {
+  const p = payload as { soulId?: string; entityId?: string; to?: [number, number]; released?: string[]; dropAt?: [number, number, number]; level?: number } | null;
+  const walk = (engine as unknown as { godWalkoutV1?: GodWalkoutV1 }).godWalkoutV1;
+  if (!p?.soulId || !p.entityId || !Array.isArray(p.to) || !walk || k.things[p.soulId]?.traits.body !== p.entityId) return;
+  const released = Array.isArray(p.released) ? p.released : [], level = Number.isInteger(p.level) ? p.level : 0;
+  if (!walk.call(engine, p.entityId, p.to, released, how, p.dropAt, level) && how === 'walked') walk.call(engine, p.entityId, p.to, released, 'relocated', p.dropAt, level);
+}
+
 /** Apply one logged event to the engine and the kernel. Deterministic; returns what happened for the host's bookkeeping. */
 export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record<string, number>): FoldResult {
   if(isStationFactV1(e.kind))parseStationFactV1(e.kind,e.payload);
@@ -92,9 +104,17 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const r = engine.perform({ actor: p.entityId, label: p.label, steps: p.steps });
       return { programId: r.id, programOk: r.ok, programCode: r.diagnostic?.code };
     }
+    case 'edge-god-walkout': {
+      // G1: a god edit walked this resident out of its way (planned against the native route; compressed to its end).
+      // Forward-only: release 1 folds this kind as a no-op, so snapshot before upgrading and never roll back past it.
+      godWalkout(engine, k, e.payload, 'walked');
+      return {};
+    }
     case 'edge-relocate': {
       // Edge reclaim after fading: land an idle body at a starting place (no-op if the engine refuses).
-      const p = e.payload as { entityId?: string; to?: [number, number] };
+      const p = e.payload as { entityId?: string; to?: [number, number]; godWalkout?: boolean };
+      // G1: no walking route out of a god edit's way: the same intervention, landed directly.
+      if (p.godWalkout) { godWalkout(engine, k, e.payload, 'relocated'); return {}; }
       const relocate = (engine as unknown as { relocateHumanV1?: (id: string, to: [number, number]) => boolean }).relocateHumanV1;
       if (p.entityId && Array.isArray(p.to) && relocate) relocate.call(engine, p.entityId, p.to);
       return {};

@@ -75,6 +75,7 @@ import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
 import {authoredBoundariesV1Schema,authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesV1,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
+import {placeOnGround} from '../../../mars/viewer/engine/items/model.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /** Make the next Spatial.sync rebuild (incrementally, from the previous grids): the world's scene contribution changed
@@ -823,6 +824,112 @@ export class MarsEngine implements Engine {
     if(body)this.ents[id].body=structuredClone(body);else delete this.ents[id].body;
     this.out.changes.push([this.rt.tick,id,'body',body]);return true;
   }
+  /** The native seat controller's standing approach, before its animation is compressed by a god edit. */
+  private godWalkoutStartV1(id:string):{level:number;p:[number,number]}|null {
+    const e=this.ents[id];if(!e?.human)return null;
+    const live=this.rt.internals().live as Map<string,any>;
+    for(const action of this.holders(id)){
+      const seat=live.get(action);
+      if(seat&&['sit','take_slot'].includes(seat.rec.verb)&&seat.exec.slot.kind==='seat'&&['sit-down','occupied','stand-up'].includes(seat.exec.phase)){
+        const approach=seat.exec.approach??seatApproach(this.rt,seat.exec.slot);
+        if(Array.isArray(approach))return {level:seat.exec.slot.level,p:[...approach] as [number,number]};
+      }
+    }
+    return {level:e.human.level??0,p:[e.pose.p[0],e.pose.p[2]]};
+  }
+  /** The landing check a god walk-out folds with (pure): standing room for this body at `to` on `level`, walkable
+   * ground there on level 0 (not deep water, steep or outside), and no other body in the way. The planner uses the same
+   * check, so a planned exit is one the fold accepts. */
+  godWalkoutLandableV1(id:string,to:[number,number],level=0):boolean {
+    const e=this.ents[id];
+    if(!e?.human||!Array.isArray(to)||to.length!==2||!to.every(Number.isFinite)||!Number.isInteger(level)||level<0)return false;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const grid=spatial.levelAt(level,to),profile=bodyProfile(e),field=level===0&&this.rt.world.groundV1?spatial.ground?.field:undefined;
+    if(!grid||clearanceAt(grid,to)<profile.radius||field&&field.medium(to[0],to[1])>1)return false;
+    return !Object.values(this.ents).some((other:any)=>other.id!==id&&other.human&&(other.human.level??0)===level&&hypot(other.pose.p[0]-to[0],other.pose.p[2]-to[1])<profile.radius+bodyProfile(other).radius);
+  }
+  /** Pure preflight for a synchronous god walk-out, using the ordinary body's native route planner.
+   * A seat first returns to its normal standing approach. No clock, action or body is changed. A failing search is
+   * proved early (identical results; path.ts proveUnreachable), so a walled-in exit costs little. */
+  godWalkoutRouteV1(id:string,to:[number,number],level=0):boolean {
+    const e=this.ents[id],start=this.godWalkoutStartV1(id);
+    if(!e?.human||!start||!this.godWalkoutLandableV1(id,to,level))return false;
+    const spatial=this.rt.services.spatial as Spatial;
+    return spatial.route(this.rt.world,bodyProfile(e),start,{level,p:to},{proveUnreachable:true}).ok;
+  }
+  /** world-edit/1 read: where a walking body is heading (its live walk_to goal), or null. */
+  walkGoalV1(id:string):{level:number;p:[number,number]}|null{
+    const task=this.ents[id]?.human?.task,ex=task?(this.rt.services.walkExecs as Map<string,any>|undefined)?.get(task):undefined;
+    return ex?.goal&&Array.isArray(ex.goal.p)?{level:ex.goal.level??0,p:[ex.goal.p[0],ex.goal.p[1]]}:null;
+  }
+  /** Logged god intervention only: ordinary cancellation releases the old activity, then its remaining
+   * interpolation is compressed to the supported terminal state. A native walk is planned/reserved/started
+   * and completed at its endpoint in this request; no engine/world ticks or unrelated actions are stepped.
+   * All carried items are set down at `dropAt` (default: the body's original feet) before it leaves. Historical
+   * edge-relocate stays unchanged; only its explicit godWalkout payload may use this stronger, synchronous intervention. */
+  godWalkoutV1(id:string,to:[number,number],released:string[],how:'walked'|'relocated',dropAt?:[number,number,number],toLevel=0):boolean {
+    const e=this.ents[id];
+    if(!e?.human||!Array.isArray(to)||to.length!==2||!to.every(Number.isFinite)||!Array.isArray(released)||released.some(x=>typeof x!=='string')||!['walked','relocated'].includes(how))return false;
+    if(dropAt!==undefined&&(!Array.isArray(dropAt)||dropAt.length!==3||!dropAt.every(Number.isFinite)))return false;
+    if(!this.godWalkoutLandableV1(id,to,toLevel))return false;
+    const spatial=this.rt.services.spatial as Spatial,field=this.rt.world.groundV1?spatial.ground?.field:undefined;
+    if(how==='walked'&&!this.godWalkoutRouteV1(id,to,toLevel))return false;
+    const start=this.godWalkoutStartV1(id)!,feet:[number,number,number]=[e.pose.p[0],e.pose.p[1],e.pose.p[2]],yaw=e.pose.yaw;
+    const setDown:[number,number,number]=dropAt?[dropAt[0],dropAt[1],dropAt[2]]:feet;
+    const reason={code:'god.walkout',message:'The god is rebuilding here; the activity ended and you stepped clear.',subjects:[id]};
+    const drop=new Set<string>();
+    for(const item of Object.values(this.ents) as any[]){const support=item.support;if(support?.kind==='in-hand'&&support.by===id||support?.kind==='held'&&support.by.includes(id))drop.add(item.id);}
+    // A shared carry is let go of too: the other carrier's action on that load ends with this one (never half-cancelled).
+    const internal=this.rt.internals(),affected=new Set<string>(),resources=new Set([`actor:${id}`,`holds:${id}`,`hand:${id}:left`,`hand:${id}:right`,...[...released,...drop].map(x=>`entity:${x}`)]);
+    for(const [resource,owners] of internal.owners as Map<string,{action:string}[]>)if(resources.has(resource))for(const owner of owners)affected.add(owner.action);
+    for(const p of this.programs.values())if(p.actor===id||p.build?.crew.includes(id)){if(p.action)affected.add(p.action);}
+    // Include the full native action tree: its parent must not recreate a cancelled child next tick.
+    let added=true;while(added){added=false;for(const record of this.rt.records.values())if(this.rt.isActive(record.id)){
+      if(affected.has(record.id)&&record.parent&&!affected.has(record.parent)){affected.add(record.parent);added=true;}
+      if(record.parent&&affected.has(record.parent)&&!affected.has(record.id)){affected.add(record.id);added=true;}
+    }}
+    for(const action of affected)if(this.rt.isActive(action))this.rt.cancel(action,reason);
+    // A controlled stop may admit cleanup children (return an item, leave a seat). Include those as well.
+    added=true;while(added){added=false;for(const record of this.rt.records.values())if(this.rt.isActive(record.id)&&record.parent&&affected.has(record.parent)&&!affected.has(record.id)){affected.add(record.id);added=true;}}
+    // Runtime's existing checkpoint terminalizer releases reservations and ordinary task/traffic ownership.
+    // Deferred seat/sleep/stair transitions cannot wait for a tick while their supporting geometry is removed.
+    const depth=(action:string)=>{let n=0;for(let record=this.rt.records.get(action);record?.parent;record=this.rt.records.get(record.parent))n++;return n;};
+    // Finish leaves first so generic parent cleanup cannot start another deferred child exit.
+    for(const action of [...affected].sort((a,b)=>depth(b)-depth(a))){const live=internal.live.get(action);if(live)internal.forceFinish(live,'cancelled',reason);else if(internal.waiting.has(action))this.rt.cancel(action,reason);}
+    for(const p of [...this.programs.values()])if(p.actor===id||p.build?.crew.includes(id)||p.action&&affected.has(p.action))this.end(p,'cancelled',reason);
+    // An already seated passenger need not have a live boarding controller, so release the seat's back-reference.
+    for(const thing of Object.values(this.ents) as any[]){
+      if(thing.support?.kind==='ridden-by'&&thing.support.by===id){thing.support={kind:'ground'};if(thing.vehicle)thing.vehicle.speed=0;}
+      for(const seats of [thing.carrier?.seats,thing.boat?.passengers])if(seats)for(const slot of Object.keys(seats))if(seats[slot]===id){if(thing.carrier?.seats===seats)seats[slot]=null;else delete seats[slot];}
+    }
+    for(const body of Object.values(this.ents) as any[])if(body.human&&(body.id===id||body.human.grip&&drop.has(body.human.grip.entity))){
+      const h=body.human;for(const key of ['task','grip','hands','sleepPose','on','riding','carrier','boatPassenger','boatTransit','shore','baseActivity','phaseK','proneYaw','prop','seatHeight','holding','partner','together','instrument','game'])delete h[key];h.activity='idle';h.speed=0;
+    }
+    for(const key of ['walkExecs','carryExecs']){const store=this.rt.services[key];if(store instanceof Map)for(const action of affected)store.delete(action);}
+    const sleeps=this.rt.services.sleeps;if(sleeps)for(const action of affected){delete sleeps.holds[action];delete sleeps.purposes[action];}
+    if(this.rt.services.socialReturns)this.rt.services.socialReturns=this.rt.services.socialReturns.filter((ret:any)=>ret.actor!==id&&!affected.has(ret.source)&&!affected.has(ret.directive));
+    // Finish the seat's ordinary rise before admitting a native route from that standing point.
+    const land=()=>{
+      for(const itemId of drop){const item=this.ents[itemId];placeOnGround(item,setDown,yaw);delete item.reservedBy;acknowledgeRelocation(this.rt,itemId);}
+      e.pose.p=[r3(to[0]),toLevel===0&&field?r3(standHeight(field,...to)):r3(spatial.base.levels.find(l=>l.id===toLevel)?.y??0),r3(to[1])];e.human.level=toLevel;
+    };
+    let walked=false;
+    if(how==='walked'){
+      const level=spatial.base.levels.find(l=>l.id===start.level),height=start.level===0&&field?standHeight(field,...start.p):level?.y??feet[1];
+      e.pose.p=[start.p[0],r3(height),start.p[1]];e.human.level=start.level;
+      const walk=this.rt.submit('walk_to',{actor:id,x:to[0],z:to[1],level:toLevel},{preempt:false});
+      const live=walk.status==='failed'?undefined:internal.live.get(walk.id);
+      // Admit against the same pre-drop geometry as preflight: a released load must not bury its
+      // former carrier's start before the already validated walk has been admitted.
+      if(live){land();internal.forceFinish(live,'completed');this.rt.services.walkExecs?.delete(walk.id);walked=true;}
+      else if(walk.status!=='failed'&&this.rt.isActive(walk.id))this.rt.cancel(walk.id,reason);
+    }
+    // No admitted walk (or no route at all): land at the same clear point, as a relocation.
+    if(!walked)land();
+    delete e.human.task;delete e.human.speed;e.human.activity='idle';acknowledgeRelocation(this.rt,id);
+    this.rt.mark('god.walkout',{entityId:id,to:[...to],...(toLevel?{level:toLevel}:{}),how:walked?'walked':'relocated',released:[...drop].sort()});
+    return true;
+  }
   /** Mars has no way to add a person to a running world; the adapter does what its world editor does, then restores canonical order. */
   /** Edge reclaim (logged 'edge-relocate'): an idle, unheld body lands on its feet at the nearest free
    * standing spot near `to` (same ring search as arrival). Refuses busy/held/sleeping bodies. */
@@ -1450,7 +1557,7 @@ export class MarsEngine implements Engine {
   /** world-edit/1 read: engine level ids and heights (ground 0 first). */
   levelsV1():{id:number;y:number}[]{const spatial=this.rt.services.spatial as Spatial;return spatial.base.levels.map(l=>({id:l.id,y:l.y}));}
   /** world-edit/1 read: who uses an entity-world fixture right now — a body seated on it (its seat slot is claimed) or
-   *  holding it — so god edits can refuse with the body named (occupied.by-body / held.by-body). */
+   *  holding it — so a god edit can walk that body out first (G1) and query can name who uses it. */
   bodyUsesV1(id:string):{body:string;how:'occupied'|'held'}|null{
     const e=this.ents[id];if(!e)return null;
     const s=e.support;if(s?.kind==='in-hand')return {body:s.by,how:'held'};if(s?.kind==='held'&&s.by?.[0])return {body:s.by[0],how:'held'};

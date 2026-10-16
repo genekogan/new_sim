@@ -273,7 +273,7 @@ test('done and final-batch done are idempotent, close atomically and reopen root
 test('RL2: abandon undo preflights subgroups, changes nothing on conflict and can retry', async t => {
   const f = fixture(); t.after(() => f.db.close()); const s = await f.start();
   for (let i = 0; i < 3; i++) assertAccepted((await f.req('/v1/god/act', { ops: [f.place(`bench-${i}`, i * 4)], build: f.field(s.lease), group: `part-${i}` })).data);
-  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'seated' } : null };
+  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'body.protected', detail: 'a resident body' } : null };
   const before = JSON.stringify(f.god.model.snapshot()), journal = f.god.store.edits(), rev = f.god.store.buildsRev(), emitted = f.emitted.length;
   const partial = (await f.req('/v1/god/builds/church/abandon', { undo: true })).data; assert.equal(code(partial), 'build.undo-incomplete'); assert.equal(partial.reverted.length, 0); assert.equal(partial.notReverted.length, 3); assert.equal(f.god.store.build('church')!.status, 'active');
   assert.equal(JSON.stringify(f.god.model.snapshot()), before); assert.deepEqual(f.god.store.edits(), journal); assert.equal(f.god.store.buildsRev(), rev); assert.equal(f.emitted.length, emitted);
@@ -501,7 +501,7 @@ test('C1b #5: non-lead field-less reverts and abandon undo never revive a quiet 
     assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(body(f).closureLapsedAt, lifted);
     assert.equal(f.god.builds.publicList().builds[0].closed, false);
   }
-  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'busy' } : null };
+  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'body.protected', detail: 'a resident body' } : null };
   assert.equal(code((await f.req('/v1/god/builds/church/abandon', { undo: true }, f.other)).data), 'build.undo-incomplete');
   assert.equal(f.god.store.build('church')!.last_at, before.last_at); assert.equal(f.god.builds.hasClosure(), false);
   assert.equal((await f.req('/v1/god/builds/church/resume', {}, f.other)).data.ok, true);

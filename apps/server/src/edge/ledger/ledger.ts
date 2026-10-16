@@ -990,6 +990,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return {happening, elsewhere};
   }
 
+  /** G1: an accepted god edit interrupts the resident's current use and any queued retry. */
+  godInterrupted(soulId: string, reason: string) {
+    this.pending.delete(soulId); this.capCache.delete(soulId);
+    for (const receipt of this.openReceipts(soulId)) this.update(receipt.id, {phase: 'failed', code: 'god.walkout', reason});
+  }
   observe(soul: EdgeSoul, include: Set<string>) {
     const m = this.mind(soul), b = this.body(m.entityId), tick = this.host.engine.world.tick, day = this.host.living;
     const program = this.host.engine.programOf(m.entityId), action = program ? this.host.engine.programAction?.(program) : null;

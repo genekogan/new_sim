@@ -75,6 +75,8 @@ async function step(name, fn, expect) {
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
+// G1 "god rules": edits are never refused for residents; a dry run names who an edit would walk out (nothing moves).
+const dryrun = (ops) => api('/v1/god/dryrun', { body: { ops } });
 const entity = async (path) => (await api(`/v1/world/entities/${path}`, { as: 'none' })).data;
 const groundAt = async (pts) => (await api('/v1/god/query', { body: { points: pts } })).data.points;
 const describe = async (ref) => (await api('/v1/god/query', { body: { describe: ref } })).data.describe;
@@ -294,16 +296,16 @@ try {
     return { offered: !!seen?.ok, accepted: r.accepted, code: r.code, reason: r.reason, s: +(r.ms / 1000).toFixed(1), walked: r.walked, straight: r.straight, end: r.end, upstairs: !!r.end && upstairs(r.end.p), throughDoor: throughDoor === null ? null : +throughDoor.toFixed(2), climbing };
   }, (r) => r.accepted && r.end?.activity === 'sit' && r.upstairs && r.throughDoor !== null && r.throughDoor < 1.5 && r.climbing >= 2);
 
-  // ======================== the god's edits that touch seated bodies are refused, naming them
-  const named = (r, who) => r.data?.accepted === false && r.data.failures?.some((f) => /by-body/.test(f.code) && new RegExp(who).test(f.detail));
+  // ======================== the god's edits that touch seated bodies are never refused: a dry run names who would move
+  const named = (r, who) => r.data?.accepted === true && (r.data.wouldMove ?? []).some((m) => new RegExp(who).test(m.name));
   const refusals = {};
-  const refuse = (name, who, ops) => step(name, async () => { const r = await act(ops, name); refusals[name] = r.data; return r; }, (r) => named(r, who));
-  await refuse('G5 unseat: the god moves the plaza bench Ana sits on — refused, naming Ana', 'Ana', [{ op: 'move', id: PBENCH, p: [PBENCH_P[0] - 3, PBENCH_P[1]] }]);
-  await refuse('G5 bury: the god drops a crate where Ana sits — refused, naming Ana', 'Ana', [{ op: 'place', def: 'core/crate@1', name: 'crate-on-ana', p: xz((await observe(S('ana'))).self.position) }]);
-  await refuse(`G6 unseat: the god rebuilds ${HOUSE} with one floor while Cleo sits upstairs — refused, naming Cleo`, 'Cleo', [{ op: 'set', id: HOUSE, params: { floors: 1 } }]);
-  await refuse(`G6 unseat: the god removes ${HOUSE} — refused, naming Cleo`, 'Cleo', [{ op: 'remove', id: HOUSE }]);
-  await refuse('G6 unseat: the god removes the library bench Ben sits on — refused, naming Ben', 'Ben', [{ op: 'remove', id: 'library-bench' }]);
-  await step('G7 the refusals left the district as it was: all three still seated where they sat; no crate', async () => {
+  const refuse = (name, who, ops) => step(name, async () => { const r = await dryrun(ops); refusals[name] = r.data; return r; }, (r) => named(r, who));
+  await refuse('G5 unseat: the god moves the plaza bench Ana sits on — a dry run names Ana, who would be walked out', 'Ana', [{ op: 'move', id: PBENCH, p: [PBENCH_P[0] - 3, PBENCH_P[1]] }]);
+  await refuse('G5 bury: the god drops a crate where Ana sits — a dry run names Ana', 'Ana', [{ op: 'place', def: 'core/crate@1', name: 'crate-on-ana', p: xz((await observe(S('ana'))).self.position) }]);
+  await refuse(`G6 unseat: the god rebuilds ${HOUSE} with one floor while Cleo sits upstairs — a dry run names Cleo`, 'Cleo', [{ op: 'set', id: HOUSE, params: { floors: 1 } }]);
+  await refuse(`G6 unseat: the god removes ${HOUSE} — a dry run names Cleo`, 'Cleo', [{ op: 'remove', id: HOUSE }]);
+  await refuse('G6 unseat: the god removes the library bench Ben sits on — a dry run names Ben', 'Ben', [{ op: 'remove', id: 'library-bench' }]);
+  await step('G7 the dry runs left the district as it was: all three still seated where they sat; no crate', async () => {
     const st = {}; for (const k of Object.keys(souls)) { const o = (await observe(S(k))).self; st[k] = { activity: o.activity, p: o.position.map((v) => +v.toFixed(2)) }; }
     const crate = await entity('crate-on-ana'), house = await describe(HOUSE);
     return { st, crate: !!crate?.entity, floors: (house?.rooms ?? []).some((r) => r.floor === 1), cleoUp: upstairs(st.cleo.p) };

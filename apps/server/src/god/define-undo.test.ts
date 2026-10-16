@@ -8,7 +8,6 @@ import { type DefInput, type Result } from '@sim/world-compiler';
 import { Db } from '../db.ts';
 import { GodMode, type WorldDiffMessage } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
-import { EngineBridge } from './engine-bridge.ts';
 
 const post = (size: [number, number, number]): DefInput => ({ schema: 'def/1', name: 'probe-post', size: { box: size }, make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, size[1] / 2, 0], size }] } } });
 function fixture(t: TestContext) {
@@ -43,12 +42,12 @@ test('RL2: a real mid-group conflict changes nothing and reports every unreverte
   const early = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'early', p: [0, 0] }] }));
   const blocked = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'blocked', p: [5, 0] }] }));
   const last = ok(f.god.act({ group, ops: [{ op: 'place', def: 'core/bench@1', name: 'last', p: [10, 0] }] }));
-  f.god.bodies = { uses: id => id === f.god.model.get('blocked')?.id ? { code: 'occupied.by-body', detail: 'blocked is occupied by Ada' } : null };
+  f.god.bodies = { uses: id => id === f.god.model.get('blocked')?.id ? { code: 'body.protected', detail: 'blocked is a resident body' } : null };
   const before = f.god.model.snapshot(), journal = f.god.store.edits(), emitted = f.emitted.length;
   const r = await f.request('/v1/god/undo?group=g');
   assert.equal(r.accepted, false); assert.deepEqual(r.reverted, []); assert.deepEqual(r.notReverted, [last.seq, blocked.seq, early.seq]);
   assert.deepEqual(f.god.model.snapshot(), before); assert.deepEqual(f.god.store.edits(), journal); assert.equal(f.emitted.length, emitted);
-  assert.equal(r.failed, blocked.seq); assert.equal(r.failures[0].code, 'occupied.by-body');
+  assert.equal(r.failed, blocked.seq); assert.equal(r.failures[0].code, 'body.protected');
   assert.ok(f.god.model.get('early') && f.god.model.get('blocked')); assert.ok(f.god.model.get('last'));
 });
 
@@ -116,37 +115,4 @@ test('SQL failure rolls back an admitted ref change and an empty-inverse undo', 
   assert.throws(() => f.god.undo(), /fixture definition fault/);
   assert.deepEqual(f.god.model.snapshot(), before); assert.equal(f.god.store.undoable()!.seq, first.seq);
   const loaded = new GodMode(f.db, f.opts); assert.equal(loaded.model.def('probe-post@1')!.hash, f.god.model.def('probe-post@1')!.hash);
-});
-
-test('bridge refusals for a redefining op preserve the op, changed instance, field and repair', t => {
-  const f = fixture(t);
-  ok(f.god.act({ ops: [{ op: 'define', def: post([0.5, 1, 0.5]) }, { op: 'place', def: 'probe-post@1', name: 'post', p: [0, 0] }] }));
-  const bridge = Object.create(EngineBridge.prototype) as any;
-  bridge.god = f.god; bridge.stats = { refusals: 0 }; bridge.soulName = () => 'Ada';
-  bridge.pinnedBodies = () => [{ id: 'body-ada', doing: 'seated', p: [2, 0, 0] }];
-  bridge.host = { engine: { bodyUsesV1: () => null } };
-  f.god.bodies = { uses: () => null, refuse: (after, diff, ops) => bridge.pinnedCheck(after, diff, ops) };
-  const before = structuredClone(f.god.model.snapshot());
-  const r = f.god.act({ ops: [{ op: 'world', state: { constitution: 'rollback' } }, { op: 'define', def: post([6, 6, 6]) }] });
-  assert.equal(r.accepted, false);
-  if (!r.accepted) {
-    const failure = r.failures[0]; assert.equal(failure.code, 'occupied.by-body'); assert.equal(failure.op, 1);
-    assert.equal(failure.entity, f.god.model.get('post')!.id); assert.ok(failure.field && failure.fix); assert.match(failure.detail, /Ada/);
-  }
-  assert.deepEqual(f.god.model.snapshot(), before);
-});
-
-test('a terrain definition that would raise ground over a pinned body names its instance and op', t => {
-  const f = fixture(t);
-  const mound = (h: number): DefInput => ({ schema: 'def/1', name: 'mound', layer: 'volume', make: { kind: 'none' }, size: { box: [10, 1, 10] }, components: { landform: { kind: 'bump', c: [0, 0], r: 5, h, peak: 1 } } });
-  ok(f.god.act({ ops: [{ op: 'define', def: mound(0) }, { op: 'place', def: 'mound@1', name: 'mound', p: [0, 0] }] }));
-  const bridge = Object.create(EngineBridge.prototype) as any;
-  bridge.god = f.god; bridge.stats = { refusals: 0 }; bridge.soulName = () => 'Ada';
-  bridge.pinnedBodies = () => [{ id: 'body-ada', doing: 'seated', p: [0, 0, 0] }];
-  bridge.host = { engine: { bodyUsesV1: () => null } };
-  f.god.bodies = { uses: () => null, refuse: (after, diff, ops) => bridge.pinnedCheck(after, diff, ops) };
-  const r = f.god.act({ ops: [{ op: 'world', state: { constitution: 'rollback' } }, { op: 'define', def: mound(4) }] });
-  assert.equal(r.accepted, false);
-  if (!r.accepted) { const failure = r.failures[0]; assert.equal(failure.op, 1); assert.equal(failure.entity, f.god.model.get('mound')!.id); assert.equal(failure.code, 'occupied.by-body'); assert.ok(failure.field && failure.fix); }
-  assert.equal(f.god.model.terrain.sample(0, 0), 0);
 });
