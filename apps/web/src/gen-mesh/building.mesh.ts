@@ -51,8 +51,9 @@ registerMesh({
     const key = `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
     let tpl = templates.get(key);
     if (!tpl) {
-      // New switch defaults must not reshuffle the legacy random facade details.
-      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k)));
+      // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
+      // must leave the shutters, flower boxes and chimney where they were).
+      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k) && k !== 'decals'));
       const seed = hashStr(`${ctx.def.hash}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
       let built: { group: THREE.Group; tris: number } | null = null;
       for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }

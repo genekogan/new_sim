@@ -26,6 +26,16 @@ function windsOutward(m: FaceMesh) {
   return n;
 }
 const centre = (m: FaceMesh) => new THREE.Box3().setFromPoints(vertices(m)).getCenter(new THREE.Vector3());
+function coreWorld(seed = 'faces') { const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed }); for (const d of CORE_KIT) w.defineDef(d, 'core', 0); return w; }
+/** A real building mesh for a core def with its default params plus `extra`, baked as the server bakes it. */
+function building(w: WorldModel, ref: string, extra: Record<string, unknown> = {}, materials = new MaterialLib()) {
+  const def = w.def(ref)!;
+  const params = { ...Object.fromEntries(Object.entries({ ...GENERATORS['building/1'].params, ...def.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default])), ...extra };
+  const baked = w.bake(def, params as Record<string, Value>, 7);
+  const root = meshFor(def)!.build({ def, entity: { id: 'b', def: def.ref, in: { parent: 'world' }, by: 't', born: 0, v: 1, params } as Entity, params, args: def.make.kind === 'gen' ? def.make.args ?? {} : {}, baked, model: w, materials, tint: (_k: string, f: string) => f } as MeshCtx)!;
+  root.updateMatrixWorld(true);
+  return { root, baked };
+}
 
 /** A browser-ish document whose canvases record fillText; the network log records every request-shaped call. */
 function sandbox() {
@@ -128,12 +138,7 @@ test('network log: faces, patterns and decals request only this world\'s /assets
     // Defence in depth: a face or decal that skipped admission still never reaches the loader.
     const smuggled = shapeFaceMeshes({ kind: 'box', at: [0, 0, 0], size: [1, 1, 0.1], faces: [{ image: 'https://external.invalid/tracker.png' }] } as never, 0);
     assert.equal((smuggled[0].material as THREE.MeshStandardMaterial).map, null);
-    const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'faces' }); for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
-    const def = w.def('core/shop@1')!;
-    const params = Object.fromEntries(Object.entries({ ...GENERATORS['building/1'].params, ...def.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
-    Object.assign(params, { decals: [...fixtures.shopDecals, { slot: 'facade-f0-e-1', w: 1, h: 1, image }, { slot: 'facade-f0-w-1', w: 1, h: 1, image: 'https://external.invalid/t.png' }] });
-    const e = { id: 'shop', def: def.ref, in: { parent: 'world' }, by: 't', born: 0, v: 1, params } as Entity;
-    const shop = meshFor(def)!.build({ def, entity: e, params, args: def.make.kind === 'gen' ? def.make.args ?? {} : {}, baked: w.bake(def, params as Record<string, Value>, 7), model: w, materials, tint: (_k: string, f: string) => f } as MeshCtx)!;
+    const { root: shop } = building(coreWorld(), 'core/shop@1', { decals: [...fixtures.shopDecals, { slot: 'facade-f0-e-1', w: 1, h: 1, image }, { slot: 'facade-f0-w-1', w: 1, h: 1, image: 'https://external.invalid/t.png' }] }, materials);
     assert.equal(faces(shop, 'building-decal').length, 4);
     t.diagnostic(`network log: ${JSON.stringify(box.log)}`);
     assert.deepEqual(box.log, [`TextureLoader:/w/fixture${image}`], 'one same-origin world image, cached; nothing else');
@@ -142,15 +147,11 @@ test('network log: faces, patterns and decals request only this world\'s /assets
 });
 
 test('building decals sit on their wall slots, in their storey\'s group, turned with the building', () => {
-  const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'decals' }); for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
-  const def = w.def('core/shop@1')!;
+  const w = coreWorld('decals'), def = w.def('core/shop@1')!;
   for (const front of ['s', 'e']) {
     // Facade and gable ids are canonical (front = s); a shop turned east carries its gables on e and w.
     const list = fixtures.shopDecals.map((d: { slot: string }) => front === 'e' && d.slot === 'gable-s' ? { ...d, slot: 'gable-e' } : d);
-    const params = { ...Object.fromEntries(Object.entries({ ...GENERATORS['building/1'].params, ...def.params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default])), front, decals: list };
-    const baked = w.bake(def, params as Record<string, Value>, 7);
-    const root = meshFor(def)!.build({ def, entity: { id: 'b', def: def.ref, in: { parent: 'world' }, by: 't', born: 0, v: 1, params } as Entity, params, args: def.make.kind === 'gen' ? def.make.args ?? {} : {}, baked, model: w, materials: new MaterialLib(), tint: (_k: string, f: string) => f } as MeshCtx)!;
-    root.updateMatrixWorld(true);
+    const { root, baked } = building(w, 'core/shop@1', { front, decals: list });
     const decals = faces(root, 'building-decal');
     assert.equal(decals.length, 2, front);
     for (const [i, d] of list.entries()) {
@@ -162,6 +163,23 @@ test('building decals sit on their wall slots, in their storey\'s group, turned 
     }
   }
   assert.deepEqual(decalGroups([{ slot: 'ridge', w: 1, h: 1, text: 'X' }, { slot: 'nowhere', w: 1, h: 1, text: 'X' }, { bogus: true }], w.bake(def, {}, 7).slots, 0), [], 'roof slots, unknown slots and bad entries draw nothing');
+});
+
+test('decals never reshuffle the building: adding one or editing its text leaves every other mesh identical', () => {
+  const w = coreWorld('reshuffle');
+  /** Every mesh but the decals, as name, positions and colours (traversal order is the build order). */
+  const body = (root: THREE.Object3D) => { const out: string[] = []; root.traverse(o => { const m = o as THREE.Mesh; if (!m.isMesh || m.name === 'building-decal') return; const g = m.geometry; out.push(`${m.parent?.name}/${m.name}:${createHash('sha256').update(new Uint8Array((g.attributes.position.array as Float32Array).buffer)).update(g.attributes.color ? new Uint8Array((g.attributes.color.array as Float32Array).buffer) : new Uint8Array()).digest('hex')}`); }); return out; };
+  for (const ref of ['core/shop@1', 'core/house@1', 'core/cottage@1']) {
+    const slot = ref === 'core/shop@1' ? 'opening-front-door' : building(w, ref).baked.slots.find(s => s.id.startsWith('facade-f0-'))!.id;
+    const sign = (text: string) => [{ slot, w: 1.2, h: 0.3, at: [0, slot.startsWith('opening-') ? 2.75 : 0.9], text, bg: 'none' }];
+    const plain = building(w, ref), signed = building(w, ref, { decals: sign('BAKERY') }), edited = building(w, ref, { decals: sign('BAKERX') });
+    assert.equal(faces(signed.root, 'building-decal').length, 1, ref); assert.equal(faces(plain.root, 'building-decal').length, 0, ref);
+    const base = body(plain.root);
+    assert.ok(base.length > 5, ref);
+    assert.deepEqual(body(signed.root), base, `${ref}: a decal changed other meshes`);
+    assert.deepEqual(body(edited.root), base, `${ref}: editing decal text changed other meshes`);
+    assert.deepEqual(body(building(w, ref, { decals: [] }).root), base, `${ref}: an empty decal list changed the building`);
+  }
 });
 
 test('face textures are cached per content and bounded: past the cap they are released, never leaked', () => {
