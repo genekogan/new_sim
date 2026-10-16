@@ -44,6 +44,7 @@
 //
 // Local only: binds 127.0.0.1, edge minds (owners' agents think; the world pays for none), no credentials, no tunnels.
 import { execFileSync } from 'node:child_process';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, request } from 'node:http';
 import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
@@ -104,7 +105,11 @@ export async function openLauncher(cfg = {}) {
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
   const stats = new Map();   // slug → { at, god, entities, seq }
-  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
+  // Travel between worlds (M3, docs/sim/TRAVEL.md): worlds reach each other only through this launcher's loopback relay,
+  // with a key made fresh for this run and handed to the children in their environment.
+  const siteKey = randomBytes(32).toString('hex');
+  const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
+  const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
     maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
@@ -343,6 +348,28 @@ export async function openLauncher(cfg = {}) {
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await (forkOp === 'register' ? opRegisterFork(body) : opRemoveFork(body)); json(res, out[0], out[1]); return;
       }
+      if (path.startsWith('/__sim/site/')) {
+        // the worlds' travel relay: this machine only, with the run's site key
+        if (!siteOk(req)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
+        if (path === '/__sim/site/worlds' && req.method === 'GET') { json(res, 200, { worlds: registry.worlds.filter((w) => !w.fork).map((w) => ({ slug: w.slug, name: w.name })) }); return; }
+        if (path === '/__sim/site/relay' && req.method === 'POST') {
+          const chunks = []; let n = 0;
+          for await (const c of req) { n += c.length; if (n > 256_000) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+          let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+          if (typeof body?.path !== 'string' || !/^\/v1\/site\/(arrive|where|where-is|presence|release)$/.test(body.path)) { json(res, 400, { ok: false, code: 'invalid', message: 'not a site path' }); return; }
+          const w = typeof body.to === 'string' ? registry.get(body.to) : null;
+          if (!w || w.fork) { json(res, 404, { ok: false, code: 'travel.unknown-world', message: `There is no world "${String(body.to ?? '').slice(0, 40)}" on this site.` }); return; }
+          let p; try { p = await pool.ensure(worldEnv(w)); } catch (e) { json(res, 503, { ok: false, code: e.code === 'capacity' ? 'travel.capacity' : 'travel.unreachable', message: `${w.name} cannot take anyone right now: ${e.message}` }); return; }
+          try {
+            const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}${body.path}`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-sim-site-key': siteKey }, body: JSON.stringify(body.body ?? {}), signal: AbortSignal.timeout(55_000) });
+            const data = await r.json().catch(() => ({ ok: false, code: 'travel.unreachable' }));
+            log(`travel relay ${body.path} → ${w.slug}: ${r.status}${data?.code ? ` ${data.code}` : ''}`);
+            json(res, r.status, data);
+          } catch (e) { json(res, 504, { ok: false, code: 'travel.unreachable', message: `${w.name} did not answer: ${e.message}` }); }
+          return;
+        }
+        json(res, 404, { ok: false, code: 'not-found' }); return;
+      }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {
         const w = registry.get(one[1]); if (!w) { json(res, 404, { ok: false, code: 'not-found' }); return; }
@@ -370,6 +397,8 @@ export async function openLauncher(cfg = {}) {
       if (world) {
         if (!SLUG_RE.test(world)) { json(res, 404, { ok: false, code: 'world.not-served' }); return; }
         if (path === `/w/${world}`) { res.writeHead(308, { location: `${wp(world)}/${url.search}` }).end(); return; }
+        // a world's site routes answer the relay above, never the public proxy
+        if (path.startsWith(`/w/${world}/v1/site/`)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
         await toWorld(req, res, world, url); return;
       }
       if (req.method === 'GET' || req.method === 'HEAD') {

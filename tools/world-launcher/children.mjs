@@ -214,6 +214,8 @@ export function defaultCommand(world, port, o) {
     ...(o.soulInstructionsFile && existsSync(o.soulInstructionsFile) ? { EDGE_INSTRUCTIONS_FILE: resolve(o.soulInstructionsFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
+    // Travel between worlds (M3): the launcher's loopback relay and this run's site key (docs/sim/TRAVEL.md)
+    ...(o.site?.url && o.site?.key ? { SIM_SITE_URL: o.site.url, SIM_SITE_KEY: o.site.key } : {}),
   };
   return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }

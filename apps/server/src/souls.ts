@@ -145,8 +145,9 @@ export class Souls {
     if(cursor!==null&&!/^lc1_lc_[0-9a-f]{32}$/.test(cursor))throw new ApiError(404,'not-found','no such lifecycle');
     try{return this.lifecycle.ownerPage(owner,cursor,owner===user.id&&this.accounts?this.accounts.associationIds(user.id):[]);}catch(error){if(error instanceof Error&&error.message==='Lifecycle cursor not found')throw new ApiError(404,'not-found','no such lifecycle');throw error;}
   }
-  acceptLifecycleCreate(userId:string,input:unknown,request?:string){
-    if(this.cfg.accountAuthRequired&&!this.accounts?.canCreate(userId))throw new ApiError(403,'approval-required','Sign in and approve this agent creation request.');
+  /** `travel`: an arrival from another world of this site (travel/travel.ts), whose owner the site already verified. */
+  acceptLifecycleCreate(userId:string,input:unknown,request?:string,travel=false){
+    if(!travel&&this.cfg.accountAuthRequired&&!this.accounts?.canCreate(userId))throw new ApiError(403,'approval-required','Sign in and approve this agent creation request.');
     if(!this.lifecycle)throw new ApiError(400,'lifecycle-unavailable','lifecycle candidate is not installed');
     const p=createSoulSchema.safeParse(input);if(!p.success)throw new ApiError(400,'invalid',p.error.issues.map(i=>i.message).join('; '));
     const id=newId('s'),entityId=`h_${id.slice(2)}`,requestId=request??'lc_'+randomBytes(16).toString('hex');
@@ -473,6 +474,8 @@ export class Souls {
   // ------------------------------------------------------------ pairing an agent
   invalidatePairings(soulId:string,keepCode?:string){for(const [code,pair]of this.pairings)if(pair.soulId===soulId&&code!==keepCode)this.pairings.delete(code);}
   private mint(soulId: string, label: string | null,keepPairCode?:string) { const token = newSoulToken(soulId);if(this.accounts){const row=this.db.soul(soulId);if(!row)throw new ApiError(404,'not-found','No such Soul.');this.accounts.rotateLegacy(row,hashToken(token),label,keepPairCode);}else this.db.setSoulToken(soulId, hashToken(token), label); return token; }
+  /** Travel (M3): a fresh token for a Soul that just arrived from another world of this site, handed to its agent. */
+  travelToken(soulId:string){this.requireControlReady(this.db.soul(soulId)!);return this.mint(soulId,'travel');}
   /** Owner-initiated: a short code the owner pastes to their agent along with the skill link. */
   pairCode(soul: SoulRow, base: string, issuer?: UserRow) {
     this.requireControlReady(soul);
