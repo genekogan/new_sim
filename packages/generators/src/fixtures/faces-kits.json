@@ -35,7 +35,7 @@
     ] } }
   },
   "shopDecals": [
-    { "slot": "facade-f0-s-1", "w": 2.4, "h": 0.45, "at": [0, 1.05], "text": "BAKERY", "font": "serif", "ink": "#3a2a22", "bg": "none" },
-    { "slot": "gable-s", "w": 0.9, "h": 0.9, "at": [0, -0.6], "pattern": "mosaic", "seed": 5, "cells": 12 }
+    { "slot": "opening-front-door", "w": 2.2, "h": 0.36, "at": [0, 2.55], "text": "BAKERY", "font": "serif", "ink": "#3a2a22", "bg": "none" },
+    { "slot": "gable-s", "w": 0.9, "h": 0.9, "at": [0, -1.2], "pattern": "mosaic", "seed": 5, "cells": 12 }
   ]
 }
