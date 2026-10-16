@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
 import { view, invalidate, mirror } from './lib/mirror.mjs';
-import { build, buildWait, EXAMPLES, examples, group, act, dryrun, importWorld, look, lookOverrides, parseFlags, parseMassing } from './cli.mjs';
+import { build, buildWait, EXAMPLES, examples, group, act, dryrun, importWorld, look, lookOverrides, parseFlags, parseMassing, planBatch } from './cli.mjs';
 import { buildSuffix, call, claimFile, load, save } from './lib/state.mjs';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
@@ -117,10 +117,29 @@ test('answer and layer commands use receipt-protected acts with fresh refs', asy
 });
 
 test('group undo prints failures and both sides of a partial revert', async t => {
-  fixture(t, { accepted: false, reverted: [16], notReverted: [15, 14], failed: 15, failures: [{ op: 0, code: 'occupied.by-body', detail: 'Ada occupies bench', entity: 'e_bench', field: 'def', fix: 'Wait until Ada is done.' }] });
+  fixture(t, { accepted: false, reverted: [16], notReverted: [15, 14], failed: 15, failures: [{ op: 0, code: 'undo.conflict', detail: 'bench was redefined later', entity: 'e_bench', field: 'def', fix: 'Undo the later definition first.' }] });
   const text = await undo({ group: 'g' });
   assert.match(text, /incomplete/); assert.match(text, /undone edits: 16/); assert.match(text, /not undone edits: 15, 14/);
-  assert.match(text, /occupied.by-body/); assert.match(text, /field def/); assert.match(text, /Wait until Ada/);
+  assert.match(text, /undo.conflict/); assert.match(text, /field def/); assert.match(text, /Undo the later definition/);
+});
+
+const walkedOut = { soulId: 's_ada', body: 'h_ada', name: 'Ada', how: 'walked', from: [0, 0], to: [3, 0], reason: 'The god is removing the bench; you stood up and stepped aside.', released: ['e_bench'] };
+test('G1: undo prints the residents walked out of the way', async t => {
+  fixture(t, { accepted: true, reverted: 16, moved: [walkedOut], warnings: [] });
+  assert.equal(await undo({}), 'undid edit 16\n  Ada walked out of the way to (3, 0): "The god is removing the bench; you stood up and stepped aside."');
+});
+test('G1: group undo prints residents relocated when no walking route was open', async t => {
+  fixture(t, { accepted: true, reverted: [16, 15], notReverted: [], moved: [{ ...walkedOut, how: 'relocated' }] });
+  assert.match(await undo({ group: 'g' }), /^undid group "g": edits 16, 15\n  Ada was moved \(no walking route\) to \(3, 0\)/);
+});
+
+test('G1: a resident only on its way to what changed is listed as stopped; upstairs exits name their floor', async t => {
+  fixture(t, { accepted: true, reverted: 17, moved: [{ ...walkedOut, how: 'stopped', to: [0, 0], reason: 'The god is moving the bench you were heading for; you stopped.' }, { ...walkedOut, name: 'Cy', level: 1 }], warnings: [] });
+  assert.equal(await undo({}), 'undid edit 17\n  Ada stopped where they were (on the way to what changed) at (0, 0): "The god is moving the bench you were heading for; you stopped."\n  Cy walked out of the way to (3, 0, floor level 1): "The god is removing the bench; you stood up and stepped aside."');
+});
+test('G1: plan names the residents a dry run would walk out', async t => {
+  fixture(t, { accepted: true, ids: {}, warnings: [], diff: { upserts: 0, removes: 1, defs: [], tiles: 0 }, wouldMove: [{ name: 'Ada', soulId: 's_ada', how: 'walked', to: [3, 0], reason: walkedOut.reason }] });
+  assert.equal(await planBatch({ ops: [{ op: 'remove', id: 'bench' }] }), 'would be accepted: 0 things placed/changed, 1 removed; residents it would walk out (never refused): Ada (walked)');
 });
 
 test('group undo never hides failures behind an accepted partial response from an older server', async t => {

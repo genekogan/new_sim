@@ -1,6 +1,6 @@
 // Lane L9 (spec eden4/31 B2/B3): Souls among god-built things, through the real host, sequencer, edge ledger and
 // compiler. The god builds a two-floor house (door, stairs, a chair and a table with a bowl upstairs); a Soul born
-// through the owner flow enters, climbs, sits; the god cannot remove the chair under it; the Soul picks up the bowl
+// through the owner flow enters, climbs, sits; god edits walk residents clear; the Soul picks up the bowl
 // (the journal shows the engine's move), puts it on the table, prays; replay from genesis agrees.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,6 +32,29 @@ async function world(dbFile = ':memory:') {
   return { ...f, god, edge, bridge, settle };
 }
 
+async function until(w: Awaited<ReturnType<typeof world>>, pred: () => boolean, n = 4000) {
+  for (let i = 0; i < n && !pred(); i++) {
+    w.host.tickOnce();
+    if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); }
+  }
+  await w.settle(2);
+  return pred();
+}
+
+function movedResident(result: any, soul: { soulId: string; entityId: string; name: string }, how?: 'walked' | 'relocated') {
+  assert.equal(result.accepted, true, JSON.stringify(result));
+  const moved = result.moved?.find((m: any) => m.soulId === soul.soulId);
+  assert.ok(moved, `resident movement in receipt: ${JSON.stringify(result)}`);
+  assert.equal(moved.body, soul.entityId); assert.equal(moved.name, soul.name);
+  assert.ok(['walked', 'relocated'].includes(moved.how));
+  if (how) assert.equal(moved.how, how, JSON.stringify(moved));
+  assert.equal(moved.from.length, 2); assert.equal(moved.to.length, 2);
+  assert.notDeepEqual(moved.to, moved.from, 'the resident leaves the affected footprint');
+  assert.match(moved.reason, /god/i); assert.ok(Array.isArray(moved.released));
+  assert.ok(result.warnings.some((warning: string) => warning.startsWith(`body.${moved.how === 'walked' ? 'walked-out' : 'relocated'}: ${soul.name} `)), JSON.stringify(result.warnings));
+  return moved;
+}
+
 test('definition edits and their undo/redo update the native engine physics', async t => {
   const w = await world(); w.brain.quiesce();
   t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
@@ -47,7 +70,7 @@ test('definition edits and their undo/redo update the native engine physics', as
   assert.equal(w.god.redo().accepted, true); await w.settle(2); assert.deepEqual(solids(), changed);
 });
 
-test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refuse edits; replay agrees', { timeout: 600000 }, async (t) => {
+test('Souls among god-built things: enter, climb, sit, carry, pray; god walks them clear; replay agrees', { timeout: 600000 }, async (t) => {
   const w = await world();
   w.brain.quiesce();
   t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
@@ -76,52 +99,52 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   const caps = w.edge.capabilities(soul);
   for (const id of [`sit:${ids['house/chair']}`, `pick-up:${ids['house/table/bowl']}`, 'pray']) assert.ok(caps.some((c) => c.id === id), `${id} offered: ${caps.map((c) => c.id).slice(0, 30).join(' ')}`);
 
-  const until = async (pred: () => boolean, n = 4000) => { for (let i = 0; i < n && !pred(); i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } } await w.settle(2); return pred(); };
   const sit: any = await accept(w.host, w.edge.act(soul, { capability: `sit:${ids['house/chair']}`, params: { seconds: 600 } }));
   assert.equal(sit.accepted, true, JSON.stringify(sit));
-  assert.ok(await until(() => E.world.entities[row.entity_id].human.activity === 'sit'), 'seated');
+  assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'sit'), 'seated');
   assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
 
-  // the god cannot remove the chair (or the house around it) while Ana sits on it
+  // Preview and invalid batches never interrupt a resident's act or move their body.
   assert.deepEqual((runQuery(w.god.model, { entity: 'house/chair' }).entity as any).usedBy, { soul: 'Ana', body: row.entity_id, how: 'occupied', thing: 'house/chair' }, 'query shows who uses it');
-  for (const id of [ids['house/chair'], ids.house]) {
-    const no = w.god.act({ ops: [{ op: 'remove', id }] }) as any;
-    assert.equal(no.accepted, false); assert.equal(no.failures[0].code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Ana/);
-  }
-  // nor bury her or unseat her as a side effect (R2): a hill raised under the house, a crate dropped on her seat
-  const groundBefore = w.god.model.terrain.sample(10, 0);
-  const mound: any = w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] });
-  assert.equal(mound.accepted, false, JSON.stringify(mound)); assert.equal(mound.failures[0].code, 'occupied.by-body'); assert.match(mound.failures[0].detail, /Ana/);
-  assert.equal(w.god.model.get('mound'), undefined); assert.equal(w.god.model.terrain.sample(10, 0), groundBefore, 'the ground is unchanged');
-  const crate: any = w.god.act({ ops: [{ op: 'place', def: coreRef('crate'), name: 'crate', in: { parent: ids.house, slot: 'floor-1' }, p: [-2, 0, 1] }] });
-  assert.equal(crate.accepted, false, JSON.stringify(crate)); assert.equal(crate.failures[0].code, 'occupied.by-body'); assert.match(crate.failures[0].detail, /bury Ana/);
-  const dry: any = w.god.dryrun({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] });
-  assert.equal(dry.accepted, false); assert.match(dry.failures[0].detail, /Ana/);
-  // the check runs as the compiler's refuse hook on the plan's own scratch: one plan (one fork) per batch, refused or not
+  const residentBefore = structuredClone(E.world.entities[row.entity_id]), programBefore = E.programOf(row.entity_id);
+  const dry: any = w.god.dryrun({ ops: [{ op: 'remove', id: ids['house/chair'] }] });
+  assert.equal(dry.accepted, true, JSON.stringify(dry));
+  assert.deepEqual(E.world.entities[row.entity_id], residentBefore); assert.equal(E.programOf(row.entity_id), programBefore);
+  assert.ok(w.god.model.entities.has(ids['house/chair']), 'preview leaves the chair intact');
+  const invalid: any = w.god.act({ ops: [{ op: 'remove', id: ids['house/chair'] }, { op: 'remove', id: 'missing-thing' }] });
+  assert.equal(invalid.accepted, false); assert.equal(invalid.failures[0].code, 'entity.unknown');
+  assert.deepEqual(E.world.entities[row.entity_id], residentBefore); assert.equal(E.programOf(row.entity_id), programBefore);
+  assert.ok(w.god.model.entities.has(ids['house/chair']), 'failed batch leaves the chair intact');
+  // Each batch uses one compiler scratch, including a body-aware preview.
   const model = w.god.model as any, fork = model.fork; let forks = 0; model.fork = function (this: unknown) { forks++; return fork.call(this); };
   try {
-    assert.equal((w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] }) as any).accepted, false);
-    assert.equal(forks, 1, 'a refused batch is planned once');
+    assert.equal((w.god.dryrun({ ops: [{ op: 'remove', id: ids['house/chair'] }] }) as any).accepted, true);
+    assert.equal(forks, 1, 'an occupied edit preview is planned once');
     assert.equal((w.god.dryrun({ ops: [{ op: 'place', def: coreRef('bench'), name: 'lawn-bench', p: [10, 14] }] }) as any).accepted, true);
     assert.equal(forks, 2, 'a harmless batch is planned once');
   } finally { model.fork = fork; }
   // pick up the bowl: stand, walk to the table, take it; the journal shows the engine's move into her hands
   const pick: any = await accept(w.host, w.edge.act(soul, { capability: `pick-up:${ids['house/table/bowl']}` }));
   assert.equal(pick.accepted, true, JSON.stringify(pick));
-  assert.ok(await until(() => E.world.entities[ids['house/table/bowl']].support?.kind === 'in-hand' && w.god.model.entities.get(ids['house/table/bowl'])!.in.parent === row.entity_id), 'carried, written back');
+  assert.ok(await until(w, () => E.world.entities[ids['house/table/bowl']].support?.kind === 'in-hand' && w.god.model.entities.get(ids['house/table/bowl'])!.in.parent === row.entity_id), 'carried, written back');
   const journal = w.god.store.edits(10);
   assert.ok(journal.some((e) => e.by === 'engine' && e.ops.some((o: any) => o.op === 'move' && o.id === ids['house/table/bowl'])), 'journaled by the engine');
-  const held: any = w.god.act({ ops: [{ op: 'remove', id: ids['house/table/bowl'] }] });
-  assert.equal(held.failures?.[0]?.code, 'held.by-body', JSON.stringify(held));
-  // engine moves are not the god's to undo: undo reverts the god's last edit (the house), refused while she holds the bowl
-  const undo: any = w.god.undo();
-  assert.equal(undo.accepted, false); assert.match(undo.failures[0].code, /by-body/);
+  const held: any = w.god.act({ ops: [{ op: 'move', id: ids['house/table/bowl'], in: { parent: ids['house/table'], slot: 'top' } }] });
+  const released = movedResident(held, soul);
+  assert.ok(released.released.includes(ids['house/table/bowl']), 'the held bowl is released');
+  assert.notEqual(E.world.entities[ids['house/table/bowl']].support?.kind, 'in-hand', 'release happens in the edit request');
+  await w.settle(3);
+  assert.equal(w.god.model.entities.get(ids['house/table/bowl'])!.in.parent, ids['house/table']);
+  assert.equal(E.world.entities[ids['house/table/bowl']].support?.kind, 'resting-on');
+  const pickAgain: any = await accept(w.host, w.edge.act(soul, { capability: `pick-up:${ids['house/table/bowl']}` }));
+  assert.equal(pickAgain.accepted, true, JSON.stringify(pickAgain));
+  assert.ok(await until(w, () => E.world.entities[ids['house/table/bowl']].support?.kind === 'in-hand' && w.god.model.entities.get(ids['house/table/bowl'])!.in.parent === row.entity_id), 'carried again after the god edit');
   // put it on the table
   const caps2 = w.edge.capabilities(soul);
   assert.ok(caps2.some((c) => c.id === `put-on:${ids['house/table']}`), 'put-on offered');
   const put: any = await accept(w.host, w.edge.act(soul, { capability: `put-on:${ids['house/table']}` }));
   assert.equal(put.accepted, true, JSON.stringify(put));
-  assert.ok(await until(() => w.god.model.entities.get(ids['house/table/bowl'])!.in.parent === ids['house/table']), 'back on the table in the entity world');
+  assert.ok(await until(w, () => w.god.model.entities.get(ids['house/table/bowl'])!.in.parent === ids['house/table']), 'back on the table in the entity world');
   // pray, and the god answers
   const pray: any = await w.edge.act(soul, { capability: 'pray', params: { text: 'May the house have a garden?' } });
   assert.equal(pray.accepted, true, JSON.stringify(pray));
@@ -130,12 +153,11 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   const ans = w.god.act({ ops: [{ op: 'answer', prayer: prayer.id, text: 'Yes; look south tomorrow.' }] });
   assert.equal(ans.accepted, true);
   assert.equal(w.god.prayersFor(soul.soulId)[0].answer, 'Yes; look south tomorrow.');
-  // close the door → the lawn cannot reach the house; open it → it can (the god edits a door with nobody in the way)
+  // A closed door blocks the lawn's route into the house after residents have been cleared if needed.
   const door = w.god.act({ ops: [{ op: 'set', id: ids.house, state: { doors: { 'front-door': 'closed' } } }] });
   assert.equal(door.accepted, true, JSON.stringify(door));
   await w.settle(3);
   assert.equal((runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:ground' } }).reach as any).reachable, false, 'door closed');
-  assert.equal(E.world.entities[row.entity_id].human.level, 1, 'Ana is untouched');
   assert.deepEqual(E.runtime.violations, []);
 
   // replay from genesis: the engine log alone re-derives the same world (entity physics included)
@@ -153,6 +175,129 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   h.stop();
 });
 
+test('occupied bench removal, move, undo and redo walk the resident clear; body entities stay protected', { timeout: 300000 }, async t => {
+  const w = await world(); w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'bench', p: [10, 0] }] }).accepted, true);
+  await w.settle(3);
+  const bench = w.god.model.get('bench')!.id, E = w.host.engine as any;
+  await invite(w, 'dee');
+  const row: any = await accept(w.host, w.souls.create('dev:dee', { name: 'Dee', description: 'enjoys benches' }));
+  await w.settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
+  const sit = async () => {
+    const r = await accept(w.host, w.edge.act(soul, { capability: `sit:${bench}`, params: { seconds: 600 } }));
+    assert.equal(r.accepted, true, JSON.stringify(r));
+    assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'sit'), 'seated on the bench');
+  };
+  const clear = (r: any) => {
+    const moved = movedResident(r, soul, 'walked'), b = E.world.entities[row.entity_id];
+    assert.ok(moved.released.includes(bench), 'the occupied seat is released');
+    assert.equal(b.human.activity, 'idle', 'standing in the edit request');
+    assert.equal(b.human.level ?? 0, 0);
+    assert.deepEqual([b.pose.p[0], b.pose.p[2]], moved.to, 'the engine reaches the receipt endpoint in the edit request');
+    assert.ok(E.clearanceAtV1(moved.to[0], moved.to[1], 0) >= 0.27, 'clear standing point');
+    return moved;
+  };
+  await sit();
+  const bodyBefore = structuredClone(E.world.entities[row.entity_id]), entityBefore = structuredClone(w.god.model.entities.get(row.entity_id));
+  for (const op of [{ op: 'remove', id: row.entity_id, cascade: true }, { op: 'move', id: row.entity_id, p: [30, 30] }, { op: 'set', id: row.entity_id, name: 'edited-resident' }]) {
+    const r: any = w.god.act({ ops: [op] });
+    assert.equal(r.accepted, false); assert.equal(r.failures[0].code, 'body.protected');
+    assert.deepEqual(E.world.entities[row.entity_id], bodyBefore); assert.deepEqual(w.god.model.entities.get(row.entity_id), entityBefore);
+  }
+  const request = { clientRef: 'occupied-remove-once', ops: [{ op: 'remove', id: bench }] };
+  const beforeFailure = w.god.model.snapshot(), programBefore = E.programOf(row.entity_id), commit = w.god.store.commit;
+  const events = () => w.db.events(w.host.worldId, 0, 10000), eventsBefore = events().length;
+  try {
+    w.god.store.commit = () => { throw Error('injected SQL failure'); };
+    assert.throws(() => w.god.act(request), /injected SQL failure/);
+  } finally { w.god.store.commit = commit; }
+  assert.deepEqual(w.god.model.snapshot(), beforeFailure, 'SQL failure keeps the authored model intact');
+  assert.deepEqual(E.world.entities[row.entity_id], bodyBefore, 'SQL failure leaves the resident seated');
+  assert.equal(E.programOf(row.entity_id), programBefore); assert.equal(events().length, eventsBefore, 'SQL failure emits no walk-out');
+  assert.equal(w.god.store.receipt(request.clientRef), null, 'the failed request has no accepted receipt');
+  const removed: any = w.god.act(request);
+  const movement = clear(removed);
+  assert.equal(removed.moved.length, 1, 'retry moves each resident once');
+  const eventsAfter = events().length;
+  assert.ok(eventsAfter > eventsBefore, 'the walk-out is durable');
+  assert.deepEqual(w.god.act(request), { ...removed, replayed: true }, 'a client retry returns the original movement receipt');
+  assert.equal(events().length, eventsAfter, 'a client retry emits no duplicate walk-out');
+  assert.equal(w.god.model.entities.has(bench), false, 'the occupied bench is removed');
+  assert.ok(JSON.stringify(w.edge.observe(soul, new Set())).includes(movement.reason), 'the next observation explains the walk-out');
+  assert.equal(w.god.undo().accepted, true, 'undo restores the bench'); await w.settle(3);
+  await sit();
+  clear(w.god.act({ ops: [{ op: 'move', id: bench, p: [18, 0] }] })); await w.settle(3);
+  await sit();
+  clear(w.god.undo()); assert.equal(w.god.model.worldPose(w.god.model.entities.get(bench)!).x, 10); await w.settle(3);
+  await sit();
+  clear(w.god.redo()); assert.equal(w.god.model.worldPose(w.god.model.entities.get(bench)!).x, 18); await w.settle(3);
+  assert.deepEqual(E.runtime.violations, []);
+});
+
+test('a redefinition walks a seated resident clear only when it re-makes the seat (and its undo); a cosmetic one moves nobody', { timeout: 300000 }, async t => {
+  const w = await world(); w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const seatDef = (width: number, tint = 'wood') => ({ schema: 'def/1', name: 'probe-seat', description: 'A bench for two.', tags: ['furniture', 'seat'], size: { box: [width, 0.45, 0.5] },
+    make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, 0.225, 0], size: [width, 0.45, 0.5], tint }] } },
+    slots: [{ id: 'seat-1', kind: 'seat', p: [-0.4, 0.45, 0], yaw: 0, accepts: { tags: ['body'] }, capacity: 1 }, { id: 'seat-2', kind: 'seat', p: [0.4, 0.45, 0], yaw: 0, accepts: { tags: ['body'] }, capacity: 1 }], components: { seat: { height: 0.45 } } });
+  const placed: any = w.god.act({ ops: [{ op: 'define', def: seatDef(1.6) }, { op: 'place', def: 'probe-seat@1', name: 'seat', p: [10, 0] }] });
+  assert.equal(placed.accepted, true, JSON.stringify(placed)); await w.settle(3);
+  const seat = w.god.model.get('seat')!.id, E = w.host.engine as any;
+  await invite(w, 'gus');
+  const row: any = await accept(w.host, w.souls.create('dev:gus', { name: 'Gus', description: 'likes benches' }));
+  await w.settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
+  const sit = async () => {
+    const r = await accept(w.host, w.edge.act(soul, { capability: `sit:${seat}`, params: { seconds: 600 } }));
+    assert.equal(r.accepted, true, JSON.stringify(r));
+    assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'sit'), 'seated on the bench');
+  };
+  await sit();
+  // A cosmetic redefinition (its colour) re-makes nothing anyone sits on: Gus keeps sitting.
+  const recoloured: any = w.god.act({ ops: [{ op: 'define', def: seatDef(1.6, 'stone') }] });
+  assert.equal(recoloured.accepted, true, JSON.stringify(recoloured)); assert.equal(recoloured.moved, undefined, JSON.stringify(recoloured.moved));
+  await w.settle(20); assert.equal(E.world.entities[row.entity_id].human.activity, 'sit', 'still seated after a colour change');
+  // A redefinition that re-makes it (twice as wide) walks him clear, in the same request.
+  const redefined: any = w.god.act({ ops: [{ op: 'define', def: seatDef(3.2, 'stone') }] });
+  const moved = movedResident(redefined, soul, 'walked');
+  assert.ok(moved.released.includes(seat)); assert.equal(E.world.entities[row.entity_id].human.activity, 'idle');
+  assert.equal(moved.reason, 'The god is rebuilding the seat; you stood up and stepped aside.');
+  assert.equal(w.god.model.footprintsOf(seat)[0].half[0], 1.6, 'the definition applies in the same request');
+  await w.settle(3); await sit();
+  movedResident(w.god.undo(), soul, 'walked');
+  assert.equal(w.god.model.footprintsOf(seat)[0].half[0], 0.8, 'undo rebinds the narrower definition');
+  await w.settle(3); assert.deepEqual(E.runtime.violations, []);
+});
+
+test('raising terrain under a sleeping resident wakes them and walks them off the affected footprint', { timeout: 300000 }, async t => {
+  const w = await world(); w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bed'), name: 'bed', p: [10, 0] }] }).accepted, true);
+  await w.settle(3);
+  await invite(w, 'fay');
+  const row: any = await accept(w.host, w.souls.create('dev:fay', { name: 'Fay', description: 'takes naps' }));
+  await w.settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner }, bed = w.god.model.get('bed')!.id, E = w.host.engine as any;
+  const sleep: any = await accept(w.host, w.edge.act(soul, { capability: `sleep:${bed}`, params: { seconds: 600 } }));
+  assert.equal(sleep.accepted, true, JSON.stringify(sleep));
+  assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'nap'), 'sleeping in the bed');
+  const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 5 } }] });
+  const movement = movedResident(r, soul, 'walked'), b = E.world.entities[row.entity_id];
+  assert.ok(movement.released.includes(bed), 'the bed is released');
+  assert.equal(b.human.activity, 'idle', 'the resident wakes in the edit request'); assert.equal(E.programOf(row.entity_id), null, 'the nap ended');
+  assert.match(movement.reason, /you woke/);
+  assert.ok(w.god.model.terrain.sample(movement.to[0], movement.to[1]) <= 0.25, 'off the raised ground (it rose by no more than a step where the resident stands)');
+  assert.deepEqual([b.pose.p[0], b.pose.p[2]], movement.to);
+  await w.settle(4);
+  assert.ok(w.god.model.get('mound')); assert.ok(w.god.model.terrain.sample(10, 0) > 3, 'terrain edit applies');
+  assert.deepEqual(E.runtime.violations, []);
+});
+
 test('a god edit that would bury a standing Soul lifts it clear, and says so', { timeout: 300000 }, async (t) => {
   const w = await world();
   w.brain.quiesce();
@@ -164,7 +309,8 @@ test('a god edit that would bury a standing Soul lifts it clear, and says so', {
   const E = w.host.engine as any, b = E.world.entities[row.entity_id], at: [number, number] = [b.pose.p[0], b.pose.p[2]];
   const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('wall'), name: 'wall', p: at, params: { w: 4, h: 2.6, d: 0.5 } }] });
   assert.equal(r.accepted, true, JSON.stringify(r));
-  assert.ok(r.warnings.some((x: string) => x.startsWith('body.lifted') && x.includes('Bo')), JSON.stringify(r.warnings));
+  assert.ok(r.warnings.some((x: string) => /^body\.(walked-out|relocated): Bo /.test(x)), JSON.stringify(r.warnings));
+  assert.equal(r.moved?.[0]?.name, 'Bo', 'the receipt lists who moved'); assert.match(r.moved[0].reason, /The god is building the wall/);
   await w.settle(4);
   const p = E.world.entities[row.entity_id].pose.p;
   assert.ok(Math.abs(p[2] - at[1]) > 0.5 || Math.abs(p[0] - at[0]) > 2.2, `Bo stepped clear: ${p} (was ${at})`);
@@ -263,12 +409,26 @@ test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; 
   const row: any = await accept(w.host, w.souls.create('dev:cy', { name: 'Cy', description: 'sits upstairs' }));
   await w.settle(3);
   const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
-  const until = async (pred: () => boolean, n = 4000) => { for (let i = 0; i < n && !pred(); i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } } await w.settle(2); return pred(); };
   const sit: any = await accept(w.host, w.edge.act(soul, { capability: `sit:${chair}`, params: { seconds: 600 } }));
   assert.equal(sit.accepted, true, JSON.stringify(sit));
-  assert.ok(await until(() => E.world.entities[row.entity_id].human.activity === 'sit'), `seated: ${JSON.stringify(E.world.entities[row.entity_id].human).slice(0, 300)}`);
+  assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'sit'), `seated: ${JSON.stringify(E.world.entities[row.entity_id].human).slice(0, 300)}`);
   assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
-  const no: any = w.god.act({ ops: [{ op: 'remove', id: house }] });
-  assert.equal(no.failures?.[0]?.code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Cy/);
+  await invite(w, 'eli');
+  const ground: any = await accept(w.host, w.souls.create('dev:eli', { name: 'Eli', description: 'visits downstairs' }));
+  await w.settle(3);
+  const guest = { soulId: ground.id, entityId: ground.entity_id, name: ground.name, owner: ground.owner };
+  await accept(w.host, w.host.enqueue('edge-relocate', 'test:ground-occupant', { soulId: guest.soulId, entityId: guest.entityId, to: [10, 0], why: 'downstairs resident fixture' }));
+  const movedHouse: any = w.god.act({ ops: [{ op: 'move', id: house, p: [28, 0] }] });
+  assert.equal(movedHouse.moved?.length, 2, JSON.stringify(movedHouse));
+  for (const resident of [soul, guest]) {
+    const moved = movedResident(movedHouse, resident, 'walked'), b = E.world.entities[resident.entityId];
+    assert.equal(b.human.activity, 'idle'); assert.equal(b.human.level ?? 0, 0, 'upstairs residents descend the stairs');
+    assert.deepEqual([b.pose.p[0], b.pose.p[2]], moved.to, 'walk-out completes in the edit request');
+    assert.ok(Math.abs(moved.to[0] - 10) > 4.3 || Math.abs(moved.to[1]) > 3.3, 'outside the original building');
+    assert.ok(Math.abs(moved.to[0] - 28) > 4.3 || Math.abs(moved.to[1]) > 3.3, 'outside the moved building');
+    assert.ok(E.clearanceAtV1(moved.to[0], moved.to[1], 0) >= 0.27);
+  }
+  await w.settle(3);
+  assert.equal(w.god.model.worldPose(w.god.model.entities.get(house)!).x, 28);
   assert.deepEqual(E.runtime.violations, []);
 });

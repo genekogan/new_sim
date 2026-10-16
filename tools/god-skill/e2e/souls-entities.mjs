@@ -76,6 +76,9 @@ const summarize = (r) => { try { const s = JSON.stringify(r); return s && s.leng
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await wait(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
+// G1 "god rules": a dry run names who an edit would walk out; nothing moves.
+const dryrun = (ops) => api('/v1/god/dryrun', { body: { ops } });
+const wouldMove = (r, who) => r.data?.accepted === true && (r.data.wouldMove ?? []).some((m) => new RegExp(who).test(m.name));
 const entity = async (path) => (await api(`/v1/world/entities/${path}`, { as: 'none' })).data;
 const observe = async () => (await api('/v1/edge/observe', { as: 'soul' })).data;
 
@@ -151,8 +154,8 @@ try {
   }, (r) => r?.ok);
   await shot('s2-seated-upstairs', { eye: [5, 13, 8], at: [9, 2.8, -1], wait: 10000 });
   await closeBrowser();
-  await step('G3 the god tries to remove the chair: refused, naming the Soul', () => act([{ op: 'remove', id: 'house/chair' }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'occupied.by-body' && /Ana/.test(r.data.failures[0].detail));
-  await step('G3 the god tries to remove the whole house: refused, naming the Soul', () => act([{ op: 'remove', id: 'house' }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'occupied.by-body' && /Ana/.test(r.data.failures[0].detail));
+  await step('G3 a dry run of removing the chair names the Soul it would walk out (never refused)', () => dryrun([{ op: 'remove', id: 'house/chair' }]), (r) => wouldMove(r, 'Ana'));
+  await step('G3 a dry run of removing the whole house names the Soul too', () => dryrun([{ op: 'remove', id: 'house' }]), (r) => wouldMove(r, 'Ana'));
 
   // ================= the Soul picks up the bowl and puts it back
   await step('S3 the Soul picks up the god\'s bowl; the entity world shows it in her hands', async () => {
@@ -163,7 +166,7 @@ try {
   await shot('s3-holding-bowl', { eye: [5, 13, 8], at: [10, 2.8, -1], wait: 10000 });
   await closeBrowser();
   await step('G4 the journal shows the engine\'s move (not undoable by the god)', async () => { const e = (await api('/v1/god/edits?limit=20')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, undone: m?.undone, kind: m?.kind }; }, (r) => r.found && (r.kind === 'engine' || r.undone === 1));
-  await step('G4 the god tries to take the bowl away: refused, held by the Soul', () => act([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'held.by-body' && /Ana/.test(r.data.failures[0].detail));
+  await step('G4 a dry run of taking the bowl away names the Soul holding it; the god cannot put things into her hands', async () => ({ dry: await dryrun([{ op: 'remove', id: ids['house/table/bowl'] }]), hands: await act([{ op: 'place', def: 'core/bowl@1', name: 'gift', in: { parent: soul.entityId, slot: 'carry' } }]) }), (r) => wouldMove(r.dry, 'Ana') && r.hands.data?.accepted === false && r.hands.data.failures?.[0]?.code === 'body.protected');
   await step('S4 the Soul puts the bowl on the table', async () => {
     const r = await api('/v1/edge/act', { as: 'soul', body: { capability: `put-on:${ids['house/table']}` } });
     if (r.data.accepted !== true) return { r: r.data };
@@ -179,20 +182,21 @@ try {
   // ================= a closed door blocks the way in, opening it restores it
   await step('G6 the god closes the front door: the lawn can no longer reach inside', async () => { const a = await act([{ op: 'set', id: 'house', state: { doors: { 'front-door': 'closed' } } }]); const r = await until(async () => { const q = (await api('/v1/god/query', { body: { reach: { from: [10, 9], to: 'house:ground' } } })).data.reach; return { ok: q?.reachable === false, q }; }, 30000); return { a: a.data.accepted, r }; }, (r) => r.a && r.r?.ok);
   await step('G6 the god opens it again: reachable', async () => { const a = await act([{ op: 'set', id: 'house', state: { doors: { 'front-door': 'open' } } }]); const r = await until(async () => { const q = (await api('/v1/god/query', { body: { reach: { from: [10, 9], to: 'house:ground' } } })).data.reach; return { ok: q?.reachable === true, length: q?.length }; }, 30000); return { a: a.data.accepted, r }; }, (r) => r.a && r.r?.ok);
-  await step('S6 the Soul sits again and the god cannot unseat her', async () => {
+  await step('S6 the Soul sits again; the god moves the chair: she is walked out politely and told why', async () => {
     const r = await api('/v1/edge/act', { as: 'soul', body: { capability: `sit:${ids['house/chair']}`, params: { seconds: 600 } } });
     const s = await until(async () => { const o = JSON.stringify(await observe()); return { ok: /"activity":"sit"/.test(o) }; }, 120000, 1000);
     const g = await act([{ op: 'move', id: 'house/chair', p: [-1, 0, 0] }]);
-    return { accepted: r.data.accepted, seated: s?.ok, refused: g.data.failures?.[0]?.code };
-  }, (r) => r.accepted && r.seated && r.refused === 'occupied.by-body');
+    const told = await until(async () => { const o = await observe(); return { ok: (o?.notices ?? []).some((n) => n.kind === 'god-change' && /chair/.test(n.text)) }; }, 30000, 1000);
+    return { accepted: r.data.accepted, seated: s?.ok, moved: (g.data.moved ?? []).map((m) => `${m.name} ${m.how}`), told: told?.ok };
+  }, (r) => r.accepted && r.seated && r.moved.some((m) => /^Ana (walked|relocated)$/.test(m)) && r.told);
   await step('S7 restart the world process: Ana, her seat, the god\'s things and the house physics survive', async () => {
     const up2 = await restart(); if (!up2) return { up2 };
     const body = await entity(soul.entityId), bowl = await entity(ids['house/table/bowl']);
     const reach = await until(async () => { const q = (await api('/v1/god/query', { body: { reach: { from: [10, 9], to: 'house:floor-1' } } })).data.reach; return { ok: q?.reachable === true, q }; }, 60000);
     const o = await until(async () => { const x = await observe(); return { ok: !!x?.self, activity: x?.self?.activity, at: x?.self?.position }; }, 60000);
-    const refused = await act([{ op: 'remove', id: 'house/chair' }]);
+    const refused = await act([{ op: 'remove', id: soul.entityId }]);
     return { up2, body: body?.entity?.id === soul.entityId, bowlOnTable: bowl?.entity?.in?.parent === ids['house/table'], reach: reach?.ok, activity: o?.activity, at: o?.at, refused: refused.data.failures?.[0]?.code };
-  }, (r) => r.up2 && r.body && r.bowlOnTable && r.reach && r.refused === 'occupied.by-body');
+  }, (r) => r.up2 && r.body && r.bowlOnTable && r.reach && r.refused === 'body.protected');
   await shot('s6-inside-roof-hidden', { eye: [10, 16, 7], at: [10, 2.5, -0.5], wait: 10000 });
   await shot('s6-house-outside', { eye: [24, 9, 20], at: [10, 2, 0], wait: 4000, hideRoofs: false });
 } catch (e) {

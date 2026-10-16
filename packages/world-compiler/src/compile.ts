@@ -17,12 +17,13 @@ import { creationInputFailure } from './input.ts';
 import { signMediaFailure } from './sign-media.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
-/** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
- *  Checked for every entity in the subtree of a remove / move / set-params target; null = free. */
-export type UsesHook = (id: string) => { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null;
+/** Body-aware edits: an entity the god may not edit as a thing (a resident's body; G1 "god rules" walks residents out
+ *  of everything else instead of refusing). Checked for every entity in the subtree of a remove / move / set-params
+ *  target; null = free. */
+export type UsesHook = (id: string) => { code: 'body.protected'; detail: string } | null;
 /** Body-aware edits, the would-be world's side (31 §3 rule 8, R2): called once after a plan succeeds, with the plan's own
  *  scratch (the world as it would be), its diff and the batch's ops; a Failure refuses the whole batch (null = fine). The
- *  engine bridge uses it to refuse burying or unseating a body that cannot step clear, without planning a second time.
+ *  engine bridge uses it to refuse edits of a resident's body itself (residents in the way are walked out, not refused).
  *  With the hook set, `uses` refusals are held back until it has run (it is called even when one was found), so its
  *  refusal wins as when it planned on a fork first; failing that, the earliest held-back one refuses the batch. */
 export type RefuseHook = (scratch: WorldModel, diff: Diff, ops: Op[]) => Failure | null;
@@ -151,7 +152,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       const u = opts.uses(sid);
       if (!u) continue;
       const f = fail(i, u.code, `${sid !== id ? `${scratch.pathOf(id)}: ` : ''}${u.detail}`);
-      f.entity = sid; f.field = 'entity'; f.fix = 'Wait until the body is no longer using this entity, then retry.';
+      f.entity = sid; f.field = 'entity'; f.fix = 'Residents move their own bodies; edit the things around them instead.';
       if (opts.refuse) { heldBack.push(f); return false; }
       failures.push(f); return true;
     }
@@ -312,7 +313,9 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (inUse(id, i)) return;
         for (const sid of sub) {
           const e = scratch.entities.get(sid)!;
-          if (isBody(scratch, e) && sid !== id) { failures.push(fail(i, 'occupied.by-body', `${scratch.pathOf(sid)} is a body inside ${op.id}`)); return; }
+          // A body inside the removed thing is refused for every caller; the body itself only for an untrusted one (an
+          // engine retire removes its own body, its carried things moved out first).
+          if (isBody(scratch, e) && (sid !== id || !opts.trusted)) { failures.push(fail(i, 'body.protected', sid !== id ? `${scratch.pathOf(sid)} is a resident's body inside ${op.id}; bodies move themselves` : `${scratch.pathOf(sid)} is a resident's body; bodies move themselves`)); return; }
         }
         // children first for the forward diff; parents first for the inverse (restore in dependency order)
         const before = sub.map((sid) => scratch.entities.get(sid)!);

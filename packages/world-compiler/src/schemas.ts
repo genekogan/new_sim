@@ -330,14 +330,19 @@ export type Failure = {
   field?: string; fix?: string; measured?: unknown; limit?: unknown; def?: string; entity?: string;
   suggest?: { p?: [number, number] | [number, number, number]; r?: number };
 };
-export type Accepted = { accepted: true; seq: number; undoId: string; ids: Record<string, string>; warnings: string[]; replayed?: true };
+/** G1: a resident a god edit walked out of its way (relocated only with no walking route; `stopped`: it was only on
+ *  its way to a seat the edit changes, so its act ended where it stood), the reason it was told, what it let go of
+ *  (seat, bed, held things) and, when it held things, where they were set down. `level`: an upstairs exit on the
+ *  resident's own floor (absent: the ground). */
+export type ResidentMove = { soulId: string; body: string; name: string; how: 'walked' | 'relocated' | 'stopped'; from: [number, number]; to: [number, number]; level?: number; reason: string; released: string[]; dropAt?: [number, number, number]; place?: string };
+export type Accepted = { accepted: true; seq: number; undoId: string; ids: Record<string, string>; warnings: string[]; moved?: ResidentMove[]; replayed?: true };
 export type Refused = { accepted: false; failures: Failure[] };
 export type Result = Accepted | Refused;
 
 export const refusalCodes = [
   'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid', 'def.in-use',
   'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
-  'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
+  'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'body.protected',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture', 'architecture.sealed', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
   'wallet.insufficient', 'relation.invalid',
   'request.conflict', 'request.budget', 'revision.stale', 'asset.invalid', 'asset.budget', 'budget.world', 'budget.region',

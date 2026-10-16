@@ -73,6 +73,9 @@ async function step(name, fn, expect) {
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
+// G1 "god rules": edits are never refused for residents; a dry run names who an edit would walk out (nothing moves).
+const dryrun = (ops) => api('/v1/god/dryrun', { body: { ops } });
+const wouldMove = (r, who) => r.data?.accepted === true && (r.data.wouldMove ?? []).some((m) => new RegExp(who).test(m.name));
 const entity = async (path) => (await api(`/v1/world/entities/${path}`, { as: 'none' })).data;
 const groundAt = async (pts) => (await api('/v1/god/query', { body: { points: pts } })).data.points;
 const observe = async () => (await api('/v1/edge/observe', { as: 'soul' })).data;
@@ -307,7 +310,7 @@ try {
   }, (r) => r?.ok);
   { const me = (await observe())?.self; if (me?.position) { const q = me.position; await shots([{ name: 's8-holding-the-bowl-roof-hidden', eye: [q[0] + 2.5, q[1] + 5.5, q[2] + 3.5], at: [q[0], q[1] + 1, q[2]], wait: 6000, hideRoofs: true }]); } }
   await step('S8 the journal shows the engine\'s move of the bowl (by:engine, not the god\'s to undo)', async () => { const e = (await api('/v1/god/edits?limit=30')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, kind: m?.kind }; }, (r) => r.found && r.kind === 'engine');
-  await step('G6 the god tries to take the bowl away: refused, held by Ana', () => act([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'held.by-body' && /Ana/.test(r.data.failures[0].detail));
+  await step('G6 a dry run of taking the bowl away names Ana, who holds it (never refused)', () => dryrun([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => wouldMove(r, 'Ana'));
 
   // ---- prayer and answer
   let prayerId = null;
@@ -315,22 +318,21 @@ try {
   await step('G7 the prayer reaches the god; the god answers', async () => { const p = (await api('/v1/god/prayers')).data.prayers; const mine = p.find((x) => x.id === prayerId); const a = await act([{ op: 'answer', prayer: prayerId, text: 'Yes. Look south of the door tomorrow.' }]); return { seen: !!mine, from: mine?.soul_name, text: mine?.text, answered: a.data.accepted }; }, (r) => r.seen && r.from === 'Ana' && r.answered);
   await step('S9 she reads the answer', async () => { const p = (await api('/v1/god/prayers/mine', { as: 'soul' })).data.prayers; return { answer: p.find((x) => x.id === prayerId)?.answer }; }, (r) => /south of the door/.test(r.answer ?? ''));
 
-  // ---- with Ana seated upstairs, edits that would unseat or bury her are refused, naming her
+  // ---- with Ana seated upstairs, edits that would unseat or bury her are never refused: a dry run names her
   await step('S10 she sits on the chair again (bowl in hand)', async () => {
     const r = await soulDoes(`sit:${ids['house/chair']}`, { params: { seconds: 600 }, maxS: 180, until: (me) => me.activity === 'sit' });
     return { accepted: r.accepted, code: r.code, end: r.end };
   }, (r) => r.accepted && r.end?.activity === 'sit' && upstairs(r.end.p));
-  const named = (r, code) => r.data?.accepted === false && r.data.failures?.some((f) => f.code === code && /Ana/.test(f.detail));
   const refusals = {};
-  const refuse = (name, ops, code = 'occupied.by-body') => step(name, async () => { const r = await act(ops, name); refusals[name] = r.data; return r; }, (r) => named(r, code));
-  await refuse('G8 unseat: the god moves the chair she sits on — refused, naming Ana', [{ op: 'move', id: 'house/chair', p: [-1, 0, 0] }]);
-  await refuse('G8 unseat: the god removes the chair — refused, naming Ana', [{ op: 'remove', id: 'house/chair' }]);
-  await refuse('G8 unseat: the god removes the whole house — refused, naming Ana', [{ op: 'remove', id: 'house' }]);
-  await refuse('G8 unseat: the god rebuilds the house with one floor — refused, naming Ana', [{ op: 'set', id: 'house', params: { floors: 1 } }]);
-  await refuse('G8 unseat: the god moves the house — refused, naming Ana', [{ op: 'move', id: 'house', p: [HOUSE[0] + 3, HOUSE[1]] }]);
-  await refuse('G9 bury: the god raises a hill under the house she sits in — refused, naming Ana', [{ op: 'place', def: 'core/knoll@1', name: 'mound', p: HOUSE, params: { height: 4, radius: 9 } }]);
-  await refuse('G9 bury: the god drops a crate where she sits — refused, naming Ana', [{ op: 'place', def: 'core/crate@1', name: 'crate', in: { parent: 'house', slot: 'floor-1' }, p: [-2, 0, 1] }]);
-  await step('G9 the refusals left the world as it was: chair, house, bowl in her hands, ground unchanged', async () => {
+  const refuse = (name, ops) => step(name, async () => { const r = await dryrun(ops); refusals[name] = r.data; return r; }, (r) => wouldMove(r, 'Ana'));
+  await refuse('G8 unseat: the god moves the chair she sits on — a dry run names Ana, who would be walked out', [{ op: 'move', id: 'house/chair', p: [-1, 0, 0] }]);
+  await refuse('G8 unseat: the god removes the chair — a dry run names Ana', [{ op: 'remove', id: 'house/chair' }]);
+  await refuse('G8 unseat: the god removes the whole house — a dry run names Ana', [{ op: 'remove', id: 'house' }]);
+  await refuse('G8 unseat: the god rebuilds the house with one floor — a dry run names Ana', [{ op: 'set', id: 'house', params: { floors: 1 } }]);
+  await refuse('G8 unseat: the god moves the house — a dry run names Ana', [{ op: 'move', id: 'house', p: [HOUSE[0] + 3, HOUSE[1]] }]);
+  await refuse('G9 bury: the god raises a hill under the house she sits in — a dry run names Ana', [{ op: 'place', def: 'core/knoll@1', name: 'mound', p: HOUSE, params: { height: 4, radius: 9 } }]);
+  await refuse('G9 bury: the god drops a crate where she sits — a dry run names Ana', [{ op: 'place', def: 'core/crate@1', name: 'crate', in: { parent: 'house', slot: 'floor-1' }, p: [-2, 0, 1] }]);
+  await step('G9 the dry runs left the world as it was: chair, house, bowl in her hands, ground unchanged', async () => {
     const chair = await entity('house/chair'), bowl = await entity(ids['house/table/bowl']), mound = await entity('mound'), crate = await entity('house/crate');
     const o = await observe();
     const [g] = await groundAt([HOUSE]);

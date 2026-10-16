@@ -4,12 +4,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import { coreLibrary, coreRef, type Result } from '@sim/world-compiler';
+import { coreLibrary, coreRef, type ResidentMove, type Result } from '@sim/world-compiler';
 import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
-import { EngineBridge } from './engine-bridge.ts';
 import { GOD_EDIT_RECEIPTS, GOD_EDIT_OUTCOME_BYTES } from './store.ts';
 
 function fixture(t: TestContext, file = false) {
@@ -116,15 +115,30 @@ test('forcing store.commit itself to fail preserves the public model', t => {
   assert.equal(f.god.model.get('phantom'), undefined);
 });
 
-test('bridge guards and warning decoration run once before the durable accepted receipt', t => {
-  const f = fixture(t), bridge = Object.create(EngineBridge.prototype) as any; bridge.god = f.god;
-  let busy = false, guards = 0, decorated = 0;
-  bridge.bodyRefusal = bridge.pinnedRefusal = () => { guards++; return busy ? { accepted: false, failures: [{ op: 0, code: 'occupied.by-body', detail: 'busy' }] } : null; };
-  bridge.buried = (_ids: string[], after: any) => { decorated++; assert.notEqual(after, f.god.model); assert.ok(after.get('b')); return ['fixture body warning']; };
-  bridge.guardGod(); bridge.guardPinned(false);
-  const batch = { clientRef: 'bridge', ops: [placement('b')] }, first = accepted(f.god.act(batch)), counts = { guards, decorated };
-  assert.deepEqual(first.warnings, ['fixture body warning']); busy = true;
-  assert.deepEqual(f.god.act(batch), { ...first, replayed: true }); assert.deepEqual({ guards, decorated }, counts);
+const walkout = (name = 'Ada'): ResidentMove => ({ soulId: `s_${name}`, body: `h_${name}`, name, how: 'walked', from: [0, 0], to: [3, 0], reason: 'The god is building the bench; you stepped aside.', released: [] });
+/** G1: a spy for the bridge's walk-out hooks (prepare plans on the would-be world; apply moves residents after SQL). */
+function walkoutSpy(f: ReturnType<typeof fixture>) {
+  const calls = { prepare: 0, apply: 0, dry: 0, moved: [] as ResidentMove[] };
+  f.god.bodies = { uses: () => null, prepare: (before, after, _diff, _ops, o) => { if (o?.dry) calls.dry++; else calls.prepare++; assert.equal(before, f.god.model); assert.notEqual(after, f.god.model); return { moved: [walkout()], warnings: [], touched: [] }; }, apply: moved => { calls.apply++; calls.moved.push(...moved); } };
+  return calls;
+}
+
+test('G1: walk-out planning runs once before the durable accepted receipt; a retry replays it without moving anyone', t => {
+  const f = fixture(t), calls = walkoutSpy(f);
+  const batch = { clientRef: 'walkout', ops: [placement('b')] }, first = accepted(f.god.act(batch));
+  assert.deepEqual(first.moved, [walkout()]); assert.match(first.warnings.join('\n'), /^body\.walked-out: Ada walked to \(3, 0\); told "The god is building the bench/m);
+  assert.deepEqual({ prepare: calls.prepare, apply: calls.apply }, { prepare: 1, apply: 1 }); assert.deepEqual(calls.moved, [walkout()]);
+  assert.deepEqual(f.god.store.receipt(batch.clientRef)?.result.moved, [walkout()], 'the durable receipt lists who moved');
+  assert.deepEqual(f.god.act(batch), { ...first, replayed: true }); assert.deepEqual({ prepare: calls.prepare, apply: calls.apply }, { prepare: 1, apply: 1 });
+  // Previews and dry runs plan who would be walked out (shown to the god) but move nobody.
+  const dry = f.god.dryrun({ ops: [{ ...placement('c'), p: [20, 0] }] }) as { accepted: boolean; wouldMove?: unknown };
+  const seen = f.god.preview({ ops: [{ ...placement('c'), p: [20, 0] }] }) as { accepted: boolean; wouldMove?: unknown };
+  const would = [{ name: 'Ada', soulId: 's_Ada', how: 'walked', to: [3, 0], reason: walkout().reason }];
+  assert.equal(dry.accepted, true); assert.deepEqual(dry.wouldMove, would); assert.equal(seen.accepted, true); assert.deepEqual(seen.wouldMove, would);
+  assert.deepEqual({ prepare: calls.prepare, apply: calls.apply, dry: calls.dry }, { prepare: 1, apply: 1, dry: 2 });
+  // Committing a sealed preview is an edit like any other.
+  const pv = f.god.preview({ ops: [{ ...placement('d'), p: [40, 0] }] }); assert.ok(pv.id);
+  assert.deepEqual(accepted(f.god.act({ preview: pv.id! })).moved, [walkout()]); assert.deepEqual({ prepare: calls.prepare, apply: calls.apply }, { prepare: 2, apply: 2 });
 });
 
 test('a generator failure during body warning geometry is a typed refusal before persistence', t => {
@@ -298,16 +312,18 @@ test('preview refuses newly affected external dependents while allowing unrelate
   accepted(f.god.act({ preview: fresh.id }));
 });
 
-test('production hooked refusal decoration runs before a receipt and refused requests re-plan', t => {
-  const f = fixture(t), bridge = Object.create(EngineBridge.prototype) as any; bridge.god = f.god;
-  let calls = 0;
-  bridge.buryRefusal = (failures: any[]) => { calls++; return { accepted: false, failures: [{ ...failures[0], detail: 'fixture decorated refusal' }] }; };
-  bridge.guardPinned(true);
-  const batch = { clientRef: 'hooked-refused', ops: [{ op: 'remove', id: 'later' }] };
-  const r = f.god.act(batch); assert.equal(r.accepted, false); if (!r.accepted) assert.equal(r.failures[0].detail, 'fixture decorated refusal');
-  assert.equal(calls, 1); assert.equal(f.god.store.receipt(batch.clientRef), null);
-  accepted(f.god.act({ ops: [placement('later')] })); accepted(f.god.act(batch));
-  const count = calls; accepted(f.god.act(batch)); assert.equal(calls, count);
+test('G1: a refused or failed request never moves a resident; undo and redo walk residents out like any edit', t => {
+  const f = fixture(t), calls = walkoutSpy(f);
+  const batch = { clientRef: 'refused-first', ops: [{ op: 'remove', id: 'later' }] };
+  const r = f.god.act(batch); assert.equal(r.accepted, false); assert.deepEqual({ prepare: calls.prepare, apply: calls.apply }, { prepare: 0, apply: 0 }); assert.equal(f.god.store.receipt(batch.clientRef), null);
+  accepted(f.god.act({ ops: [placement('later')] })); assert.equal(calls.apply, 1);
+  const commit = f.god.store.commit.bind(f.god.store); f.god.store.commit = () => { throw Error('forced commit failure'); };
+  try { assert.throws(() => f.god.act(batch), /forced commit failure/); } finally { f.god.store.commit = commit; }
+  assert.equal(calls.apply, 1, 'a failed SQL commit moves nobody'); assert.ok(f.god.model.get('later'));
+  const removed = accepted(f.god.act(batch)); assert.deepEqual(removed.moved, [walkout()]); assert.equal(calls.apply, 2);
+  const undo = accepted(f.god.undo()); assert.deepEqual(undo.moved, [walkout()]); assert.ok(undo.warnings.some(w => w.startsWith('body.walked-out: Ada')));
+  const redo = accepted(f.god.redo()); assert.deepEqual(redo.moved, [walkout()]); assert.equal(calls.apply, 4);
+  assert.deepEqual(f.god.act(batch), { ...removed, replayed: true }); assert.equal(calls.apply, 4);
 });
 
 test('empty refs stay lookupable and unknown prayers are repairable refusals', async t => {

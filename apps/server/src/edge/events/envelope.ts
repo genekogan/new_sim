@@ -64,6 +64,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'weather.changed': {salience: 1, what: 'reserved: no weather yet'},
   'mail.delivered':{salience:2,what:'private postbox letter; attributed, untrusted text'},
   'world.narration': {salience: 1, what: 'world narration/small consequences'},
+  'god-change': {salience: 3, what: 'god changed something by me; moved: walked/relocated'},
   'other': {salience: 1, what: 'unknown envelope kind'},
 };
 
@@ -131,6 +132,8 @@ export function classify(e: StreamEvent, me: Viewer): {kind: string; salience: 0
     case 'reminder.due': return k('reminder.due');
     case 'world.notice': return k('world.notice', d.level === 'outage' || d.level === 'restart' ? 3 : Number(d.salience) === 3 ? 3 : 2);
     case 'mail.delivered':return k('mail.delivered');
+    // G1 walk-outs (3); R8 "the god changed something near you" sets its own salience.
+    case 'god-change': return k('god-change', [0, 1, 2, 3].includes(Number(d.salience)) ? Number(d.salience) as 0 | 1 | 2 | 3 : d.moved ? 3 : 2);
     case 'receipt': {
       const r = d.receipt ?? {}, plan = !!d.plan;
       if (r.channel === 'attention' || r.channel === 'none') return k('receipt.terminal', 0);

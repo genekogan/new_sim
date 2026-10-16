@@ -2891,7 +2891,7 @@ async function planBatch(batch) {
   const b = typeof batch === "string" ? JSON.parse(batch) : batch;
   const r = await dryrun(b);
   if (!r.accepted) return `would be REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
-  return `would be accepted: ${r.diff.upserts} things placed/changed, ${r.diff.removes} removed${r.diff.defs.length ? `, defines ${r.diff.defs.join(", ")}` : ""}${r.diff.tiles ? `, ${r.diff.tiles} terrain tiles` : ""}${r.warnings.length ? `; warnings: ${r.warnings.join("; ")}` : ""}`;
+  return `would be accepted: ${r.diff.upserts} things placed/changed, ${r.diff.removes} removed${r.diff.defs.length ? `, defines ${r.diff.defs.join(", ")}` : ""}${r.diff.tiles ? `, ${r.diff.tiles} terrain tiles` : ""}${r.warnings.length ? `; warnings: ${r.warnings.join("; ")}` : ""}${r.wouldMove?.length ? `; residents it would walk out (never refused): ${r.wouldMove.map((m) => `${m.name} (${m.how})`).join(", ")}` : ""}`;
 }
 var HINTS = {
   "build.unknown": "`build` lists sites; start a new build or check its id",
@@ -2925,8 +2925,7 @@ var HINTS = {
   "params.invalid": "`defs <name>` shows params with ranges",
   "state.invalid": "unknown or bad state field; `describe` shows the state",
   "name.taken": "names are unique per parent; choose another --name",
-  "occupied.by-body": "a Soul is there; wait, or ask it to move",
-  "held.by-body": "a Soul holds it",
+  "body.protected": "a resident's body moves itself; edit the things around it (residents in the way are walked out)",
   "entity.unknown": "no such thing; `map` lists paths",
   "architecture.unreachable": "a room has no way in; add a door (plan) or stairs",
   "architecture.headroom": "a floor is too low; raise floorHeight",
@@ -3574,6 +3573,9 @@ async function group(name, flags2 = {}) {
   save({ group: g });
   return `current group: ${g} (every edit until \`group --off\`; undo it all with \`undo --group ${g}\`)`;
 }
+var movedHow = (m) => m.how === "walked" ? "walked out of the way" : m.how === "stopped" ? "stopped where they were (on the way to what changed)" : "was moved (no walking route)";
+var movedNote = (r) => (r?.moved ?? []).map((m) => `
+  ${m.name} ${movedHow(m)} ${m.how === "stopped" ? "at" : "to"} (${m.to.join(", ")}${m.level ? `, floor level ${m.level}` : ""}): "${m.reason}"`).join("");
 async function undo(flags2 = {}) {
   const g = flags2.group === true ? load().group : flags2.group;
   if ((process.env.EDEN_GOD_CLAIM || load().build?.claim) && !g) {
@@ -3583,16 +3585,16 @@ async function undo(flags2 = {}) {
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ""}`, { method: "POST" }), "undo");
   invalidate();
   if (g) {
-    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(", ")}`;
+    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(", ")}${movedNote(r)}`;
     return `group "${g}" undo incomplete; undone edits: ${r.reverted?.join(", ") || "none"}; not undone edits: ${r.notReverted?.join(", ") || (r.failed !== void 0 ? r.failed : "unknown (server did not list them)")}
 ${r.failures?.map(explainFailure).join("; ") || "Undo did not complete."}`;
   }
-  return r.accepted ? `undid edit ${r.reverted}` : `nothing undone: ${r.failures?.map(explainFailure).join("; ")}`;
+  return r.accepted ? `undid edit ${r.reverted}${movedNote(r)}` : `nothing undone: ${r.failures?.map(explainFailure).join("; ")}`;
 }
 async function redo() {
   const r = ok(await call("/v1/god/redo", { method: "POST" }), "redo");
   invalidate();
-  return r.accepted ? `redid edit ${r.reverted}` : `nothing to redo: ${r.failures?.map(explainFailure).join("; ")}`;
+  return r.accepted ? `redid edit ${r.reverted}${movedNote(r)}` : `nothing to redo: ${r.failures?.map(explainFailure).join("; ")}`;
 }
 async function history(n = 20, flags2 = {}) {
   const r = ok(await call(`/v1/god/edits?limit=${n}`), "history");
@@ -4211,6 +4213,7 @@ export {
   mirror,
   mkdirSync3 as mkdirSync,
   move,
+  movedNote,
   pair,
   parseFlags,
   parseMassing,

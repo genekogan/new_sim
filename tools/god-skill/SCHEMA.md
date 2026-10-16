@@ -289,7 +289,7 @@ seat, bed, surface, stand, door, hang, carry, socket, room, floor, roof, wall, p
 wood, stone, plaster, brick, glass, metal, fabric, thatch, tile, ceramic, grass, water, sand, gravel, asphalt, cobble, dirt, rock, moss, mud, snow, leaf, bark, fur, feather, paint, plastic, paper, rubber, emissive
 
 ## Refusal codes
-schema, def.unknown, def.budget, def.expansion, def.invalid, parent.unknown, slot.unknown, slot.incompatible, slot.full, size.range, extent.outside, overlap.solid, support.none, held.by-body, occupied.by-body, constant.immutable, float.no-water, constraint.unsatisfied, architecture.unreachable, architecture.headroom, entity.unknown, entity.limit, name.taken, params.invalid, state.invalid, undo.conflict
+schema, def.unknown, def.budget, def.expansion, def.invalid, parent.unknown, slot.unknown, slot.incompatible, slot.full, size.range, extent.outside, overlap.solid, support.none, body.protected, constant.immutable, float.no-water, constraint.unsatisfied, architecture.unreachable, architecture.headroom, entity.unknown, entity.limit, name.taken, params.invalid, state.invalid, undo.conflict
 
 ## Endpoints
 - read: GET /v1/world/snapshot · GET /v1/world/ground · GET /v1/world/tiles/:tx/:tz · GET /v1/world/entities/:path · GET /v1/god/schema · POST /v1/god/query

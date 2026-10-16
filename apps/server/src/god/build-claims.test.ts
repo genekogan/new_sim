@@ -147,7 +147,7 @@ test('§9.3.9 done:true keeps lead edit, claim done releases only itself, force 
 
 test('RL2: force abandon preflights released claims without mutating them on a conflict', async t => {
   const f = fixture(); t.after(() => f.db.close()); const c = await f.claim({ part: 'east', root: 'shell/east' }); accepted(await f.act([place('child', 0, 0, 'shell/east')], f.field(c.claim.id), 1));
-  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'occupied.by-body', detail: 'busy' } : null };
+  let calls = 0; f.god.bodies = { uses: () => null, refuse: () => ++calls === 2 ? { op: -1, code: 'body.protected', detail: 'a resident body' } : null };
   const r = await f.req('/v1/god/builds/church/abandon', { force: true, undo: true }); assert.equal(code(r), 'build.undo-incomplete'); assert.equal(r.reverted.length, 0); assert.equal(f.body().claims[0].status, 'held'); assert.equal(f.god.store.build('church')!.status, 'active');
   f.god.bodies = null;
   assert.equal((await f.req('/v1/god/builds/church/abandon', { force: true, undo: true })).build.status, 'abandoned'); assert.equal(f.god.model.entities.size, 0);

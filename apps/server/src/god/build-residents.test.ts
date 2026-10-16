@@ -110,29 +110,70 @@ test('verify-use enters and sits at an open build; probe body never evacuates or
   assert.equal(JSON.parse(w.god.store.build('church')!.body).roots.some((id: string) => id.startsWith('h_vp')), false);
 });
 
-test('idle resident steps off a newly marked site within 15 ticks; probes, busy, sleeping and upper bodies are skipped', async t => {
+test('G1: a resident inside a newly marked site walks off it within 15 ticks and is told why', async t => {
   const w = world(t), s = await w.soul(); await w.move(s, [0, 0]);
   w.start({ root: undefined, site: { at: [0, 0], size: [10, 10], yaw: .4 }, massing: [{ at: [0, 0], size: [10, 10], h: 2 }] });
   await w.settle(15); assert.equal(inSite({ at: [0, 0], size: [10, 10], yaw: .4 }, w.pos(s), .5), false, JSON.stringify(w.pos(s)));
-  const ev = w.db.events(w.host.worldId, 0, 10000).filter(e => e.kind === 'edge-relocate' && (e.payload as any).why === 'the god started building here: stepped off the site'); assert.ok(ev.length > 0);
-  const E = w.host.engine as any;
-  // The same pass is exercised against the real body with transient busy postures, without scheduling an illegal activity.
-  for (const patch of [{ sleepPose: {} }, { level: 1 }, { activity: 'sit' }]) { await accept(w.host, w.host.enqueue('edge-relocate', 'test:posture', { soulId: s.soulId, entityId: s.entityId, to: [0, 0], why: 'fixture posture' })); const b = E.world.entities[s.entityId], saved = structuredClone(b.human); Object.assign(b.human, patch); w.bridge.evacuateSites(); b.human = saved; w.host.drainInputs(); assert.ok(inSite({ at: [0, 0], size: [10, 10], yaw: .4 }, w.pos(s))); }
+  const ev = w.db.events(w.host.worldId, 0, 10000).filter(e => e.author === 'god:walkout');
+  assert.equal(ev.length, 1, 'one walk-out, not one per cadence'); assert.equal(ev[0].kind, 'edge-god-walkout');
+  const why = 'The god started building Stone church here; you stepped off the site.';
+  assert.equal((ev[0].payload as any).why, why); assert.deepEqual([w.pos(s)[0], w.pos(s)[1]], (ev[0].payload as any).to, 'the walk ends at its exit in the same pass');
+  const seen = w.edge.observe(s as any, new Set()) as any;
+  assert.deepEqual(seen.notices?.map((n: any) => [n.kind, n.text, n.moved, n.place]), [['god-change', why, 'walked', 'Stone church']], 'the next observation carries the notice');
+  assert.ok(w.host.minds.get(s.soulId)!.recent.includes(why), 'the native observation remembers it too');
 });
 
-test('seated resident is kept in place and protects occupied building; after stand, cadence evacuates without another god edit', { timeout: 30_000 }, async t => {
+test('G1: seated residents are walked out by a closing site, a build edit and a whole-build undo; none is refused', { timeout: 60_000 }, async t => {
   const w = world(t); await w.build(); const s = await w.soul(); await w.move(s, [10, 8]); const E = w.host.engine as any;
-  const sit = await accept(w.host, w.edge.act(s, { capability: `sit:${w.god.model.get('church/pew')!.id}`, params: { seconds: 1 } })); assert.equal(sit.accepted, true, JSON.stringify(sit));
-  for (let i = 0; i < 3000 && E.world.entities[s.entityId].human.activity !== 'sit'; i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } }
-  await w.settle(40); assert.equal(E.world.entities[s.entityId].human.activity, 'sit');
-  const refused = w.god.builds.start({ id: 'church', title: 'Stone church', steps: ['shell', 'roof'], root: 'church', site: { at: [10, 0], size: [14, 12] } }, w.caller) as any;
-  assert.equal(refused.ok, false); assert.equal(refused.failures[0].code, 'build.site'); assert.equal(refused.failures[0].field, 'include'); assert.match(refused.failures[0].fix, /church\/pew/); assert.ok(refused.inventory.seats.some((s: any) => s.path === 'church/pew' && s.occupied));
-  const before = w.pos(s), start = w.start({ include: [w.god.model.get('church/pew')!.id] }); await w.settle(45); assert.deepEqual(w.pos(s), before);
-  const edit = w.god.act({ ops: [{ op: 'set', id: 'church', params: { floors: 2 } }], build: { id: 'church', lease: start.lease } }) as any; assert.equal(edit.accepted, false); assert.equal(edit.failures[0].code, 'occupied.by-body');
-  assert.equal((await accept(w.host, w.edge.act(s, { capability: 'stand:here' }))).accepted, true); await w.settle(40);
-  if (E.world.entities[s.entityId].human.activity === 'sit') { assert.equal((await accept(w.host, w.edge.act(s, { capability: 'stand:here' }))).accepted, true); await w.settle(40); }
-  await w.settle(40);
-  assert.equal(w.god.builds.closingSites().some(site => inClosure(site, w.pos(s))), false, JSON.stringify({ p: w.pos(s), human: E.world.entities[s.entityId].human, program: E.programOf(s.entityId), reach: [[1.5,0],[18.5,0],[10,7.5],[10,-7.5]].map(p => E.reachV1({p:w.pos(s),level:0},{p,level:0})) }));
+  const pew = w.god.model.get('church/pew')!.id, church = w.god.model.get('church')!.id;
+  const sit = async () => {
+    const r = await accept(w.host, w.edge.act(s, { capability: `sit:${pew}`, params: { seconds: 600 } })); assert.equal(r.accepted, true, JSON.stringify(r));
+    for (let i = 0; i < 3000 && E.world.entities[s.entityId].human.activity !== 'sit'; i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } }
+    await w.settle(5); assert.equal(E.world.entities[s.entityId].human.activity, 'sit', 'seated on the pew');
+  };
+  const outside = () => { const [x, z] = w.pos(s); return Math.abs(x - 10) > 4 || Math.abs(z) > 3; };
+  await sit();
+  // 1. Starting a build over an occupied pew is not refused; the closure walks the seated resident off the site.
+  const start = w.start(); assert.ok(start.inventory.seats.some((x: any) => x.path === 'church/pew' && x.occupied), 'the inventory still shows who sits there');
+  await w.settle(45);
+  assert.notEqual(E.world.entities[s.entityId].human.activity, 'sit'); assert.equal(w.god.builds.closingSites().some(site => inClosure(site, w.pos(s))), false);
+  const first = w.db.events(w.host.worldId, 0, 10000).filter(e => e.author === 'god:walkout').at(-1)!;
+  assert.equal((first.payload as any).why, 'The god started building Stone church here; you stood up and stepped off the site.');
+  assert.ok((first.payload as any).released.includes(pew), 'the pew is released');
+  // 2. A build edit (not just a free edit) over a seated resident applies at once and walks it outside.
+  w.advance(501); w.god.builds.sweep(); await w.settle(1); await sit();
+  const resume = w.god.builds.resume('church', {}, w.caller) as any; assert.equal(resume.ok, true);
+  const edit = w.god.act({ ops: [{ op: 'set', id: 'church', params: { floors: 2 } }], build: { id: 'church', lease: resume.lease } }) as any;
+  assert.equal(edit.accepted, true, JSON.stringify(edit));
+  assert.deepEqual(edit.moved.map((m: any) => [m.name, m.how, m.reason]), [['Ana', 'walked', 'The god is rebuilding the church; you stood up and stepped outside.']]);
+  assert.equal(E.world.entities[s.entityId].human.activity, 'idle'); assert.ok(outside(), `outside the church: ${w.pos(s)}`);
+  assert.equal(w.god.model.entities.get(church)!.params?.floors, 2);
+  // 3. Whole-build undo after done (the release-1 copy case) is a god edit too: walked out, never refused.
+  w.god.builds.done('church', {}, w.caller); await w.settle(1); await sit();
+  const undo = w.god.undoGroup('church') as any; assert.equal(undo.accepted, true, JSON.stringify(undo));
+  assert.deepEqual(undo.moved.map((m: any) => [m.name, m.how]), [['Ana', 'walked']]); assert.match(undo.moved[0].reason, /^The god is rebuilding the church; you stood up and stepped outside\.$/);
+  assert.ok(undo.warnings.some((x: string) => x.startsWith('body.walked-out: Ana walked to ')));
+  assert.equal(E.world.entities[s.entityId].human.activity, 'idle'); assert.ok(outside(), `outside the church: ${w.pos(s)}`);
+  assert.equal(w.god.model.entities.get(church)!.params?.floors ?? 1, 1, 'the build edit is undone');
+  await w.settle(5); assert.deepEqual(E.runtime.violations, []);
+});
+
+test('G1: a resident walking through a closing site to a seat beyond it is passing by: never walked out, reaches the seat', { timeout: 60_000 }, async t => {
+  const w = world(t), s = await w.soul(), E = w.host.engine as any;
+  assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'far-bench', p: [-14, 0] }] }).accepted, true); await w.settle(3);
+  await w.move(s, [14, 0]);
+  w.start({ root: undefined, site: { at: [0, 0], size: [12, 30] }, massing: [{ at: [0, 0], size: [12, 30], h: 2 }] }); await w.settle(2);
+  const bench = w.god.model.get('far-bench')!.id;
+  const r = await accept(w.host, w.edge.act(s, { capability: `sit:${bench}`, params: { seconds: 600 } })); assert.equal(r.accepted, true, JSON.stringify(r));
+  let crossed = false;
+  for (let i = 0; i < 3000 && E.world.entities[s.entityId].human.activity !== 'sit'; i++) {
+    w.host.tickOnce(); if (w.god.builds.closingSites().some(site => inClosure(site, w.pos(s)))) crossed = true;
+    if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); }
+  }
+  await w.settle(3);
+  assert.ok(crossed, 'the route crossed the closing site');
+  assert.equal(E.world.entities[s.entityId].human.activity, 'sit', `reached the bench beyond the site: ${JSON.stringify(w.pos(s))}`);
+  assert.equal(w.db.events(w.host.worldId, 0, 10000).filter(e => e.author === 'god:walkout').length, 0, 'never walked out on the way');
 });
 
 test('closure lift, done and abandon reopen capabilities; lifted build keeps its slot', async t => {

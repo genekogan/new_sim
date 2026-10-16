@@ -91,16 +91,16 @@ test('slot changes re-admit descendants and refuse missing or smaller slots atom
   ok(act(w, changed.inverse!, true)); assert.equal(w.footprintsOf(w.get('host/post')!.id)[0].y0, 1);
 });
 
-test('scale, float support and body use apply to redefinition with repair context', () => {
-  for (const kind of ['scale', 'float', 'occupied', 'held'] as const) {
+test('scale, float support and a protected body apply to redefinition with repair context', () => {
+  for (const kind of ['scale', 'float', 'protected'] as const) {
     const w = fresh();
     ok(act(w, [{ op: 'define', def: post([0.5, 1, 0.5]) }, { op: 'place', def: 'probe-post@1', name: 'post', p: [0, 0] }]));
     const before = structuredClone(w.snapshot());
     const def: DefInput = { ...post([1, 2, 1]), ...(kind === 'scale' ? { size: { box: [1, 2, 1], scale: [2, 3] } } : kind === 'float' ? { anchor: 'float' } : {}) };
-    const r = applyBatch(w, { ops: [{ op: 'define', def }] }, 'god', 100, { uses: kind === 'occupied' || kind === 'held' ? () => ({ code: kind === 'occupied' ? 'occupied.by-body' : 'held.by-body', detail: `post is ${kind} by Ada` }) : undefined });
+    const r = applyBatch(w, { ops: [{ op: 'define', def }] }, 'god', 100, { uses: kind === 'protected' ? () => ({ code: 'body.protected', detail: 'post is a resident body' }) : undefined });
     assert.equal(r.result.accepted, false);
     if (!r.result.accepted) {
-      const f = r.result.failures[0]; assert.equal(f.code, kind === 'scale' ? 'size.range' : kind === 'float' ? 'float.no-water' : `${kind}.by-body`);
+      const f = r.result.failures[0]; assert.equal(f.code, kind === 'scale' ? 'size.range' : kind === 'float' ? 'float.no-water' : 'body.protected');
       assert.equal(f.entity, w.get('post')!.id); assert.equal(f.op, 0); assert.ok(f.field && f.fix);
     }
     assert.deepEqual(w.snapshot(), before);
@@ -180,4 +180,21 @@ test('definition undo restores geometry prepared by a new generator while preser
   const reverted = ok(act(w, changed.inverse!, true));
   assert.deepEqual(w.get('lane')!.params, before.params); assert.equal(w.get('lane')!.state!.label, 'later');
   ok(act(w, reverted.inverse!, true)); assert.ok(w.get('lane')!.params?.grade);
+});
+
+test('a resident body inside a removed thing is refused for every caller; only a trusted retire removes the body itself', () => {
+  const w = fresh();
+  ok(act(w, [{ op: 'place', def: 'core/platform@1', name: 'deck', p: [0, 0] }]));
+  const deck = w.get('deck')!.id;
+  const body = { id: 'h_ada1', name: 'ada', def: 'core/humanoid@1', in: { parent: deck, slot: 'top' }, p: [0, 0, 0], r: 0, anchor: 'center', state: {}, by: 'engine', born: 1, v: 1 };
+  ok(act(w, [{ op: 'restore', entity: body }], true));
+  for (const trusted of [false, true]) {
+    const r = act(w, [{ op: 'remove', id: deck, cascade: true }], trusted);
+    assert.equal(r.result.accepted, false, `trusted=${trusted}`);
+    if (!r.result.accepted) { assert.equal(r.result.failures[0].code, 'body.protected'); assert.match(r.result.failures[0].detail, /inside/); }
+  }
+  ok(act(w, [{ op: 'move', id: 'h_ada1', in: { parent: 'world' }, p: [5, 5], mode: 'nudge' }], true));
+  const untrusted = act(w, [{ op: 'remove', id: 'h_ada1', cascade: true }]);
+  assert.equal(untrusted.result.accepted, false); if (!untrusted.result.accepted) assert.equal(untrusted.result.failures[0].code, 'body.protected');
+  ok(act(w, [{ op: 'remove', id: 'h_ada1', cascade: true }], true)); assert.equal(w.entities.has('h_ada1'), false);
 });
