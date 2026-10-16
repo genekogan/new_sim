@@ -108,7 +108,7 @@ export function impliedSpecs(def: DefLike | undefined): SoundSpec[] {
   if (has('reeds') || (has('water') && has('cover') && has('plant'))) out.push(S('frogs', 16, 0.18, { when: 'night' }), S('leaves', 8, 0.08, { variant: 1 }));
   if (has('duck', 'goose')) out.push(S('waterfowl', 16, 0.2, { variant: 1, when: 'day' }));
   if (has('seagull', 'gull')) out.push(S('waterfowl', 30, 0.22, { variant: 0, when: 'day' }));
-  if (has('flag') || /(^|-)flag(-|$)/.test(name)) out.push(S('flag', 10, 0.14, { variant: hash(name) % 2 }));
+  if (has('flag') || /(^|-)flag(-|$)/.test(name)) out.push(S('flag', 10, 0.14));
   if (has('fridge', 'freezer')) out.push(S('hum', 4, 0.06));
   return out.slice(0, 4);
 }
@@ -120,6 +120,8 @@ export function emittersOf(model: WorldModel): Emitter[] {
   for (const e of model.entities.values()) {
     const def = model.resolvedDef(e.def), own = specsOf(def), implied = impliedSpecs(def as DefLike | undefined);
     if (!def || (!own.length && !implied.length)) continue;
+    // a fountain's own water is the splashing voicing (its drip and pigeons come as extra sounds)
+    if (own[0] && own[0].variant === undefined && ((def as DefLike).tags ?? []).includes('fountain')) own[0] = { ...own[0], variant: 0 };
     const specs = own.length ? [...own, ...implied].slice(0, 4) : implied.filter((s) => !CLUSTERED.has(s.kind));
     if (!own.length) for (const spec of implied) {
       if (!CLUSTERED.has(spec.kind)) continue;

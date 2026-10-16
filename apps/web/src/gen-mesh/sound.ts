@@ -185,12 +185,13 @@ function scanWorld(model: WorldModel) {
   ys.sort((a, b) => a - b); typicalGround = ys.length ? ys[Math.floor(ys.length / 2)] : 0;
 }
 const lastValue = new Map<string, unknown>();
+let meter: AnalyserNode | null = null;
 const log: LogRow[] = [];
 
 function applyMaster() { if (master) master.gain.value = settings.muted ? 0 : settings.volume; }
 function unlock() {
   if (ctx || typeof AudioContext === 'undefined') return;
-  try { ctx = new AudioContext(); master = ctx.createGain(); applyMaster(); master.connect(ctx.destination); noise(ctx).stop(); } catch { ctx = null; }
+  try { ctx = new AudioContext(); master = ctx.createGain(); applyMaster(); master.connect(ctx.destination); meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); noise(ctx).stop(); } catch { ctx = null; }
 }
 /** The opt-in ambient piece: a slow pad that follows the listener (off unless the visitor turns music on). */
 function musicBed(x: number, y: number, z: number): Emitter[] {
@@ -285,6 +286,8 @@ export function startSoundLayer() {
       heard: lastHeard.map(({ e: _e, ...h }) => ({ ...h, gain: +h.gain.toFixed(3), d: +h.d.toFixed(1) })),
       voices: [...voices.entries()].map(([id, v]) => ({ id, kind: v.kind, variant: v.variant, source: v.source, gain: +v.gain.toFixed(3) })) }),
     log: () => log.slice(),
+    /** RMS of what is actually coming out (after the master gain), for proof that sound plays and that mute silences it. */
+    level: () => { if (!ctx || !master) return 0; if (!meter) { meter = ctx.createAnalyser(); meter.fftSize = 2048; master.connect(meter); } const d = new Float32Array(meter.fftSize); meter.getFloatTimeDomainData(d); let q = 0; for (const v of d) q += v * v; return +Math.sqrt(q / d.length).toFixed(5); },
     mute: (m: boolean) => setSettings({ muted: m }),
     music: (m: boolean) => setSettings({ music: m }),
     unlock,
