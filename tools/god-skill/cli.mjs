@@ -677,8 +677,10 @@ const siteReportText = r => [`site report: ground ${r.ground.min}..${r.ground.ma
 const checkedReceipt = r => r ? [`checked receipt at seq ${r.seq}: ${r.exists.count} parts exist; ${r.undoability.ok ? 'undo preflight OK' : 'undo CONFLICT'} (${r.undoability.edits} edits)`, `exists: ${r.exists.paths.join(', ') || 'none'}`, ...r.preservation.outside.map(x => `changed outside: ${x.path}${x.included ? ' (included)' : ''}`), ...r.undoability.conflicts.map(explainFailure), ...r.massing.map(m => `mass ${m.name}: ${m.parts} parts; ${m.height}/${m.plannedHeight} m; ${m.fits ? 'fits' : 'warning'}`), ...r.uses.map(u => `uses ${u.path}: ${JSON.stringify(u.walk ?? u.behaviours ?? u.error ?? 'no compiled uses')}`), `viewer cost: ${JSON.stringify(r.viewerCost)}`, `refused: ${r.refused.count}; ${r.refused.recent.map(x => `${x.code}${x.entity ? ' on ' + x.entity : ''}: ${x.detail}`).join('; ')}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n') : '';
 const buildValues = (value, separator, flag, max, size) => { if (value === undefined) return undefined; if (typeof value !== 'string') throw new Error(`--${flag} needs text`); const values = value.split(separator).map(x => x.trim()); if (values.length > max || values.some(x => !x || x.length > size)) throw new Error(`--${flag} needs 1..${max} values, each at most ${size} characters`); return values; };
 const reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(', ') || 'none'}${r.recorded === false ? `; not fully recorded${r.code ? ' (' + r.code + ')' : ''}` : ''}` : '';
+// RL7: a refusal the server saw 3+ times in 2 min (same code + field), from build show and trace.
+export const loopLine = (l) => `LOOP ×${l.count} in ${Math.max(1, Math.round((l.lastAt - l.firstAt) / 1000))} s: ${l.code}${l.field ? ` (field ${l.field})` : ''} via ${l.routes.join(', ')}${l.builds?.length ? ` [build ${l.builds.join(', ')}]` : ''} — the same refusal keeps coming back; change the request${HINTS[l.code] ? ` (${HINTS[l.code]})` : ''} instead of resending it`;
 function buildReport(r) {
-  if (r.open) return [...r.open.flatMap(b => [...buildWords(b), buildListLine(b)]), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
+  if (r.open) return [...(r.loops ?? []).map(loopLine), ...r.open.flatMap(b => [...buildWords(b), buildListLine(b)]), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
   const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
   const lines = [...buildWords(b), ...buildOutline(b)];
   if (current) {
@@ -694,7 +696,21 @@ function buildReport(r) {
   if (load().build?.id === b.id) lines.push(`local: ${buildHeader()}`);
   const reuse = reuseReport(r.reuse ?? b.reuse); if (reuse) lines.push(reuse);
   const receipt = checkedReceipt(r.receipt ?? b.done?.receipt); if (receipt) lines.push(receipt);
+  for (const l of r.loops ?? []) lines.push(loopLine(l));
   return lines.join('\n');
+}
+const ago = (now, at) => { const s = Math.max(0, Math.round((now - at) / 1000)); return s < 120 ? `${s}s ago` : `${Math.round(s / 60)}m ago`; };
+/** trace [--build id] [--limit n]: this world's recent god requests — route, outcome code, field, ms; never payloads. */
+export async function trace(flags = {}) {
+  const q = new URLSearchParams();
+  if (flags.build !== undefined) { if (typeof flags.build !== 'string' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(flags.build)) throw new Error('trace --build takes a build id'); q.set('build', flags.build); }
+  if (flags.limit !== undefined) { const n = Number(flags.limit); if (!Number.isInteger(n) || n < 1 || n > 1024) throw new Error('trace --limit takes 1..1024'); q.set('limit', String(n)); }
+  const r = ok(await call(`/v1/god/trace${q.size ? `?${q}` : ''}`), 'trace');
+  if (flags.json) return r;
+  const s = r.stats;
+  if (!r.enabled) return 'trace: off on this server (GOD_TRACE=0)';
+  return [`trace: ${s.kept} of ${s.traced} god requests kept (newest first, max ${s.rowsMax}); ${s.refused} refused, ${s.repeated} of them repeats inside a loop`, ...r.loops.map(loopLine),
+    ...r.rows.map(x => `  ${ago(r.now, x.at)} ${x.method} ${x.route} → ${x.code}${x.field ? ` (${x.field})` : ''} ${x.ms} ms${x.build ? ` [${x.build}${x.step !== undefined ? ` ${x.step}` : ''}]` : ''} ${x.tok ?? '-'}${x.tok === r.you ? ' (you)' : ''}`)].join('\n');
 }
 const waitTimeout = (value = '15m') => {
   const m = typeof value === 'string' && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
@@ -1150,7 +1166,7 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
-  doctor: 'fix local',
+  doctor: 'fix local', trace: 'build limit',
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -1161,7 +1177,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { doctor: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -1184,7 +1200,7 @@ export function checkArgs(cmd, f, rest) {
 /** RL6 replay/lint: the CLI's own reading tables (read-only). */
 export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
-export const COMMANDS = { doctor: (r, f) => doctor(f),
+export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
@@ -1207,6 +1223,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f),
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
+trace:  trace [--build id] [--limit n] (the world's recent god requests: route, outcome, ms, no payloads; LOOP = the same refusal 3+ times in 2 min, also in build show)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
 look:   --views \"sw;w --dist 30;inside\" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).\nlook:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. Sheets, frame strips and kit workbench require local Playwright and Google Chrome. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]

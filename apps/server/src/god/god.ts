@@ -19,6 +19,7 @@ import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type Buil
 import { Parts } from './parts.ts';
 import { buildReceipt } from './build-integrity.ts';
 import { definitionUseClosure } from './unused-defs.ts';
+import { GodTrace } from './trace.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -63,6 +64,8 @@ export class GodMode {
   readonly assets: AssetStore;
   readonly builds: GodBuilds;
   readonly parts: Parts;
+  /** RL7: bounded in-memory ring of god request metadata (routes.ts records; `trace` and `build show` read). */
+  readonly trace: GodTrace = new GodTrace({ now: () => this.now() });
   private caller: BuildCaller = {};
   private buildListeners: ((e: BuildNotice) => void)[] = [];
   onBuild(fn: (e: BuildNotice) => void): () => void { this.buildListeners.push(fn); return () => { this.buildListeners = this.buildListeners.filter(f => f !== fn); }; }

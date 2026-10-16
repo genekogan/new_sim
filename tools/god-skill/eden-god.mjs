@@ -3303,8 +3303,9 @@ var buildValues = (value, separator, flag2, max, size) => {
   return values;
 };
 var reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(", ") || "none"}${r.recorded === false ? `; not fully recorded${r.code ? " (" + r.code + ")" : ""}` : ""}` : "";
+var loopLine = (l) => `LOOP \xD7${l.count} in ${Math.max(1, Math.round((l.lastAt - l.firstAt) / 1e3))} s: ${l.code}${l.field ? ` (field ${l.field})` : ""} via ${l.routes.join(", ")}${l.builds?.length ? ` [build ${l.builds.join(", ")}]` : ""} \u2014 the same refusal keeps coming back; change the request${HINTS[l.code] ? ` (${HINTS[l.code]})` : ""} instead of resending it`;
 function buildReport(r) {
-  if (r.open) return [...r.open.flatMap((b2) => [...buildWords(b2), buildListLine(b2)]), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
+  if (r.open) return [...(r.loops ?? []).map(loopLine), ...r.open.flatMap((b2) => [...buildWords(b2), buildListLine(b2)]), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
   const b = r.build, steps2 = b.plan.steps, current = r.current ?? b.current, open = ["active", "paused"].includes(b.status);
   const lines = [...buildWords(b), ...buildOutline(b)];
   if (current) {
@@ -3323,7 +3324,33 @@ function buildReport(r) {
   if (reuse) lines.push(reuse);
   const receipt = checkedReceipt(r.receipt ?? b.done?.receipt);
   if (receipt) lines.push(receipt);
+  for (const l of r.loops ?? []) lines.push(loopLine(l));
   return lines.join("\n");
+}
+var ago = (now, at) => {
+  const s = Math.max(0, Math.round((now - at) / 1e3));
+  return s < 120 ? `${s}s ago` : `${Math.round(s / 60)}m ago`;
+};
+async function trace(flags2 = {}) {
+  const q = new URLSearchParams();
+  if (flags2.build !== void 0) {
+    if (typeof flags2.build !== "string" || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(flags2.build)) throw new Error("trace --build takes a build id");
+    q.set("build", flags2.build);
+  }
+  if (flags2.limit !== void 0) {
+    const n = Number(flags2.limit);
+    if (!Number.isInteger(n) || n < 1 || n > 1024) throw new Error("trace --limit takes 1..1024");
+    q.set("limit", String(n));
+  }
+  const r = ok(await call(`/v1/god/trace${q.size ? `?${q}` : ""}`), "trace");
+  if (flags2.json) return r;
+  const s = r.stats;
+  if (!r.enabled) return "trace: off on this server (GOD_TRACE=0)";
+  return [
+    `trace: ${s.kept} of ${s.traced} god requests kept (newest first, max ${s.rowsMax}); ${s.refused} refused, ${s.repeated} of them repeats inside a loop`,
+    ...r.loops.map(loopLine),
+    ...r.rows.map((x) => `  ${ago(r.now, x.at)} ${x.method} ${x.route} \u2192 ${x.code}${x.field ? ` (${x.field})` : ""} ${x.ms} ms${x.build ? ` [${x.build}${x.step !== void 0 ? ` ${x.step}` : ""}]` : ""} ${x.tok ?? "-"}${x.tok === r.you ? " (you)" : ""}`)
+  ].join("\n");
 }
 var waitTimeout = (value = "15m") => {
   const m = typeof value === "string" && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
@@ -3890,6 +3917,7 @@ function parseFlags(argv, bools = BOOL) {
 var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
 var FLAGS = {
   doctor: "fix local",
+  trace: "build limit",
   build: "title steps at offset size yaw mass brief root take done force undo say timeout asks include",
   "verify-use": "seat from uses",
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -3928,7 +3956,7 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { doctor: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { doctor: 0, trace: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -3951,6 +3979,7 @@ var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 var readArg = (r) => r[0] !== void 0 ? existsSync6(r[0]) && !r[0].trim().startsWith("{") ? readFileSync6(r[0], "utf8") : r[0] : readFileSync6(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
+  trace: (r, f) => trace(f),
   kit: (r, f) => {
     if (r[0] !== "look" || !r[1]) throw Error("usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]");
     return kitLook(readArg(r.slice(1)), f);
@@ -4042,6 +4071,7 @@ var COMMANDS = {
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ["build", "group"].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
+trace:  trace [--build id] [--limit n] (the world's recent god requests: route, outcome, ms, no payloads; LOOP = the same refusal 3+ times in 2 min, also in build show)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> ([bounds] containment / [collider] hit) \xB7 reach <from> <to> \xB7 clear <x,z|ref> --size WxD \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
 look:   --views "sw;w --dist 30;inside" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).
 look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. Sheets, frame strips and kit workbench require local Playwright and Google Chrome. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
@@ -4153,6 +4183,7 @@ export {
   lookFrame,
   lookOverrides,
   lookViews,
+  loopLine,
   map,
   mint,
   mirror,
@@ -4186,6 +4217,7 @@ export {
   status,
   stream,
   terrain,
+  trace,
   undo,
   verifyUse,
   view,

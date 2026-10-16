@@ -355,6 +355,8 @@ day is a Saturday.
   browser; `resolve` — constraints that no longer hold.
 - `history` — the journal (seq, group, note, what each edit did). `schema --md` — the full
   vocabulary (every generator's params with ranges, kit primitives, ops, refusal codes) = SCHEMA.md.
+- `trace [--build id]` — this world's recent god requests (route, outcome code, field, ms; never payloads). A
+  `LOOP` line, here or in `build show`, means the same refusal came back 3+ times in 2 min: change the request.
 
 ## New kinds of things (bespoke kits and meshes)
 
