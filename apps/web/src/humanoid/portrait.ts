@@ -71,19 +71,16 @@ export async function humanoidPortraitPNG(kit: HumanoidKit, params: unknown, siz
   rig.mixer.update(0.01); rig.holder.updateMatrixWorld(true);
   const meshes: THREE.SkinnedMesh[] = []; rig.model.traverse(o => { if ((o as THREE.SkinnedMesh).isSkinnedMesh) meshes.push(o as THREE.SkinnedMesh); });
   const headBone = rig.model.getObjectByName('Head'); if (!headBone) throw Error('portrait: rig has no Head bone');
-  // The body faces +x (createRig). Frame from the head's own extent: top of hair/hat down to mid-chest.
-  const tris: Tri[] = [], far = new THREE.Vector3(100, 1.5, 0);
-  const pattern = (meshes[0]?.material as THREE.Material | undefined)?.userData.humanoid.pattern.value as number ?? 0;
-  for (const mesh of meshes) trianglesOf(mesh, tris, far, 0);
-  const head = meshes.find(m => m.name === 'head'), hb = new THREE.Box3();
-  if (head) { const only: Tri[] = []; trianglesOf(head, only, far, 0); for (const t of only) for (let k = 0; k < 9; k += 3) hb.expandByPoint(new THREE.Vector3(t.p[k], t.p[k + 1], t.p[k + 2])); }
-  const hp = headBone.getWorldPosition(new THREE.Vector3());
-  const top = hb.isEmpty() ? hp.y + 0.3 : hb.max.y, headH = Math.max(0.2, top - hp.y + 0.06);
-  const span = headH * 2.05, cy = top + span * 0.08 - span / 2, cz = hb.isEmpty() ? hp.z : (hb.min.z + hb.max.z) / 2;
+  // The body faces +x (createRig). Frame from the skull, not from hair or hats (a mohawk or a tall hat may be cropped,
+  // as in a real portrait): ks = the rig's world scale (neck→head joint is 0.0767 m in kit space), the skull top 0.24 m and
+  // the eyes 0.11 m above the head joint (kit landmarks), the eye line ~37 % from the top so a round avatar crop keeps the face.
+  const neckBone = rig.model.getObjectByName('Neck'), hp = headBone.getWorldPosition(new THREE.Vector3());
+  const ks = (neckBone ? Math.max(0.5, Math.min(2, (hp.y - neckBone.getWorldPosition(new THREE.Vector3()).y) / 0.07673)) : 1) * look.headSize;
+  const span = 0.62 * ks, skull = hp.y + 0.24 * ks, cy = skull + 0.16 * span - span / 2, cz = hp.z;
+  const pattern = (meshes[0]?.material as THREE.Material | undefined)?.userData.humanoid.pattern.value as number ?? 0, tris: Tri[] = [];
   const fov = 16 * Math.PI / 180, tanH = Math.tan(fov / 2), dist = (span / 2) / tanH;
   const cam = new THREE.Vector3(hp.x + dist, cy, cz);
-  // re-light from the real camera position (double-sided flip)
-  tris.length = 0; for (const mesh of meshes) trianglesOf(mesh, tris, cam, pattern);
+  for (const mesh of meshes) trianglesOf(mesh, tris, cam, pattern);
   const S = size * 2, depth = new Float32Array(S * S).fill(Infinity), rgb = new Float32Array(S * S * 3);
   for (let y = 0; y < S; y++) { const f = y / (S - 1); for (let x = 0; x < S; x++) for (let k = 0; k < 3; k++) rgb[(y * S + x) * 3 + k] = BG_TOP[k] * (1 - f) + BG_BOTTOM[k] * f; }
   const sx = new Float64Array(3), sy = new Float64Array(3), sz = new Float64Array(3);
