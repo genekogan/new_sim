@@ -170,6 +170,37 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
 import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3, unlinkSync as unlinkSync2, statSync as statSync2 } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
+// lib/chrome-lease.mjs
+var CHROME_SLOTS = 3;
+function chromeSlotCount(env2 = process.env) {
+  const n = Number(env2.CHROME_LEASE_SLOTS ?? CHROME_SLOTS);
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, 16) : CHROME_SLOTS;
+}
+var chromeSlotDirs = (base = CHROME_LOCK, slots = chromeSlotCount()) => Array.from({ length: slots }, (_, i) => i === 0 ? base : `${base}.${i}`);
+async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK, slots = chromeSlotCount() } = {}) {
+  const started = Date.now(), dirs = chromeSlotDirs(leaseDir, slots);
+  for (; ; ) {
+    const busy = [];
+    for (const dir of dirs) {
+      try {
+        const release = acquireLock(dir, { label, ttlMs: staleMs });
+        release.dir = dir;
+        return release;
+      } catch (e) {
+        if (e.code !== "lock.busy") throw e;
+        busy.push(e);
+      }
+    }
+    if (Date.now() - started >= waitMs) {
+      const e = busy[0];
+      e.message = `chrome lease busy: ${dirs.length === 1 ? e.message : `all ${dirs.length} slots held (${busy.map((b) => b.message.replace(/^lock\.busy: /, "").replace(/; run doctor$/, "")).join("; ")}); run doctor`}`;
+      e.locks = busy.map((b) => b.lock);
+      throw e;
+    }
+    await new Promise((r) => setTimeout(r, Math.min(200 + Math.random() * 200, Math.max(1, waitMs - (Date.now() - started)))));
+  }
+}
+
 // lib/state.mjs
 import { existsSync, readFileSync as readFileSync2, writeFileSync as writeFileSync2, renameSync, unlinkSync } from "node:fs";
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -426,10 +457,10 @@ var r2 = (v) => Math.round(v * 100) / 100;
 
 // lib/doctor.mjs
 function localDoctor({ fix = false, cwd = process.cwd(), chrome = CHROME_LOCK } = {}) {
-  const paths = [chrome, resolve2(cwd, ".eden-god.look.json.lock"), resolve2(cwd, ".eden-god.json.lock"), ...readdirSync(cwd).filter((n) => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map((n) => resolve2(cwd, n))];
+  const slots = chromeSlotDirs(chrome), paths = [...slots, resolve2(cwd, ".eden-god.look.json.lock"), resolve2(cwd, ".eden-god.json.lock"), ...readdirSync(cwd).filter((n) => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map((n) => resolve2(cwd, n))];
   for (let i = 0; i < paths.length; i++) if (existsSync2(paths[i] + ".reclaim")) paths.push(paths[i] + ".reclaim");
   const locks = paths.map((path2) => {
-    const row = { kind: path2 === chrome ? "chrome" : "state", ...inspectLock(path2) };
+    const slot = slots.indexOf(path2), row = { kind: slot >= 0 ? "chrome" : "state", ...slot >= 0 ? { slot } : {}, ...inspectLock(path2) };
     if (fix && row.stale) row.fixed = breakLock(path2);
     return row;
   });
@@ -1711,23 +1742,6 @@ async function withRemoteLook(args, runtime, local) {
   }
 }
 
-// lib/chrome-lease.mjs
-async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
-  const started = Date.now();
-  for (; ; ) {
-    try {
-      return acquireLock(leaseDir, { label, ttlMs: staleMs });
-    } catch (e) {
-      if (e.code !== "lock.busy") throw e;
-      if (Date.now() - started >= waitMs) {
-        e.message = `chrome lease busy: ${e.message}`;
-        throw e;
-      }
-      await new Promise((r) => setTimeout(r, Math.min(100, Math.max(1, waitMs - (Date.now() - started)))));
-    }
-  }
-}
-
 // lib/look.mjs
 var GL_ARGS = process.env.EDEN_GOD_GL === "swiftshader" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : ["--ignore-gpu-blocklist"];
 var PRESERVE = () => {
@@ -2015,7 +2029,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
       if (!current.has("eye") || !current.has("at") || ["hour", "weather"].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
       await page.setViewportSize?.({ width, height });
     } else {
-      const unlock = await (runtime.lease ?? chromeLease2)("eden-god look");
+      const unlock = await (runtime.lease ?? chromeLease2)("eden-god look", { waitMs: Math.max(0, timeoutMs - (now() - t0) - 1e4) });
       let unlocked = false;
       release = () => {
         if (!unlocked) {

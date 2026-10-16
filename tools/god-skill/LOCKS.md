@@ -6,7 +6,7 @@ Local exclusive directories contain a private JSON `holder` record, acquisition 
 
 | Ownership | Liveness | Break/recovery |
 | --- | --- | --- |
-| `/tmp/eden-chrome-lease` | process identity; 30 s unknown-holder TTL | next look or `doctor --fix` |
+| `/tmp/eden-chrome-lease`, `.1`, `.2` (Chrome slots: `CHROME_LEASE_SLOTS`, default 3; slot 0 is the old single lease) | process identity; 30 s unknown-holder TTL; a team-lease text holder keeps live-PID protection | next look or `doctor --fix` (every slot) |
 | `.eden-god.look.json.lock` / keeper record | process identity, 5 s heartbeat, 30 s unknown-holder TTL | `look --stop` for a verified live keeper; doctor removes a stale record |
 | `.eden-god.json.lock`, claim-file `.lock` | process identity; held only over read/modify/atomic rename | next save or `doctor --fix` |
 | build lease / claims | caller identity, persisted server activity, world build pause TTL for unknown/remote holders | resume/take, pause/release, or doctor stale repair |
@@ -16,4 +16,4 @@ Workflow files (`.eden-god.json`, per-claim files and their saved steps) are dur
 
 `node eden-god.mjs doctor [--fix] [--local] [--json]` includes free known lock slots, present local claim write locks, saved step pointers, and authenticated server ownership. It never prints credentials, raw workflow state, build lease values or token hashes. `--local` requires no server. Incomplete state-write temporary files are not locks and do not block recovery.
 
-Look's wall-clock deadline includes discovery, lease wait, keeper startup, navigation, settle and capture. It releases Chrome ownership even if browser launch/close hangs. Kept-shot child processes have a matching 30 s kill deadline.
+Look's wall-clock deadline includes discovery, lease wait (any free slot; the wait stops 10 s before the deadline and names every holder), keeper startup, navigation, settle and capture. It releases Chrome ownership even if browser launch/close hangs. Kept-shot child processes have a matching 30 s kill deadline.

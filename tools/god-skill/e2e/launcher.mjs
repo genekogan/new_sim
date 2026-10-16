@@ -68,7 +68,8 @@ await until('the launcher', async () => (await fetch(`${origin}/__sim/worlds.jso
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
 // One Chrome at a time across lanes (team/lanes/MERGES.md): hold the lease for this run, keep it fresh.
 const releaseLease = await chromeLease('launcher-e2e');
-const leaseBeat = setInterval(() => { try { rmFile('/tmp/eden-chrome-lease/holder', { force: true }); writeFile('/tmp/eden-chrome-lease/holder', `launcher-e2e ${process.pid} ${new Date().toISOString()}\n`); } catch { /* lease gone */ } }, 60_000);
+const leaseDir = releaseLease.dir ?? '/tmp/eden-chrome-lease'; // the slot this run holds (lib/chrome-lease.mjs slots)
+const leaseBeat = setInterval(() => { try { rmFile(`${leaseDir}/holder`, { force: true }); writeFile(`${leaseDir}/holder`, `launcher-e2e ${process.pid} ${new Date().toISOString()}\n`); } catch { /* lease gone */ } }, 60_000);
 // Real GPU (Metal) headless Chrome; swiftshader starves on this shared machine.
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });

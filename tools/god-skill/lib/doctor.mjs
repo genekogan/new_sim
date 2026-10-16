@@ -2,11 +2,12 @@
 import { existsSync, readdirSync, readFileSync, unlinkSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { breakLock, CHROME_LOCK, inspectLock, lockStatus, parseHolder } from './locks.mjs';
+import { chromeSlotDirs } from './chrome-lease.mjs';
 import { call, load, ok } from './state.mjs';
 export function localDoctor({ fix = false, cwd = process.cwd(), chrome = CHROME_LOCK } = {}) {
-  const paths = [chrome, resolve(cwd, '.eden-god.look.json.lock'), resolve(cwd, '.eden-god.json.lock'), ...readdirSync(cwd).filter(n => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map(n => resolve(cwd, n))];
+  const slots = chromeSlotDirs(chrome), paths = [...slots, resolve(cwd, '.eden-god.look.json.lock'), resolve(cwd, '.eden-god.json.lock'), ...readdirSync(cwd).filter(n => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map(n => resolve(cwd, n))];
   for (let i = 0; i < paths.length; i++) if (existsSync(paths[i] + '.reclaim')) paths.push(paths[i] + '.reclaim');
-  const locks = paths.map(path => { const row = { kind: path === chrome ? 'chrome' : 'state', ...inspectLock(path) }; if (fix && row.stale) row.fixed = breakLock(path); return row; });
+  const locks = paths.map(path => { const slot = slots.indexOf(path), row = { kind: slot >= 0 ? 'chrome' : 'state', ...(slot >= 0 ? { slot } : {}), ...inspectLock(path) }; if (fix && row.stale) row.fixed = breakLock(path); return row; });
   const path = resolve(cwd, '.eden-god.look.json');
   if (existsSync(path)) {
     let raw, k; try { raw = readFileSync(path, 'utf8'); k = JSON.parse(raw); } catch { /* malformed gets bounded grace */ }
