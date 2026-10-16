@@ -337,5 +337,5 @@ export function validateUpload(input: Uint8Array, policy: UploadPolicy): Validat
   const r = checkImage(input, undefined, { ...policy, maxImageBytes: policy.maxBytes }, text);
   const bytes = cut(input, r.drop);
   if (bytes !== input && r.image.mime === 'image/png') { const d = decoded.get(input); if (d) decoded.set(bytes, d); }
-  return { format: kind, bytes, sha: bytes === input ? inputSha : sha256(bytes), inputSha, tris: 0, textures: 1, texPx: Math.max(r.image.w, r.image.h), stripped: { fields: 0, chunks: 0, segments: r.drop.length, bytes: input.length - bytes.length }, text, images: [{ ...r.image, bytes }] };
+  return { format: kind as 'png' | 'jpg', bytes, sha: bytes === input ? inputSha : sha256(bytes), inputSha, tris: 0, textures: 1, texPx: Math.max(r.image.w, r.image.h), stripped: { fields: 0, chunks: 0, segments: r.drop.length, bytes: input.length - bytes.length }, text, images: [{ ...r.image, bytes }] };
 }

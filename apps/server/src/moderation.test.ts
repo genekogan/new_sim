@@ -197,7 +197,7 @@ function godWorld(t: { after(f: () => void): void }) {
   };
   return { god, store, req, dir, app };
 }
-const uploadForm = (bytes: Uint8Array, name: string) => { const f = new FormData(); f.set('file', new Blob([bytes], { type: 'model/gltf-binary' }), `${name}.glb`); f.set('name', name); f.set('height', '1'); f.set('define', '1'); return f; };
+const uploadForm = (bytes: Uint8Array, name: string) => { const f = new FormData(); f.set('file', new Blob([new Uint8Array(bytes)], { type: 'model/gltf-binary' }), `${name}.glb`); f.set('name', name); f.set('height', '1'); f.set('define', '1'); return f; };
 
 test('Godmode world: upload is gated and stripped, the creator hides it everywhere, undo restores it, the log keeps both', async (t) => {
   const w = godWorld(t);
