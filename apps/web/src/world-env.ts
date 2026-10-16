@@ -105,7 +105,7 @@ type TourViewLike = { id: string; label: string; p: readonly [number, number, nu
   radius?: number };
 type ViewModel = {
   entities: Map<string, { id: string; name?: string; def: string; in: { parent: string }; shape?: { area?: [number, number][]; path?: [number, number][] } }>;
-  resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown } } | undefined;
+  resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown }; make?: { kind?: string } } | undefined;
   footprint(e: unknown): { c: [number, number]; half: [number, number]; y0: number; y1: number }[];
   editSeq?: number;
 };
@@ -121,7 +121,8 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
   const found: { v: TourViewLike; size: number }[] = [];
   for (const e of m.entities.values()) {
     if (e.in.parent !== 'world' || !e.name || /^flag[-:]/.test(e.name)) continue;
-    const d = m.resolvedDef(e.def); if (!d || d.components?.landform || (d.tags ?? []).some((t) => IGNORE_TAGS.test(t))) continue;
+    // a landform-only def (hill, cutting) is ground, not a landmark; a thing that also carves (a pool's basin) still is one
+    const d = m.resolvedDef(e.def); if (!d || (d.components?.landform && (!d.make || d.make.kind === 'none')) || (d.tags ?? []).some((t) => IGNORE_TAGS.test(t))) continue;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, top = 0;
     try { for (const b of m.footprint(e)) { const r = Math.hypot(b.half[0], b.half[1]); x0 = Math.min(x0, b.c[0] - r); x1 = Math.max(x1, b.c[0] + r); z0 = Math.min(z0, b.c[1] - r); z1 = Math.max(z1, b.c[1] + r); top = Math.max(top, b.y1 - b.y0); } } catch { continue; }
     if (e.shape?.area) for (const [x, z] of e.shape.area) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }

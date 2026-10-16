@@ -43,3 +43,11 @@ test('the Explore picture of a god landmark slices the entity layer, all of it, 
   assert.equal(seen.length, 1, 'an 8 m slice of a 24 x 18 m hall is empty');
   previews.dispose();
 });
+
+test('a thing that carves its own ground (a sunken pool) is still a landmark; a landform-only def is not', () => {
+  const fp = () => [{c: [0, 0] as [number, number], half: [8, 5.5] as [number, number], y0: -1.6, y1: 0.2}];
+  const m = (make: {kind: string}) => ({editSeq: Math.random(), entities: new Map([['p1', {id: 'p1', name: 'lido', def: 'core/swimming-pool@1', in: {parent: 'world'}}]]),
+    resolvedDef: () => ({tags: ['water', 'body'], components: {landform: {kind: 'carve'}}, make}), footprint: fp});
+  assert.equal(godTourViews({model: m({kind: 'gen'})}, () => 0)[0]?.label, 'lido');
+  assert.equal(godTourViews({model: m({kind: 'none'})}, () => 0).length, 0);
+});
