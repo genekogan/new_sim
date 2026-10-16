@@ -22,7 +22,7 @@ const query = new URLSearchParams(typeof location === 'undefined' ? '' : locatio
 const shotMode = query.get('shot') === '1';
 // Read at module load: Shell rewrites the landing fragment to its tab (#watch) before the scene is ready.
 // Taking it also strips it from the URL, so the view key does not stay in browser history.
-const landingPreviewKey = typeof location === 'undefined' ? null : takePreviewKey({ location, history });
+const landingPreviewKey = typeof location === 'undefined' || typeof history === 'undefined' ? null : takePreviewKey({ location, history });
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
 const PHONE = () => typeof matchMedia === 'function' && matchMedia('(max-width:700px)').matches;
 // Phones keep their own remembered choice and start compact: the open panel covers most of a small screen.
