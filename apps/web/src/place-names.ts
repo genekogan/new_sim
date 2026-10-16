@@ -13,6 +13,11 @@ for(const s of (spotData as {spots?:{id?:unknown;label?:unknown}[]}).spots??[])i
 const ID=/^[a-z0-9]+([-_:.][a-z0-9]+)+$/i;
 const DIRECTION=new Set(['north','south','east','west','northeast','northwest','southeast','southwest','upper','lower','left','right','front','back','inner','outer']);
 const NOISE=new Set(['eden','social','mars','int','region']);
+/** In water the body is drawn swimming, or treading water when still; these outrank POSES (one "Swimming" for both). */
+const WATER:Record<string,string>={swim:'Swimming',tread:'Treading water',wade:'Wading'};
+/** The server's doing while no activity runs (apps/server/src/world.ts). It says nothing about the body, so it never
+ * outranks a named pose the body is visibly in: a swimmer left treading water after its swim reads "Treading water". */
+const IDLE_DOING='standing around';
 const cap=(s:string)=>s?s[0].toUpperCase()+s.slice(1):s;
 /** "bench east" → "east bench"; "mat 3" stays; noise prefixes dropped. */
 function words(tokens:string[]){
@@ -38,15 +43,18 @@ const POSES:Record<string,string>={sit:'Sitting',walk:'Walking',idle:'Standing a
 /** The body's activity in words ("sit" → "Sitting"); ids become plain words, never raw. */
 export function activityWords(activity:string|undefined|null,soulId?:string){
  if(!activity)return '';
- const a=activity.replace(/^mars:/,'');
- if(POSES[a])return POSES[a];
+ const a=activity.replace(/^mars:/,''),named=namedPose(a);
+ if(named)return named;
  const label=humanActivity(a,soulId).label;
  return cap(looksLikeId(label)?placeName(label):label.replace(/[-_]+/g,' '));
 }
+/** The dedicated word for a named pose ("tread" → "Treading water"), or '' for any other activity. */
+function namedPose(activity:string|undefined|null){const a=(activity??'').replace(/^mars:/,'');return WATER[a]??POSES[a]??'';}
 /** A Soul's "doing" line: free text as written; a bare id reads as the body's activity at that named thing
  * ("Sitting · East bench, Commons gathering lawn"). */
 export function doingText(doing:string|undefined|null,activity:string|undefined|null,soulId?:string,known?:(id:string)=>string|null|undefined){
  const d=(doing??'').trim(),pose=activityWords(activity,soulId);
+ if(d.toLowerCase()===IDLE_DOING&&namedPose(activity))return pose;
  if(d&&looksLikeId(d)){
   const verb=d.includes(':')?d.slice(0,d.indexOf(':')):'';
   const act=pose||(verb?activityWords(verb,soulId):'');

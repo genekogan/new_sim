@@ -8,7 +8,7 @@ import {ownedLiveChunk} from './owned-live-chunks.ts';
 import {parsePlatformFloors,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {parseWorldShore,type WorldShore} from './WorldShore.ts';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
-import {shoreBankEdgePositions} from './WorldShoreBankEdges.ts';
+import {shoreBankEdgePositions,SHORE_BANK_EDGE_NAME} from './WorldShoreBankEdges.ts';
 import {groundOutsideTerrain,type GroundRectangle} from './WorldGround.ts';
 import {createCapturedShoreEnvironment,type CapturedShoreView} from '../../../mars/viewer/app/engine-view/content/environment/captured-shore.ts';
 import { commonsSceneMetadataV1Schema, type CommonsSceneMetadataV1 } from '@sim/engine-contract';
@@ -255,7 +255,7 @@ export class WorldGeometry {
     groundPlanes([x0-80,z0-80,x1+80,z1+80],backdropY,this.materials.outside,'outside-ground');
     if(shore?.profile==='connected-commons-shore/1'){
       const edge=new THREE.BufferGeometry();edge.setAttribute('position',new THREE.Float32BufferAttribute(shoreBankEdgePositions(shore.metadata.terrain,backdropY),3));edge.computeVertexNormals();
-      const banks=new THREE.Mesh(edge,this.materials.bank);banks.name='Captured shore north/south visual bank edge closure (no support)';banks.userData.cameraTransparent=true;
+      const banks=new THREE.Mesh(edge,this.materials.bank);banks.name=SHORE_BANK_EDGE_NAME;banks.userData.cameraTransparent=true;
       // Both banks must be readable from water and land without a duplicated mesh.
       this.group.add(banks);
     }
