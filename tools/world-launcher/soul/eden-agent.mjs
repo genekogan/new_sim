@@ -30,6 +30,7 @@ Finish: wait 60 \xB7 receipt [receipt ID] (accepted is not completed)
 Talk: say "<text>" \xB7 converse start <Soul ID> [text]
       converse say <conversation ID> "<text>" \xB7 converse accept|decline|leave <ID>
 Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
+Travel: travel \xB7 travel <world on this site> \xB7 travel home (this folder follows)
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
@@ -3352,6 +3353,86 @@ function openClientMemory(directory, { scope, now: now2 = () => (/* @__PURE__ */
   return api;
 }
 
+// tools/edge-skill/client-travel.mjs
+var TRAVEL_PATH = "/v1/edge/travel";
+var USAGE = "usage: travel [<world slug or name> | home]";
+var ASK_HOME = /* @__PURE__ */ new Set(["travel.away", "travel.unavailable", "unreachable"]);
+function travelledState(prev, r) {
+  if (!r?.ok || typeof r.base !== "string" || !/^https?:\/\/.+\/w\/[a-z0-9-]+$/.test(r.base) || typeof r.soulId !== "string") throw Error("travel: the world answered without a destination");
+  const home = prev.travel?.home ?? (r.from === r.home ? { world: prev.world, soul: prev.soul, token: prev.token } : null);
+  const token = r.token ?? (r.base === prev.world ? prev.token : null);
+  if (!token) throw Error("travel: the world answered without a Soul token for the destination");
+  const grant = { world: r.base, soul: r.soulId, token };
+  const travel2 = { home: r.atHome ? { ...grant } : home, homeSlug: r.home ?? prev.travel?.homeSlug ?? null, at: r.to, lastAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const next = { world: r.base, soul: r.soulId, token, travel: travel2, mode: void 0, lastReceipt: void 0 };
+  if (prev.accountAuth) next.delegations = { ...prev.delegations ?? {}, [r.soulId]: { world: r.base, token } };
+  return next;
+}
+function travelReport(r, state) {
+  const { token: _t, ...rest } = r;
+  return {
+    ...rest,
+    folder: { world: state.world, soul: state.soul, homeKept: !!state.travel?.home },
+    next: r.atHome ? "You are home. Run here or observe." : `You are in ${r.toName ?? r.to}. Run here or observe; "travel home" brings you back.`
+  };
+}
+async function callAt(base, token, path, { body: body2, fetchImpl = fetch, timeoutMs = 9e4 } = {}) {
+  let r;
+  try {
+    r = await fetchImpl(base + path, { method: body2 ? "POST" : "GET", headers: { "content-type": "application/json", ...token ? { authorization: `Bearer ${token}` } : {} }, body: body2 ? JSON.stringify(body2) : void 0, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    return { status: 0, data: { code: "unreachable", message: String(e?.message ?? e) } };
+  }
+  const text3 = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text3);
+  } catch {
+    data = { raw: text3.slice(0, 200) };
+  }
+  return { status: r.status, data };
+}
+var codeOf = (r) => r.status === 0 ? "unreachable" : r.data?.code ?? r.data?.error?.code ?? null;
+var fail3 = (r, what) => {
+  const e = Error(`${what}: ${codeOf(r) ?? "HTTP " + r.status}: ${r.data?.message ?? r.data?.error?.message ?? JSON.stringify(r.data).slice(0, 200)}`);
+  e.code = codeOf(r);
+  e.status = r.status;
+  return e;
+};
+async function travelCommand(args, { load: load2, save: save2, live: live2 = () => false, fetchImpl = fetch }) {
+  if (args.length > 1) throw Error(USAGE);
+  const s = load2();
+  if (!s.world) throw Error("No world yet. Run: node eden-agent.mjs register <world-url>");
+  if (!s.token) throw Error("No paired Soul yet. Run create-soul (or pair-soul) first.");
+  const to = args[0];
+  if (to === void 0) {
+    const r2 = await callAt(s.world, s.token, TRAVEL_PATH, { fetchImpl });
+    if (r2.status === 200) return { ...r2.data, folder: { world: s.world, soul: s.soul, homeKept: !!s.travel?.home } };
+    const h = s.travel?.home;
+    if (h && h.world !== s.world && ASK_HOME.has(codeOf(r2))) {
+      const x = await callAt(h.world, h.token, TRAVEL_PATH, { fetchImpl });
+      if (x.status === 200) return { ...x.data, folder: { world: s.world, soul: s.soul, homeKept: true }, note: `${s.world} answered ${codeOf(r2)}; this is home's view` };
+    }
+    throw fail3(r2, "travel");
+  }
+  if (typeof to !== "string" || !to.trim() || to.length > 80 || to.startsWith("-")) throw Error(USAGE);
+  if (live2()) throw Error("Stop this folder\u2019s mind before travelling (the mind keeps the world it started in).");
+  const home = to.trim().toLowerCase() === "home";
+  let r = await callAt(s.world, s.token, TRAVEL_PATH, { body: { to }, fetchImpl });
+  if (r.status !== 200 && home && s.travel?.home && s.travel.home.world !== s.world && ASK_HOME.has(codeOf(r))) {
+    const h = s.travel.home, first = codeOf(r);
+    r = await callAt(h.world, h.token, TRAVEL_PATH, { body: { to: "home" }, fetchImpl });
+    if (r.status === 200 && r.data?.ok) {
+      const d = { ...r.data, base: r.data.base ?? h.world, soulId: r.data.soulId ?? h.soul, token: r.data.token ?? h.token, atHome: true, viaHome: first };
+      const st2 = save2(travelledState(s, d));
+      return travelReport(d, st2);
+    }
+  }
+  if (r.status !== 200 || !r.data?.ok) throw fail3(r, "travel");
+  const st = save2(travelledState(s, r.data));
+  return travelReport(r.data, st);
+}
+
 // tools/edge-skill/eden-agent.mjs
 var SKILL_VERSION = "1.9";
 var CONTRACT = "eden-edge/1";
@@ -5949,6 +6030,9 @@ async function body(cmd, ...args) {
   if (!response.ok) throw new Error((data.error?.code ?? "body.unavailable") + ": " + (data.error?.message ?? "Body upload refused"));
   return data.asset;
 }
+async function travel(...args) {
+  return travelCommand(args, { load, save, live: () => !!liveRunning() });
+}
 async function profile(...args) {
   return clientProfile(load().soul, args, { call });
 }
@@ -5977,7 +6061,7 @@ async function dashboard(...args) {
   });
   return { dashboard: "closed" };
 }
-var commands = { body, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
+var commands = { body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync2(process.argv[1])).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd || ["help", "--help", "-h"].includes(cmd)) {
@@ -6040,6 +6124,7 @@ export {
   selectSoul,
   status,
   tell,
+  travel,
   view,
   wait,
   whatson

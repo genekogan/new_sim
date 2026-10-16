@@ -7,7 +7,7 @@
 //   node tools/world-launcher/travel.e2e.mjs [--port 6110] [--range 6111-6114] [--out <dir>] [--keep] [--cli]
 //
 // --cli also drives the Soul CLI (tools/edge-skill/eden-agent.mjs): `travel birch`, `observe` there, `travel home`.
-// Writes report.json in --out (default <team>/scratch/travel/e2e-<stamp>).
+// Writes report.json in --out (default <team>/scratch/travel/e2e-<stamp>). Runs headless (no browser).
 import { execFile, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, copyFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -159,15 +159,17 @@ try {
     const dir = mkdtempSync(join(tmpdir(), 'travel-cli-'));
     const cli = (...a) => exec(process.execPath, [join(dir, 'eden-agent.mjs'), ...a], { cwd: dir, timeout: 180_000 }).then((r) => JSON.parse(r.stdout), (e) => { throw new Error(`${a.join(' ')} → ${String(e.stdout).slice(0, 300)} ${String(e.stderr).slice(0, 300)}`); });
     await step('C1 the Soul CLI: Cleo\'s agent (create-soul in Alder), `travel Birch` → its folder now speaks to Birch; `observe` there; `travel home`', async () => {
-      copyFileSync(resolve(root, 'tools/edge-skill/eden-agent.mjs'), join(dir, 'eden-agent.mjs'));
+      copyFileSync(resolve(root, 'tools/world-launcher/soul/eden-agent.mjs'), join(dir, 'eden-agent.mjs')); // the pinned one-file bundle every world serves
       await cli('register', W.alder); await cli('create-soul', 'Cleo');
       const went = await cli('travel', 'Birch');
       const conf = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8'));
       const there = await cli('travel');
+      const seen = await cli('observe').then(() => 'ok', (e) => e.message.slice(0, 200));
       const back = await cli('travel', 'home');
       const home = await cli('travel');
-      return { went: { to: went.to, base: went.base }, confBase: conf.base ?? conf.world ?? null, there: { here: there.here, state: there.state }, back: { to: back.to }, home: { here: home.here, state: home.state } };
-    }, (r) => r.went.to === 'birch' && r.there.here === 'birch' && r.back.to === 'alder' && r.home.here === 'alder' && r.home.state === 'present');
+      const after = JSON.parse(readFileSync(join(dir, '.eden-agent.json'), 'utf8'));
+      return { went: { to: went.to, base: went.base, printsToken: JSON.stringify(went).includes('sim_') }, confWorld: conf.world, keptHome: conf.travel?.home?.world, there: { here: there.here, state: there.state }, seen, back: { to: back.to }, home: { here: home.here, state: home.state }, afterWorld: after.world };
+    }, (r) => r.went.to === 'birch' && !r.went.printsToken && r.confWorld === W.birch && r.keptHome === W.alder && r.there.here === 'birch' && r.seen === 'ok' && r.back.to === 'alder' && r.home.here === 'alder' && r.home.state === 'present' && r.afterWorld === W.alder);
   }
 } finally {
   report.finishedAt = new Date().toISOString();

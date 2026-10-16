@@ -1,10 +1,10 @@
 {
   "what": "The Soul CLI and Soul guides every launcher world serves (/eden-agent.mjs, /skill.md, /instructions.md). Exact copies, never forks.",
-  "cli": { "file": "eden-agent.mjs", "version": "1.9", "sha256": "40cc21a6815f56c17a4fa70595e9ed756671ab9b38f4d766648dd5d1e94083f0",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-e2e86c12.manifest.json)", "source": "e2e86c12173a1619576cf711faac3c4aaddd3bab",
-    "note": "lane LOOKS: 1.9 + the additive `body look` command (previous pin bb53a105 from 4fdb39d2, publication-20be-001)" },
-  "skill": { "file": "skill.md", "sha256": "c286d2e311a429d7d2e569f1a5e10fd6621d0c18f101027593f6acdd1cff863d",
-    "from": "git show e2e86c12:tools/edge-skill/SKILL.md", "note": "template; the world fills {{BASE}}. Differs from publication-20be-001 only by the `body look` paragraph" },
+  "cli": { "file": "eden-agent.mjs", "version": "1.9", "sha256": "18ff81e2b41c49bd02755236ec7760d8453d9477b1fe426972be8ca060c8a409",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-4d9e5995.manifest.json)", "source": "4d9e59950734871daf47b77fcc135aa0e426bf27",
+    "note": "lane TRAVEL: 1.9 + the additive `travel [<world>|home]` command (previous pin 40cc21a6 from e2e86c12, lane LOOKS: `body look`)" },
+  "skill": { "file": "skill.md", "sha256": "104ebe239fc87fbf5dab9ef2a52be3792baf94258bdee6dc5d67330f0d2949c2",
+    "from": "git show 4d9e5995:tools/edge-skill/SKILL.md", "note": "template; the world fills {{BASE}}. Differs from publication-20be-001 by the `body look` paragraph and the `travel` paragraph + command row" },
   "instructions": { "file": "instructions.md", "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
     "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md", "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36…)" },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
