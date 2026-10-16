@@ -28,6 +28,7 @@ import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
 import { mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
+import { mountDistrictRoutes, withDistrict } from './districts.ts'; // Y3 districts
 
 export type GodDeps = {
   god: GodMode;
@@ -73,6 +74,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   mountWorkbenchRoutes(app, { god: d.god, requireGod, limitGod, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountLandRoutes(app, { god: d.god, requireGod });
+  mountDistrictRoutes(app, { districts: () => d.god.districts, requireGod, limitGod }); // Y3: POST/GET /v1/god/districts[/:id]
   mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => d.god.model.entities.size }); // W2 remote looks
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });
   // LAYERS: GET /v1/world/layers, /v1/world/layers/me (Soul), /v1/god/layers, /v1/god/layers/zone-suggest?use=
@@ -136,14 +138,14 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   const doctorIdentity = (c: Context) => { const identity = d.god.godIdentity(bearer(c)); if (!identity) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); return identity; };
   app.get('/v1/god/doctor', c => c.json(serverDoctor(d.god.builds, d.verifyUse, doctorIdentity(c)), 200, noStore));
   app.post('/v1/god/doctor', async c => { const who = doctorIdentity(c); const input = z.object({ fix: z.literal(true) }).strict().parse(await body(c)); return c.json(serverDoctor(d.god.builds, d.verifyUse, who, input.fix), 200, noStore); });
-  app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); const r = d.god.builds.start(await body(c), requireGod(c)); return c.json(r.ok ? { ...r, report: siteReport(d.god.model.fork(), { ...r.build, roots: r.build.roots.map(root => root.id) }, r.inventory, d.god.builds.inventoryContext?.()), parts: d.god.parts.suggest(r.build), build: { ...r.build, reuse: d.god.parts.reuseOf(r.build.id) } } : r, 200, noStore); });
+  app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); const r = d.god.builds.start(await body(c), requireGod(c)); const district = r.ok ? d.god.districts.report(r.build) : undefined; return c.json(r.ok ? { ...r, report: { ...siteReport(d.god.model.fork(), { ...r.build, roots: r.build.roots.map(root => root.id) }, r.inventory, d.god.builds.inventoryContext?.()), ...(district ? { district } : {}) }, parts: d.god.parts.suggest(r.build), build: { ...r.build, reuse: d.god.parts.reuseOf(r.build.id) } } : r, 200, noStore); });
   app.get('/v1/god/builds', (c) => { requireGod(c); return c.json(d.god.builds.list(), 200, noStore); });
-  app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); const reuse = d.god.parts.reuseOf(result.build.id); return c.json({ ...result, reuse, build: { ...result.build, reuse } }, 200, noStore); });
+  app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); const reuse = d.god.parts.reuseOf(result.build.id); return c.json(withDistrict(d.god.districts, { ...result, reuse, build: { ...result.build, reuse } }), 200, noStore); });
   app.post('/v1/god/builds/:id/check', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); requireGod(c); const r = d.god.checkBuild(c.req.param('id')); if (!r) throw new ApiError(404, 'not-found', 'unknown build'); return c.json(r, 200, noStore); });
   app.post('/v1/god/builds/:id/step', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.step(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/pause', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.pause(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
-  app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });
-  app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const r = d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)); const reuse = r.ok ? d.god.parts.reuseOf(r.build.id) : undefined; return c.json(r.ok ? { ...r, receipt: r.build.done?.receipt, reuse, build: { ...r.build, reuse } } : r, 200, noStore); });
+  app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(withDistrict(d.god.districts, d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c))), 200, noStore); });
+  app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const r = d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)); const reuse = r.ok ? d.god.parts.reuseOf(r.build.id) : undefined; return c.json(r.ok ? withDistrict(d.god.districts, { ...r, receipt: r.build.done?.receipt, reuse, build: { ...r.build, reuse } }) : r, 200, noStore); });
   app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id, b.force === true))), 200, noStore); });
   app.post('/v1/god/builds/:id/claims', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.claim(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/claims/:cid/release', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.release(c.req.param('id'), c.req.param('cid'), await optionalBody(c)), 200, noStore); });

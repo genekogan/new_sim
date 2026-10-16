@@ -40,7 +40,9 @@ const labelSchema = z.string().min(1).max(60);
 export const buildFieldSchema = z.object({ id: idSchema, lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), claim: z.string().regex(/^c_[0-9a-f]{8}$/).optional(), step: z.number().int().min(0).max(999).optional(), label: z.string().max(60).optional(), done: z.boolean().optional() }).strict().refine(f => (f.lease !== undefined) !== (f.claim !== undefined), 'Supply exactly one of lease and claim.');
 const siteSchema = z.object({ at: pair, size: z.tuple([z.number().min(1).max(200), z.number().min(1).max(200)]), yaw: z.number().finite().default(0) }).strict();
 export const massSchema = z.object({ name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/).optional(), at: pair, size: z.tuple([z.number().positive().max(200), z.number().positive().max(200)]), h: z.number().min(.5).max(120), yaw: z.number().finite().optional(), roof: z.enum(['flat', 'gable', 'pyramid']).optional() }).strict();
-export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), asks: asksSchema.optional(), root: z.string().min(1).max(300).optional(), include: includeSchema.optional() }).strict();
+// Y3 districts: a chapter of a district plan (site, massing, title and steps are filled from the plan by districts.ts).
+export const buildDistrictSchema = z.object({ id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,29}$/), plots: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,7}$/)).min(1).max(8) }).strict();
+export const buildStartSchema = z.object({ id: idSchema, title: z.string().min(1).max(80), steps: z.array(labelSchema).min(1).max(24), site: siteSchema, massing: z.array(massSchema).max(8).default([]), brief: z.string().max(4000).optional(), asks: asksSchema.optional(), root: z.string().min(1).max(300).optional(), include: includeSchema.optional(), district: buildDistrictSchema.optional() }).strict();
 const STEP_CALLS = 256;
 const cleanText = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').replace(/ {2,}/g, ' ').trim();
 export const buildActionSchemas = {
@@ -60,7 +62,7 @@ export type BuildCaller = { identity?: Identity; build?: BuildField };
 export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string; process?: Holder }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
 type Caption = { text: string; at: number };
 export type BuildBody = {
-  id: string; title: string; plan: { steps: string[]; brief?: string; asks?: string[] }; root?: string; chapterOf?: string; include?: string[]; initialRoots?: string[]; refusals?: { at: number; code: string; entity?: string; detail: string }[]; refusalCount?: number; site: Site; massing: Mass[]; roots: string[];
+  id: string; title: string; plan: { steps: string[]; brief?: string; asks?: string[] }; root?: string; chapterOf?: string; district?: { id: string; plots: string[] }; include?: string[]; initialRoots?: string[]; refusals?: { at: number; code: string; entity?: string; detail: string }[]; refusalCount?: number; site: Site; massing: Mass[]; roots: string[];
   lead: { lease: string; label: string; hash8: string; tokenHash: string; since: number; holder?: Holder };
   step: { n: number; label: string; at: number; seq: number | null };
   steps: { n: number; label: string; claim?: string; batches: number; firstSeq: number; lastSeq: number; at: number }[];
@@ -292,6 +294,8 @@ export class GodBuilds {
   private geometry = new WeakMap<WorldModel, { seq: number; rows: Map<string, { body: BuildBody; zones: Site[]; hits: Map<string, boolean> }> }>();
   /** Engine-only observations are read at start, never persisted in a public site. */
   inventoryContext?: () => BuildInventoryContext;
+  /** Y3 districts: fills a district chapter's site, massing, title and steps from its plan before validation. */
+  districtStart?: (raw: Record<string, unknown>) => { raw: unknown } | { failures: Failure[] };
   readonly rootIndex = new Map<string, string>();
   readonly pauseMs: number; readonly closureMs: number;
   readonly store: WorldStore;
@@ -396,7 +400,9 @@ export class GodBuilds {
     return { inventory, protectedThings };
   }
   start(raw: unknown, caller: Identity) {
-    const now = this.host.now(); this.sweep(now); const p = buildStartSchema.safeParse(raw); if (!p.success) return schemaFailure(p.error);
+    const now = this.host.now(); this.sweep(now);
+    if (this.districtStart && raw && typeof raw === 'object' && (raw as Record<string, unknown>).district !== undefined) { const expanded = this.districtStart(raw as Record<string, unknown>); if ('failures' in expanded) return { ok: false as const, failures: expanded.failures }; raw = expanded.raw; } // Y3 districts
+    const p = buildStartSchema.safeParse(raw); if (!p.success) return schemaFailure(p.error);
     const input = p.data, startHash = hashOf(input), prior = this.row(input.id);
     if (prior) return !open(prior) ? fail('build.closed', input.id) : prior.body.startHash === startHash && prior.body.lead.tokenHash === caller.hash ? { ok: true as const, build: this.view(prior, now), lease: prior.body.lead.lease, inventory: this.inventory(prior.body).inventory, replayed: true } : fail('build.exists', `${input.id} already exists.`);
     if (this.store.hasGroupUnder(input.id)) return fail('build.exists', `${input.id} is already a journal group.`);
@@ -414,7 +420,7 @@ export class GodBuilds {
     if (adopted.some(id => this.rootIndex.has(id))) return fail('build.site', 'A chapter root already belongs to an open build.', 'root');
     const included: string[] = [];
     for (const ref of input.include ?? []) { const e = model.get(ref); if (!e) return fail('build.site', `Unknown included entity ${ref}.`, 'include', { fix: 'Use an existing entity id or path.' }); included.push(e.id); }
-    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief !== undefined ? { brief: input.brief } : {}), ...(input.asks ? { asks: input.asks } : {}) }, ...(input.root ? { root: input.root } : {}), ...(chapter ? { chapterOf: chapter.id } : {}), ...(included.length ? { include: [...new Set(included)] } : {}), site: input.site, massing: input.massing, roots: adopted, ...(adopted.length ? { initialRoots: adopted } : {}), lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now, ...(caller.holder ? { holder: caller.holder } : {}) }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
+    const body: BuildBody = { id: input.id, title: input.title, plan: { steps: input.steps, ...(input.brief !== undefined ? { brief: input.brief } : {}), ...(input.asks ? { asks: input.asks } : {}) }, ...(input.root ? { root: input.root } : {}), ...(chapter ? { chapterOf: chapter.id } : {}), ...(input.district ? { district: input.district } : chapter?.body.district ? { district: structuredClone(chapter.body.district) } : {}), ...(included.length ? { include: [...new Set(included)] } : {}), site: input.site, massing: input.massing, roots: adopted, ...(adopted.length ? { initialRoots: adopted } : {}), lead: { lease: lease(), label: caller.label, hash8: caller.hash.slice(0, 8), tokenHash: caller.hash, since: now, ...(caller.holder ? { holder: caller.holder } : {}) }, step: { n: 1, label: input.steps[0], at: now, seq: null }, steps: [], claims: [], agents: [{ label: caller.label, hash8: caller.hash.slice(0, 8), at: now }], pauses: 0, startHash };
     const { inventory, protectedThings } = this.inventory(body), explicit = new Set(included);
     const missing = protectedThings.filter(e => !explicit.has(e.id));
     if (missing.length) return { ...fail('build.site', `Closure would cover ${missing.length} protected thing(s).`, 'include', { fix: `Include ${missing.slice(0, 50).map(e => `${e.path} (${e.id})`).join(', ')}${missing.length > 50 ? `; ${missing.length - 50} more (see inventory counts)` : ''}, or move/shrink the massing or root.`, measured: missing.length }), inventory };

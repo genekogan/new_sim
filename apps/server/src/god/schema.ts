@@ -7,6 +7,7 @@ import { godVersions } from './versions.ts';
 import { submissionSchema } from './submission.ts';
 import {verifyCodes, verifyUseSchema} from './verify-use.ts';
 import { buildCodes, buildFailure, buildStartSchema, buildFieldSchema, buildActionSchemas, BUILD_LIMITS } from './builds.ts';
+import { DISTRICT_LIMITS, districtChapterSchema, districtCodes, districtFailure, districtPlanSchema } from './districts.ts'; // Y3 districts
 
 let cached: Record<string, unknown> | null = null;
 const limitsFor = (limits?: WorldConstants['limits']) => ({ ...CREATION_LIMITS,
@@ -32,6 +33,7 @@ export function godSchema(limits?: WorldConstants['limits']): Record<string, unk
     submission: js(submissionSchema),
     verifyUse: js(verifyUseSchema),
     builds: { start: js(buildStartSchema), field: js(buildFieldSchema), actions: Object.fromEntries(Object.entries(buildActionSchemas).map(([k, v]) => [k, js(v)])), limits: BUILD_LIMITS, refusals: buildCodes.map(code => ({ code, fix: buildFailure(code, '').fix })) },
+    districts: { plan: js(districtPlanSchema), chapter: js(districtChapterSchema), limits: DISTRICT_LIMITS, refusals: districtCodes.map(code => ({ code, fix: districtFailure(code, '').fix })) }, // Y3
     def: js(defSchema),
     components: Object.keys((componentsSchema as unknown as { shape: Record<string, unknown> }).shape),
     constraints: js(constraintSchema),
@@ -39,10 +41,10 @@ export function godSchema(limits?: WorldConstants['limits']): Record<string, unk
     materials: materialEnum.options,
     kit: { primitives: KIT_PRIMITIVES, roles: KIT_ROLES, args: js(kitArgs) },
     generators: describeGenerators(),
-    refusals: [...refusalCodes, ...verifyCodes, ...buildCodes, 'site.under-construction'],
+    refusals: [...refusalCodes, ...verifyCodes, ...buildCodes, ...districtCodes, 'site.under-construction'],
     endpoints: {
       read: ['GET /v1/world/builds', 'GET /v1/world/seq', 'GET /god/kit-primitives.png', 'GET /assets/<sha>.<ext>', 'GET /v1/god/assets/<sha>', 'GET /v1/god/defs/<ref>/thumb.png', 'GET /v1/world/snapshot', 'GET /v1/world/ground', 'GET /v1/world/tiles/:tx/:tz', 'GET /v1/world/entities/:path', 'GET /v1/god/schema', 'POST /v1/god/query'],
-      god: ['POST /v1/god/builds', 'GET /v1/god/builds', 'GET /v1/god/builds/:id', 'POST /v1/god/builds/:id/step', 'POST /v1/god/builds/:id/check', 'POST /v1/god/builds/:id/pause', 'POST /v1/god/builds/:id/resume', 'POST /v1/god/builds/:id/done', 'POST /v1/god/builds/:id/abandon', 'POST /v1/god/builds/:id/claims', 'POST /v1/god/builds/:id/claims/:cid/release', 'POST /v1/god/verify-use', 'GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act (ops and/or preview, expect?, clientRef?)', 'GET /v1/god/requests/:clientRef', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
+      god: ['POST /v1/god/builds', 'GET /v1/god/builds', 'GET /v1/god/builds/:id', 'POST /v1/god/builds/:id/step', 'POST /v1/god/builds/:id/check', 'POST /v1/god/builds/:id/pause', 'POST /v1/god/builds/:id/resume', 'POST /v1/god/builds/:id/done', 'POST /v1/god/builds/:id/abandon', 'POST /v1/god/builds/:id/claims', 'POST /v1/god/builds/:id/claims/:cid/release', 'POST /v1/god/districts', 'GET /v1/god/districts', 'GET /v1/god/districts/:id', 'POST /v1/god/verify-use', 'GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act (ops and/or preview, expect?, clientRef?)', 'GET /v1/god/requests/:clientRef', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
     },
   };
   return { ...cached, limits: limitsFor(limits) };
