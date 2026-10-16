@@ -124,7 +124,7 @@ test('the god program binds no Eden textures, reads the surface attribute and ca
   assert.equal((shader.uniforms.edenPattern as THREE.IUniform).value, 1);
   assert.equal(((shader.uniforms.edenRealism as THREE.IUniform).value as THREE.Vector4).x, 9);
   const god = new Set(['EDEN_GOD_SURFACE']), v = preprocess(shader.vertexShader, god), f = preprocess(shader.fragmentShader, god);
-  assert.match(v, /attribute vec4 edenSurf;/); assert.match(v, /vEdenL=edenSurf\.xyz/);
+  assert.match(v, /attribute vec4 edenSurf;/); assert.match(v, /vEdenL=edenSurf\.xyz/); assert.match(v, /vEdenH=\.8;/, 'no base fade from the kit frame');
   assert.doesNotMatch(f, /texture2D\(eden/, 'no Eden pattern texture is sampled in the god variant');
   assert.match(f, /if\(edenPattern>\.5\)/); assert.match(f, /roughnessFactor=clamp\(roughnessFactor\*edenRough/);
   // The native Eden realism variant is unchanged by the god blocks: textures still sampled, no surface attribute.

@@ -34,7 +34,8 @@ const VERTEX_BODY=/* glsl */`
  vEdenW=(modelMatrix*edenP).xyz;vEdenO=(modelMatrix*edenOrigin).xyz;vEdenN=normalize(mat3(modelMatrix)*edenNrm);
  vEdenH=clamp(transformed.y/max(edenRealism.w,1e-3),0.,1.);
  #ifdef EDEN_GOD_SURFACE
-  {float k=floor(edenSurf.w+1e-3);vEdenL=edenSurf.xyz;vEdenKS=vec2(k,edenSurf.w-k);}
+  // Kit geometry has no per-shape height here: foliage keeps its full tone instead of a base fade.
+  {float k=floor(edenSurf.w+1e-3);vEdenL=edenSurf.xyz;vEdenKS=vec2(k,edenSurf.w-k);vEdenH=.8;}
  #endif
 }
 `;
