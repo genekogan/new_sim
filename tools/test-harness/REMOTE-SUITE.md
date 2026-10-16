@@ -26,6 +26,20 @@ changed skips/TODOs and removed baseline assertions also block. Raw TAP leaf IDs
 already-failing file from hiding. Passing web assertions retain separate per-file attribution; removing a file's
 tests cannot count as repairing a loader. V6 case receipts retain scenario IDs so dropped scenarios block too.
 
+### V7 and the ship receipt
+
+The CPU receipt above excludes V7; the real-Chrome walk proves it, and `ship-receipt.mjs` joins the two:
+
+```sh
+# from a clean checkout of the SAME candidate commit (with the .lane/mars-web overlay), ports 5870-5879, ~10 min + lease
+bash tools/test-harness/v7-walks.sh /absolute/scratch/gate/<run>-v7          # prints RELEASE_GATE_V7, writes v7-receipt.json
+node tools/test-harness/ship-receipt.mjs <run>/receipt.json <run>-v7/v7-receipt.json   # prints RELEASE_SHIP, writes <run>/ship-receipt.json
+```
+
+`ship-receipt.json` is what a ship attaches. It is `pass`/`quarantined` (the gate's status) only when the V7 source
+SHA equals the gate's candidate SHA, the V7 checkout was clean, every V7 check passed and the gate was not blocked;
+otherwise `blocked` (exit 1). It records both input receipts' sha256 and the remaining exclusion (V8).
+
 For audited recovery, `--baseline-results <dir> --candidate-results <dir>` imports a completed pair only when the
 resolved source SHAs, identical harness commit/tree/archive, Node major/patch, pnpm, complete step contract and
 scope all validate. Output directories with an existing receipt are never overwritten. Older unpinned runs and
