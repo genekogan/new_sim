@@ -30,6 +30,9 @@ import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
 import { FOOTPRINT_BYTES, godBodyLimit } from './ingestion.ts';
 import { godTokenLimiter } from './rate-limit.ts';
+import { intakeUpload, recordIntake } from '../moderation/intake.ts';
+import { moderationFor } from '../moderation/store.ts';
+import { assetPolicy, UploadRejected, validateUpload } from '../moderation/validate.ts';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const CORE_ASSET_INDEX = join(REPO_ROOT, 'worlds/core-assets/index.json');
@@ -604,7 +607,13 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     }
     store.checkWorldBudget([admitted, ...(footprint ? [inspectAsset(footprint, { kind: 'footprint' })] : []), ...(scaledFootprint ? [inspectAsset(scaledFootprint, { kind: 'footprint' })] : [])]);
     if (admitted.kind === 'mesh') { const v = await validateGlb(bytes); if (v) throw new ApiError(400, 'asset.invalid', `the GLB does not parse: ${v}`, { field: 'file', measured: { problem: v, bytes: bytes.byteLength }, allowed: { format: 'valid self-contained GLB 2.0' }, fix: 'Export a valid self-contained binary glTF 2.0 file.' }); }
+    // G8 moderation after release 2's structured admission: metadata stripped, words and classifier checked
+    const moderation = moderationFor(d.god.db.db, d.god.opts.worldId);
+    const intake = await intakeUpload(moderation, bytes, { surface: 'asset', policy: assetPolicy(budget()), words: [name, field.source, field.license, field.description, field.tags], actor: 'god' })
+      .catch((e) => { if (e instanceof UploadRejected) throw new ApiError(e.status, e.code, e.message); throw e; });
+    bytes = intake.upload.bytes;
     const meta = store.put(bytes, { name, license: field.license, source: field.source, by: 'god', budget: budget(), footprint });
+    recordIntake(moderation, intake, { surface: 'asset', actor: 'god' });
     const warnings: string[] = [];
     // the def's footprint is in the def's metres: rescale the sidecar when the import states another height
     let fpMeta = meta.footprint ? store.info(meta.footprint) : undefined;
@@ -618,7 +627,7 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
       `${meta.kind} ${meta.sha.slice(0, 12)}… ${meta.bytes} bytes${meta.kind === 'mesh' ? `, ${meta.tris} tris, ${meta.textures} textures (max ${meta.texPx} px), box ${meta.box.join(' × ')} m, clips ${meta.animations?.join(', ') || 'none'}` : ''}`,
       ...(fpMeta?.baked?.notes ?? []), ...(def ? [`def ${def.name}@1: size ${def.size.box.join(' × ')} m, layer ${def.layer}${def.slots ? `, ${def.slots.length} room slots` : ''}`] : []), ...warnings,
     ];
-    return c.json({ ok: true, asset: { ...meta, url: `/assets/${meta.sha}.${meta.ext}` }, footprint: fpMeta ? { sha: fpMeta.sha, rooms: fpMeta.baked?.rooms?.length ?? 0, openings: fpMeta.baked?.openings?.length ?? 0, links: fpMeta.baked?.links?.length ?? 0, colliders: fpMeta.baked?.colliders.length ?? 0 } : null, def: def ?? null, defined: defined ?? null, warnings, report: report.join('\n') }, 200, noStore);
+    return c.json({ ok: true, moderation: { ...moderation.state(meta.sha), classifier: intake.verdict.classifier, labels: intake.verdict.labels, stripped: intake.upload.stripped }, asset: { ...meta, url: `/assets/${meta.sha}.${meta.ext}` }, footprint: fpMeta ? { sha: fpMeta.sha, rooms: fpMeta.baked?.rooms?.length ?? 0, openings: fpMeta.baked?.openings?.length ?? 0, links: fpMeta.baked?.links?.length ?? 0, colliders: fpMeta.baked?.colliders.length ?? 0 } : null, def: def ?? null, defined: defined ?? null, warnings, report: report.join('\n') }, 200, noStore);
   });
   app.get('/v1/god/assets', (c) => { d.requireGod(c); const strip = (m: AssetMeta) => { const { baked: _b, ...rest } = m; return { ...rest, url: `/assets/${m.sha}.${m.ext}` }; }; return c.json({ assets: store.listWorld().map(strip), ...(c.req.query('core') ? { core: store.coreAssets().map(strip) } : {}) }, 200, noStore); });
   app.get('/v1/god/assets/:sha{[0-9a-f]{64}}', (c) => { const m = store.info(c.req.param('sha')); if (!m) throw new ApiError(404, 'not-found', 'no such asset'); const { baked, ...rest } = m; return c.json({ asset: { ...rest, url: `/assets/${m.sha}.${m.ext}` }, ...(baked ? { baked } : {}) }, 200, noStore); });
@@ -686,7 +695,11 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     if (!rest.endsWith('/thumb.png')) throw new ApiError(404, 'not-found', 'POST /v1/god/defs/<ref>/thumb.png with a PNG body');
     const def = findDef(rest.slice(0, -'/thumb.png'.length));
     if (!def) throw new ApiError(404, 'not-found', 'no such def');
-    store.putThumb(def.hash, new Uint8Array(await c.req.arrayBuffer()));
+    // G8 moderation: the same gate as every upload (a well-formed PNG, metadata stripped)
+    let png: Uint8Array;
+    try { png = validateUpload(new Uint8Array(await c.req.arrayBuffer()), { formats: ['png'], maxBytes: 400_000, maxTris: 0, maxTextures: 1, maxTexPx: 512, maxImageBytes: 400_000 }).bytes; }
+    catch (e) { if (e instanceof UploadRejected) throw new ApiError(e.status, e.code, e.message); throw e; }
+    store.putThumb(def.hash, png);
     return c.json({ ok: true, thumb: `/v1/god/defs/${publicRef(def)}/thumb.png`, immutable: `/thumbs/${def.hash}.png` }, 200, noStore);
   });
   mountCatalogRoutes(app, { god: d.god, requireGod: d.requireGod, store, library, ownDefs });
