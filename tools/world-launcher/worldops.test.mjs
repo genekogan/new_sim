@@ -102,3 +102,54 @@ test('the operator archives any world (a godless one too); restore refuses an oc
   r = await post('/__sim/op/restore-world', { id: a.id }); assert.equal(r.status, 409); assert.equal((await r.json()).code, 'occupied');
   assert.equal((await post('/__sim/op/restore-world', { id: '../etc' })).status, 400);
 });
+
+const tokenCount = (slug, prefix = '') => { const d = new DatabaseSync(join(data, 'worlds', slug, 'sim.db'), { readOnly: true }); try { return d.prepare('SELECT count(*) n FROM god_tokens_v1 WHERE world_id=? AND label LIKE ?').get(`${slug}-1`, `${prefix}%`).n; } finally { d.close(); } };
+const ownerOf = (slug) => { const d = new DatabaseSync(join(data, 'worlds', slug, 'sim.db'), { readOnly: true }); try { return JSON.parse(d.prepare('SELECT body FROM world_meta_v1').get().body).owner; } finally { d.close(); } };
+const G = { authorization: 'Bearer dev:gene' }, V = { authorization: 'Bearer dev:victor' }, M = { authorization: 'Bearer dev:mallory' };
+test('co-builders: owner invites, the invited person accepts, pairs their own agent, and is removed with their tokens', async () => {
+  let r = await post('/__sim/op/create-world', { name: 'Arium', template: 'plain', owner: 'dev:gene' }); assert.equal(r.status, 201);
+  assert.equal((await post('/__sim/worlds/arium/cobuilders/invite', {}, M)).status, 403, 'only the owner invites');
+  r = await post('/__sim/worlds/arium/cobuilders/invite', { to: 'dev:victor' }, G); const inv = await r.json();
+  assert.equal(r.status, 200); assert.match(inv.url, /\/w\/arium\/#worldoffer\//);
+  assert.equal((await (await api(`/__sim/worlds/arium/offer?code=${inv.code}`)).json()).kind, 'cobuild');
+  assert.equal((await post('/__sim/worlds/arium/offer/accept', { code: inv.code })).status, 401, 'consent needs a sign-in');
+  assert.equal((await post('/__sim/worlds/arium/offer/accept', { code: inv.code }, M)).status, 403, 'an invitation for another account');
+  r = await post('/__sim/worlds/arium/offer/accept', { code: inv.code }, V); assert.equal(r.status, 200);
+  assert.equal((await post('/__sim/worlds/arium/offer/accept', { code: inv.code }, V)).status, 404, 'used once');
+  // the co-builder's agent pairs; only that co-builder approves it
+  r = await post('/__sim/worlds/arium/cobuild/pair/start', { agent: 'victor-claude' }); const pair = await r.json();
+  assert.equal((await (await post('/__sim/worlds/arium/cobuild/pair/poll', { poll_token: pair.poll_token })).json()).approved, false);
+  assert.equal((await post('/__sim/worlds/arium/cobuild/pair/approve', { code: pair.user_code }, M)).status, 403);
+  assert.equal((await post('/__sim/worlds/arium/cobuild/pair/approve', { code: pair.user_code }, V)).status, 200);
+  const got = await (await post('/__sim/worlds/arium/cobuild/pair/poll', { poll_token: pair.poll_token })).json();
+  assert.equal(got.approved, true); assert.match(got.token, /^god_/);
+  assert.equal(tokenCount('arium', 'cobuilder:dev:victor:'), 1);
+  // the co-builder's token cannot archive, invite or hand the world on
+  const VT = { authorization: `Bearer ${got.token}` };
+  assert.equal((await post('/__sim/worlds/arium/archive', { confirm: 'arium' }, VT)).status, 403);
+  assert.equal((await post('/__sim/worlds/arium/cobuilders/invite', {}, VT)).status, 403);
+  assert.equal((await post('/__sim/worlds/arium/transfer', {}, VT)).status, 403);
+  const listed = await (await api('/__sim/worlds/arium/cobuilders', { headers: G })).json();
+  assert.deepEqual(listed.cobuilders.map((c) => c.account), ['dev:victor']);
+  r = await post('/__sim/worlds/arium/cobuilders/remove', { account: 'dev:victor' }, G);
+  assert.deepEqual(await r.json(), { ok: true, account: 'dev:victor', tokensRevoked: 1 });
+  assert.equal(tokenCount('arium', 'cobuilder:'), 0);
+});
+test('handoff: the world changes owner only when the receiving person accepts; every old god token is revoked; audited', async () => {
+  addGodToken(join(data, 'worlds/arium/sim.db'), 'arium-1', 'god_geneagent', 'claude-code');
+  assert.equal((await post('/__sim/worlds/arium/transfer', { to: 'dev:victor' }, M)).status, 403);
+  let r = await post('/__sim/worlds/arium/transfer', { to: 'dev:victor' }, { authorization: 'Bearer god_geneagent' }); const off = await r.json();
+  assert.equal(r.status, 200, 'the owner\'s own agent may offer it'); assert.equal(off.kind, 'transfer');
+  assert.equal(ownerOf('arium'), 'dev:gene', 'nothing changes before consent');
+  assert.equal((await post('/__sim/worlds/arium/offer/accept', { code: off.code }, M)).status, 403);
+  r = await post('/__sim/worlds/arium/offer/accept', { code: off.code }, V); const d = await r.json();
+  assert.equal(r.status, 200, JSON.stringify(d)); assert.equal(d.owner, 'dev:victor'); assert.equal(d.tokensRevoked, 1);
+  assert.equal(ownerOf('arium'), 'dev:victor'); assert.equal(tokenCount('arium'), 0);
+  assert.equal((await api('/w/arium/healthz')).status, 200, 'wakes again under its new owner');
+  // the old owner is now just a visitor; the new owner can archive it
+  assert.equal((await post('/__sim/worlds/arium/cobuilders/invite', {}, G)).status, 403);
+  assert.equal((await post('/__sim/worlds/arium/cobuilders/invite', {}, V)).status, 200);
+  assert.equal((await post('/__sim/worlds/arium/offers/cancel', {}, V)).status, 200);
+  const log = (await (await post('/__sim/op/audit', { slug: 'arium' })).json()).audit.map((x) => x.op);
+  assert.deepEqual(log, ['cobuilder-invite', 'cobuilder-add', 'cobuilder-pair', 'cobuilder-remove', 'transfer-offer', 'transfer', 'cobuilder-invite', 'offers-cancel']);
+});

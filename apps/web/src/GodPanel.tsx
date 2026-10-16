@@ -13,6 +13,7 @@ import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
 import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
+import { OfferCard, offerFromHash } from './god-ui/OfferCard.tsx';
 import './god-ui/god-panel.css';
 
 type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
@@ -28,6 +29,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const joinHash = landingHash === '#join';
   // #approve/<id> (the link the Soul CLI prints for its human): the approval card, panel open
   const [approvalId, setApprovalId] = useState(() => approvalFromHash(landingHash));
+  // #worldoffer/<code>, #cobuildpair/<code> (the launcher's co-builder and handoff links): that card first
+  const [offerLink, setOfferLink] = useState(() => offerFromHash(landingHash));
   const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || localStorage.getItem(OPEN_KEY) !== '0');
   const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
   const [welcome, setWelcome] = useState<string | null>(null);
@@ -126,6 +129,10 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
       <button className="gp-btn" onClick={hideGhost}>hide</button>
     </div>
   );
+  if (offerLink) return <>{ghostBar}<div data-god-panel="1" className="gp-card">
+    <OfferCard link={offerLink} signedIn={signedIn} onDone={() => { setOfferLink(null); history.replaceState(null, '', location.pathname + location.search); void refresh(); }} />
+    {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
+  </div></>;
   if (!status) return ghostBar || null;
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');

@@ -24,6 +24,10 @@
 //                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
 //                                audit {slug?} reads <data>/audit.jsonl
 //   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
+//   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/: owner: GET cobuilders, POST cobuilders/invite {to?},
+//   cobuilders/remove {account}, transfer {to?}, offers/cancel; anyone with the link: GET offer?code=, POST offer/accept
+//   {code} (signed in: that is the consent); a co-builder's agent: POST cobuild/pair/start|poll, approved by the co-builder
+//   (POST cobuild/pair/approve {code}).
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -59,6 +63,7 @@ import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registr
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
+import { makeHandoff } from './handoff.mjs';
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
@@ -182,6 +187,7 @@ export async function openLauncher(cfg = {}) {
     try { const r = await archiveWorld({ registry, pool, dataDir }, w.slug, by, reason); seen.delete(w.slug); stats.delete(w.slug); log(`archived ${w.slug} → ${r.archive} (by ${by})`); return [200, { ok: true, ...r }]; }
     finally { closing.delete(w.slug); }
   }
+  const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log });
   async function ownerArchive(w, body, authorization) {
     const a = await actorOf(w, authorization);
     if (!isOwner(w, a)) return [403, { ok: false, code: 'forbidden', message: "only this world's owner (or the site admin) may archive it" }];
@@ -414,13 +420,18 @@ export async function openLauncher(cfg = {}) {
           'list-archive': () => [200, { ok: true, archive: listArchive(dataDir) }],
           'audit': (b) => [200, { ok: true, audit: readAudit(dataDir, typeof b?.slug === 'string' ? b.slug : undefined) }] })[forkOp](body); json(res, out[0], out[1]); return;
       }
-      const own = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})\/(archive)$/);
-      if (own && req.method === 'POST') {
+      const own = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})\/(archive|offer|offer\/accept|offers\/cancel|transfer|cobuilders|cobuilders\/(?:invite|remove)|cobuild\/pair\/(?:start|poll|approve))$/);
+      if (own && (req.method === 'POST' || req.method === 'GET')) {
         const w = registry.get(own[1]); if (!w || closing.has(w.slug)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
-        const chunks = []; let n = 0;
-        for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
-        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const out = await ownerArchive(w, body, req.headers.authorization); json(res, out[0], out[1]); return;
+        let body = Object.fromEntries(url.searchParams);
+        if (req.method === 'POST') {
+          const chunks = []; let n = 0;
+          for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
+          try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        }
+        const out = own[2] === 'archive' ? (req.method === 'POST' ? await ownerArchive(w, body, req.headers.authorization) : null) : await handoff(w, own[2], req.method, body, req.headers.authorization);
+        if (!out) { json(res, 405, { ok: false, code: 'method' }); return; }
+        json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {
