@@ -27,7 +27,10 @@ export function entityArrivalPose(bounds: readonly [number, number, number, numb
   const vfov = (fovDeg * Math.PI) / 180, tanH = Math.tan(vfov / 2) * (aspect > 0 ? aspect : 1), hfov = 2 * Math.atan(tanH * f);
   const half = Math.max(0.1, Math.min(vfov, hfov) / 2);
   const fit = span > 0 ? (span / 2) / Math.sin(half) * 0.9 : 0;
-  const distance = Math.min(ARRIVAL_MAX, Math.max(ARRIVAL_MIN, fit));
+  // Portrait: the narrow width would push a built world out to the 110 m cap, which on a phone reads as a speck. Cap the
+  // distance in proportion to the aspect (390x844 -> ~51 m) so the middle of what was built is framed large; the rest is a drag away.
+  const cap = aspect >= 1 ? ARRIVAL_MAX : Math.max(ARRIVAL_MIN, ARRIVAL_MAX * Math.max(0.1, aspect));
+  const distance = Math.min(cap, Math.max(ARRIVAL_MIN, fit));
   const gy = groundAt(cx, cz) ?? 0;
   const h = Math.cos(ELEVATION) * distance;
   // Screen centre = the target. Put the built centre at the middle of the uncovered part: move the target right (the

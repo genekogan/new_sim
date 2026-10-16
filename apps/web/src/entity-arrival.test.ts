@@ -36,3 +36,10 @@ test('the god panel covers the right of the view: what was built lands in the un
   const width = 2 * covered.distance * Math.tan(22.5 * Math.PI / 180) * 1.5;
   assert.ok(Math.abs(along / width + 0.15) < 0.01, String(along / width));
 });
+
+test('portrait phone: a large built world is framed nearer than on a landscape screen, landscape unchanged', () => {
+  const big: [number, number, number, number] = [-100, -100, 100, 100], g = () => 0;
+  const wide = entityArrivalPose(big, 50, g, 45, 16 / 9), tall = entityArrivalPose(big, 50, g, 45, 390 / 844);
+  assert.equal(wide.distance, 110);
+  assert.ok(tall.distance < 60 && tall.distance >= 22, `portrait distance ${tall.distance}`);
+});

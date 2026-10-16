@@ -19,7 +19,9 @@ type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 const shotMode = query.get('shot') === '1';
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
-const OPEN_KEY = 'sim.godPanel.open';
+const PHONE = () => typeof matchMedia === 'function' && matchMedia('(max-width:700px)').matches;
+// Phones keep their own remembered choice and start compact: the open panel covers most of a small screen.
+const openKey = () => 'sim.godPanel.open' + (PHONE() ? '.phone' : '');
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 
 export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMode: (v: boolean) => void }) {
@@ -28,7 +30,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const joinHash = landingHash === '#join';
   // #approve/<id> (the link the Soul CLI prints for its human): the approval card, panel open
   const [approvalId, setApprovalId] = useState(() => approvalFromHash(landingHash));
-  const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || localStorage.getItem(OPEN_KEY) !== '0');
+  const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || (PHONE() ? localStorage.getItem(openKey()) === '1' : localStorage.getItem(openKey()) !== '0'));
   const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
   const [welcome, setWelcome] = useState<string | null>(null);
   const [edits, setEdits] = useState<G.EditRow[] | null>(null);
@@ -51,7 +53,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const refresh = useCallback(async () => { const s = await G.getStatus(); if (s) setStatus(s); }, []);
   useEffect(() => G.watchStatus(setStatus), []);
   useEffect(() => { void refresh(); }, [refresh, session.authed, session.label]);
-  useEffect(() => { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); }, [open]);
+  useEffect(() => { localStorage.setItem(openKey(), open ? '1' : '0'); }, [open]);
   useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
   // journal, flags: whenever the world's edit counter moves
   useEffect(() => { if (seq === undefined) return; void G.flags().then(setFlags).catch(() => {}); if (owner) void G.edits(30).then(setEdits).catch(() => setEdits(null)); }, [seq, owner]);
