@@ -134,7 +134,8 @@ try {
       await step(`V7[${d}] Explore (real click) lists the god's landmarks with pictures`, async () => {
         await page.getByRole('button', { name: /^Explore /i }).first().click();
         const r = await waitFor(async () => { const n = await page.evaluate(() => ({ cards: document.querySelectorAll('.explore-locations button').length, pictures: document.querySelectorAll('.explore-locations .explore-picture img').length, labels: [...document.querySelectorAll('.explore-locations button span:last-child')].map((s) => s.textContent) })); return { ok: n.cards >= 3 && n.pictures >= 3, ...n }; }, 30000);
-        await snap(page, `v7-explore-pictures-${d}`); await page.keyboard.press('Escape'); return r;
+        await snap(page, `v7-explore-pictures-${d}`); await page.keyboard.press('Escape');
+        return r;
       }, (r) => r?.ok);
       await step(`V5[${d}] click the lido's Explore card (real click): the camera frames the sunken basin`, async () => {
         await page.getByRole('button', { name: /^Explore /i }).first().click();

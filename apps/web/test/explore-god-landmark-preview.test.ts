@@ -51,3 +51,15 @@ test('a thing that carves its own ground (a sunken pool) is still a landmark; a 
   assert.equal(godTourViews({model: m({kind: 'gen'})}, () => 0)[0]?.label, 'lido');
   assert.equal(godTourViews({model: m({kind: 'none'})}, () => 0).length, 0);
 });
+
+test("a god thing drawn as instances is pictured even when its palette names water (a pool's parts)", async () => {
+  const seen: {triangles: number}[] = [], box = new THREE.BoxGeometry(10, 1, 5), mat = new THREE.MeshStandardMaterial();
+  const inst = new THREE.InstancedMesh(box, mat, 1); inst.name = 'instances:kit/2|abc:{"deck":"#ddd","water":"#4fb0c8"}:111:0';
+  inst.setMatrixAt(0, new THREE.Matrix4().makeTranslation(30, 0, -10)); const g = new THREE.Group(); g.add(inst);
+  let rendered = 0;
+  const renderer = {...(recordingRenderer(seen) as any), render: () => { rendered++; throw Error('recorded'); }} as unknown as THREE.WebGLRenderer;
+  const previews = new WorldPlacePreviews(renderer, () => [g]);
+  await previews.captureLocation({id: 'god:p', label: 'lido', regionId: 'god:p', p: [40, 10, 0], target: [30, 0, -10], radius: 10}, 'k');
+  assert.equal(rendered, 1, 'the instanced pool was put in the picture');
+  previews.dispose();
+});
