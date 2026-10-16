@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { cdnFetch, cdnOrigin, installCdnAssets, manifestAsset, readCdnManifest } from './cdn-assets.ts';
+import { cdnFetch, cdnOrigin, installCdnAssets, manifestAsset, pageWorld, readCdnManifest } from './cdn-assets.ts';
 
 const bytes = new TextEncoder().encode('approved fixture bytes');
 const sha256 = createHash('sha256').update(bytes).digest('hex');
@@ -96,4 +96,87 @@ test('unmapped, range and non-GET requests retain their ordinary transport', asy
   await wrapped('/worlds/assets/model.glb', { method: 'POST' });
   await wrapped('/worlds/assets/model.glb', { headers: { range: 'bytes=0-2' } });
   assert.deepEqual(calls, ['/not-published.glb', '/worlds/assets/model.glb', '/worlds/assets/model.glb']);
+});
+
+const scopedEntry = (world: string, ext = 'glb') => ({ key: `assets${world}/${sha256}.${ext}`, sha256, bytes: bytes.length, licence: 'world-scoped' });
+const scoped = readCdnManifest({ version: 1, assets: { '/browser/campus.glb?v=shared': entry }, worlds: {
+  '/w/mars': { '/browser/campus.glb?v=20260922b': scopedEntry('/w/mars'), [`/blobs/assets/${sha256.slice(0, 2)}/${sha256}.glb`]: scopedEntry('/w/mars') },
+  '/worlds/w/mars': { [`/blobs/assets/${sha256.slice(0, 2)}/${sha256}.glb`]: scopedEntry('/worlds/w/mars') },
+  '/w/littlemartians': { '/world-assets/littlemartians/characters/kin/chebel.glb': scopedEntry('/w/littlemartians') },
+} });
+
+test('world-scoped entries apply only on their own world page, by exact path and version query', () => {
+  const campus = '/browser/campus.glb?v=20260922b', blob = `/blobs/assets/${sha256.slice(0, 2)}/${sha256}.glb`;
+  assert.equal(pageWorld('https://sim.eden.art/w/mars?dev=1'), '/w/mars');
+  assert.equal(pageWorld('https://sim.eden.art/worlds/w/mars/'), '/worlds/w/mars');
+  assert.equal(pageWorld('https://sim.eden.art/'), undefined);
+  assert.equal(manifestAsset(scoped, campus, 'https://sim.eden.art/w/mars?dev=1')?.key, `assets/w/mars/${sha256}.glb`);
+  assert.equal(manifestAsset(scoped, blob, 'https://sim.eden.art/w/mars')?.key, `assets/w/mars/${sha256}.glb`);
+  // The fork's page uses its own scope; it never inherits root Mars's legacy campus mapping.
+  assert.equal(manifestAsset(scoped, blob, 'https://sim.eden.art/worlds/w/mars')?.key, `assets/worlds/w/mars/${sha256}.glb`);
+  assert.equal(manifestAsset(scoped, campus, 'https://sim.eden.art/worlds/w/mars'), undefined);
+  for (const page of ['https://sim.eden.art/w/eden', 'https://sim.eden.art/w/mars-two', 'https://sim.eden.art/', 'https://sim.eden.art/worlds/w/marsx']) {
+    assert.equal(manifestAsset(scoped, campus, page), undefined, page);
+    assert.equal(manifestAsset(scoped, blob, page), undefined, page);
+  }
+  assert.equal(manifestAsset(scoped, '/browser/campus.glb', 'https://sim.eden.art/w/mars'), undefined, 'query pins stay exact');
+  assert.equal(manifestAsset(scoped, '/browser/campus.glb?v=other', 'https://sim.eden.art/w/mars'), undefined);
+  assert.equal(manifestAsset(scoped, '/world-assets/littlemartians/characters/kin/chebel.glb', 'https://sim.eden.art/w/mars'), undefined);
+  assert.equal(manifestAsset(scoped, '/world-assets/littlemartians/characters/kin/chebel.glb', 'https://sim.eden.art/w/littlemartians')?.licence, 'world-scoped');
+  // Scoped hashes never become shared or dynamic /assets/<sha> aliases.
+  assert.equal(manifestAsset(scoped, `/w/mars/assets/${sha256}.glb`, 'https://sim.eden.art/w/mars'), undefined);
+  assert.equal(manifestAsset(scoped, `/assets/${sha256}.glb`, 'https://sim.eden.art/w/mars'), undefined);
+  assert.equal(manifestAsset(scoped, '/browser/campus.glb?v=shared', 'https://sim.eden.art/w/eden'), entry, 'shared entries unchanged');
+});
+
+test('world-scoped manifest validation binds key, rights label and namespace', () => {
+  const bad = (world: string, path: string, value: object) => assert.throws(() => readCdnManifest({ version: 1, assets: {}, worlds: { [world]: { [path]: value } } }), /Invalid/, JSON.stringify(value));
+  bad('/w/mars', '/browser/campus.glb', { ...scopedEntry('/w/mars'), licence: 'CC0-1.0' });
+  bad('/w/mars', '/browser/campus.glb', scopedEntry('/w/littlemartians'));
+  bad('/w/mars', '/browser/campus.glb', scopedEntry('/worlds/w/mars'));
+  bad('/w/mars', '/browser/campus.glb', entry);
+  bad('/w/mars', '/browser/campus.glb', scopedEntry('/w/mars', 'png'));
+  bad('/w/mars', '/browser/campus.gltf', scopedEntry('/w/mars', 'gltf'));
+  bad('/w/Mars', '/browser/campus.glb', scopedEntry('/w/Mars'));
+  bad('/x/w/mars', '/browser/campus.glb', scopedEntry('/x/w/mars'));
+  bad('/w/mars', '//other.test/campus.glb', scopedEntry('/w/mars'));
+  bad('/w/mars', '/browser/campus.glb', { ...scopedEntry('/w/mars'), key: `assets/w/mars/${'0'.repeat(64)}.glb` });
+  assert.throws(() => readCdnManifest({ version: 1, assets: { '/a.glb': scopedEntry("/w/mars") } }), /Invalid/, "scoped rights never enter the shared catalogue");
+  assert.throws(() => readCdnManifest({ version: 1, assets: {}, worlds: [] }));
+  assert.deepEqual(Object.keys(readCdnManifest({ version: 1, assets: {} })), ['version', 'assets']);
+});
+
+test('a large CDN body that keeps moving outlasts the stall timeout and reports progress', async () => {
+  const progress: number[] = [];
+  const original: typeof fetch = async () => new Response(new ReadableStream({ async start(c) {
+    for (const byte of bytes) { await new Promise(r => setTimeout(r, 3)); c.enqueue(new Uint8Array([byte])); }
+    c.close();
+  } }));
+  // 22 chunks x 3 ms is well past a 20 ms total, but no single gap reaches it.
+  const response = await cdnFetch(original, scoped, 'https://assets.eden.art', 'https://sim.eden.art/w/mars', 20, (url, loaded, total) => {
+    assert.equal(url, '/browser/campus.glb?v=20260922b'); assert.equal(total, bytes.length); progress.push(loaded);
+  })('/browser/campus.glb?v=20260922b');
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  assert.equal(progress.length, bytes.length);
+  assert.equal(progress.at(-1), bytes.length);
+});
+
+test('a CDN body that stalls falls back to the exact origin request; an oversize body is rejected early', async () => {
+  for (const body of ['stall', 'oversize']) {
+    const calls: (RequestInfo | URL)[] = [];
+    const original: typeof fetch = async (input, init) => {
+      calls.push(input);
+      if (calls.length === 2) return new Response('origin');
+      return new Response(new ReadableStream({ start(c) {
+        c.enqueue(body === 'oversize' ? new Uint8Array(bytes.length + 1) : bytes.slice(0, 4));
+        init?.signal?.addEventListener('abort', () => c.error(init.signal?.reason));
+      } }));
+    };
+    const keepAlive = setTimeout(() => {}, 500);
+    try {
+      const response = await cdnFetch(original, scoped, 'https://assets.eden.art', 'https://sim.eden.art/w/mars', 15)('/browser/campus.glb?v=20260922b');
+      assert.equal(await response.text(), 'origin', body);
+      assert.deepEqual(calls, [`https://assets.eden.art/assets/w/mars/${sha256}.glb`, '/browser/campus.glb?v=20260922b']);
+    } finally { clearTimeout(keepAlive); }
+  }
 });

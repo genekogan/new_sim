@@ -87,7 +87,8 @@ function WorldRoot() {
   return <Suspense fallback={<pre>connecting sign-in…</pre>}><PrivyAuth cfg={cfg} arrivalEnabled={arrivalEnabled}/></Suspense>;
 }
 
-void installCdnAssets(cdnManifestUrl).finally(()=>{
+// A large CDN file is buffered for its hash check: report its bytes to the arrival bar while they stream in.
+void installCdnAssets(cdnManifestUrl,(url,loaded)=>assetBytes.progress(url,loaded)).finally(()=>{
  installAssetMeter(); // meter the original asset URL, including its CDN attempt and origin fallback
  createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
 });
