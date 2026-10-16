@@ -7,7 +7,10 @@ import {resolve} from 'node:path';
 import {chromeLease} from '<team>/ops/chrome-lease.mjs';
 const root=resolve(new URL('../..',import.meta.url).pathname);
 const [world,visualJson,outDir,probe]=process.argv.slice(2);
-const visual=JSON.parse(readFileSync(visualJson,'utf8'));
+let visual;
+if(visualJson.endsWith('views.json')){const v=JSON.parse(readFileSync(visualJson,'utf8'));visual={pairs:[]};
+  for(const dpr of [1,2])for(const [t,hour] of Object.entries(v.timePresets))for(const w of v.views)visual.pairs.push({name:`${w.id}-${t}`,dpr,hour,old:{pose:{eye:w.eye,at:w.at}}});}
+else visual=JSON.parse(readFileSync(visualJson,'utf8'));
 mkdirSync(outDir,{recursive:true});
 const {chromium}=createRequire(resolve(root,'mars/viewer/package.json'))('@playwright/test');
 const url=`https://sim.eden.art/worlds/w/${world}/?shot=1&dpr=fixed`;
@@ -48,7 +51,7 @@ try{
       await page.evaluate(([pose,h])=>{globalThis.__parityPose=pose;globalThis.__parityHour=h;},[pose,p.hour]);
       const b=await page.evaluate(()=>globalThis.__parityFrames);await page.waitForFunction(n=>globalThis.__parityFrames>n+2,b);
       await page.waitForFunction(h=>{const d=globalThis.__parityRenderedDatetime;if(typeof d!=='string')return false;return Math.abs(Number(d.slice(11,13))+Number(d.slice(14,16))/60-h)<.05;},p.hour,{timeout:20000}).catch(()=>{});
-      await page.waitForTimeout(6000); // let streamed meshes/textures settle at the new pose
+      await page.waitForTimeout(visualJson.endsWith('views.json')?4000:6000); // let streamed meshes/textures settle at the new pose
       const state=await page.evaluate(info);const file=resolve(outDir,`${p.name}-dpr${dpr}-old.png`);
       await page.locator('canvas').first().screenshot({path:file});
       report.shots.push({name:p.name,dpr,hour:p.hour,file,pose,state});console.log('shot',world,p.name,dpr,state.datetime);
