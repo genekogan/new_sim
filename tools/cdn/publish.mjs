@@ -11,6 +11,7 @@ import { withNewReceipt } from './receipt.mjs';
 
 export const ENDPOINT = 'https://<cf-account-id>.r2.cloudflarestorage.com';
 export const BUCKET = 'eden-assets';
+export const SCOPED_KEY = /^assets(?:\/worlds)?\/w\/[a-z][a-z0-9-]{0,31}\/[0-9a-f]{64}\.[a-z0-9]+$/;
 const sha = value => createHash('sha256').update(value).digest('hex');
 const hmac = (key, value) => createHmac('sha256', key).update(value).digest();
 const enc = value => encodeURIComponent(value).replace(/[!'()*]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
@@ -46,7 +47,8 @@ export function sigv4Headers({ url, method, credentials, body = Buffer.alloc(0),
   return signed;
 }
 export function signRequest({ method, key, credentials, body = Buffer.alloc(0), headers = {}, now = new Date() }) {
-  if (!/^assets\/[0-9a-f]{2}\/[0-9a-f]{64}\.[a-z0-9]+$/.test(key)) throw Error('Invalid immutable key');
+  // Shared catalogue keys, or world-scoped keys bound to one world page namespace (world-scoped.mjs).
+  if (!/^assets\/[0-9a-f]{2}\/[0-9a-f]{64}\.[a-z0-9]+$/.test(key) && !SCOPED_KEY.test(key)) throw Error('Invalid immutable key');
   const url = new URL(`/${BUCKET}/${key.split('/').map(enc).join('/')}`, ENDPOINT);
   return { url: url.href, headers: sigv4Headers({ url, method, credentials, body, headers, now }) };
 }
