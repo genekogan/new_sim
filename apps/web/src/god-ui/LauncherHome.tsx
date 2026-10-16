@@ -53,6 +53,7 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
         {worlds.map((w) => (
           <a key={w.slug} href={w.url} data-world={w.slug} className="lh-card">
             <h2>{w.name}</h2>
+            <p className="lh-world-slug" title={`World address: ${w.slug}`}>{w.slug}</p>
             {w.god ? w.godName && <p className="lh-god">god: <b>{w.godName}</b></p> : <p className="lh-god"><span className="lh-unclaimed">no god yet: open it to claim it</span></p>}
             <p className="lh-meta" data-world-souls={w.souls ?? ''}>{w.souls == null ? 'Souls: –' : w.souls === 0 ? 'no Souls yet' : `${w.souls} Soul${w.souls === 1 ? '' : 's'}`} · {w.entities ?? '–'} things</p>
             <p className="lh-foot dim"><span className={`lh-dot lh-${w.status}`} />made {ago(w.createdAt)}{w.status === 'running' ? null : <> · {STATUS[w.status] ?? w.status}</>}</p>

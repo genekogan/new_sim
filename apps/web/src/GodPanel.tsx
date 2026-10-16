@@ -52,7 +52,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   useEffect(() => { if (wasAuthed.current && !session.authed) G.forgetToken(); wasAuthed.current = session.authed; }, [session.authed]);
 
   const refresh = useCallback(async () => { const s = await G.getStatus(); if (s) setStatus(s); }, []);
-  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [refresh, session.authed, session.label]);
+  useEffect(() => G.watchStatus(setStatus), []);
+  useEffect(() => { void refresh(); }, [refresh, session.authed, session.label]);
   useEffect(() => { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); }, [open]);
   useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
   // journal, flags: whenever the world's edit counter moves

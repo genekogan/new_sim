@@ -15,6 +15,8 @@ export type Session = {
   ready: boolean;
   /** Signed in and, under Clerk, bound to this server's account (`acct_…`). */
   authed: boolean;
+  /** Stable account scope, when supplied by the world shell (never a bearer token). */
+  scope?: string | null;
   /** What to show for "signed in as" (an email, a name). */
   label: string | null;
   /** Clerk on a non-canonical origin: sign in over there. */
@@ -28,10 +30,11 @@ const NONE: Session = { mode: 'none', ready: true, authed: false, label: null, g
 let current: Session = { ...NONE, ready: false };
 const subs = new Set<() => void>();
 const subscribe = (fn: () => void) => { subs.add(fn); return () => { subs.delete(fn); }; };
+export const watchSession = subscribe;
 
 /** main.tsx / Shell: publish the page's sign-in. Re-renders subscribers only when what they show changes. */
 export function publishSession(next: Session) {
-  const changed = next.mode !== current.mode || next.ready !== current.ready || next.authed !== current.authed || next.label !== current.label || next.signInUrl !== current.signInUrl;
+  const changed = next.mode !== current.mode || next.ready !== current.ready || next.authed !== current.authed || next.scope !== current.scope || next.label !== current.label || next.signInUrl !== current.signInUrl;
   // functions are always refreshed (a Clerk getToken closes over the latest session) without a re-render
   current = changed ? { ...next } : Object.assign(current, { getToken: next.getToken, login: next.login, logout: next.logout });
   if (changed) for (const fn of subs) fn();

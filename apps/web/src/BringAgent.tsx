@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom';
 import {pendingNewSoul,requestNewSoul,resumeNewSoul,dismissNewSoul} from './new-soul-entry.ts';
 import {agentOnboarding} from './auth-ui.ts';
 import './BringAgent.css';
+import {copyText,manualCopyHint} from './clipboard.ts';
 /** VF3: the "New Soul" button (top right of the Eden viewer) and its "Bring a new Soul to Eden" dialog. Opens on #join, so the link itself can be shared. */
 export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean;worldName?:string}){
  const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl,worldName);
@@ -12,8 +13,7 @@ export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{a
  useEffect(()=>{if(resumeNewSoul(pending,requireAuth,auth.authed,worldUrl,port.storage)){setOpen(true);setPending(false);}},[pending,auth.authed,requireAuth]);
  useEffect(()=>{if(!open)return;const prior=document.activeElement as HTMLElement|null;modal.current?.querySelector<HTMLButtonElement>('.primary')?.focus();const k=(e:KeyboardEvent)=>{if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'){const nodes=[...modal.current?.querySelectorAll<HTMLElement>('button,a[href]')??[]];const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};addEventListener('keydown',k);return()=>{removeEventListener('keydown',k);if(prior?.isConnected&&prior.getClientRects().length)prior.focus();else document.querySelector<HTMLElement>('.account-avatar,.account-sign-in')?.focus();};},[open]);
  const close=()=>{setPending(false);setOpen(false);setNote('');dismissNewSoul(worldUrl,port);};
- const copy=()=>{const fallback=()=>{if(prompt.current){const range=document.createRange();range.selectNodeContents(prompt.current);const selection=getSelection();selection?.removeAllRanges();selection?.addRange(range);}setNote('Select and copy the prompt.');};
-  if(navigator.clipboard?.writeText)void navigator.clipboard.writeText(text).then(()=>setNote('Copied.'),fallback);else fallback();};
+ const copy=async()=>{if(await copyText(text)){setNote('Copied.');return;}if(prompt.current){const range=document.createRange();range.selectNodeContents(prompt.current);const selection=getSelection();selection?.removeAllRanges();selection?.addRange(range);}setNote(manualCopyHint);};
  const canonicalJoin=auth.signInUrl?new URL(auth.signInUrl):null;if(canonicalJoin)canonicalJoin.hash='join';
  if(canonicalJoin)return showButton?<a className="bring-agent-open" href={canonicalJoin.href} title={`Bring a new Soul to ${world}`}><span>New Soul</span></a>:null;
  const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title={`Bring a new Soul to ${world}`} onClick={()=>{if(requestNewSoul(auth,requireAuth,worldUrl,port))setOpen(true);else setPending(true);}}><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 16v-1.5a5 5 0 0 1 10 0V16M15.5 7v6M12.5 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg><span>New Soul</span></button>;
