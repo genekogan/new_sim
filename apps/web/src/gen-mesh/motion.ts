@@ -15,7 +15,7 @@ import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose
 /** True if this entity needs per-frame motion (the layer only calls `animate` for these). */
 export function hasMotion(def: StoredDef): boolean {
   const c = def.components;
-  if (c.spin || c.sway || c.hover || c.route || c.behavior || c.light || c.lights) return true;
+  if (c.spin || c.swing || c.sway || c.hover || c.route || c.behavior || c.light || c.lights) return true;
   if (def.tags.includes('creature') || def.tags.includes('moving')) return true;
   if (def.make.kind === 'gen' && def.make.gen === 'animals/1') return true;
   const gait = def.make.kind === 'gen' && def.make.gen === 'kit/2' ? (def.make.args as { gait?: string } | undefined)?.gait : undefined;
@@ -45,9 +45,34 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
     const target = c.spin.role ? obj.getObjectByName(`role:${c.spin.role}`) : obj;
     if (target) { if (c.spin.axis === 'x') target.rotation.x = ang; else if (c.spin.axis === 'z') target.rotation.z = ang; else target.rotation.y = (target === obj ? base.yaw : 0) + ang; }
   }
+  if (c.swing) swingStep(obj, entity, c.swing.parts, t);
   if (c.sway) { obj.rotation.z = Math.sin(t * (Math.PI * 2) / c.sway.period + phase) * c.sway.amount * 0.3; obj.rotation.x = Math.cos(t * (Math.PI * 2) / (c.sway.period * 1.3) + phase) * c.sway.amount * 0.2; }
   if (c.hover) obj.position.y = (c.route ? obj.position.y : base.y + c.hover.height) + Math.sin(t * (Math.PI * 2) / c.hover.period + phase) * c.hover.bob;
   if (c.light || c.lights) glowStep(obj, entity, def, model, t);
+}
+
+type Swing = NonNullable<StoredDef['components']['swing']>['parts'][number];
+/** E2 #4: is a `when` gate (`field` or `!field`) open for this entity's state? */
+export function swingOpen(when: string | undefined, state: Record<string, unknown> | undefined): boolean {
+  if (!when) return true;
+  const neg = when.startsWith('!'), v = state?.[neg ? when.slice(1) : when];
+  return neg ? !v : !!v;
+}
+/** E2 #4: 0…1 along a working stroke at world time `t` (eased at both ends, like a hydraulic ram). */
+export function swingStroke(t: number, period: number, phase: number): number { return 0.5 - 0.5 * Math.cos(((t / period) + phase) * Math.PI * 2); }
+/** Pose each working role from its rest pose; a gated role eases back to rest when its gate closes (engine off). */
+function swingStep(obj: THREE.Object3D, entity: Entity, swings: Swing[], t: number) {
+  for (const w of swings) {
+    const target = obj.getObjectByName(`role:${w.role}`); if (!target) continue;
+    const ud = target.userData as { swingRest?: { p: [number, number, number]; r: [number, number, number] }; swingK?: number; swingAt?: number };
+    ud.swingRest ??= { p: [target.position.x, target.position.y, target.position.z], r: [target.rotation.x, target.rotation.y, target.rotation.z] };
+    const open = swingOpen(w.when, entity.state as Record<string, unknown> | undefined), dt = ud.swingAt === undefined ? 0 : Math.max(0, Math.min(0.25, t - ud.swingAt));
+    ud.swingAt = t; ud.swingK = open ? 1 : Math.max(0, (ud.swingK ?? 0) - dt / 1.5);   // settle back over 1.5 s
+    const k = open ? swingStroke(t, w.period, w.phase) : Math.min(ud.swingK, swingStroke(t, w.period, w.phase)), i = w.axis === 'x' ? 0 : w.axis === 'y' ? 1 : 2;
+    const r = ud.swingRest;
+    if (w.kind === 'slide') target.position.setComponent(i, r.p[i] + w.amount * k);
+    else target.rotation.set(r.r[0] + (i === 0 ? w.amount * k : 0), r.r[1] + (i === 1 ? w.amount * k : 0), r.r[2] + (i === 2 ? w.amount * k : 0));
+  }
 }
 
 // ---------------------------------------------------------------- world reading
@@ -127,6 +152,8 @@ export function surroundings(model: WorldModel, home: V2, reach: number, medium:
 export type Gait = 'quadruped-walk' | 'biped-waddle' | 'bird-fly' | 'fish-swim' | 'hover' | 'none';
 export type Rig = {
   gait: Gait; kind: BehaviorKind; speed: number; radius: number; seed: number; follow?: string;
+  /** E2 #3: run from people closer than this (m); 0/undefined = unbothered */
+  flee?: number; fleeState?: FleeState;
   model: WorldModel | null; species?: string;
   roles: Record<string, THREE.Object3D | undefined>;
   /** hip height, body length (m, at scale 1) */
@@ -175,6 +202,8 @@ export function creatureStep(obj: THREE.Object3D, rig: Rig, entity: Entity | nul
   if (kind === 'follow' && rig.follow) P = followPose(rig, model, t, hx, hz);
   else if (kind !== rig.plan.kind) P = pose({ ...rig.plan, kind }, t, rig.world!, rig.cache!);
   else P = pose(rig.plan, t, rig.world!, rig.cache!);
+  // E2 #3: shy animals bolt from people who come close, then wander back to their routine
+  if (rig.flee && rig.gait !== 'fish-swim' && kind !== 'follow') P = fleeStep(rig.fleeState ??= { ox: 0, oz: 0, dist: 0, t }, P, fleeSources(t), rig.flee, rig.speed * s, t, (x, z) => rig.world!.free(x, z, rig.plan!.size));
   // vertical: ground, water surface, or flight altitude
   const g = model.terrain.sample(P.x, P.z), wl = waterAt(model, P.x, P.z);
   const homeG = model.terrain.sample(hx, hz);
@@ -191,6 +220,32 @@ export function creatureStep(obj: THREE.Object3D, rig: Rig, entity: Entity | nul
   const pitch = floating || P.alt > 0.2 ? 0 : Math.max(-0.35, Math.min(0.35, -Math.atan2(gx - g, ahead)));
   obj.rotation.set(pitch, P.yaw, 0, 'YXZ');
   gait(obj, rig, P, t, s, floating ? 1 : 0);
+}
+// ---------------------------------------------------------------- E2 #3: flee
+export type FleeState = { ox: number; oz: number; dist: number; t: number };
+let fleeProvider: (() => readonly (readonly [number, number])[]) | null = null, fleeFrame = Number.NaN, fleeList: readonly (readonly [number, number])[] = [];
+/** The live view tells motion where people are (Souls' figures, x/z); null = nobody to run from. */
+export function setFleeSources(fn: (() => readonly (readonly [number, number])[]) | null) { fleeProvider = fn; fleeFrame = Number.NaN; }
+function fleeSources(t: number) { if (t !== fleeFrame) { fleeFrame = t; try { fleeList = fleeProvider?.() ?? []; } catch { fleeList = []; } } return fleeList; }
+/** Offset the routine pose away from anyone within `reach`: a bolt at a run (3x walking, at least 1.5 m/s) for up to
+ *  twice `reach` from the routine spot, stopping at anything solid; once nobody is near, walk back to the routine.
+ *  `st` keeps the offset (the routine itself stays a pure function of time). */
+export function fleeStep(st: FleeState, P: Pose, people: readonly (readonly [number, number])[], reach: number, speed: number, t: number, free: (x: number, z: number) => boolean): Pose {
+  const dt = Math.min(0.25, Math.max(0, t - st.t)); st.t = t;
+  const x = P.x + st.ox, z = P.z + st.oz;
+  let near: readonly [number, number] | null = null, nd = reach;
+  for (const q of people) { const d = Math.hypot(x - q[0], z - q[1]); if (d < nd) { nd = d; near = q; } }
+  if (near) {
+    const run = Math.max(1.5, speed * 3), d = Math.max(1e-3, nd), ux = (x - near[0]) / d, uz = (z - near[1]) / d, step = run * dt;
+    const nx = st.ox + ux * step, nz = st.oz + uz * step;
+    if (Math.hypot(nx, nz) <= reach * 2 && free(P.x + nx, P.z + nz)) { st.ox = nx; st.oz = nz; st.dist += step; }
+    return { ...P, x: P.x + st.ox, z: P.z + st.oz, yaw: Math.atan2(ux, uz), speed: run, dist: st.dist, rest: 0, activity: 'walk', alt: 0 };
+  }
+  const off = Math.hypot(st.ox, st.oz);
+  if (off < 0.05) { st.ox = 0; st.oz = 0; return P; }
+  const back = Math.max(0.3, speed), step = Math.min(off, back * dt);
+  st.ox -= (st.ox / off) * step; st.oz -= (st.oz / off) * step; st.dist += step;
+  return { ...P, x: P.x + st.ox, z: P.z + st.oz, yaw: Math.atan2(-st.ox, -st.oz), speed: back, dist: st.dist, rest: 0, activity: 'walk', alt: 0 };
 }
 function idlePose(x: number, z: number, yaw: number): Pose { return { x, z, yaw, speed: 0, dist: 0, rest: 1, activity: 'look', alt: 0, u: 0 }; }
 

@@ -28,7 +28,7 @@ export function shell(b:Builder,k:NewBuilding){b.label='shell '+k.id;b.push(k.cx
  b.box(0,0,0,w,FLOOR,d,'#9d968a','floor');
  for(let z=-d/2+T,i=0;z<d/2-T-1e-6;z+=.22,i++){const dd=Math.min(.22,d/2-T-z)-.006;b.box(0,FLOOR,z+dd/2+.003,w-2*T,.01,dd,i%3===0?'#a77c52':i%3===1?'#b88d60':'#ae8358','floor');}
  // ceiling
- b.box(0,top,0,w,.12,d,k.int,'wall');
+ b.box(0,top,0,w,.11,d,k.int,'wall');  // E2 #9: its top stays inside the eaves trim below (no shared plane)
  // walls: each side as a run along its own axis with openings cut
  const sides:[Side,number][]= [['front',w],['back',w],['left',d-2*T],['right',d-2*T]];
  for(const [side,len] of sides){
@@ -41,13 +41,14 @@ export function shell(b:Builder,k:NewBuilding){b.label='shell '+k.id;b.push(k.cx
    let x=-len/2;for(const o of ops){const a=o.at-o.w/2,c=o.at+o.w/2;seg(x,a,0,h);seg(a,c,0,o.sill!);seg(a,c,o.top!,h);
     if(o.sill!>0){b.box(o.at,FLOOR+o.sill!,depth,o.w,o.top!-o.sill!,.02,'#bcd6e0','glass');b.box(o.at,FLOOR+o.sill!-.04,depth+T/2+.05,o.w+.1,.05,.14,k.trim,'furn');
      b.box(o.at,FLOOR+o.sill!,depth+.03,.05,o.top!-o.sill!,.05,k.trim,'furn');b.box(o.at,FLOOR+(o.sill!+o.top!)/2,depth+.03,o.w,.05,.05,k.trim,'furn');}
-    else{for(const sx of[-1,1])b.box(o.at+sx*(o.w/2+.04),FLOOR,depth,.08,o.top!+.06,T+.04,k.trim,'furn');b.box(o.at,FLOOR+o.top!,depth,o.w+.16,.08,T+.04,k.trim,'furn');}
+    // E2 #9: the frame stands 5 mm proud of the wall's reveal (jambs into the opening, head below the lintel) so the two never share a face
+    else{for(const sx of[-1,1])b.box(o.at+sx*(o.w/2+.035),FLOOR+.002,depth,.08,o.top!+.058,T+.04,k.trim,'furn');b.box(o.at,FLOOR+o.top!-.005,depth,o.w+.16,.085,T+.04,k.trim,'furn');}
     x=c;}
    seg(x,len/2,0,h);});
  }
  // gable roof, ridge along local X, eaves .3
  b.at(0,top+.12,0,PI/2,()=>b.prism(0,0,0,d+.6,Math.min(1.8,d*.38),w+.6,k.roof,'roof'));
- b.box(0,top,0,w+.08,.12,d+.08,k.trim,'roof');
+ b.box(0,top+.01,0,w+.08,.11,d+.08,k.trim,'roof');  // E2 #9: the eaves trim sits 1 cm above the ceiling's underside, not in its plane
  // step, sign board, lantern
  const dz=d/2;b.box(k.door.at,0,dz+.3,k.door.w+.5,FLOOR,.6,'#8f8a80','floor');
  b.label='sign '+k.id;b.box(k.door.at,FLOOR+2.38,dz+.05,Math.min(1.6,k.door.w+.6),.36,.06,k.sign,'furn');b.box(k.door.at,FLOOR+2.45,dz+.085,Math.min(1.3,k.door.w+.3),.22,.01,C.cream,'glow');

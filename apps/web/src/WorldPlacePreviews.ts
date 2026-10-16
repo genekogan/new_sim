@@ -12,16 +12,18 @@ export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,asp
  camera.position.copy(aim).addScaledVector(view,distance);camera.lookAt(aim);camera.updateMatrixWorld(true);return camera;
 }
 /** Transparent thumbnails of the actual authored mesh data, using the world's existing renderer.
- * Work runs only for visible Explore cards, caches at most24 images and never loads a second model. */
+ * Work runs only for visible Explore cards, caches at most24 images and never loads a second model. An empty capture
+ * (the place not drawn yet, e.g. a god world still streaming its things in) is not cached: the next opening retries. */
 export class WorldPlacePreviews{
  private images=new Map<string,string|null>();private pending=new Map<string,Promise<string|null>>();private closed=false;private revision=0;private tail:Promise<unknown>=Promise.resolve();
- constructor(private renderer:THREE.WebGLRenderer,private roots:()=>readonly THREE.Object3D[]){}
+ private renderer:THREE.WebGLRenderer;private roots:()=>readonly THREE.Object3D[];
+ constructor(renderer:THREE.WebGLRenderer,roots:()=>readonly THREE.Object3D[]){this.renderer=renderer;this.roots=roots;}
  capture(id:WorldPlaceId):Promise<string|null>{return this.request(id,()=>this.render(id));}
  captureLocation(location:WorldLocation,sceneKey:string):Promise<string|null>{return this.request(sceneKey+':'+location.id,()=>this.render(location.id,location));}
  invalidate(){this.revision++;this.images.clear();this.pending.clear();}
  private request(key:string,render:()=>string|null):Promise<string|null>{
   if(this.closed)return Promise.resolve(null);if(this.images.has(key))return Promise.resolve(this.images.get(key)!);const pending=this.pending.get(key);if(pending)return pending;const revision=this.revision;
-  const job=this.tail.then(()=>new Promise<void>(resolve=>setTimeout(resolve,0))).then(()=>this.closed||revision!==this.revision?null:render()).catch(()=>null).then(image=>{if(this.closed||revision!==this.revision)return null;this.pending.delete(key);this.images.set(key,image);if(this.images.size>24)this.images.delete(this.images.keys().next().value!);return image;});this.pending.set(key,job);this.tail=job;return job;
+  const job=this.tail.then(()=>new Promise<void>(resolve=>setTimeout(resolve,0))).then(()=>this.closed||revision!==this.revision?null:render()).catch(()=>null).then(image=>{if(this.closed||revision!==this.revision)return null;this.pending.delete(key);if(image)this.images.set(key,image);if(this.images.size>24)this.images.delete(this.images.keys().next().value!);return image;});this.pending.set(key,job);this.tail=job;return job;
  }
  private render(id:string,location?:WorldLocation):string|null{
   const view=location??worldPlaceView(id as WorldPlaceId);if(this.closed||!view)return null;
@@ -33,7 +35,7 @@ export class WorldPlacePreviews{
    const roots=this.roots(),owner=PREVIEW_OWNERS[id],selected=owner?roots.flatMap(root=>{const found=root.getObjectByName(owner);return found?[found]:[];}):roots;
    for(const root of selected){root.updateWorldMatrix(true,true);root.traverse(object=>{
     for(let parent:THREE.Object3D|null=object;parent&&parent!==root;parent=parent.parent)if(!parent.visible)return;
-    if(!(object instanceof THREE.Mesh)||object instanceof THREE.SkinnedMesh||Array.isArray(object.material)||/terrain|ground|outside|sea|water|shore|rain|sky|cloud|marker|ring|label/i.test(object.name))return;
+    if(!(object instanceof THREE.Mesh)||object instanceof THREE.SkinnedMesh||Array.isArray(object.material)||/terrain|ground|outside|sea|water|shore|rain|sky|cloud|marker|ring|label/i.test(object.name.startsWith('instances:')?'':object.name))return;  // a god thing's instanced parts are named by their def and palette ("water":…): always the thing itself
     const geometry=object.geometry,position=geometry.getAttribute('position');if(!position||triangles>24000||visited>=120000)return;
     if(!(object instanceof THREE.InstancedMesh)){if(!geometry.boundingBox)geometry.computeBoundingBox();if(geometry.boundingBox&&!worldBox.copy(geometry.boundingBox).applyMatrix4(object.matrixWorld).intersectsBox(regionBox))return;}
     if(object instanceof THREE.InstancedMesh){const selected:number[]=[];for(let i=0;i<object.count;i++){object.getMatrixAt(i,matrix);matrix.premultiply(object.matrixWorld);point.setFromMatrixPosition(matrix);if(Math.hypot(point.x-center.x,point.z-center.z)<=radius)selected.push(i);}if(!selected.length)return;const mesh=new THREE.InstancedMesh(geometry,material(object.material),selected.length),color=new THREE.Color();instances.push(mesh);selected.forEach((source,i)=>{object.getMatrixAt(source,matrix);matrix.premultiply(object.matrixWorld);mesh.setMatrixAt(i,matrix);if(object.instanceColor){object.getColorAt(source,color);mesh.setColorAt(i,color);}});mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;scene.add(mesh);return;}

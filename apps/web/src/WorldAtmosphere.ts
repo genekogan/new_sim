@@ -22,7 +22,7 @@ import {skyBodies,type SkyBodies} from './atmosphere/astro.ts';
 import {setGrade,clearGrade} from './atmosphere/grade.ts';
 import {setWindowLife} from './WorldNightLights.ts';
 import {ScaledNumber,TintedColor,overcast} from './atmosphere/lighting.ts';
-import {type WeatherState,type WeatherKind,type WeatherOverride,weatherKindAt,targetFor,easeWeather,copyWeather,parseWeatherOverride,cycleKind,clockMs,hourOf,hash01} from './atmosphere/weather.ts';
+import {type WeatherState,type WeatherKind,type WeatherOverride,weatherKindAt,targetFor,easeWeather,copyWeather,weatherEaseRate,setWeatherChanged,parseWeatherOverride,cycleKind,clockMs,hourOf,hash01} from './atmosphere/weather.ts';
 /** World Motion & Weather lane entry point (owned by that lane): wind, flags,
  * birds, smoke, water motion, clouds, rain, fog. Presentation only.
  *
@@ -78,7 +78,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0,ferrisAngle=0;
  const own=(o:THREE.Object3D)=>o===root;
  const state:WeatherState={cloud:0,rain:0,wind:0,fog:0,mist:0,wet:0},target:WeatherState={...state};
- let profile:'eden'|'world'='eden',setWeather:SetWeather|null=null,indoorsOf:AtmosphereFrame['indoors']=undefined,lastFlash=0,flashCell=-1;
+ let profile:'eden'|'world'='eden',setWeather:SetWeather|null=null,lastSet:SetWeather|null=null,godChangeAt=-Infinity,indoorsOf:AtmosphereFrame['indoors']=undefined,lastFlash=0,flashCell=-1;
  let clockAt=0,clockNow=0,active=false,closed=false,initialised=false,expansionSeen=-1,scans=0,nextScan=0,kind:WeatherKind|null=null,lastFound={flowers:0,meadow:0,roofs:0,water:0,harbour:false};
  // Pixel scale for world-sized point sprites, read where the renderer is known (no allocation).
  const size=new THREE.Vector2();
@@ -227,7 +227,9 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
     if(!initialised&&override?.from)targetFor(override.from,hour,state);}
    const ms=clockNow;
    // a god's change shows in about 10–25 s (not the schedule's minutes): the god is watching it happen
-   if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*(override?.kind==='cycle'?4:setWeather?3.5:1));
+   // ... and keeps that pace for a while after the god clears it back to the schedule (E2 #8: rain lingered for minutes)
+   if(setWeatherChanged(lastSet,setWeather)){if(initialised)godChangeAt=seconds;lastSet=setWeather?{...setWeather}:null;}
+   if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*weatherEaseRate(!!setWeather,seconds-godChangeAt,override?.kind==='cycle'));
    windDirection(seconds,ms);
    // Rooms behind lit windows switch on and off with the hour of the world clock.
    setWindowLife(frame.daylight===null?null:hourOf(ms),frame.reducedMotion?0:seconds);

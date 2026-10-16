@@ -56,11 +56,17 @@ export const componentsSchema = z.object({
   /** Decorative motion, client-side and deterministic from world tick: rotate parts with role `blade|wheel` or the whole thing. */
   spin: z.object({ axis: z.enum(['x', 'y', 'z']).default('y'), rpm: num.default(2), role: z.string().optional() }).optional(),
   sway: z.object({ amount: num.min(0).max(1).default(0.15), period: num.positive().default(6) }).optional(),
+  /** E2 #4: articulated parts that work back and forth (an excavator's arm, a forklift's forks): each role pivot rotates
+   *  (radians) or slides (metres) along `axis` between 0 and `amount` over `period` seconds, offset by `phase` (0…1),
+   *  only while `when` (a state field, `!field` negated) holds; without `when`, always. */
+  swing: z.object({ parts: z.array(z.object({ role: z.string(), kind: z.enum(['rotate', 'slide']).default('rotate'), axis: z.enum(['x', 'y', 'z']).default('x'), amount: num.min(-3.2).max(3.2), period: num.positive().max(600).default(6), phase: num.min(0).max(1).default(0), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional() })).min(1).max(4) }).optional(),
   hover: z.object({ height: num.default(0), bob: num.min(0).max(2).default(0.15), period: num.positive().default(4) }).optional(),
   /** Follow the entity's own path shape (or a ref's) at `speed` m/s; loop or ping-pong. Balloons, boats, carts, trains. */
   route: z.object({ ref: z.string().optional(), speed: num.positive().default(2), loop: z.boolean().default(true), altitude: num.default(0) }).optional(),
   /** Creature behaviour, client-side deterministic: needs a gait in kit args (or a pack animal). */
-  behavior: z.object({ kind: z.enum(['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle']), speed: num.positive().default(1), radius: num.positive().default(8), ref: z.string().optional() }).optional(),
+  behavior: z.object({ kind: z.enum(['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle']), speed: num.positive().default(1), radius: num.positive().default(8), ref: z.string().optional(),
+    /** E2 #3: shy animals run from people who come closer than this (m) and wander back once they have gone. */
+    flee: num.min(0).max(40).optional() }).optional(),
   /** VOCAB-W2 sound layer (viewer, procedural WebAudio, new worlds): a loop while state `when` holds ('on', '!open', 'lit'),
    *  or a one-shot each time that field changes (mode 'change'); heard within `radius` m of the thing (path/area: its outline). */
   sound: z.object({ kind: z.enum(['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music']), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop') }).optional(),

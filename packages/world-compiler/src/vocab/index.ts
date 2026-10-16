@@ -347,5 +347,7 @@ export function stretchBaked(b: Baked, [sx, sy, sz]: [number, number, number]): 
     ...(b.openings ? { openings: b.openings.map((o) => ({ ...o, at: p2(o.at), width: o.width * (Math.abs(Math.sin(o.yaw)) > 0.7 ? sz : sx), height: o.height * sy, ...(o.sill !== undefined ? { sill: o.sill * sy } : {}) })) } : {}),
     ...(b.links ? { links: b.links.map((l) => ({ ...l, path: l.path.map(p2), y0: l.y0 * sy, y1: l.y1 * sy })) } : {}),
     ...(b.rooms ? { rooms: b.rooms.map((r) => ({ ...r, polygon: r.polygon.map(p2), origin: p2(r.origin), y: r.y * sy, height: r.height * sy })) } : {}),
+    // E2 #5: a def's carve (a pool's basin) stretches with the picture
+    ...(b.landform?.kind === 'carve' ? { landform: { ...b.landform, ...(b.landform.area ? { area: b.landform.area.map(p2) } : {}), bed: b.landform.bed * sy } } : {}),
   };
 }

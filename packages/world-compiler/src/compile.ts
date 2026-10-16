@@ -887,7 +887,9 @@ function indexAndGround(w: WorldModel, e: Entity, def: StoredDef, diff: Diff) {
   if (def.layer === 'solid' && baked.colliders.length) w.index(e.id, w.footprint(e, def));
   if (baked.landform) {
     const wp = w.worldPose(e);
-    const lf = placeLandform(baked.landform, wp, e.id);
+    // E2 #5: a def's own landform (components.landform: a pool's basin) is authored in the def frame, bed relative to
+    // where the thing stands; a generator's landform keeps its world-frame shapes.
+    const lf = def.components.landform ? placeDefLandform(baked.landform, wp, e.id) : placeLandform(baked.landform, wp, e.id);
     for (const t of w.terrain.update(w.ground(), [])) diff.tiles.push(t);
     const changed = w.setLandform(lf, e.id);
     for (const c of changed) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
@@ -905,6 +907,20 @@ function clearGround(w: WorldModel, e: Entity, diff: Diff) {
   for (const c of w.setLandform(null, e.id)) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
   for (const c of w.setLandform(null, `${e.id}:pad`)) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
   w.setWater(null, e.id);
+}
+/** E2 #5: a def-carried landform, authored in the def frame: area/path points turn and move with the entity, widths scale,
+ *  and levels (carve bed, pad level) are relative to the entity's own height. */
+function placeDefLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landform']>, wp: { x: number; y: number; z: number; yaw: number; s: number }, id: string): Landform {
+  const c = Math.cos(wp.yaw), sn = Math.sin(wp.yaw);
+  const at = ([u, v]: [number, number]): [number, number] => [wp.x + (u * c + v * sn) * wp.s, wp.z + (-u * sn + v * c) * wp.s];
+  const o = { ...lf, id } as Landform & { area?: [number, number][]; path?: [number, number][]; w?: number; bed?: number; level?: number };
+  if (o.area) o.area = o.area.map(at);
+  if (o.path) o.path = o.path.map(at);
+  if (typeof o.w === 'number') o.w *= wp.s;
+  if (o.kind === 'carve') o.bed = wp.y + (o.bed ?? 0) * wp.s;
+  if (o.kind === 'pad') o.level = wp.y + (o.level ?? 0) * wp.s;
+  if (o.kind === 'bump' || o.kind === 'brush') return placeLandform(lf, wp, id);
+  return o;
 }
 /** A def's landform is authored in the def frame; bumps move to the entity's world position, shapes are already in world metres. */
 function placeLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landform']>, wp: { x: number; z: number; s: number }, id: string): Landform {

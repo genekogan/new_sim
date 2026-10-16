@@ -40,7 +40,8 @@ export class CoverProbe {
   private last = 0;
   private covered = false;
   // a camera for sprites (labels) in the god's layer: three's Sprite.raycast needs one; label hits are skipped below
-  constructor(private roots: () => THREE.Object3D[]) { this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
+  private roots: () => THREE.Object3D[];
+  constructor(roots: () => THREE.Object3D[]) { this.roots = roots; this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
   test(x: number, y: number, z: number): boolean {
     const now = performance.now();
     if (now - this.last < 400 && this.at.distanceToSquared(_p.set(x, y, z)) < 1) return this.covered;
@@ -76,7 +77,11 @@ export class GodWorldLiving {
   private patterns: PatternNightMap | null = null;
   private reduced = false;
   lights = 0;
-  constructor(private layer: LayerLike, private renderer?: THREE.WebGLRenderer) {
+  // explicit fields (not parameter properties): lane bugs' tests load this file under Node's strip-only TypeScript
+  private layer: LayerLike;
+  private renderer?: THREE.WebGLRenderer;
+  constructor(layer: LayerLike, renderer?: THREE.WebGLRenderer) {
+    this.layer = layer; this.renderer = renderer;
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
     this.cover = new CoverProbe(() => (this.layer.active ? [this.layer.group] : []));
   }
@@ -128,10 +133,12 @@ export class GodWorldLiving {
 }
 
 // ---------------------------------------------------------------- broadcast: a god world's establishing views
-type TourViewLike = { id: string; label: string; p: readonly [number, number, number]; target: readonly [number, number, number] };
+type TourViewLike = { id: string; label: string; p: readonly [number, number, number]; target: readonly [number, number, number];
+  /** Ground radius (m) around `target` that holds the whole landmark: Explore's picture of it slices this much. */
+  radius?: number };
 type ViewModel = {
   entities: Map<string, { id: string; name?: string; def: string; in: { parent: string }; shape?: { area?: [number, number][]; path?: [number, number][] } }>;
-  resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown } } | undefined;
+  resolvedDef(ref: string): { layer?: string; tags?: string[]; components?: { landform?: unknown }; make?: { kind?: string } } | undefined;
   footprint(e: unknown): { c: [number, number]; half: [number, number]; y0: number; y1: number }[];
   editSeq?: number;
 };
@@ -147,7 +154,8 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
   const found: { v: TourViewLike; size: number }[] = [];
   for (const e of m.entities.values()) {
     if (e.in.parent !== 'world' || !e.name || /^flag[-:]/.test(e.name)) continue;
-    const d = m.resolvedDef(e.def); if (!d || d.components?.landform || (d.tags ?? []).some((t) => IGNORE_TAGS.test(t))) continue;
+    // a landform-only def (hill, cutting) is ground, not a landmark; a thing that also carves (a pool's basin) still is one
+    const d = m.resolvedDef(e.def); if (!d || (d.components?.landform && (!d.make || d.make.kind === 'none')) || (d.tags ?? []).some((t) => IGNORE_TAGS.test(t))) continue;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, top = 0;
     try { for (const b of m.footprint(e)) { const r = Math.hypot(b.half[0], b.half[1]); x0 = Math.min(x0, b.c[0] - r); x1 = Math.max(x1, b.c[0] + r); z0 = Math.min(z0, b.c[1] - r); z1 = Math.max(z1, b.c[1] + r); top = Math.max(top, b.y1 - b.y0); } } catch { continue; }
     if (e.shape?.area) for (const [x, z] of e.shape.area) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
@@ -158,7 +166,7 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
     const dist = Math.max(10, Math.min(70, size * 1.9 + 6)), a = ((hashStr(e.id) % 360) / 360) * Math.PI * 2;
     const ex = cx + Math.cos(a) * dist, ez = cz + Math.sin(a) * dist, eg = groundAt(ex, ez) ?? g;
     const ty = g + Math.min(top, 8) * 0.45;
-    found.push({ size, v: { id: `god:${e.id}`, label: e.name.replace(/[-_]+/g, ' '), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez] } });
+    found.push({ size, v: { id: `god:${e.id}`, label: e.name.replace(/[-_]+/g, ' '), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) } });
   }
   const views = found.sort((a, b) => b.size - a.size).slice(0, 12).map((f) => f.v);
   viewsCache = { key, views };

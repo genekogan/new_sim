@@ -53,12 +53,26 @@ export function targetFor(kind:WeatherKind,hour:number|null,out?:WeatherState):W
 }
 /** Seconds to cover ~63% of the way to a new target, per channel. */
 export const TAU:Record<keyof WeatherState,number>={cloud:70,rain:35,wind:45,fog:80,mist:90,wet:45};
-const DRY_TAU=300,KEYS=Object.keys(TAU) as (keyof WeatherState)[];
+/** Ground dries slowly; a shower, though, stops within about half a minute rather than tapering for minutes
+ * (E2 #8: with rain's 35 s build-up constant it was still visibly falling 2–3 minutes after the sky cleared). */
+const DRY_TAU=300,RAIN_STOP_TAU=8,KEYS=Object.keys(TAU) as (keyof WeatherState)[];
+/** A god's weather change eases this many times faster than the schedule, so it shows in about 10–25 s. */
+export const GOD_EASE=3.5;
+/** ... and for this long after the god's last change, including a return to the scheduled ('auto') weather. */
+export const GOD_SETTLE_S=90;
+/** The easing speed-up for this frame: a god's set weather, or the settling time after a god changed (or cleared) it. */
+export function weatherEaseRate(set:boolean,secondsSinceGodChange:number,cycle=false){return cycle?4:set||secondsSinceGodChange<GOD_SETTLE_S?GOD_EASE:1;}
+type SetChannels={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
+/** Did the god's set weather change (including being set, or cleared back to the schedule)? */
+export function setWeatherChanged(a:SetChannels|null,b:SetChannels|null){
+ if(!a||!b)return a!==b;
+ return a.kind!==b.kind||a.clouds!==b.clouds||a.rain!==b.rain||a.wind!==b.wind||a.fog!==b.fog||a.intensity!==b.intensity;
+}
 /** Ease `state` toward `target` in place (frame-rate independent). */
 export function easeWeather(state:WeatherState,target:WeatherState,dt:number){
  if(!(dt>0))return state;dt=Math.min(dt,5);
  for(const k of KEYS){
-  const tau=k==='wet'&&target.wet<state.wet?DRY_TAU:TAU[k];
+  const tau=k==='wet'&&target.wet<state.wet?DRY_TAU:k==='rain'&&target.rain<state.rain?RAIN_STOP_TAU:TAU[k];
   state[k]+=(target[k]-state[k])*(1-Math.exp(-dt/tau));
  }
  return state;
