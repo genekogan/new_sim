@@ -147,7 +147,7 @@ const planting = [
   woodland('north-woods', [-20,-65,30,-32], 0.016),
   woodland('forest-campsite', [-176,-136,-106,-74], 0.011),
   woodland('east-hills-groves', [307,-148,425,71], 0.005),
-  woodland('north-mountain-pines', [-430,-410,430,-335], 0.0015, [{ kind: 'pine', weight: 7, maxSlope: 0.8, scale: [0.7,1.4] }, { kind: 'rock', weight: 2 }, { kind: 'boulder', weight: 1, minSlope: 0.25 }]),
+  woodland('north-mountain-pines', [-430,-410,430,-335], 0.004, [{ kind: 'pine', weight: 7, maxSlope: 0.8, scale: [0.7,1.4] }, { kind: 'rock', weight: 2 }, { kind: 'boulder', weight: 1, minSlope: 0.25 }]),
   woodland('western-forest', [-429,-190,-285,90], 0.003),
   woodland('west-lake-willows', [-201,-47,-104,51], 0.006, [{ kind: 'birch', weight: 3, farWater: 3 }, { kind: 'oak', weight: 2, farWater: 5 }, { kind: 'reed', weight: 5, nearWater: 3, wet: 0.4 }, { kind: 'bush', weight: 2 }]),
   woodland('river-bank-groves', [-269,-229,-212,145], 0.004, [{ kind: 'birch', weight: 4, nearWater: 16, farWater: 3 }, { kind: 'bush', weight: 2 }, { kind: 'reed', weight: 4, nearWater: 4, wet: 0.4 }]),

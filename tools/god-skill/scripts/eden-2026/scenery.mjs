@@ -23,6 +23,8 @@ const helter = [{ kind: 'cyl', at: [0, 4.5, 0], r: 1.6, h: 9, color: YELLOW, seg
   { kind: 'sweep', at: [0, 0, 0], path: spiral, r: 0.32, color: RED, collide: false }];
 const golfFlag = [{ kind: 'cyl', at: [0, 1.1, 0], r: 0.03, h: 2.2, color: WHITE }, { kind: 'box', at: [0.26, 1.95, 0], size: [0.5, 0.32, 0.02], color: '#d9473e', collide: false }];
 groups.push({ label: 'scenery: Eden fairground and golf defs', ops: [
+  kit('eden-lighthouse-bands', 'Three red paint bands round the harbour lighthouse tower (old Eden: a red-and-white banded lighthouse).', [5.3, 11, 5.3],
+    [2.2, 5.4, 8.6].map(y => ({ kind: 'cyl', at: [0, y, 0], r: 2.62, h: 1.3, color: RED, segments: 24, collide: false }))),
   kit('eden-big-top', 'A red-and-white striped circus big top (23 m) with a pennant on its peak (old Eden festival meadow).', [23.6, 14, 23.6], bigTop),
   kit('eden-helter-skelter', 'A yellow helter-skelter tower with a red spiral slide (old Eden festival meadow).', [5.5, 11.4, 5.5], helter),
   kit('eden-golf-flag', 'A golf green pin: a white pole with a red flag.', [0.6, 2.2, 0.1], golfFlag)] });
@@ -59,7 +61,6 @@ group('scenery: railway and train', put => {
 });
 group('scenery: festival meadow', put => {
   // big top: a striped canvas tent at circus scale; helter-skelter yellow tower; balloons; food stalls and lights
-  put('eden-big-top@1', 'festival-big-top', mid('region-festival-meadow.big-top'));
   put('eden-helter-skelter@1', 'festival-helter-skelter', mid('region-festival-meadow.helter-skelter'));
   put('balloon', 'festival-balloon-2', [262, 70], { params: { env: '#d9473e', stripe: '#f4efe4' } });
   put('balloon', 'festival-balloon-3', [300, 48], { params: { env: '#3f7fb5', stripe: '#f2c14e' } });
@@ -84,6 +85,10 @@ group('scenery: campsite and artists green', put => {
   for (let i = 0; i < 3; i++) put('picnic-table', `artists-green-picnic-${i + 1}`, [gx - 5 + i * 5, gz + 1], {});
   put('totem', 'artists-green-totem', [gx, gz - 1], {});
 });
+group('scenery: lighthouse stripes', put => {
+  // old harbour lighthouse is banded red and white; three red bands round the native tower (5 m, 5 x 2.6 m floors)
+  put('eden-lighthouse-bands@1', 'harbour-lighthouse-bands', [96, 0.1, 188]);
+});
 group('scenery: campus dome', put => {
   // old north.ts: the library annex has a domed central roof over its portico; the annex is a 2-storey 7.2 m hall
   const [x, z] = mid('region-campus.library-annex');
@@ -101,8 +106,14 @@ group('scenery: avenue and commons trees', put => {
 });
 group('scenery: library and cafe interiors', put => {
   for (const [name, p] of [['library-reading-rug', [-2.5, 0, -0.6]], ['library-reading-rug-2', [-3.4, 0, 1.8]]]) put('rug', name, p, { in: { parent: 'eden-library-1', slot: 'reading' }, params: { border: '#7a2e24', field: '#b8503c' } });
-  put('office-desk', 'library-computer-desk', [1.2, 0, 2.3], { in: { parent: 'eden-library-1', slot: 'reading' }, r: Math.PI });
+  put('office-desk', 'library-computer-desk', [1.2, 0, 1.9], { in: { parent: 'eden-library-1', slot: 'reading' }, r: Math.PI });
   put('bookcase', 'library-reading-shelf-1', [-4.6, 0, -1.6], { in: { parent: 'eden-library-1', slot: 'reading' }, r: Math.PI / 2 });
   put('potted-plant', 'library-reading-plant', [2.4, 0, -1.8], { in: { parent: 'eden-library-1', slot: 'reading' } });
+  // cafe (int-cafe, room 8 x 3.8 m): cakes under glass, a menu board, a rug under the tables, a plant
+  const cafe = { in: { parent: 'int-cafe', slot: 'cafe' } };
+  put('display-case', 'cafe-cake-case', [1.3, 0, -1.2], { ...cafe, params: { g0: '#f3d9e4', g1: '#e9c46a', g2: '#c8553d' } });
+  put('chalkboard', 'cafe-menu-board', [3.3, 0, 1.1], { ...cafe, r: -Math.PI / 2 });
+  put('rug', 'cafe-rug', [-1.2, 0, 0.7], { ...cafe, params: { border: '#2f4f4a', field: '#c79a5b' } });
+  put('potted-plant', 'cafe-plant', [-3.6, 0, 1.55], cafe);
 });
 export const SCENERY_BATCHES = groups;
