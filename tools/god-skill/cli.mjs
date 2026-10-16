@@ -90,12 +90,19 @@ export async function parts(words = '', flags = {}) {
   const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), 'parts');
   return flags.json ? d : d.parts.length ? d.parts.map(partLine).join('\n') : `no parts from finished builds${words ? ` matching "${words}"` : ''}`;
 }
+// r2.1: a catalogue (registry) world may predate the built-in motion/light kits (core/twinkle-lights@1 is not in
+// registry stable@3), so `find twinkle` finds nothing there. Every world serves a ready def for each motion word.
+const MOTION_EXAMPLES = ['spin', 'sway', 'hover', 'route', 'sound', 'twinkle'];
+function servedMotionExample(words = '') {
+  const name = MOTION_EXAMPLES.find(k => String(words).toLowerCase().split(/[^a-z]+/).includes(k)); if (!name) return '';
+  return `\nready def for "${name}" in every world: curl -s ${load().world}/god/examples/light-motion.mjs -o light-motion.mjs && node light-motion.mjs ${name} > ${name}.def.json && node eden-god.mjs define ${name}.def.json`;
+}
 // Keep the shared catalogue module unchanged: this CLI adds the reuse badge to its normal manifest lines.
 export async function find(words, flags = {}) {
   if (!words && !flags.category && !flags.has) throw new Error('find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]');
   const d = await searchDefs(words, { category: flags.category, has: flags.has, tag: flags.tag, compact: 1, limit: flags.all ? 500 : 25 });
   if (flags.json) return d.defs;
-  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.${servedMotionExample(words)}`;
   return [`${d.defs.length} match${words ? ` "${words}"` : ''}:`, ...d.defs.map(r => `${catalogLine(r)}${usedBadge(r)}${r.why?.length ? `  ‹${r.why.join(' ')}›` : ''}`)].join('\n');
 }
 

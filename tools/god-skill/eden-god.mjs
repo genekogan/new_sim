@@ -2620,11 +2620,18 @@ async function parts(words = "", flags2 = {}) {
   const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), "parts");
   return flags2.json ? d : d.parts.length ? d.parts.map(partLine).join("\n") : `no parts from finished builds${words ? ` matching "${words}"` : ""}`;
 }
+var MOTION_EXAMPLES = ["spin", "sway", "hover", "route", "sound", "twinkle"];
+function servedMotionExample(words = "") {
+  const name = MOTION_EXAMPLES.find((k) => String(words).toLowerCase().split(/[^a-z]+/).includes(k));
+  if (!name) return "";
+  return `
+ready def for "${name}" in every world: curl -s ${load().world}/god/examples/light-motion.mjs -o light-motion.mjs && node light-motion.mjs ${name} > ${name}.def.json && node eden-god.mjs define ${name}.def.json`;
+}
 async function find(words, flags2 = {}) {
   if (!words && !flags2.category && !flags2.has) throw new Error("find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]");
   const d = await searchDefs(words, { category: flags2.category, has: flags2.has, tag: flags2.tag, compact: 1, limit: flags2.all ? 500 : 25 });
   if (flags2.json) return d.defs;
-  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ""}${flags2.category ? ` in ${flags2.category}` : ""}${flags2.has ? ` with ${[].concat(flags2.has).join(", ")}` : ""}${d.hint ? `. ${d.hint}` : ""}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ""}${flags2.category ? ` in ${flags2.category}` : ""}${flags2.has ? ` with ${[].concat(flags2.has).join(", ")}` : ""}${d.hint ? `. ${d.hint}` : ""}. Try \`recommend <what you want>\` or \`taxonomy\`.${servedMotionExample(words)}`;
   return [`${d.defs.length} match${words ? ` "${words}"` : ""}:`, ...d.defs.map((r) => `${line(r)}${usedBadge(r)}${r.why?.length ? `  \u2039${r.why.join(" ")}\u203A` : ""}`)].join("\n");
 }
 async function map(opts = {}) {

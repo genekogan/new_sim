@@ -14,7 +14,8 @@
 //        y locates the halo. lights:[...] replaces light and allows 1..8 independent bulbs.
 //        Patterns: steady, blink/pulse/chase .5 Hz, twinkle 1/3 Hz; reduced motion makes them steady.
 //        Chase phases follow array order; twinkle phases follow entity id + bulb index.
-//        `find twinkle` / `place twinkle-lights` use the built-in example. Look at hour 21.
+//        `find twinkle` / `place twinkle-lights` use the built-in kit where the world's library has it;
+//        otherwise `node light-motion.mjs twinkle` is the ready def. Look at hour 21.
 import { pathToFileURL } from 'node:url';
 const shape = { kind: 'sphere', at: [0, .5, 0], r: .5, segments: 5, color: '#e6b654', collide: false };
 const def = (name, components, shapes = [shape], box = [1, 1, 1]) => ({
