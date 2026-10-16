@@ -192,7 +192,6 @@ export function defaultCommand(world, port, o) {
     PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG,
     // fake minds and no model keys: $0 model spend, always
     ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', BRAIN_MODE: 'fake',
-    ...Object.fromEntries(['CATALOG_REGISTRY_DIR', 'CATALOG_CHANNEL', 'CATALOG_GENE_OWNER_ID'].filter((name) => process.env[name]).map((name) => [name, process.env[name]])),
     WORLD_KEY: world.slug, WORLD_ID: `${world.slug}-1`, WORLD_NAME: world.name ?? '', ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
     DEV_AUTH: clerk ? '0' : '1', SEED_NATIVES: '0', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin, ENABLE_WORLD_ENGINE: '1',
     WORLD_PATH: `/w/${world.slug}`,

@@ -3,7 +3,6 @@
 set -u
 rc=0
 packages=(engine-mars world-compiler generators ground kernel brain engine-toy engine-contract)
-[ ! -d packages/catalog/src ] || packages+=(catalog)
 for p in "${packages[@]}"; do
   echo "## $p"
   (

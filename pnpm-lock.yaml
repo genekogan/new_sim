@@ -32,9 +32,6 @@ importers:
       '@sim/brain':
         specifier: workspace:*
         version: link:../../packages/brain
-      '@sim/catalog':
-        specifier: workspace:*
-        version: link:../../packages/catalog
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../../packages/engine-contract
@@ -228,22 +225,6 @@ importers:
       '@types/node':
         specifier: ^22.19.19
         version: 22.20.4
-
-  packages/catalog:
-    dependencies:
-      '@sim/generators':
-        specifier: workspace:*
-        version: link:../generators
-      '@sim/world-compiler':
-        specifier: workspace:*
-        version: link:../world-compiler
-      zod:
-        specifier: ^4.6.5
-        version: 4.6.5
-    devDependencies:
-      '@types/node':
-        specifier: ^22.19.19
-        version: 22.19.19
 
   packages/client:
     dependencies:
