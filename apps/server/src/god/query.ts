@@ -69,7 +69,7 @@ export function runQuery(w: WorldModel, q: QueryInput) {
         rooms: baked.rooms?.map((r) => ({ id: r.id, name: r.name, floor: r.floor })) ?? [],
         openings: baked.openings?.map((o) => ({ id: o.id, kind: o.kind, level: o.level, state: o.state })) ?? [],
         links: baked.links?.map((l) => ({ id: l.id, kind: l.kind, from: l.from, to: l.to })) ?? [],
-        slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, used: [...(w.children.get(e.id) ?? [])].filter((c) => w.entities.get(c)?.in.slot === s.id).length + (s.kind === 'seat' ? (seatProviders.get(w)?.(e.id) ?? []).filter((x) => x.slot === s.id).length : 0) })),
+        slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, used: [...(w.children.get(e.id) ?? [])].filter((c) => w.entities.get(c)?.in.slot === s.id).length + (s.kind === 'seat' ? (seatProviders.get(w)?.(e.id) ?? []).filter((x) => x.slot === s.id).length : 0), ...(s.retired ? { retired: true } : {}) })).filter((s) => !s.retired || s.used),
         children: [...(w.children.get(e.id) ?? [])].map((c) => w.pathOf(c)),
         constraints: e.constraints ?? [],
         ...(usesProviders.get(w) ? { usedBy: usesProviders.get(w)!(e.id) } : {}),
@@ -133,11 +133,12 @@ function boundsOf(w: WorldModel, e: Entity, def: StoredDef, baked: Baked) {
 function slotWorld(w: WorldModel, e: Entity, baked: Baked) {
   const pose = w.worldPose(e);
   const kids = [...(w.children.get(e.id) ?? [])].map((c) => w.entities.get(c)!).filter(Boolean);
-  return baked.slots.map((s) => {
+  // a retired slot (an earlier release's facade frame) is listed only while something still hangs in it
+  return baked.slots.filter((s) => !s.retired || kids.some((k) => k.in.slot === s.id)).map((s) => {
     const [x, z] = toWorld(pose, s.p[0], s.p[2]);
     const occ = kids.filter((k) => k.in.slot === s.id);
     const souls = s.kind === 'seat' ? (seatProviders.get(w)?.(e.id) ?? []).filter((x) => x.slot === s.id).map((x) => x.soul) : [];
-    return { id: s.id, kind: s.kind, p: [x, round(pose.y + s.p[1] * pose.s), z], yaw: round(pose.yaw + s.yaw), capacity: s.capacity, used: occ.length + souls.length, occupants: [...souls, ...occ.slice(0, 64).map((k) => k.name ?? k.id)], ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.polygon ? { polygon: s.polygon.map(([a, b]) => toWorld(pose, s.p[0] + a, s.p[2] + b)), local: s.polygon } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}), ...(s.label ? { label: s.label } : {}) };
+    return { id: s.id, kind: s.kind, p: [x, round(pose.y + s.p[1] * pose.s), z], yaw: round(pose.yaw + s.yaw), capacity: s.capacity, used: occ.length + souls.length, occupants: [...souls, ...occ.slice(0, 64).map((k) => k.name ?? k.id)], ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.polygon ? { polygon: s.polygon.map(([a, b]) => toWorld(pose, s.p[0] + a, s.p[2] + b)), local: s.polygon } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}), ...(s.label ? { label: s.label } : {}), ...(s.retired ? { retired: true as const } : {}) };
   });
 }
 
@@ -156,7 +157,7 @@ function layout(w: WorldModel, o: { area?: [number, number, number, number]; max
     if (e.in.slot) row.slot = e.in.slot;
     if (e.shape) row.shape = e.shape;
     if (wantObbs && fp.length) row.obbs = fp.slice(0, 48).map((f) => [round(f.c[0]), round(f.c[1]), round(f.half[0]), round(f.half[1]), round(f.yaw), round(f.y0), round(f.y1)]);
-    if (b.baked.rooms?.length || b.baked.slots.length) row.slots = slotWorld(w, e, b.baked).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, used: s.used, ...(s.polygon ? { polygon: s.polygon, local: s.local } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}) }));
+    if (b.baked.rooms?.length || b.baked.slots.length) row.slots = slotWorld(w, e, b.baked).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, used: s.used, ...(s.polygon ? { polygon: s.polygon, local: s.local } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.retired ? { retired: true } : {}) }));
     if (b.baked.water) row.water = b.baked.water.level;
     if (e.constraints?.length) row.constraints = e.constraints;
     // doors (world frame; `out`: opens to the outside) and the building's front, for the CLI solver's
@@ -188,7 +189,7 @@ function bakeDef(w: WorldModel, b: NonNullable<QueryInput['bake']>) {
     ref: def.ref, name: def.name, gen: def.make.kind === 'gen' ? def.make.gen : def.make.kind, form: def.form, layer: def.layer, anchor: def.anchor, tags: def.tags, box: baked.box.map(round), scale: def.size.scale,
     colliders: baked.colliders.length, tris: baked.tris,
     rooms: baked.rooms?.map((r) => ({ id: r.id, name: r.name, floor: r.floor, y: round(r.y), height: r.height, polygon: r.polygon, origin: r.origin })) ?? [],
-    slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, ...(s.polygon ? { polygon: s.polygon } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}) })),
+    slots: baked.slots.filter((s) => !s.retired).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, ...(s.polygon ? { polygon: s.polygon } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}) })),
     openings: baked.openings ?? [], links: baked.links?.map((l) => ({ id: l.id, kind: l.kind, from: l.from, to: l.to, width: l.width })) ?? [],
     surfaces: baked.surfaces?.map((s) => ({ level: s.level, y: round(s.y), tag: s.tag })) ?? [],
     landform: !!baked.landform, water: baked.water?.level ?? null, notes: baked.notes ?? [],
