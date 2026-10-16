@@ -189,3 +189,28 @@ test('Y4b fuzz: whatever co-builders send, world state (env, sky, time, weather,
   }
   assert.equal(refused, 150); assert.equal(JSON.stringify(f.god.model.state), state);
 });
+
+test('Y4b × Y5: rewind is a build-wide undo; co-builders rewind only their own account\'s builds and edits, helpers never', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const church = await f.start(f.owner, 'church', 0);
+  for (const [name, step] of [['nave', 1], ['roof', 2]] as const) assert.equal(f.god.as({ identity: f.id(f.owner) }, () => f.god.act({ ops: [place(name, step * 10)], build: { ...church, step } })).accepted, true);
+  const seq = f.god.model.editSeq, rev = f.god.store.build('church')!.rev;
+  assert.equal(code(await f.post('/v1/god/builds/church/rewind', f.alice, { to: 0 })), 'cobuilder.scope');
+  assert.equal(code(await f.post('/v1/god/builds/church/rewind', f.alice, { to: 1, dry: true })), 'cobuilder.scope');
+  assert.equal(code(await f.post('/v1/god/undo?group=church', f.alice)), 'cobuilder.scope', 'undo --group <open build> is a rewind to the start');
+  assert.equal(f.god.model.editSeq, seq); assert.equal(f.god.store.build('church')!.rev, rev); assert.ok(f.god.model.get('roof'));
+  // Her own build rewinds; once the owner has worked inside it (through a claim), the rewind is refused whole.
+  const barn = await f.start(f.alice, 'barn', 200);
+  for (const [name, step] of [['loft', 1], ['hayrack', 2]] as const) assert.equal((await f.post('/v1/god/act', f.alice, { ops: [place(name, 190 + step * 5, 0)], build: { ...barn, step } })).accepted, true);
+  const own = await f.post('/v1/god/builds/barn/rewind', f.alice2, { to: 1 }); assert.equal(own.ok, true, JSON.stringify(own)); assert.equal(f.god.model.get('hayrack'), undefined);
+  const door = await f.post('/v1/god/builds/barn/claims', f.owner, { part: 'door', root: 'loft' });
+  assert.equal((await f.post('/v1/god/act', f.owner, { ops: [place('door', 1, 0, 'loft')], build: { id: 'barn', claim: door.claim.id, step: 2 } })).accepted, true);
+  await f.post(`/v1/god/builds/barn/claims/${door.claim.id}/release`, f.owner, { done: true });
+  const mixed = await f.post('/v1/god/builds/barn/rewind', f.alice, { to: 0 }); assert.equal(code(mixed), 'cobuilder.scope'); assert.ok(f.god.model.get('loft/door')); assert.ok(f.god.model.get('loft'));
+  assert.equal((await f.post('/v1/god/builds/barn/rewind', f.owner, { to: 0 })).ok, true, 'owner tokens are unchanged');
+  // Helpers (here the owner's) never rewind, by route or through undo --group.
+  const claim = await f.post('/v1/god/builds/church/claims', f.owner, { part: 'nave', root: 'nave' });
+  const helper = (await f.post(`/v1/god/builds/church/claims/${claim.claim.id}/helper`, f.owner, {})).token as string;
+  const routed = await f.call('POST', '/v1/god/builds/church/rewind', helper, { to: 0 }); assert.equal(routed.status, 403); assert.equal(routed.data.code, 'helper.scope');
+  assert.equal(code(await f.post('/v1/god/undo?group=church', helper)), 'helper.scope'); assert.ok(f.god.model.get('roof'));
+});

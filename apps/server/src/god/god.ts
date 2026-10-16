@@ -517,9 +517,14 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
    *  after step k is reverted by one atomic R1 chain; later live edits that depend on them refuse the whole rewind.
    *  The build stays open at step k with closure re-armed; `dry` returns the same summary and changes nothing. */
   rewind(id: string, raw: unknown) {
+    // Y4/Y4b: rewind is a build-wide undo. Helpers never rewind (not even through `undo --group <build>`); a co-builder
+    // rewinds only builds its account leads, and only when every edit to revert is its account's own.
+    if (this.caller.identity?.child) return { ok: false as const, failures: [helperFailure('helper.scope', `Helper tokens cannot rewind build ${id}; ask the lead.`)] };
+    const foreignBuild = this.builds.foreignTo(this.caller.identity, id, undefined, 'rewind'); if (foreignBuild) return { ok: false as const, failures: [foreignBuild] };
     const plan = this.builds.rewindPlan(id, raw, this.store.groupEditsUnder(id, true, 2_147_483_647));
     if (!plan.ok) return plan;
     const { targets, to, force } = plan, edits = targets.map(t => t.seq), at = this.now(), from = plan.row.body.step.n;
+    const foreign = this.foreignEdit(targets); if (foreign) return { ok: false as const, failures: [foreign], edits };
     const preflight = this.preflightUndo(targets, this.model, true, force ? id : undefined);
     if (!preflight.ok) return { ok: false as const, failures: preflight.failures, failed: preflight.failed, edits };
     const dependents = targets.length ? rewindDependents(id, to, this.model, preflight.model, preflight.entries, targets, this.store.liveEditsAfter(Math.min(...edits))) : [];
