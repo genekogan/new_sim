@@ -3,7 +3,7 @@
 // The world's ordinary viewer page renders the picture in its `?shot=1` mode (canvas only, camera from
 // eye/at, window.__shotReady once drawn). Default: open Chrome, wait until every entity has eased in,
 // read the canvas back (the WebGL buffer is preserved by an init script), close Chrome. Machines shared
-// by many agents take a lease (/tmp/eden-chrome-lease) so only one headless Chrome renders at a time.
+// by many agents take one of the machine's Chrome lease slots (/tmp/eden-chrome-lease[.1|.2], lib/chrome-lease.mjs).
 // `look --keep` instead leaves a keeper process holding one tab on the world (it follows edits live),
 // so later looks cost seconds; it quits after 20 idle minutes, `look --stop` ends it. Use it on your own
 // machine, not a shared one. GPU by default; EDEN_GOD_GL=swiftshader forces software GL.
@@ -26,7 +26,7 @@ const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HT
 import { acquireLock, holder, liveness, lockStatus, parseHolder } from './locks.mjs';
 import { atomicWrite } from './state.mjs';
 import { chromeLease as lease } from './chrome-lease.mjs';
-/** One headless Chrome at a time on a shared machine (the lanes' lease); EDEN_GOD_NO_LEASE=1 skips it. */
+/** A few headless Chromes at a time on a shared machine (the lanes' lease slots); EDEN_GOD_NO_LEASE=1 skips it. */
 export const chromeLease = (holder = 'eden-god', o) => (process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {}) : lease(holder, o));
 const KEEPER = '.eden-god.look.json';
 const IDLE_MS = 20 * 60_000;
@@ -211,7 +211,8 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = f
       if (!current.has('eye') || !current.has('at') || ['hour', 'weather'].some(key => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
       await page.setViewportSize?.({ width, height });
     } else {
-      const unlock = await (runtime.lease ?? chromeLease)('eden-god look');
+      // The slot wait is inside the look deadline, leaving 10 s to launch and draw (a busy-slot refusal names the holders).
+      const unlock = await (runtime.lease ?? chromeLease)('eden-god look', { waitMs: Math.max(0, timeoutMs - (now() - t0) - 10_000) });
       let unlocked = false; release = () => { if (!unlocked) { unlocked = true; unlock(); } };
       if (cancelled) { release(); throw new Error('look.timeout: lease wait exceeded deadline'); }
       browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch(e => { throw Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });

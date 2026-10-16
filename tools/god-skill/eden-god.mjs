@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { hostname } from "node:os";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 var CHROME_LOCK = "/tmp/eden-chrome-lease";
 var LOCK_TTL_MS = 3e4;
 var ownStart = new Date(Date.now() - process.uptime() * 1e3).toISOString();
@@ -117,7 +117,7 @@ var LockBusy = class extends Error {
   }
 };
 var owned = /* @__PURE__ */ new Map();
-function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant = false } = {}) {
+function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant = false, detail = true } = {}) {
   path = resolve(path);
   if (reentrant && owned.has(path)) return () => {
   };
@@ -128,7 +128,7 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       if (breakLock(path, { ttlMs })) continue;
-      throw new LockBusy(path, inspectLock(path, ttlMs));
+      throw new LockBusy(path, detail ? inspectLock(path, ttlMs) : { present: true, holder: null, reason: "held" });
     }
   }
   const record = { schema: "eden-lock/1", holder: holder(label), acquiredAt: Date.now(), heartbeatAt: Date.now(), ttlMs, nonce: randomUUID() };
@@ -142,8 +142,10 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
   const heartbeat = setInterval(() => {
     try {
       if (!same(original, snapshot(path))) return;
-      record.heartbeatAt = Date.now();
+      const now = Date.now();
+      record.heartbeatAt = now;
       writeFileSync(`${path}/holder`, JSON.stringify(record) + "\n", { mode: 384 });
+      utimesSync(path, new Date(now), new Date(now));
       original = snapshot(path);
     } catch {
     }
@@ -169,6 +171,41 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
 // lib/doctor.mjs
 import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3, unlinkSync as unlinkSync2, statSync as statSync2 } from "node:fs";
 import { resolve as resolve2 } from "node:path";
+
+// lib/chrome-lease.mjs
+var CHROME_SLOTS = 3;
+function chromeSlotCount(env2 = process.env) {
+  const n = Number(env2.CHROME_LEASE_SLOTS ?? CHROME_SLOTS);
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, 16) : CHROME_SLOTS;
+}
+var chromeSlotDirs = (base = CHROME_LOCK, slots = chromeSlotCount()) => Array.from({ length: slots }, (_, i) => i === 0 ? base : `${base}.${i}`);
+async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK, slots = chromeSlotCount() } = {}) {
+  const started = Date.now(), dirs = chromeSlotDirs(leaseDir, slots), order = dirs.slice().reverse();
+  for (; ; ) {
+    const last = Date.now() - started >= waitMs, busy = /* @__PURE__ */ new Map(), failed = /* @__PURE__ */ new Map();
+    for (const dir of order) {
+      try {
+        const release = acquireLock(dir, { label, ttlMs: staleMs, detail: last });
+        release.dir = dir;
+        return release;
+      } catch (e) {
+        (e.code === "lock.busy" ? busy : failed).set(dir, e);
+      }
+    }
+    if (!busy.size) {
+      const e = failed.get(dirs[0]) ?? [...failed.values()][0];
+      if (failed.size > 1) e.message = `chrome lease: no slot usable (${dirs.map((d) => `${d}: ${failed.get(d).message}`).join("; ")})`;
+      throw e;
+    }
+    if (last) {
+      const e = busy.get(dirs.find((d) => busy.has(d))), why = dirs.map((d) => busy.has(d) ? busy.get(d).message.replace(/^lock\.busy: /, "").replace(/; run doctor$/, "") : `${d} unusable: ${failed.get(d).code ?? failed.get(d).message}`);
+      e.message = `chrome lease busy: ${dirs.length === 1 ? e.message : `all ${dirs.length} slots ${failed.size ? "held or unusable" : "held"} (${why.join("; ")}); run doctor`}`;
+      e.locks = dirs.filter((d) => busy.has(d)).map((d) => busy.get(d).lock);
+      throw e;
+    }
+    await new Promise((r) => setTimeout(r, Math.min(200 + Math.random() * 200, Math.max(1, waitMs - (Date.now() - started)))));
+  }
+}
 
 // lib/state.mjs
 import { existsSync, readFileSync as readFileSync2, writeFileSync as writeFileSync2, renameSync, unlinkSync } from "node:fs";
@@ -426,10 +463,10 @@ var r2 = (v) => Math.round(v * 100) / 100;
 
 // lib/doctor.mjs
 function localDoctor({ fix = false, cwd = process.cwd(), chrome = CHROME_LOCK } = {}) {
-  const paths = [chrome, resolve2(cwd, ".eden-god.look.json.lock"), resolve2(cwd, ".eden-god.json.lock"), ...readdirSync(cwd).filter((n) => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map((n) => resolve2(cwd, n))];
+  const slots = chromeSlotDirs(chrome), paths = [...slots, resolve2(cwd, ".eden-god.look.json.lock"), resolve2(cwd, ".eden-god.json.lock"), ...readdirSync(cwd).filter((n) => /^\.eden-god\.claim-c_[0-9a-f]{8}\.json\.lock$/.test(n)).map((n) => resolve2(cwd, n))];
   for (let i = 0; i < paths.length; i++) if (existsSync2(paths[i] + ".reclaim")) paths.push(paths[i] + ".reclaim");
   const locks = paths.map((path2) => {
-    const row = { kind: path2 === chrome ? "chrome" : "state", ...inspectLock(path2) };
+    const slot = slots.indexOf(path2), row = { kind: slot >= 0 ? "chrome" : "state", ...slot >= 0 ? { slot } : {}, ...inspectLock(path2) };
     if (fix && row.stale) row.fixed = breakLock(path2);
     return row;
   });
@@ -1642,7 +1679,7 @@ function exportGenesis(snapshot3, { name } = {}) {
 
 // lib/look.mjs
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync3, utimesSync } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve as resolve4 } from "node:path";
@@ -1707,23 +1744,6 @@ async function withRemoteLook(args, runtime, local) {
       return { ...await remoteLook(args, runtime), ms: now() - started };
     } catch (remote) {
       throw new Error(`look: local: ${e.message}; remote: ${remote.message}`, { cause: remote });
-    }
-  }
-}
-
-// lib/chrome-lease.mjs
-async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK } = {}) {
-  const started = Date.now();
-  for (; ; ) {
-    try {
-      return acquireLock(leaseDir, { label, ttlMs: staleMs });
-    } catch (e) {
-      if (e.code !== "lock.busy") throw e;
-      if (Date.now() - started >= waitMs) {
-        e.message = `chrome lease busy: ${e.message}`;
-        throw e;
-      }
-      await new Promise((r) => setTimeout(r, Math.min(100, Math.max(1, waitMs - (Date.now() - started)))));
     }
   }
 }
@@ -1842,7 +1862,7 @@ async function keeper(worldUrl, port) {
       if (last !== lastUse) lastUse = last;
       if (Date.now() - lastUse > IDLE_MS || readKeeper()?.pid !== process.pid) break;
       write();
-      utimesSync(KEEPER, new Date(lastUse), new Date(lastUse));
+      utimesSync2(KEEPER, new Date(lastUse), new Date(lastUse));
     }
   } finally {
     if (browser) await browser.close().catch(() => {
@@ -1856,7 +1876,7 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
   if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && k.world === worldUrl && await alive(k.port)) {
     const now = /* @__PURE__ */ new Date();
     try {
-      utimesSync(KEEPER, now, now);
+      utimesSync2(KEEPER, now, now);
     } catch {
     }
     return k;
@@ -2015,7 +2035,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
       if (!current.has("eye") || !current.has("at") || ["hour", "weather"].some((key) => current.get(key) !== q.get(key))) await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
       await page.setViewportSize?.({ width, height });
     } else {
-      const unlock = await (runtime.lease ?? chromeLease2)("eden-god look");
+      const unlock = await (runtime.lease ?? chromeLease2)("eden-god look", { waitMs: Math.max(0, timeoutMs - (now() - t0) - 1e4) });
       let unlocked = false;
       release = () => {
         if (!unlocked) {
@@ -2765,8 +2785,18 @@ function walkLine(walk) {
   if (!walk) return "";
   if (walk.state === "pending" || walk.state === "unchecked") return `  walk: not checked \u2014 ${walk.note}`;
   if (walk.state === "ok") return `  walk: all ${walk.rooms.length} room${walk.rooms.length === 1 ? "" : "s"} can be walked into from the front door and out again (the engine's own route check: it overrides "reachable from outside" in the notes, which only reads the design's doors and stairs)`;
-  const why = (r) => [r.in !== true && `no way in (${r.in})`, r.out !== true && `no way out (${r.out})`].filter(Boolean).join(", ");
-  return `  walk: NOT WALKABLE \u2014 ${walk.rooms.filter((r) => r.in !== true || r.out !== true).map((r) => `${r.id} (floor ${r.floor}): ${why(r)}`).join("; ")}. This is the engine's own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; fix the stairs, doors or whatever stands in the way, then describe again.`;
+  const floorIn = (r) => r.in === "room.no-standing-room" || r.why?.in?.endpoint?.side === "to";
+  const floorOut = (r) => r.out === "room.no-standing-room" || r.why?.out?.endpoint?.side === "from";
+  const bad = walk.rooms.filter((r) => r.in !== true || r.out !== true), floorless = bad.filter((r) => floorIn(r) || floorOut(r));
+  const failure = (code, w) => /^reach\.bad-/.test(code) && w?.detail ? `${code}: ${w.detail}` : code;
+  const why = (r) => [r.in !== true && !floorIn(r) && `no way in (${failure(r.in, r.why?.in)})`, r.out !== true && !floorOut(r) && `no way out (${failure(r.out, r.why?.out)})`].filter(Boolean).join(", ");
+  const routes = bad.filter((r) => why(r));
+  const parts2 = [
+    floorless.length && `the engine has no floor to stand on in room${floorless.length > 1 ? "s" : ""} ${floorless.map((r) => `${r.id} (floor ${r.floor})`).join(", ")}`,
+    ...routes.map((r) => `${r.id} (floor ${r.floor}): ${why(r)}`)
+  ].filter(Boolean);
+  const fix = [floorless.length && `give ${floorless.length > 1 ? "those rooms" : "that room"} a floor the engine can stand on (the floor may be missing for the engine, or the room filled wall to wall; describe --json shows where it looked)`, routes.length && "fix the stairs, doors or whatever stands in the way"].filter(Boolean).join("; ");
+  return `  walk: NOT WALKABLE \u2014 ${parts2.join("; ")}. This is the engine's own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; ${fix}, then describe again.`;
 }
 async function describe(ref, flags2 = {}) {
   if (!ref) throw new Error("usage: describe <path|flag:name>");
@@ -2784,7 +2814,10 @@ async function describe(ref, flags2 = {}) {
     const cut = ref.lastIndexOf("/"), h = (await query({ describe: ref.slice(0, cut) })).describe, word = ref.slice(cut + 1).toLowerCase().replace(/[^a-z0-9]/g, "");
     const room = h.error ? null : (h.rooms ?? []).find((r) => r.id === ref.slice(cut + 1)) ?? (h.rooms ?? []).find((r) => r.id.replace(/[^a-z0-9]/g, "").startsWith(word));
     if (room) {
-      if (flags2.json) return room;
+      if (flags2.json) {
+        const walked = h.walk?.rooms?.find((r) => r.id === room.id);
+        return walked ? { ...room, walk: { state: h.walk.state, from: h.walk.from, ...walked } } : room;
+      }
       return [`${h.path}/${room.id} \u2014 room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join("\xD7")} m, headroom ${room.height} m`, `  doors: ${room.doors.join(", ") || "none"}`, `  holds: ${room.occupants.map((o) => o.name).join(", ") || "nothing"}`, ...h.walk?.rooms.find((r) => r.id === room.id) ? [walkLine({ ...h.walk, rooms: h.walk.rooms.filter((r) => r.id === room.id) })] : [], `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|\u2026]; furnish ${h.path}/${room.id}`].join("\n");
     }
   }

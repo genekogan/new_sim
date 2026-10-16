@@ -16,7 +16,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { rmSync as rmFile, writeFileSync as writeFile } from 'node:fs';
 import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -66,9 +65,8 @@ await until('the launcher', async () => (await fetch(`${origin}/__sim/worlds.jso
 
 // ---------- the browser (a person) and a fresh folder (their agent)
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
-// One Chrome at a time across lanes (team/lanes/MERGES.md): hold the lease for this run, keep it fresh.
+// A Chrome lease slot for this run (lib/chrome-lease.mjs): eden-lock/1's heartbeat keeps it fresh, directory mtime too.
 const releaseLease = await chromeLease('launcher-e2e');
-const leaseBeat = setInterval(() => { try { rmFile('/tmp/eden-chrome-lease/holder', { force: true }); writeFile('/tmp/eden-chrome-lease/holder', `launcher-e2e ${process.pid} ${new Date().toISOString()}\n`); } catch { /* lease gone */ } }, 60_000);
 // Real GPU (Metal) headless Chrome; swiftshader starves on this shared machine.
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
@@ -283,7 +281,7 @@ try {
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(join(out, 'launcher.log'), launcherLog);
   await browser.close().catch(() => {});
-  clearInterval(leaseBeat); releaseLease();
+  releaseLease();
   console.log(`\n${report.passed}/${report.total} steps passed${report.failures.length ? `, ${report.failures.length} failures` : ''} — ${out}`);
   if (!args.keep) cleanup();
   process.exit(report.failures.length ? 1 : 0);

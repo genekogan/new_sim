@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 
 export const CHROME_LOCK = '/tmp/eden-chrome-lease';
 export const LOCK_TTL_MS = 30_000;
@@ -80,19 +80,22 @@ export class LockBusy extends Error {
   constructor(path, status) { super(`lock.busy: ${path} held by ${status.holder ? `${status.holder.label} pid=${status.holder.pid} host=${status.holder.host} start=${status.holder.start}` : status.reason ?? 'unknown holder'}; run doctor`); this.code = 'lock.busy'; this.lock = { path, ...status }; }
 }
 const owned = new Map();
-export function acquireLock(path, { label = 'eden-god', ttlMs = LOCK_TTL_MS, reentrant = false } = {}) {
+// detail: false skips the busy holder's full status (a second `ps`) for pollers that only need to know it is busy.
+export function acquireLock(path, { label = 'eden-god', ttlMs = LOCK_TTL_MS, reentrant = false, detail = true } = {}) {
   path = resolve(path);
   if (reentrant && owned.has(path)) return () => {};
   for (;;) {
     try { mkdirSync(path, { mode: 0o700 }); break; }
-    catch (e) { if (e.code !== 'EEXIST') throw e; if (breakLock(path, { ttlMs })) continue; throw new LockBusy(path, inspectLock(path, ttlMs)); }
+    catch (e) { if (e.code !== 'EEXIST') throw e; if (breakLock(path, { ttlMs })) continue; throw new LockBusy(path, detail ? inspectLock(path, ttlMs) : { present: true, holder: null, reason: 'held' }); }
   }
   const record = { schema: 'eden-lock/1', holder: holder(label), acquiredAt: Date.now(), heartbeatAt: Date.now(), ttlMs, nonce: randomUUID() };
   try { writeFileSync(`${path}/holder`, JSON.stringify(record) + '\n', { mode: 0o600 }); }
   catch (e) { rmSync(path, { recursive: true, force: true }); throw e; }
   let original = snapshot(path), released = false;
+  // The directory's mtime is refreshed too: an in-place holder write leaves it unchanged, and the team's Chrome lease
+  // (team/ops/chrome-lease.mjs) breaks any slot whose directory is 15 minutes old.
   const heartbeat = setInterval(() => {
-    try { if (!same(original, snapshot(path))) return; record.heartbeatAt = Date.now(); writeFileSync(`${path}/holder`, JSON.stringify(record) + "\n", { mode: 0o600 }); original = snapshot(path); } catch { /* release/replacement wins */ }
+    try { if (!same(original, snapshot(path))) return; const now = Date.now(); record.heartbeatAt = now; writeFileSync(`${path}/holder`, JSON.stringify(record) + "\n", { mode: 0o600 }); utimesSync(path, new Date(now), new Date(now)); original = snapshot(path); } catch { /* release/replacement wins */ }
   }, Math.max(10, Math.min(5000, ttlMs / 3)));
   heartbeat.unref();
   const release = () => { if (released) return; released = true; clearInterval(heartbeat); owned.delete(path); process.removeListener('exit', release); try { if (same(original, snapshot(path))) rmSync(path, { recursive: true, force: true }); } catch (e) { if (e.code !== 'ENOENT') throw e; } };

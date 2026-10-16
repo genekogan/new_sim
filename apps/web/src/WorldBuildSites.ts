@@ -331,6 +331,7 @@ export class WorldBuildSites {
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     const lines = text.split('\n');
     ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(Math.max(...lines.map(line => ctx.measureText(line).width))) + 28;
+    const resized = canvas.width !== width || canvas.height !== LABEL_HEIGHT_PX * lines.length;
     canvas.width = width; canvas.height = LABEL_HEIGHT_PX * lines.length;
     ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, canvas.height, 10); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; lines.forEach((line, i) => ctx.fillText(line, 14, 23 + i * LABEL_HEIGHT_PX));
@@ -355,6 +356,11 @@ export class WorldBuildSites {
         sprite.updateMatrixWorld();
       };
       v.label.renderOrder = 998; v.group.add(v.label);
+    } else if (resized) {
+      // A WebGL2 texture keeps the size of its first upload: a taller/wider canvas copied into it overflows
+      // (glCopySubTextureCHROMIUM: Offset overflow) and the old, stretched label stays on screen. New size, new texture.
+      const old = v.label.material.map, texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+      v.label.material.map = texture; old?.dispose();
     }
     v.canvas = canvas; v.text = text; v.label.material.map!.needsUpdate = true;
     v.label.scale.set(width / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, canvas.height / LABEL_HEIGHT_PX * LABEL_WORLD_HEIGHT, 1);

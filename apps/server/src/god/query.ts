@@ -13,6 +13,9 @@ import { furnishBatch } from '../../../../tools/god-skill/lib/furnish.mjs';
 /** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
 export type ReachEnd = string | [number, number] | [number, number, number];
 export type ReachFn = (from: ReachEnd, to: ReachEnd) => unknown;
+/** A reach end the engine has nowhere to stand at (reach.bad-from / reach.bad-to): the point and height it looked at, the
+ *  engine level that height resolves to and that level's height. */
+export type ReachEndpoint = { what: string; at: [number, number]; y: number; level: number; levelY: number };
 /** Reachability needs the Soul engine; the engine bridge (engine-bridge.ts, lane L9) registers it per world model. */
 export const reachProviders = new WeakMap<WorldModel, ReachFn>();
 /** Whether the engine already holds the latest physics of the model (false while the last edit is still on its way);
@@ -221,7 +224,8 @@ function behaviours(def: StoredDef): { supported: string[]; missing: Record<stri
  *  its front door and back out. The generator's "reachable from outside" note is a graph of doors and stairs; this is the
  *  answer a resident gets, so the two can never silently disagree (a 4-floor lighthouse whose upper floors the graph
  *  called reachable and no resident could climb to). `in`/`out` are true or the engine's refusal code. */
-export type WalkReport = { state: 'ok' | 'failed' | 'pending' | 'unchecked'; from?: [number, number]; rooms: { id: string; floor: number; in: true | string; out: true | string }[]; note: string };
+export type WalkFailure = { code: string; detail?: string; endpoint?: ReachEndpoint & { side?: 'from' | 'to' } };
+export type WalkReport = { state: 'ok' | 'failed' | 'pending' | 'unchecked'; from?: [number, number]; rooms: { id: string; floor: number; in: true | string; out: true | string; why?: { in?: WalkFailure; out?: WalkFailure } }[]; note: string };
 const WALK_ROOMS = 24;
 
 function walkReport(w: WorldModel, e: Entity, slots: ReturnType<typeof slotWorld>, rooms: { id: string; floor: number; polygon: Vec2[] }[]): WalkReport | undefined {
@@ -231,13 +235,18 @@ function walkReport(w: WorldModel, e: Entity, slots: ReturnType<typeof slotWorld
   const front = slots.find((s) => s.id === 'front');
   if (!front) return { state: 'unchecked', rooms: [], note: 'no stand outside a front door to walk in from' };
   const from: [number, number] = [front.p[0], front.p[2]], path = w.pathOf(e.id);
-  type Route = { reachable?: boolean; code?: string; from?: { p: Vec2 }; to?: { p: Vec2 } };
+  type Route = { reachable?: boolean; code?: string; detail?: string; endpoint?: WalkFailure['endpoint']; from?: { p: Vec2; level?: number }; to?: { p: Vec2; level?: number } };
   const out = rooms.slice(0, WALK_ROOMS).map((r) => {
     const into = reach(from, `${path}:${r.id}`) as Route, back = reach(`${path}:${r.id}`, from) as Route;
     const verdict = (x: Route) => (x.reachable ? true as const : x.code ?? 'route.unreachable');
     // the engine stands a resident on the nearest free spot to the room's middle: it must still be in this room
     const inside = (x: Route, end?: { p: Vec2 }) => !x.reachable || !end || pointInPoly(end.p[0], end.p[1], r.polygon);
-    return { id: r.id, floor: r.floor, in: inside(into, into.to) ? verdict(into) : 'room.no-standing-room', out: inside(back, back.from) ? verdict(back) : 'room.no-standing-room' };
+    // why a side failed, with the end the engine could not stand at (R2F: say "no floor to stand on", not "no way in")
+    const why = (x: Route, end?: { p: Vec2; level?: number }): WalkFailure | undefined => x.reachable && inside(x, end) ? undefined
+      : x.reachable ? { code: 'room.no-standing-room', detail: `the engine's nearest standing spot (${end!.p.map((v) => round(v)).join(', ')}) is outside room ${r.id}` }
+      : { code: x.code ?? 'route.unreachable', ...(x.detail ? { detail: x.detail } : {}), ...(x.endpoint ? { endpoint: x.endpoint } : {}) };
+    const whyIn = why(into, into.to), whyOut = why(back, back.from);
+    return { id: r.id, floor: r.floor, in: whyIn?.code ?? verdict(into), out: whyOut?.code ?? verdict(back), ...(whyIn || whyOut ? { why: { ...(whyIn ? { in: whyIn } : {}), ...(whyOut ? { out: whyOut } : {}) } } : {}) } as WalkReport['rooms'][number];
   });
   const bad = out.filter((r) => r.in !== true || r.out !== true);
   return { state: bad.length ? 'failed' : 'ok', from, rooms: out, note: rooms.length > WALK_ROOMS ? `first ${WALK_ROOMS} of ${rooms.length} rooms checked` : '' };

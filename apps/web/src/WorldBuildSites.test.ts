@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { registerHooks } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { WorldModel, type Entity, type OBB } from '@sim/world-compiler';
 import { WorldBuildSites, parseBuildFeed, SITE_REFINEMENT, type PublicSite, type SiteDelta, type SiteModel } from './WorldBuildSites.ts';
 
@@ -115,7 +116,8 @@ test('batch captions fade for six seconds inside the existing label draw without
   h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0.5); assert.equal(h.sites.stats.labelRedraws, redraws);
   h.sites.apply(edge(delta(2), SERVER_NOW + 5000)); assert.equal(h.sites.stats.labelRedraws, redraws);
   h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0); assert.doesNotMatch(h.sites.inspect().sites[0].text, /shell committed/);
-  assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.equal(sprite.material.map, texture); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
+  // The canvas shrank to two lines: same canvas, a fresh texture (WebGL texture storage keeps its first size).
+  assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.notEqual(sprite.material.map, texture); assert.equal(sprite.material.map!.image, canvas); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
   h.sites.apply(edge(delta(3, { note: { text: 'next batch', at: SERVER_NOW + 6000 } }), SERVER_NOW + 6000));
   assert.match(h.sites.inspect().sites[0].text, /next batch$/); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 1);
   h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
@@ -232,15 +234,107 @@ for (const skew of [-600_000, 600_000]) test(`pause and alive deadline use serve
   } finally { h.sites.dispose(); Date.now = realDateNow; }
 });
 
-test('one canvas and texture per site; ordinary frames and alive/claim updates do not repaint unchanged text', () => {
+// Release 1.1 walk: after `build step --say` the label grew to two lines on the same CanvasTexture; Chrome refused the
+// upload (glCopySubTextureCHROMIUM: Offset overflow) and a visitor kept the old one-line "paused" label, stretched.
+test('a label that changes size gets a fresh texture (the old one disposed once) carrying exactly the new text', () => {
+  const painted: string[][] = []; let frame: string[] = [];
+  const canvas = fakeCanvas(((text: string) => { frame.push(text); }) as () => void);
+  const context = canvas.getContext('2d')! as unknown as { roundRect: () => void };
+  context.roundRect = () => { frame = []; painted.push(frame); };
+  const sites = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => 1000, createCanvas: () => canvas, search: '?sites=ring,label' });
+  const sprite = () => sites.group.children[0].children.find(o => o instanceof THREE.Sprite) as THREE.Sprite;
+  sites.apply(start(site({ title: 'Release walk lighthouse', step: { n: 1, label: 'massing', of: 3 } })));
+  const first = sprite().material.map!; let disposed = 0; first.addEventListener('dispose', () => disposed++);
+  assert.deepEqual(painted.at(-1), ['Release walk lighthouse · massing 1/3']); assert.equal(canvas.height, 44);
+  sites.apply(edge(delta(2, { step: { n: 1, label: 'massing', of: 3 }, say: { text: 'raising the lighthouse tower', at: SERVER_NOW }, designing: ['nave'] })));
+  const second = sprite().material.map!;
+  assert.notEqual(second, first); assert.equal(disposed, 1); assert.equal(second.image, canvas); assert.equal(second.colorSpace, THREE.SRGBColorSpace);
+  assert.ok(second.version > 0, 'the fresh texture uploads the new canvas'); assert.equal(canvas.height, 88);
+  assert.deepEqual(painted.at(-1), ['Release walk lighthouse · massing 1/3', 'designing: raising the lighthouse tower']);
+  assert.deepEqual(painted.at(-1), sites.inspect().sites[0].text.split('\n'));
+  // same size again (another narration of equal length): the texture is reused, only re-uploaded
+  const version = second.version;
+  sites.apply(edge(delta(3, { say: { text: 'raising the lighthouse lamps', at: SERVER_NOW } })));
+  assert.equal(sprite().material.map, second); assert.ok(second.version > version); assert.match(painted.at(-1)![1], /lamps$/);
+  sites.dispose(); assert.equal(disposed, 1);
+});
+
+const walkFeed = () => JSON.parse(readFileSync(new URL('../../server/src/god/fixtures/build-messages.json', import.meta.url), 'utf8')).walk as { type: string; kind: string; event?: string; now: number; rev?: number; seq?: number }[];
+// R2F: the server's own feed for the walk (apps/server/src/god/builds.test.ts "R2F", fixtures/build-messages.json `walk`):
+// started, paused after a 12-minute look, the lead's step --say (resumed + step), reads (alive) and more steps, a committed
+// batch with a note, a step. Production defaults: 10 min pause, 30 min closure. Delivered in order at server time, no reload.
+test('visitors apply the real step feed live: narration and pulse appear, "paused" never shows while narrating, and the batch moves reopensAt', () => {
+  const walk = walkFeed(), T0 = walk[0].now; let mono = 1000;
+  const sites = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => mono, createCanvas: () => fakeCanvas(), search: '?sites=ring,label' });
+  const at = (serverMs: number) => { mono = 1000 + serverMs - T0; sites.update(mono); };
+  const text = () => sites.inspect().sites[0]?.text ?? '';
+  const pulse = () => { const faces = sites.group.children[0].children[1] as THREE.Mesh; return Array.from(faces.geometry.getAttribute('buildDesigning').array).some(n => n === 1); };
+  sites.setWorldClock('2026-10-15T21:00:00', 1); // the world's clock at the build's start (T0)
+  const seen: string[] = []; let narrating = false;
+  for (const m of walk) {
+    // between messages the viewer runs on its own clock, sampled every 10 s of real time
+    for (let t = mono - 1000 + T0 + 10_000; t < m.now; t += 10_000) {
+      at(t);
+      if (narrating) { assert.doesNotMatch(text(), /paused|quiet/, `while narrating at +${(t - T0) / 1000}s: ${text()}`); assert.match(text().split('\n')[1], /^designing: /); assert.ok(pulse() || !/Raising/.test(text())); }
+    }
+    at(m.now); sites.apply(m); seen.push(`${m.kind === 'world-diff' ? 'diff' : m.event}: ${text()}`);
+    if (m.event === 'step') narrating = true;
+    if (m.event === 'paused') assert.match(text(), /^Release walk lighthouse · massing 1\/3 · paused 2 min · open again Thu · 9:30 pm$/, 'what the walk saw, legitimately: the build was paused');
+    if (m.event === 'step' && /Raising/.test(JSON.stringify(m))) {
+      assert.equal(text(), 'Release walk lighthouse · massing 1/3\ndesigning: Raising the lighthouse tower'); assert.equal(pulse(), true, 'the tower mass pulses');
+    }
+    if (m.kind === 'world-diff') { assert.equal(text().split('\n').at(-1), 'Placed the lighthouse'); assert.match(text(), /\ndesigning: Designing course 2\n/); }
+  }
+  assert.deepEqual(seen.map(line => line.split(':')[0]), ['started', 'paused', 'resumed', 'step', 'alive', 'step', 'alive', 'step', 'alive', 'step', 'diff', 'step']);
+  assert.equal(sites.maxRev, 12); assert.equal(sites.stats.refetches, 0, 'contiguous revisions: no snapshot refetch, no reload');
+  // the lead stops: narration (8 min) ends before the pause (10 min after the last activity) — then paused, closed until
+  // the committed batch's deadline (T0 + 25 min + 30 min = 9:55 pm world time), not the start's 9:30 pm
+  const lastStep = walk.at(-1)!.now;
+  at(lastStep + 8 * 60_000 - 1); assert.doesNotMatch(text(), /paused/); assert.match(text(), /designing: Shaping the lantern/);
+  at(lastStep + 10 * 60_000); assert.equal(text(), 'Release walk lighthouse · tower 2/3 · paused 0 min · open again Thu · 9:55 pm');
+  sites.dispose();
+});
+
+// R2F: a visitor receives that feed through WorldEntityLayer.applyEdge, which LiveWorld calls every frame with the whole
+// edge buffer: world-build messages pass only when rev > maxRev, the diff (and its build delta) only in seq order.
+test('the walk feed through the visitor entry point (applyEdge, the buffer re-sent every frame) gives the same labels, maxRev 12, no resync', async () => {
+  const { WorldEntityLayer } = await entityLayerFixture();
+  const walk = walkFeed(), T0 = walk[0].now; let mono = 1000;
+  const direct = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => mono, createCanvas: () => fakeCanvas(), search: '?sites=ring,label' });
+  const layer = new WorldEntityLayer(p => p); layer.sites.siteStyle('ring,label');
+  const internals = layer as unknown as { model: WorldModel; seq: number; now: number; sites: { clock: () => number; options: { createCanvas: () => HTMLCanvasElement } } };
+  internals.model = new WorldModel({ constants: { ground: 'land' }, seed: 'offline-walk-feed' }); internals.seq = 0; internals.now = 1000; layer.active = true;
+  internals.sites.clock = () => mono; internals.sites.options.createCanvas = () => fakeCanvas();
+  let resyncs = 0; layer.resync = async () => { resyncs++; };
+  for (const s of [direct, layer.sites]) s.setWorldClock('2026-10-15T21:00:00', 1);
+  const labels = { direct: [] as string[], layer: [] as string[] };
+  for (const [i, m] of walk.entries()) {
+    mono = 1000 + m.now - T0; direct.update(mono); layer.update(0, mono);
+    direct.apply(m); labels.direct.push(direct.inspect().sites[0]?.text ?? '');
+    const buffer = walk.slice(0, i + 1);
+    layer.applyEdge(buffer); const text = layer.sites.inspect().sites[0]?.text ?? ''; labels.layer.push(text);
+    layer.applyEdge(buffer); assert.equal(layer.sites.inspect().sites[0]?.text, text, `re-sending the buffer after ${m.kind === 'world-diff' ? 'the diff' : m.event} changes nothing`);
+  }
+  assert.deepEqual(labels.layer, labels.direct);
+  assert.equal(labels.layer[3], 'Release walk lighthouse · massing 1/3\ndesigning: Raising the lighthouse tower'); assert.equal(labels.layer[10].split('\n').at(-1), 'Placed the lighthouse');
+  assert.equal(layer.sites.maxRev, 12); assert.equal(layer.sites.stats.refetches, 0); assert.equal(resyncs, 0, 'no world resync');
+  assert.equal(layer.stats.edgeSeen, 1); assert.equal(layer.stats.applied, 1); assert.equal(layer.stats.lastError, null);
+  assert.ok(internals.model.entities.has('e_0df38658'), 'the diff\'s upsert reached the model');
+  direct.dispose(); layer.dispose();
+});
+
+test('one canvas per site, one texture per label size; ordinary frames and alive/claim updates do not repaint unchanged text', () => {
   const h = harness(); h.sites.apply(start());
   const sprite = group(h).children.find(o => o instanceof THREE.Sprite) as THREE.Sprite, texture = sprite.material.map;
   for (let i = 0; i < 1000; i++) h.advance(16);
   h.sites.apply(edge(delta(2))); h.sites.apply(edge(delta(3, { claim: { part: 'tower', status: 'held' } })));
   assert.equal(h.canvases, 1); assert.equal(h.paints, 1); assert.equal(sprite.material.map, texture);
   h.advance(180_000); assert.match(h.sites.inspect().sites[0].text, /quiet 3 min/); assert.equal(h.paints, 2);
+  const wider = sprite.material.map; assert.notEqual(wider, texture, 'a wider label gets its own texture');
+  h.advance(60_000); assert.match(h.sites.inspect().sites[0].text, /quiet 4 min/); assert.equal(h.paints, 3);
+  assert.equal(sprite.material.map, wider, 'a same-size repaint reuses the texture');
   h.sites.apply(edge(delta(4, { step: { n: 3, of: 6, label: 'roof' } })));
-  assert.equal(h.paints, 3); assert.equal(h.canvases, 1); assert.equal(sprite.material.map, texture);
+  assert.equal(h.paints, 4); assert.equal(h.canvases, 1); assert.equal(sprite.material.map!.image, texture!.image);
   h.sites.dispose();
 });
 

@@ -109,6 +109,35 @@ test('an empty plain on its ground (a new launcher world): a lighthouse and a co
   }
 });
 
+// R2F: when the engine has no floor to stand on in a room (the release 1.1 walk: its paged windows had not taken in the new
+// floors, reach.bad-to in / reach.bad-from out), describe --json carries where it looked and the CLI says so plainly.
+test('describe --json names the end the engine could not stand at; the CLI says "no floor to stand on in room X (floor n)"', {timeout: 60_000}, async t => {
+  const w = world(t); await w.settle(2);
+  assert.equal((w.god.act({ops: [{op: 'place', def: 'core/lighthouse@1', name: 'tower', p: [8, 0], params: {floors: 4}}]}) as any).accepted, true);
+  await w.settle(); assert.equal(w.describe('tower').walk.state, 'ok');
+  const engine = w.host.engine as any, standable = engine.standableNearV1.bind(engine);
+  t.mock.method(engine, 'standableNearV1', (at: [number, number], level?: number, ...rest: unknown[]) => (level ?? 0) > 0 ? null : standable(at, level, ...rest));
+  const d = w.describe('tower'), walk = d.walk as WalkReport;
+  assert.equal(walk.state, 'failed');
+  assert.deepEqual(walk.rooms.map(r => [r.id, r.floor, r.in, r.out]), [['entrance', 0, true, true], ['room', 1, 'reach.bad-to', 'reach.bad-from'], ['room-2', 2, 'reach.bad-to', 'reach.bad-from'], ['lantern', 3, 'reach.bad-to', 'reach.bad-from']]);
+  assert.equal(walk.rooms[0].why, undefined);
+  for (const r of walk.rooms.slice(1)) {
+    const room = d.rooms.find((x: any) => x.id === r.id), into = r.why!.in!, back = r.why!.out!;
+    assert.equal(into.detail, `no standing room in tower:${r.id}`); assert.equal(back.detail, into.detail);
+    assert.equal(into.endpoint!.side, 'to'); assert.equal(back.endpoint!.side, 'from');
+    assert.equal(into.endpoint!.what, `tower:${r.id}`); assert.ok(Math.abs(into.endpoint!.y - room.y) < 0.05, `${into.endpoint!.y} vs room floor ${room.y}`);
+    assert.ok(into.endpoint!.level > 0 && Math.abs(into.endpoint!.levelY - room.y) < 0.2, 'an engine level exists at that height: the floor is there, the engine has nowhere on it to stand');
+    assert.ok(Math.hypot(into.endpoint!.at[0] - 8, into.endpoint!.at[1]) < 3, 'it looked inside the tower');
+  }
+  // the same end straight from reach
+  const reach = runQuery(w.god.model, {reach: {from: walk.from!, to: 'tower:room-2'}}).reach as any;
+  assert.equal(reach.code, 'reach.bad-to'); assert.equal(reach.endpoint.what, 'tower:room-2'); assert.equal(reach.endpoint.side, 'to');
+  const {walkLine} = await import('../../../../tools/god-skill/cli.mjs' as string);
+  const line = walkLine(walk) as string;
+  assert.match(line, /^ {2}walk: NOT WALKABLE — the engine has no floor to stand on in rooms room \(floor 1\), room-2 \(floor 2\), lantern \(floor 3\)\. /);
+  assert.doesNotMatch(line, /no way (in|out)/); assert.match(line, /give those rooms a floor the engine can stand on/);
+});
+
 test('describe reports what the engine says when the design graph is wrong, and "pending" while the engine is behind the model', {timeout: 60_000}, async t => {
   const w = world(t); await w.settle(2);
   assert.equal((w.god.act({ops: [{op: 'place', def: 'core/lighthouse@1', name: 'tower', p: [8, 0], params: {floors: 4}}]}) as any).accepted, true);

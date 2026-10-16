@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { acquireLock, breakLock, holder, inspectLock, lockStatus } from './locks.mjs';
@@ -54,6 +54,21 @@ test('heartbeat refreshes unknown-host TTL and release removes the refreshed own
   await new Promise(r => setTimeout(r, 55));
   const record = JSON.parse(readFileSync(join(path, 'holder')));
   assert.ok(record.heartbeatAt > at); release(); assert.equal(existsSync(path), false);
+});
+// R2F review: the team's Chrome lease (team/ops/chrome-lease.mjs) breaks a slot whose directory mtime is 15 minutes old,
+// and an in-place holder write does not change it; the heartbeat touches the directory, and release still owns it.
+test('heartbeat refreshes the lock directory mtime too, without losing its own identity', async t => {
+  const path = join(fixture(t), 'dir-beat'), release = acquireLock(path, { ttlMs: 30 }); t.after(release);
+  const born = statSync(path).mtimeMs;
+  await new Promise(r => setTimeout(r, 60));
+  const beat = statSync(path).mtimeMs; assert.ok(beat - born >= 20, `directory mtime moved ${beat - born} ms`);
+  assert.ok(Date.now() - beat < 1000, 'the team lease sees a fresh directory');
+  release(); assert.equal(existsSync(path), false, 'release still recognises its own touched directory');
+});
+test('detail: false reports a busy lock without probing its holder again', t => {
+  const path = join(fixture(t), 'quiet'), release = acquireLock(path); t.after(release);
+  assert.throws(() => acquireLock(path, { detail: false }), e => e.code === 'lock.busy' && e.lock.holder === null && e.lock.reason === 'held');
+  assert.throws(() => acquireLock(path), e => e.code === 'lock.busy' && e.lock.holder.pid === process.pid && e.lock.liveness === 'alive');
 });
 test('malformed lock timing cannot suppress stale recovery forever', t => {
   const path = join(fixture(t), 'malformed'); mkdirSync(path);
