@@ -2250,7 +2250,7 @@ function kitDefinition(k) {
   const e = k.box ? [] : k.shapes.map(ext);
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, Math.round(v * 100) / 100));
   const args = { shapes: k.shapes };
-  for (const key of ["v", "footprint", "gait", "slots", "round"]) if (k[key] !== void 0) args[key] = k[key];
+  for (const key of ["v", "footprint", "gait", "slots", "round", "surfaces"]) if (k[key] !== void 0) args[key] = k[key];
   const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args }, size: { box, scale: k.scale ?? [0.5, 2] } };
   for (const key of ["components", "anchor", "state", "params"]) if (k[key] !== void 0) def[key] = k[key];
   return def;

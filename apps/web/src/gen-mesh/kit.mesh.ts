@@ -138,7 +138,7 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
 /** Material class of a shape: shapes of one class merge into one draw. */
 // Four bounded emissive classes, so glow does not add one draw per numerical value.
 const glowLevel = (value: number | undefined) => value ? Math.min(4, Math.ceil(value * 4)) : 0;
-const classOf = (sh: KitShape, v: number) => v === 2 ? `${sh.material ?? 'paint'}:${glowLevel(sh.glow ?? (sh.material === 'emissive' ? 1 : 0))}${kitSurfaceSuffix(sh)}` : (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
+const classOf = (sh: KitShape, v: number, surfaces = false) => v === 2 ? `${sh.material ?? 'paint'}:${glowLevel(sh.glow ?? (sh.material === 'emissive' ? 1 : 0))}${kitSurfaceSuffix(sh, surfaces)}` : (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
 
 /** VOCAB-MECH: which `when` shapes are on for these params/state (a cache key part; '' when the kit has none). */
 export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
@@ -150,17 +150,17 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   const root = new THREE.Group();
   const byClass = new Map<string, THREE.BufferGeometry[]>();
   const byRole = new Map<string, KitShape[]>();
-  const color = new THREE.Color();
+  const color = new THREE.Color(), surfaces = args.v === 2 && args.surfaces === true; // Y1: the kit's surfaces opt-in
   for (const sh of args.shapes) {
     if (sh.when && !kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {})) continue;
     if (sh.role) { const list = byRole.get(sh.role) ?? []; list.push(sh); byRole.set(sh.role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
-    const k = classOf(sh, args.v); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k))); byClass.set(k, list);
+    const k = classOf(sh, args.v, surfaces); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
   }
   const matFor = (k: string) => {
     if (args.v !== 2) return k === 'glass' ? ctx.materials.get('glass', undefined, { vertexColors: true }) : k === 'water' ? ctx.materials.get('water', undefined, { vertexColors: true }) : k === 'glow' ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8 }) : ctx.materials.get('paint', undefined, { vertexColors: true });
     const [kind, level] = k.split(':');
-    return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}), surface: kitClassSurface(k) });
+    return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}), surface: kitClassSurface(k, surfaces) });
   };
   for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; root.add(mesh); }
   // XP8 hook: faces (text, this world's images, seeded glass/mosaic) sit on their shapes; role faces follow the pivot below.
@@ -176,7 +176,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
       mesh.castShadow = true; pivot.add(mesh);
     } else {
       const classes = new Map<string, THREE.BufferGeometry[]>();
-      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv, !!kitClassSurface(k))); classes.set(k, list); }
+      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2, surfaces), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv, !!kitClassSurface(k, surfaces))); classes.set(k, list); }
       for (const [k, geos] of classes) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = !k.startsWith('glass:') && !k.startsWith('water:'); mesh.receiveShadow = true; mesh.name = `kit:${k}`; pivot.add(mesh); }
       if (args.v === 2) for (const sh of shapes) for (const face of shapeFaceMeshes(sh, args.round, pv)) pivot.add(face); // XP8 hook
     }

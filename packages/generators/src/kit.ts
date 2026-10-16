@@ -216,6 +216,9 @@ export const plainKitArgs = z.object({
   round: num.nonnegative().default(0.04),
   /** Creature gait the viewer animates from roles: quadruped-walk, biped-waddle, bird-fly, fish-swim, none. */
   gait: z.enum(['none', 'quadruped-walk', 'biped-waddle', 'bird-fly', 'fish-swim', 'hover']).default('none'),
+  /** Y1 / XP7, contract 2 only: opaque shapes take their material's procedural surface (grain, mottle, courses).
+   *  Omitted = today's flat looks; a shape's explicit `pattern` draws without it. Presentation only. */
+  surfaces: z.boolean().optional(),
 }).superRefine(validateKit);
 export type KitArgs = z.infer<typeof plainKitArgs>;
 // Authored programs retain their instructions until bake/mesh resolve instance params.
@@ -235,6 +238,7 @@ const admissionArgs = kitArgs.superRefine((args, ctx) => {
   if (args.v === 1) for (const [i, sh] of args.shapes.entries()) if ((sh as { faces?: unknown }).faces !== undefined) ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces'], message: 'faces: requires kit contract 2; fix: set make.args.v to 2 and serve the matching viewer bundle' });
   // Y1 / XP7: refused when defined, so a legacy kit never silently drops it; retained data still draws (flat).
   if (args.v === 1) args.shapes.forEach((sh, i) => { if (sh.pattern !== undefined) ctx.addIssue({ code: 'custom', path: ['shapes', i, 'pattern'], message: 'pattern: requires kit contract 2; fix: set make.args.v to 2 and serve the matching viewer bundle' }); });
+  if (args.v === 1 && args.surfaces !== undefined) ctx.addIssue({ code: 'custom', path: ['surfaces'], message: 'surfaces: requires kit contract 2; fix: set make.args.v to 2 and serve the matching viewer bundle' });
 });
 
 /** Axis-aligned extent of a shape in its own frame (before yaw/pitch/roll), half sizes. */

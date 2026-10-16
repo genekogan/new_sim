@@ -47,3 +47,16 @@ test('kit programs carry pattern through repeats, mirrors and repeat-step overri
   assert.equal(out.shapes.length, 6);
   assert.deepEqual(out.shapes.map(s => s.pattern), ['stripes', 'stripes', 'none', 'none', 'none', 'none']);
 });
+
+test('kit-level surfaces: optional, contract 2 only at definition, presentation only and kept through program expansion', () => {
+  setKitViewerContract({ 'kit/2': 2 });
+  assert.equal(kitArgs.parse(kit({ material: 'stone' })).surfaces, undefined, 'omitted = today\'s flat looks');
+  assert.equal(kitGen.args!.safeParse({ ...kit({ material: 'stone' }), surfaces: true }).success, true);
+  const r = kitGen.args!.safeParse({ ...kit({ material: 'stone' }, 1), surfaces: true });
+  assert.equal(r.success, false);
+  if (!r.success) { assert.deepEqual(r.error.issues[0].path, ['surfaces']); assert.match(r.error.issues[0].message, /requires kit contract 2; fix: set make.args.v to 2/); }
+  assert.equal(kitArgs.safeParse({ ...kit({}), surfaces: 'yes' }).success, false);
+  const shapes = [{ kind: 'box', at: [0, 0.5, 0], size: [2, 1, 1], material: 'stone' }, { kind: 'cyl', at: [2, 1, 0], r: 0.4, h: 2, material: 'wood' }];
+  assert.deepEqual(kitPhysics(kitArgs.parse({ v: 2, surfaces: true, shapes })), kitPhysics(kitArgs.parse({ v: 2, shapes })));
+  assert.equal(expandKitProgram({ v: 2, surfaces: true, shapes: [{ kind: 'box', at: [0, 0.5, 0], size: [0.5, 1, 0.5], material: 'wood', repeat: { n: 2, step: [1, 0, 0] } }] }).surfaces, true);
+});

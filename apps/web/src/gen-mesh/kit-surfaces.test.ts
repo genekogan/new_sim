@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { kitArgs, KIT_PATTERNS, type KitProgramArgs } from '@sim/generators';
+import { kitArgs, materialEnum, KIT_PATTERNS, type KitProgramArgs } from '@sim/generators';
 import { CORE_KIT, WorldModel } from '@sim/world-compiler';
 import { buildKit } from './kit.mesh.ts';
 import { MaterialLib } from './materials.ts';
@@ -10,7 +10,7 @@ import { KitSurfaceMaterial, KIT_PATTERN_ID, MATERIAL_SURFACE, kitSurface } from
 import { applyWorldRealism } from '../WorldEdenRealism.ts';
 
 type M = THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
-const kit = (s: Record<string, unknown>[], v = 2) => kitArgs.parse({ v, round: 0, shapes: s.map(sh => ({ kind: 'box', at: [0, 0.5, 0], size: [1, 1, 1], ...sh })) });
+const kit = (s: Record<string, unknown>[], v = 2, extra: Record<string, unknown> = {}) => kitArgs.parse({ v, round: 0, ...extra, shapes: s.map(sh => ({ kind: 'box', at: [0, 0.5, 0], size: [1, 1, 1], ...sh })) });
 const draw = (a: KitProgramArgs, lib = new MaterialLib()) => buildKit(a, { materials: lib, tint: (_k, fallback) => fallback, params: {}, state: {} });
 const meshes = (o: THREE.Object3D) => { const m: M[] = []; o.traverse(n => { if ((n as THREE.Mesh).isMesh) m.push(n as M); }); return m; };
 const byName = (o: THREE.Object3D) => Object.fromEntries(meshes(o).map(m => [m.name, m]));
@@ -56,11 +56,28 @@ test('contract-1 kits and every library kit draw exactly as before: no surface m
   assert.ok(kits > 50, `library kits checked: ${kits}`);
 });
 
-test('contract-2 shapes take the realism class of their material; paint, plastic, glass, water and glow stay flat', () => {
+test('contract-2 kits without surfaces: true draw exactly as before; only an explicit pattern opts a shape in', () => {
+  const shapes = [undefined, ...materialEnum.options].flatMap((material, i) => [{ material, at: [i * 2, 0.5, 0] }, { kind: 'cyl', size: undefined, material, at: [i * 2, 2, 0], r: 0.4, h: 1 }, { material, pattern: 'none', at: [i * 2, 4, 0] }]);
+  const lib = new MaterialLib(), plain = draw(kit(shapes), lib);
+  for (const m of meshes(plain)) {
+    assert.equal(surfaced(m), false, m.name); assert.equal(m.geometry.attributes.edenSurf, undefined, m.name);
+    assert.deepEqual(Object.keys(m.geometry.attributes).sort(), ['color', 'normal', 'position'], m.name);
+    // The very material the pre-surface mesher asked for (same MaterialLib key, no surface part).
+    const [, kind, level] = m.name.split(':');
+    assert.equal(m.material, lib.get(kind as never, undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}) }), m.name);
+  }
+  assert.deepEqual(meshes(plain).map(m => m.name).sort(), meshes(draw(kit(shapes, 2, { surfaces: false }))).map(m => m.name).sort());
+  const o = byName(draw(kit([{ material: 'stone' }, { material: 'stone', pattern: 'ashlar', at: [2, 0.5, 0] }, { material: 'stone', pattern: 'none', at: [4, 0.5, 0] }, { pattern: 'stripes', at: [6, 0.5, 0] }])));
+  assert.deepEqual(Object.keys(o).sort(), ['kit:paint:0:stripes', 'kit:stone:0', 'kit:stone:0:ashlar']);
+  assert.equal(surfaced(o['kit:stone:0']), false); assert.equal(o['kit:stone:0'].geometry.attributes.position.count, 2 * 36, 'pattern none joins the flat draw');
+  assert.deepEqual(o['kit:stone:0:ashlar'].material.userData.kitSurface, { cls: 'stone', pattern: 2 }); assert.ok(o['kit:paint:0:stripes'].geometry.attributes.edenSurf);
+});
+
+test('contract-2 kits with surfaces: true take the realism class of each material; paint, plastic, glass, water and glow stay flat', () => {
   const o = byName(draw(kit([
     { material: 'stone' }, { material: 'wood', at: [2, 0.5, 0] }, { material: 'tile', at: [4, 0.5, 0] }, { material: 'fabric', at: [6, 0.5, 0] },
     { at: [8, 0.5, 0] }, { material: 'plastic', at: [10, 0.5, 0] }, { material: 'glass', at: [12, 0.5, 0] }, { material: 'stone', glow: 0.3, at: [14, 0.5, 0] },
-  ])));
+  ], 2, { surfaces: true })));
   assert.deepEqual(Object.keys(o).sort(), ['kit:fabric:0', 'kit:glass:0', 'kit:paint:0', 'kit:plastic:0', 'kit:stone:0', 'kit:stone:2', 'kit:tile:0', 'kit:wood:0']);
   for (const [name, cls] of [['kit:stone:0', 'stone'], ['kit:wood:0', 'wood'], ['kit:tile:0', 'roof'], ['kit:fabric:0', 'cloth']] as const) {
     assert.ok(surfaced(o[name]), name); assert.deepEqual(o[name].material.userData.kitSurface, { cls, pattern: 0 });
@@ -69,7 +86,7 @@ test('contract-2 shapes take the realism class of their material; paint, plastic
   for (const name of ['kit:paint:0', 'kit:plastic:0', 'kit:glass:0', 'kit:stone:2']) { assert.equal(surfaced(o[name]), false, name); assert.equal(o[name].geometry.attributes.edenSurf, undefined, name); }
   // Unchanged finishes: the surface keeps the material's declared roughness/metalness (kit metal included).
   assert.equal(o['kit:stone:0'].material.roughness, 0.92); assert.equal(o['kit:stone:2'].material.emissiveIntensity, 0.4);
-  const metal = meshes(draw(kit([{ material: 'metal' }])))[0].material; assert.ok(metal instanceof KitSurfaceMaterial); assert.equal(metal.metalness, 0.25); assert.equal(metal.roughness, 0.32);
+  const metal = meshes(draw(kit([{ material: 'metal' }], 2, { surfaces: true })))[0].material; assert.ok(metal instanceof KitSurfaceMaterial); assert.equal(metal.metalness, 0.25); assert.equal(metal.roughness, 0.32);
 });
 
 test('patterns draw apart only when they change the surface; none flattens a material that has a class', () => {
@@ -77,7 +94,7 @@ test('patterns draw apart only when they change the surface; none flattens a mat
     { material: 'stone' }, { material: 'stone', pattern: 'marble', at: [2, 0.5, 0] }, { material: 'stone', pattern: 'ashlar', at: [4, 0.5, 0] },
     { material: 'stone', pattern: 'none', at: [6, 0.5, 0] }, { pattern: 'none', at: [8, 0.5, 0] }, { at: [10, 0.5, 0] }, { pattern: 'stripes', at: [12, 0.5, 0] },
     { material: 'wood', pattern: 'planks', at: [14, 0.5, 0] }, { material: 'tile', pattern: 'shingles', at: [16, 0.5, 0] },
-  ])));
+  ], 2, { surfaces: true })));
   assert.deepEqual(Object.keys(o).sort(), ['kit:paint:0', 'kit:paint:0:stripes', 'kit:stone:0', 'kit:stone:0:ashlar', 'kit:stone:0:marble', 'kit:stone:0:none', 'kit:tile:0:shingles', 'kit:wood:0:planks']);
   assert.equal(o['kit:paint:0'].geometry.attributes.position.count, 2 * 36, 'pattern none on paint joins the plain paint draw');
   assert.deepEqual(o['kit:stone:0:marble'].material.userData.kitSurface, { cls: 'stone', pattern: 1 });
@@ -85,12 +102,12 @@ test('patterns draw apart only when they change the surface; none flattens a mat
   assert.deepEqual(o['kit:wood:0:planks'].material.userData.kitSurface, { cls: 'wood', pattern: 3 });
   assert.equal(surfaced(o['kit:stone:0:none']), false); assert.equal(o['kit:stone:0:none'].geometry.attributes.edenSurf, undefined);
   for (const p of KIT_PATTERNS) if (p !== 'none') assert.ok(KIT_PATTERN_ID[p] > 0, p);
-  for (const material of Object.keys(MATERIAL_SURFACE)) assert.ok(kitSurface(material, 0), material);
+  for (const material of Object.keys(MATERIAL_SURFACE)) { assert.ok(kitSurface(material, 0, undefined, true), material); assert.equal(kitSurface(material, 0), null, material); }
 });
 
 test('surface coordinates are shape-local metres: they follow yaw, pitch, scale and mirrors, and x is the long side', () => {
   const at: [number, number, number] = [3, 1, -2];
-  const local = (sh: Record<string, unknown>) => meshes(draw(kit([{ material: 'stone', at, ...sh }])))[0].geometry.attributes.edenSurf as THREE.BufferAttribute;
+  const local = (sh: Record<string, unknown>) => meshes(draw(kit([{ material: 'stone', at, ...sh }], 2, { surfaces: true })))[0].geometry.attributes.edenSurf as THREE.BufferAttribute;
   const plain = local({ size: [2, 1, 1] }), turned = local({ size: [2, 1, 1], yaw: 0.7, pitch: 0.4 });
   assert.deepEqual([...turned.array], [...plain.array], 'rotation is not baked into the surface coordinates');
   const xs = Array.from({ length: plain.count }, (_, i) => plain.getX(i));
@@ -105,7 +122,7 @@ test('surface coordinates are shape-local metres: they follow yaw, pitch, scale 
   for (let i = 1; i < plain.count; i++) assert.equal(plain.getW(i), word(plain));
   const cone = local({ kind: 'cone', size: undefined, r: 3, h: 2 }), ring = Math.floor(word(cone) + 1e-3);
   assert.ok(ring >= 8 && ring % 2 === 0, `ring ${ring}`); assert.equal(ring, 2 * Math.round(Math.PI * 3 / 0.4));
-  assert.notEqual(word(local({ size: [2, 1, 1] })), word(meshes(draw(kit([{ material: 'stone', at: [0, 2, 0], size: [2, 1, 1] }])))[0].geometry.attributes.edenSurf as THREE.BufferAttribute), 'shapes differ by seed');
+  assert.notEqual(word(local({ size: [2, 1, 1] })), word(local({ at: [0, 2, 0], size: [2, 1, 1] })), 'shapes differ by seed');
 });
 
 type V3 = [number, number, number];
@@ -151,14 +168,14 @@ test('the shader face normal points out of every surfaced triangle: long-z shape
     for (const f of faces) assert.ok(dot3(f.kit, f.N) > 0.5, `${label}: shader normal ${f.n.map(v => v.toFixed(2))} points into the shape (geometry normal ${f.N.map(v => v.toFixed(2))})`);
   }
   // The class looks read n.y: a top face reads up and a ridge along z keeps its slopes facing up.
-  const ys = (sh: Record<string, unknown>) => shaderFaces(meshes(draw(kit([{ material: 'tile', ...sh }])))[0]).faces.map(f => [f.N[1], f.n[1]]);
+  const ys = (sh: Record<string, unknown>) => shaderFaces(meshes(draw(kit([{ material: 'tile', ...sh }], 2, { surfaces: true })))[0]).faces.map(f => [f.N[1], f.n[1]]);
   for (const [N, n] of ys({ size: [1, 1, 3] })) if (N > 0.99) assert.ok(n > 0.99, `top face of a box longer in z reads n.y ${n}`);
   const slope = ys({ kind: 'wedge', size: [2, 1, 4] }).filter(([N]) => N > 0.5 && N < 0.99);
   assert.ok(slope.length > 0 && slope.every(([N, n]) => Math.abs(n - N) < 1e-3), `z-ridged wedge slope reads up: ${JSON.stringify(slope)}`);
 });
 
 test('moving roles keep their surfaces; clones made by looks and lights keep the shader', () => {
-  const o = draw(kit([{ kind: 'cyl', size: undefined, r: 0.5, h: 0.2, material: 'wood', pattern: 'planks', role: 'wheel' }, { kind: 'box', material: 'stone', role: 'door', at: [2, 1, 0], size: [1, 2, 0.1] }]));
+  const o = draw(kit([{ kind: 'cyl', size: undefined, r: 0.5, h: 0.2, material: 'wood', pattern: 'planks', role: 'wheel' }, { kind: 'box', material: 'stone', role: 'door', at: [2, 1, 0], size: [1, 2, 0.1] }], 2, { surfaces: true }));
   const ms = meshes(o); assert.equal(ms.length, 2);
   for (const m of ms) { assert.ok(surfaced(m)); assert.ok(m.geometry.attributes.edenSurf); assert.ok(m.parent?.name.startsWith('role:')); }
   const clone = ms[0].material.clone();
@@ -203,7 +220,7 @@ test('?surfaces=0 turns every god surface off', async () => {
   (globalThis as { location?: unknown }).location = { search: '?surfaces=0' };
   try {
     const fresh = './kit-surfaces.ts?surfaces-off', off = await import(fresh) as typeof import('./kit-surfaces.ts'); // a second module instance
-    assert.equal(off.kitSurface('stone', 0, 'marble'), null); assert.equal(off.kitSurface('wood', 0), null);
+    assert.equal(off.kitSurface('stone', 0, 'marble'), null); assert.equal(off.kitSurface('wood', 0, undefined, true), null);
     assert.equal(off.kitSurfaceSuffix({ kind: 'box', at: [0, 0, 0], material: 'stone', pattern: 'marble' }), '');
   } finally { (globalThis as { location?: unknown }).location = saved; }
 });

@@ -27,11 +27,14 @@ Contract 2
   equal vertex counts and winding. Concave caps triangulate; sides are ruled triangles. Match corresponding vertices.
 * Sweep `profile` is a simple closed 2-D outline instead of `r`/`segments`. Its initial +y faces projected world up
   (−z for vertical paths); the frame transports along the Catmull–Rom path. A +z path maps profile +x/+y to world +x/+y.
-* Surfaces (Y1 / XP7) are presentation only. Opaque unlit shapes of wood, bark, stone, rock, cobble, brick, plaster,
-  tile, thatch, metal, fabric, sand, gravel, dirt, mud, leaf, moss and grass take the Eden realism shader by material
-  class; `pattern` (`marble`, `ashlar`, `planks`, `shingles`, `stripes`; `none` = flat) replaces that surface. One
-  program serves all of them; a per-vertex `edenSurf` (shape-local metres, ring count, seed) keeps patterns on the
-  shape. Contract 1 refuses `pattern` when defined and draws retained data flat; `?surfaces=0` turns surfaces off.
+* Surfaces (Y1 / XP7) are presentation only and opt-in, so retained v2 content keeps its look. With kit-level
+  `surfaces: true`, opaque unlit shapes of wood, bark, stone, rock, cobble, brick, plaster, tile, thatch, metal, fabric,
+  sand, gravel, dirt, mud, leaf, moss and grass take the Eden realism shader by material class. A shape's `pattern`
+  (`marble`, `ashlar`, `planks`, `shingles`, `stripes`; `none` = flat) replaces that surface and needs no kit flag.
+  A per-vertex `edenSurf` (shape-local metres, circumference, seed) keeps patterns on the shape; up-facing looks use
+  world up. Contract 1 refuses `pattern` and `surfaces` when defined and draws retained data flat; `?surfaces=0`
+  turns surfaces off. `gallery-surfaces-examples.json` is the v2 fixture: plain classes must not change; the
+  intended changes are listed in `gallery-surfaces-allow.json`.
 * Unsupported shape fields refuse with a field path and fix. Segments that would be clamped refuse. Physics includes
   bevels and a conservative spline control hull; all new shapes retain boxes. Triangle estimates cover actual cap,
   bevel and subdivision counts and refuse above 80,000 before meshing.

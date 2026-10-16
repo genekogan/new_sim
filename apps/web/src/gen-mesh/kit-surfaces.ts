@@ -1,6 +1,7 @@
-// Y1 / XP7: procedural surfaces for god kit/2 contract-2 shapes. Presentation only: the native Eden realism shader
-// (WorldEdenRealism.ts) is applied by material class, and an optional shape `pattern` adds marble, ashlar, planks,
-// shingles or stripes. Contract-1 kits, library generators and glass/water/emissive/glowing shapes stay as they were.
+// Y1 / XP7: procedural surfaces for god kit/2 contract-2 shapes. Presentation only. A kit opts in with `surfaces: true`:
+// its opaque shapes then take the native Eden realism shader (WorldEdenRealism.ts) by material class. A shape's
+// `pattern` (marble, ashlar, planks, shingles, stripes) opts that shape in on its own. Without either, v2 shapes draw
+// exactly as before, and contract-1 kits, library generators and glass/water/emissive/glowing shapes stay as they were.
 // Patterns are drawn in each shape's own metres (a per-vertex `edenSurf` attribute), so they follow the shape's yaw,
 // pitch and scale, hold still while a thing eases in or moves, and differ per shape by a seed. `?surfaces=0` turns
 // every god surface off (plain materials and draws exactly as before) for comparison.
@@ -21,22 +22,23 @@ const ROUND = new Set<string>(['cyl', 'cone', 'sphere', 'lathe', 'capsule']);
 const surfacesOff = () => typeof location !== 'undefined' && new URLSearchParams(location.search).get('surfaces') === '0';
 const OFF = surfacesOff();
 
-/** The surface of one contract-2 draw class, or null when it stays flat (unlit opaque shapes only). */
-export function kitSurface(material: string | undefined, glowLevel: number, pattern?: string): KitSurface | null {
-  const kind = material ?? 'paint';
-  if (OFF || glowLevel > 0 || FLAT.has(kind) || pattern === 'none') return null;
-  const cls = MATERIAL_SURFACE[kind as Material] ?? null, id = pattern ? KIT_PATTERN_ID[pattern] ?? 0 : 0;
+/** The surface of one contract-2 draw class, or null when it stays flat (unlit opaque shapes only). `classes` is the
+ *  kit's `surfaces` opt-in; an explicit pattern needs no opt-in. */
+export function kitSurface(material: string | undefined, glowLevel: number, pattern?: string, classes = false): KitSurface | null {
+  const kind = material ?? 'paint', id = pattern ? KIT_PATTERN_ID[pattern] ?? 0 : 0;
+  if (OFF || glowLevel > 0 || FLAT.has(kind) || pattern === 'none' || (!id && !classes)) return null;
+  const cls = MATERIAL_SURFACE[kind as Material] ?? null;
   return cls || id ? { cls: cls ?? 'generic', pattern: id } : null;
 }
 /** Draw-class suffix: a shape draws apart from its material's other shapes only when its pattern changes the surface. */
-export function kitSurfaceSuffix(sh: KitShape): string {
+export function kitSurfaceSuffix(sh: KitShape, classes = false): string {
   if (OFF || !sh.pattern || sh.glow || sh.material === 'emissive') return '';
-  return JSON.stringify(kitSurface(sh.material, 0)) === JSON.stringify(kitSurface(sh.material, 0, sh.pattern)) ? '' : `:${sh.pattern}`;
+  return JSON.stringify(kitSurface(sh.material, 0, undefined, classes)) === JSON.stringify(kitSurface(sh.material, 0, sh.pattern, classes)) ? '' : `:${sh.pattern}`;
 }
-/** Surface for a contract-2 class key `material:glow[:pattern]` (kit.mesh.ts classOf). */
-export function kitClassSurface(key: string): KitSurface | null {
+/** Surface for a contract-2 class key `material:glow[:pattern]` (kit.mesh.ts classOf) of a kit with or without `surfaces`. */
+export function kitClassSurface(key: string, classes = false): KitSurface | null {
   const [material, level, pattern] = key.split(':');
-  return kitSurface(material, Number(level) || 0, pattern);
+  return kitSurface(material, Number(level) || 0, pattern, classes);
 }
 
 const seedOf = (at: readonly number[]) => { let h = 2166136261; for (const c of at.map(v => v.toFixed(3)).join(',')) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return ((h >>> 0) % 990) / 1000; };

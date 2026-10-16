@@ -433,10 +433,11 @@ if it no longer fits), and `undo` restores the previous version. A new `"version
 are; use it when only new copies should change.
 
 - **Colour and material.** Per shape `color: "#rrggbb"` and `material` = wood stone plaster brick glass metal
-  fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. In `v:2` kits wood stone
-  brick plaster tile thatch metal fabric leaf bark get a subtle surface (grain, mottle, courses); `pattern` =
-  `marble` `ashlar` `planks` `shingles` `stripes` (`none` = flat) draws one in the shape's own metres, courses
-  along its longest side; stripes alternate the colour with cream, radially on round shapes. Presentation only.
+  fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. A `v:2` kit with
+  `"surfaces": true` gives wood stone brick plaster tile thatch metal fabric leaf bark a subtle surface (grain,
+  mottle, courses; `pattern:"none"` keeps one flat). A shape's `pattern` = `marble` `ashlar` `planks` `shingles`
+  `stripes` draws one in its own metres (shingles run up the slope); stripes alternate the colour with
+  cream, radially on round shapes. Presentation only.
   v1 looks are flat (marble = pale `stone`, cool tint); copper = `metal` `#b87333` (weathered `#4f9a83`);
   no roughness or metalness control. Buildings take `wall`, `trim`, `roofColor`, `material`.
 - **Light.** `glow: 0…1` on a shape makes it self-lit (an LED strip, a lit window, a lantern pane): it shows
