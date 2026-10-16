@@ -65,7 +65,7 @@ import { newWorld } from './world-kind.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
-import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt } from './world-env.ts';
+import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
@@ -304,7 +304,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
-      if(shotMode){await whenAssetsSettled();requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      // r2.1: and after the first world clock reaches the lights (all views/frames of `look --hour` honour the hour)
+      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
         (window as unknown as {__shotReady?:boolean}).__shotReady=true;window.dispatchEvent(new Event('sim-shot-ready'));
       }));}

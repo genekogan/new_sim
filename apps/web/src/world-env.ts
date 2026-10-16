@@ -20,6 +20,18 @@ export function shotClockAt(clock: string | null, hour: number | null): string |
   return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;
 }
 
+/** r2.1: `?shot=1` readiness waits for the first world clock to reach the lights. Takes (and so the clock) arrive a few
+ *  hundred ms after the entity layer settles; until then the sky is the no-clock midday, so `look --views/--frames
+ *  --hour 21` captured day in its first views. Resolves true once `hasClock()`, false after `timeoutMs` (a world
+ *  without a clock still gets its picture) or on abort. */
+export function whenShotClock(hasClock: () => boolean, { timeoutMs, signal, frame = (fn: () => void) => requestAnimationFrame(fn) }: { timeoutMs: number; signal?: AbortSignal; frame?: (fn: () => void) => unknown }): Promise<boolean> {
+  const until = performance.now() + timeoutMs;
+  return new Promise(resolve => {
+    const check = () => { if (hasClock()) resolve(true); else if (signal?.aborted || performance.now() >= until) resolve(false); else frame(check); };
+    check();
+  });
+}
+
 /** The god's set weather, or null when the world follows the scheduled weather ('auto', the default). */
 export function setWeatherOf(state: WorldStateLike): SetWeather | null {
   const w = state?.weather;

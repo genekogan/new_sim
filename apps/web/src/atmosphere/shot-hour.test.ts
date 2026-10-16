@@ -16,7 +16,7 @@ const hooks = registerHooks({ load(url, context, next) {
 } });
 const browserGlobal = globalThis as unknown as { location?: URL };
 browserGlobal.location ??= new URL('http://offline.invalid/w/fixture');
-const { parseShotHour, shotClockAt, GodWorldLiving } = await import('../world-env.ts');
+const { parseShotHour, shotClockAt, GodWorldLiving, whenShotClock } = await import('../world-env.ts');
 const { Daylight } = await import('../WorldGeometry.ts');
 const { createWorldAtmosphere } = await import('../WorldAtmosphere.ts');
 const { skyBodies } = await import('./astro.ts');
@@ -78,4 +78,13 @@ test('LiveWorld sends the shot clock to lighting/atmosphere and the real clock t
   assert.match(source, /clock:shotClockAt\(shown\.current\?\.datetime\?\?null,shotHour\)/);
   assert.match(source, /sites\.setWorldClock\(datetime,dayTicks\?86400\/\(dayTicks\*dt\):1\)/);
   assert.match(source, /shown\.current = \{ tick: depictedTick, datetime, take, entities: sampled\.entities \}/);
+});
+
+test('r2.1 shot readiness waits for the first world clock, gives up at its bound, and stops on abort', async () => {
+  let frames = 0, clock = false; const frame = (fn: () => void) => { frames++; if (frames === 3) clock = true; setImmediate(fn); };
+  assert.equal(await whenShotClock(() => clock, { timeoutMs: 5000, frame }), true); assert.equal(frames, 3, 'ready only once the lights have a clock');
+  frames = 0; assert.equal(await whenShotClock(() => true, { timeoutMs: 5000, frame }), true); assert.equal(frames, 0, 'no wait when the clock is already there');
+  const t0 = performance.now(); assert.equal(await whenShotClock(() => false, { timeoutMs: 30, frame: fn => setTimeout(fn, 5) }), false);
+  assert.ok(performance.now() - t0 < 1000, 'a clockless world still becomes ready');
+  const abort = new AbortController(); abort.abort(); assert.equal(await whenShotClock(() => false, { timeoutMs: 5000, signal: abort.signal, frame }), false);
 });
