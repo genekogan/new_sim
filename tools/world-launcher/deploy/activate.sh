@@ -37,13 +37,22 @@ activate() {
   if [ "$1" = reload ]; then
     local before; before="$(kj handover.startedAt)"; reload_unit
     local st=""; for i in $(seq 1 1800); do
-      if [ "$(kj handover.startedAt)" != "$before" ]; then st="$(kj handover.state)"; case "$st" in done|failed) break;; esac; fi; sleep 1
+      if [ "$(kj handover.startedAt)" != "$before" ]; then st="$(kj handover.state)"; case "$st" in done|failed|rolled-back) break;; esac; fi; sleep 1
     done
-    node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).handover;console.log(`handover ${h.from} -> ${h.to}: ${h.state} in ${h.ms} ms`+(h.error?` (${h.error})`:"")+Object.entries(h.worlds||{}).map(([s,w])=>`\n  ${s}: ${w.ok?w.ms+" ms":"FAILED "+w.error}`).join(""))' "$data/keeper.json"
+    node -e 'const h=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).handover;console.log(`handover ${h.from} -> ${h.to}: ${h.state} in ${h.ms} ms`+(h.error?` (${h.error})`:"")+(h.canary?` (canary ${h.canary})`:"")+Object.entries(h.worlds||{}).map(([s,w])=>`\n  ${s}: ${w.ok?w.ms+" ms"+(w.warm?.ok?` (pre-warmed ${w.warm.ms} ms)`:"")+(w.canary?" canary":""):"FAILED "+w.error}`).join(""))' "$data/keeper.json"
+    # canary failed: the keeper already handed back to the previous release, which serves every world; only the link moves back
+    if [ "$st" = rolled-back ]; then canary_back; fi
     [ "$st" = done ]
   else
     restart_unit
   fi
+}
+canary_back() {
+  local prev; prev="$(readlink "$ROOT/$STAGE.previous" 2>/dev/null || true)"
+  [ -z "$prev" ] || point "$prev" "$ROOT/$STAGE"
+  echo "canary world $(kj handover.canary) could not run on $BUILD: the previous release ($(kj active.build)) serves on, link back to ${prev:-?}; nothing else moved"
+  tail -15 "$data/logs/$(kj handover.canary).log" 2>/dev/null || true
+  exit 1
 }
 rollback() {
   local prev; prev="$(readlink "$ROOT/$STAGE.previous" 2>/dev/null || true)"

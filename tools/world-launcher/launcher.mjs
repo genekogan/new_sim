@@ -121,7 +121,7 @@ export async function openLauncher(cfg = {}) {
   const registry = new Registry(dataDir);
   const accountPolicy = creationPolicy(cfg);
   /** Handover state (keeper.mjs): 'active' → 'preparing' → 'retired' (or back to 'active' when the next one fails). */
-  let phase = 'active', retiredTo = null, gate = null;
+  let phase = 'active', retiredTo = null, gate = null, retiredPidFile = null;
   const adopting = Array.isArray(cfg.adopt) ? cfg.adopt : null;
   const createLimit = cfg.createLimit ?? Infinity, made = new Map();
   /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
@@ -135,7 +135,7 @@ export async function openLauncher(cfg = {}) {
   const siteKey = randomBytes(32).toString('hex');
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
   const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
-    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -625,25 +625,53 @@ export async function openLauncher(cfg = {}) {
     /** Keeper, step 3: the next launcher serves new connections; anything still arriving here is forwarded to it. No
      *  world starts here again. Idle connections close now, busy ones after their response. */
     retire() {
-      phase = 'retired'; retiredTo = port; pool.fence();
+      phase = 'retired'; retiredTo = port; pool.fence(); retiredPidFile = gate?.pidFile ?? retiredPidFile;
       const g = gate; gate = null; g?.open();
       server.keepAliveTimeout = 1;
       for (const s of sockets) if (!s.simBusy && !s.simUpgraded) s.destroy();
     },
+    /** Keeper, canary failed (the next launcher could not run its first world and has stopped it): serve again as
+     *  before, booting that world here on this release's code. The other worlds never left this launcher. */
+    async unretire(slug) {
+      if (phase !== 'retired') throw new Error(`cannot unretire while ${phase}`);
+      phase = 'active'; retiredTo = null; pool.unfence(); registry.frozen = false; pool.o.pidFile = retiredPidFile; pool.savePids(); registry.save();
+      server.keepAliveTimeout = 5_000;
+      log(`the next launcher's canary failed: serving on as before${slug ? `, booting ${slug} here again` : ''}`);
+      const w = slug ? registry.get(slug) : null;
+      return w ? pool.ensure(worldEnv(w)) : null;
+    },
     /** Keeper, step 4 (on the old launcher): stop one world so the next one can boot it on the same data. */
     async releaseWorld(slug) { if (phase !== 'retired') throw new Error('release before retire'); await pool.stop(slug); return pool.status(slug); },
     /** Keeper, step 4 (on the new launcher): take every adopted world over, `concurrency` at a time; per-world results. */
-    async takeOverAll(release, { concurrency = 1 } = {}) {
+    async takeOverAll(release, { concurrency = 1, canary = false } = {}) {
       const todo = [...pool.kids.values()].filter((k) => k.adopted).map((k) => k.slug), out = {};
       const one = async (slug) => {
         const t0 = performance.now();
-        try { const p = await pool.takeOver(slug, release); out[slug] = { ok: true, ms: Math.round(performance.now() - t0), port: p }; log(`took over ${slug} on :${p} in ${out[slug].ms} ms`); }
-        catch (e) { out[slug] = { ok: false, ms: Math.round(performance.now() - t0), error: e.message }; log(`could not take over ${slug}: ${e.message}`); }
+        try {
+          const p = await pool.takeOver(slug, release);
+          const k = pool.state(slug);
+          // ms: the world's visible pause (old process stopping + new one opening); totalMs adds the pre-warm before it
+          const total = Math.round(performance.now() - t0);
+          out[slug] = { ok: true, ms: k?.pauseStart ? Date.now() - k.pauseStart : total, totalMs: total, port: p, ...(k?.lastWarm ? { warm: k.lastWarm } : {}) }; log(`took over ${slug} on :${p} in ${out[slug].ms} ms${k?.lastWarm?.ok ? ` (pre-warmed ${k.lastWarm.ms} ms before)` : ''}`);
+        } catch (e) { out[slug] = { ok: false, ms: Math.round(performance.now() - t0), error: e.message }; log(`could not take over ${slug}: ${e.message}`); }
       };
+      // canary: one world moves first and must also answer its config (as the release's boot smoke asks); if it cannot,
+      // nothing else moves and the keeper hands back to the previous launcher, which boots that one world again
+      if (canary && todo.length) {
+        const pick = todo.find((s) => !registry.get(s)?.fork) ?? todo[0];
+        todo.splice(todo.indexOf(pick), 1);
+        await one(pick);
+        if (out[pick].ok) {
+          const r = await fetch(`http://127.0.0.1:${out[pick].port}${wp(pick)}/v1/config`, { signal: AbortSignal.timeout(10_000) }).catch((e) => ({ ok: false, status: e.message }));
+          if (!r.ok) { out[pick] = { ...out[pick], ok: false, error: `canary: /v1/config answered ${r.status}` }; await pool.stop(pick); }
+        }
+        if (!out[pick].ok) { pool.handBack(pick); log(`canary ${pick} failed on this release: handing back`); return { worlds: out, canaryFailed: pick }; }
+        out[pick].canary = true;
+      }
       const lanes = Array.from({ length: Math.max(1, concurrency) }, async () => { while (todo.length) await one(todo.shift()); });
       await Promise.all(lanes);
       wakeRecent();
-      return out;
+      return { worlds: out };
     },
     /** Open (non-upgraded) requests still being answered here. */
     busy() { let n = 0; for (const s of sockets) if (s.simBusy && !s.simUpgraded) n++; return n; },
@@ -686,7 +714,8 @@ function serveKeeper(l, stop) {
     else if (m.t === 'retire') l.retire();
     else if (m.t === 'release') reply(l.releaseWorld(m.slug).then((st) => ({ slug: m.slug, status: st.status })));
     else if (m.t === 'release-done') { const w = waiting.get(m.id); waiting.delete(m.id); if (w) (m.ok ? w.yes() : w.no(new Error(m.error ?? 'the previous launcher could not stop it'))); }
-    else if (m.t === 'take-over') reply(l.takeOverAll((slug) => ask({ t: 'release', slug }), { concurrency: Number(process.env.SIM_HANDOVER_CONCURRENCY ?? 1) }).then((worlds) => ({ worlds })));
+    else if (m.t === 'take-over') reply(l.takeOverAll((slug) => ask({ t: 'release', slug }), { concurrency: Number(process.env.SIM_HANDOVER_CONCURRENCY ?? 1), canary: m.canary === true }));
+    else if (m.t === 'unretire') reply(l.unretire(m.slug).then((p) => ({ slug: m.slug ?? null, port: p ?? null })));
     else if (m.t === 'exit') {
       // the last forwarded responses finish (up to 10 s), then this generation is gone
       const t0 = Date.now(); const done = () => (l.busy() === 0 || Date.now() - t0 > 10_000 ? stop('handed over') : setTimeout(done, 100)); done();
