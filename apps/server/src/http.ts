@@ -1,6 +1,7 @@
 import {SoulProfiles} from './soul-profile.ts';
 import {WorldAccounts} from './accounts/service.ts';
 import {mountAccountRoutes} from './accounts/routes.ts';
+import {mountWelcomeRoutes} from './welcome.ts';
 import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -101,6 +102,7 @@ export function buildApp(d: Deps) {
   app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/(?:souls\/[^/]+\/photo|agent\/photo)$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
 
   // ---- public
+  mountWelcomeRoutes(app,d);
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>d.cfg.publicUrl:baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));

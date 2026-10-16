@@ -190,8 +190,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [entityWorld, setEntityWorld] = useState(false);
   /** Entity worlds: the person's camera across scene re-mounts of this page (framed once, on first arrival). */
   const entityView = useRef<{eye:[number,number,number];target:[number,number,number];pending?:boolean}|null>(null);
-  const context = useRef({ sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
-  context.current = { sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
+  const context = useRef({ placeCard, sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
+  context.current = { placeCard, sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
   const past = useRef<Past | null>(null);
   const shown = useRef<Shown>({ tick: 0, datetime: null, take: null, entities: {} });
   const drawnTick = useRef<number | null>(null);
@@ -204,7 +204,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     stateSignature.current = signature; context.current.onViewerState(state);
   };
   const seeking = useRef<AbortController | null>(null);
-  const controlsApi = useRef<{ overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
+  const controlsApi = useRef<{ feedbackContext(): import('./WorldViewer.ts').WorldViewContext; overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
   const playbackCommands = useRef<{ seek(tick: number): Promise<void>; live(): void; setPlaying(playing: boolean): boolean } | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -376,6 +376,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     overview(geometry.bounds);
     framing.framed = false; // the placeholder ground does not count: frame again once the real layout (or the people) arrive
     controlsApi.current = {
+      feedbackContext: () => ({camera:{position:camera.position.toArray(),target:controls.target.toArray(),fov:camera.fov},placeId:context.current.placeCard?.id??latestViewerState.current?.room?.id??null}),
       overview: () => { navigation?.release(); overview(expansion&&!past.current?[-100,-65,105,85]:geometry.bounds); },
       framePoint:(point,radius)=>{context.current.setCameraMode('manual');context.current.setManualNavigation('orbit');rts.frameSubject(point,radius);},
       frameSouls: ids => {
@@ -1042,6 +1043,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   } };
   useEffect(() => {
     const handle = createWorldViewerHandle(() => ({
+      feedbackContext: () => controlsApi.current?.feedbackContext() ?? null,
       setCameraMode: mode => { controlsApi.current?.releaseInput(); context.current.setCameraMode(mode); },
       setManualNavigation: mode => { controlsApi.current?.releaseInput(); context.current.setManualNavigation(mode); context.current.setCameraMode('manual'); },
       resetView: () => controlsApi.current?.reset() ?? false,
