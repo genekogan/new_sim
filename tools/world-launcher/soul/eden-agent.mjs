@@ -32,7 +32,7 @@ Talk: say "<text>" \xB7 converse start <Soul ID> [text]
 Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
-Owner inbox: listen [--after message-id] [--timeout 25] [--once] \xB7 ack <message-id> ["short reply"]
+Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["short reply"]
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
@@ -58,21 +58,24 @@ function noticeInboxHeader(headers) {
     return false;
   }
 }
-async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Promise((resolve9) => setTimeout(resolve9, ms)) }) {
-  let seconds = 25, after, once = false;
+async function clientListen(args, { call: call2, sleep: sleep2 = (ms) => new Promise((resolve9) => setTimeout(resolve9, ms)), write, stop }) {
+  let seconds = 25, after, once = false, follow = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--once") once = true;
+    else if (arg === "--follow") follow = true;
     else if (arg === "--timeout") {
       const value = args[++i];
       seconds = value === void 0 || value === "" ? NaN : Number(value);
     } else if (arg === "--after") {
       after = args[++i];
       if (!after || after.startsWith("--")) throw new Error("listen --after needs a message id");
-    } else throw new Error("usage: listen [--after message-id] [--timeout seconds] [--once]");
+    } else throw new Error("usage: listen [--after message-id] [--timeout seconds] [--once|--follow]");
   }
+  if (once && follow) throw new Error("listen takes --follow or --once, not both");
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55) throw new Error("listen --timeout takes seconds from 0 to 55");
   if (seconds === 0 && !once) throw new Error("listen --timeout 0 requires --once");
+  if (follow) return followInbox({ poll: (last) => call2(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...last ? { after: last } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after, wait: sleep2, write, stop });
   const query = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} });
   for (; ; ) {
     const response = await call2(`/v1/edge/inbox/listen?${query}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 });
@@ -91,6 +94,23 @@ function inboxResult(response, operation) {
   if (response.status < 200 || response.status >= 300) throw new Error(`${operation}: HTTP ${response.status} ${JSON.stringify(response.data).slice(0, 300)}`);
   if (!response.data?.inbox) throw new Error(`${operation}: this world does not serve the owner inbox yet`);
   return response.data;
+}
+async function followInbox({ poll, after, write = (line) => process.stdout.write(line + "\n"), wait: wait2, stop = () => false }) {
+  let last = after, delay = 0;
+  while (!stop()) {
+    const r = await poll(last);
+    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await wait2(delay);
+      continue;
+    }
+    delay = 0;
+    const m = inboxResult(r, "listen").inbox.latest;
+    if (m && m.state !== "acknowledged" && m.id !== last) {
+      write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
+      last = m.id;
+    } else await wait2(50);
+  }
 }
 
 // tools/edge-skill/eden-agent.mjs

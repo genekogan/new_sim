@@ -3,15 +3,15 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "35d05482f2620a148daf0b9be6bedbb55005a11205dafa4dceebdf57ca31e315",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-f5cb5b7d.manifest.json)",
-    "source": "f5cb5b7d098b58be51cd1bdbcadbfd1792538cb7",
-    "note": "lane inbox: 1.9 + owner-message listen/ack and authenticated JSON, image and event-stream receipts"
+    "sha256": "694f05d7b7ad5ac3689641545b8add3550337f579a2c96dd0a0dfc278954504b",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-fcb47049.manifest.json)",
+    "source": "fcb470499750d4efe4913bf2df8c82e625d523de",
+    "note": "lane inbox: 1.9 + owner-message listen (--once/--follow)/ack and authenticated JSON, image and event-stream receipts"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "17b5459e55b4a2b296f21d732f32e27c96a881c29538bc6831b71e182fc61b6b",
-    "from": "git show f5cb5b7d:tools/edge-skill/SKILL.md",
+    "sha256": "32d4514ee7dadaf13941205fcd35146742ca05d78c7281dd27bd6acc3e864f51",
+    "from": "git show fcb47049:tools/edge-skill/SKILL.md",
     "note": "template; the world fills {{BASE}}. Includes owner inbox listening and acknowledgement guidance."
   },
   "instructions": {
