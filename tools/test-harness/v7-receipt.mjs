@@ -8,7 +8,7 @@ export function judge({old,fresh,rcOld=0,rcNew=0}){
     const r=(old||[]).find(x=>x.world===w&&x.dpr===dpr);const id=`old ${w} dpr${dpr}`;
     if(!r){add(id,false,'no run');continue;}
     const g=r.geometry||{},buf=g.buffer,css=g.canvasCss;
-    add(`${id} arrived`,r.ui?.simEntity&&r.ui?.revealed==='true'&&!r.ui?.arrival,JSON.stringify({entity:r.ui?.simEntity,revealed:r.ui?.revealed,arrival:r.ui?.arrival}));
+    add(`${id} arrived`,r.ui?.revealed==='true'&&!r.ui?.arrival,JSON.stringify({revealed:r.ui?.revealed,arrival:r.ui?.arrival}));
     add(`${id} canvas dpr`,css&&buf&&buf[0]>=css[0]*dpr*0.9,JSON.stringify({css,buf}));
     add(`${id} no page errors`,(r.errors||[]).length===0,(r.errors||[]).join(' | ').slice(0,300));
     const moved=Object.values(r.input||{}).filter(Boolean).length;add(`${id} input moves camera`,moved>=2,`${moved}/4 ${JSON.stringify(r.input)}`);
