@@ -403,7 +403,7 @@ export function compactAround(a){
  const clip=(s,n)=>String(s??'').length>n?String(s).slice(0,n-1)+'…':String(s??'');
  const places=(a.places??[]).map((p,i)=>`${p.name} · ${p.dir} ${p.m}m ${p.eta} · ${p.been===undefined?'new':p.been==='found'?'found':'been '+p.been+'×'}${i<3&&p.what?' · '+clip(p.what,80):''}${p.walk?` [${p.walk}]`:''}`);
  const go=a.unvisited?.[0]??null;
- return {...(a.found?.length?{found:a.found.map(f=>`${f.name}${f.what?' · '+clip(f.what,80):''} [walk:${f.id}]`)}:{}),places,people:(a.people??[]).slice(0,6),things:(a.things??[]).slice(0,6),
+ return {...(a.found?.length?{found:a.found.map(f=>`${f.name}${f.what?' · '+clip(f.what,80):''}${f.walk?` [${f.walk}]`:''}`)}:{}),places,people:(a.people??[]).slice(0,6),things:(a.things??[]).slice(0,6),
   ...(go?{suggestion:go,next:`act ${go}, then leave a mark or meet someone there`}:{}),untrusted:true};
 }
 /** explore / look around — more of what is near (places with what they are and whether you have been there, the people

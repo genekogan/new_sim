@@ -106,21 +106,22 @@ try {
     return { where: h?.me?.placePath, district: h?.district, far: h?.far, farMore: h?.farMore, exits: (h?.exits ?? []).map((e) => e.to), grove: JSON.stringify(h).includes('grove'), size: report.sizes.hereStart };
   }, (r) => Array.isArray(r.far) && r.far.some((x) => /^garden · /.test(x)) && r.far.some((x) => /^orchard · /.test(x)) && !r.grove && r.far.every((x) => x.split(' · ').length === 2));
   await step('K2 the grove is secret to Ana: not on her map, not walkable by id or by name', async () => {
-    const m = (await ana.run('map')).data?.places ?? [], a = (await ana.run('act', 'walk:g-grove')).data, b = (await ana.run('act', 'walk to the grove')).data;
-    return { onMap: m.some((p) => p.id === 'g-grove'), mapCount: m.length, byId: { accepted: a?.accepted, code: a?.code }, byName: { accepted: b?.accepted, code: b?.code, reason: b?.reason } };
-  }, (r) => !r.onMap && r.mapCount > 0 && r.byId.accepted === false && r.byName.accepted === false && !/grove/i.test(r.byName.reason ?? ''));
+    const m = (await ana.run('map')).data?.places ?? [], a = (await ana.run('act', 'walk:grove')).data, b = (await ana.run('act', 'walk to the grove')).data;
+    // the reply may quote the Soul's own words back; nothing else in it (reason, note, did_you_mean) names the grove
+    return { onMap: m.some((p) => p.id === 'g-grove'), mapCount: m.length, byId: { accepted: a?.accepted, code: a?.code }, byName: { accepted: b?.accepted, code: b?.code, reason: b?.reason, leaks: /grove/i.test(JSON.stringify(b ?? {}).replaceAll('walk to the grove', '')) } };
+  }, (r) => !r.onMap && r.mapCount > 0 && r.byId.accepted === false && r.byName.accepted === false && !r.byName.leaks);
   await step('K3 Ana walks to the plaza and looks around: the grove is found (remembered), with its walk', async () => {
-    const w = await ana.act('walk:g-plaza'), r = await ana.run('look', 'around'); report.sizes.lookAround = r.chars;
+    const w = await ana.act('walk:plaza'), r = await ana.run('look', 'around'); report.sizes.lookAround = r.chars;
     const full = await ana.run('look', 'around', '--full'); report.sizes.lookAroundFull = full.chars;
     return { walk: w.phase, found: r.data?.found, places: r.data?.places?.slice(0, 5), suggestion: r.data?.suggestion, chars: r.chars, fullChars: full.chars };
-  }, (r) => r.walk === 'completed' && (r.found ?? []).some((x) => /^grove/.test(x) && x.includes('[walk:g-grove]')));
+  }, (r) => r.walk === 'completed' && (r.found ?? []).some((x) => /^grove/.test(x) && x.includes('[walk:grove]')));
   await step('K4 now known: Ana walks into the grove; her map is still the public one (no grove), Ben still knows nothing of it', async () => {
-    const w = await ana.act('walk:g-grove'), h = (await ana.run('here')).data, m = (await ana.run('map')).data?.places ?? [];
-    const bh = (await ben.run('here')).data, bm = (await ben.run('map')).data?.places ?? [], bw = (await ben.run('act', 'walk:g-grove')).data;
+    const w = await ana.act('walk:grove'), h = (await ana.run('here')).data, m = (await ana.run('map')).data?.places ?? [];
+    const bh = (await ben.run('here')).data, bm = (await ben.run('map')).data?.places ?? [], bw = (await ben.run('act', 'walk:grove')).data;
     return { walk: w.phase, anaAt: h?.me?.placePath, anaMapHasGrove: m.some((p) => p.id === 'g-grove'), benHere: JSON.stringify(bh).includes('grove'), benMap: bm.some((p) => p.id === 'g-grove'), benWalk: bw?.accepted };
   }, (r) => r.walk === 'completed' && r.anaAt?.[0] === 'grove' && !r.anaMapHasGrove && !r.benHere && !r.benMap && r.benWalk === false);
   await step('K5 Ana walks to the garden and back to the plaza; her here now gives the garden\'s distance and that she has been', async () => {
-    const a = await ana.act('walk:g-garden'), b = await ana.act('walk:g-plaza'), h = (await ana.run('here')).data; report.sizes.hereLater = sizeOf(h);
+    const a = await ana.act('walk:garden'), b = await ana.act('walk:plaza'), h = (await ana.run('here')).data; report.sizes.hereLater = sizeOf(h);
     const bf = (await ben.run('here')).data?.far ?? [];
     return { there: a.phase, back: b.phase, far: h?.far, district: h?.district, ben: bf.find((x) => /^garden/.test(x)) };
   }, (r) => r.there === 'completed' && r.back === 'completed' && r.far?.some((x) => /^garden · [NESW]{1,2} \d+m · been/.test(x)) && /^garden · [NESW]{1,2}$/.test(r.ben ?? ''));

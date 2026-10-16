@@ -36,6 +36,6 @@ export function aroundFrame(ledger: EdgeLedger, soul: EdgeSoul) {
       return {id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), dir: compassPoint(compassOf(at[0] - pos[0], at[1] - pos[1])), m: Math.round(d), eta: '~' + durationWord(walkSeconds(d * 1.25)),
         ...(p.description ? {what: clip(p.description, 110)} : {}), ...(k ? {been: k.how === 'visited' ? k.visits : 'found'} : {}), ...(K.isSecret(p.id) ? {secret: true} : {})};});
   const unvisited = places.filter(p => !mem.has(p.id) && p.walk).slice(0, 3).map(p => p.walk!);
-  return {tick, ...(found.length ? {found: found.map(p => ({id: p.id, name: p.name, ...(p.description ? {what: clip(p.description, 110)} : {})}))} : {}),
+  return {tick, ...(found.length ? {found: found.map(p => ({id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), ...(p.description ? {what: clip(p.description, 110)} : {})}))} : {}),
     people, things, places, ...(unvisited.length ? {unvisited} : {}), untrusted: true};
 }

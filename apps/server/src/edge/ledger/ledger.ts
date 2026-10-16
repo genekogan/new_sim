@@ -853,10 +853,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** What each capability answers to, for PM-R057 natural names (built only when an id is not exact). */
   private vocabulary(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
     const w = this.host.engine.world as NativeWorld, me = this.body(soul.entityId), all = [...this.places.byId.values()], root = all.find(p => p.parent === null);
+    // knowledge/1: a secret place this Soul does not know is no name to resolve (nor a "contains it" fallback naming it)
+    const known: typeof all = [], withheld: string[] = [];
+    for (const p of all) if (p.parent !== null) {if (this.knowledge.knows(soul.soulId, p.id)) known.push(p); else withheld.push(tokens(p.name).join(' '), tokens(p.id).join(' '));}
     const objects = new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]));
     const around = (x: number, z: number) => {const p = this.places.containing(x, z, 0).find(q => q.parent !== null); return p ? [p.id, p.name] : [];};
     return {caps, me: me ? [me.pose.p[0], me.pose.p[2]] : null, root: root ? [...tokens(root.id), ...tokens(root.name)] : [],
-      places: all.filter(p => p.parent !== null).map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
+      withheld, places: known.map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
         if (t.kind === 'spot') {

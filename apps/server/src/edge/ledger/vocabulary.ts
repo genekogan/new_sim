@@ -19,6 +19,9 @@ export type VocabContext = {
   target(cap: EdgeCapability): VocabTarget;
   /** Every known place (including ones with no capability yet), and the root's id/name tokens to ignore. */
   places: VocabPlace[];
+  /** knowledge/1: the names (as tokens, space-joined) of places withheld from this Soul (secret, not yet known). Words that
+   *  name one name nothing: never swapped for another place by synonym or description (a name never confirms one). */
+  withheld?: string[];
   root: string[];
   me: [number, number] | null;
 };
@@ -245,7 +248,7 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
     // place that contains it. A named place that cannot be reached is refused honestly (place.unreachable), never swapped
     // for an unrelated place; the nearest places you can reach are offered in did_you_mean.
     if (PLACE_VERBS.has(verb)) for (const words of passes) {
-      const found = placeMatch(words, ctx.places);
+      const found = placeMatch(words, ctx.places, ctx.withheld);
       if (!found.length) continue;
       const capOf = new Map(pool.filter(c => c.target).map(c => [c.target!.id, c]));
       const reach = found.filter(p => capOf.has(p.id));
@@ -276,7 +279,7 @@ function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined)
 }
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */
-export function placeMatch(words: string[], places: VocabPlace[]): VocabPlace[] {
+export function placeMatch(words: string[], places: VocabPlace[], withheld: readonly string[] = []): VocabPlace[] {
   if (!words.length) return [];
   const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id)], descT = (p: VocabPlace) => tokens(p.description ?? '');
   const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
@@ -287,6 +290,8 @@ export function placeMatch(words: string[], places: VocabPlace[]): VocabPlace[] 
     places.filter(p => words.every(w => hit(w, nameT(p)))),
     places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)]))),
   ];
+  // knowledge/1: a withheld place's own name is not an everyday word for some other place (the grove is not the orchard)
+  if (!tiers[0].length && !tiers[1].length && withheld.includes(words.join(' '))) return [];
   const found = tiers.find(t => t.length) ?? [];
   const depth = (p: VocabPlace) => {let n = 0; for (let q: VocabPlace | undefined = p; q?.parent; q = places.find(x => x.id === q!.parent)) n++; return n;};
   return [...found].sort((a, b) => Number(!!b.walkable) - Number(!!a.walkable) || Number(a.kind === 'water') - Number(b.kind === 'water') || depth(a) - depth(b) || a.id.localeCompare(b.id));

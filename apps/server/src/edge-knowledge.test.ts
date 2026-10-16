@@ -5,8 +5,14 @@
 // the Soul knows it. Fake minds; no network.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {setImmediate} from 'node:timers/promises';
 import {Hono} from 'hono';
+import {coreRef} from '@sim/world-compiler';
 import {coreAWorld} from '../test/core-a-fixture.ts';
+import {fixture, invite, accept, factory} from '../test/native-owner-fixture.ts';
+import {EdgeLedger} from './edge/ledger/ledger.ts';
+import {GodMode} from './god/god.ts';
+import {installEngineBridge} from './god/engine-bridge.ts';
 import {PlaceKnowledge, edgeDistance} from './edge/perception/knowledge.ts';
 import {mountSecretPlaceRoutes} from './edge/perception/secret-routes.ts';
 
@@ -71,6 +77,7 @@ test('knowledge at scales: district summary, far names, memory of visits, look a
   // ---- look around: finds it (close enough), and remembers; B (not looking) still does not know
   const ar = await around(a), rawA = JSON.stringify(ar);
   assert.deepEqual(ar.found.map((x: any) => x.id), ['commons-deck'], rawA);
+  assert.equal(ar.found[0].walk, 'walk:commons-deck', 'found, with the walk offered now');
   assert.ok(ar.places.some((p: any) => p.id === 'commons-deck' && p.secret === true && p.been === 'found' && p.walk === 'walk:commons-deck'), 'listed as a found secret, walkable now');
   assert.ok(ar.unvisited.every((x: string) => x.startsWith('walk:')), 'suggestions are offered walks');
   assert.ok(ar.places.length > 0 && ar.places.every((p: any) => p.dir && p.eta && typeof p.m === 'number'), JSON.stringify(ar.places));
@@ -105,4 +112,47 @@ test('god route: mark a place secret by id or name, list, refuse unknown and roo
   assert.equal((await call('POST', {place: 'eden', secret: true})).status, 400);
   assert.equal((await call('POST', {place: 'commons-deck', secret: false})).body.secret, false);
   assert.deepEqual(w.ledger.knowledge.secrets().map(s => s.id), ['eden-housing']);
+});
+
+test('god world: a secret place is not walked to by name (walk:<ref> offers, plain words, everyday synonyms)', {timeout: 300000}, async t => {
+  const f = fixture(':memory:', factory, {durableClockV1: true});
+  const god = new GodMode(f.db, {worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {}});
+  const L = new EdgeLedger(f.host, f.db), bridge = installEngineBridge({host: f.host, god, edge: L, log: () => {}});
+  const settle = async (n = 4) => {for (let i = 0; i < n; i++) {f.host.tickOnce(); await setImmediate(); f.host.drainInputs();}};
+  f.brain.quiesce(); t.after(() => {f.brain.quiesce(); f.host.stop(); f.db.close();});
+  await settle(2);
+  const built = god.act({ops: [
+    {op: 'place', def: coreRef('plaza'), name: 'plaza', shape: {area: [[-8, -25], [8, -25], [8, -11], [-8, -11]]}},
+    {op: 'place', def: coreRef('lawn'), name: 'grove', shape: {area: [[17, -23], [27, -23], [27, -13], [17, -13]]}},
+    {op: 'place', def: coreRef('lawn'), name: 'orchard', shape: {area: [[-40, -40], [-28, -40], [-28, -28], [-40, -28]]}},
+  ]}, 'a plaza, a grove beside it, an orchard') as {accepted: boolean};
+  assert.equal(built.accepted, true, JSON.stringify(built));
+  await settle(4); bridge.perceive.sync(true);
+  await invite(f, 'ana');
+  const row = await accept(f.host, f.souls.create('dev:ana', {name: 'Ana', description: 'curious'})) as {id: string; entity_id: string; name: string; owner: string};
+  await settle(3);
+  const soul = {soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner};
+  const act = async (capability: string) => await accept(f.host, L.act(soul, {capability})) as {accepted: boolean; code?: string; reason?: string; receipt?: {capability: string}};
+
+  // god-world walks are walk:<ref> (nav.ts), their target the god place g-<ref>
+  const caps0 = L.capabilities(soul);
+  assert.deepEqual(caps0.find(c => c.id === 'walk:grove')?.target, {id: 'g-grove', kind: 'place'});
+  assert.ok(caps0.find(c => c.id === 'walk:orchard')?.available, 'the orchard (an everyday word for a grove) is walkable');
+  assert.ok(L.knowledge.setSecret('g-grove', true));
+  assert.ok(!L.capabilities(soul).some(c => c.id.endsWith(':grove') || c.target?.id === 'g-grove'), 'no walk:grove, hang-out:grove …');
+
+  // plain words: refused as any unknown name is — not walked to the field that holds it, not swapped for the orchard,
+  // and nothing in the reply (note, reason, did_you_mean) names the grove beyond the words the Soul said
+  const unknown = await act('walk to the zyzzyva');
+  for (const words of ['walk to the grove', 'go to grove', 'hang out at the grove', 'walk to g-grove']) {
+    const r = await act(words), leak = JSON.stringify(r).replaceAll(words, '');
+    assert.equal(r.accepted, false, `${words}: ${JSON.stringify(r)}`);
+    assert.equal(r.code, unknown.code, `${words}: refused like an unknown name: ${JSON.stringify(r)}`);
+    assert.ok(!/grove/i.test(leak), `${words}: ${leak}`);
+  }
+
+  // found (by looking around): the same words reach it
+  L.knowledge.find(soul.soulId, 'g-grove', f.host.engine.world.tick); L.invalidateBodies();
+  const known = await act('walk to the grove');
+  assert.equal(known.accepted, true, JSON.stringify(known)); assert.equal(known.receipt?.capability, 'walk:grove');
 });
