@@ -9,8 +9,7 @@ import type {HumanoidKit} from './compose.ts';
 import {resolveLook} from './look.ts';
 
 export const PORTRAIT_SIZE = 256;
-/** Bumped when the framing or lighting changes, so stored automatic portraits are redrawn. */
-export const PORTRAIT_STYLE = 'portrait-cpu/1';
+// A change to framing or light here must bump AUTO_PORTRAIT_STYLE (apps/server/src/portrait/auto-portraits.ts) so stored portraits redraw.
 const BG_TOP = [0.86, 0.84, 0.78], BG_BOTTOM = [0.68, 0.66, 0.6]; // linear
 const KEY = new THREE.Vector3(0.75, 0.55, -0.35).normalize(), FILL = new THREE.Vector3(0.6, 0.1, 0.8).normalize();
 
