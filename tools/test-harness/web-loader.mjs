@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url';
 const { transformSync } = createRequire(new URL('../../mars/viewer/package.json', import.meta.url))('esbuild');
 // URL-only browser context for modules computing public asset paths at import time.
 globalThis.location ??= new URL('http://fixture.invalid/w/eden/');
+// …and its history, which modules reading the landing URL at import time pair with it (GodPanel's preview key).
+globalThis.history ??= { replaceState() {}, pushState() {}, state: null, length: 1 };
 registerHooks({
   load(url, context, next) {
     if (!url.startsWith('file:')) return next(url, context);
