@@ -4,6 +4,7 @@ import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul} from '
 import type {EdgeLedger} from './ledger/ledger.ts';
 import {registerEdgeComms} from './comms/index.ts';
 import {hereFrame} from './perception/here.ts';
+import {aroundFrame} from './perception/around.ts';
 import {registerEdgeEvents} from './events/index.ts';
 import {mountIdempotency} from './events/idempotency.ts';
 import {mountSchema,EDGE_ACT_VERBS} from './events/schema.ts';
@@ -49,6 +50,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.post('/v1/edge/act', wrap(async c => {const s = deps.soul(c); limit(s, 'act', 60); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {capability, params?, clientRef?} or {verb, target, …}'); }); return L.act(s, body ?? {});}));
   // perception/1 + intents/1 (Core-A, EDGE-CONTRACT-v1 §8): a compact first-person frame, and the dry run of act.
   app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240); const modern=(c.req.query('include')??'').split(',').includes('doHere');return {tick: deps.host.engine.world.tick, here: hereFrame(L, s,{doHere:modern}),...(modern?{apiContract:'eden-edge/1.1'}:{})};}));
+  // knowledge/1: look around / explore — more of what is near, places close by, and secret places found (remembered).
+  app.get('/v1/edge/around', wrap(c => {const s = deps.soul(c); limit(s, 'around', 30); return {tick: deps.host.engine.world.tick, around: aroundFrame(L, s)};}));
   app.post('/v1/edge/resolve', wrap(async c => {const s = deps.soul(c); limit(s, 'resolve', 120); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); }); if (!body || typeof body !== 'object' || (body.verb === undefined && body.capability === undefined)) throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); return {tick: deps.host.engine.world.tick, resolve: L.intents.dryRun(s, body)};}));
   app.get('/v1/edge/receipts/:id', wrap(c => {const s = deps.soul(c); const r = L.receipt(s.soulId, c.req.param('id') ?? ''); if (!r) throw new EdgeError(404, 'not-found', 'no such receipt for this Soul'); return {receipt: r};}));
   app.get('/v1/edge/public/souls/:soulId', wrap(c => L.publicSoul(c.req.param('soulId') ?? '')));

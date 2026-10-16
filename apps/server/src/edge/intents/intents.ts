@@ -119,7 +119,7 @@ export class Intents {
     const free = s.free !== false, all = P.seats(1e9), here = (seat: Located) => ({seat: seat.id, label: seat.name, free: !!seat.free, distFromYou: seat.distance, ...this.eta(P, seat.at)});
     const room = str(s.in);
     if (room) {
-      const identity=lookupPlaceIdentity(this.L,room);if(!identity.ok)return {...identity,code:identity.code==='capability.unknown'?'place.unknown':identity.code};
+      const identity=lookupPlaceIdentity(this.L,room,P.soul.soulId);if(!identity.ok)return {...identity,code:identity.code==='capability.unknown'?'place.unknown':identity.code};
       const place=this.L.places.byId.get(identity.chosen.place);
       if (!place) return no('place.unknown', `No place called "${room}" in the map.`);
       const admission=knownBootPlaces(this.L).find(p=>p.id===place.id)!;
@@ -195,7 +195,7 @@ export class Intents {
     let cap = swims[0];
     if (asked) {
       const named = swims.find(c => c.id === asked || c.id === `swim:${asked}` || c.target?.id === asked);
-      const identity=named?null:lookupPlaceIdentity(this.L,asked);if(identity&&!identity.ok)return identity;
+      const identity=named?null:lookupPlaceIdentity(this.L,asked,P.soul.soulId);if(identity&&!identity.ok)return identity;
       const loc=identity?.ok?P.locate(identity.chosen.place,{souls:false,things:false}):null;
       const hit = named ?? (loc ? swims.find(c => {const p = c.target ? this.L.places.byId.get(c.target.id) : undefined; return !!p && (p.id === loc.id || inPoly(loc.at[0], loc.at[1], p.polygon) || this.L.coreA.isAncestor(loc.id, p.id));}) : undefined);
       if (!hit) return no('swim.not-swimmable', `${loc?.name ?? asked} is not water you can swim in; you can swim in ${swims.map(c => this.L.places.byId.get(c.target?.id ?? '')?.name ?? c.label).join(', ')}.`, swims.map(c => ({id: c.id, label: c.label})));

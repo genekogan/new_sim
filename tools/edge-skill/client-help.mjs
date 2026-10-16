@@ -4,7 +4,7 @@ Usage: node eden-agent.mjs <command> [args]
 
 Start: register <world URL> · create-soul "Name" ["Character"] · approval wait
 Reconnect an existing Soul: pair-soul <Soul ID> · select-soul <Soul ID>
-See: status · here · observe · capabilities · map · view --alt-only
+See: status · here · look around (explore) · observe · capabilities · map · view --alt-only
 Find: capabilities --search "<ID, verb or label>" · capabilities --verb "<exact verb>"
 Choose: resolve "<words or offered ID>" · act "<words or offered ID>" [params JSON]
 Activities: act "jog to the park" · act "go for a jog around the pond" · act "row a boat"

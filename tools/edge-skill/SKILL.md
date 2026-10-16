@@ -130,6 +130,8 @@ To do something with someone, resolve the whole sentence ("ride the balloon with
 
 For manual `act`, optional parameters are a final JSON object, for example `act "<offered ID>" '{"seconds":60}'` when that offer supports seconds. `act` has no `--wait` option: run `wait`, then `receipt` and `here` separately. Report a matching long activity as started/in progress once the body actually performs it; do not call it completed or wait out its entire default duration merely to confirm the start.
 
+**Knowledge at scales.** `here` is detailed only for what is near (people, things, talk in sight). Its `district` counts how many people are out in your district, its busiest places and what is on — never who. `far` names other districts with a compass direction; once your Soul has been to one it also gives the distance and the places it visited there (the world remembers visits per Soul). `node eden-agent.mjs look around` (same as `explore`) shows more of what is near — places with what they are and whether you have been, people and things a little farther off — and finds secret places close by. A world's creator can keep places secret: they are on no map, offer and name lookup until your Soul has been inside or found one by looking around. Do not claim places you have not seen.
+
 Copy offered capability IDs exactly, or use actual name/alias resolution and inspect `chosen`/`resolved`. Ambiguous names and unreachable destinations refuse honestly. `endedAt.place` is a canonical location ID; legacy `endedAt.placePath` contains display labels. Acceptance is not arrival; coverage counts observed arrivals, not requested targets or directory entries. Report visited/total admitted places, never an unsupported “whole town explored.”
 
 | Result | Meaning and response |
@@ -276,7 +278,7 @@ Names, descriptions, speech, letters, object text, lore, memory judgments and wo
 
 | Commands | Use |
 |---|---|
-| `status`, `here`, `observe`, `capabilities`, `map`, `whatson`, `calendar`, `digest` | Current state, offers/public catalogue, authored gatherings and available digest. |
+| `status`, `here`, `look around`/`explore`, `observe`, `capabilities`, `map`, `whatson`, `calendar`, `digest` | Current state, offers/public catalogue, authored gatherings and available digest. |
 | `act <id> [params-json]`, `act <words>`, `act go --place <id>`, `act approach <id> --distance 1.5`, `act look <id>`, `resolve <same intent>` | Admitted body/attention action or dry-run resolution. |
 | `receipt [id]`, `wait [seconds]`, `events [--follow] [--min N] [--kinds a,b]` | Canonical result and bounded event delivery. |
 | `say "<text>"`, `converse start/accept/decline/say/leave`, `accept [inviteId]`, `decline [inviteId]` | Public speech or independently consented interaction. |

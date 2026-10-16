@@ -23,6 +23,7 @@ import { schemaMarkdown } from './lib/schema-md.mjs';
 import { listen, ack } from './lib/inbox.mjs';
 export { listen, ack };
 import { time as envTime, weather as envWeather, strike as envStrike, land as envLand, ENV_FLAGS, ENV_BOOLS, LAND_HELP } from './lib/env.mjs';
+import { secret, SECRET_HELP } from './lib/secret.mjs';
 import { hours, event, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
 export { schemaMarkdown };
 
@@ -1324,6 +1325,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
   hours: (r, f) => hours(r[0], f), event: (r, f) => event(r[0], r[1], f), own: (r, f) => own(r[0], r[1], f), access: (r) => access(r[0], r[1]), price: (r, f) => price(r[0], r[1], f), currency: (r) => currency(r[0]),
   give: (r) => give(r[0], r[1]), pay: (r) => pay(r[0], r[1], r[2]), zone: (r, f) => zone(r[0], r[1], f), 'zone-suggest': (r) => zoneSuggest(r[0]), relate: (r, f) => relate(r[0], r[1], r[2], f), layers: (r, f) => layers(f),
+  secret: (r) => secret(r[0], r[1]),
   help: () => HELP,
 };
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
@@ -1348,6 +1350,7 @@ ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
 ${LAYERS_HELP}
+${SECRET_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {

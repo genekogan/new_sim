@@ -122,7 +122,8 @@ export class Perception {
       if (e && e.kind !== 'human') {const at: V2 = [e.pose.p[0], e.pose.p[2]]; if (this.dist(at) <= 60 && this.sameEnclosure(at) && this.sees(at)) return {kind: 'fixture', id: e.id, name: e.label ?? e.def ?? e.id, at, entityId: e.id, distance: this.dist(at)};}
     }
     if (opts.places !== false) {
-      const p = this.L.places.byId.get(q) ?? [...this.L.places.byId.values()].find(x => x.parent !== null && named(x.name));
+      const known = (x: {id: string} | undefined) => !!x && (this.L.knowledge?.knows(this.soul.soulId, x.id) ?? true);   // knowledge/1: secret places stay unnamed until known
+      const byId = this.L.places.byId.get(q), p = known(byId) ? byId : [...this.L.places.byId.values()].find(x => x.parent !== null && named(x.name) && known(x));
       if (p) {const at = p.carrier ? (() => {const e = this.w.entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] as V2 : centroid(p.polygon);})() : centroid(p.polygon); return {kind: 'place', id: p.id, name: p.name, at, distance: this.dist(at)};}
     }
     return null;
@@ -234,7 +235,10 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
       activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
       ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
-    near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, untrusted: true,
+    near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits,
+    // knowledge/1: the district summarised, far districts as names and directions (more once visited)
+    ...(ledger.knowledge?.scales(soul.soulId, ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id), P.pos, c ? c.hour * 60 + c.minute : null) ?? {}),
+    untrusted: true,
   };
   if(!options.doHere)return frame;
   const baseBytes=Buffer.byteLength(JSON.stringify(frame)),budget=Math.max(0,Math.min(1800,2600-baseBytes-240));
