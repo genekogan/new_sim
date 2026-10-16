@@ -173,7 +173,8 @@ async function handover() {
     try {
       await ask(old, { t: 'unretire', slug: canaryFailed }, 180_000);
       activate(old); h.switchedBackAt = Date.now() - t0;
-      try { next.child.send({ t: 'exit' }); } catch { /* gone */ }
+      // the new generation forwards what it still holds (requests waiting for the canary world) to the old one, then goes
+      try { next.child.send({ t: 'retire' }); next.child.send({ t: 'exit' }); } catch { /* gone */ }
       await withTimeout(new Promise((r) => (next.exited ? r() : next.child.once('exit', r))), 45_000, 'new generation exit').catch(() => { log(`generation ${next.n} did not exit; killing it`); next.child.kill('SIGKILL'); });
       h.state = 'rolled-back'; h.endedAt = new Date().toISOString(); h.ms = Date.now() - t0;
       log(`handover ${h.from} → ${h.to}: canary ${canaryFailed} failed (${h.worlds[canaryFailed]?.error ?? '?'}); generation ${old.n} (${old.build}) serves on, in ${h.ms} ms`);

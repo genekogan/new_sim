@@ -121,7 +121,12 @@ export async function openLauncher(cfg = {}) {
   const registry = new Registry(dataDir);
   const accountPolicy = creationPolicy(cfg);
   /** Handover state (keeper.mjs): 'active' → 'preparing' → 'retired' (or back to 'active' when the next one fails). */
-  let phase = 'active', retiredTo = null, gate = null, retiredPidFile = null;
+  let phase = 'active', retiredTo = null, gate = null, retiredPidFile = null, handBack = null;
+  /** After a failed canary: resolves true once this launcher is retired (the keeper switched back), false after 30 s. */
+  const handedBack = () => (retiredTo ? Promise.resolve(true) : handBack ? Promise.race([handBack.p.then(() => true), new Promise((r) => setTimeout(() => r(false), 30_000).unref())]) : Promise.resolve(false));
+  /** The canary world under test here: { slug, passed: Promise<boolean> }. A request that failed on it waits for the verdict. */
+  let canaryRun = null;
+  const waitHandBack = async (slug, e) => (e.code === 'handed-back' || canaryRun?.slug === slug) && (await canaryRun?.passed) === false && handedBack();
   const adopting = Array.isArray(cfg.adopt) ? cfg.adopt : null;
   const createLimit = cfg.createLimit ?? Infinity, made = new Map();
   /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
@@ -405,6 +410,8 @@ export async function openLauncher(cfg = {}) {
     try { p = await pool.ensure(worldEnv(w)); }
     catch (e) {
       if (e.code === 'handed-over' && retiredTo) { forward(req, res); return; }
+      // our canary failed and the world is going back to the previous launcher: wait for the keeper to switch back
+      if (await waitHandBack(slug, e)) { forward(req, res); return; }
       json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return;
     }
     const rest = retried ? url.pathname : observe(slug, req, url);
@@ -577,7 +584,7 @@ export async function openLauncher(cfg = {}) {
     if (!w) { socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n'); return; }
     const attach = async (again) => {
       let p; try { p = await pool.ensure(worldEnv(w)); }
-      catch (e) { if (e.code === 'handed-over' && retiredTo) pipeUpgrade(req, socket, head, port); else socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
+      catch (e) { if ((e.code === 'handed-over' && retiredTo) || (await waitHandBack(slug, e))) pipeUpgrade(req, socket, head, port); else socket.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n'); return; }
       // a world being handed over may refuse once (its old process just stopped): ask again, which waits for the new one
       pipeUpgrade(req, socket, head, p, again ? () => void attach(false) : undefined);
     };
@@ -626,7 +633,7 @@ export async function openLauncher(cfg = {}) {
      *  world starts here again. Idle connections close now, busy ones after their response. */
     retire() {
       phase = 'retired'; retiredTo = port; pool.fence(); retiredPidFile = gate?.pidFile ?? retiredPidFile;
-      const g = gate; gate = null; g?.open();
+      const g = gate; gate = null; g?.open(); handBack?.open();
       server.keepAliveTimeout = 1;
       for (const s of sockets) if (!s.simBusy && !s.simUpgraded) s.destroy();
     },
@@ -660,13 +667,14 @@ export async function openLauncher(cfg = {}) {
       if (canary && todo.length) {
         const pick = todo.find((s) => !registry.get(s)?.fork) ?? todo[0];
         todo.splice(todo.indexOf(pick), 1);
+        let verdict; canaryRun = { slug: pick, passed: new Promise((r) => { verdict = r; }) };
         await one(pick);
         if (out[pick].ok) {
           const r = await fetch(`http://127.0.0.1:${out[pick].port}${wp(pick)}/v1/config`, { signal: AbortSignal.timeout(10_000) }).catch((e) => ({ ok: false, status: e.message }));
           if (!r.ok) { out[pick] = { ...out[pick], ok: false, error: `canary: /v1/config answered ${r.status}` }; await pool.stop(pick); }
         }
-        if (!out[pick].ok) { pool.handBack(pick); log(`canary ${pick} failed on this release: handing back`); return { worlds: out, canaryFailed: pick }; }
-        out[pick].canary = true;
+        if (!out[pick].ok) { let open; handBack = { p: new Promise((r) => { open = r; }), open }; pool.handBack(pick); verdict(false); log(`canary ${pick} failed on this release: handing back`); return { worlds: out, canaryFailed: pick }; }
+        out[pick].canary = true; verdict(true); canaryRun = null;
       }
       const lanes = Array.from({ length: Math.max(1, concurrency) }, async () => { while (todo.length) await one(todo.shift()); });
       await Promise.all(lanes);

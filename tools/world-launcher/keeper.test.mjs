@@ -82,14 +82,14 @@ test('a new release whose launcher cannot start changes nothing: the running one
   assert.deepEqual(bad, []);
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
 });
-test('a release whose worlds cannot boot fails its canary: only that world pauses, the running release serves on, no reload', async () => {
+test('a release whose worlds cannot boot fails its canary: only that world pauses (no error), the running release serves on, no reload', async () => {
   const pids = Object.fromEntries((await Promise.all(['one', 'two'].map(async (s) => [s, (await (await api(`/w/${s}/healthz`)).json()).pid]))));
   const { out: h, bad } = await watch(['one', 'two'], () => handover(release('noboot', { brokenWorlds: true })));
   assert.equal(h.state, 'rolled-back', JSON.stringify(h)); assert.ok(['one', 'two'].includes(h.canary));
   assert.deepEqual(Object.keys(h.worlds), [h.canary], 'nothing but the canary moved'); assert.equal(h.worlds[h.canary].ok, false);
   const other = h.canary === 'one' ? 'two' : 'one';
   assert.equal((await (await api(`/w/${other}/healthz`)).json()).pid, pids[other], 'the other world kept its process');
-  assert.ok(bad.every((b) => b.startsWith(`${h.canary} `)), `only the canary world may answer 503 while it goes back: ${bad}`);
+  assert.deepEqual(bad, [], 'requests for the canary world wait for it to come back instead of failing');
   assert.equal((await (await api('/__sim/healthz')).json()).build, 'we-b');
   assert.equal(status().active.build, 'we-b');
   let ok = false; for (let i = 0; i < 50 && !ok; i++) { ok = (await api(`/w/${h.canary}/healthz`)).ok; if (!ok) await sleep(100); }
