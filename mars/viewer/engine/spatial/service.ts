@@ -316,8 +316,11 @@ export class Spatial {
     for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
     if (!units.length) clip(rectOf([[0, 0]]));
     const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
-    const changed = this.navChanged(world);
-    if (!changed && this.scene && this.pages && this.pages.key === key) return false;
+    // no scene = first sync or a re-base (refreshForWorld: new levels, wider raster). That changes the static world even
+    // when no static entity did: an empty god world's only content is its world-edits, so `navChanged` alone would keep
+    // the windows' old grids (no new floor, no new walls) until the next edit or a restart.
+    const changed = this.navChanged(world) || !this.scene;
+    if (!changed && this.pages && this.pages.key === key) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
     const links: Link[] = [...this.base.links];
@@ -337,7 +340,7 @@ export class Spatial {
       if (r.links) links.push(...r.links);
     }
     const all: SpatialScene = { bounds: g.boundsOf(rects[0]), levels, surfaces, obstacles, links };
-    if (changed || !this.scene) {
+    if (changed) {
       const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
       g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
       g.setSolids(obstacles);
@@ -350,7 +353,7 @@ export class Spatial {
     this.pages = { rects, key, sets: rects.map((r) => old?.get(r.join(',')) ?? null), scenes: rects.map((r) => ({ ...all, bounds: g.boundsOf(r) })), all };
     // the navigation epoch moves with the static world only: windows hold the same tiles wherever they lie, so a walk's
     // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
-    if (changed || !this.scene) { this.epoch++; this.aroundCache.clear(); }
+    if (changed) { this.epoch++; this.aroundCache.clear(); }
     this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
     return true;
   }
