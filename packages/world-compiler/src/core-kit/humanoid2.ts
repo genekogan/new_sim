@@ -3,7 +3,7 @@
 // Subpath export: `@sim/world-compiler/humanoid2`.
 import type { DefInput } from '../schemas.ts';
 
-export const HUMANOID2_DEF: DefInput = { schema: 'def/1', name: 'core-humanoid', version: 2, extends: 'core/humanoid@1', description: 'A human body on the humanoid rig whose look (frame, face, hair, clothes, hat, glasses, bag, facial hair, scarf, gloves, mask, jewellery, colours, head size, height, build, walking speed) is composed from the shared humanoid kit.', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.56, 1.8, 0.56] }, layer: 'solid', anchor: 'base',
+export const HUMANOID2_DEF: DefInput = { schema: 'def/1', name: 'core-humanoid', version: 2, extends: 'core/humanoid@1', description: 'A human body on the humanoid rig whose look (frame, face, hair, clothes, hat, glasses, bag, facial hair, scarf, gloves, mask, jewellery, colours, head size, height, build, shoulders, chest, hips, weight, walking speed) is composed from the shared humanoid kit.', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.56, 1.8, 0.56] }, layer: 'solid', anchor: 'base',
     params: {
       preset: { type: 'enum', values: ['none', 'casual', 'punk', 'woman'], default: 'none' },
       frame: { type: 'enum', values: ['masc', 'fem'], default: 'masc' },
@@ -22,6 +22,9 @@ export const HUMANOID2_DEF: DefInput = { schema: 'def/1', name: 'core-humanoid',
       gloves: { type: 'enum', values: ['none', 'gloves'], default: 'none' },
       mask: { type: 'enum', values: ['none', 'cloth'], default: 'none' },
       jewellery: { type: 'enum', values: ['none', 'earrings', 'necklace', 'both'], default: 'none' },
+      // looks v2 body shape (proportions on the rig; the collider widens with the widest, clamped so every body fits a 0.9 m door)
+      shoulders: { type: 'number', min: 0.9, max: 1.12, default: 1 }, chest: { type: 'number', min: 0.9, max: 1.15, default: 1 },
+      hips: { type: 'number', min: 0.9, max: 1.15, default: 1 }, weight: { type: 'number', min: 0.9, max: 1.25, default: 1 },
       headSize: { type: 'number', min: 0.94, max: 1.08, default: 1 },
       height: { type: 'number', min: 1.65, max: 1.85, default: 1.75 }, build: { type: 'number', min: 0.92, max: 1.1, default: 1 }, walkSpeed: { type: 'number', min: 0.9, max: 1.4, default: 1.35 },
       skin: { type: 'color', default: '#cead86' }, hair1: { type: 'color', default: '#492e18' }, brows: { type: 'color', default: '#3e3429' }, eyes: { type: 'color', default: '#31251c' },

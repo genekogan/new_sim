@@ -46,3 +46,12 @@ test('seeded looks: v1 fields unchanged, v2 accessories drawn after them', () =>
   const masc = Array.from({length: 200}, (_, i) => L.appearanceFromSeed(i)).filter(l => l.frame === 'masc');
   assert.ok(masc.some(l => l.facialHair !== 'none') && masc.some(l => l.facialHair === 'none'), 'some seeded men have facial hair');
 });
+test('body shape: validated, rounded, kept with a preset, part of the key only when set', () => {
+  assert.equal(L.resolveLook({weight: 1.2345}).weight, 1.23);
+  for (const bad of [{shoulders: 1.3}, {hips: 0.5}, {weight: 2}, {chest: 'big'}]) assert.throws(() => L.checkLook(bad), L.LookError);
+  const p = L.editLook({preset: 'woman'}, {hips: 1.12, weight: 1.1});
+  assert.equal(p.preset, 'woman'); assert.deepEqual(L.compactLook(p), {preset: 'woman', hips: 1.12, weight: 1.1});
+  assert.equal(L.lookKey({preset: 'woman', hips: 1}), L.lookKey({preset: 'woman'}));
+  assert.notEqual(L.lookKey(p), L.lookKey({preset: 'woman'}));
+  assert.match(L.describeLook(p), /hips 112 %, weight 110 %/);
+});

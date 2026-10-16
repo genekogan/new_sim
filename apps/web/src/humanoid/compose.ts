@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {templateFromParts, type Template} from '../../../../mars/viewer/app/engine-view/people.ts';
-import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, type Look, type Slot} from './look.ts';
+import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, SHAPE_KEYS, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
 import {BASE} from '../base-path.ts';
 import {hatPieces, glassesPieces, bagPieces, skinned, facialHairLayers, mustachePieces, maskLayer, scarfWrap, scarfEndPieces, gloveLayer, earringPieces, necklacePieces, type HeadFit} from './props.ts';
@@ -77,6 +77,42 @@ export function withGirth(g: THREE.BufferGeometry, build: number, rig: Pick<Rig,
       d.addScaledVector(off, w * s.g);
     }
     P.setXYZ(i, p.x + k * d.x, p.y + k * d.y, p.z + k * d.z);
+  }
+  return out;
+}
+/** Looks v2 body shape, per bone in the rig's rest (bind) space like `build`, blended by skin weight so seams stay closed:
+ *  chest and hips widen the trunk about the vertical axis (hips also widen and spread the thighs, tapering to the knee), weight fills the
+ *  belly (front more than back) and a little of the upper limbs, and shoulders move each arm chain outward along x
+ *  (≤ 3.6 cm: the arm still pivots at its own joint) with the shoulder blades widened to meet it. Hands, feet, head unchanged. */
+const SHAPE: Record<'chest' | 'hips' | 'weight', Record<string, [number, 'trunk' | 'limb' | 'belly']>> = {
+  chest: {Chest: [1.7, 'trunk'], Torso: [1.1, 'trunk'], ShoulderL: [0.6, 'trunk'], ShoulderR: [0.6, 'trunk'], Abdomen: [0.35, 'trunk']},
+  hips: {Hips: [1.5, 'trunk'], Body: [1.3, 'trunk'], Abdomen: [1.2, 'trunk'], Torso: [0.4, 'trunk'], UpperLegL: [1.3, 'limb'], UpperLegR: [1.3, 'limb'], LowerLegL: [0.3, 'limb'], LowerLegR: [0.3, 'limb']},
+  weight: {Abdomen: [1.2, 'belly'], Body: [0.8, 'belly'], Torso: [0.7, 'belly'], Hips: [0.7, 'belly'], Chest: [0.35, 'trunk'], Neck: [0.3, 'trunk'], UpperArmL: [0.6, 'limb'], UpperArmR: [0.6, 'limb'], LowerArmL: [0.3, 'limb'], LowerArmR: [0.3, 'limb'], UpperLegL: [0.7, 'limb'], UpperLegR: [0.7, 'limb'], LowerLegL: [0.35, 'limb'], LowerLegR: [0.35, 'limb']},
+};
+const ARM_CHAIN = /^(Shoulder|UpperArm|LowerArm|Wrist|Thumb\d|Index\d|Middle\d|Ring\d|Pinky\d)([LR])$/;
+const SHOULDER_SHIFT = 0.3; // m per unit of `shoulders` (1.12 moves each arm out 3.6 cm)
+export function withShape(g: THREE.BufferGeometry, look: Pick<Look, 'shoulders' | 'chest' | 'hips' | 'weight'>, rig: Pick<Rig, 'names' | 'joints' | 'ends'>): THREE.BufferGeometry {
+  if (look.shoulders === 1 && look.chest === 1 && look.hips === 1 && look.weight === 1) return g;
+  const out = g.clone(), P = out.attributes.position, J = out.attributes.skinIndex, W = out.attributes.skinWeight;
+  const specs = (['chest', 'hips', 'weight'] as const).filter(k => look[k] !== 1).map(k => ({k: look[k] - 1, bones: rig.names.map((n, i) => { const e = SHAPE[k][n]; if (!e) return null; const end = rig.ends[i]; return {g: e[0], mode: e[1], at: rig.joints[i], dir: e[1] === 'limb' && end ? end.clone().sub(rig.joints[i]).normalize() : null}; })}));
+  // shoulders: arm chain bones carry the full shift, the shoulder (blade) bone half of it
+  const arm = rig.names.map(n => { const m = n.match(ARM_CHAIN); return m ? {side: m[2] === 'L' ? 1 : -1, w: m[1] === 'Shoulder' ? 0.5 : 1} : null; }), dx = (look.shoulders - 1) * SHOULDER_SHIFT;
+  // hips also spread the thighs: full at the hip joint, nothing at the knee (feet stay where the gait puts them) and
+  // nothing 10 cm above the hip joint (a top's hem still covers the trousers' waist)
+  const legs = (['L', 'R'] as const).map(sd => ({side: sd === 'L' ? 1 : -1, up: rig.names.indexOf('UpperLeg' + sd), hip: rig.joints[rig.names.indexOf('UpperLeg' + sd)]?.y ?? 0.9, knee: rig.joints[rig.names.indexOf('LowerLeg' + sd)]?.y ?? 0.5})), hx = (look.hips - 1) * 0.22;
+  const p = new THREE.Vector3(), d = new THREE.Vector3(), off = new THREE.Vector3();
+  for (let i = 0; i < P.count; i++) {
+    p.fromBufferAttribute(P, i); d.set(0, 0, 0);
+    if (hx) for (const l of legs) for (let c = 0; c < 4; c++) if (J.getComponent(i, c) === l.up) { const t = p.y > l.hip ? Math.max(0, 1 - (p.y - l.hip) / 0.1) : Math.min(1, Math.max(0, (p.y - l.knee) / (l.hip - l.knee))); d.x += l.side * W.getComponent(i, c) * hx * t; }
+    for (const s of specs) for (let c = 0; c < 4; c++) {
+      const w = W.getComponent(i, c), b = w > 0 ? s.bones[J.getComponent(i, c)] : null; if (!b) continue;
+      off.subVectors(p, b.at);
+      if (b.dir) off.addScaledVector(b.dir, -off.dot(b.dir)); else off.y = 0;
+      if (b.mode === 'belly') off.z *= off.z > 0 ? 2.2 : 0.5;
+      d.addScaledVector(off, w * b.g * s.k);
+    }
+    if (dx) for (let c = 0; c < 4; c++) { const w = W.getComponent(i, c), a = w > 0 ? arm[J.getComponent(i, c)] : null; if (a) d.x += a.side * a.w * w * dx; }
+    P.setXYZ(i, p.x + d.x, p.y + d.y, p.z + d.z);
   }
   return out;
 }
@@ -195,9 +231,10 @@ export class HumanoidKit {
   async tris(params: unknown) { const look = resolveLook(params), [head, top, b, s] = await this.geometries(look); return [head, top, b, s].reduce((a, g) => a + g.index!.count / 3, 0); }
   private async geometries(look: Look) {
     const base = await Promise.all([this.head(look), this.top(look), this.part('bottom', look.bottom, look.frame), this.part('shoes', look.shoes, look.frame)]);
-    if (look.build === 1) return base;
+    const shaped = SHAPE_KEYS.some(k => look[k] !== 1);
+    if (look.build === 1 && !shaped) return base;
     const rig = await this.rig(look.frame), keys = [headKey(look), topKey(look), ['bottom', look.frame, look.bottom], ['shoes', look.frame, look.shoes]];
-    return Promise.all(base.map((g, i) => { const key = [...keys[i], 'build', look.build].join(':'); let p = this.merged.get(key); if (!p) this.merged.set(key, p = Promise.resolve(withGirth(g, look.build, rig))); return p; }));
+    return Promise.all(base.map((g, i) => { const key = [...keys[i], 'build', look.build, ...SHAPE_KEYS.map(k => look[k])].join(':'); let p = this.merged.get(key); if (!p) this.merged.set(key, p = Promise.resolve(withShape(withGirth(g, look.build, rig), look, rig))); return p; }));
   }
   private async compose(look: Look, key: string): Promise<Template> {
     const m = await this.manifest(), [rig, geos] = await Promise.all([this.rig(look.frame), this.geometries(look)]);

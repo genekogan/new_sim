@@ -20,10 +20,15 @@ export const HUMANOID_DIM_RANGES = Object.freeze({
   build: [0.92, 1.1] as const,
   walkSpeed: [0.9, 1.4] as const,
   headSize: [0.94, 1.08] as const,
+  // looks v2 body shape: drawn proportions; the widest of them widens the collider (still clamped to HUMANOID_RADIUS_RANGE)
+  shoulders: [0.9, 1.12] as const,
+  chest: [0.9, 1.15] as const,
+  hips: [0.9, 1.15] as const,
+  weight: [0.9, 1.25] as const,
 });
 export type HumanoidDimKey = keyof typeof HUMANOID_DIM_RANGES;
 /** Today's body: the 1.75 m model, girth 1, HUMAN_PROFILE's 1.35 m/s, head 1. */
-export const HUMANOID_DEFAULT_DIMS: Readonly<Record<HumanoidDimKey, number>> = Object.freeze({ height: 1.75, build: 1, walkSpeed: HUMAN_PROFILE.speed, headSize: 1 });
+export const HUMANOID_DEFAULT_DIMS: Readonly<Record<HumanoidDimKey, number>> = Object.freeze({ height: 1.75, build: 1, walkSpeed: HUMAN_PROFILE.speed, headSize: 1, shoulders: 1, chest: 1, hips: 1, weight: 1 });
 /** Today's constants the dims scale (radius: world/catalog HUMAN_RADIUS; eyes: edge/eyes/view.ts; seat range:
  *  social/pose.ts seatHeight 0.2–1.2 and the renderer's accepted seat tops). */
 export const HUMANOID_BASE = Object.freeze({ radius: HUMAN_PROFILE.radius, height: HUMAN_PROFILE.height, eye: 1.62, seatedEye: 1.15, knee: 0.45, seatLo: 0.2, seatHi: 1.2 });
@@ -32,6 +37,8 @@ export const HUMANOID_RADIUS_RANGE: readonly [number, number] = [0.24, 0.32];
 
 export type HumanoidDims = {
   height: number; build: number; walkSpeed: number; headSize: number;
+  /** Looks v2 shape: the widest of shoulders, chest, hips and weight (at least 1), a factor on the collision radius. */
+  width: number;
   /** height / 1.75: the uniform body scale (renderer and every length below). */
   scale: number;
   radius: number;
@@ -57,10 +64,12 @@ const STANDARD: HumanoidDims = Object.freeze(dimsOf(undefined));
 export function dimsOf(params: Record<string, unknown> | undefined): HumanoidDims {
   const height = num(params, 'height'), build = num(params, 'build'), walkSpeed = num(params, 'walkSpeed'), headSize = num(params, 'headSize');
   const scale = height / HUMANOID_DEFAULT_DIMS.height;
-  const standard = height === HUMANOID_DEFAULT_DIMS.height && build === 1 && walkSpeed === HUMANOID_DEFAULT_DIMS.walkSpeed;
-  const radius = standard ? HUMANOID_BASE.radius : r3(Math.min(HUMANOID_RADIUS_RANGE[1], Math.max(HUMANOID_RADIUS_RANGE[0], HUMANOID_BASE.radius * (0.5 + 0.5 * scale) * build)));
+  // a narrower shape never shrinks the collider below today's for its height and build; a wider one widens it
+  const width = Math.max(1, num(params, 'shoulders'), num(params, 'chest'), num(params, 'hips'), num(params, 'weight'));
+  const standard = height === HUMANOID_DEFAULT_DIMS.height && build === 1 && walkSpeed === HUMANOID_DEFAULT_DIMS.walkSpeed && width === 1;
+  const radius = standard ? HUMANOID_BASE.radius : r3(Math.min(HUMANOID_RADIUS_RANGE[1], Math.max(HUMANOID_RADIUS_RANGE[0], HUMANOID_BASE.radius * (0.5 + 0.5 * scale) * build * width)));
   return {
-    height, build, walkSpeed, headSize, scale, radius,
+    height, build, walkSpeed, headSize, width, scale, radius,
     eyeHeight: r3(HUMANOID_BASE.eye * scale), seatedEyeHeight: r3(HUMANOID_BASE.seatedEye * scale), kneeHeight: r3(HUMANOID_BASE.knee * scale),
     seat: [r3(HUMANOID_BASE.seatLo * scale), r3(HUMANOID_BASE.seatHi * scale)], standard,
   };

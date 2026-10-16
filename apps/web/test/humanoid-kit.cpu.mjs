@@ -71,4 +71,14 @@ ok('every combination ≤ 20k tris',maxTris<=20000,`${n} combinations, max ${max
  ok('every face with every accessory ≤ 20k tris',maxV2<=20000,`max ${maxV2} (${where})`);
  const helmet={frame:'masc',face:'spacesuit',hair:'bald'};ok('a helmet face takes no facial hair or mask',await kit.tris({...helmet,facialHair:'beard',mask:'cloth'})===await kit.tris(helmet));
  const t=await kit.template({...bare,gloves:'gloves',scarf:'scarf'});const mats=new Set();let draws=0;t.gltf.scene.traverse(o=>{if(o.isMesh){mats.add(o.material);draws++;}});ok('accessories add no draw calls or materials',draws===4&&mats.size===1,String(draws));}
+// looks v2 body shape: each param widens its region, the skeleton (joints, arms, stride) is untouched, a narrow shape narrows
+{const box=async(look,part,y0,y1)=>{const t=await kit.template(look),r=createRig(t);r.mixer.update(.01);r.holder.updateMatrixWorld(true);const m=r.model.getObjectByName(part);m.geometry.computeBoundingBox();
+  const P=m.geometry.attributes.position,b=new THREE.Box3();for(let i=0;i<P.count;i++){const y=P.getY(i);if(y>=y0&&y<=y1&&Math.abs(P.getX(i))<0.3)b.expandByPoint(new THREE.Vector3(P.getX(i),y,P.getZ(i)));}return [b.max.x-b.min.x,b.max.z-b.min.z];};
+ const plain={frame:'masc',top:'shirt',bottom:'jeans'},b0=await box(plain,'top',1.05,1.2),h0=await box(plain,'bottom',0.7,0.85);
+ const bw=await box({...plain,weight:1.25},'top',1.05,1.2);ok('weight fills the belly',bw[1]>b0[1]*1.15&&bw[0]>b0[0]*1.1,JSON.stringify([b0,bw].map(v=>v.map(x=>+x.toFixed(3)))));
+ const hw=await box({...plain,hips:1.15},'bottom',0.7,0.85);ok('hips widen the hips and thighs',hw[0]>h0[0]*1.04,JSON.stringify([h0,hw].map(v=>v.map(x=>+x.toFixed(3)))));
+ const cw=await box({...plain,chest:1.15},'top',1.25,1.4),c0=await box(plain,'top',1.25,1.4);ok('chest deepens the chest',cw[1]>c0[1]*1.1,JSON.stringify([c0,cw].map(v=>v.map(x=>+x.toFixed(3)))));
+ const nw=await box({...plain,weight:0.9,chest:0.9},'top',1.05,1.2);ok('a narrow shape narrows',nw[1]<b0[1],JSON.stringify([b0[1],nw[1]].map(x=>+x.toFixed(3))));
+ const sh=await kit.template({...plain,shoulders:1.12,chest:1.15,hips:1.15,weight:1.25}),st=await kit.template(plain);
+ ok('shape keeps the skeleton: arms reach, stride unchanged',arm(sh).every(v=>Math.abs(v-BODY_MODEL.armLength)<0.02)&&Math.abs(sh.walkSpeed-st.walkSpeed)<1e-3,arm(sh).map(v=>v.toFixed(4)).join('/'));}
 console.log(JSON.stringify({bytesFetched:kit.bytes,files:kit.files}));

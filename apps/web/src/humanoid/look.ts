@@ -22,11 +22,14 @@ export const PROP_SLOTS = ['hat', 'glasses', 'bag'] as const;
 export const ACCESSORY_SLOTS = ['facialHair', 'scarf', 'gloves', 'mask', 'jewellery'] as const;
 export const COLOR_KEYS = ['skin', 'hair1', 'brows', 'eyes', 'top1', 'top2', 'bottom1', 'shoes1', 'soles', 'accent', 'gear', 'accessory'] as const;
 /** Params added after looks v1: a look with all of them at their defaults keeps its v1 template key (lookKey). */
-export const V2_KEYS = [...ACCESSORY_SLOTS, 'accessory'] as const;
+/** Looks v2 body shape: shoulder width, chest and hip girth, weight (belly and limbs); 1 = today's body. */
+export const SHAPE_KEYS = ['shoulders', 'chest', 'hips', 'weight'] as const;
+export const V2_KEYS = [...ACCESSORY_SLOTS, 'accessory', ...SHAPE_KEYS] as const;
 export type Look = {
   preset: 'none' | 'casual' | 'punk' | 'woman'; frame: 'masc' | 'fem';
   face: string; hair: string; top: string; bottom: string; shoes: string;
   hat: string; glasses: string; bag: string; pattern: 'plain' | 'stripes' | 'checks' | 'knit';
+  shoulders: number; chest: number; hips: number; weight: number;
   facialHair: 'none' | 'mustache' | 'goatee' | 'beard'; scarf: 'none' | 'scarf'; gloves: 'none' | 'gloves'; mask: 'none' | 'cloth'; jewellery: 'none' | 'earrings' | 'necklace' | 'both'; accessory: string;
   /** Physical/size params (engine bodies/humanoid.ts): head size (drawn only), height m, build (girth), walking speed m/s. */
   headSize: number; height: number; build: number; walkSpeed: number;
@@ -40,7 +43,7 @@ const SIZE_STEP: Record<SizeKey, number> = {headSize: 0.005, height: 0.01, build
 const round = (v: number, step: number) => +(Math.round(v / step) * step).toFixed(4);
 export type Preset = typeof PRESETS[number];
 
-const NO_ACCESSORIES = {facialHair: 'none', scarf: 'none', gloves: 'none', mask: 'none', jewellery: 'none', accessory: '#a03a3a'} as const;
+const NO_ACCESSORIES = {facialHair: 'none', scarf: 'none', gloves: 'none', mask: 'none', jewellery: 'none', accessory: '#a03a3a', shoulders: 1, chest: 1, hips: 1, weight: 1} as const;
 /** Legacy looks as explicit params (sRGB hex of the shipped GLBs' baseColorFactor). The viewer uses the kit's
  *  exact linear factors while `preset` is set; these hex values are what an owner edits from. */
 export const PRESET_LOOKS: Readonly<Record<Preset, Omit<Look, 'preset'>>> = Object.freeze({
@@ -68,9 +71,9 @@ export function resolveLook(params: unknown): Look {
   const filled = checkFields(HUMANOID_PARAMS as Record<string, Field>, p as Record<string, Value>, true);
   if (!filled.ok) throw new LookError(filled.detail);
   const v = filled.values as unknown as Look;
-  const size = Object.fromEntries(SIZE_KEYS.map(k => [k, round(v[k], SIZE_STEP[k])])) as Record<SizeKey, number>;
+  const size = {...Object.fromEntries(SIZE_KEYS.map(k => [k, round(v[k], SIZE_STEP[k])])), ...Object.fromEntries(SHAPE_KEYS.map(k => [k, round(v[k], 0.01)]))} as Record<SizeKey | typeof SHAPE_KEYS[number], number>;
   // a preset keeps its exact parts and colours; sizes and the v2 accessories still apply
-  if (v.preset !== 'none') return {preset: v.preset, ...PRESET_LOOKS[v.preset], ...size, ...Object.fromEntries(V2_KEYS.map(k => [k, v[k]]))};
+  if (v.preset !== 'none') return {preset: v.preset, ...PRESET_LOOKS[v.preset], ...Object.fromEntries(V2_KEYS.map(k => [k, v[k]])), ...size};
   return {...v, ...size};
 }
 /** The minimal stored form: only keys that differ from the def defaults (a preset look stores just `preset`). */
@@ -233,7 +236,8 @@ export function paletteOf(look: Look, legacy?: Partial<Record<Slot, readonly num
 }
 /** Short human summary for CLI/panel output. */
 export function describeLook(look: Look): string {
-  const size = [look.height !== 1.75 ? `${look.height.toFixed(2)} m` : '', look.build < 0.97 ? 'slim' : look.build > 1.03 ? 'broad' : '', look.headSize !== 1 ? `head ${Math.round(look.headSize * 100)} %` : '', look.walkSpeed !== 1.35 ? `walks ${look.walkSpeed.toFixed(2)} m/s` : ''].filter(Boolean);
+  const size = [look.height !== 1.75 ? `${look.height.toFixed(2)} m` : '', look.build < 0.97 ? 'slim' : look.build > 1.03 ? 'broad' : '', look.headSize !== 1 ? `head ${Math.round(look.headSize * 100)} %` : '', look.walkSpeed !== 1.35 ? `walks ${look.walkSpeed.toFixed(2)} m/s` : '',
+    ...SHAPE_KEYS.filter(k => look[k] !== 1).map(k => `${k} ${Math.round(look[k] * 100)} %`)].filter(Boolean);
   if (look.preset !== 'none') return `preset ${look.preset}${size.length ? ', ' + size.join(', ') : ''}`;
   const extras = [look.hat !== 'none' ? look.hat : '', look.glasses !== 'none' ? `${look.glasses} glasses` : '', look.bag !== 'none' ? look.bag : '', look.pattern !== 'plain' ? `${look.pattern} top` : '',
     look.facialHair !== 'none' ? look.facialHair : '', look.scarf !== 'none' ? 'scarf' : '', look.gloves !== 'none' ? 'gloves' : '', look.mask !== 'none' ? `${look.mask} mask` : '', look.jewellery !== 'none' ? (look.jewellery === 'both' ? 'earrings and necklace' : look.jewellery) : ''].filter(Boolean);
