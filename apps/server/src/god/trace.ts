@@ -3,7 +3,7 @@
 // design (nothing here is a journal). Loop hints: the same refusal code + field 3 or more times within 2 minutes.
 // Recording is O(1) on the request path; reading (`rows`, `loops`) is for the lead's `trace` and `build show`.
 
-export const TRACE_LIMITS = { rows: 1024, loopWindowMs: 120_000, loopMin: 3, code: 60, field: 80 } as const;
+export const TRACE_LIMITS = { rows: 1024, loopWindowMs: 120_000, loopMin: 3, code: 60, field: 80, keys: 256 } as const;
 
 export type TraceRow = {
   at: number; method: string; route: string; status: number; ms: number;
@@ -18,12 +18,21 @@ export type TraceStats = { since: number; traced: number; untraced: number; refu
 
 const SLUG = /^[a-z0-9][a-z0-9-]{0,39}$/;
 const clip = (s: unknown, n: number) => typeof s === 'string' && s ? s.slice(0, n) : undefined;
+// Fields are schema paths, but some carry a caller's ids or keys (`expect.<ref>`, `preview.subtrees.<id>`, an upload's
+// form key): keep identifier and index segments, mask the rest, and mask everything after a keyed prefix.
+const KEYED = /^(expect|preview\.subtrees)\./, SEGMENT = /^(?:\d{1,6}|[A-Za-z_][A-Za-z0-9_]{0,31})$/;
+const fieldShape = (s: unknown) => {
+  const f = clip(s, 400); if (!f) return undefined;
+  const keyed = KEYED.exec(f);
+  return (keyed ? `${keyed[1]}.*` : f.split('.').map(x => SEGMENT.test(x) ? x : '*').join('.')).slice(0, TRACE_LIMITS.field);
+};
 
 /** Outcome of one god response, from the object the route returned (no serialisation) or the error it threw. */
 export function outcomeOf(result: unknown, error: unknown, status: number): { code: string; field?: string } {
   if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string' && 'status' in error) {
     const e = error as { code: string; extra?: Record<string, unknown> };
-    return { code: e.code.slice(0, TRACE_LIMITS.code), ...(clip(e.extra?.field, TRACE_LIMITS.field) ? { field: clip(e.extra?.field, TRACE_LIMITS.field) } : {}) };
+    const field = fieldShape(e.extra?.field);
+    return { code: e.code.slice(0, TRACE_LIMITS.code), ...(field ? { field } : {}) };
   }
   if (error) return { code: 'internal' };
   if (result && typeof result === 'object') {
@@ -32,7 +41,7 @@ export function outcomeOf(result: unknown, error: unknown, status: number): { co
     if (failed) {
       const f = Array.isArray(r.failures) ? r.failures[0] : undefined;
       const code = clip(f?.code, TRACE_LIMITS.code) ?? clip(r.code, TRACE_LIMITS.code) ?? clip(r.reason?.code, TRACE_LIMITS.code) ?? 'refused';
-      const field = clip(f?.field, TRACE_LIMITS.field);
+      const field = fieldShape(f?.field);
       return { code, ...(field ? { field } : {}) };
     }
   }
@@ -75,7 +84,11 @@ export class GodTrace {
     if (times.length >= TRACE_LIMITS.loopMin - 1) this.stats.repeated++;
     times.push(row.at); if (times.length > TRACE_LIMITS.loopMin) times.shift();
     this.recent.set(key, times);
-    if (this.recent.size > 256) for (const [k, t] of this.recent) if (!t.length || row.at - t[t.length - 1] > TRACE_LIMITS.loopWindowMs) this.recent.delete(k);
+    if (this.recent.size > TRACE_LIMITS.keys) {
+      for (const [k, t] of this.recent) if (!t.length || row.at - t[t.length - 1] > TRACE_LIMITS.loopWindowMs) this.recent.delete(k);
+      // still full of live keys: forget the oldest-inserted ones, so the map stays bounded whatever the request mix
+      for (const k of this.recent.keys()) { if (this.recent.size <= TRACE_LIMITS.keys / 2) break; if (k !== key) this.recent.delete(k); }
+    }
   }
   /** Walk kept rows newest first until `visit` returns false. */
   private walk(visit: (r: TraceRow) => boolean | void) {

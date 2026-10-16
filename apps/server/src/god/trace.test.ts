@@ -52,6 +52,20 @@ test('outcomes come from the returned object or the thrown error, never from tex
   assert.deepEqual(outcomeOf(undefined, undefined, 304), { code: 'ok' });
   assert.deepEqual(outcomeOf(undefined, undefined, 404), { code: 'http.404' });
   assert.equal(outcomeOf({ accepted: false, failures: [{ code: 'x'.repeat(500) }] }, undefined, 200).code.length, TRACE_LIMITS.code);
+  // fields keep their schema shape; ids, refs and keys a caller chose are masked
+  assert.deepEqual(outcomeOf({ accepted: false, failures: [{ code: 'revision.stale', field: 'expect.house/secret-room' }] }, undefined, 200), { code: 'revision.stale', field: 'expect.*' });
+  assert.deepEqual(outcomeOf({ accepted: false, failures: [{ code: 'revision.stale', field: 'preview.subtrees.e-123.x' }] }, undefined, 200), { code: 'revision.stale', field: 'preview.subtrees.*' });
+  assert.deepEqual(outcomeOf({ accepted: false, failures: [{ code: 'schema', field: 'ops.12.param.my secret-key' }] }, undefined, 200), { code: 'schema', field: 'ops.12.param.*' });
+  assert.deepEqual(outcomeOf(undefined, new ApiError(413, 'asset.budget', 'big', { field: 'core/secret@1' }), 413), { code: 'asset.budget', field: '*' });
+  assert.ok(outcomeOf({ accepted: false, failures: [{ code: 'schema', field: 'a.'.repeat(300) }] }, undefined, 200).field!.length <= TRACE_LIMITS.field);
+});
+
+test('the loop window map stays bounded under many distinct live refusal keys', () => {
+  const t = new GodTrace({ enabled: true, now: () => 1000 });
+  for (let i = 0; i < 5000; i++) t.record(row(1000, `code.${i}`));
+  assert.ok((t as unknown as { recent: Map<string, number[]> }).recent.size <= TRACE_LIMITS.keys + 1);
+  for (let i = 0; i < 3; i++) t.record(row(1000, 'overlap.solid', { field: 'p' }));
+  assert.equal(t.loops()[0].code, 'overlap.solid', 'a fresh loop is still seen after the map was trimmed');
 });
 
 test('recording costs about a microsecond and memory stays bounded', () => {
