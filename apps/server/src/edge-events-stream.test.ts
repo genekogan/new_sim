@@ -282,6 +282,8 @@ test('schema: machine-readable verbs, plan grammar, event kinds and limits (publ
     assert.ok(body.endpoints.some((e: any) => e.path === '/v1/edge/events' && e.produces === 'text/event-stream'));
     assert.equal(body.body.contract,'body/1');
     assert.equal(Object.keys(body.act.verbOutcomes).length,body.act.verbs.length);
-    assert.ok(Buffer.byteLength(JSON.stringify(body), 'utf8') < 16_000, 'small enough to fetch once per session');
+    // 16 KB until release 3 added creature bodies, looks v2 outfits, travel, knowledge and new verbs (16.7 KB on 2026-10-16);
+    // still one small fetch per session (no client caps it), so the budget is 20 KB.
+    assert.ok(Buffer.byteLength(JSON.stringify(body), 'utf8') < 20_000, 'small enough to fetch once per session');
   } finally { f.destroy(); }
 });
