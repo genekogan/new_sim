@@ -175,7 +175,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- receipts
   private rows(where: string, ...args: (string | number | null)[]): Row[] {return this.db.db.prepare(`SELECT * FROM edge_receipts_v1 WHERE world_id=? AND ${where}`).all(this.host.worldId, ...args) as Row[];}
-  private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{})};}
+  private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);
+    // An invitation nobody has answered yet is not a shared activity: the host's receipt stays `waiting` (quality case 32).
+    const awaiting=r.phase==='started'?this.together?.awaitingAnswer(r.receipt_id,r.capability)??null:null;
+    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{})};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
   private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {},contentParams:Record<string,unknown>={},receiptId?:string): EdgeReceipt {

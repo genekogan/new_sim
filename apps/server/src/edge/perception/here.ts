@@ -192,6 +192,8 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     if (secs !== null && started !== undefined) endsIn = durationWord(Math.max(0, secs - (tick - started) / 20));
   }
   const activityKind = open[0]?.capability.split(':')[0] ?? String(b?.human?.activity ?? 'idle');
+  // an unanswered invitation is `inviting`, not the shared activity it asks for (quality case 32)
+  const inviting = open[0] ? (open[0] as {awaitingAnswer?: {what: string; waitingFor: {name: string}[]; expiresInSeconds: number}}).awaitingAnswer : undefined;
   const fade = ledger.comms?.fading.status(soul.soulId) as {colour?: string} | null | undefined;
   const gaze = b?.human?.gaze as {kind: string; target?: string; at?: V2} | undefined;
   const nameOfEntity = (id: string) => host.mindByEntity?.get(id)?.name ?? (P.w.entities[id]?.label as string | undefined) ?? id;
@@ -229,7 +231,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
-      activity: {kind: activityKind, ...(endsIn ? {endsIn} : {})},
+      activity: inviting ? {kind: 'inviting', what: inviting.what, with: inviting.waitingFor.map(g => g.name), answerWithin: durationWord(inviting.expiresInSeconds)} : {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
       ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
     near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, untrusted: true,

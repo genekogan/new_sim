@@ -172,6 +172,18 @@ export class Together {
   private pending(): Invite[] {return (this.p.db.db.prepare("SELECT body FROM edge_invites_v1 WHERE world_id=? AND state='pending' ORDER BY created_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Invite);}
   private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
   inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
+  /** A paired gesture or a give whose host receipt is open while nobody has answered yet (quality case 32): the host is
+   *  only walking over / holding out a hand, so the receipt reads `waiting` and `here` reads `inviting` until a guest
+   *  accepts. Cheap for every other receipt: only paired/give capabilities ever look at the invitation table. */
+  awaitingAnswer(receiptId: string, capability: string): {invite: string; what: string; waitingFor: {soulId: string; name: string}[]; expiresInSeconds: number} | null {
+    const verb = capability.split(':')[0]!;
+    if (verb !== 'give' && !Object.hasOwn(PAIRED, verb)) return null;
+    const inv = this.pending().find(i => i.hostReceipt === receiptId && (i.kind === 'paired' || i.kind === 'give'));
+    if (!inv || Object.values(inv.responses).includes('accepted')) return null;
+    const open = inv.guests.filter(g => !inv.responses[g.soulId]);
+    if (!open.length) return null;
+    return {invite: inv.id, what: inv.what, waitingFor: open.map(g => ({soulId: g.soulId, name: this.p.host.minds.get(g.soulId)?.name ?? g.name})), expiresInSeconds: Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))};
+  }
   /** Pending invitations addressed to this Soul that it has not answered. */
   invitesFor(soulId: string): Invite[] {return this.pending().filter(i => i.guests.some(g => g.soulId === soulId) && !i.responses[soulId]).map(i=>({...i,host:{...i.host,name:this.p.host.minds.get(i.host.soulId)?.name??i.host.name},guests:i.guests.map(g=>({...g,name:this.p.host.minds.get(g.soulId)?.name??g.name}))}));}
   item(id: string): Item | null {const r = this.p.db.db.prepare('SELECT body FROM edge_items_v1 WHERE world_id=? AND item_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
