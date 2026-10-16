@@ -2,6 +2,7 @@
 // add procedural textures (triplanar wood/stone/plaster) behind the same `get` signature.
 import * as THREE from 'three';
 import type { Material } from '@sim/generators';
+import { KitSurfaceMaterial, type KitSurface } from './kit-surfaces.ts'; // Y1 / XP7 hook
 
 type Look = { color: string; roughness: number; metalness: number; transparent?: boolean; opacity?: number; emissive?: boolean };
 export const MATERIAL_LOOKS: Record<Material, Look> = {
@@ -35,15 +36,16 @@ class VertexGlowMaterial extends THREE.MeshStandardMaterial {
 export class MaterialLib {
   private cache = new Map<string, THREE.Material>();
   /** A material for a kind and colour. `vertexColors` materials ignore `color` (the geometry carries it). */
-  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side; finish?: 'kit-metal'; vertexGlow?: boolean } = {}): THREE.Material {
+  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side; finish?: 'kit-metal'; vertexGlow?: boolean; surface?: KitSurface | null } = {}): THREE.Material {
     const look = MATERIAL_LOOKS[kind ?? 'paint'] ?? MATERIAL_LOOKS.paint;
     const c = color ?? look.color;
-    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}${opts.finish ? '|' + opts.finish : ''}${opts.vertexGlow ? '|vertex-glow' : ''}`;
+    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}${opts.finish ? '|' + opts.finish : ''}${opts.vertexGlow ? '|vertex-glow' : ''}${opts.surface ? `|surface:${opts.surface.cls}:${opts.surface.pattern}` : ''}`;
     let m = this.cache.get(key);
     if (!m) {
       const glow = opts.glow ?? (look.emissive ? 1 : 0);
-      const Mat = opts.vertexGlow && opts.vertexColors && glow > 0 ? VertexGlowMaterial : THREE.MeshStandardMaterial;
+      const Mat = opts.surface ? KitSurfaceMaterial : opts.vertexGlow && opts.vertexColors && glow > 0 ? VertexGlowMaterial : THREE.MeshStandardMaterial;
       const mat = new Mat({ color: opts.vertexColors ? '#ffffff' : c, roughness: opts.finish === 'kit-metal' ? 0.32 : look.roughness, metalness: opts.finish === 'kit-metal' ? 0.25 : look.metalness, vertexColors: !!opts.vertexColors, transparent: !!look.transparent, opacity: look.opacity ?? 1, depthWrite: !look.transparent, side: opts.side ?? THREE.FrontSide });
+      if (opts.surface) mat.userData.kitSurface = { ...opts.surface }; // Y1: kept by clones (userData is copied)
       if (glow > 0) {
         mat.emissive = new THREE.Color(opts.vertexGlow && opts.vertexColors ? '#ffffff' : c); mat.emissiveIntensity = glow;
         if (opts.vertexGlow) mat.userData.kitGlowIntensity = glow;

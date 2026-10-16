@@ -483,6 +483,17 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   }
   return finish(receiptResult(receipt) ?? lost(failure));
 }
+var ATTENTION_TIMEOUT_MS = 1e3;
+function attention(at, eye) {
+  try {
+    const s = load(), b = s.build, point = (p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite);
+    if (!s.world || !s.token || !b?.id || !b.lease || context.getStore()?.noBuild || /^(0|off|false|no)$/i.test(process.env.EDEN_GOD_ATTENTION ?? "") || !point(at)) return Promise.resolve(false);
+    const body = JSON.stringify({ lease: b.lease, at: at.map(r2), ...point(eye) ? { eye: eye.map(r2) } : {} });
+    return fetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) }).then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
+  } catch {
+    return Promise.resolve(false);
+  }
+}
 var ok = (r, what) => {
   if (r.status >= 200 && r.status < 300) return r.data;
   throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
@@ -2263,7 +2274,7 @@ function kitDefinition(k) {
   const e = k.box ? [] : k.shapes.map(ext);
   const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, Math.round(v * 100) / 100));
   const args = { shapes: k.shapes };
-  for (const key of ["v", "footprint", "gait", "slots", "round"]) if (k[key] !== void 0) args[key] = k[key];
+  for (const key of ["v", "footprint", "gait", "slots", "round", "surfaces"]) if (k[key] !== void 0) args[key] = k[key];
   const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args }, size: { box, scale: k.scale ?? [0.5, 2] } };
   for (const key of ["components", "anchor", "state", "params"]) if (k[key] !== void 0) def[key] = k[key];
   return def;
@@ -3105,6 +3116,7 @@ async function where(spec, flags2 = {}) {
   const p = refPoint(v, spec, flags2.offset);
   const result = await query({ where: [p.x, p.z], clearance: { at: [p.x, p.z], size: [0, 0] } });
   const d = result.where, colliders = new Set(result.clearance?.blockedBy ?? []);
+  void attention([d.x, d.y, d.z]);
   if (flags2.json) return d;
   return [
     `(${d.x}, ${d.z}): ground y ${d.y}, slope ${d.slopeDeg}\xB0, ${d.medium}${d.water ? `, water level ${d.water.level} (${d.water.depth} m deep)` : ""}`,
@@ -3146,6 +3158,7 @@ async function freePlots(size, flags2 = {}) {
   const v = view(m);
   const near = flags2.near ? refPoint(v, flags2.near) : { x: 0, z: 0 };
   const r = (await query({ free: { size: [w, d], near: [near.x, near.z], radius: flags2.radius ? num(flags2.radius) : 150, count: flags2.count ? num(flags2.count) : 4, maxSlope: flags2.slope ? num(flags2.slope) : 0.25 } })).free;
+  if (r[0]) void attention([r[0].at[0], r[0].y, r[0].at[1]]);
   return flags2.json ? r : r.length ? r.map((f) => `- (${f.at.join(", ")}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join("\n") : "no free plot of that size within the radius";
 }
 async function act(batch, note) {
@@ -4199,6 +4212,7 @@ async function lookInner(flags2 = {}, runtime = {}, signal) {
   }
   const cam = views[0];
   signal.throwIfAborted();
+  void attention(cam.at, cam.eye);
   const out = resolve5(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
   const args = {
     timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()),

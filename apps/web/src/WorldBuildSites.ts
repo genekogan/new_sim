@@ -10,20 +10,26 @@ export type PublicSite = {
   step: { n: number; label: string; of: number }; site: { at: [number, number]; size: [number, number]; yaw: number };
   massing: Mass[]; roots: string[]; claims: { part: string; status: 'held' | 'stale' | 'released' | 'done' | 'taken'; root?: string }[];
   say?: { text: string; at: number }; designing?: string[]; note?: { text: string; at: number }; reopensAt?: number;
+  /** CE8: the lead's latest look target (server time t); shown as a reticle for ~20 s. */
+  attention?: Attention;
 };
-export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & Partial<Pick<PublicSite, 'say' | 'designing' | 'note' | 'reopensAt'>> & {
+export type Attention = { at: [number, number, number]; eye?: [number, number, number]; t: number };
+export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt'> & Partial<Pick<PublicSite, 'say' | 'designing' | 'note' | 'reopensAt' | 'attention'>> & {
   closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[];
 };
 type SiteRecord = PublicSite | SiteDelta;
-type Feed = { reset: boolean; records: SiteRecord[]; rev: number; now?: number };
+/** `attention` feeds carry the site's current rev and are applied outside the rev sequence. */
+type Feed = { reset: boolean; records: SiteRecord[]; rev: number; now?: number; attention?: boolean };
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object';
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const revision = (v: unknown): v is number => finite(v) && Number.isSafeInteger(v) && v >= 0;
 const timedText = (v: unknown) => record(v) && typeof v.text === 'string' && finite(v.at);
+const point3 = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(finite);
+const isAttention = (v: unknown): v is Attention => record(v) && point3(v.at) && (v.eye === undefined || point3(v.eye)) && finite(v.t);
 const isSiteRecord = (v: unknown): v is SiteRecord => record(v) && typeof v.id === 'string' && revision(v.rev) && finite(v.lastAt) && ['active', 'paused', 'done', 'abandoned'].includes(String(v.status))
   && (v.say === undefined || timedText(v.say)) && (v.note === undefined || timedText(v.note))
   && (v.designing === undefined || (Array.isArray(v.designing) && v.designing.length <= 8 && v.designing.every(n => typeof n === 'string')))
-  && (v.reopensAt === undefined || finite(v.reopensAt));
+  && (v.reopensAt === undefined || finite(v.reopensAt)) && (v.attention === undefined || isAttention(v.attention));
 const fullSite = (v: SiteRecord): v is PublicSite => 'site' in v && 'massing' in v && 'roots' in v;
 
 /** The only wire-shape adapter. Revision 2 uses builds[] on diffs, site/delta on world-build,
@@ -35,6 +41,7 @@ export function parseBuildFeed(input: unknown, now?: number): Feed | null {
   if (input.kind === 'world-build') {
     const site = input.site ?? input.delta;
     if (!isSiteRecord(site) || !revision(input.rev) || site.rev !== input.rev) return null;
+    if (input.event === 'attention') return site.attention ? { reset: false, records: [site], rev: input.rev, now: clock, attention: true } : null;
     return { reset: false, records: [site], rev: input.rev, now: clock };
   }
   if (input.kind === 'world-diff') {
@@ -53,6 +60,8 @@ export type SiteModel = Pick<WorldModel, 'entities' | 'subtree' | 'worldPose' | 
 type Options = {
   model: () => SiteModel | null; groundAt: (x: number, z: number) => number | null;
   fetchBuilds?: () => Promise<unknown>; now?: () => number; createCanvas?: () => HTMLCanvasElement; search?: string;
+  /** Default: the viewer's prefers-reduced-motion media query (live). */
+  reducedMotion?: () => boolean;
 };
 type VertexRange = { start: number; count: number };
 type Member = { root: string; mask: number; boxes: OBB[] };
@@ -67,12 +76,18 @@ type View = {
   deadline: number; receivedAt: number; silence: number; pausedAt: number; paused: boolean; nextLabelAt: number;
   sayUntil: number; noteUntil: number; reopenDeadline: number; designingActive: boolean;
   captionAlpha: { value: number }; captionTop: { value: number };
+  /** CE8 reticle: one sprite, created on the first hint; gazeUntil is the local-clock end of the fade. */
+  gaze: THREE.Sprite | null; gazeT: number; gazeUntil: number; gazePulse: number; gazeSize: number;
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
 const MARKER_ALPHA = 0.95, FAINT_EDGE_ALPHA = 0.06, COVERAGE_GRID = 8; // 64 sampled columns per mass
 const MINUTE = 60_000, QUIET_MS = 3 * MINUTE, SAY_MS = 8 * MINUTE, NOTE_MS = 6000;
 const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
+/** CE8: full for 14 s, faded out by 20 s after the god looked. The ring spans what the look framed at its target
+ * (half-height = distance × tan(45°/2), the look camera's vertical fov), clamped to 2.4–60 m and ≥ 36 px across. */
+export const GAZE = { ttlMs: 20_000, fadeMs: 6000, alpha: 0.85, worldSize: 2.4, maxSize: 60, viewTan: Math.tan(Math.PI / 8), minPx: 36, pulse: 0.06 } as const;
+export const gazeSize = (a: Pick<Attention, 'at' | 'eye'>) => a.eye ? Math.min(GAZE.maxSize, Math.max(GAZE.worldSize, 2 * GAZE.viewTan * Math.hypot(a.eye[0] - a.at[0], a.eye[1] - a.at[1], a.eye[2] - a.at[2]))) : GAZE.worldSize;
 const STYLES = ['ring', 'label', 'outline', 'sheen', 'wheel'] as const;
 type Style = typeof STYLES[number];
 
@@ -98,9 +113,15 @@ export class WorldBuildSites {
   private activeSheen: THREE.ShaderMaterial | null = null;
   private pausedSheen: THREE.ShaderMaterial | null = null;
   private viewport = new THREE.Vector2();
+  private gazing = new Set<View>();
+  private gazeTexture: THREE.CanvasTexture | null = null;
+  private seenAttention = new WeakSet<object>();
+  private reducedMotion: () => boolean;
 
   constructor(options: Options) {
     this.options = options; this.clock = options.now ?? (() => performance.now());
+    const motion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+    this.reducedMotion = options.reducedMotion ?? (() => motion?.matches ?? false);
     this.group.name = 'build-sites'; this.group.userData.cameraTransparent = true;
     this.siteStyle(new URLSearchParams(options.search ?? (typeof location === 'undefined' ? '' : location.search)).get('sites') ?? 'ring,label');
   }
@@ -128,7 +149,10 @@ export class WorldBuildSites {
 
   apply(input: unknown, now?: number) {
     if (this.disposed) return;
+    // The layer replays its whole edge buffer every frame; an attention message is parsed once.
+    if (record(input) && input.event === 'attention') { if (this.seenAttention.has(input)) return; this.seenAttention.add(input); }
     const feed = parseBuildFeed(input, now); if (!feed) return;
+    if (feed.attention) { for (const item of feed.records) { const v = this.views.get(item.id); if (v && item.attention) this.attend(v, item.attention, feed.now); } return; }
     if (feed.reset) { this.reset(feed.records as PublicSite[], feed.rev, feed.now); return; }
     for (const item of feed.records) {
       if (item.rev <= this.maxRev) continue;
@@ -186,6 +210,7 @@ export class WorldBuildSites {
       for (const id of item.rootsAdded ?? []) old.roots.add(id);
       b.roots = [...old.roots]; old.reindex = true;
     }
+    if (item.attention) this.attend(old, item.attention, now);
     this.setClock(old, now); this.tint(old); this.refresh(old, this.clock());
     if (old.wheel && this.styles.has('wheel')) this.wheel(old);
   }
@@ -242,6 +267,53 @@ export class WorldBuildSites {
       v.captionAlpha.value = Math.max(0, Math.min(1, (v.noteUntil - nowMs) / 2000));
       if (nowMs >= v.nextLabelAt) this.refresh(v, nowMs);
     }
+    // Only sites with a fresh look are visited; an expired reticle stops drawing and leaves the set.
+    if (this.gazing.size) { const still = this.reducedMotion(); for (const v of this.gazing) this.gazeFrame(v, nowMs, still); }
+  }
+
+  /** CE8: show where the lead is looking. Older hints (by server time) never replace newer ones. */
+  private attend(v: View, attention: Attention, now?: number) {
+    if (attention.t <= v.gazeT) return;
+    v.gazeT = attention.t; v.data.attention = { at: [...attention.at], ...(attention.eye ? { eye: [...attention.eye] } : {}), t: attention.t };
+    const receivedAt = this.clock(); v.gazeUntil = receivedAt + attention.t + GAZE.ttlMs - (now ?? Date.now());
+    if (v.gazeUntil <= receivedAt) { if (v.gaze) v.gaze.visible = false; this.gazing.delete(v); return; }
+    // A close look is a small mark; a wide look rings the area it framed.
+    v.gazeSize = gazeSize(attention);
+    const sprite = v.gaze ?? this.gazeSprite(v);
+    sprite.position.set(attention.at[0], attention.at[1] + 0.05, attention.at[2]); sprite.scale.set(v.gazeSize, v.gazeSize, 1);
+    this.gazing.add(v); this.gazeFrame(v, receivedAt, this.reducedMotion());
+  }
+  private gazeFrame(v: View, nowMs: number, still: boolean) {
+    const sprite = v.gaze!, left = v.gazeUntil - nowMs;
+    if (left <= 0) { sprite.visible = false; this.gazing.delete(v); return; }
+    sprite.visible = true; sprite.material.opacity = GAZE.alpha * Math.min(1, left / GAZE.fadeMs);
+    v.gazePulse = still ? 1 : 1 + GAZE.pulse * Math.sin(nowMs / 700);
+  }
+  private gazeSprite(v: View) {
+    if (!this.gazeTexture) {
+      const canvas = this.options.createCanvas?.() ?? document.createElement('canvas'); canvas.width = canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        const stroke = (style: string, width: number, path: () => void) => { ctx.strokeStyle = style; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.beginPath(); path(); ctx.stroke(); };
+        const shape = () => { ctx.arc(64, 64, 42, 0, Math.PI * 2); for (const [dx, dz] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) { ctx.moveTo(64 + dx * 26, 64 + dz * 26); ctx.lineTo(64 + dx * 36, 64 + dz * 36); } };
+        // A dark halo keeps the soft white ring legible on snow, sand and sky.
+        stroke('rgba(20,20,20,0.35)', 11, shape); stroke('rgba(255,248,232,0.95)', 5, shape);
+        ctx.fillStyle = 'rgba(255,248,232,0.95)'; ctx.beginPath(); ctx.arc(64, 64, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      this.gazeTexture = new THREE.CanvasTexture(canvas); this.gazeTexture.colorSpace = THREE.SRGBColorSpace;
+    }
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.gazeTexture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, opacity: 0 }));
+    sprite.name = 'build-gaze'; sprite.renderOrder = 999; sprite.frustumCulled = false; sprite.visible = false; sprite.scale.set(v.gazeSize, v.gazeSize, 1);
+    sprite.onBeforeRender = (renderer, _scene, camera) => {
+      const m = sprite.matrixWorld.elements, view = camera.matrixWorldInverse.elements;
+      const depth = Math.max(0.01, -(view[2] * m[12] + view[6] * m[13] + view[10] * m[14] + view[14]));
+      const height = renderer.getSize(this.viewport).y;
+      const unitsPerPixel = 2 * (camera instanceof THREE.PerspectiveCamera ? depth : 1) / (Math.max(1, height) * camera.projectionMatrix.elements[5]);
+      const size = Math.max(v.gazeSize, GAZE.minPx * unitsPerPixel) * v.gazePulse;
+      sprite.scale.set(size, size, 1); sprite.updateMatrixWorld();
+    };
+    v.gaze = sprite; v.group.add(sprite); this.tag(v);
+    return sprite;
   }
 
   /** The real depicted world clock and its world-ms/real-ms rate; never the shot-hour clock. */
@@ -264,7 +336,8 @@ export class WorldBuildSites {
     return { kind: 'place' as const, id, name: `Under construction: ${b.title}`, detail: `${b.step.label} ${b.step.n}/${b.step.of}`, point: new THREE.Vector3(x, this.options.groundAt(x, z) ?? 0, z) };
   }
   inspect() {
-    return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], coverage: [...v.coverage], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length })) };
+    return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], coverage: [...v.coverage], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length,
+      gaze: v.gaze?.visible ? { at: v.gaze.position.toArray(), size: v.gazeSize, opacity: v.gaze.material.opacity, t: v.gazeT } : null })) };
   }
 
   private put(data: PublicSite, now?: number) {
@@ -272,6 +345,7 @@ export class WorldBuildSites {
     // Preserve canvas/texture and geometry for identical start/resume shapes.
     if (previous && JSON.stringify([previous.data.site, previous.data.massing]) === JSON.stringify([data.site, data.massing])) {
       previous.data = data; previous.roots = new Set(data.roots); previous.reindex = true;
+      if (data.attention) this.attend(previous, data.attention, now);
       this.setClock(previous, now); this.countParts(previous); this.refit(previous); this.refresh(previous, this.clock()); return;
     }
     if (previous) this.release(previous);
@@ -283,9 +357,10 @@ export class WorldBuildSites {
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
     installDesignPulse(faces.material, this.pulse);
     faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 } };
+    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 }, gaze: null, gazeT: -Infinity, gazeUntil: 0, gazePulse: 1, gazeSize: GAZE.worldSize };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
+    if (data.attention) this.attend(v, data.attention, now);
     this.tag(v);
   }
   private tag(v: View) { v.group.traverse(o => { o.userData.buildSite = v.data.id; o.userData.entity = `build-site:${v.data.id}`; o.userData.cameraTransparent = true; }); }
@@ -515,6 +590,7 @@ export class WorldBuildSites {
     if (v.label) { v.label.material.map?.dispose(); v.label.material.dispose(); }
     if (v.wheel) { v.wheel.geometry.dispose(); v.wheel.material.dispose(); }
     v.sheen?.geometry.dispose(); // sheen materials are layer-owned and shared among all sites
+    v.gaze?.material.dispose(); this.gazing.delete(v); // the reticle texture is layer-owned
     v.group.clear(); v.members.clear();
   }
   dispose() {
@@ -522,7 +598,7 @@ export class WorldBuildSites {
     this.disposed = true; this.generation++;
     for (const v of this.views.values()) this.release(v);
     this.views.clear(); this.pending.clear(); this.group.clear(); this.group.removeFromParent();
-    this.activeSheen?.dispose(); this.pausedSheen?.dispose();
+    this.activeSheen?.dispose(); this.pausedSheen?.dispose(); this.gazeTexture?.dispose(); this.gazing.clear();
   }
 }
 

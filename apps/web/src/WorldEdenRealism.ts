@@ -16,6 +16,11 @@ varying vec3 vEdenO;
 varying vec3 vEdenN;
 varying float vEdenH;
 uniform vec4 edenRealism;
+#ifdef EDEN_GOD_SURFACE
+attribute vec4 edenSurf;
+varying vec3 vEdenL;
+varying vec2 vEdenKS;
+#endif
 `;
 const VERTEX_BODY=/* glsl */`
 {
@@ -28,6 +33,10 @@ const VERTEX_BODY=/* glsl */`
  #endif
  vEdenW=(modelMatrix*edenP).xyz;vEdenO=(modelMatrix*edenOrigin).xyz;vEdenN=normalize(mat3(modelMatrix)*edenNrm);
  vEdenH=clamp(transformed.y/max(edenRealism.w,1e-3),0.,1.);
+ #ifdef EDEN_GOD_SURFACE
+  // Kit geometry has no per-shape height here: foliage keeps its full tone instead of a base fade.
+  {float k=floor(edenSurf.w+1e-3);vEdenL=edenSurf.xyz;vEdenKS=vec2(k,edenSurf.w-k);vEdenH=.8;}
+ #endif
 }
 `;
 const FRAGMENT_HEAD=/* glsl */`
@@ -53,6 +62,61 @@ uniform vec4 edenMuralA; // mural centre xyz, width
 uniform vec4 edenMuralB; // mural right xz, height
 // Planar projection by dominant world normal: a one-tap stand-in for triplanar.
 vec2 edenPlane(vec3 w,vec3 n){vec3 a=abs(n);return a.y>max(a.x,a.z)?w.xz:(a.x>a.z?w.zy:w.xy);}
+#ifdef EDEN_GOD_SURFACE
+varying vec3 vEdenL;
+varying vec2 vEdenKS;
+uniform float edenPattern;
+#endif
+`;
+/** Y1 / XP7: explicit god kit patterns in shape-local metres (1 marble, 2 ashlar, 3 planks, 4 shingles, 5 stripes).
+ * They replace the material class's tint; fine lines fade with pixel size, so distance never shimmers. */
+const GOD_PATTERNS=/* glsl */`
+ #ifdef EDEN_GOD_SURFACE
+ if(edenPattern>.5){
+  float pat=edenPattern,ring=floor(vEdenKS.x+.5),sd0=vEdenKS.y;vec3 L=vEdenL;
+  float px=max(max(fwidth(L.x),fwidth(L.y)),fwidth(L.z));bool cyl=ring>.5&&abs(n.y)<.7;
+  vec2 q=cyl?vec2(atan(L.z,L.x)*length(L.xz),L.y):edenPlane(L,n);
+  if(pat<1.5){ // marble: thin turbulent veins with a soft halo (solid, so seam-free), broken hairlines, a faint cloud
+   vec3 P=L*1.1+sd0*17.;float t=edenNoise(P.xy*1.3)*.5+edenNoise(P.yz*2.7+3.7)*.3+edenNoise(P.zx*5.9+9.1)*.2;
+   float s=dot(P,vec3(.55,1.,.35))*2.7+t*4.2,a=fwidth(s),v=abs(sin(s)),th=.015+.03*edenNoise(P.xz*1.7+5.),far2=1.-smoothstep(1.,3.,a);
+   float vein=(1.-smoothstep(th,th+a*1.2+.008,v))*far2,halo=(1.-smoothstep(th,th+.3,v))*far2;
+   float s2=dot(P,vec3(-.4,.7,.9))*4.6+t*6.,a2=fwidth(s2);
+   float hair=(1.-smoothstep(.01,.02+a2*1.2,abs(sin(s2))))*(1.-smoothstep(.6,1.6,a2))*smoothstep(.42,.58,edenNoise(P.xy*.9+2.));
+   float cloud=edenNoise(P.xz*.45+P.y*.31+11.)*.6+edenNoise(P.xy*1.9+4.)*.4;
+   tint=vec3(.97+.06*cloud)*mix(vec3(1.),vec3(.6,.62,.67),max(max(vein*.85,halo*.28),hair*.45));edenRough=.5+.2*cloud;
+  }else if(pat<2.5){ // ashlar: coursed blocks, offset joints, per-block tone, recessed mortar
+   float ch=.42,bw=.9,row=floor(q.y/ch),fy=fract(q.y/ch),xx=q.x/bw+row*.5+edenHash(vec2(row,sd0*7.+1.))*.6,col=floor(xx),fx=fract(xx);
+   float d=min(min(fx,1.-fx)*bw,min(fy,1.-fy)*ch),fade=1.-smoothstep(.02,.06,px);
+   float joint=(1.-smoothstep(.01,.012+px*1.5,d))*fade,edge=(1.-smoothstep(.012,.07,d))*fade,f=detail?mix(edenNoise(q*6.+col*3.1),.5,far):.5;
+   tint=vec3(.84+.24*edenHash(vec2(col,row)+sd0*13.))*(.93+.12*f)*mix(1.,.9,edge)*mix(1.,.55,joint);
+   edenRough=.92+.12*f;edenBump=-(joint*.008+edge*.003);edenBumpAmt=near*fade;
+  }else if(pat<3.5){ // planks: boards along the long side, staggered butt joints, grain
+   float bw=.16,bl=2.2,b=floor(q.y/bw),fy=fract(q.y/bw),e=q.x/bl+edenHash(vec2(b,sd0*5.+2.))*3.,ei=floor(e),ef=fract(e),fade=1.-smoothstep(.02,.05,px);
+   float gap=max(1.-smoothstep(.004,.005+px*1.5,min(fy,1.-fy)*bw),1.-smoothstep(.003,.004+px*1.5,min(ef,1.-ef)*bl))*fade;
+   float tone=.82+.26*edenHash(vec2(b,ei)+sd0*11.),g=detail?mix(edenNoise(vec2(q.x*1.1,q.y*34.)+b*3.1),.5,far):.5;
+   tint=vec3(tone)*mix(vec3(1.),vec3(1.05,.98,.9),tone-.82)*(.86+.24*g)*mix(1.,.5,gap);
+   edenRough=.84+.16*g;edenBump=-gap*.006;edenBumpAmt=near*fade;
+  }else if(pat<4.5){ // shingles: courses up the world slope (pitched slabs too), staggered tabs, a shadow under each butt
+   float u=q.x,s=q.y;
+   if(ring>.5){if(abs(n.y)<=.97){u=atan(L.z,L.x)*length(L.xz);s=L.y/max(sqrt(max(1.-n.y*n.y,0.)),.25);}} // round: around, by height
+   else{ // flat faces: world up projected on the face, carried back into shape metres through the screen derivatives
+    vec3 a1=dFdx(L),a2=dFdy(L),b1=dFdx(vEdenW),b2=dFdy(vEdenW),nw=cross(b1,b2);nw*=inversesqrt(max(dot(nw,nw),1e-30));
+    vec3 tw=vec3(0.,1.,0.)-nw.y*nw;float g11=dot(b1,b1),g12=dot(b1,b2),g22=dot(b2,b2);
+    vec3 up=(g22*dot(b1,tw)-g12*dot(b2,tw))*a1+(g11*dot(b2,tw)-g12*dot(b1,tw))*a2;float ul=length(up);
+    if(abs(nw.y)<.97&&ul>0.){vec3 e=up/ul;s=dot(L,e);u=dot(L,normalize(cross(n,e)));}
+   }
+   float rh=.2,tw=.3,row=floor(s/rh),fy=fract(s/rh),xx=u/tw+row*.5+edenHash(vec2(row,sd0*3.))*.3,c=floor(xx),fx=fract(xx),fade=1.-smoothstep(.03,.08,px);
+   float slot=(1.-smoothstep(.005,.006+px*1.5,min(fx,1.-fx)*tw))*(1.-smoothstep(.7,.85,fy))*fade,butt=smoothstep(.7,1.,fy)*fade,f=detail?mix(edenNoise(vec2(u,s)*6.),.5,far):.5;
+   tint=vec3(.8+.3*edenHash(vec2(c,row)+sd0*17.))*(.92+.14*f)*mix(1.,.62,butt)*mix(1.,.6,slot);
+   edenRough=.9+.12*f;edenBump=(1.-fy)*.012*fade-slot*.004;edenBumpAmt=near;
+  }else{ // stripes: the colour alternating with cream (a light colour with its darker shade), around round shapes
+   float t=ring>.5?atan(L.z,L.x)/6.2831853*ring*.5:L.x/.5,per=ring>.5?6.2831853*max(length(L.xz),.02)/(ring*.5):.5;
+   float a=px/per*2.,band=smoothstep(.5-a,.5+a,abs(fract(t)-.5)*2.);band=mix(band,.5,smoothstep(.25,.5,a));
+   vec3 c=diffuseColor.rgb,alt=dot(c,vec3(.3,.59,.11))>.62?c*vec3(.52,.58,.68):vec3(.93,.91,.86);
+   diffuseColor.rgb=mix(alt,c,band);tint=vec3(.97+.05*(detail?mix(edenNoise(q*9.),.5,far):.5));edenRough=.95;
+  }
+ }else
+ #endif
 `;
 const FRAGMENT_BODY=/* glsl */`
 float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
@@ -64,9 +128,19 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
  // Interpolated per-object origins wobble in the last bits; snap before hashing so seeds are constant per object.
  vec3 seed=floor(vEdenO*4.+.5)*.25;
  float obj=edenHash(seed.xz*.731+seed.y*.17+edenRealism.z);
+ #ifdef EDEN_GOD_SURFACE
+  // Y1 / XP7: god kit shapes shade in their own metres and faces (vEdenL) with a per-shape seed, so a surface holds
+  // still while a thing eases in, moves, turns or swings; the face normal is the screen-derivative one, oriented by
+  // the interpolated world normal.
+  {vec3 fl=cross(dFdx(vEdenL),dFdy(vEdenL)),fw=cross(dFdx(vEdenW),dFdy(vEdenW));
+   n=normalize(fl+vec3(0.,1e-12,0.))*(dot(fw,vEdenN)<0.?-1.:1.);w=vEdenL+vEdenKS.y*vec3(41.,0.,29.);obj=edenHash(vec2(vEdenKS.y*97.,7.1));}
+ #endif
  // Shared countryside macro field: lush and sun-dried patches agree between turf and blades.
  float macro=.5;if(cls<1.5||(cls>3.5&&cls<4.5))macro=edenNoise(w.xz*.045)*.65+edenNoise(w.xz*.14+7.3)*.35;
  vec3 dry=vec3(1.12,1.04,.86),lush=vec3(.88,.98,.94);
+${GOD_PATTERNS}
+ // God kit shapes never take the terrain, flower, skin or water classes: those branches stay out of the god program.
+ #ifndef EDEN_GOD_SURFACE
  if(cls<1.5){ // ground turf: strong lush/dry and warm/cool fields, textured blades and clumps, mown lawn stripes
   float temp=edenNoise(w.xz*.028+31.);
   tint=mix(vec3(.74,.97,.86),vec3(1.24,1.08,.7),smoothstep(.28,.78,macro))*(.82+.3*macro);
@@ -86,7 +160,9 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
   float broad=edenNoise(w.xz*.15+5.),mid=edenNoise(w.xz*.6),g=.9;
   if(detail){vec4 G=texture2D(edenPatC,w.xz/2.3);g=mix((.72+.36*G.b)*(.9+.2*G.a),g,far);edenBump=G.b*.012;edenBumpAmt=near;}
   tint=vec3(.82+.28*mid)*mix(vec3(.9,.93,.94),vec3(1.08,1.02,.92),broad)*g;
- }else if(cls<3.5){ // soil
+ }else
+ #endif
+ if(cls<3.5){ // soil
   float mid=edenNoise(w.xz*1.1+4.),fine=detail?mix(edenNoise(w.xz*5.7),.5,far):.5;
   tint=vec3(.72+.36*fine)*(.88+.2*mid);
  }else if(cls<4.5){ // foliage: per-plant hue/value, shared macro, base and underside occlusion
@@ -97,9 +173,13 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
   tint*=mix(.88,1.05,clamp(n.y*.5+.5,0.,1.));
   if(detail)tint*=mix(.88+.22*edenNoise(edenPlane(w,n)*1.9+r*11.),.99,far);
   tint*=mix(vec3(.95,1.,1.03),vec3(1.04,1.02,.93),clamp(n.y*.5+.5,0.,1.));
- }else if(cls<5.5){ // flowers: restrained per-plant value only
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls<5.5){ // flowers: restrained per-plant value only
   tint=vec3(.9+.18*edenHash(seed.xz*2.3));
- }else if(cls<6.5){ // bark/stems: vertical fibres
+ }
+ #endif
+ else if(cls<6.5){ // bark/stems: vertical fibres
   vec2 p=edenPlane(w,n);float s=.5,k=.5;if(detail){s=mix(edenNoise(vec2(p.x*16.,p.y*1.1)+obj*5.),.5,far);k=mix(edenNoise(vec2(p.x*3.,p.y*2.4)+obj*7.),.5,far);}
   tint=vec3(.68+.44*s)*(.88+.2*k)*(.9+.2*obj)*mix(.72,1.,smoothstep(0.,.35,vEdenH));
  }else if(cls<7.5){ // timber: board-to-board tone, grain mottle, slightly glossier wear
@@ -124,18 +204,27 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
    tint*=mix(1.,.86+.14*course,smoothstep(.3,.45,n.y)*(1.-smoothstep(.93,.98,n.y)));}
  }else if(cls<11.5){ // metal: tarnish and roughness drift
   float m=edenNoise(edenPlane(w,n)*2.2);tint=vec3(.9+.16*m);edenRough=.82+.32*m;
- }else if(cls<12.5){ // skin: per-person warmth, faint mottling, subtle sheen
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls<12.5){ // skin: per-person warmth, faint mottling, subtle sheen
   tint=mix(vec3(.96,.97,.98),vec3(1.04,1.,.97),obj)*(.97+.05*edenNoise(w.xz*9.+w.y*7.));edenRough=.82;
- }else if(cls<13.5){ // cloth: weave/fold value, per-garment tone, never glossy
+ }
+ #endif
+ else if(cls<13.5){ // cloth: weave/fold value, per-garment tone, never glossy
   float m=detail?mix(edenNoise(edenPlane(w,n)*14.),.5,far):.5;tint=vec3(.9+.14*obj)*(.94+.1*m);edenRough=1.08;
- }else if(cls>14.5){ // open water: drifting two-scale ripple height -> bump normals, glossy sun glints; alpha untouched
+ }
+ #ifndef EDEN_GOD_SURFACE
+ else if(cls>14.5){ // open water: drifting two-scale ripple height -> bump normals, glossy sun glints; alpha untouched
   vec2 p=w.xz;float t=edenTime;float h=.15*(sin(dot(p,vec2(.8,.6))*1.6+t*1.1)*.5+.5)+.42;
   if(detail){h=mix(texture2D(edenPatC,p/3.1+vec2(.031,.017)*t).a*.55+texture2D(edenPatC,p/1.2-vec2(.043,.029)*t).a*.3,.42,far)+h-.42;edenBump=h*.12;edenBumpAmt=near;}
   edenRough=.3;
   tint=vec3(.78+.36*h)*mix(vec3(.9,.97,1.02),vec3(1.1,1.08,1.02),smoothstep(.55,.85,h));
- }else{ // generic painted/built surfaces
+ }
+ #endif
+ else{ // generic painted/built surfaces
   vec2 p=edenPlane(w,n);tint=vec3(.94+.12*obj)*(.95+.08*edenNoise(p*.7));
  }
+ #ifndef EDEN_GOD_SURFACE
  // Building identity: per-building finish (brick/stone/siding/limewash, tile/slate roofs, mural) from generated tiling patterns.
  // One texture tap per wall/roof pixel near; zero beyond 40 m (the pattern's mean tone instead).
  float role=edenStyle.x;
@@ -191,6 +280,7 @@ float edenRough=1.,edenBump=0.,edenBumpAmt=0.;
    if(abs(side)>.7&&u>0.&&u<1.&&vv>0.&&vv<1.){if(side<0.)u=1.-u;diffuseColor.rgb=texture2D(edenMuralMap,vec2(u,1.-vv)).rgb;edenRough=.92;tint=mix(vec3(1.),tint,.4);}
   }
  }
+ #endif
  diffuseColor.rgb*=mix(vec3(1.),tint,amt);
  edenRough=mix(1.,edenRough,amt);
 }
@@ -203,6 +293,24 @@ export function setRealismTime(seconds:number){if(Number.isFinite(seconds))reali
 /** Derivative bump from the procedural height (three's bumpmap formulation), no tangents or maps needed. */
 const BUMP=/* glsl */`if(edenBumpAmt>0.){vec3 sx=dFdx(-vViewPosition),sy=dFdy(-vViewPosition),r1=cross(sy,normal),r2=cross(normal,sx);float det=dot(sx,r1);
  vec3 grad=sign(det)*(dFdx(edenBump)*r1+dFdy(edenBump)*r2);normal=normalize(abs(det)*normal-grad*edenBumpAmt);}`;
+type CompileShader=Parameters<THREE.Material['onBeforeCompile']>[0];
+function patchShader(shader:CompileShader,uniforms:Record<string,THREE.IUniform>,god=false){
+ Object.assign(shader.uniforms,uniforms);shader.uniforms.edenTime=realismTime;const head=god?'#define EDEN_GOD_SURFACE\n':'';
+ shader.vertexShader=head+VERTEX_HEAD+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+VERTEX_BODY);
+ shader.fragmentShader=head+FRAGMENT_HEAD+shader.fragmentShader
+  .replace('#include <color_fragment>','#include <color_fragment>\n'+FRAGMENT_BODY)
+  .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor*edenRough,.04,1.);')
+  .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n'+BUMP);
+}
+/** Y1 / XP7: one realism program serves every god kit/2 surface (class and pattern are uniforms). It reads the
+ * `edenSurf` attribute (shape-local metres + ring count + seed) and never binds the Eden pattern textures. */
+export type GodSurface={cls:RealismClass;pattern:number};
+export const GOD_SURFACE_KEY=KEY+'|god-surface/1';
+export function patchGodSurface(shader:CompileShader,surface:GodSurface){
+ patchShader(shader,{edenRealism:{value:new THREE.Vector4(CLASS_ID[surface.cls],1,0,1)},edenPattern:{value:surface.pattern},
+  edenPatA:{value:null},edenPatB:{value:null},edenPatC:{value:null},edenMuralMap:{value:null},edenStyle:{value:new THREE.Vector4()},
+  edenPaint:{value:new THREE.Color(1,1,1)},edenTrim:{value:new THREE.Color(1,1,1)},edenMuralA:{value:new THREE.Vector4()},edenMuralB:{value:new THREE.Vector4(1,0,1,0)}},true);
+}
 function install(material:THREE.MeshStandardMaterial,cls:RealismClass,height:number,strength:number,context:string,style?:BuildingStyle){
  let h=2166136261;for(let i=0;i<context.length;i++)h=Math.imul(h^context.charCodeAt(i),16777619);
  const previous=material.onBeforeCompile,previousKey=material.customProgramCacheKey;
@@ -213,12 +321,7 @@ function install(material:THREE.MeshStandardMaterial,cls:RealismClass,height:num
   edenMuralA:{value:mural?new THREE.Vector4(mural.centre.x,mural.centre.y,mural.centre.z,mural.width):new THREE.Vector4()},edenMuralB:{value:mural?new THREE.Vector4(mural.right.x,mural.right.y,mural.height,0):new THREE.Vector4(1,0,1,0)}};
  material.onBeforeCompile=function(shader,renderer){
   previous.call(this,shader,renderer);
-  shader.uniforms.edenRealism=uniform;Object.assign(shader.uniforms,styleUniforms);shader.uniforms.edenTime=realismTime;
-  shader.vertexShader=VERTEX_HEAD+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+VERTEX_BODY);
-  shader.fragmentShader=FRAGMENT_HEAD+shader.fragmentShader
-   .replace('#include <color_fragment>','#include <color_fragment>\n'+FRAGMENT_BODY)
-   .replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(roughnessFactor*edenRough,.04,1.);')
-   .replace('#include <normal_fragment_maps>','#include <normal_fragment_maps>\n'+BUMP);
+  patchShader(shader,{edenRealism:uniform,...styleUniforms});
  };
  material.customProgramCacheKey=function(){return previousKey.call(this)+'|'+KEY;};
  material.needsUpdate=true;

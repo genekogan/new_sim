@@ -116,7 +116,8 @@ export class WorldEntityLayer {
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
     if (!this.model) return;
     for (const m of msgs) {
-      if (m.kind === 'world-build') { if (typeof m.rev === 'number' && m.rev > this.sites.maxRev) this.sites.apply(m); continue; }
+      // CE8: attention hints keep the current rev; the sites layer parses each message once.
+      if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
       this.stats.edgeSeen++;
       if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again

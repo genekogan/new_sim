@@ -368,6 +368,8 @@ day is a Saturday.
   and waits for the world to settle: about 5–10 s on a free machine, longer on a busy one, so give the
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
   before judging the build. `look --keep` reuses a browser; `look --stop` closes it.
+  While you lead a build, `look`, `where` and `free` also show the owner a soft reticle where you are
+  looking (about 20 s; never blocks or fails the command; `EDEN_GOD_ATTENTION=off` stops it).
 - `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; optional ok/failed receipt
   (about 5–10 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
@@ -416,7 +418,7 @@ Kit programs add `repeat`, `radial`, `mirror`, `from`/`to`, `arch.pointed`, `out
 | sweep | a tube of radius `r` along a 3-D `path`, relative to `at` |
 
 Kit contract `v` (in kit JSON or `make.args`, separate from def `version`) defaults to legacy `1`.
-Use `v:2` for arcs on lathe/sphere/cyl/cone/arch, four glow levels and metal finish;
+Use `v:2` for arcs on lathe/sphere/cyl/cone/arch, four glow levels, metal finish and surfaces;
 unused shape fields refuse with a fix. Extrude `holes` are interior polygons. `loft` uses
 `polygon` at y=0 and `top` at y=`h`, matching vertex count/winding. Sweep `profile` is a
 closed 2-D cross-section instead of `r`; omit a repeated endpoint. These keep box colliders.
@@ -431,9 +433,13 @@ if it no longer fits), and `undo` restores the previous version. A new `"version
 are; use it when only new copies should change.
 
 - **Colour and material.** Per shape `color: "#rrggbb"` and `material` = wood stone plaster brick glass metal
-  fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. Materials are flat looks,
-  not textures: marble = pale `stone` with a cool tint; copper = `metal` `#b87333` (weathered `#4f9a83`);
-  there is no veining, roughness or metalness control. Buildings take `wall`, `trim`, `roofColor`, `material`.
+  fabric thatch tile ceramic leaf bark fur feather paint plastic paper rubber emissive. A `v:2` kit with
+  `"surfaces": true` gives wood stone brick plaster tile thatch metal fabric leaf bark a subtle surface (grain,
+  mottle, courses; `pattern:"none"` keeps one flat). A shape's `pattern` = `marble` `ashlar` `planks` `shingles`
+  `stripes` draws one in its own metres (shingles run up the slope); stripes alternate the colour with
+  cream, radially on round shapes. Presentation only.
+  v1 looks are flat (marble = pale `stone`, cool tint); copper = `metal` `#b87333` (weathered `#4f9a83`);
+  no roughness or metalness control. Buildings take `wall`, `trim`, `roofColor`, `material`.
 - **Light.** `glow: 0…1` on a shape makes it self-lit (an LED strip, a lit window, a lantern pane): it shows
   bright at night but lights nothing around it. A def with `components: {"light": {"color": "#ffe9c4",
   "range": 8, "on": true}}` (kit: put it in the kit JSON's `components`) also paints a light pool on the ground

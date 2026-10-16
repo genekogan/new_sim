@@ -16,6 +16,7 @@ test('workbench and define-kit share versioned walkable program definitions', ()
   assert.deepEqual(def.make.args.shapes, program.shapes); assert.deepEqual(def.size.box, program.box);
   assert.throws(() => kitDefinition({ ...program, box: undefined }), /programs need box/);
   assert.equal(kitDefinition(def), def);
+  assert.equal(kitDefinition({ ...program, surfaces: true }).make.args.surfaces, true); // Y1: kit-level surfaces opt-in
 });
 test('views parse shorthand and per-camera options without changing their base or permitting actions', () => {
   const base = { at: 'chapel', hour: '21', weather: 'rain' };

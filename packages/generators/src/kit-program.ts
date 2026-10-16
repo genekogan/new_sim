@@ -135,8 +135,8 @@ function deltaStep(s: Delta, delta: Delta, params: Record<string, unknown>, path
   for (const [key, value] of Object.entries(delta)) {
     if (key === 'from' || key === 'to') refuse([...path, key], 'Endpoint expansion precedes repeat steps', 'Use at/size/h deltas on the resolved primitive');
     if (numeric.has(key)) out[key] = add(s[key] ?? (key === 'at' ? [0, 0, 0] : 0), value, [...path, key]);
-    else if (['color', 'material', 'collide', 'tint'].includes(key)) out[key] = value;
-    else refuse([...path, key], `Unsupported repeat step field ${key}`, 'Use numeric shape deltas or color/material/collide/tint overrides');
+    else if (['color', 'material', 'collide', 'tint', 'pattern'].includes(key)) out[key] = value; // Y1: pattern
+    else refuse([...path, key], `Unsupported repeat step field ${key}`, 'Use numeric shape deltas or color/material/pattern/collide/tint overrides');
   }
   // A positional delta carries the pivot unless it has its own delta.
   if (delta.at && s.pivot && !delta.pivot) out.pivot = add(s.pivot, delta.at, [...path, 'pivot']);
