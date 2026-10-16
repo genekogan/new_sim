@@ -126,7 +126,9 @@ export function guardRollback(edits,receipt,snapshot){
  assert(Number.isInteger(receipt.appliedSeq),'receipt has no accepted patch sequence');
  if(snapshot){
   verifyPatch(snapshot,receipt);assert(receipt.appliedVersions,'post-apply versions unavailable; use --recover to verify the accepted patch first');
-  for(const [id,v]of Object.entries(receipt.appliedVersions))assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
+  // versions may only drift through later edits that have no net effect (undone, undo records, rolled-back pairs); verifyPatch above proved the exact state
+  const drift=edits.some(e=>e.seq>receipt.appliedSeq&&e.by!=='engine'&&e.kind!=='engine')&&latestEffectiveEdit(edits)?.seq===receipt.appliedSeq;
+  if(!drift)for(const [id,v]of Object.entries(receipt.appliedVersions))assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
  }
  const authored=latestEffectiveEdit(edits);
  assert(authored&&authored.seq===receipt.appliedSeq&&authored.grp===receipt.batch.group&&authored.kind==='edit'&&!authored.undone,'rollback refused: an authored edit intervened, or patch is not the latest authored edit');

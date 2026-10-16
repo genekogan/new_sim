@@ -54,7 +54,8 @@ export function verify(snapshot,receipt,rollback=false){
 export function latestEffectiveEdit(edits){const paired=new Set(edits.filter(e=>/-rollback$/.test(e.grp??'')).flatMap(e=>[e.grp,e.grp.replace(/-rollback$/,'')]));return edits.find(e=>e.by!=='engine'&&e.kind!=='engine'&&!e.undone&&e.kind!=='undo'&&!paired.has(e.grp));}
 export function guardRollback(edits,receipt,snapshot){
  assert(Number.isInteger(receipt.appliedSeq),'receipt has no accepted sequence');verify(snapshot,receipt);
- for(const [id,v] of Object.entries(receipt.appliedVersions)) assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
+ const drift=edits.some(e=>e.seq>receipt.appliedSeq&&e.by!=='engine'&&e.kind!=='engine')&&latestEffectiveEdit(edits)?.seq===receipt.appliedSeq; // no-net-effect edits only; verify() proved the poses
+ if(!drift) for(const [id,v] of Object.entries(receipt.appliedVersions)) assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
  const authored=latestEffectiveEdit(edits);
  assert(authored&&authored.seq===receipt.appliedSeq&&authored.grp===receipt.batch.group&&authored.kind==='edit'&&!authored.undone&&edits.filter(e=>e.grp===receipt.batch.group&&!e.undone&&(e.kind==='edit'||e.kind==='redo')).length===1,'rollback refused: an authored edit intervened (undo later patches first), or this is not the latest authored edit');
  return receipt.rollbackPath;
