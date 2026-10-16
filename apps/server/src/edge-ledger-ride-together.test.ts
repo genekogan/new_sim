@@ -42,6 +42,9 @@ test('balloon for two: the basket waits for the invited companion, keeps their p
  // the ordinary 15 s boarding wait passes; the basket keeps waiting for ben
  for(let i=0;i<20*25;i++)f.host.tickOnce();
  assert.equal(balloon().carrier.phase,'boarding','still waiting for the companion');
+ // r3 quality case 33: the host cannot force a departure that would leave the invited companion behind
+ const early=await call(0,'POST','/v1/edge/act',{capability:'object:ride-eden-balloon:start'});assert.equal(early.accepted,false,JSON.stringify(early));assert.equal(early.code,'ride.keeping-place');assert.match(early.reason,/keeping a place for ben.*leave them behind/);
+ assert.equal(balloon().carrier.phase,'boarding','still boarding after the refused start');
  const ride=(await (await app.request('/v1/edge/rides')).json() as any).rides[0];assert.equal(ride.hold?.for?.[0]?.name,'ben');assert.equal(ride.seatsFree,0);
  // ben accepts (plain words) and climbs in; it lifts off soon after
  const jb=await call(1,'POST','/v1/edge/act',{capability:'yes'});assert.equal(jb.accepted,true,JSON.stringify(jb));assert.match(jb.resolved?.to??'',/^accept:/);

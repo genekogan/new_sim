@@ -48,7 +48,7 @@ export const rideKind: ObjectKind<RideState> = {
     }
     if (next.phase === 'boarding' && next.riders.length > state.riders.length) for (const r of next.riders.filter(r => !state.riders.some(o => o.soulId === r.soulId)))
       events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into ${next.rowing ? 'the punt' : 'the basket'} with you.`, untrusted: true}, {to: [r.soulId], text: (next.keptFor ?? []).length
-        ? `You are in ${next.rowing ? 'the punt' : 'the basket'}. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before departing (or start now).` : `You are in ${next.rowing ? 'the punt' : 'the basket'}. It departs in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
+        ? `You are in ${next.rowing ? 'the punt' : 'the basket'}. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before departing, and lifts off by itself once they are aboard.` : `You are in ${next.rowing ? 'the punt' : 'the basket'}. It departs in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
     if (!state.holding && next.holding && to.length) events.push({to, text: next.rowing ? 'The punt waits at the bank until its disembarkation point is clear.' : 'The balloon hovers above its landing spot until the ground below is clear.'});
     return {state: next, events};
   },
@@ -80,7 +80,10 @@ export const rideKind: ObjectKind<RideState> = {
     start: {
       movesBody:true,
       label: 'Depart now instead of waiting for more riders', roles: ['rider'], reach: 'anywhere', params: {},
-      available: s => s.rowing ? {code: 'ride.automatic', reason: 'The punt departs automatically after boarding; wait for the rowing receipt.'} : s.phase !== 'boarding' ? {code: 'ride.not-boarding', reason: 'It is not waiting at its boarding point.'} : null,
+      // r3 quality case 33: a host who forced "start" while the invited companion (who had accepted) was still walking to the
+      // basket left them behind (carrier.departed). While a place is kept for an invited companion, it departs by itself.
+      available: s => s.rowing ? {code: 'ride.automatic', reason: 'The punt departs automatically after boarding; wait for the rowing receipt.'} : s.phase !== 'boarding' ? {code: 'ride.not-boarding', reason: 'It is not waiting at its boarding point.'}
+        : (s.keptFor ?? []).length ? {code: 'ride.keeping-place', reason: `It is keeping a place for ${(s.keptFor ?? []).map(k => k.name).join(', ')} (invited) and departs by itself once they are aboard or the hold ends; starting now would leave them behind. Keep waiting.`} : null,
       validate(s, _p, ctx) { return rideKind.actions.start.available!(s, ctx); },
       apply(s) { return {state: s, result: {departing: s.carrier}, bodies: [{label: s.rowing ? 'Start the rowing loop' : 'Ask the balloon to lift off', steps: [{verb: 'mars:carrier_depart', params: {carrier: s.carrier}}]}]}; },
     },
