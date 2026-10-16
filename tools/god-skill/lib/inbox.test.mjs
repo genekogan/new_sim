@@ -128,3 +128,17 @@ test('god remote PNG and mirror SSE surface the owner header once across authent
   assert.equal(events[0].event, 'hello');
   assert.deepEqual(notices, ['OWNER MESSAGE ' + JSON.stringify(message)]);
 });
+
+test('god inbox --follow prints one JSON line per new message, retries outages and refuses auth failures', async () => {
+  const { followInbox } = await import('./inbox.mjs');
+  const answers = [{ status: 0, data: {} }, { status: 200, data: envelope(null) }, { status: 200, data: envelope(latest('a')) }, { status: 503, data: {} },
+    { status: 200, data: envelope(latest('a')) }, { status: 200, data: envelope({ ...latest('a', 'acknowledged'), reply: 'ok' }) }, { status: 200, data: envelope(latest('b')) }];
+  const afters = [], lines = [], waits = [];
+  await followInbox({ poll: async after => { afters.push(after); return answers.shift(); }, after: 'old', write: line => lines.push(JSON.parse(line)), wait: async ms => waits.push(ms), stop: () => !answers.length });
+  assert.deepEqual(lines, [{ id: 'a', text: 'Please make a quiet garden.', sentAt: 1 }, { id: 'b', text: 'Please make a quiet garden.', sentAt: 1 }]);
+  assert.deepEqual(afters, ['old', 'old', 'old', 'a', 'a', 'a', 'a']);
+  assert.deepEqual(waits.filter(ms => ms >= 1000), [1000, 1000]);
+  await assert.rejects(followInbox({ poll: async () => ({ status: 401, data: { code: 'unauthorized' } }), wait: async () => {} }), /HTTP 401/);
+  await assert.rejects(listen({ follow: true, once: true }), /not both/);
+  assert.doesNotThrow(() => checkArgs('listen', { follow: true }, []));
+});

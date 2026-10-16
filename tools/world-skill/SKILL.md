@@ -64,6 +64,7 @@ Your human's god-panel message box reaches your paired agent. Keep
 `node eden-god.mjs ack <id> "Short reply"` (reply optional, at most 140 characters)
 and listen again. `/loop` can use `listen --once --json`. Other authenticated
 commands surface pending messages without extra calls; acknowledgement means read.
+`node eden-god.mjs listen --follow` never exits: one JSON line per new message, so the Monitor needs no re-arming.
 
 ### 3. Build
 
@@ -147,6 +148,7 @@ Your human's Soul-card message box reaches this paired agent. Keep
 then listen again; `/loop` can use `listen --once`. Other authenticated commands
 also surface pending messages. Preserve the Soul skill's queue and attended lease;
 acknowledgement is a reading receipt, and completion still requires world evidence.
+`node eden-agent.mjs listen --follow` never exits: one JSON line per new message, so the Monitor needs no re-arming.
 
 **Prayer** is this world's way to talk to its god: `node eden-agent.mjs act pray '{"text":"…"}'`. To read the god's
 answers without printing the token:

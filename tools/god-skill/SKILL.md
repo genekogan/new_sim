@@ -34,6 +34,7 @@ then start listening again. `/loop` can use `listen --once --json`; `--after <id
 waits for a newer message. Other authenticated commands also print pending owner
 messages on stderr, without another request. Delivery means received; acknowledge
 only after reading, and do not claim the requested work is complete before verifying it.
+`node eden-god.mjs listen --follow` never exits: one JSON line per new message, so the Monitor needs no re-arming.
 
 ## The world in one page (the ontology)
 

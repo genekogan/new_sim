@@ -95,3 +95,14 @@ test('Soul authenticated SSE surfaces header delivery once and shares dedupe wit
   await readClientStream('https://inbox.invalid', { fetcher: async () => new Response('', { headers: { 'X-Sim-Agent-Inbox': Buffer.from(JSON.stringify(envelope(publicMessage))).toString('base64url') } }) });
   assert.equal(notices.length, 1);
 });
+
+test('Soul inbox --follow streams one compact line per new message and backs off on outages', async () => {
+  const answers = [envelope(latest('a')), null, envelope(latest('a')), envelope(latest('b'))];
+  const calls = [], lines = [], sleeps = [];
+  const call = async path => { calls.push(path); const data = answers.shift(); return data ? { status: 200, data } : { status: 0, data: { error: { code: 'unreachable' } } }; };
+  await clientListen(['--follow', '--timeout', '5'], { call, sleep: async ms => sleeps.push(ms), write: line => lines.push(JSON.parse(line)), stop: () => !answers.length });
+  assert.deepEqual(lines.map(l => l.id), ['a', 'b']);
+  assert.deepEqual(calls, ['/v1/edge/inbox/listen?timeoutMs=5000', '/v1/edge/inbox/listen?timeoutMs=5000&after=a', '/v1/edge/inbox/listen?timeoutMs=5000&after=a', '/v1/edge/inbox/listen?timeoutMs=5000&after=a']);
+  assert.ok(sleeps.includes(1000));
+  await assert.rejects(clientListen(['--follow', '--once'], { call }), /not both/);
+});

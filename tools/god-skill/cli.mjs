@@ -1026,7 +1026,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['once', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['once', 'follow', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1048,7 +1048,7 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
-  listen: 'after timeout once', ack: '',
+  listen: 'after timeout once follow', ack: '',
   build: 'title steps at offset size yaw mass brief root take done force undo say timeout',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -1114,7 +1114,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once] · ack <message-id> [\"reply up to 140 characters\"]
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [\"reply up to 140 characters\"]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)

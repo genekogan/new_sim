@@ -1883,6 +1883,8 @@ async function listen(flags2 = {}) {
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55 || flags2.timeout === true) throw new Error("listen --timeout takes seconds from 0 to 55");
   if (flags2.after !== void 0 && (typeof flags2.after !== "string" || !flags2.after)) throw new Error("listen --after needs a message id");
   if (seconds === 0 && !flags2.once) throw new Error("listen --timeout 0 requires --once");
+  if (flags2.follow && flags2.once) throw new Error("listen takes --follow or --once, not both");
+  if (flags2.follow) return followInbox({ poll: (after) => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after: flags2.after });
   const query2 = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...flags2.after ? { after: flags2.after } : {} });
   for (; ; ) {
     const data = ok(await call(`/v1/god/inbox/listen?${query2}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), "listen");
@@ -1896,6 +1898,25 @@ async function ack(id, reply) {
   if (typeof id !== "string" || !id.trim()) throw new Error('usage: ack <message-id> ["reply up to 140 characters"]');
   if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
   return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
+}
+async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false }) {
+  let last = after, delay = 0;
+  while (!stop()) {
+    const r = await poll(last);
+    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await wait(delay);
+      continue;
+    }
+    delay = 0;
+    if (r.status < 200 || r.status >= 300) throw new Error(`listen: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
+    if (!r.data?.inbox) throw new Error("listen: this world does not serve the owner inbox yet");
+    const m = r.data.inbox.latest;
+    if (m && m.state !== "acknowledged" && m.id !== last) {
+      write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
+      last = m.id;
+    } else await wait(50);
+  }
 }
 
 // lib/env.mjs
@@ -3406,7 +3427,7 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["once", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["once", "follow", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -3429,7 +3450,7 @@ function parseFlags(argv, bools = BOOL) {
 }
 var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
 var FLAGS = {
-  listen: "after timeout once",
+  listen: "after timeout once follow",
   ack: "",
   build: "title steps at offset size yaw mass brief root take done force undo say timeout",
   "verify-use": "seat from uses",
@@ -3589,7 +3610,7 @@ resume: omit id to resume the only paused build or active build with a dead lead
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once] \xB7 ack <message-id> ["reply up to 140 characters"]
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["reply up to 140 characters"]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)

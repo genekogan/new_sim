@@ -16,20 +16,23 @@ export function noticeInboxHeader(headers) {
   } catch { return false; }
 }
 
-export async function clientListen(args, { call, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
-  let seconds = 25, after, once = false;
+export async function clientListen(args, { call, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), write, stop }) {
+  let seconds = 25, after, once = false, follow = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--once') once = true;
+    else if (arg === '--follow') follow = true;
     else if (arg === '--timeout') {
       const value = args[++i]; seconds = value === undefined || value === '' ? NaN : Number(value);
     } else if (arg === '--after') {
       after = args[++i];
       if (!after || after.startsWith('--')) throw new Error('listen --after needs a message id');
-    } else throw new Error('usage: listen [--after message-id] [--timeout seconds] [--once]');
+    } else throw new Error('usage: listen [--after message-id] [--timeout seconds] [--once|--follow]');
   }
+  if (once && follow) throw new Error('listen takes --follow or --once, not both');
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55) throw new Error('listen --timeout takes seconds from 0 to 55');
   if (seconds === 0 && !once) throw new Error('listen --timeout 0 requires --once');
+  if (follow) return followInbox({ poll: last => call(`/v1/edge/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1000)), ...(last ? { after: last } : {}) })}`, { timeoutMs: Math.round(seconds * 1000) + 10_000 }), after, wait: sleep, write, stop });
   const query = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1000)), ...(after ? { after } : {}) });
   for (;;) {
     const response = await call(`/v1/edge/inbox/listen?${query}`, { timeoutMs: Math.round(seconds * 1000) + 10_000 });
@@ -50,4 +53,18 @@ function inboxResult(response, operation) {
   if (response.status < 200 || response.status >= 300) throw new Error(`${operation}: HTTP ${response.status} ${JSON.stringify(response.data).slice(0, 300)}`);
   if (!response.data?.inbox) throw new Error(`${operation}: this world does not serve the owner inbox yet`);
   return response.data;
+}
+
+/** listen --follow: never returns; prints one compact JSON line per new owner message
+ * (a background Monitor's event stream). Network, 429 and 5xx answers back off and retry. */
+export async function followInbox({ poll, after, write = line => process.stdout.write(line + '\n'), wait, stop = () => false }) {
+  let last = after, delay = 0;
+  while (!stop()) {
+    const r = await poll(last);
+    if (r.status === 0 || r.status === 429 || r.status >= 500) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await wait(delay); continue; }
+    delay = 0;
+    const m = inboxResult(r, 'listen').inbox.latest;
+    if (m && m.state !== 'acknowledged' && m.id !== last) { write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt })); last = m.id; }
+    else await wait(50);
+  }
 }

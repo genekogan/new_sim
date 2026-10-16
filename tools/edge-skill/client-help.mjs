@@ -12,7 +12,7 @@ Talk: say "<text>" · converse start <Soul ID> [text]
 Objects: object <ID> · mark <note|sign|offering|proposal> "Title" "Text"
 Auto mode: dashboard [--engine codex] · live [--engine codex] · cost
 While live: tell "<human request>" --wait · report
-Owner inbox: listen [--after message-id] [--timeout 25] [--once] · ack <message-id> ["short reply"]
+Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> ["short reply"]
 Manual session: attend 90 · act/say/converse · attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
