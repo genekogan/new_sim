@@ -339,17 +339,31 @@ const waterKit = [
 ];
 const WB = { category: 'water.body', tags: ['water'] };
 const waterBodies = [
+  // E2 #5: a real basin. The def carves the ground under it (components.landform, def frame, bed relative to where it
+  // stands) and a 16 x 11 m paved deck covers the carve's 1 m terrain slopes; tiled walls and floor line the hole, and
+  // the water stands 30 cm below the coping. Round variant: a 5 m round basin in the same deck.
   vocabDef({ ...WB, name: 'swimming-pool', synonyms: ['pool', 'swimming bath', 'lido', 'plunge pool', 'backyard pool', 'lap pool'],
-    description: 'An outdoor swimming pool (10 × 5 m) with a tiled coping, clear blue water, a steel ladder, a diving board option and two loungers; people swim and sunbathe. Variants: rect, round (6 m across).',
+    description: 'An outdoor swimming pool sunk into the ground: a 10 x 5 m basin, 1.5 m deep, with tiled walls, clear blue water and a steel ladder, in a 16 x 11 m paved surround with a diving board option and two loungers; people swim and sunbathe. Variants: rect, round (a 5 m round basin).',
     variants: ['rect', 'round'], ranges: { sx: [0.5, 2.5], sy: [0.8, 1.2], sz: [0.5, 2.5] }, layer: 'surface', params: { board: { type: 'bool', default: true, doc: 'a diving board at the deep end' } },
-    shapes: [...when('variant=rect', [cbox([0, 0.08, 0], [11.2, 0.16, 6.2], 'coping'), box([0, 0.13, 0], [10, 0.06, 5], 'water', { material: 'water' }), ...[-1, 1].map((s) => box([s * 5.0, 0.165, 0], [0.04, 0.01, 5], 'line'))]),
-      ...when('variant=round', [cyl([0, 0.08, 0], 3.6, 0.16, 'coping', { seg: 16 }), cyl([0, 0.13, 0], 3.0, 0.06, 'water', { seg: 16, material: 'water' })]),
-      ...[-0.3, 0.3].map((x) => limb([x + 4.4, 0.1, 2.5], [x + 4.4, 1.0, 2.75], 0.025, 'steel', { kind: 'cyl', seg: 5 })), box([4.4, 0.95, 2.78], [0.66, 0.03, 0.03], 'steel'),
-      ...when('board&variant=rect', [cbox([-5.2, 0.4, 0], [0.5, 0.8, 0.5], 'coping'), box([-4.6, 0.82, 0], [2.2, 0.06, 0.5], 'board')]),
-      ...[-1.2, 1.2].flatMap((x) => [cbox([x, 0.3, 4.2], [0.7, 0.1, 1.8], 'lounger'), cbox([x, 0.5, 3.45], [0.7, 0.4, 0.08], 'lounger', { pitch: 0.5 }), ...[[-0.3, 3.4], [0.3, 3.4], [-0.3, 5.0], [0.3, 5.0]].map(([dx, z]) => box([x + dx, 0.13, z], [0.04, 0.26, 0.04], 'steel'))])],
-    palette: { coping: '#e8e2d4', water: '#4fb0c8', line: '#2f6b8b', steel: '#c0c4c8', board: '#f2ead8', lounger: '#f2ead8' },
-    slots: [seat('lounger-1', [-1.2, 0.35, 4.4], PI), seat('lounger-2', [1.2, 0.35, 4.4], PI), stand('ladder', [4.4, 0.16, 3.2], PI)],
-    components: { water: { level: 0.16 }, place: { kind: 'pool', enclosed: false, capacity: 16 } } }),
+    shapes: [
+      // paved deck: a frame round the rectangular basin …
+      ...when('variant=rect', [box([0, 0.08, -4], [16, 0.16, 3], 'deck'), box([0, 0.08, 4], [16, 0.16, 3], 'deck'), box([-6.5, 0.08, 0], [3, 0.16, 5], 'deck'), box([6.5, 0.08, 0], [3, 0.16, 5], 'deck'),
+        cbox([0, 0.18, -2.62], [10.48, 0.04, 0.24], 'coping'), cbox([0, 0.18, 2.62], [10.48, 0.04, 0.24], 'coping'), cbox([-5.12, 0.18, 0], [0.24, 0.04, 5.0], 'coping'), cbox([5.12, 0.18, 0], [0.24, 0.04, 5.0], 'coping'),
+        // … tiled walls and floor down to the bed, the water 15 cm below ground, lane lines on the floor
+        box([0, -0.75, -2.55], [10.2, 1.5, 0.1], 'tile'), box([0, -0.75, 2.55], [10.2, 1.5, 0.1], 'tile'), box([-5.05, -0.75, 0], [0.1, 1.5, 5.0], 'tile'), box([5.05, -0.75, 0], [0.1, 1.5, 5.0], 'tile'),
+        box([0, -1.525, 0], [10, 0.05, 5], 'floor'), ...[-1.25, 0, 1.25].map((z) => box([0, -1.497, z], [9, 0.006, 0.2], 'line')),
+        box([0, -0.18, 0], [10, 0.06, 5], 'water', { material: 'water' })]),
+      // … or round the round basin (two C-shaped halves of the deck), its curved tiled wall (inward faces) and floor
+      ...when('variant=round', [...[1, -1].map((side) => extrude([0, 0, 0], [[-8, 0], [-2.5, 0], ...Array.from({ length: 9 }, (_, i) => { const a = Math.PI - (i + 1) * Math.PI / 10; return [+(2.5 * Math.cos(a)).toFixed(3), +(side * 2.5 * Math.sin(a)).toFixed(3)]; }), [2.5, 0], [8, 0], [8, side * 5.5], [-8, side * 5.5]], 0.16, 'deck')),
+        lathe([0, -1.5, 0], [[2.5, 1.5], [2.5, 0]], 'tile', { seg: 20 }), cyl([0, -1.525, 0], 2.5, 0.05, 'floor', { seg: 20 }), tor([0, 0.18, 0], 2.6, 0.06, 'coping', { seg: 20, pitch: PI / 2 }),
+        cyl([0, -0.18, 0], 2.5, 0.06, 'water', { seg: 20, material: 'water' })]),
+      ...[-0.3, 0.3].map((x) => limb([x + 4.4, -1.2, 2.42], [x + 4.4, 1.0, 2.8], 0.025, 'steel', { kind: 'cyl', seg: 5 })), box([4.4, 0.95, 2.83], [0.66, 0.03, 0.03], 'steel'),
+      ...[-0.75, -0.25].map((y) => box([4.4, y, 2.47], [0.6, 0.03, 0.08], 'steel')),
+      ...when('board&variant=rect', [cbox([-5.9, 0.56, 0], [0.5, 0.8, 0.5], 'coping'), box([-5.2, 0.98, 0], [2.2, 0.06, 0.5], 'board')]),
+      ...[-1.2, 1.2].flatMap((x) => [cbox([x, 0.46, 4.4], [0.7, 0.1, 1.8], 'lounger'), cbox([x, 0.66, 3.65], [0.7, 0.4, 0.08], 'lounger', { pitch: 0.5 }), ...[[-0.3, 3.6], [0.3, 3.6], [-0.3, 5.2], [0.3, 5.2]].map(([dx, z]) => box([x + dx, 0.29, z], [0.04, 0.26, 0.04], 'steel'))])],
+    palette: { deck: '#d8d2c4', coping: '#eee8da', tile: '#7fc4d6', floor: '#a9dbe6', water: '#4fb0c8', line: '#2f6b8b', steel: '#c0c4c8', board: '#f2ead8', lounger: '#f2ead8' },
+    slots: [seat('lounger-1', [-1.2, 0.51, 4.6], PI), seat('lounger-2', [1.2, 0.51, 4.6], PI), stand('ladder', [4.4, 0.16, 3.4], PI)],
+    components: { water: { level: -0.15 }, landform: { kind: 'carve', area: [[-6.5, -4], [6.5, -4], [6.5, 4], [-6.5, 4]], bed: -1.6, edge: 0.05 }, place: { kind: 'pool', enclosed: false, capacity: 16 } } }),
   vocabDef({ ...WB, name: 'stepping-stones', synonyms: ['stepping stones', 'stepping stone path', 'ford stones', 'river stones', 'crossing stones'],
     description: 'A line of seven flat stepping stones (6 m along z) to cross a stream or a pond on foot, or to make a garden path through a lawn. Variants: straight, curve.',
     variants: ['straight', 'curve'], conventions: ['stretch', 'paint', 'wear', 'warp'], ranges: { sx: [0.6, 2], sy: [0.6, 2], sz: [0.6, 2] }, layer: 'surface',
