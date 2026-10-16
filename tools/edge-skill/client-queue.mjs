@@ -7,6 +7,8 @@ const fail=message=>{throw Error('client queue: '+message);};
 const stable=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9:._@-]{0,159}$/.test(value)?value:fail('invalid stable ID');
 const safeText=(value,max=300)=>typeof value==='string'&&value.trim()&&value.length<=max?value.trim():fail('invalid text');
 const plain=value=>value&&typeof value==='object'&&!Array.isArray(value);
+/** A queued public step that speaks: a say, or a conversation step carrying text. */
+export const spokenStep=step=>!!step?.publicStep&&(typeof step.publicStep.say==='string'||typeof step.publicStep.text==='string');
 export function durationSeconds(value){
  if(typeof value==='number'&&Number.isFinite(value)&&value>0&&value<=86400)return value;
  const m=/^(\d+(?:\.\d+)?)(s|m|h)$/.exec(String(value));if(!m)fail('duration must be positive seconds or Ns/Nm/Nh');
@@ -132,7 +134,11 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
     if(state.source==='owner'&&source==='owner'&&id!==state.id)fail('a new owner request must explicitly replace the queue; fixes continues its original request');
     if(active.publicStep||active.status!=='failed'||active.refusalConfirmed!==true||active.receiptId)fail('repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed');
     const index=state.steps.indexOf(active),next={...replacement,...(active.protected?{protected:true}:{}),id:`step-repair-${randomUUID()}`,status:'pending',attempts:0};
-    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now()}].slice(-24);
+    // Truth rule: speech queued after the refused step was written before the refusal and may claim
+    // an outcome that never happened. A repair never carries it: every unrun speech step after the
+    // refused one in this plan is skipped (redraft:true) and the mind redrafts from actual results.
+    const droppedSpeech=[];for(const s of state.steps.slice(index+1))if(s.status==='pending'&&spokenStep(s)){s.status='skipped';s.redraft=true;s.reason=`drafted before ${String(active.act).slice(0,60)} was refused; not spoken`;droppedSpeech.push(s.id);}
+    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now(),droppedSpeech}].slice(-24);
     state.steps[index]=next;state.notice=null;save();return snapshot();
    }
    if(state.id===id)return snapshot();

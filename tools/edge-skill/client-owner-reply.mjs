@@ -1,7 +1,27 @@
+/** Owner answers are never cut mid-sentence. 4,000 characters holds a full hourly
+ * check-in; anything longer is cut at the last sentence end that fits and marked. */
+export const OWNER_ANSWER_MAX=4000;
+export function ownerAnswerText(text,max=OWNER_ANSWER_MAX){
+ if(typeof text!=='string')return text??null;
+ const value=text.trim();if(value.length<=max)return value;
+ const head=value.slice(0,max-2),ends=[...head.matchAll(/[.!?](?=\s|$)|;(?=\s)/g)],end=ends.at(-1)?.index;
+ return (end>max/2?head.slice(0,end+1):head.replace(/\s+\S*$/,''))+' …';
+}
+/** The owner report is private. Used only in the wake right after an owner request's
+ * own queue finished (the report-due wake): if the mind gave no "owner" text, its bare
+ * say steps are the report it meant for its owner, so they go to the owner channel
+ * instead of being spoken. With "owner" text present, says stay public as the mind chose. */
+export function routeOwnerReport(steps,owner){
+ if(typeof owner==='string'&&owner.trim())return {steps,owner,routed:0};
+ const report=steps.filter(s=>typeof s?.say==='string'&&s.say.trim()&&!s.act&&!s.converse);
+ if(!report.length)return {steps,owner,routed:0};
+ return {steps:steps.filter(s=>!report.includes(s)),owner:report.map(s=>s.say.trim()).join(' '),routed:report.length,
+  line:`Report sent to your owner privately, not said aloud (${report.length} say step${report.length===1?'':'s'}). Put owner reports in "owner".`};
+}
 /** Local persistence is distinct from both a model's factual report and world
  * execution. Body/refusal verdicts already qualified by the caller take priority. */
 export function ownerReplyWithLocalResults({answer,source,results=[],localResults=[]}={}){
- const verdict=()=>({answer:results.join('; ').slice(0,600),source:'execution-verdict'});
+ const verdict=()=>({answer:ownerAnswerText(results.join('; ')),source:'execution-verdict'});
  if(source==='execution-verdict'||typeof answer!=='string'||!answer.trim())return verdict();
  const scheduled=localResults.some(r=>r.operation==='schedule'||r.operation==='compile');
  let report=answer.trim();
@@ -13,7 +33,7 @@ export function ownerReplyWithLocalResults({answer,source,results=[],localResult
  const warnings=localResults.filter(r=>r.accepted===false||r.operation==='schedule'||r.operation==='compile').map(r=>r.line);
  if(scheduled)warnings.push('Saving a local schedule or binding does not confirm execution.');
  if(!report)return verdict();
- // Keep the authoritative failure visible before truncating an independent report.
+ // Keep the authoritative failure visible before an independent report.
  const prefix=warnings.length?warnings.join('; ')+' Model report (unverified): ':'';
- return {answer:(prefix+report).slice(0,600),source:'model-unverified'};
+ return {answer:ownerAnswerText(prefix+report),source:'model-unverified'};
 }

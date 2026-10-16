@@ -22,6 +22,8 @@ export async function executeReplySteps(steps,{queue,id,source,replace=false,for
  const refusal=(code,reason,extra={})=>{results.push({operation:'ordered-reply',accepted:false,code,reason,line:`refused ${code}: ${reason}`,...extra});return {results,again:true,retained:false};};
  if(first>=0){
   let retained;try{retained=queue.enqueue(steps.map(s=>s.act&&ATTENTION.test(s.act)?{publicStep:s}:s),{id,source,replace,force});}catch(error){return refusal('local.queue-refused',error.message);}
+  const repair=steps.some(s=>s.fixes!==undefined)?retained.repairs?.at(-1):null,dropped=repair?.droppedSpeech?.length??0;
+  if(dropped)results.push({operation:'speech-redraft',accepted:null,readOnly:true,code:'local.speech-redraft',line:`Dropped ${dropped} pre-written speech step${dropped===1?'':'s'} queued after the refused ${repair.failedStep.act}: written before the refusal, not said. Speak only after the replacement finishes, and only about what actually happened.`});
   const state=await pump();const failed=state.steps.find(s=>['failed','blocked','interrupted'].includes(s.status));
   if(failed){results.push({operation:failed.act,accepted:false,code:failed.code??state.notice?.reason??failed.status,reason:failed.reason??state.notice?.reason??failed.status,queueRetained:true,line:`Queue ${state.id} retained, but ${failed.act} ${failed.status}: ${failed.code??state.notice?.reason??''}. Dependent public steps have not run.`});return {results,again:true,retained:true};}
   const current=state.steps.find(s=>s.receiptId),accepted=!!current?.receiptId;
