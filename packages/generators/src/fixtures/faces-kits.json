@@ -1,0 +1,41 @@
+{
+  "README": "XP8 faces fixtures (shared by generators, world-compiler and viewer tests, and the lane's browser network log).",
+  "menuBoard": {
+    "schema": "def/1", "name": "menu-board", "version": 1,
+    "description": "A cafe menu board: a header and priced lines as text faces on one kit.",
+    "tags": ["sign", "menu", "prop"], "form": "point", "layer": "solid", "size": { "box": [1.2, 1.8, 0.2] },
+    "make": { "kind": "gen", "gen": "kit/2", "args": { "v": 2, "shapes": [
+      { "kind": "box", "at": [-0.52, 0.875, 0], "size": [0.08, 1.75, 0.08], "material": "wood", "color": "#5e412b" },
+      { "kind": "box", "at": [0.52, 0.875, 0], "size": [0.08, 1.75, 0.08], "material": "wood", "color": "#5e412b" },
+      { "kind": "box", "at": [0, 1.25, 0.06], "size": [1.1, 0.9, 0.05], "material": "wood", "color": "#2f3a33", "faces": [
+        { "side": "front", "h": 0.2, "at": [0, 0.33], "text": "CAFE MENU", "font": "serif", "ink": "#f4e9c8", "bg": "#2f3a33" },
+        { "side": "front", "h": 0.6, "at": [0, -0.08], "text": ["Tea\t2", "Coffee\t3", "Cake\t4", "Soup of the day\t6"], "font": "hand", "ink": "#f4f1e8", "bg": "#2f3a33", "align": "left" },
+        { "side": "back", "text": "Open daily 8 - 6", "font": "sans", "ink": "#f4f1e8", "bg": "#2f3a33" }
+      ] }
+    ] } }
+  },
+  "stainedGlassWindow": {
+    "schema": "def/1", "name": "stained-glass-window", "version": 1,
+    "description": "A pointed window: a stone arch and one glass panel whose front face is seeded stained glass.",
+    "tags": ["window", "glass", "church"], "form": "point", "layer": "decor", "size": { "box": [1.4, 3.2, 0.2] },
+    "make": { "kind": "gen", "gen": "kit/2", "args": { "v": 2, "box": [1.4, 3.2, 0.2], "shapes": [
+      { "kind": "arch.pointed", "at": [0, 1.6, 0], "size": [1.4, 3.2, 0.2], "segments": 8, "material": "stone", "color": "#cfc6b4", "collide": false },
+      { "kind": "extrude", "outline": "lancet", "size": [0.92, 2.96, 0.04], "segments": 8, "at": [0, 0, 0], "pitch": -1.5708, "round": 0, "material": "glass", "collide": false,
+        "faces": [{ "side": "front", "pattern": "stained-glass", "seed": 7, "glow": 0.4 }] }
+    ] } }
+  },
+  "mosaicMedallion": {
+    "schema": "def/1", "name": "mosaic-medallion", "version": 1,
+    "description": "An octagonal floor medallion whose top is a seeded mosaic.",
+    "tags": ["floor", "mosaic", "decor"], "form": "point", "layer": "decor", "size": { "box": [2, 0.06, 2] },
+    "make": { "kind": "gen", "gen": "kit/2", "args": { "v": 2, "shapes": [
+      { "kind": "extrude", "at": [0, 0, 0], "h": 0.04, "round": 0, "material": "stone", "color": "#e8dcc4", "collide": false,
+        "polygon": [[0.414, -1], [1, -0.414], [1, 0.414], [0.414, 1], [-0.414, 1], [-1, 0.414], [-1, -0.414], [-0.414, -1]],
+        "faces": [{ "side": "top", "pattern": "mosaic", "seed": 3, "cells": 20 }] }
+    ] } }
+  },
+  "shopDecals": [
+    { "slot": "facade-f0-s-1", "w": 2.4, "h": 0.45, "at": [0, 1.05], "text": "BAKERY", "font": "serif", "ink": "#3a2a22", "bg": "none" },
+    { "slot": "gable-e", "w": 0.9, "h": 0.9, "at": [0, -0.6], "pattern": "mosaic", "seed": 5, "cells": 12 }
+  ]
+}

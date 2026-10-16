@@ -9,6 +9,7 @@ import { CREATION_LIMITS } from './creation-limits.ts';
 // K2 hook: authored programs share one expansion path with the viewer.
 import { expandKitProgram, withKitPrograms } from './kit-program.ts';
 import { kitFootprint, kitFootprintSchema } from './kit-footprint.ts'; // XP5 hook
+import { FACE_LIMITS, boxSideSize, faceContentIssues, faceLocalSide, faceTriangles, shapeFaceSchema } from './faces.ts'; // XP8 hook
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep', 'loft'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -53,6 +54,8 @@ const shape = z.object({
    *  "variant=tall", "variant=tall|wide", "condition!=new", "awning", "!awning", "floors>1". A leading `@` reads entity
    *  state instead ("@open", "@sign=closed"): drawn by the viewer only, never a collider. */
   when: z.string().max(80).optional(),
+  /** XP8 (v2; box, rbox, extrude): text, a world image or a seeded pattern on one of the shape's sides. */
+  faces: z.array(shapeFaceSchema).min(1).max(FACE_LIMITS.perShape).optional(),
 }).passthrough();
 export type KitShape = z.infer<typeof shape>;
 
@@ -88,6 +91,9 @@ const outlinesCross = (a: Point2[], b: Point2[]) => a.some((p, i) => b.some((q, 
 
 /** An upper bound on rendered triangles, including caps, holes, bevels and path subdivisions. */
 export function kitShapeTriangles(sh: KitShape, round: number, v = 1): number {
+  return shapeTriangles(sh, round, v) + faceTriangles(sh); // XP8 hook
+}
+function shapeTriangles(sh: KitShape, round: number, v: number): number {
   const seg = sh.segments ?? 10, r = sh.round ?? (v === 2 && sh.kind === 'rbox' ? Math.max(round, 0.06) : round);
   // K2's pointed ribbon is a polygonal extrusion in either viewer contract.
   if (sh.kind === 'arch' && sh.polygon) return sh.polygon.length * 4 - 4;
@@ -114,11 +120,11 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
   for (const [i, sh] of args.shapes.entries()) {
     // Never silently accept v2 content with the legacy renderer. Existing v1 fields remain grandfathered.
     if (args.v === 1) {
-      for (const f of ['holes', 'top'] as const) if (sh[f] !== undefined) issue(i, f, 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
+      for (const f of ['holes', 'top', 'faces'] as const) if (sh[f] !== undefined) issue(i, f, 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
       if (sh.kind === 'loft' || (sh.kind === 'sweep' && sh.profile)) issue(i, sh.kind === 'loft' ? 'kind' : 'profile', 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
       continue;
     }
-    const known = new Set(['kind', 'at', 'size', 'r', 'h', 'r2', 'scale', 'yaw', 'pitch', 'roll', 'color', 'material', 'tint', 'round', 'segments', 'profile', 'polygon', 'path', 'holes', 'top', 'arc', 'collide', 'role', 'pivot', 'glow', 'when']);
+    const known = new Set(['kind', 'at', 'size', 'r', 'h', 'r2', 'scale', 'yaw', 'pitch', 'roll', 'color', 'material', 'tint', 'round', 'segments', 'profile', 'polygon', 'path', 'holes', 'top', 'arc', 'collide', 'role', 'pivot', 'glow', 'when', 'faces']);
     for (const f of Object.keys(sh)) if (!known.has(f)) issue(i, f, 'is not a kit field', `remove ${f}`);
     const fields: Record<KitShape['kind'], string[]> = {
       box: ['size', 'round'], rbox: ['size', 'round', 'segments'], wedge: ['size', 'round'],
@@ -150,6 +156,7 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
       else if (sh.polygon.length !== sh.top.length || Math.sign(area(sh.polygon)) !== Math.sign(area(sh.top))) issue(i, 'top', 'loft outlines need matching vertex counts and winding', 'pair corresponding vertices in the same winding order');
       else { for (const t of [0.25, 0.5, 0.75]) { const p = sh.polygon.map((p, j) => [p[0] * (1 - t) + sh.top![j][0] * t, p[1] * (1 - t) + sh.top![j][1] * t] as Point2); if (outlineProblem(p)) { issue(i, 'top', 'loft twists through an invalid intermediate outline', 'align corresponding vertices without crossing'); break; } } }
     }
+    if (sh.faces) faceIssues(sh, args.round, (path, message, fix) => ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces', ...path], message: `faces${path.length ? '.' + path.join('.') : ''}: ${message}; fix: ${fix}` })); // XP8 hook
     for (const [j, hole] of (sh.holes ?? []).entries()) {
       const problem = outlineProblem(hole);
       if (problem) issue(i, 'holes', `hole ${j}: ${problem}`, 'use a simple nonzero-area interior outline');
@@ -161,6 +168,26 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
   if (args.v === 2) {
     const tris = args.shapes.reduce((n, sh) => n + kitShapeTriangles(sh, args.round, 2), 0);
     if (tris > CREATION_LIMITS.defTris) ctx.addIssue({ code: 'custom', path: ['shapes'], message: `shapes: triangle estimate ${tris} exceeds ${CREATION_LIMITS.defTris}; fix: reduce shapes, segments, path points or outline vertices` });
+    const faces = args.shapes.reduce((n, sh) => n + (sh.faces?.length ?? 0), 0); // XP8: every face is a draw and a texture
+    if (faces > FACE_LIMITS.perKit) ctx.addIssue({ code: 'custom', path: ['shapes'], message: `shapes: ${faces} faces after expansion exceed ${FACE_LIMITS.perKit} per kit; fix: put faces on fewer repeated shapes, or split the kit` });
+  }
+}
+
+/** XP8: a face sits on a box/rbox side or an extrude cap; box faces may be a smaller rectangle (w, h, at) on that side. */
+function faceIssues(sh: KitShape, round: number, issue: (path: (string | number)[], message: string, fix: string) => void) {
+  if (sh.kind !== 'box' && sh.kind !== 'rbox' && sh.kind !== 'extrude') return issue([], `have no effect on ${sh.kind}`, 'put faces on a box, rbox or extrude panel (a thin box makes a board)');
+  for (const [j, face] of (sh.faces ?? []).entries()) {
+    for (const p of faceContentIssues(face, false)) issue([j, ...p.path], p.message, p.fix);
+    const { local, align } = faceLocalSide(sh, face.side);
+    if (sh.kind === 'extrude') {
+      for (const key of ['w', 'h', 'at'] as const) if (face[key] !== undefined) issue([j, key], 'has no effect on an extrude cap (the face takes its outline)', `remove ${key}, or use a box for a smaller panel`);
+      if (align < 0.5) issue([j, 'side'], `${face.side ?? 'front'} is edge-on to this extrude: its caps face elsewhere`, `name the side a cap faces (an upright panel with pitch -1.5708 has front and back caps)`);
+      continue;
+    }
+    const size = sh.size ?? [1, 1, 1], [W, H] = boxSideSize(size, local), at = face.at ?? [0, 0];
+    const r = Math.max(0, Math.min(sh.round ?? (sh.kind === 'rbox' ? Math.max(round, 0.06) : round), Math.min(...size) / 2 - 1e-4));
+    if (face.w === undefined && face.h === undefined && face.at === undefined && Math.min(W, H) <= 2 * r + 0.01) issue([j], `the ${local} side is all bevel (${W}×${H} m with round ${r})`, 'make the shape larger on that side, lower round, or face another side');
+    if (Math.abs(at[0]) + (face.w ?? 0) / 2 > W / 2 + 0.01 || Math.abs(at[1]) + (face.h ?? 0) / 2 > H / 2 + 0.01) issue([j, face.w !== undefined || face.h !== undefined ? 'w' : 'at'], `does not fit the ${local} side (${W}×${H} m)`, 'shrink w/h or move at so the face stays on the side');
   }
 }
 

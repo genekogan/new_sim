@@ -36,6 +36,8 @@ export const buildingParams = {
   windows: { type: 'number', min: 0, max: 1, default: 0.6, doc: 'window density along exterior walls' },
   plan: { type: 'json', doc: 'optional explicit plan: {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[…],exterior:[…]}],stairs:[…]}' },
   wallThickness: { type: 'number', min: 0.1, max: 0.6, default: 0.22 },
+  // XP8 hook: drawn only by the viewer (no physics); world-compiler/src/faces.ts checks slots and images.
+  decals: { type: 'json', doc: 'optional wall decals: [{slot (a wall slot: facade-*, opening-*, gable-*, wall-*), w, h, at?:[right,up], text|image|pattern, …face fields}]' },
 } as const;
 
 const FRONT_YAW: Record<string, number> = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
