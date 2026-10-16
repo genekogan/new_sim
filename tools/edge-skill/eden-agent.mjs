@@ -328,7 +328,10 @@ export async function act(first,...rest){
  if(!d.accepted&&d.code==='soul.not-in-sight'){const at=/\(in ([^,()]+),/.exec(d.reason??'');
   if(at){const d2=ok(await call(EDGE.act,{body:{capability:`walk to ${at[1]}`,params:{},clientRef:randomUUID()}}),'act');if(d2.accepted){d=d2;rewritten={from:rewritten?.from??capability,then:rewritten?.from??capability};}}}
  const then=rewritten?.then?{then:rewritten.then,next:`wait until this completes, then: act ${JSON.stringify(rewritten.then)}`}:{};
- if(d.accepted){accepted();/* Accepted targets are not visits; observed arrival owns coverage. */if(d.receipt?.channel!=='attention'&&d.receipt?.channel!=='none')save({lastReceipt:d.receipt?.id,lastActAt:now()});return {accepted:true,receipt:d.receipt,...(d.resolved?{resolved:d.resolved}:{}),...(rewritten?{asked:rewritten.from}:{}),...(d.receipt?.object||d.object?{object:d.receipt?.object??d.object}:{}),next:'wait',...then};}
+ if(d.accepted){accepted();/* Accepted targets are not visits; observed arrival owns coverage. */if(d.receipt?.channel!=='attention'&&d.receipt?.channel!=='none')save({lastReceipt:d.receipt?.id,lastActAt:now()});
+  // A person reference in a manual act on a non-person capability is ignored by the world: say so, so a solo act is never reported as shared.
+  const personKey=['targetSoul','target'].find(k=>params?.[k]!==undefined);const solo=personKey&&!/:s_[A-Za-z0-9]+/.test(capability)&&!/^(?:hug|high-five|dance-with|handshake|wave|give|go-near|walk-with|invite)/.test(capability);
+  return {accepted:true,receipt:d.receipt,...(solo?{warning:`"${personKey}" did not make this a shared act: ${capability} is a solo action. Resolve the complete request and use the offered partner capability (capabilities --verb <verb>); do not report it as done with the other person.`}:{}),...(d.resolved?{resolved:d.resolved}:{}),...(rewritten?{asked:rewritten.from}:{}),...(d.receipt?.object||d.object?{object:d.receipt?.object??d.object}:{}),next:'wait',...then};}
  return hinted({accepted:false,code:d.code,reason:d.reason,...(d.did_you_mean?{did_you_mean:d.did_you_mean}:{}),...(d.retry_after?{retry_after:d.retry_after}:{}),next:'observe and choose something else'});
 }
 /** 1.7.1: everyday phrasings the world does not resolve yet, rewritten to ones it does (the world still decides).
