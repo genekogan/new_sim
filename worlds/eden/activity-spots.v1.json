@@ -4006,7 +4006,13 @@
    "seatHeight": 0.88,
    "label": "Drum kit on the performance stage",
    "instrument": "drums",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-keys",
@@ -4023,7 +4029,13 @@
    ],
    "label": "Keyboard on the performance stage",
    "instrument": "keyboard",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-guitar",
@@ -4040,7 +4052,13 @@
    ],
    "label": "Guitar on the performance stage",
    "instrument": "guitar",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-bass",
@@ -4057,7 +4075,13 @@
    ],
    "label": "Bass guitar on the performance stage",
    "instrument": "bass",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-mic-1",
@@ -4073,7 +4097,13 @@
     -26
    ],
    "label": "Lead microphone on the performance stage",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "stage-mic-2",
@@ -4089,7 +4119,13 @@
     -26
    ],
    "label": "Second microphone on the performance stage",
-   "platform": "performance-stage-deck"
+   "platform": "performance-stage-deck",
+   "together": {
+    "group": "concert-stage",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "amph-mic",
@@ -5179,6 +5215,587 @@
    ],
    "seatHeight": 0.2,
    "label": "Picnic blanket, south-west lawn of the park (south side)"
+  },
+  {
+   "id": "story-teller",
+   "place": "eden-north-woods",
+   "activity": "tell-story",
+   "base": "idle",
+   "at": [
+    15.1,
+    -32.6
+   ],
+   "faceTo": [
+    15.1,
+    -35.4
+   ],
+   "label": "Storyteller's place at the log circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "story-log-1",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    18.2,
+    -34.91
+   ],
+   "faceTo": [
+    16.25,
+    -34.91
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 1 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "story-log-2",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    14.9,
+    -38.18
+   ],
+   "faceTo": [
+    14.9,
+    -36.23
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 2 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "story-log-3",
+   "place": "eden-north-woods",
+   "activity": "hear-story",
+   "base": "sit",
+   "at": [
+    11.99,
+    -34.06
+   ],
+   "faceTo": [
+    13.85,
+    -34.64
+   ],
+   "seatHeight": 0.4,
+   "label": "Log 3 of the story circle, north woods",
+   "together": {
+    "group": "story-woods",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   },
+   "requires": "story-teller"
+  },
+  {
+   "id": "book-club-1-north",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    71.5,
+    -7.45
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-1-south",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    71.5,
+    -5.75
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west (south side) (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-2-north",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    76.5,
+    -7.45
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "book-club-2-south",
+   "place": "int-library-reading-tables",
+   "activity": "book-club",
+   "base": "sit",
+   "at": [
+    76.5,
+    -5.75
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east (south side) (book club)",
+   "together": {
+    "group": "book-club-library",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-a-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -22.45,
+    3.15
+   ],
+   "faceTo": [
+    -22.45,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-a-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -22.45,
+    4.85
+   ],
+   "faceTo": [
+    -22.45,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-b-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -21.55,
+    3.15
+   ],
+   "faceTo": [
+    -21.55,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-w-b-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -21.55,
+    4.85
+   ],
+   "faceTo": [
+    -21.55,
+    4
+   ],
+   "label": "Preparation table 1, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-a-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -16.45,
+    3.15
+   ],
+   "faceTo": [
+    -16.45,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-a-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -16.45,
+    4.85
+   ],
+   "faceTo": [
+    -16.45,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-b-n",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -15.55,
+    3.15
+   ],
+   "faceTo": [
+    -15.55,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "cook-e-b-s",
+   "place": "commons-kitchen",
+   "activity": "cook-together",
+   "base": "idle",
+   "at": [
+    -15.55,
+    4.85
+   ],
+   "faceTo": [
+    -15.55,
+    4
+   ],
+   "label": "Preparation table 2, commons kitchen",
+   "together": {
+    "group": "kitchen-cooks",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "bandstand-dance-1",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    37.3,
+    -24.3
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-2",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    38.5,
+    -23.85
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-3",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    39.7,
+    -24.3
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "bandstand-dance-4",
+   "place": "eden-bandstand",
+   "activity": "social-dance",
+   "base": "idle",
+   "at": [
+    38.5,
+    -25.0
+   ],
+   "faceTo": [
+    38.5,
+    -24.35
+   ],
+   "platform": "bandstand-deck",
+   "label": "Bandstand dance floor",
+   "together": {
+    "group": "bandstand-dance",
+    "need": 1,
+    "wait": 45,
+    "alone": "start"
+   }
+  },
+  {
+   "id": "yoga-class-front",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    70.6
+   ],
+   "faceTo": [
+    -7,
+    72.6
+   ],
+   "label": "Yoga class, teacher's mat, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-1",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -9,
+    73.2
+   ],
+   "faceTo": [
+    -9,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-3",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    73.2
+   ],
+   "faceTo": [
+    -7,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-1-5",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -5,
+    73.2
+   ],
+   "faceTo": [
+    -5,
+    71.2
+   ],
+   "label": "Yoga class, mat in row 1, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-1",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -9,
+    75.6
+   ],
+   "faceTo": [
+    -9,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-3",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -7,
+    75.6
+   ],
+   "faceTo": [
+    -7,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
+  },
+  {
+   "id": "yoga-class-2-5",
+   "place": "eden-south-lawn",
+   "activity": "yoga-class",
+   "base": "idle",
+   "at": [
+    -5,
+    75.6
+   ],
+   "faceTo": [
+    -5,
+    73.6
+   ],
+   "label": "Yoga class, mat in row 2, south lawn",
+   "together": {
+    "group": "yoga-lawn",
+    "need": 1,
+    "wait": 150,
+    "alone": "fail"
+   }
   }
  ],
  "solids": [

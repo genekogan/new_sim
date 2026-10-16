@@ -74,6 +74,14 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\bbench[- ]?press(?:es|ing)?\b/, 'bench-press'], [/\b(?:pull|chin)[- ]?ups?\b/, 'pull-ups'], [/\b(?:tricep )?dips\b|\bdip bars?\b/, 'dips'],
   [/\b(?:lift(?:ing)? weights|weight ?lifting|weights|dumbbells?|bicep curls?|curls|free weights|pump(?:ing)? iron)\b/, 'lift-weights'],
   [/\b(?:p[eé]tanque|boules|bocce)\b/, 'play-petanque'], [/\bfrisbee\b/, 'play-frisbee'], [/\b(?:beach )?volley ?ball\b/, 'play-volleyball'],
+  // R5 group life: storytelling, a book club, cooking together, dancing on the bandstand, a yoga class, giving a concert
+  [/\b(?:tell|telling|share|sharing) (?:a |some |the )?(?:stor(?:y|ies)|tales?)\b|\bstory ?tell\w*/, 'tell-story'],
+  [/\b(?:listen to|hear|join) (?:a |the |some )?(?:stor(?:y|ies)|storyteller|story ?(?:circle|time))\b|\bstory ?(?:circle|time)\b/, 'hear-story'],
+  [/\bbook ?club\b|\bread(?:ing)? (?:together|with (?:others|friends|the group))\b/, 'book-club'],
+  [/\bcook(?:ing)? (?:together|with (?:others|friends|everyone|the group))\b|\b(?:communal|group) cooking\b|\bcooking (?:class|club)\b/, 'cook-together'],
+  [/\bbandstand\b.*\bdanc\w*|\bdanc\w*\b.*\bbandstand\b|\b(?:barn|social|square|line|ballroom) danc\w*|\bdance (?:party|together)\b/, 'social-dance'],
+  [/\byoga (?:class|session|together|group)\b|\b(?:lead|teach|join|take) (?:a |the )?yoga\b/, 'yoga-class'],
+  [/\b(?:give|play|perform|put on|hold) (?:a |the )?(?:concert|gig)\b|\bjam session\b|\bperform (?:on|at) (?:the )?stage\b/, 'play-music'],
   [/\b(?:sing|singing|karaoke|open mic|microphone)\b/, 'sing'],
   [/\b(?:listen|listening|concert|audience|watch (?:the )?(?:show|band|performance|concert|musicians?))\b/, 'listen'],
   [/\b(?:drums?|drum kit|guitar|bass|violin|viola|cello|keyboard|keys)\b/, 'play-music', 'keep'],
@@ -103,12 +111,14 @@ const FILLER = new Set(['find', 'somewhere', 'someplace', 'place', 'spot', 'quie
   'music', 'instrument', 'craft', 'crafts', 'game', 'games', 'cards', 'eat', 'meal', 'lunch', 'dinner', 'breakfast', 'snack', 'drink', 'coffee', 'tea', 'post', 'send', 'mail',
   'letter', 'card', 'write', 'writing', 'stroll', 'wander', 'walk', 'go', 'take', 'have', 'let', 'lets', 'me', 'i', 'want', 'like', 'would', 'could', 'can', 'you', 'we', 'he', 'she', 'they',
   'him', 'her', 'them', 'just', 'now', 'something', 'thing', 'do', 'get', 'grab', 'head', 'come', 'return', 'visit', 'travel', 'around', 'about', 'quick', 'short', 'long', 'while',
-  'use', 'using', 'check', 'work', 'game', 'round', 'throw', 'toss', 'catch', 'sing', 'song', 'songs', 'listen', 'watch', 'show', 'set', 'reps', 'exercise', 'exercises', 'workout', 'concert', 'performance', 'audience', 'band']);
+  'use', 'using', 'check', 'work', 'join', 'game', 'round', 'throw', 'toss', 'catch', 'sing', 'song', 'songs', 'listen', 'watch', 'show', 'set', 'reps', 'exercise', 'exercises', 'workout', 'concert', 'performance', 'audience', 'band']);
 
 /** "go for a X", "take a X", "have a X": X decides the verb (a swim is a swim, a balloon ride is the ride, never a stroll). */
 const GO_FOR = /^(?:let'?s\s+|i\s+want\s+to\s+|please\s+)?(?:go|going|take|have|do|try)\s+(?:for\s+|on\s+|in\s+)?(?:a|an|some|the)\s+(.+)$/i;
 const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
   [/^(?:seat|sit)\b/, 'sit'], [/^(?:dance|boogie)\b/, 'dance'], [/^(?:stretch)\b/, 'stretch'], [/^(?:read|book)\b/, 'read'], [/^(?:look|wander around)\b/, 'stroll'], [/^(?:rest|break|breather)\b/, 'rest'], [/^(?:drink|coffee|tea|cuppa)\b/, 'drink'], [/^(?:meal|bite|snack|lunch|dinner|breakfast)\b/, 'eat']];
+/** R5 group activities whose phrase decides even after a plain verb ("dance on the bandstand" is the bandstand dance). */
+const GROUP_VERBS = new Set(['tell-story', 'hear-story', 'book-club', 'cook-together', 'social-dance', 'yoga-class']);
 /** leisure: a posture or play word followed by a playground or lawn thing (the thing decides what is done there). */
 const LEISURE_LEAD = /^(?:please\s+)?(?:sit|lie|lay|rest|relax|nap|snooze|doze|play|ride|get|hop|go|have a go)\b/i;
 const LEISURE_OBJECTS: [RegExp, string][] = [[/\bhammocks?\b/, 'hammock'], [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/, 'seesaw'], [/\bswings?\b(?!\s+by\b)/, 'swing'], [/\bpicnic (?:blanket|rug)\b/, 'picnic']];
@@ -145,6 +155,8 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
   if (gf) {const x = gf[1].toLowerCase().trim(); for (const [re, v] of GO_FOR_X) if (re.test(x)) {if (verbs.has(v) || v === 'stroll') return {verb: v, rest: x.replace(re, ' ').trim()}; break;}}
   const words = raw.split(/\s+/);
   // leisure: "sit on the swing", "lie in the hammock", "play on the see-saw": the named thing decides, not the posture word
+  // R5: "dance on the bandstand", "yoga class", "read with friends": the group phrase wins over its leading verb
+  {const low = raw.toLowerCase(); for (const [re, v] of INTENTS) if (GROUP_VERBS.has(v) && verbs.has(v) && re.test(low)) return {verb: v, rest: low.replace(re, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};}
   if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (verbs.has(v) && re.test(raw.toLowerCase())) return {verb: v, rest: raw.toLowerCase().replace(re, ' ').replace(LEISURE_LEAD, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};
   for (let n = Math.min(4, words.length); n >= 1; n--) {
     const v = canon(words.slice(0, n).join('-')), rest = words.slice(n).join(' ');

@@ -150,6 +150,10 @@ Rowing uses an offered two-seat punt, on old Eden's native pond and on world-eng
 In old Eden's park: `act "go on the swings"`, `act "play on the see-saw"` (it needs someone on the other end: a lone rider waits up to 150 s, then the receipt fails honestly with "Nobody came"; both riders' receipts complete together), `act "lie in a hammock"` and `act "have a picnic"` (on the blanket, with food). `act "go stargazing"` lies back on open grass and is offered only from 20:00 to 05:00 world time; by day it is refused with the hours. "Swing by" is a visit, not a swing; eating at a picnic table stays eating.
 Bicycles: old Eden has a dock of four by the park gate. `act "go for a bike ride around the park"` or `act "ride a bike to the commons"` walks to a dock within 120 m, takes a bicycle, rides at 4.5 m/s on dry ground and brings it back; the receipt completes once it is docked. When every bicycle is out the ride is offered but blocked until one is back. The seaside Ferris wheel and carousel are scenery for now and are refused.
 
+## Group life (old Eden)
+
+Done together at shared places, each Soul by its own owner's command (being nearby is never consent): `act "tell a story"` (the log circle in the north woods; listeners can `act "listen to a story"` only once someone is telling one), `act "join the book club"` (library reading tables), `act "cook together"` (commons kitchen preparation tables), `act "join the yoga class"` (mats on the south lawn) and `act "dance on the bandstand"`. Each waits up to 150 s for someone to join (the bandstand dance 45 s, then starts alone); nobody coming fails the receipt honestly ("Nobody came"). `act "give a concert"` plays at the performance stage: players who arrive within 20 s start and finish together, later ones join the running set; `act "go to the concert"` sits in the audience.
+
 ## Terminal outcomes and content
 
 ### Carry, put down, and signs

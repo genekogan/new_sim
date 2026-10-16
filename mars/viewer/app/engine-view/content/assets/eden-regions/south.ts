@@ -67,8 +67,10 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees,motion?:DecorationSink
  // a bicycle dock on the south lawn by the park path (todo leisure): four bicycles; one disappears for each that is out
  {b.box('metal',4.05,0,84.35,2.9,.06,.1,'#5a6268');for(const x of [2.6,5.5])b.box('metal',x,0,84.35,.06,.75,.06,'#5a6268');b.box('metal',4.05,.72,84.35,2.96,.05,.05,'#5a6268');
   [3,3.7,4.4,5.1].forEach((x,i)=>drawDecoration(b,motion,{kind:'dock-bike',pivot:[x,.3,84],phase:i},d=>{d.push(x,0,84,0);const c=['#c43a2a','#3d5a80','#2f6f4f','#e0b04a'][i];
-   for(const s of [-.5,.5]){d.push(s,.34,0,0);d.pushRot('z',Math.PI/2);d.cyl('dressing',0,-.02,0,.33,.04,12,'#1e1e1e',false);d.pop();d.pop();}
+   for(const s of [-.5,.5]){d.push(0,.34,s,0);d.pushRot('z',Math.PI/2);d.cyl('dressing',0,-.02,0,.33,.04,12,'#1e1e1e',false);d.pop();d.pop();}
    d.box('dressing',0,.55,0,.05,.05,1,c);d.box('dressing',0,.3,.05,.05,.5,.05,c);d.box('dressing',0,.8,-.38,.05,.05,.12,'#1e1e1e');d.box('dressing',0,.95,.42,.5,.03,.03,'#1e1e1e');d.pop();}));}
+ // R5: yoga mats on the south lawn, the teacher's facing two rows of three
+ for(const [x,z,c] of [[-7,70.6,'#5a8a6a'],[-9,73.2,'#7a4a8a'],[-7,73.2,'#3d8ab0'],[-5,73.2,'#e88aa0'],[-9,75.6,'#e0b04a'],[-7,75.6,'#c45a4a'],[-5,75.6,'#3d5a80']] as [number,number,string][])b.box('cloth',x,0,z,.62,.012,1.8,c);
  // the south-west lawn (todo leisure): two hammocks slung between posts (cloth 0.62 m at its lowest), a picnic blanket with a basket
  for(const z of [126.5,130]){for(const x of [-21.6,-18.4])b.box('timber',x,0,z,.12,1.5,.12,'#7a5a3a');
   for(let i=0;i<12;i++){const u0=i/12,u1=(i+1)/12,sag=(u:number)=>1.25-.63*Math.sin(Math.PI*u),x0=-21.5+3*u0,x1=-21.5+3*u1;b.quad('cloth',[x0,sag(u0),z-.42],[x1,sag(u1),z-.42],[x1,sag(u1),z+.42],[x0,sag(u0),z+.42],i%2?'#e8a33c':'#2f6f8f');b.quad('cloth',[x0,sag(u0),z+.42],[x1,sag(u1),z+.42],[x1,sag(u1),z-.42],[x0,sag(u0),z-.42],i%2?'#e8a33c':'#2f6f8f');}}

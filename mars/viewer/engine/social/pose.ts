@@ -23,7 +23,9 @@ export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-mus
   // CN5: at a desk computer, at a microphone, in an audience, with dumbbells
   'use-computer', 'sing', 'listen', 'lift-weights',
   // todo (leisure): fishing from a bank, tossing bread, tending garden beds; on a swing or a see-saw seat, picnicking
-  'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic'] as const;
+  'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic',
+  // R5: telling a story to a circle (standing, talking with the hands)
+  'tell-story'] as const;
 /** Whole-body postures on open ground (the body point stays; the viewer lays the body out along pose.yaw). */
 export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga',
   // CN5: lying on a gym bench (seatHeight = the bench top)

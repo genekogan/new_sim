@@ -105,3 +105,31 @@ test('bicycles: ride from the park-gate dock around the park and back, or to a p
   for (const words of ['ride the ferris wheel', 'go on the carousel']) {const r = await w.act(b, words); assert.equal(r.accepted, false, words); assert.match(r.reason ?? '', /scenery for now/);}
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
 });
+
+test('group life: story circle needs a teller, book club, cooking together, yoga class, bandstand dance and a concert', {timeout: 1800000}, async t => {
+  const w = await world(4); t.after(() => {w.f.host.stop(); w.f.db.close();});
+  const [a, b, c, d] = w.souls;
+  const pair = async (x: typeof a, xw: string, y: typeof a, yw: string, verb: string, pose: string) => {
+    const p = await w.act(x, xw, {seconds: 6}), q = await w.act(y, yw, {seconds: 6});
+    for (const [r, words] of [[p, xw], [q, yw]] as const) {assert.equal(r.accepted, true, words + ' ' + JSON.stringify(r)); assert.match(r.resolved?.to, new RegExp('^' + verb + ':'), words);}
+    let both = 0; await w.run([{soulId: x.soulId, id: p.receipt.id}, {soulId: y.soulId, id: q.receipt.id}], 20 * 60 * 6, () => {if (w.body(x).human.activity === pose && w.body(y).human.activity === pose) both++;});
+    for (const [s, r] of [[x, p], [y, q]] as const) assert.equal(w.ledger.receipt(s.soulId, r.receipt.id)!.phase, 'completed', `${verb}: ${JSON.stringify(w.ledger.receipt(s.soulId, r.receipt.id))}`);
+    assert.ok(both >= 20 * 5, `${verb} together for ${both} ticks`);
+  };
+  // nobody is telling a story yet: joining the circle is refused, never swapped
+  const early = await w.act(b, 'join the story circle'); assert.equal(early.accepted, false, JSON.stringify(early)); assert.match(early.reason ?? '', /Nobody is at/);
+  const teller = await w.act(a, 'tell a story', {seconds: 6}); assert.equal(teller.accepted, true, JSON.stringify(teller)); assert.match(teller.resolved?.to, /^tell-story:/);
+  await w.run([], 20 * 50);   // the teller walks to the circle
+  const hear = await w.act(b, 'listen to a story', {seconds: 6}); assert.equal(hear.accepted, true, JSON.stringify(hear)); assert.match(hear.resolved?.to, /^hear-story:story-log-/);
+  await w.run([{soulId: a.soulId, id: teller.receipt.id}, {soulId: b.soulId, id: hear.receipt.id}], 20 * 60 * 6);
+  assert.equal(w.ledger.receipt(a.soulId, teller.receipt.id)!.phase, 'completed'); assert.equal(w.ledger.receipt(b.soulId, hear.receipt.id)!.phase, 'completed');
+  await pair(c, 'cook together', d, 'cook with friends', 'cook-together', 'cook');
+  await pair(a, 'join the book club', b, 'read with friends', 'book-club', 'read');
+  await pair(c, 'join the yoga class', d, 'yoga class', 'yoga-class', 'yoga');
+  // a dance on the bandstand and a concert may start alone after a short wait
+  const dance = await w.act(a, 'dance on the bandstand', {seconds: 6}); assert.match(dance.resolved?.to, /^social-dance:bandstand-dance-/);
+  const gig = await w.act(b, 'give a concert', {seconds: 6}); assert.match(gig.resolved?.to, /^(?:play-music|sing):stage-/, JSON.stringify(gig));
+  assert.equal((await w.done(a, dance, 20 * 60 * 6)).phase, 'completed'); assert.equal((await w.done(b, gig, 20 * 60 * 6)).phase, 'completed');
+  assert.deepEqual(w.f.host.engine.runtime.violations, []);
+  await w.replayExact();
+});

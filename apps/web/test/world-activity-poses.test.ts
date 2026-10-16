@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { ACTIVITY_OVERLAYS, activityBase, activityFrame, makeProp, propFor, PROPS } from '../../../mars/viewer/app/engine-view/activity-poses.ts';
 
 // ACTIVITIES-v1 §2 ids (Core mars:pose_v1) plus the exercise cycles the viewer draws when Core publishes them.
-const OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic'];
+const OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic', 'tell-story'];
+// R5 group activities at spots, done in an existing pose (server SPOT_ACTIVITIES[...].pose)
+const GROUP = ['hear-story', 'book-club', 'cook-together', 'social-dance', 'yoga-class'];
 // World-proposed overlay ids (CONTRACTS/proposals WORLD-EVENTS, WORLD-COMPUTERS): drawn now, offered once Core adds them.
 const PROPOSED = ['use-computer', 'sing', 'listen'], GESTURES = ['bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five'], PROPOSED_MOVES = ['play-volleyball', 'play-petanque', 'play-frisbee', 'pull-ups', 'dips', 'bench-press', 'lift-weights'];
 const WHOLE = ['lie', 'nap', 'hammock', 'stargaze'], CYCLES = ['jumping-jacks', 'jump', 'dance', 'stretch', 'yoga', 'pushups', 'situps'];
@@ -40,7 +42,7 @@ test('World activity spots: well-formed, unique, facing their furniture, on the 
   const ids = new Set<string>();
   for (const s of d.spots) {
     assert.ok(!ids.has(s.id), 'unique ' + s.id);ids.add(s.id);
-    assert.ok([...OVERLAYS, ...PROPOSED, ...PROPOSED_MOVES, ...WHOLE, ...CYCLES].includes(s.activity), s.id);assert.ok(['sit', 'idle', 'lie', 'nap'].includes(s.base), s.id);
+    assert.ok([...OVERLAYS, ...PROPOSED, ...PROPOSED_MOVES, ...WHOLE, ...CYCLES, ...GROUP].includes(s.activity), s.id);assert.ok(['sit', 'idle', 'lie', 'nap'].includes(s.base), s.id);
     const dist = Math.hypot(s.faceTo[0] - s.at[0], s.faceTo[1] - s.at[1]);assert.ok(dist > .3 && dist < 3.5, s.id + ' ' + dist);
     if (s.base === 'sit') assert.ok(s.seatHeight >= .2 && s.seatHeight <= 1.2, s.id);
   }
