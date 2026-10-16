@@ -13,7 +13,7 @@ import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
-import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd } from './query.ts';
+import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
@@ -622,7 +622,13 @@ export class EngineBridge {
 
   // ------------------------------------------------------------------ reach
 
-  private endOf(x: ReachEnd): { p: Vec2; level: number; what: string } | { error: string } {
+  /** Where an end was looked for when the engine has nowhere to stand there: the point, its height, the engine level that
+   *  height resolves to and that level's own height (a room floor at y 3.1 resolving to level 0 at y 0 = no engine floor). */
+  private endpoint(what: string, at: Vec2, y: number, level: number): ReachEndpoint {
+    const levelY = level === 0 ? 0 : this.levels.find((l) => l.id === level)?.y ?? 0;
+    return { what, at: [r3(at[0]), r3(at[1])], y: r3(y), level, levelY: r3(levelY) };
+  }
+  private endOf(x: ReachEnd): { p: Vec2; level: number; what: string } | { error: string; endpoint?: ReachEndpoint } {
     if (Array.isArray(x)) { const y = x.length === 3 ? x[1] : 0; const p: Vec2 = [x[0], x[x.length - 1]]; return { p, level: this.levelOfY(y as number), what: `(${p.join(', ')})` }; }
     const [path, room] = String(x).split(':');
     const e = this.model.get(path);
@@ -632,15 +638,15 @@ export class EngineBridge {
       if (!slot) return { error: `${path} has no room ${room}` };
       const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
       const at: Vec2 = [wp.x + (slot.p[0] * c + slot.p[2] * s) * wp.s, wp.z + (-slot.p[0] * s + slot.p[2] * c) * wp.s];
-      const level = this.levelOfY(wp.y + slot.p[1] * wp.s);
+      const y = wp.y + slot.p[1] * wp.s, level = this.levelOfY(y);
       const p = this.engine.standableNearV1(at, level, undefined, 0.4, 40);
-      return p ? { p, level, what: `${path}:${room}` } : { error: `no standing room in ${path}:${room}` };
+      return p ? { p, level, what: `${path}:${room}` } : { error: `no standing room in ${path}:${room}`, endpoint: this.endpoint(`${path}:${room}`, at, y, level) };
     }
     const body = this.engine.world.entities[e.id];
     if (body?.human) return { p: [body.pose.p[0], body.pose.p[2]], level: body.human.level ?? 0, what: this.model.pathOf(e.id) };
     const wp = this.model.worldPose(e), level = body ? this.levelOfY(body.pose.p[1]) : this.levelOfY(wp.y);
     const p = this.engine.standableNearV1([wp.x, wp.z], level, undefined, 0.4, 40);
-    return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}` };
+    return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}`, endpoint: this.endpoint(this.model.pathOf(e.id), [wp.x, wp.z], body ? body.pose.p[1] : wp.y, level) };
   }
   /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
   levelAt(x: number, z: number, y: number): number {
@@ -656,8 +662,8 @@ export class EngineBridge {
   private levelOfY(y: number) { if (Math.abs(y) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; } if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
     const a = this.endOf(from), b = this.endOf(to);
-    if ('error' in a) return { reachable: false, code: 'reach.bad-from', detail: a.error };
-    if ('error' in b) return { reachable: false, code: 'reach.bad-to', detail: b.error };
+    if ('error' in a) return { reachable: false, code: 'reach.bad-from', detail: a.error, ...(a.endpoint ? { endpoint: { side: 'from', ...a.endpoint } } : {}) };
+    if ('error' in b) return { reachable: false, code: 'reach.bad-to', detail: b.error, ...(b.endpoint ? { endpoint: { side: 'to', ...b.endpoint } } : {}) };
     const r = this.engine.reachV1({ p: a.p, level: a.level }, { p: b.p, level: b.level });
     return r.ok ? { reachable: true, from: { ...a }, to: { ...b }, length: r.length, legs: r.legs, levels: r.levels }
       : { reachable: false, from: { ...a }, to: { ...b }, code: r.code, detail: r.message };
