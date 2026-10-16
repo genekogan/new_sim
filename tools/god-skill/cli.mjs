@@ -683,7 +683,7 @@ export function districtLines(v, chapter) {
       ...v.chapters.map(c => `chapter ${c.id} [${c.plots.join(',')}]: ${c.status}, step ${c.step.n}/${c.step.of} ${c.step.label}, ${c.parts} parts${c.closed ? ', closed to residents' : ''}${c.followUpOf ? `, follow-up of ${c.followUpOf}` : ''}${c.brief !== undefined ? `; brief: ${c.brief}` : ''}`)]),
     ...(!chapter || !mine || ['done', 'abandoned'].includes(mine.status) ? [districtNext(v)] : [])];
 }
-const districtReportText = d => [`district ${d.id}: chapter ${d.chapter} builds ${d.plots.map(p => `${p.id}${p.title ? ` ${p.title}` : ''}${p.use ? ` [${p.use}]` : ''}`).join(', ')}; ${d.counts.built}/${d.counts.plots} plots built, ${d.counts.building} building`, ...d.frontage.map(f => `frontage ${f.plot}: road ${f.road} to the ${f.side}, ${f.gap} m from the plot edge (front yaw ${f.frontYaw})`), ...(d.neighbours.length ? [`neighbour plots: ${d.neighbours.map(n => `${n.plot} ${n.status}${n.chapter ? ` (${n.chapter})` : ''}`).join(', ')} — finished plots stay open to residents; edit only this chapter's plots`] : []), ...(d.terrain ? [`terrain: ${d.terrain}`] : []), ...(d.water ? [`water: ${d.water}`] : [])];
+const districtReportText = d => [`district ${d.id}: chapter ${d.chapter} builds ${d.plots.map(p => `${p.id}${p.title ? ` ${p.title}` : ''}${p.use ? ` [${p.use}]` : ''}`).join(', ')}; ${d.counts.built}/${d.counts.plots} plots built, ${d.counts.building} building`, ...d.frontage.map(f => `frontage ${f.plot}: road ${f.road} to the ${f.side}, ${f.gap} m from the plot edge (front yaw ${f.frontYaw})`), ...(d.warnings ?? []).map(w => `WARNING: ${w}`), ...(d.neighbours.length ? [`neighbour plots: ${d.neighbours.map(n => `${n.plot} ${n.status}${n.chapter ? ` (${n.chapter})` : ''}`).join(', ')} — finished plots stay open to residents; edit only this chapter's plots`] : []), ...(d.terrain ? [`terrain: ${d.terrain}`] : []), ...(d.water ? [`water: ${d.water}`] : [])];
 const siteReportText = r => [...(r.district ? districtReportText(r.district) : []), `site report: ground ${r.ground.min}..${r.ground.max} m${r.ground.sampled ? ' (sampled)' : ''}; neighbour eaves median ${r.eaves.median ?? 'n/a'}, max ${r.eaves.max ?? 'n/a'} m`, ...r.neighbours.map(n => `near ${n.path}: ${n.footprint.map(f => f.size.join('×')).join(', ')} m; eave ${n.eave} m (${n.eaveSource})`), ...r.masses.map(m => `${m.name}: ${m.fits ? 'fits' : 'outside site'}; height/neighbours median ${m.medianRatio ?? 'n/a'}, max ${m.maxRatio ?? 'n/a'}`), `closure: ${Object.entries(r.closure.counts ?? {}).map(([k,v]) => `${v} ${k}`).join(', ')}; ${(r.closure.things ?? []).map(x => x.path).join(', ')}`, ...(r.approach ? [`approach: ${r.approach.from ?? r.approach.note}${r.approach.checked ? '' : ' (not checked)'}`] : []), ...(r.library ?? []).map(x => `library: ${x.ref} (${x.category})`), ...(r.truncated ? ['site report shortened; inspect closure inventory for all returned rows'] : [])].join('\n');
 const checkedReceipt = r => r ? [`checked receipt at seq ${r.seq}: ${r.exists.count} parts exist; ${r.undoability.ok ? 'undo preflight OK' : 'undo CONFLICT'} (${r.undoability.edits} edits)`, `exists: ${r.exists.paths.join(', ') || 'none'}`, ...r.preservation.outside.map(x => `changed outside: ${x.path}${x.included ? ' (included)' : ''}`), ...r.undoability.conflicts.map(explainFailure), ...r.massing.map(m => `mass ${m.name}: ${m.parts} parts; ${m.height}/${m.plannedHeight} m; ${m.fits ? 'fits' : 'warning'}`), ...r.uses.map(u => `uses ${u.path}: ${JSON.stringify(u.walk ?? u.behaviours ?? u.error ?? 'no compiled uses')}`), `viewer cost: ${JSON.stringify(r.viewerCost)}`, `refused: ${r.refused.count}; ${r.refused.recent.map(x => `${x.code}${x.entity ? ' on ' + x.entity : ''}: ${x.detail}`).join('; ')}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n') : '';
 const buildValues = (value, separator, flag, max, size) => { if (value === undefined) return undefined; if (typeof value !== 'string') throw new Error(`--${flag} needs text`); const values = value.split(separator).map(x => x.trim()); if (values.length > max || values.some(x => !x || x.length > size)) throw new Error(`--${flag} needs 1..${max} values, each at most ${size} characters`); return values; };
@@ -745,7 +745,7 @@ export async function buildWait(id, flags = {}, runtime = {}) {
 }
 export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
   const s = load(), b = s.build, arg = args[0];
-  const options = { start: 'title steps at offset size yaw mass brief root asks include district plots', district: 'file', continue: 'brief asks include title steps', check: '', step: 'say mass asks include', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
+  const options = { start: 'title steps at offset size yaw mass brief root asks include district plots', district: 'file delete', continue: 'brief asks include title steps', check: '', step: 'say mass asks include', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
   if (!Object.hasOwn(options, sub)) throw new Error('build: start|district|continue|step|check|show|wait|resume|claim|release|pause|done|abandon');
   if (args.length > (['release', 'abandon', 'wait'].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
   for (const [k, v] of Object.entries(f)) {
@@ -753,7 +753,7 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
     if (Array.isArray(v)) throw new Error(`build ${sub} --${k} takes one value`);
   }
   if (sub === 'resume' && f.take !== undefined && f.take !== true) throw new Error('build resume --take takes no value');
-  if ((process.env.EDEN_GOD_CLAIM || b?.claim) && (['start', 'continue', 'resume', 'claim', 'done', 'abandon'].includes(sub) || (sub === 'district' && f.file !== undefined))) throw new Error(`claim holders cannot build ${sub}${sub === 'resume' ? ': it would take the lead lease' : '; edit your claim, then build release --done'}`);
+  if ((process.env.EDEN_GOD_CLAIM || b?.claim) && (['start', 'continue', 'resume', 'claim', 'done', 'abandon'].includes(sub) || (sub === 'district' && (f.file !== undefined || f.delete !== undefined)))) throw new Error(`claim holders cannot build ${sub}${sub === 'resume' ? ': it would take the lead lease' : '; edit your claim, then build release --done'}`);
   if (sub === 'step') {
     if (!b) throw new Error('no current build; build start or build resume first');
     const n = !arg && f.say === undefined && (f.include !== undefined || f.asks !== undefined) ? b.n : b.n + 1;
@@ -797,8 +797,19 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
     return f.json ? r : checkedReceipt(r.receipt);
   }
   if (sub === 'district') {
-    // Y3: record a plan once (--file plan.json or inline JSON), show one district, or list them. Reads only otherwise.
+    // Y3: record a plan once (--file plan.json or inline JSON), delete one (--delete), show one district, or list them.
     if (arg !== undefined && !/^[a-z0-9][a-z0-9-]{0,29}$/.test(arg)) throw new Error('build district needs a district id (slug, at most 30 characters)');
+    const unknown = () => f.json ? { ok: false, code: 'district.unknown' } : `unknown district: ${arg}; \`build district\` lists them`;
+    if (f.delete !== undefined) {
+      if (!arg) throw new Error('build district <id> --delete');
+      if (f.delete !== true) throw new Error('--delete takes no value');
+      if (f.file !== undefined) throw new Error('--delete and --file are separate commands');
+      const response = await call(`/v1/god/districts/${encodeURIComponent(arg)}`, { method: 'DELETE' });
+      if (response.status === 404) return unknown();
+      const r = ok(response, 'build district --delete');
+      if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+      return f.json ? r : `district ${arg} deleted: its buildings and ${r.chapters.length} chapter build(s) stay; undo --group <chapter> still works`;
+    }
     if (f.file !== undefined) {
       if (!arg) throw new Error('build district <id> --file plan.json');
       if (typeof f.file !== 'string') throw new Error('--file needs a plan file or inline JSON');
@@ -810,7 +821,7 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
     }
     if (!arg) { const r = ok(await call('/v1/god/districts'), 'build district'); return f.json ? r : r.districts.map(x => `${x.id}: ${x.title}; ${x.counts.built}/${x.counts.plots} built; ${districtNext(x)}`).join('\n') || 'no districts; build district <id> --file plan.json records one'; }
     const response = await call(`/v1/god/districts/${encodeURIComponent(arg)}`);
-    if (response.status === 404) return f.json ? { ok: false, code: 'district.unknown' } : `unknown district: ${arg}; \`build district\` lists them`;
+    if (response.status === 404) return unknown();
     const r = ok(response, 'build district'); return f.json ? r : districtLines(r.district).join('\n');
   }
   if (sub === 'continue') {
@@ -1190,7 +1201,7 @@ export function parseFlags(argv, bools = BOOL) {
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
   doctor: 'fix local',
-  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file',
+  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep remote out span height width h hide-roofs stop hour weather views site frames every', kit: 'hour weather beside out width h', defs: 'tag all unused remove', where: 'at offset', reach: '', clear: 'size', free: 'near radius count slope',
@@ -1209,7 +1220,7 @@ export function checkArgs(cmd, f, rest) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}…": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => '--' + x).join(' ')}`);
     for (const x of [].concat(v)) {
-      if (x === true && !BOOL.has(k) && !(cmd === 'build' && k === 'take') && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
+      if (x === true && !BOOL.has(k) && !(cmd === 'build' && (k === 'take' || k === 'delete' /* Y3 */)) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && !(cmd === 'build' && k === 'steps') && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (cmd === 'look' && ['dist', 'span'].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === '' || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
@@ -1251,7 +1262,7 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json] (one plan: roads, plots with massing, terrain/water notes, chapters; no file = show it) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>

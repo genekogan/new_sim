@@ -57,10 +57,10 @@ test('Y3 acceptance: a fake agent plans a 6-plot street and builds it in 3 chapt
   session(1);
   let r = await cli('build', 'district', 'high', '--file', plan);
   assert.equal(r.calls, 1); assert.match(r.out, /district high: High Street; 0\/6 plots built/); assert.match(r.out, /district brief: Owner words: a lively six-shop street/);
-  assert.match(r.out, /next: build start high-1 --district high --plots p1,p2/);
+  assert.match(r.out, /next: build start high-1 --district high --plots p1,p2/); assert.match(r.out, /WARNING: chapter 1 \(p1,p2\) site spans road high/);
   r = await cli('build', 'start', 'high-1', '--district', 'high', '--brief', 'Chapter 1: a bakery and a smithy facing the street');
   assert.equal(r.calls, 1, 'a chapter start is one request'); assert.match(r.out, /chapter high-1 builds p1 Bakery, p2 Smithy/); assert.match(r.out, /frontage p1: road high to the south, 1 m from the plot edge \(front yaw 0\)/);
-  assert.match(r.out, /massing: p1-hall 10×8 m/);
+  assert.match(r.out, /massing: p1-hall 10×8 m/); assert.match(r.out, /WARNING: this chapter's site spans road high: things placed on that road inside the site join the chapter/);
   for (const [name, x, z] of [['bakery-bench', -40, -16], ['smithy-bench', -40, 16]] as const) assert.match((await place(name, x, z)).out, /"accepted":true/);
   r = await cli('build', 'done', 'bakery and smithy');
   assert.match(r.out, /high-1: done/); assert.match(r.out, /2\/6 plots built/); assert.match(r.out, /next: build start high-2 --district high --plots p3,p4/);

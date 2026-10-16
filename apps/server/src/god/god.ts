@@ -121,6 +121,7 @@ export class GodMode {
     // Y3 districts: private plans built as chapter builds; a chapter start takes site and massing from its plots.
     this.districts = new GodDistricts({ store: this.store, model: () => this.model, now: () => this.now(), builds: () => this.builds });
     this.builds.districtStart = raw => this.districts.expand(raw);
+    this.onBuild(e => { if (e.kind === 'done' || e.kind === 'abandoned') this.districts.onClosed(e.id); }); // Y3: closed chapters outlive the build-row prune
     this.parts = new Parts(this.store, { model: () => this.model, now: () => this.now() });
     this.onBuild(e => { if (e.kind === 'done') this.parts.onDone(e.id); });
     this.parts.backfill();

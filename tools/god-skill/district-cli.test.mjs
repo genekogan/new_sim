@@ -9,7 +9,7 @@ import { build, checkArgs, districtLines, parseFlags } from './cli.mjs';
 function offline(t, reply) {
   const cwd = process.cwd(), originalFetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'god-district-cli-')), calls = [];
   process.chdir(dir); writeFileSync('.eden-god.json', JSON.stringify({ world: 'https://world.invalid', token: 'fixture-only' }));
-  globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); return Response.json(reply(url, options)); };
+  globalThis.fetch = async (url, options) => { calls.push({ url, ...options }); const out = reply(url, options); return out instanceof Response ? out : Response.json(out); };
   t.after(() => { globalThis.fetch = originalFetch; process.chdir(cwd); rmSync(dir, { recursive: true, force: true }); });
   return { dir, calls };
 }
@@ -18,7 +18,7 @@ const view = { id: 'high', title: 'High Street', brief: 'six shops', roads: [{ i
   chapters: [{ id: 'high-1', plots: ['p1'], status: 'done', step: { n: 3, label: 'details', of: 3 }, parts: 3, closed: false }], next: { action: 'start', id: 'high-2', plots: ['p2'] } };
 
 test('district arguments pass the CLI check and refuse site flags on a chapter before any request', async t => {
-  for (const argv of [['district', 'high', '--file', 'plan.json'], ['district', 'high'], ['district'], ['start', 'high-1', '--district', 'high', '--plots', 'p1,p2', '--brief', 'words']]) {
+  for (const argv of [['district', 'high', '--file', 'plan.json'], ['district', 'high'], ['district'], ['district', 'high', '--delete'], ['start', 'high-1', '--district', 'high', '--plots', 'p1,p2', '--brief', 'words']]) {
     const { flags, rest } = parseFlags(argv); checkArgs('build', flags, rest);
   }
   const { calls } = offline(t, () => ({}));
@@ -28,6 +28,9 @@ test('district arguments pass the CLI check and refuse site flags on a chapter b
   await assert.rejects(build('district', ['Bad Id'], {}), /district id/);
   await assert.rejects(build('district', [], { file: 'plan.json' }), /--file plan.json/);
   await assert.rejects(build('district', ['high'], { file: '{"id":"other","title":"x","plots":[]}' }), /differs from high/);
+  await assert.rejects(build('district', [], { delete: true }), /build district <id> --delete/);
+  await assert.rejects(build('district', ['high'], { delete: 'yes' }), /--delete takes no value/);
+  await assert.rejects(build('district', ['high'], { delete: true, file: 'plan.json' }), /separate commands/);
   assert.equal(calls.length, 0);
 });
 
@@ -49,4 +52,16 @@ test('beside one chapter the district view is compact and shows next only once t
   assert.match(districtLines(view, 'high-1').join('\n'), /next: build start high-2/);
   assert.match(districtLines({ ...view, next: { action: 'resume', id: 'high-2', plots: ['p2'] } }).join('\n'), /next: build resume high-2 \(plots p2\)/);
   assert.match(districtLines({ ...view, next: null }).join('\n'), /next: every plot is built/);
+});
+
+test('an unknown district is a 404 the CLI explains; --delete sends DELETE and reports a refusal or what stays', async t => {
+  let deleted = false;
+  const { calls } = offline(t, (url, options) => String(url).endsWith('/missing') ? Response.json({ ok: false, code: 'not-found' }, { status: 404 })
+    : options.method === 'DELETE' ? (deleted ? { ok: true, deleted: 'high', chapters: ['high-1', 'high-2'] } : (deleted = true, { ok: false, failures: [{ op: -1, code: 'district.open', detail: 'Chapter high-2 of high is open.', field: 'id', fix: 'Finish or abandon high-2 first.' }] })) : {});
+  assert.equal(await build('district', ['missing'], {}), 'unknown district: missing; `build district` lists them');
+  assert.deepEqual(await build('district', ['missing'], { json: true }), { ok: false, code: 'district.unknown' });
+  assert.equal(await build('district', ['missing'], { delete: true }), 'unknown district: missing; `build district` lists them');
+  assert.match(await build('district', ['high'], { delete: true }), /REFUSED: district.open.*high-2/);
+  assert.equal(await build('district', ['high'], { delete: true }), 'district high deleted: its buildings and 2 chapter build(s) stay; undo --group <chapter> still works');
+  assert.deepEqual(calls.map(c => `${c.method} ${new URL(c.url).pathname}`), ['GET /v1/god/districts/missing', 'GET /v1/god/districts/missing', 'DELETE /v1/god/districts/missing', 'DELETE /v1/god/districts/high', 'DELETE /v1/god/districts/high']);
 });
