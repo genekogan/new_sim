@@ -4,10 +4,10 @@ import { readFileSync } from 'node:fs';
 import { ACTIVITY_OVERLAYS, activityBase, activityFrame, makeProp, propFor, PROPS } from '../../../mars/viewer/app/engine-view/activity-poses.ts';
 
 // ACTIVITIES-v1 §2 ids (Core mars:pose_v1) plus the exercise cycles the viewer draws when Core publishes them.
-const OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'fish', 'feed', 'garden'];
+const OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic'];
 // World-proposed overlay ids (CONTRACTS/proposals WORLD-EVENTS, WORLD-COMPUTERS): drawn now, offered once Core adds them.
 const PROPOSED = ['use-computer', 'sing', 'listen'], GESTURES = ['bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five'], PROPOSED_MOVES = ['play-volleyball', 'play-petanque', 'play-frisbee', 'pull-ups', 'dips', 'bench-press', 'lift-weights'];
-const WHOLE = ['lie', 'nap'], CYCLES = ['jumping-jacks', 'jump', 'dance', 'stretch', 'yoga', 'pushups', 'situps'];
+const WHOLE = ['lie', 'nap', 'hammock', 'stargaze'], CYCLES = ['jumping-jacks', 'jump', 'dance', 'stretch', 'yoga', 'pushups', 'situps'];
 
 test('every contract overlay layers on its base and has hand goals over time; props follow the contract', () => {
   for (const id of [...OVERLAYS, ...PROPOSED]) {

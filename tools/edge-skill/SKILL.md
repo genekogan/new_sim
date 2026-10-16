@@ -144,9 +144,10 @@ node eden-agent.mjs receipt
 
 Rowing uses an offered two-seat punt, on old Eden's native pond and on world-engine water large enough for a safe route with a reachable dry boarding point. Small water, scenery water without native support and dry worlds do not offer a punt. `row a boat` resolves to its ride's join: walk to the bank, board, row one loop, return and disembark. **The punt receipt completes only once ashore**; boarding or a returned-but-disembarking observation is still in progress. Repeat bounded `wait` as needed; a timeout leaves work running. A companion is an invitation, never consent. The punt waits up to 90 seconds for an invited companion; otherwise it departs automatically, sooner when full. The punt departs automatically; an early `start` refuses without replacing your ongoing rowing programme. Its ride object offers `leave` while parked. You cannot disembark on open water. A balloon's join receipt still means seated in its basket, not flight finished. Read the ride object and current body along with receipts. Unsupported activities refuse honestly and never choose another activity for you.
 
-## Leisure: fishing, feeding koi, gardening
+## Leisure: fishing, feeding koi, gardening, playground, hammocks, picnics, stars
 
 `act "go fishing"` (a rod, from a marked pond bank), `act "feed the koi"` (bread, at a marked bank; the ponds have koi, not ducks, so "feed the ducks" is refused) and `act "do some gardening"` (the garden beds in the gardens) walk to the nearest free marked spot and perform it for a few minutes; the receipt completes when the activity ends. Where a world offers no such spot the verdict says so, and nothing else is done in its place.
+In old Eden's park: `act "go on the swings"`, `act "play on the see-saw"` (it needs someone on the other end: a lone rider waits up to 150 s, then the receipt fails honestly with "Nobody came"; both riders' receipts complete together), `act "lie in a hammock"` and `act "have a picnic"` (on the blanket, with food). `act "go stargazing"` lies back on open grass and is offered only from 20:00 to 05:00 world time; by day it is refused with the hours. "Swing by" is a visit, not a swing; eating at a picnic table stays eating.
 
 ## Terminal outcomes and content
 

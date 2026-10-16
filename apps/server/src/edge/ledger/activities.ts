@@ -11,7 +11,10 @@ type V2 = [number, number];
 export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 'idle' | 'lie'; at: V2; faceTo?: V2; seatHeight?: number; prop?: string; label?: string;
   /** CN5: the instrument at a play-music spot (drums, guitar, violin…); the raised deck it stands on (platforms[] id);
    *  further activities offered at the same spot (a desk with a computer: `also: ['use-computer']`). */
-  instrument?: string; platform?: string; also?: string[]};
+  instrument?: string; platform?: string; also?: string[];
+  /** todo (leisure): a spot done together (a see-saw's two ends): the shared group, how many others it needs, how long it
+   *  waits for them and what happens alone (fail: "nobody came" is the honest verdict). */
+  together?: {group: string; need: number; wait: number; alone: 'fail' | 'start'}};
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2};
 export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]};
 export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
@@ -29,13 +32,16 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
   dips: {seconds: 30, label: 'Do dips on the bars'}, situps: {seconds: 30, label: 'Do sit-ups'}, pushups: {seconds: 30, label: 'Do push-ups'}, yoga: {seconds: 120, label: 'Do yoga'},
   // leisure: nature activities at World's bank, pond and bed spots
   fish: {prop: 'rod', seconds: 180, label: 'Fish from the bank'}, feed: {prop: 'bread', seconds: 90, label: 'Feed the koi'}, garden: {prop: 'tool', seconds: 150, label: 'Tend the garden beds'},
+  // leisure: the playground, the hammocks and the picnic blanket (World's scenery), and lying back to watch the night sky
+  swing: {seconds: 120, label: 'Swing on a swing'}, seesaw: {seconds: 120, label: 'Ride the see-saw (with someone on the other end)'},
+  hammock: {seconds: 300, label: 'Rest in a hammock'}, picnic: {prop: 'food', seconds: 300, label: 'Have a picnic on the blanket'},
   'play-frisbee': {seconds: 300, label: 'Throw a frisbee'}, 'play-petanque': {seconds: 600, label: 'Play pétanque'}, 'play-volleyball': {seconds: 300, label: 'Play beach volleyball'},
 };
 /** CN5 choreographed games at spots: 2–6 players; the world keeps the turns (social/pose.ts GAMES). */
 export const GAME_ACTIVITIES: Record<string, 'frisbee' | 'petanque' | 'volleyball'> = {'play-frisbee': 'frisbee', 'play-petanque': 'petanque', 'play-volleyball': 'volleyball'};
 export const GAME_MAX_PLAYERS = 6;
 /** Postures done lying on a spot's furniture or mat (the rest of a `lie` spot is lying down or a nap). */
-const LYING_SPOT = new Set(['lie', 'nap', 'situps', 'pushups', 'bench-press', 'yoga']);
+const LYING_SPOT = new Set(['lie', 'nap', 'situps', 'pushups', 'bench-press', 'yoga', 'hammock']);
 const INSTRUMENTS = new Set<string>(POSE_INSTRUMENTS);
 const REF = /^[a-z0-9][a-z0-9._-]{0,99}$/;
 /** Clear ground a body needs to stand or sit at a spot (m): the walk planner's body radius. */
@@ -44,12 +50,14 @@ const STAND_CLEAR = 0.28;
 export const SPOT_REACH = 200;
 const pt = (v: unknown): v is V2 => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
 
+const validTogether = (t: Spot['together']) => !!t && typeof t.group === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(t.group) && Number.isInteger(t.need) && t.need >= 1 && t.need <= 8
+  && Number.isFinite(t.wait) && t.wait >= 0 && t.wait <= 180 && (t.alone === 'fail' || t.alone === 'start');
 /** Validate an activity-spots/1 file; bad entries are dropped and reported (never faked). */
 export function loadSpots(raw: unknown): {data: SpotsData; refused: string[]} {
   const d = (raw ?? {}) as Partial<SpotsData>, refused: string[] = [], ids = new Set<string>();
   const ok = (id: unknown) => typeof id === 'string' && REF.test(id) && !ids.has(id) && !!ids.add(id);
   const spots = (d.spots ?? []).filter(s => {const good = ok(s?.id) && pt(s.at) && s.activity in SPOT_ACTIVITIES && ['sit', 'idle', 'lie'].includes(s.base) && (s.faceTo === undefined || pt(s.faceTo))
-    && (s.instrument === undefined || INSTRUMENTS.has(s.instrument)) && (s.also === undefined || (Array.isArray(s.also) && s.also.every(a => a in SPOT_ACTIVITIES && !(a in GAME_ACTIVITIES)))); if (!good) refused.push('spot ' + String(s?.id)); return good;});
+    && (s.instrument === undefined || INSTRUMENTS.has(s.instrument)) && (s.together === undefined || validTogether(s.together)) && (s.also === undefined || (Array.isArray(s.also) && s.also.every(a => a in SPOT_ACTIVITIES && !(a in GAME_ACTIVITIES)))); if (!good) refused.push('spot ' + String(s?.id)); return good;});
   const shelves = (d.shelves ?? []).filter(s => {const good = ok(s?.id) && pt(s.at); if (!good) refused.push('shelf ' + String(s?.id)); return good;});
   const interiors = (d.interiors ?? []).filter(i => {const good = typeof i?.place === 'string' && Array.isArray(i.doors) && i.doors.length > 0 && i.doors.every(x => Array.isArray(x) && x.length === 4 && x.every(Number.isFinite)) && (i.shell===undefined||validInteriorShellBounds(i.shell)); if (!good) refused.push('interior ' + String(i?.place)); return good;});
   const solids = (d.solids ?? []).filter(s => {const good = ok(s?.id) && pt(s.c) && pt(s.half) && Number.isFinite(s.yaw); if (!good) refused.push('solid ' + String(s?.id)); return good;});
@@ -78,7 +86,11 @@ export type ActivityWorld = {
   ancestors(id: string): string[];
   /** CN5: how many bodies are playing (or waiting to play) in this game group now. */
   groupSize(group: string): number;
+  /** leisure: the world clock now (null/absent: this world keeps no day), for stargazing after dark. */
+  clock?: {hour: number; minute: number} | null;
 };
+/** leisure: the stars are out from 20:00 until 05:00 world time. */
+export const STARS_FROM = 20, STARS_UNTIL = 5;
 
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const pose = (activity: string, seconds: number, extra: Record<string, unknown> = {}) => ({verb: 'mars:pose_v1', params: {activity, seconds, ...extra}});
@@ -110,7 +122,9 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     const def = SPOT_ACTIVITIES[activity], lying = s.base === 'lie', act = lying && !LYING_SPOT.has(activity) ? 'lie' : activity, prop = s.prop ?? def.prop;
     return [...standFirst(w), walk(clearAt(s) ?? s.at), pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
-      ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {})})];
+      ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {}),
+      // leisure: done together (a see-saw): wait for the other end, then the same shared stretch for both
+      ...(s.together ? {group: s.together.group, need: s.together.need, waitSeconds: s.together.wait, alone: s.together.alone, seatTogether: true} : {})})];
   };
   const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
   /** Reading at a spot: take a book from the nearest shelf, read, put it back. */
@@ -132,6 +146,16 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     const plan: Plan = beds[0] ? {label: SPOT_ACTIVITIES[act].label, steps: spotSteps(beds[0], sec), seconds: true} : {label: SPOT_ACTIVITIES[act].label, steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose(act, sec)], seconds: true};
     add({id: `${act}:here`, verb: act, label: act === 'lie' ? (beds[0] ? `Lie down (${beds[0].label ?? beds[0].id})` : 'Lie down on the grass here') : (beds[0] ? `Take a nap (${beds[0].label ?? beds[0].id})` : 'Take a nap on the grass here'), available: !!beds[0] || canHere,
       ...(beds[0] || canHere ? {} : {blocked: {code: 'pose.no-room', reason: 'No open ground within 15 m to lie on; walk to a lawn or garden first.'}}), params: secondsParam(sec)}, plan);
+  }
+  // ---- leisure: lie back on open grass and watch the stars, after dark only (the verdict says when, never a lie in daylight)
+  {
+    const spot = groundHere >= 0.95 ? null : w.open(w.me, 0.95, 30), room = groundHere >= 0.95 || !!spot, c = w.clock;
+    const dark = !!c && (c.hour >= STARS_FROM || c.hour < STARS_UNTIL), at = c ? `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}` : null;
+    const blocked = !c ? {code: 'sky.no-clock', reason: 'This world keeps no day and night, so there are no stars to watch.'}
+      : !dark ? {code: 'sky.daylight', reason: `The stars come out from ${STARS_FROM}:00 to 0${STARS_UNTIL}:00 world time; it is ${at} now. Lie down on the grass instead, or ask again after dark.`}
+      : !room ? {code: 'pose.no-room', reason: 'No open ground within 15 m to lie on; walk to a lawn first.'} : null;
+    add({id: 'stargaze:here', verb: 'stargaze', label: 'Lie back on the grass and watch the stars', available: !blocked, ...(blocked ? {blocked} : {}), params: secondsParam(300)},
+      {label: 'Watch the stars', steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose('stargaze', 300)], seconds: true});
   }
   // ---- moving on the spot (P1): standing or on the ground, wherever there is room
   for (const [act, label, sec, lying] of [['dance', 'Dance here', 60, false], ['jump', 'Jump on the spot', 5, false], ['stretch', 'Stretch', 30, false], ['jumping-jacks', 'Do jumping jacks', 30, false],
@@ -161,7 +185,8 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
-      add({id, verb: activity, label: labelOf(s, activity), available: true, target: {id: s.id, kind: 'spot'}, params: secondsParam(def.seconds)}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true});
+      const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : `; someone must take the other end within ${s.together.wait} s`) : '';
+      add({id, verb: activity, label: labelOf(s, activity) + withWho, available: true, target: {id: s.id, kind: 'spot'}, params: secondsParam(def.seconds)}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true});
     }
   }
   // ---- CN5 choreographed games: each court's free places (its spots, then extra places beside them up to 6 players)

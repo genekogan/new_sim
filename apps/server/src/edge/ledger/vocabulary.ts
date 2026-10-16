@@ -80,6 +80,10 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\bjumping[- ]?jacks?\b|\bstar[- ]?jumps?\b/, 'jumping-jacks'], [/\bpush[- ]?ups?\b|\bpress[- ]?ups?\b/, 'pushups'], [/\bsit[- ]?ups?\b|\bcrunches\b/, 'situps'],
   [/\bfeed(?:ing)? (?:the |some |a few )?(?:koi|fish|carp)\b|\b(?:throw|toss|scatter) (?:some |the )?(?:bread|crumbs|food) (?:to|for|into|in) (?:the )?(?:koi|fish|pond)\b|\bfeed (?:the )?pond\b/, 'feed'],
   [/\b(?:fishing|angling)\b|\b(?:go|to|let'?s) fish\b|^fish\b|\bcast (?:a |my |the )?(?:line|rod)\b|\bcatch (?:a |some )?fish\b/, 'fish'],
+  // leisure: the playground, the hammocks, a picnic blanket, the night sky ("swing by" is a visit, not a swing; a picnic table is for eating)
+  [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/, 'seesaw'], [/\b(?:swing|swings|swinging)\b(?!\s+by\b)/, 'swing'], [/\bhammocks?\b/, 'hammock'],
+  [/\bpicnic(?:king)?\b(?!\s+tables?\b)/, 'picnic'],
+  [/\bstar[- ]?gaz\w*|\b(?:watch|look at|see|count) (?:the )?(?:stars|night sky)\b/, 'stargaze'],
   [/^(?:please\s+)?garden\b|\b(?:gardening|weed(?:ing)?|(?:tend|tending|water|watering|plant|planting) (?:the |some |my )?(?:garden )?(?:beds?|seeds?|flowers?|vegetables?|plots?|plants?|crops?))\b/, 'garden'],
   [/\byoga\b/, 'yoga'], [/\bstretch(?:es|ing)?\b/, 'stretch'], [/\bdanc(?:e|es|ing)\b|\bboogie\b/, 'dance'], [/\bjump(?:s|ing)?\b|\bhop\b/, 'jump'],
   [/\b(?:read|reading|reads)\b/, 'read'], [/\b(?:write|writing)\b/, 'write'],
@@ -105,6 +109,9 @@ const FILLER = new Set(['find', 'somewhere', 'someplace', 'place', 'spot', 'quie
 const GO_FOR = /^(?:let'?s\s+|i\s+want\s+to\s+|please\s+)?(?:go|going|take|have|do|try)\s+(?:for\s+|on\s+|in\s+)?(?:a|an|some|the)\s+(.+)$/i;
 const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
   [/^(?:seat|sit)\b/, 'sit'], [/^(?:dance|boogie)\b/, 'dance'], [/^(?:stretch)\b/, 'stretch'], [/^(?:read|book)\b/, 'read'], [/^(?:look|wander around)\b/, 'stroll'], [/^(?:rest|break|breather)\b/, 'rest'], [/^(?:drink|coffee|tea|cuppa)\b/, 'drink'], [/^(?:meal|bite|snack|lunch|dinner|breakfast)\b/, 'eat']];
+/** leisure: a posture or play word followed by a playground or lawn thing (the thing decides what is done there). */
+const LEISURE_LEAD = /^(?:please\s+)?(?:sit|lie|lay|rest|relax|nap|snooze|doze|play|ride|get|hop|go|have a go)\b/i;
+const LEISURE_OBJECTS: [RegExp, string][] = [[/\bhammocks?\b/, 'hammock'], [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/, 'seesaw'], [/\bswings?\b(?!\s+by\b)/, 'swing'], [/\bpicnic (?:blanket|rug)\b/, 'picnic']];
 /** Rides: the balloon (and any later carrier) is an object you join. */
 export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in the air|hot[- ]air|row|rowing|punt|boat|boating)\b/i;
 /** Things bodies cannot do yet: refused honestly (never resolved to something else). */
@@ -116,12 +123,16 @@ export const NOT_YET: [RegExp, string, string[], string?][] = [
   [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish)\b/i, 'There is nowhere to fish from here right now: fishing is offered only at a marked pond bank.', ['swim', 'stroll', 'sit'], 'fish'],
   [/\b(?:sailing|canoeing|kayaking)\b/i, 'Sailing, canoes and kayaks are not possible yet; an offered punt can be rowed.', ['swim', 'stroll', 'sit']],
   [/\b(?:swinging|on the swings?|go on (?:a |the )?swing)\b/i, 'There is no swing offered here right now.', ['stroll', 'sit', 'dance'], 'swing'],
+  [/\bsee[- ]?saw\b|\bteeter[- ]?totter\b/i, 'There is no see-saw offered here right now.', ['stroll', 'sit'], 'seesaw'],
+  [/\bhammocks?\b/i, 'There is no hammock offered here right now.', ['lie', 'nap', 'sit'], 'hammock'],
+  [/\b(?:have|having|go for|go on|for) (?:a |some )?picnic\b|^picnic\b|\bpicnicking\b/i, 'There is no picnic blanket laid out here right now; eat at a table or sit on the grass instead.', ['eat', 'sit-ground', 'sit'], 'picnic'],
+  [/\bstar[- ]?gaz\w*|\b(?:watch|look at|count) (?:the )?stars\b/i, 'Stargazing needs open grass and a world with nights.', ['lie', 'sit-ground'], 'stargaze'],
   [/\bfeed(?:ing)? (?:the |some )?(?:ducks?|geese|goose|swans?|birds?|pigeons?|gulls?)\b/i, 'There are no ducks or birds to feed here; the ponds have koi, which can be fed from a marked bank.', ['feed', 'stroll', 'sit'], undefined],
   [/\b(?:feed(?:ing)? (?:the |some )?(?:fish|koi|carp))\b/i, 'There is nowhere to feed the koi from here right now: it is offered at a marked pond bank.', ['stroll', 'sit'], 'feed'],
   [/\b(?:skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance'], 'cycle'],
 ];
 /** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
-const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
+const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', swinging: 'swing', stargazing: 'stargaze', picnicking: 'picnic', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
@@ -132,6 +143,8 @@ export function parseCapability(input: string, verbs: Set<string>): {verb: strin
   const gf = GO_FOR.exec(raw);
   if (gf) {const x = gf[1].toLowerCase().trim(); for (const [re, v] of GO_FOR_X) if (re.test(x)) {if (verbs.has(v) || v === 'stroll') return {verb: v, rest: x.replace(re, ' ').trim()}; break;}}
   const words = raw.split(/\s+/);
+  // leisure: "sit on the swing", "lie in the hammock", "play on the see-saw": the named thing decides, not the posture word
+  if (LEISURE_LEAD.test(raw)) for (const [re, v] of LEISURE_OBJECTS) if (verbs.has(v) && re.test(raw.toLowerCase())) return {verb: v, rest: raw.toLowerCase().replace(re, ' ').replace(LEISURE_LEAD, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};
   for (let n = Math.min(4, words.length); n >= 1; n--) {
     const v = canon(words.slice(0, n).join('-')), rest = words.slice(n).join(' ');
     if (!verbs.has(v)) continue;
@@ -178,7 +191,7 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   }
   const rideIntent = /\b(?:row|rowing|boating|ride|rides|fly|flight|flying|leave|disembark|alight|start|depart)\b/.test(text) || /^(?:punt|boat|balloon)(?::|$)/.test(text);
   // Rowing always means a punt, and an explicit balloon always means a balloon.
-  if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse)\b/.test(text)) {
+  if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|see[- ]?saw|teeter[- ]?totter|swings?)\b/.test(text)) {
     const water = /\b(?:row|rowing|punt|boat|boating)\b/.test(text), air = /\b(?:balloon|fly|flight|flying|hot[- ]air)\b/.test(text);
     const action = /\b(?:leave|disembark|alight)\b/.test(text) ? 'leave' : /\b(?:start|depart)\b/.test(text) ? 'start' : 'join';
     const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing/i.test(c.id + ' ' + c.label) : air ? /balloon/i.test(c.id + ' ' + c.label) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));

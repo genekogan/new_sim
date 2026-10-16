@@ -22,12 +22,14 @@ export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-mus
   'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
   // CN5: at a desk computer, at a microphone, in an audience, with dumbbells
   'use-computer', 'sing', 'listen', 'lift-weights',
-  // todo (leisure): fishing from a bank, tossing bread, tending garden beds
-  'fish', 'feed', 'garden'] as const;
+  // todo (leisure): fishing from a bank, tossing bread, tending garden beds; on a swing or a see-saw seat, picnicking
+  'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic'] as const;
 /** Whole-body postures on open ground (the body point stays; the viewer lays the body out along pose.yaw). */
 export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga',
   // CN5: lying on a gym bench (seatHeight = the bench top)
-  'bench-press'] as const;
+  'bench-press',
+  // todo (leisure): lying in a hammock (seatHeight = the cloth), lying back on the grass to watch the stars
+  'hammock', 'stargaze'] as const;
 /** Standing whole-body exercise/expression poses (cyclic; the viewer animates them from the tick). */
 export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // paired touch gestures (core-next4): both bodies face each other at `gap` and share one start and end
@@ -52,7 +54,7 @@ export type GameState = { kind: GameKind; group: string; players: string[]; wait
 const STEP_IN_SPEED = 0.6;
 /** together/1: partners further apart than this never pair (m). */
 const PAIR_REACH = 4;
-const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga', 'bench-press']);
+const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga', 'bench-press', 'hammock', 'stargaze']);
 /** CN5: players of a game are found within this distance (a frisbee lawn's ends are 14 m apart). */
 const GAME_REACH = 30;
 /** Open ground a lying body needs around its point (m). */

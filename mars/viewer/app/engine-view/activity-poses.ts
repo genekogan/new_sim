@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import {gameContact,type RecordedGame} from './recorded-games.ts';
 import {rowingStroke} from './rowing-motion.ts';
+import {seesawAngle, swingAngle} from './play-motion.ts';
 // Body activities (ACTIVITIES-v1, Core `mars:pose_v1`) as a cosmetic, random-access renderer layer: hand goals
 // relative to each shoulder, whole-body layouts (sitting on the ground, lying on the back), procedural cycles for
 // exercise/dance ids, and small hand props. Pure function of (activity, base, prop, seconds, id): canonical
 // roots, contacts, seats and hands stay the engine's; engine hand points / grips always win over this layer.
 
 /** Overlay ids drawn on top of their base posture (sit / idle / sit-ground). */
-export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['row', 'read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'fish', 'feed', 'garden', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
+export const ACTIVITY_OVERLAYS: ReadonlySet<string> = new Set(['row', 'read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave', 'use-computer', 'sing', 'listen', 'fish', 'feed', 'garden', 'swing', 'seesaw', 'picnic', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point', 'pick-up', 'put-down', 'hug', 'handshake', 'high-five', 'give', 'take']);
 /** Whole-body ids: the body point stays put and the viewer lays the body out from it along pose.yaw. */
-export const LYING: ReadonlySet<string> = new Set(['lie', 'nap', 'situps', 'bench-press']);
+export const LYING: ReadonlySet<string> = new Set(['lie', 'nap', 'situps', 'bench-press', 'hammock', 'stargaze']);
 export const FACE_DOWN: ReadonlySet<string> = new Set(['pushups']);
 /** Standing procedural cycles (Core may publish these ids; unknown ids simply stand). */
 export const CYCLES: ReadonlySet<string> = new Set(['dance', 'jumping-jacks', 'jump', 'stretch', 'yoga', 'pull-ups', 'dips', 'lift-weights', 'play-volleyball', 'play-frisbee', 'play-petanque']);
@@ -17,7 +18,7 @@ export const CYCLES: ReadonlySet<string> = new Set(['dance', 'jumping-jacks', 'j
 export const GROUND_SEAT = 0.04;
 export const PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'boule', 'dumbbell', 'rod', 'bread', 'guitar', 'bass', 'violin', 'viola', 'cello', 'flute', 'drumsticks'] as const;
 export type PropKind = (typeof PROPS)[number];
-const DEFAULT_PROP: Record<string, PropKind> = { read: 'book', browse: 'book', write: 'pen', paint: 'brush', eat: 'plate', drink: 'cup', cook: 'tool', 'play-game': 'cards', craft: 'tool', 'post-letter': 'letter', fish: 'rod', feed: 'bread', garden: 'tool' };
+const DEFAULT_PROP: Record<string, PropKind> = { read: 'book', browse: 'book', write: 'pen', paint: 'brush', eat: 'plate', drink: 'cup', cook: 'tool', 'play-game': 'cards', craft: 'tool', 'post-letter': 'letter', fish: 'rod', feed: 'bread', garden: 'tool', picnic: 'food' };
 
 /** The posture an activity sits on, given the engine's baseActivity. */
 export function activityBase(activity: string, base?: string): string {
@@ -54,6 +55,8 @@ export type ActivityFrame = {
   lying: null | { face: 'back' | 'front'; raise: number };
   /** Head pitch (rad, + down: looking at a book or the keys). */
   look: number;
+  /** leisure: riding a playground seat (play-motion.ts): the swing's or the see-saw plank's angle now (rad). */
+  ride?: { kind: 'swing' | 'seesaw'; angle: number };
 };
 const S = (x: number) => x * x * (3 - 2 * x);
 const tri = (x: number) => 1 - Math.abs(((x % 2) + 2) % 2 - 1); // 0..1..0 over 2
@@ -94,6 +97,17 @@ export function activityFrame(activity: string, base: string, seconds: number, i
       f.hands = [[0.28, -0.12, -0.3 + 0.1 * scoop], [0.3 - 0.1 * scoop + 0.34 * toss - 0.2 * rest, 0.04 + 0.12 * toss, -0.38 + 0.26 * scoop + 0.1 * toss - 0.2 * rest]]; f.lean = 0.12 + 0.12 * toss; f.look = 0.3; return f; }
     case 'garden': { const dig = Math.sin(t * 3.2), k = tri(t * 0.2);
       f.hands = [[0.42, -0.06, -0.62 + 0.02 * k], [0.46 + 0.08 * dig, 0.05, -0.64 + 0.06 * Math.abs(dig)]]; f.lean = 0.62 + 0.06 * dig; f.feetOut = 0.17; f.look = 0.2; return f; }
+    // leisure: holding the swing's chains at shoulder height, leaning back as it goes forward; the see-saw's handle in
+    // front, the same rhythm for both ends (world seconds); a picnic is eating sat low on the blanket; lying in a hammock
+    // with the head propped, or flat on the grass with the hands behind the head, looking up
+    case 'swing': { const angle = swingAngle(t), v = Math.cos((t * 2 * Math.PI) / 2.7);
+      f.hands = [[0.02, 0.03, 0.14], [0.02, 0.03, 0.14]]; f.lean = -0.1 * v; f.look = -0.05 - 0.08 * v; f.ride = { kind: 'swing', angle }; return f; }
+    case 'seesaw': { const angle = seesawAngle(seconds);
+      f.hands = [[0.26, -0.1, -0.3], [0.26, -0.1, -0.3]]; f.lean = 0.08; f.look = -0.05; f.ride = { kind: 'seesaw', angle }; return f; }
+    case 'picnic': { const k = S(Math.max(0, Math.sin(t * 0.7)));
+      f.hands = [[0.3, -0.1, down - 0.04], [0.32 - 0.14 * k, -0.08 - 0.08 * k, down + 0.48 * k]]; f.look = 0.25 * (1 - k); return f; }
+    case 'hammock': f.lying = { face: 'back', raise: 0.22 }; f.hands = [[0.28, -0.1, 0.04], [0.3, -0.06, 0.04]]; f.look = 0.1; return f;
+    case 'stargaze': f.lying = { face: 'back', raise: 0 }; f.hands = [[-0.04, 0.02, 0.3], [-0.04, 0.02, 0.3]]; f.look = -0.2; return f;
     case 'read': { const turn = Math.max(0, Math.sin(t * 0.21) - 0.96) * 6; // now and then a page turns
       f.hands = [[0.33, -0.13, down + 0.04], [0.33 + 0.04 * turn, -0.13 + 0.1 * turn, down + 0.04 + 0.03 * turn]]; f.look = 0.38; f.lean = seated ? 0.06 : 0.03; return f; }
     case 'browse': { const k = S(tri(t * 0.45));

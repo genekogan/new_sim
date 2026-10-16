@@ -53,6 +53,7 @@ import { PRONE_ACTIVITY } from '../../engine/construction/handup.ts';
 import { ACTIVITY_OVERLAYS, GROUND_SEAT, LYING, activityFrame, makeProp, placeProp, propFor, type ActivityFrame, type PropKind } from './activity-poses.ts';
 import {recordedGame,type RecordedGame} from './recorded-games.ts';
 import {runningGaitAt} from './running-gait.ts';
+import {PLAY_MOTION, playSeatAt, rideSeat} from './play-motion.ts';
 
 type Hands = { left?: Vec3; right?: Vec3 };
 type Snap = { p: [number, number, number]; yaw: number; walkW: number; walkT: number; idleT: number; sitW: number; warmW: number; expressionT: number; pose: Posture; hands: Hands; pr: ProneState | null };
@@ -649,6 +650,7 @@ export class HumanViews {
    * `reach`: nearest point of a gripped part (components.ts) for grips without a known slot.
    */
   render(alpha: number, reach?: Reach) {
+    PLAY_MOTION.value.set(0, 0, 0, 0); // empty playground seats hang at rest; riders set theirs below
     for (const v of this.views.values()) this.pose(v, alpha, reach);
   }
 
@@ -695,6 +697,8 @@ export class HumanViews {
         if (fit.k !== 0 && !v.bench) h.quaternion.premultiply(_tilt.setFromAxisAngle(_axis.set(-s, 0, c), Math.atan(fit.k))); }
       else { h.rotation.z = -(Math.PI / 2 - act.lying.raise); h.position.y += 0.06; }
     } else if (act && act.hop > 0) h.position.y += act.hop;
+    // leisure: a rider moves with the swing or the see-saw plank they sit on (play-motion.ts); the scenery seat follows
+    if (act?.ride) { const seat = playSeatAt(act.ride.kind, h.position.x, h.position.z); if (seat) rideSeat(h, seat, act.ride.angle); }
     // clips: Run replaces Walk while running; Wave / Interact / Idle_Neutral take Idle's share
     // running: the library jog / sprint (speed-matched) where present, else the GLB's Run
     const jog = v.running ? libAction(v.rig, v.speed > SPRINT_SPEED && v.rig.template.sprintSpeed ? 'Sprint_Loop' : 'Jog_Fwd_Loop') : null;

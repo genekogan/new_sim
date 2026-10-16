@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {kernelHash} from '@sim/kernel';
 import {edenNavWorld, factory, WORLD_SPOTS} from '../test/eden-nav-fixture.ts';
 import {WorldHost} from './world.ts';
-import {loadSpots} from './edge/ledger/activities.ts';
+import {activityCapabilities, loadSpots} from './edge/ledger/activities.ts';
 
 async function world(n: number) {
   const w = await edenNavWorld(n, {cn5: true, spots: WORLD_SPOTS});
@@ -41,6 +41,50 @@ test('leisure: go fishing, feed the koi, tend the beds; ducks are refused, not s
   // garden beds in the gardens
   const garden = await w.act(c, 'do some gardening', {seconds: 6}); assert.equal(garden.accepted, true, JSON.stringify(garden)); assert.match(garden.resolved?.to, /^garden:garden-bed-/);
   const f3 = await w.seen(c, garden, 'garden'); assert.equal(f3.r.phase, 'completed'); assert.equal(f3.got?.prop, 'tool');
+  assert.deepEqual(w.f.host.engine.runtime.violations, []);
+  await w.replayExact();
+});
+
+test('playground and lawn spots load: swings, see-saw ends (together), hammocks, picnic blanket', () => {
+  const out = loadSpots(WORLD_SPOTS); assert.deepEqual(out.refused, []);
+  const by = new Map(out.data.spots.map(s => [s.id, s]));
+  for (const id of ['swing-1', 'swing-2', 'seesaw-west', 'seesaw-east', 'hammock-1', 'hammock-2', 'picnic-blanket-w', 'picnic-blanket-n']) assert.ok(by.has(id), id);
+  assert.deepEqual(by.get('seesaw-east')!.together, {group: 'seesaw-playground', need: 1, wait: 150, alone: 'fail'});
+  assert.deepEqual(loadSpots({contract: 'activity-spots/1', spots: [{...by.get('seesaw-west'), together: {group: 'bad group!', need: 1, wait: 150, alone: 'fail'}}]}).refused, ['spot seesaw-west']);
+});
+
+test('stargazing is offered only after dark, and says when the stars come out', () => {
+  const data = loadSpots({contract: 'activity-spots/1', spots: []}).data;
+  const w = (hour: number | null) => ({me: [0, 0] as [number, number], seated: false, clearance: () => 2, open: () => null, taken: () => false, enterable: () => true, seat: () => null,
+    placeName: () => null, ancestors: () => [], groupSize: () => 0, clock: hour === null ? null : {hour, minute: 30}});
+  const cap = (hour: number | null) => activityCapabilities(data, w(hour)).caps.find(c => c.id === 'stargaze:here')!;
+  assert.equal(cap(22).available, true); assert.equal(cap(3).available, true);
+  assert.equal(cap(9).available, false); assert.match(cap(9).blocked!.reason, /20:00 to 05:00.*09:30/);
+  assert.equal(cap(null).blocked!.code, 'sky.no-clock');
+});
+
+test('leisure: swing, see-saw with a partner (alone: nobody came), hammock, picnic; stargazing refused by day', {timeout: 1800000}, async t => {
+  const w = await world(4); t.after(() => {w.f.host.stop(); w.f.db.close();});
+  const [a, b, c, d] = w.souls;
+  // a swing in the playground: seated at the swing's seat height, swinging
+  const swing = await w.act(a, 'go on the swings', {seconds: 8}); assert.equal(swing.accepted, true, JSON.stringify(swing)); assert.match(swing.resolved?.to, /^swing:swing-/);
+  const s1 = await w.seen(a, swing, 'swing'); assert.equal(s1.r.phase, 'completed'); assert.equal(s1.got?.base, 'sit');
+  // see-saw: one end alone waits, then honestly fails; with someone on the other end both ride together and both complete
+  const lone = await w.act(b, 'ride the see-saw', {seconds: 6}); assert.equal(lone.accepted, true, JSON.stringify(lone)); assert.match(lone.resolved?.to, /^seesaw:seesaw-/);
+  const l1 = await w.done(b, lone); assert.equal(l1.phase, 'failed'); assert.match(JSON.stringify(l1), /Nobody came/);
+  const p1 = await w.act(b, 'play on the see-saw', {seconds: 6}); assert.equal(p1.accepted, true, JSON.stringify(p1));
+  const p2 = await w.act(c, 'see-saw', {seconds: 6}); assert.equal(p2.accepted, true, JSON.stringify(p2)); assert.notEqual(p2.resolved?.to, p1.resolved?.to);
+  let together = 0; await w.run([{soulId: b.soulId, id: p1.receipt.id}, {soulId: c.soulId, id: p2.receipt.id}], 20 * 60 * 5, () => {if (w.body(b).human.activity === 'seesaw' && w.body(c).human.activity === 'seesaw') together++;});
+  assert.equal(w.ledger.receipt(b.soulId, p1.receipt.id)!.phase, 'completed', JSON.stringify([w.ledger.receipt(b.soulId, p1.receipt.id), w.ledger.receipt(c.soulId, p2.receipt.id)])); assert.equal(w.ledger.receipt(c.soulId, p2.receipt.id)!.phase, 'completed'); assert.ok(together > 20 * 4, String(together));
+  // a hammock: lying on the cloth (seat height), and a picnic on the blanket with food in hand
+  const ham = await w.act(d, 'lie in a hammock', {seconds: 6}); assert.equal(ham.accepted, true, JSON.stringify(ham)); assert.match(ham.resolved?.to, /^hammock:hammock-/);
+  const h1 = await w.seen(d, ham, 'hammock'); assert.equal(h1.r.phase, 'completed');
+  const pic = await w.act(a, 'have a picnic', {seconds: 6}); assert.equal(pic.accepted, true, JSON.stringify(pic)); assert.match(pic.resolved?.to, /^picnic:picnic-blanket-/);
+  const pc = await w.seen(a, pic, 'picnic'); assert.equal(pc.r.phase, 'completed'); assert.equal(pc.got?.prop, 'food'); assert.equal(pc.got?.base, 'sit');
+  // eating at a picnic TABLE stays eating; stargazing in the morning is refused with the hours, never swapped
+  const table = await w.act(c, 'eat lunch at the picnic table'); assert.doesNotMatch(String(table.resolved?.to ?? ''), /^picnic:/);
+  const stars = await w.act(b, 'go stargazing'); assert.equal(stars.accepted, false); assert.match(stars.reason ?? JSON.stringify(stars), /stars come out from 20:00/);
+  assert.equal((await w.act(b, 'swing by the cafe')).resolved?.to?.startsWith('swing:') ?? false, false);
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
   await w.replayExact();
 });
