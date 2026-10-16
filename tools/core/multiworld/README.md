@@ -25,7 +25,7 @@ To run the whole local group, save a config outside the repository:
 }
 ```
 
-`node tools/core/multiworld/local-worlds.mjs /absolute/local-config.json` reuses the already-running Eden process without writing its files; optionally `edenDescriptor` starts an owned Eden copy on4950–4959 instead. `sourceDb` per new world uses built-in SQLite `readOnly:true` plus `VACUUM INTO` and refuses an existing destination. Never point a world dataDir at live data. Readiness checks all three world identities before starting the proxy. Ctrl-C/SIGTERM stops only owned children.
+`node tools/core/multiworld/local-worlds.mjs /absolute/local-config.json` reuses the already-running Eden process without writing its files; optionally `edenDescriptor` starts an owned Eden copy on4950–4959 instead. `sourceDb` per new world uses `copy-sqlite.mjs` (source attached `mode=ro`, compact copy: every table verified, recordings `take_chunks`/`take_archives` left empty) and refuses an existing destination. Never point a world dataDir at live data. Readiness checks all three world identities before starting the proxy. Ctrl-C/SIGTERM stops only owned children.
 
 The proxy preserves selected-world HTTP, streaming SSE, WebSocket upgrades and queries. `/__sim/worlds.json` returns `local-worlds/1` metadata. Campus derivative routes go to Mars; existing `/w/mars/2020`–`2027` year surfaces stay on Eden's static handler. Unknown world prefixes return404 instead of rendering another world's API.
 

@@ -2,7 +2,7 @@
 // tree? This is the data-safety check for moving old-world backends to the merged codebase (docs/god/MERGE-GUIDE.md
 // F4).
 //
-// For each world, the production SQLite is copied READ-ONLY (VACUUM INTO, tools/core/multiworld/copy-sqlite.mjs:
+// For each world, the production SQLite is copied READ-ONLY (compact copy without the take_chunks/take_archives recordings, tools/core/multiworld/copy-sqlite.mjs:
 // readOnly connection, fresh destination) once per tree into --out. Each tree's own sanctioned check-only boot then
 // runs on its copy, in a separate process under the port-remap preload: Mars/LM use openWorldServer({checkOnly}), Eden
 // uses openEdgeServerV1({checkOnly}). Neither binds a port. The tick, head, state hash, rules and boot replay are
