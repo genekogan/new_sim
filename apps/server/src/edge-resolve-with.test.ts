@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {edenNavWorld} from '../test/eden-nav-fixture.ts';
 import {confirmedTogetherEffects} from './edge/outcomes/effects.ts';
+import {resolveCapability} from './edge/ledger/vocabulary.ts';
 
 test('resolve keeps the companion: walk with X to an ambiguous place, sit with X by the fire; walks list `with`', {timeout: 300000}, async t => {
   const w = await edenNavWorld(2, {cn5: true}); t.after(() => {w.f.host.stop(); w.f.db.close();});
@@ -31,4 +32,13 @@ test('a guest who accepts a ride invitation is told they boarded, not that the r
   assert.match(String(guest.summary), /boarded ride-eden-balloon; the ride has not left the ground yet and is not finished/);
   const other = confirmedTogetherEffects(ledger, {id: 'r_other', soulId: 's_guest', capability: 'walk:x', phase: 'completed', programId: 'p2'} as any, null);
   assert.equal(other.summary, undefined);
+});
+
+test('things that exist nowhere in the world are refused terminally, with nothing chosen in their place (quality 22/29/30)', () => {
+  const caps = [{id: 'stroll:here', verb: 'stroll', label: 'Stroll', available: true}, {id: 'sit:here', verb: 'sit', label: 'Sit', available: true}, {id: 'dance:here', verb: 'dance', label: 'Dance', available: true}] as any[];
+  const ctx: any = {caps, target: () => ({names: [], around: [], at: null}), places: [], root: [], me: null};
+  for (const ask of ['go play on the swings', 'feed the ducks', 'row a boat on the pond', 'ride a bike', 'go skateboarding']) {
+    const r: any = resolveCapability(ask, ctx);
+    assert.equal(r.kind, 'unknown', ask); assert.match(r.reason, /exists anywhere in this world.*will not help/, ask);
+  }
 });

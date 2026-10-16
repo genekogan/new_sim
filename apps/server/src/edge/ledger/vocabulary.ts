@@ -109,8 +109,10 @@ export const NOT_YET: [RegExp, string, string[]][] = [
   [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
   // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped
   [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish|rowing|row (?:a |the )?boat|boating|sailing|canoeing|kayaking|paddle (?:a |the )?boat)\b/i, 'Fishing and boats are not possible yet.', ['swim', 'stroll', 'sit']],
-  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance']],
+  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'Swings, feeding animals, skateboards and bikes are not possible yet.', ['stroll', 'sit', 'dance']],
 ];
+/** Quality cases 22/29/30: a NOT_YET refusal is terminal. Agents walked off to look for swings or ducks after it. */
+export const NOWHERE = ' Nothing like it exists anywhere in this world, so walking somewhere else to look for it will not help: tell your owner plainly it is not possible here (the suggestions are other things to do).';
 /** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
 const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
@@ -159,12 +161,12 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
   if (going && !NOT_YET.some(([re]) => re.test(text))) {
     const [verb, ...more] = (GO_ING[going[1]] ?? '').split(' ');
-    if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
+    if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.${NOWHERE}`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
     const sub = resolveCapability(`${verb} ${[...more, going[2].trim()].join(' ')}`.trim(), ctx);
     return sub.kind === 'unknown' || sub.cap.verb === verb || (verb === 'stroll' && sub.cap.verb === 'wander') ? sub : {kind: 'unknown', reason: `Nothing to ${verb} is offered here right now; nothing else was chosen in its place.`, didYouMean: suggest(input, verb, '', ctx)};
   }
   // Unsupported motions are refused honestly, with the nearest real things to do.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   // Rides: "ride the balloon", "go for a balloon ride", "fly" → joining the ride object.
   if ((colon < 0 || ['ride', 'fly', 'balloon'].includes(head)) && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|boat)\b/.test(text)) {
     const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === 'join' && /ride|balloon|carrier/i.test(c.id + ' ' + c.label));
