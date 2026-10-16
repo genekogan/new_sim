@@ -636,7 +636,7 @@ export class MarsEngine implements Engine {
         return [...(g === 'here' ? [] : [{ verb: this.movementVerb(me,g.x,g.z), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x,g.z)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done' } as Op]), { wait: n }];
       }
       case 'sit': return [{ verb: 'sit', params: { actor: me, fixture: String(a.on ?? '') }, settle: 'held' }, { wait: secs(a.seconds, 60) }];
-      case 'stand': return this.holders(me).length ? [{ verb: 'stand', params: { actor: me }, settle: 'done', soft: true }] : [];
+      case 'stand': return typeof a.nativeSeatReleaseV1==='string'?[{verb:'stand',params:{actor:me},settle:'done'}]:this.holders(me).length ? [{ verb: 'stand', params: { actor: me }, settle: 'done', soft: true }] : [];
       case 'ambient_wander': {
         // Mars's own ambient_wander is not resumable from a snapshot, so strolling is built from walks and pauses, which are.
         const total = secs(a.seconds, 60), radius = Math.min(40, Math.max(2, typeof a.radius === 'number' ? a.radius : 12));
@@ -704,6 +704,10 @@ export class MarsEngine implements Engine {
     const aboard=this.carrierOf(program.actor);
     if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart'].includes(s.verb)))
       return {code:'carrier.aloft',message:`You are riding in ${aboard.label} above the ground; it lands by itself and you step out then.`};
+    if(first.verb==='stand'&&first.params.nativeSeatReleaseV1!==undefined){
+      if(this.ents[program.actor].body?.family==='floater'||typeof first.params.nativeSeatReleaseV1!=='string'||!this.nativeSeatHoldsV1(program.actor).some(s=>s.action===first.params.nativeSeatReleaseV1))return {code:'stand.seat-claim-changed',message:'The explicit stand no longer owns its original native seat claim.'};
+      return this.plan('stand',{actor:program.actor});
+    }
     for(const step of program.steps)if(step.verb==='activity_readiness_v1'){const issue=this.readinessIssue(program.actor,step.params,false);if(issue)return issue;}
     if(first.verb==='rest'&&typeof first.params.seatedAt==='string'&&!this.seatedAt(program.actor,first.params.seatedAt))return {code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'};
     if (this.cfg.disassemblyV1 && (first.verb === 'build_lookout' || first.verb === 'unbuild_lookout') && [...this.programs.values()].some(p=>p.build)) return {code:'construction.site-busy',message:'Another crew is building or taking down the lookout; one finite job at a time.'};
@@ -765,13 +769,23 @@ export class MarsEngine implements Engine {
   perform(program: Program) {
     const {result,build,reverse}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
-    if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical&&result.diagnostic?.code!=='body.unsupported') this.stop(old); return result; }
+    if (!result.ok) {
+      const old = this.byActor.get(program.actor);
+      const explicitSeatRelease=program.steps[0]?.verb==='stand'&&program.steps[0].params.nativeSeatReleaseV1!==undefined;
+      if(old&&!this.physical&&!explicitSeatRelease&&result.diagnostic?.code!=='body.unsupported')this.stop(old);
+      return result;
+    }
     if(program.steps[0]?.verb==='control_classroom_v1'){const p:Prog={id,actor:program.actor,label:program.label.slice(0,200),steps:structuredClone(program.steps),index:0,started:false,since:this.rt.tick,ops:[],controlOf:String(program.steps[0].params.session)};this.programs.set(id,p);return result;}
     const commitment=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?[...new Set([program.steps[0].params.host,...(program.steps[0].params.presenters as string[]??[]),...(program.steps[0].params.audience as string[]??[])].filter((id):id is string=>typeof id==='string'&&id!==program.actor))]:[];
     const handover=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?this.classroomReadyActors(program.steps[0].params,program.actor):[];
     for(const actor of handover){const ready=this.programs.get(this.byActor.get(actor)!);if(ready)this.end(ready,'completed',{code:'activity.readiness-handover',message:'The explicitly offered wait joined its matching owned classroom.'});}
     const old = this.byActor.get(program.actor);
-    if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
+    if (old) { const o = this.programs.get(old)!,seatRelease=program.steps[0]?.verb==='stand'&&program.steps[0].params.nativeSeatReleaseV1===o.action&&this.nativeSeatHoldsV1(program.actor).some(s=>s.action===o.action);
+      // The versioned strict stand will cancel this exact actor-owned seat and
+      // follow its deferred exit. Cancelling it here first would invalidate stand admission.
+      if(o.action&&this.rt.isActive(o.action)&&!seatRelease)this.rt.cancel(o.action,{code:'program.replaced',message:'replaced'});
+      this.end(o,'cancelled',{code:'program.replaced',message:'replaced by a new program'});
+    }
     const p: Prog = { ...(commitment.length?{readiedActors:commitment}:{}), id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew,...(reverse?{reverse:true as const}:{})}}:{}) };
     this.programs.set(id, p); this.byActor.set(p.actor, id);
     return result;
@@ -786,6 +800,34 @@ export class MarsEngine implements Engine {
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
   programOf(actor: string) { return this.byActor.get(actor) ?? null; }
+  nativeSeatHoldsV1(actor:string):{action:string;slot:string}[]{
+    const out:{action:string;slot:string}[]=[];
+    for(const action of this.rt.holder('actor:'+actor)){
+      const r=this.rt.records.get(action),l=this.rt.live.get(action),slot=l?.exec?.slot;
+      if(!r||!l||!['sit','take_slot'].includes(r.verb)||r.params.actor!==actor||slot?.kind!=='seat'||typeof slot.id!=='string')continue;
+      if(this.rt.holder('slot:'+slot.id).includes(action))out.push({action,slot:slot.id});
+    }return out;
+  }
+  /** Seat exit is only complete on current native support; no relocation or geometry exemption. */
+  standingSupportProblemV1(actor:string,originalSeats:{action:string;slot:string}[]=[]):Diag|null{
+    const e=this.ents[actor],h=e?.human;
+    const no=(message:string):Diag=>({code:'stand.unsupported',message});
+    if(!h||!e.pose.p.every(Number.isFinite)||!Number.isFinite(e.pose.yaw))return no('The original body has no finite standing pose.');
+    if(originalSeats.some(s=>this.rt.isActive(s.action)||this.rt.holder('slot:'+s.slot).includes(s.action)))return no('The original native seat action or slot claim remains active.');
+    if(this.holders(actor).length||h.baseActivity==='sit'||!['idle','wait'].includes(h.activity)||h.on||h.grip||h.riding||h.carrier||h.boatPassenger||h.boatTransit||h.sleepPose||h.shore)return no('The body has not finished releasing its native support.');
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const p:[number,number]=[e.pose.p[0],e.pose.p[2]],g=spatial.levelAt(h.level,p),profile=bodyProfile(e);
+    if(!g||clearanceAt(g,p)<profile.radius)return no('The body has no admitted clear standing surface.');
+    const y=g.level===0&&spatial.ground?spatial.ground.standY(p[0],p[1]):g.y;
+    if(!Number.isFinite(y)||Math.abs(e.pose.p[1]-y)>.03)return no('The body is not at its native standing support height.');
+    // Grid support uses the planner's floor/void boundary. Check actual body height as well.
+    for(const o of spatial.scene.obstacles){if(o.y1<=e.pose.p[1]+1e-9||o.y0>=e.pose.p[1]+profile.height-1e-9)continue;
+      const dx=p[0]-o.obb.c[0],dz=p[1]-o.obb.c[1],cs=dcos(o.obb.yaw),sn=dsin(o.obb.yaw),x=Math.max(Math.abs(dx*cs+dz*sn)-o.obb.half[0],0),z=Math.max(Math.abs(-dx*sn+dz*cs)-o.obb.half[1],0);
+      if(x*x+z*z<profile.radius*profile.radius-1e-9)return no('Standing would intersect native solid geometry.');
+    }
+    if(Object.values(this.ents).some(o=>o.id!==actor&&o.human&&o.human.level===h.level&&o.pose.p[1]<e.pose.p[1]+profile.height&&e.pose.p[1]<o.pose.p[1]+bodyProfile(o).height&&hypot(o.pose.p[0]-p[0],o.pose.p[2]-p[1])<profile.radius+bodyProfile(o).radius))return no('Standing would overlap another body.');
+    return null;
+  }
   programAction(programId:string) {
     const p=this.programs.get(programId),r=p?.action?this.rt.records.get(p.action):undefined;
     if(!p || !r)return null;
