@@ -49,10 +49,13 @@ export function verify(snapshot,receipt,rollback=false){
   assert(Math.abs(first(want.r)-first(e.r))<1e-6,b.name+'.r retained');
  }
 }
+/** Latest authored edit that still has an effect: skips engine rows, undone edits, undo records, and add-patch pairs (a patch
+ *  group whose guarded '-rollback' removal came later), so patches can be rolled back in strict reverse order. */
+export function latestEffectiveEdit(edits){const paired=new Set(edits.filter(e=>/-rollback$/.test(e.grp??'')).flatMap(e=>[e.grp,e.grp.replace(/-rollback$/,'')]));return edits.find(e=>e.by!=='engine'&&e.kind!=='engine'&&!e.undone&&e.kind!=='undo'&&!paired.has(e.grp));}
 export function guardRollback(edits,receipt,snapshot){
  assert(Number.isInteger(receipt.appliedSeq),'receipt has no accepted sequence');verify(snapshot,receipt);
  for(const [id,v] of Object.entries(receipt.appliedVersions)) assert.equal(snapshot.entities.find(e=>e.id===id)?.v,v,'rollback refused: touched entity '+id+' changed after apply');
- const authored=edits.find(e=>e.by!=='engine'&&e.kind!=='engine');
+ const authored=latestEffectiveEdit(edits);
  assert(authored&&authored.seq===receipt.appliedSeq&&authored.grp===receipt.batch.group&&authored.kind==='edit'&&!authored.undone&&edits.filter(e=>e.grp===receipt.batch.group&&!e.undone&&(e.kind==='edit'||e.kind==='redo')).length===1,'rollback refused: an authored edit intervened (undo later patches first), or this is not the latest authored edit');
  return receipt.rollbackPath;
 }

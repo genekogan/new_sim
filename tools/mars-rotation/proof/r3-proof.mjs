@@ -93,8 +93,11 @@ try {
     const st = async (n) => (await ctx.query({ describe: E(n) })).describe.state;
     result.walk = [];
     const step = async (cap, opt = {}) => { const r = await follow(ctx, cap, { timeout: 400000, ...opt }); const row = { cap: cap.replace(/e_[0-9a-f]+/, (m) => snap.entities.find((e) => e.id === m)?.name ?? m), ok: r.ok ?? false, accepted: r.accepted, code: r.code ?? null, phase: r.phase ?? null, room: r.room ? `${r.room.building}/${r.room.room}` : null, s: Math.round((r.ms ?? 0) / 1000) }; result.walk.push(row); note('step', row); return r; };
-    await step('walk:mimos/main-south');
-    await step(`sit:${E('red-sofa-12')}`, { seated: true, params: { seconds: 600 } });
+    // field first, then water, then Mimos (walk:freeside from inside Mimos is refused, see report)
+    await step('walk:chiba/field-fire-bowl');
+    await step(`object:${E('field-fire-bowl')}:light`);
+    await step(`sit:${E('field-beanbag')}`, { seated: true, params: { seconds: 900 } });
+    result.bowl = await st('field-fire-bowl'); note('bowl', result.bowl);
     await step('stand:here');
     await step('walk:freeside'); await step('walk:water-tank');
     await step(`pick-up:${E('watering-can')}`);
@@ -105,13 +108,10 @@ try {
     await step('put-down:here');
     result.canParent = (await ctx.api('/v1/world/snapshot', { as: 'public' })).entities.find((e) => e.id === E('watering-can'))?.in;
     note('can after put-down', result.canParent);
-    await step('walk:chiba/field-fire-bowl');
-    await step(`object:${E('field-fire-bowl')}:light`);
-    await step(`sit:${E('field-beanbag')}`, { seated: true, params: { seconds: 900 } });
-    result.bowl = await st('field-fire-bowl'); note('bowl', result.bowl);
+    await step('walk:mimos/main-south');
+    await step(`sit:${E('red-sofa-12')}`, { seated: true, params: { seconds: 600 } });
   }
   await shoot('after', 82);
-  if (resident) await follow(ctx, 'walk:mimos/floor', { timeout: 400000 }).catch(() => null); // out of the field before rollbacks
   result.rollback = {};
   for (const k of ['water', 'field', 'rotation', 'fidelity']) {
     const review = run(T[k]('--rollback')), apply = review.failed ? { skipped: 'review refused' } : run(T[k]('--rollback', '--apply'));

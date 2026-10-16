@@ -39,3 +39,26 @@ test('apply refuses a patched or wrong world; rollback removes exactly its thing
   assert.throws(() => rollbackBatch(receipt, held), /watering-can is held/);
   verify({ ...w }, receipt, true);
 });
+
+test('rollback guards skip undone edits, undo records and rolled-back add-patch pairs, nothing else', async () => {
+  const { latestEffectiveEdit: rot } = await import('./patch.mjs');
+  const { latestEffectiveEdit: fid } = await import('../mars-fidelity/patch.mjs');
+  for (const latest of [rot, fid]) {
+    const mine = { seq: 30, grp: 'mars-rotation-20261016-ab', kind: 'edit', by: 'god' };
+    const edits = [
+      { seq: 36, kind: 'engine', by: 'engine' },
+      { seq: 35, grp: 'mars-field-20261016-cd-rollback', kind: 'edit', by: 'god' },
+      { seq: 34, grp: 'mars-water-20261016-ef-rollback', kind: 'edit', by: 'god' },
+      { seq: 33, kind: 'undo', by: 'god' },
+      { seq: 32, grp: 'other', kind: 'edit', by: 'god', undone: true },
+      { seq: 31, grp: 'mars-field-20261016-cd', kind: 'edit', by: 'god' },
+      { seq: 31.5, grp: 'mars-water-20261016-ef', kind: 'edit', by: 'god' },
+      mine,
+    ];
+    assert.equal(latest(edits), mine);
+    // a later ordinary edit still blocks the rollback
+    assert.notEqual(latest([{ seq: 40, grp: 'g-free-edit', kind: 'edit', by: 'god' }, ...edits]), mine);
+    // a patch whose rollback has not happened still blocks it
+    assert.notEqual(latest(edits.filter((e) => e.seq !== 35)), mine);
+  }
+});
