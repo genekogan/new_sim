@@ -108,6 +108,55 @@ test('surface coordinates are shape-local metres: they follow yaw, pitch, scale 
   assert.notEqual(word(local({ size: [2, 1, 1] })), word(meshes(draw(kit([{ material: 'stone', at: [0, 2, 0], size: [2, 1, 1] }])))[0].geometry.attributes.edenSurf as THREE.BufferAttribute), 'shapes differ by seed');
 });
 
+type V3 = [number, number, number];
+const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross3 = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot3 = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const unit = (a: V3): V3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+/** Per surfaced triangle: the god shader's face normal (WorldEdenRealism: n = normalize(cross(dFdx L, dFdy L)) oriented
+ *  by sign(dot(cross(dFdx W, dFdy W), N))). L and W are affine in screen space on one triangle, so both derivative
+ *  crosses are the edge crosses times one shared Jacobian, whose sign cancels. Also the least-squares local->kit map. */
+function shaderFaces(m: M) {
+  const P = m.geometry.attributes.position, Nn = m.geometry.attributes.normal, S = m.geometry.attributes.edenSurf as THREE.BufferAttribute;
+  const W = (i: number): V3 => [P.getX(i), P.getY(i), P.getZ(i)], L = (i: number): V3 => [S.getX(i), S.getY(i), S.getZ(i)];
+  const mean = (f: (i: number) => V3) => { const s: V3 = [0, 0, 0]; for (let i = 0; i < P.count; i++) f(i).forEach((v, k) => { s[k] += v / P.count; }); return s; };
+  const lm = mean(L), wm = mean(W), wl = new THREE.Matrix3().set(0, 0, 0, 0, 0, 0, 0, 0, 0), ll = wl.clone();
+  for (let i = 0; i < P.count; i++) {
+    const l = sub(L(i), lm), w = sub(W(i), wm);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) { wl.elements[c * 3 + r] += w[r] * l[c]; ll.elements[c * 3 + r] += l[r] * l[c]; }
+  }
+  const A = wl.multiply(ll.invert()), faces: { n: V3; N: V3; kit: V3 }[] = [];
+  for (let i = 0; i < P.count; i += 3) {
+    const cl = cross3(sub(L(i + 1), L(i)), sub(L(i + 2), L(i))), cw = cross3(sub(W(i + 1), W(i)), sub(W(i + 2), W(i)));
+    if (Math.hypot(...cw) < 1e-9) continue;
+    const N = unit([0, 1, 2].reduce<V3>((s, k) => [s[0] + Nn.getX(i + k), s[1] + Nn.getY(i + k), s[2] + Nn.getZ(i + k)], [0, 0, 0]));
+    const n = unit(cl).map(v => v * Math.sign(dot3(cw, N))) as V3, kit = new THREE.Vector3(...n).applyMatrix3(A).toArray() as V3;
+    faces.push({ n, N, kit });
+  }
+  return { faces, det: A.determinant() };
+}
+
+test('the shader face normal points out of every surfaced triangle: long-z shapes, wedges, mirrors and rotations', () => {
+  const cases: Record<string, unknown>[] = [
+    { size: [3, 1, 1] }, { size: [1, 1, 3] }, { kind: 'wedge', size: [2, 1, 4] }, { kind: 'wedge', size: [4, 1, 2] },
+    { size: [1, 1, 3], scale: [-1, 1, 1] }, { size: [1, 1, 3], scale: [1, 1, -2] }, { kind: 'wedge', size: [2, 1, 4], scale: [-1, 1, 1], yaw: 1.2 },
+    { size: [1, 1, 3], yaw: 0.7, pitch: 0.4, roll: 0.3 }, { size: [3, 1, 1], yaw: -2.1, pitch: -0.5 }, { kind: 'rbox', size: [1, 0.5, 2.5], round: 0.1 },
+    { kind: 'cyl', size: undefined, r: 0.5, h: 2 }, { kind: 'cone', size: undefined, r: 2, h: 1, pitch: 0.3 }, { kind: 'sphere', size: undefined, r: 1 },
+    { kind: 'extrude', size: undefined, polygon: [[0, 0], [0.6, 0], [0.6, 2.5], [0, 2.5]], h: 0.3 },
+  ];
+  for (const sh of cases) {
+    const label = JSON.stringify(sh), { faces, det } = shaderFaces(meshes(draw(kit([{ material: 'stone', pattern: 'ashlar', ...sh }])))[0]);
+    assert.ok(det > 0, `${label}: the shape-local frame is a rotation of the kit frame (det ${det.toFixed(3)})`);
+    assert.ok(faces.length >= 8, label);
+    for (const f of faces) assert.ok(dot3(f.kit, f.N) > 0.5, `${label}: shader normal ${f.n.map(v => v.toFixed(2))} points into the shape (geometry normal ${f.N.map(v => v.toFixed(2))})`);
+  }
+  // The class looks read n.y: a top face reads up and a ridge along z keeps its slopes facing up.
+  const ys = (sh: Record<string, unknown>) => shaderFaces(meshes(draw(kit([{ material: 'tile', ...sh }])))[0]).faces.map(f => [f.N[1], f.n[1]]);
+  for (const [N, n] of ys({ size: [1, 1, 3] })) if (N > 0.99) assert.ok(n > 0.99, `top face of a box longer in z reads n.y ${n}`);
+  const slope = ys({ kind: 'wedge', size: [2, 1, 4] }).filter(([N]) => N > 0.5 && N < 0.99);
+  assert.ok(slope.length > 0 && slope.every(([N, n]) => Math.abs(n - N) < 1e-3), `z-ridged wedge slope reads up: ${JSON.stringify(slope)}`);
+});
+
 test('moving roles keep their surfaces; clones made by looks and lights keep the shader', () => {
   const o = draw(kit([{ kind: 'cyl', size: undefined, r: 0.5, h: 0.2, material: 'wood', pattern: 'planks', role: 'wheel' }, { kind: 'box', material: 'stone', role: 'door', at: [2, 1, 0], size: [1, 2, 0.1] }]));
   const ms = meshes(o); assert.equal(ms.length, 2);

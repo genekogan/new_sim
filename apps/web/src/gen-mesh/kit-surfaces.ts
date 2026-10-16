@@ -52,7 +52,8 @@ export function kitSurfaceAttribute(sh: KitShape, g: THREE.BufferGeometry): THRE
   const word = (round ? Math.max(8, 2 * Math.round(Math.PI * radius / 0.4)) : 0) + seedOf(sh.at);
   for (let i = 0; i < n; i++) {
     const x = p.getX(i) * sx, y = p.getY(i) * sy, z = p.getZ(i) * sz;
-    out[i * 4] = swap ? z : x; out[i * 4 + 1] = y; out[i * 4 + 2] = swap ? x : z; out[i * 4 + 3] = word;
+    // A quarter turn about y (det +1), never a reflection: the shader's derivative face normal keeps its outward side.
+    out[i * 4] = swap ? z : x; out[i * 4 + 1] = y; out[i * 4 + 2] = swap ? -x : z; out[i * 4 + 3] = word;
   }
   return new THREE.BufferAttribute(out, 4);
 }
