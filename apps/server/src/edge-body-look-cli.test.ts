@@ -21,6 +21,13 @@ test('CLI body look: show, seeded random, set parts and colours, classic preset,
   assert.equal(set.body.params.top,appearanceFromSeed(11).top,'unnamed parts are kept');
   const now=await run();assert.equal(now.look.hat,'sunhat');
   const classic=await run('--set','preset=punk');assert.deepEqual(classic.body.params,{preset:'punk'});
+  // looks v2: an outfit, facial hair, an accessory colour and body shape in one command; a preset keeps them
+  const v2=await run('--set','outfit=suit','facialHair=beard','scarf=scarf','accessory=#c58a2e','shoulders=1.1','weight=1.2');
+  assert.equal(v2.body.params.top,'suit');assert.equal(v2.body.params.facialHair,'beard');assert.equal(v2.body.params.shoulders,1.1);assert.equal(v2.body.params.weight,1.2);
+  assert.ok(shown.choices.outfit.includes('suit')&&shown.choices.facialHair.includes('beard'),'choices list outfits and accessories');
+  const kept=await run('--set','preset=woman');assert.deepEqual(kept.body.params,{preset:'woman'},'choosing a preset is that classic look exactly');
+  const punk=await run('--set','preset=punk');void punk;
+  await assert.rejects(run('--set','outfit=tuxedo'),/outfit must be one of/);
   await assert.rejects(run('--set','hair=purple'),/body.look/);
   assert.deepEqual(f.host.engine.world.entities[row.entity_id].body,classic.body);
  }finally{if(pump)clearInterval(pump);if(server){server.closeAllConnections();await new Promise<void>(r=>server!.close(()=>r()));}f.host.stop();f.db.close();rmSync(dir,{recursive:true,force:true});}
