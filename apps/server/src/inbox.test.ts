@@ -124,3 +124,16 @@ test('real owner and paired HTTP flows: absent, browser, command polling, listen
   const revoked = await waiting; assert.equal(revoked.status, 401); assert.equal(revoked.data.inbox, undefined);
   assert.equal(f.db.paidCost(), 0);
 });
+
+test('owner box and edge command need an invited owner (same gate as the central /v1/souls/:id/command)', async t => {
+  const f = fixture(':memory:'); f.brain.quiesce(); t.after(() => { f.host.stop(); f.db.close(); });
+  await invite(f, 'carol');
+  const s = await accept(f.host, f.souls.create('dev:carol', {name: 'Cato', description: 'Invite gate fixture'}));
+  const app = buildApp({cfg: {...config, port: 5961, worldPath: '/w/eden', publicUrl: 'http://127.0.0.1:5961/w/eden', accountAuthRequired: false, inviteRequired: true, webDir: '/nonexistent-inbox-fixture', marsWebDir: '/nonexistent-inbox-fixture'}, db: f.db, host: f.host, auth: f.auth, brain: f.brain, souls: f.souls, edge: new EdgeLedger(f.host, f.db), hub: {clients: new Map(), refreshMe() {}} as never});
+  const post = (path: string) => app.request(path, {method: 'POST', headers: {authorization: 'Bearer dev:carol', 'content-type': 'application/json'}, body: JSON.stringify({text: 'come home'})});
+  assert.equal((await post(`/v1/souls/${s.id}/command`)).status, 200);
+  (f.db as unknown as {db: {prepare(q: string): {run(...a: unknown[]): void}}}).db.prepare('UPDATE users SET invited_by = NULL WHERE id = ?').run('dev:carol');
+  for (const path of [`/v1/souls/${s.id}/command`, `/v1/edge/owner/${s.id}/inbox`]) {
+    const r = await post(path); assert.equal(r.status, 403, path); assert.equal(((await r.json()) as {code?: string; error?: string}).code ?? 'invite-required', 'invite-required');
+  }
+});

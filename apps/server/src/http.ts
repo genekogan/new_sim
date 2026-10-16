@@ -58,7 +58,7 @@ export function buildApp(d: Deps) {
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
   mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
-  mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c), s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }});
+  mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }}); // invite gate as on the central /v1/souls/:id/command
   // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
   let travel: Travel | undefined;
   const travelGate = (resolve: ReturnType<typeof edgeSoulResolver>) => (c: Context) => { const s = resolve(c), t = travel?.inc(s.soulId); if (t && (t.state === 'away' || t.state === 'departing')) throw new EdgeError(409, t.state === 'away' ? 'travel.away' : 'travel.departing', `${s.name} is ${t.state === 'away' ? 'in' : 'on the way to'} ${t.at}: act there, or travel home (POST /v1/edge/travel {"to":"home"})`); return s; };
