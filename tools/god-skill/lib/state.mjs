@@ -190,6 +190,18 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
   try { receipt = await lookup(); } catch { return lost(failure); }
   return finish(receiptResult(receipt) ?? lost(failure));
 }
+/** CE8: tell the owner's viewer where the build lead is looking. One tiny POST that callers never await; it never
+ *  throws, prints or retries, and is skipped without a lead build (claims, --no-build, EDEN_GOD_ATTENTION=off). */
+export const ATTENTION_TIMEOUT_MS = 1000;
+export function attention(at, eye) {
+  try {
+    const s = load(), b = s.build, point = (p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite);
+    if (!s.world || !s.token || !b?.id || !b.lease || context.getStore()?.noBuild || /^(0|off|false|no)$/i.test(process.env.EDEN_GOD_ATTENTION ?? '') || !point(at)) return Promise.resolve(false);
+    const body = JSON.stringify({ lease: b.lease, at: at.map(r2), ...(point(eye) ? { eye: eye.map(r2) } : {}) });
+    return fetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) })
+      .then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
+  } catch { return Promise.resolve(false); }
+}
 export const ok = (r, what) => { if (r.status >= 200 && r.status < 300) return r.data; throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`); };
 export const num = (v) => { const n = Number(v); if (!Number.isFinite(n)) throw new Error(`not a number: ${v}`); return n; };
 export const r2 = (v) => Math.round(v * 100) / 100;

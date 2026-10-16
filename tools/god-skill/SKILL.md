@@ -368,6 +368,8 @@ day is a Saturday.
   and waits for the world to settle: about 5–10 s on a free machine, longer on a busy one, so give the
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
   before judging the build. `look --keep` reuses a browser; `look --stop` closes it.
+  While you lead a build, `look`, `where` and `free` also show the owner a soft reticle where you are
+  looking (about 20 s; never blocks or fails the command; `EDEN_GOD_ATTENTION=off` stops it).
 - `verify-use <thing> [--seat …] [--from …]` — a probe resident actually walks in and sits; optional ok/failed receipt
   (about 5–10 s; one probe per world at a time).
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,

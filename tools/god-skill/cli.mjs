@@ -8,7 +8,7 @@ import { doctor } from './lib/doctor.mjs';
 import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { activeClaim, atomicWrite, buildHeader, call, claimFile, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
+import { activeClaim, atomicWrite, attention, buildHeader, call, claimFile, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
@@ -293,6 +293,7 @@ export async function where(spec, flags = {}) {
   // same request. Bounds alone cannot tell whether an open gate's passage is blocked.
   const result = await query({ where: [p.x, p.z], clearance: { at: [p.x, p.z], size: [0, 0] } });
   const d = result.where, colliders = new Set(result.clearance?.blockedBy ?? []);
+  void attention([d.x, d.y, d.z]); // CE8 fire-and-forget
   if (flags.json) return d;
   return [`(${d.x}, ${d.z}): ground y ${d.y}, slope ${d.slopeDeg}°, ${d.medium}${d.water ? `, water level ${d.water.level} (${d.water.depth} m deep)` : ''}`,
     d.room ? `  inside ${d.room.building}, room ${d.room.room} (floor ${d.room.floor})` : '',
@@ -334,6 +335,7 @@ export async function freePlots(size, flags = {}) {
   const m = await mirror(); const v = view(m);
   const near = flags.near ? refPoint(v, flags.near) : { x: 0, z: 0 };
   const r = (await query({ free: { size: [w, d], near: [near.x, near.z], radius: flags.radius ? num(flags.radius) : 150, count: flags.count ? num(flags.count) : 4, maxSlope: flags.slope ? num(flags.slope) : 0.25 } })).free;
+  if (r[0]) void attention([r[0].at[0], r[0].y, r[0].at[1]]); // CE8: the best plot
   return flags.json ? r : r.length ? r.map((f) => `- (${f.at.join(', ')}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join('\n') : 'no free plot of that size within the radius';
 }
 
@@ -1144,6 +1146,7 @@ async function lookInner(flags = {}, runtime = {}, signal) {
   }
   const cam = views[0];
   signal.throwIfAborted();
+  void attention(cam.at, cam.eye); // CE8: in flight during the shot; never awaited
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
   const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides,
     ...(flags.views || flags.site ? { views } : {}), frames: count, every,
