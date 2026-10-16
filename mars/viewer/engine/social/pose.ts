@@ -21,7 +21,9 @@ export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-mus
   // gestures (core-next4): solo, and the hand-over pair give/take; pick-up/put-down an item
   'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
   // CN5: at a desk computer, at a microphone, in an audience, with dumbbells
-  'use-computer', 'sing', 'listen', 'lift-weights'] as const;
+  'use-computer', 'sing', 'listen', 'lift-weights',
+  // todo (leisure): fishing from a bank, tossing bread, tending garden beds
+  'fish', 'feed', 'garden'] as const;
 /** Whole-body postures on open ground (the body point stays; the viewer lays the body out along pose.yaw). */
 export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga',
   // CN5: lying on a gym bench (seatHeight = the bench top)
@@ -33,7 +35,7 @@ export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // CN5: outdoor gym bars; choreographed games (grouped: the world keeps the turns, see `game`)
   'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball'] as const;
 export const POSE_ACTIVITIES: readonly string[] = [...POSE_OVERLAYS, ...POSE_POSTURES, ...POSE_MOVES];
-export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'dumbbell', 'boule'] as const;
+export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'dumbbell', 'boule', 'rod', 'bread'] as const;
 /** CN5: the instrument a `play-music` body plays (World draws it at the spot; the body state names it). */
 export const POSE_INSTRUMENTS = ['drums', 'keyboard', 'guitar', 'bass', 'violin', 'viola', 'cello', 'piano', 'flute', 'ukulele'] as const;
 /** CN5 choreographed games: no physics. The world keeps whose turn it is (a pure function of the tick and the players in

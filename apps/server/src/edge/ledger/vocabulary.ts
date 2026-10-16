@@ -78,6 +78,9 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\b(?:listen|listening|concert|audience|watch (?:the )?(?:show|band|performance|concert|musicians?))\b/, 'listen'],
   [/\b(?:drums?|drum kit|guitar|bass|violin|viola|cello|keyboard|keys)\b/, 'play-music', 'keep'],
   [/\bjumping[- ]?jacks?\b|\bstar[- ]?jumps?\b/, 'jumping-jacks'], [/\bpush[- ]?ups?\b|\bpress[- ]?ups?\b/, 'pushups'], [/\bsit[- ]?ups?\b|\bcrunches\b/, 'situps'],
+  [/\bfeed(?:ing)? (?:the |some |a few )?(?:koi|fish|carp)\b|\b(?:throw|toss|scatter) (?:some |the )?(?:bread|crumbs|food) (?:to|for|into|in) (?:the )?(?:koi|fish|pond)\b|\bfeed (?:the )?pond\b/, 'feed'],
+  [/\b(?:fishing|angling)\b|\b(?:go|to|let'?s) fish\b|^fish\b|\bcast (?:a |my |the )?(?:line|rod)\b|\bcatch (?:a |some )?fish\b/, 'fish'],
+  [/^(?:please\s+)?garden\b|\b(?:gardening|weed(?:ing)?|(?:tend|tending|water|watering|plant|planting) (?:the |some |my )?(?:garden )?(?:beds?|seeds?|flowers?|vegetables?|plots?|plants?|crops?))\b/, 'garden'],
   [/\byoga\b/, 'yoga'], [/\bstretch(?:es|ing)?\b/, 'stretch'], [/\bdanc(?:e|es|ing)\b|\bboogie\b/, 'dance'], [/\bjump(?:s|ing)?\b|\bhop\b/, 'jump'],
   [/\b(?:read|reading|reads)\b/, 'read'], [/\b(?:write|writing)\b/, 'write'],
   [/\bpiano\b/, 'play-piano'], [/\b(?:paint|painting|easel)\b/, 'paint'], [/\b(?:cook|cooking|bake|baking)\b/, 'cook'],
@@ -105,15 +108,20 @@ const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps']
 /** Rides: the balloon (and any later carrier) is an object you join. */
 export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in the air|hot[- ]air|row|rowing|punt|boat|boating)\b/i;
 /** Things bodies cannot do yet: refused honestly (never resolved to something else). */
-export const NOT_YET: [RegExp, string, string[]][] = [
+export const NOT_YET: [RegExp, string, string[], string?][] = [
   [/\b(?:kiss|kisses|kissing|snog)\b/i, 'Kissing is not a gesture here; hug, shake hands, high-five, bow or wave instead (hugs and handshakes ask the other Soul first).', ['hug', 'handshake', 'high-five', 'wave']],
   [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
-  // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped
-  [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish|sailing|canoeing|kayaking)\b/i, 'Fishing, sailing, canoes and kayaks are not possible yet; an offered punt can be rowed.', ['swim', 'stroll', 'sit']],
-  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance']],
+  // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped. The
+  // optional fourth item is the verb that, when the world offers it, makes the activity real (then it is not refused).
+  [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish)\b/i, 'There is nowhere to fish from here right now: fishing is offered only at a marked pond bank.', ['swim', 'stroll', 'sit'], 'fish'],
+  [/\b(?:sailing|canoeing|kayaking)\b/i, 'Sailing, canoes and kayaks are not possible yet; an offered punt can be rowed.', ['swim', 'stroll', 'sit']],
+  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing)\b/i, 'There is no swing offered here right now.', ['stroll', 'sit', 'dance'], 'swing'],
+  [/\bfeed(?:ing)? (?:the |some )?(?:ducks?|geese|goose|swans?|birds?|pigeons?|gulls?)\b/i, 'There are no ducks or birds to feed here; the ponds have koi, which can be fed from a marked bank.', ['feed', 'stroll', 'sit'], undefined],
+  [/\b(?:feed(?:ing)? (?:the |some )?(?:fish|koi|carp))\b/i, 'There is nowhere to feed the koi from here right now: it is offered at a marked pond bank.', ['stroll', 'sit'], 'feed'],
+  [/\b(?:skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance'], 'cycle'],
 ];
 /** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
-const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
+const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', fishing: 'fish', gardening: 'garden', weeding: 'garden', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
@@ -182,14 +190,15 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   }
   // CN5: "go fishing", "go swimming": the doing word decides; an unknown one is refused, never taken as a place
   const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
-  if (going && !NOT_YET.some(([re]) => re.test(text))) {
+  const offeredVerbs = new Set(ctx.caps.map(c => c.verb)), notYet = NOT_YET.filter(([, , , v]) => !v || !offeredVerbs.has(v));
+  if (going && !notYet.some(([re]) => re.test(text))) {
     const [verb, ...more] = (GO_ING[going[1]] ?? '').split(' ');
     if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
     const sub = resolveCapability(`${verb} ${[...more, going[2].trim()].join(' ')}`.trim(), ctx);
     return sub.kind === 'unknown' || sub.cap.verb === verb || (verb === 'stroll' && sub.cap.verb === 'wander') ? sub : {kind: 'unknown', reason: `Nothing to ${verb} is offered here right now; nothing else was chosen in its place.`, didYouMean: suggest(input, verb, '', ctx)};
   }
   // Unsupported motions are refused honestly, with the nearest real things to do.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.

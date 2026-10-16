@@ -4707,6 +4707,306 @@
     84.35
    ],
    "label": "Outdoor gym: exercise mat (push-ups)"
+  },
+  {
+   "id": "fish-shore-1",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -6.5
+   ],
+   "faceTo": [
+    -46.6,
+    -6.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-2",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -3.5
+   ],
+   "faceTo": [
+    -46.6,
+    -3.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-3",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    3.5
+   ],
+   "faceTo": [
+    -46.6,
+    3.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-shore-4",
+   "place": "shore-bank",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -43.6,
+    6.5
+   ],
+   "faceTo": [
+    -46.6,
+    6.5
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "feed-shore-1",
+   "place": "shore-bank",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -43.6,
+    -8
+   ],
+   "faceTo": [
+    -46.6,
+    -8
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "feed-shore-2",
+   "place": "shore-bank",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -43.6,
+    8
+   ],
+   "faceTo": [
+    -46.6,
+    8
+   ],
+   "label": "Pond bank, shore pond"
+  },
+  {
+   "id": "fish-park-1",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -14,
+    101.6
+   ],
+   "faceTo": [
+    -14,
+    104.6
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "fish-park-2",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -8,
+    101.6
+   ],
+   "faceTo": [
+    -8,
+    104.6
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "fish-park-3",
+   "place": "region-park",
+   "activity": "fish",
+   "base": "idle",
+   "at": [
+    -2,
+    101.6
+   ],
+   "faceTo": [
+    -2,
+    104.6
+   ],
+   "label": "North bank of the park pond"
+  },
+  {
+   "id": "feed-park-1",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -11,
+    101.6
+   ],
+   "faceTo": [
+    -11,
+    104.6
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "feed-park-2",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    -5,
+    101.6
+   ],
+   "faceTo": [
+    -5,
+    104.6
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "feed-park-3",
+   "place": "region-park",
+   "activity": "feed",
+   "base": "idle",
+   "at": [
+    1,
+    101.6
+   ],
+   "faceTo": [
+    1,
+    104.6
+   ],
+   "label": "North bank of the park pond, feeding the koi"
+  },
+  {
+   "id": "garden-bed-1",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    35.5,
+    46.0
+   ],
+   "faceTo": [
+    35.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-2",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    38.5,
+    46.0
+   ],
+   "faceTo": [
+    38.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-3",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    43.5,
+    46.0
+   ],
+   "faceTo": [
+    43.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-4",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    46.5,
+    46.0
+   ],
+   "faceTo": [
+    46.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-5",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    62.5,
+    46.0
+   ],
+   "faceTo": [
+    62.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-6",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    65.5,
+    46.0
+   ],
+   "faceTo": [
+    65.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
+  },
+  {
+   "id": "garden-bed-7",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    70.5,
+    46.0
+   ],
+   "faceTo": [
+    70.5,
+    44.0
+   ],
+   "label": "Garden beds, north row"
+  },
+  {
+   "id": "garden-bed-8",
+   "place": "eden-gardens",
+   "activity": "garden",
+   "base": "idle",
+   "at": [
+    73.5,
+    46.0
+   ],
+   "faceTo": [
+    73.5,
+    48.0
+   ],
+   "label": "Garden beds, south row"
   }
  ],
  "solids": [

@@ -27,6 +27,8 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
   'use-computer': {seconds: 300, label: 'Use the computer'}, sing: {seconds: 120, label: 'Sing at the microphone'}, listen: {seconds: 300, label: 'Sit in the audience and listen'},
   'lift-weights': {prop: 'dumbbell', seconds: 60, label: 'Lift weights (dumbbell curls)'}, 'bench-press': {seconds: 60, label: 'Do a bench press'}, 'pull-ups': {seconds: 30, label: 'Do pull-ups'},
   dips: {seconds: 30, label: 'Do dips on the bars'}, situps: {seconds: 30, label: 'Do sit-ups'}, pushups: {seconds: 30, label: 'Do push-ups'}, yoga: {seconds: 120, label: 'Do yoga'},
+  // leisure: nature activities at World's bank, pond and bed spots
+  fish: {prop: 'rod', seconds: 180, label: 'Fish from the bank'}, feed: {prop: 'bread', seconds: 90, label: 'Feed the koi'}, garden: {prop: 'tool', seconds: 150, label: 'Tend the garden beds'},
   'play-frisbee': {seconds: 300, label: 'Throw a frisbee'}, 'play-petanque': {seconds: 600, label: 'Play pétanque'}, 'play-volleyball': {seconds: 300, label: 'Play beach volleyball'},
 };
 /** CN5 choreographed games at spots: 2–6 players; the world keeps the turns (social/pose.ts GAMES). */
