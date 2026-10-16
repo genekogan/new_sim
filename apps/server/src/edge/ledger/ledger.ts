@@ -617,7 +617,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // together/1: doing a paired gesture back to someone who offered it is accepting their invitation
     if (cap.target?.kind === 'soul' && cap.verb in PAIRED) {const back = this.together.reciprocal(soul.soulId, cap.target.id, cap.verb), acc = back ? caps.find(c => c.id === 'accept:' + back.id) : undefined; if (acc) {cap = acc; capability = acc.id;}}
     const resolved: {resolved?: Resolved} = capability !== asked ? {resolved: {from: asked, to: cap.id, note: note || `${asked} is ${cap.id}.`}} : {};
-    const nativeUse = this.nativeUseRefusal?.(capability);
+    // A capability already blocked by the world (construction, private access) keeps that refusal; unsupported native
+    // use is checked again at launch/decide/completion.
+    const nativeUse = cap.available === false && cap.blocked ? null : this.nativeUseRefusal?.(capability);
     if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     if (cap.verb === 'accept') return this.acceptInvite(soul, cap, plans, caps, clientRef, resolved, refuse);
     if (cap.verb === 'object' && cap.object && cap.action && this.comms?.objects.prepareAct) {

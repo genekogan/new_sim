@@ -122,10 +122,11 @@ test('a wide raise over seated and napping residents moves them (walked or reloc
   await w.settle(2);
   assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'bench', p: [10, 0] }, { op: 'place', def: coreRef('bed'), name: 'bed', p: [16, 6] }] }).accepted, true);
   await w.settle(3);
-  const E = w.E, bench = w.god.model.get('bench')!.id, bed = w.god.model.get('bed')!.id;
+  const E = w.E, bench = w.god.model.get('bench')!.id;
   const dee = await w.soul('dee', 'Dee'), fay = await w.soul('fay', 'Fay');
   await w.doing(dee, `sit:${bench}`, () => E.world.entities[dee.entityId].human.activity === 'sit', { seconds: 600 });
-  await w.doing(fay, `sleep:${bed}`, () => E.world.entities[fay.entityId].human.activity === 'nap', { seconds: 600 });
+  // lane walk (E2#10): core beds refuse sleep, so Fay naps on the ground (the raise covers the whole world)
+  await w.doing(fay, 'nap:here', () => E.world.entities[fay.entityId].human.activity === 'nap', { seconds: 600 });
   const [x0, z0, x1, z1] = w.god.model.ground().extent, area = [[Math.max(x0 + 2, -90), Math.max(z0 + 2, -90)], [Math.min(x1 - 2, 110), Math.max(z0 + 2, -90)], [Math.min(x1 - 2, 110), Math.min(z1 - 2, 90)], [Math.max(x0 + 2, -90), Math.min(z1 - 2, 90)]];
   const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('plateau'), name: 'terrace', shape: { area }, params: { height: 6, edge: 4 } }] });
   assert.equal(r.accepted, true, JSON.stringify(r));

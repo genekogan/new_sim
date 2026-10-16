@@ -273,28 +273,28 @@ test('a redefinition walks a seated resident clear only when it re-makes the sea
   await w.settle(3); assert.deepEqual(E.runtime.violations, []);
 });
 
-test('raising terrain under a sleeping resident wakes them and walks them off the affected footprint', { timeout: 300000 }, async t => {
+test('raising terrain under a napping resident wakes them and walks them off the affected footprint', { timeout: 300000 }, async t => {
+  // Integration with lane walk (E2#10): core beds refuse lie/sleep until they have native berth support, so the
+  // resident naps on the ground and the knoll rises where it lies.
   const w = await world(); w.brain.quiesce();
   t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
   await w.settle(2);
-  assert.equal(w.god.act({ ops: [{ op: 'place', def: coreRef('bed'), name: 'bed', p: [10, 0] }] }).accepted, true);
-  await w.settle(3);
   await invite(w, 'fay');
   const row: any = await accept(w.host, w.souls.create('dev:fay', { name: 'Fay', description: 'takes naps' }));
   await w.settle(3);
-  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner }, bed = w.god.model.get('bed')!.id, E = w.host.engine as any;
-  const sleep: any = await accept(w.host, w.edge.act(soul, { capability: `sleep:${bed}`, params: { seconds: 600 } }));
-  assert.equal(sleep.accepted, true, JSON.stringify(sleep));
-  assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'nap'), 'sleeping in the bed');
-  const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 5 } }] });
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner }, E = w.host.engine as any;
+  const nap: any = await accept(w.host, w.edge.act(soul, { capability: 'nap:here', params: { seconds: 600 } }));
+  assert.equal(nap.accepted, true, JSON.stringify(nap));
+  assert.ok(await until(w, () => E.world.entities[row.entity_id].human.activity === 'nap'), 'napping on the ground');
+  const p = E.world.entities[row.entity_id].pose.p, at: [number, number] = [Math.round(p[0] * 100) / 100, Math.round(p[2] * 100) / 100];
+  const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: at, params: { height: 4, radius: 5 } }] });
   const movement = movedResident(r, soul, 'walked'), b = E.world.entities[row.entity_id];
-  assert.ok(movement.released.includes(bed), 'the bed is released');
   assert.equal(b.human.activity, 'idle', 'the resident wakes in the edit request'); assert.equal(E.programOf(row.entity_id), null, 'the nap ended');
   assert.match(movement.reason, /you woke/);
   assert.ok(w.god.model.terrain.sample(movement.to[0], movement.to[1]) <= 0.25, 'off the raised ground (it rose by no more than a step where the resident stands)');
   assert.deepEqual([b.pose.p[0], b.pose.p[2]], movement.to);
   await w.settle(4);
-  assert.ok(w.god.model.get('mound')); assert.ok(w.god.model.terrain.sample(10, 0) > 3, 'terrain edit applies');
+  assert.ok(w.god.model.get('mound')); assert.ok(w.god.model.terrain.sample(at[0], at[1]) > 3, 'terrain edit applies');
   assert.deepEqual(E.runtime.violations, []);
 });
 
