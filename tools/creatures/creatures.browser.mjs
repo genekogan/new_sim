@@ -12,7 +12,8 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { startWorld } from '../god-skill/dev-world.mjs';
+import { spawn } from 'node:child_process';
+import { openSync } from 'node:fs';
 import { chromeLease } from '<team>/ops/chrome-lease.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -24,8 +25,12 @@ rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true 
 const report = { startedAt: new Date().toISOString(), steps: [], shots: [], pageErrors: [] };
 const step = async (name, fn) => { const value = await fn(); report.steps.push({ name, value }); console.log('PASS ' + name); return value; };
 
-const server = await startWorld({ slug, port, fresh: true, log: resolve(out, 'server.log') });
-const base = server.base;
+// a fresh world like tools/god-skill/dev-world.mjs, but served the tracked viewer assets (the shared overlay predates
+// the humanoid kit, so a humanoid's look would not compose); this script stops only the server it started
+const base = `http://127.0.0.1:${port}/w/${slug}`;
+const server = { child: spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', openSync(resolve(out, 'server.log'), 'a'), openSync(resolve(out, 'server.log'), 'a')],
+  env: { ...process.env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: resolve(out, 'data'), PUBLIC_URL: `http://127.0.0.1:${port}`, MARS_WEB_DIR: resolve(root, 'mars/viewer/public'), ANTHROPIC_API_KEY: '', OPENAI_API_KEY: '', TYPESAFE_API_KEY: '' } }) };
+for (let i = 0; ; i++) { try { if ((await fetch(base + '/healthz')).ok) break; } catch { /* booting */ } if (i > 1800 || server.child.exitCode !== null) throw Error('world did not boot'); await wait(100); }
 async function http(path, { as, token, body, method } = {}) {
   const r = await fetch(base + path, { method: method ?? (body === undefined ? 'GET' : 'POST'), headers: { ...(as ? { authorization: `Bearer dev:${as}` } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const value = await r.json().catch(() => null);
@@ -98,12 +103,18 @@ try {
   release = await chromeLease('creatures');
   browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
   async function frame(page, name, wheel = 3) {
-    // select the resident through its visible name, then zoom on it with real wheel input
+    // select the resident through its visible name, follow it with the camera, then zoom in with real wheel input
     const label = page.locator('b').filter({ hasText: new RegExp('^' + name + '$') }).first();
     await label.waitFor({ state: 'visible', timeout: 120000 });
-    await label.click(); await wait(800);
-    for (let k = 0; k < wheel; k++) { const box = await label.boundingBox(); if (!box) break; await page.mouse.move(box.x + box.width / 2, box.y + box.height + 40); await page.mouse.wheel(0, -320); await wait(500); }
-    await wait(1500);
+    const box = await label.boundingBox(); assert.ok(box, name);
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2); await wait(800);
+    const follow = page.getByRole('button', { name: /^Follow$/ });
+    if (await follow.count()) { await follow.first().click(); await wait(1500); }
+    const close = page.getByRole('button', { name: /close/i });
+    if (await close.count()) { await close.first().click().catch(() => {}); await wait(300); }
+    const vp = page.viewportSize();
+    for (let k = 0; k < wheel; k++) { await page.mouse.move(vp.width / 2, vp.height / 2); await page.mouse.wheel(0, -400); await wait(500); }
+    await wait(2500);
   }
   async function shoot(stage, name, dpr, wheel) {
     const page = await browser.newPage({ viewport: { width: 1000, height: 720 }, deviceScaleFactor: dpr });
