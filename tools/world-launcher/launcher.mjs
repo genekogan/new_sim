@@ -53,6 +53,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
+import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
@@ -74,7 +75,8 @@ const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', 
  *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, command?: Function, log?: (s: string) => void,
  *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,
  *           minFreeMb?: number, worldHeapMb?: number, createLimit?: number, base?: string,
- *           soulCli?: string, soulSkill?: string, soulInstructions?: string }} cfg
+ *           soulCli?: string, soulSkill?: string, soulInstructions?: string, maxWorldsPerAccount?: number,
+ *           newAccountHours?: number, newAccountWorldLimit?: number, newAccountCreateLimit?: number, newAccountWindowMinutes?: number }} cfg
  * Without the production fields the launcher behaves as it always did locally (dev auth, 200 worlds, origin = bind).
  */
 export async function openLauncher(cfg = {}) {
@@ -97,6 +99,7 @@ export async function openLauncher(cfg = {}) {
   const behindProxy = publicOrigin !== origin;
   const B = prod.base, wp = (slug) => `${B}/w/${slug}`;
   const registry = new Registry(dataDir);
+  const accountPolicy = creationPolicy(cfg);
   const createLimit = cfg.createLimit ?? Infinity, made = new Map();
   /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
   const live = new Map();
@@ -147,6 +150,25 @@ export async function openLauncher(cfg = {}) {
     const template = typeof body?.template === 'string' ? body.template : 'empty';
     const t = templates.find((x) => x.id === template);
     if (!t) return [400, { ok: false, code: 'invalid', message: `unknown template ${template}; one of ${templates.map((x) => x.id).join(', ')}` }];
+    if (!op && creator) {
+      const db = new DatabaseSync(auth.child.registryPath, { readOnly: true });
+      let account;
+      try { account = db.prepare('SELECT created_at FROM provider_accounts_v1 WHERE account_id=?').get(creator); }
+      finally { db.close(); }
+      // Read actual world ownership for old registry rows too: pre-cap worlds did not persist owner in worlds.json.
+      const worlds = registry.worlds.filter(w => !w.fork && worldOwner(w.slug) === creator);
+      const refusal = checkAccountCreation(accountPolicy, { createdAt: account?.created_at, worlds });
+      if (refusal) { const { status, ...body } = refusal; return [status, body]; }
+    }
+    // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
+    const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
+    // The label is self-chosen text, so one person must not be able to wear another god's label on the homepage.
+    const verifiedOwner = op?.owner ?? creator;
+    if (godName && verifiedOwner) {
+      const key = godName.toLocaleLowerCase();
+      if (registry.worlds.some((w) => !w.fork && typeof w.godName === 'string' && w.godName.toLocaleLowerCase() === key && worldOwner(w.slug) !== verifiedOwner))
+        return [409, { ok: false, code: 'god-name-taken', message: `"${godName}" is already shown as the god of someone else's world; choose another name to show.` }];
+    }
     if (registry.worlds.length >= MAX_WORLDS) return [409, { ok: false, code: 'full', message: `this launcher holds at most ${MAX_WORLDS} worlds` }];
     const slug = slugFor(name, registry.slugs());
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
@@ -180,8 +202,6 @@ export async function openLauncher(cfg = {}) {
         return [r.status === 403 ? 403 : 401, { ok: false, code: 'signin-required', message: `the new world could not make you its god: ${d.message ?? r.status}; sign in again and retry` }];
       } else log(`created ${slug} unclaimed: the creator's dev sign-in was refused (${r.status})`);
     }
-    // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
-    const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
     if (owner && godName) registry.update(slug, { godName });
     log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${op ? `, owned by ${op.owner} (operator)` : owner ? ', claimed by its creator' : ''}`);
     await refreshStats(entry);
@@ -327,7 +347,7 @@ export async function openLauncher(cfg = {}) {
         if (recent.length >= createLimit) { json(res, 429, { ok: false, code: 'slow-down', message: `at most ${createLimit} new worlds per 10 minutes from one place` }, { 'retry-after': '120' }); return; }
         const run = creating.then(() => createWorld(body, req.headers.authorization)); creating = run.catch(() => {});
         const out = await run; if (out[0] === 201) made.set(who, [...recent, Date.now()]);
-        json(res, out[0], out[1]); return;
+        json(res, out[0], out[1], out[1].retry_after ? { 'retry-after': String(out[1].retry_after) } : {}); return;
       }
       if (path === '/__sim/op/create-world' && req.method === 'POST') {
         // operator only: a request through the reverse proxy carries x-forwarded-for and is refused
@@ -446,6 +466,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
+      maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
       marsWebDir: flag('mars-web'), webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions') });
     let stopping = false;
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (stopping) return; stopping = true; console.log(`[launcher] ${sig}: stopping worlds…`); void l.close().then(() => process.exit(0)); });
