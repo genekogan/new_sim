@@ -23,7 +23,7 @@ import { schemaMarkdown } from './lib/schema-md.mjs';
 import { listen, ack } from './lib/inbox.mjs';
 export { listen, ack };
 import { time as envTime, weather as envWeather, strike as envStrike, land as envLand, ENV_FLAGS, ENV_BOOLS, LAND_HELP } from './lib/env.mjs';
-import { hours, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
+import { hours, event, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
 export { schemaMarkdown };
 
 import { SKILL_VERSION } from './lib/version.mjs';
@@ -1218,7 +1218,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f),
   sky: (r, f) => sky(f), weather: (r, f) => envWeather(f), time: (r, f) => envTime(r, f), strike: (r, f) => envStrike(f), land: (r, f) => envLand(r, f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
   flags, flag: (r, f) => flag(r.join(' '), f), prayers: (r, f) => prayers(f), answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
-  hours: (r, f) => hours(r[0], f), own: (r, f) => own(r[0], r[1], f), access: (r) => access(r[0], r[1]), price: (r, f) => price(r[0], r[1], f), currency: (r) => currency(r[0]),
+  hours: (r, f) => hours(r[0], f), event: (r, f) => event(r[0], r[1], f), own: (r, f) => own(r[0], r[1], f), access: (r) => access(r[0], r[1]), price: (r, f) => price(r[0], r[1], f), currency: (r) => currency(r[0]),
   give: (r) => give(r[0], r[1]), pay: (r) => pay(r[0], r[1], r[2]), zone: (r, f) => zone(r[0], r[1], f), 'zone-suggest': (r) => zoneSuggest(r[0]), relate: (r, f) => relate(r[0], r[1], r[2], f), layers: (r, f) => layers(f),
   help: () => HELP,
 };

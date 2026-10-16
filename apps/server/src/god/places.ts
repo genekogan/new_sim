@@ -71,7 +71,7 @@ export type PlacesHost = {
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
   /** LAYERS: schedules (today's slots), ownership and who works/lives there, in each place (layers.ts). */
-  layers?: { active(): boolean; dayKey(): string; slotsFor(e: Entity, label: string): NonNullable<Place['schedule']>; tag(e: Entity): string; peopleAt(id: string): string };
+  layers?: { active(): boolean; dayKey(): string; slotsFor(e: Entity, label: string): NonNullable<Place['schedule']>; tag(e: Entity): string; peopleAt(id: string): string; onNow?(e: Entity): string };
 };
 
 /** What is where on a god's world, as the ledger's places. */
@@ -200,6 +200,8 @@ export class GodPlaces {
       // a place's own opening hours are its slots; a thing inside (a door that follows the café's hours) adds only its events
       const label = e.name ? m.pathOf(e.id) : p.name, slots = L.slotsFor(e, label).filter((s) => own || !s.id.startsWith('open-')).map((s) => ({ ...s, id: own ? s.id : `${e.id}-${s.id}`.slice(0, 60) }));
       if (slots.length) p.schedule = [...(p.schedule ?? []), ...slots];
+      // EVENTS: an event on now with its set up leads the description (whatson shows its first words)
+      const on = L.onNow?.(e); if (on) p.description = `${on}; ${p.description ?? ''}`.replace(/; $/, '').slice(0, 600);
     }
   }
 

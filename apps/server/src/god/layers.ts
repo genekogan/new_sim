@@ -24,6 +24,7 @@ import { ApiError } from '../souls.ts';
 import type { Objects } from '../edge/comms/objects/framework.ts';
 import { isVerificationProbe } from '../verification-probe.ts';
 import { inClosure, type ClosingSite } from './builds.ts';
+import { EventSets } from './event-sets.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -76,11 +77,13 @@ export class GodLayers {
   private h: LayersHost;
   private lastDay = '';
   private followed = new Map<string, string>();
-  constructor(h: LayersHost) { this.h = h; }
+  /** EVENTS: the things an event sets up while it is on (event-sets.ts). */
+  readonly sets: EventSets;
+  constructor(h: LayersHost) { this.h = h; this.sets = new EventSets(h); }
 
   private get m() { return this.h.model; }
   /** Is this world using any layer at all? (cheap) */
-  active(): boolean { if (this.h.buildingActive?.() || this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access || (!this.h.buildingActive && this.h.building?.(e.id))) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
+  active(): boolean { if (this.h.buildingActive?.() || this.m.state.layers || this.sets.active()) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access || (!this.h.buildingActive && this.h.building?.(e.id))) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
   private calendarObjects(): Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> | undefined { return (this.h.edge as any)?.comms?.objects; }
 
   // ---------- the clock ----------
@@ -94,9 +97,10 @@ export class GodLayers {
   dayKey(): string { return this.clock()?.day ?? ''; }
 
   /** One clock step (the bridge calls it every couple of seconds): states that follow schedules, calendar items. */
-  step(): { changed: number; posted: number } {
+  step(): { changed: number; posted: number; set?: number; packed?: number } {
     const scheduled = [...this.m.entities.values()].filter((e) => e.schedule);
     const c = this.clock(); if (!c) return { changed: 0, posted: 0 };
+    const sets = this.sets.active() ? this.sets.step(c) : null;
     const ops: Op[] = [], notes: string[] = [];
     for (const e of scheduled) {
       if (!e.schedule?.follow?.length) continue;
@@ -116,7 +120,7 @@ export class GodLayers {
       if (r.accepted) changed = ops.length; else this.h.log(`schedule: refused ${JSON.stringify((r as any).failures).slice(0, 300)}`);
     }
     const posted = this.postCalendar(scheduled, c);
-    return { changed, posted };
+    return { changed, posted, ...(sets && (sets.set || sets.packed) ? sets : {}) };
   }
 
   /** Each scheduled event within the next day goes on the calendar once (ids from the thing, the event and the date). */
@@ -155,6 +159,8 @@ export class GodLayers {
     return posted;
   }
 
+  /** EVENTS: "Saturday market is on here now (3 market stalls and a banner set up, until 13:00)" (places.ts leads with it). */
+  onNow(e: Entity): string { return this.sets.onNow(e, this.clock()); }
   /** Today's place schedule slots for a thing (places.ts adds them to its place). */
   slotsFor(e: Entity, label: string) { const c = this.clock(); return e.schedule ? scheduleSlots(e.schedule, c?.weekday ?? 6, label) : []; }
   /** "open 07:00–15:00 (open now)". */
@@ -350,6 +356,7 @@ export class GodLayers {
       zones,
       things: things.map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, ...(e.owner ? { owner: this.nameOf(e.owner), ownerRef: e.owner } : {}), ...(e.access ? { access: e.access } : {}), ...(econ && e.price ? { price: e.price } : {}), ...(e.schedule ? { schedule: e.schedule, hours: this.hoursOf(e.schedule) } : {}) })),
       ...(econ ? { relations: this.relations().map((r) => ({ a: this.nameOf(r.a), rel: r.rel, b: this.nameOf(r.b), refs: r })) } : {}),
+      ...(this.sets.active() ? { sets: this.sets.status(this.clock()) } : {}),
     };
   }
   /** Who works and lives at a thing: "Ana works here". */

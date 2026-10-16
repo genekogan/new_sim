@@ -50,6 +50,53 @@ export async function hours(ref, f) {
   if (!Object.keys(s).length) throw new Error('hours: give --open, --event or --follow (or --clear)');
   return edit([{ op: 'set', id: ref, schedule: s }], `${ref}: ${[...(s.open ?? []).map((o) => `open ${o.from}–${o.to}${o.days ? ' ' + o.days.join(',') : ''}`), ...(s.events ?? []).map((e) => `${e.label} ${e.at} ${e.minutes}m${e.days ? ' ' + e.days.join(',') : ''}`), ...(s.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].join('; ')}`);
 }
+/** EVENTS: ready sets (metres from the scheduled thing's centre, its own frame; yaw in radians). `market`: a row of
+ *  stalls behind a banner with crates; `concert`: a stage with floodlights, string lights, speakers and benches. */
+export const EVENT_SETS = {
+  market: (label) => [
+    ...[-9, -3, 3, 9].map((x) => ({ def: 'core/market-stall@1', p: [x, 0] })),
+    ...[[-6, 2], [0.5, 2.2], [6, 1.8]].map((p) => ({ def: 'core/crate@1', p })),
+    { def: 'core/banner@1', p: [0, -4], state: { text: label.slice(0, 60) } },
+  ],
+  concert: () => [   // the stage at the back faces +z; the audience benches, under string lights, in front of it
+    { def: 'core/stage@1', p: [0, -5] },
+    { def: 'core/floodlight@1', p: [-8, -1], r: Math.PI, state: { on: true } }, { def: 'core/floodlight@1', p: [8, -1], r: Math.PI, state: { on: true } },
+    { def: 'core/speaker@1', p: [-5.5, -1.5], state: { playing: true } }, { def: 'core/speaker@1', p: [5.5, -1.5], state: { playing: true } },
+    { def: 'core/string-lights@1', p: [-4.5, 3.5], state: { on: true } }, { def: 'core/string-lights@1', p: [4.5, 3.5], state: { on: true } },
+    ...[-4, 0, 4].map((x) => ({ def: 'core/bench@1', p: [x, 6] })),
+  ],
+};
+const piece = (s) => {   // def@x,z[@yawdeg]  (core/lantern-post@1 is a def ref: the position follows the second @)
+  const m = /^([a-z0-9][a-z0-9._/-]*@\d+|sha:[0-9a-f]{16,64})@(-?[\d.]+),(-?[\d.]+)(?:@(-?[\d.]+))?$/.exec(String(s).trim());
+  if (!m) throw new Error(`--piece takes def@x,z[@yawdeg] (core/lantern-post@1@4,-2@90), got "${s}"`);
+  return { def: m[1], p: [Number(m[2]), Number(m[3])], ...(m[4] !== undefined ? { r: Number(m[4]) * Math.PI / 180 } : {}) };
+};
+/** event <ref> "name HH:MM [minutes] [days]" [--set market|concert] [--piece def@x,z[@yaw]] [--shift dx,dz] [--label "…"]
+ *  · event <ref> --remove <name>. Adds (or replaces, by name) one event in the thing's schedule, keeping its hours and
+ *  other events. With a set, its things appear at the start and are packed away at the end. */
+export async function event(ref, spec, f) {
+  if (!ref) throw new Error('event <thing> "name HH:MM [minutes] [days]" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "…"] · event <thing> --remove <name>');
+  const L = ok(await call('/v1/god/layers'), 'layers'), t = L.things.find((x) => x.id === ref || x.name === ref);
+  const s = structuredClone(t?.schedule ?? {}), events = s.events ?? [];
+  if (f.remove) {
+    const name = String(f.remove === true ? spec ?? '' : f.remove).toLowerCase(); if (!events.some((e) => e.name === name)) throw new Error(`event: ${ref} has no event "${name}" (it has ${events.map((e) => e.name).join(', ') || 'none'})`);
+    s.events = events.filter((e) => e.name !== name); if (!s.events.length) delete s.events;
+    return edit([{ op: 'set', id: ref, schedule: Object.keys(s).length ? s : null }], `${ref}: no ${name} any more (its set is packed away if it was out)`);
+  }
+  const w = String(spec ?? '').trim().split(/\s+/); if (w.length < 2) throw new Error(`event: give "name HH:MM [minutes] [days]" (e.g. "market 09:00 240 sat"), got "${spec ?? ''}"`);
+  const name = w[0].toLowerCase().replace(/[^a-z0-9-]+/g, '-'), minutes = w[2] && /^\d+$/.test(w[2]) ? Number(w[2]) : 60, d = w[2] && !/^\d+$/.test(w[2]) ? w[2] : w[3];
+  const label = String(f.label ?? w[0].replace(/-/g, ' ')).slice(0, 80);
+  if (f.set && !EVENT_SETS[f.set]) throw new Error(`--set is one of ${Object.keys(EVENT_SETS).join(', ')} (or give --piece def@x,z …)`);
+  const [sx, sz] = f.shift ? String(f.shift).split(',').map(Number) : [0, 0]; if (!Number.isFinite(sx) || !Number.isFinite(sz)) throw new Error('--shift takes dx,dz (metres)');
+  const set = [...(f.set ? EVENT_SETS[f.set](label) : []), ...list(f.piece).map(piece)].map((p) => ({ ...p, p: [p.p[0] + sx, p.p[1] + sz] }));
+  if (set.length > 24) throw new Error(`event: a set has at most 24 things (this one has ${set.length})`);
+  const ev = { name, label, at: hhmm(w[1], 'event'), minutes, ...(d ? { days: days(d, 'event') } : {}), ...(set.length ? { set } : {}) };
+  s.events = [...events.filter((e) => e.name !== name), ev];
+  const end = (() => { const [h, m] = ev.at.split(':').map(Number), x = (h * 60 + m + minutes) % 1440; return `${String(Math.floor(x / 60)).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; })();
+  const counts = {}; for (const p of set) { const k = p.def.replace(/^core\//, '').replace(/@\d+$/, ''); counts[k] = (counts[k] ?? 0) + 1; }
+  const what = Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(', ');
+  return edit([{ op: 'set', id: ref, schedule: s }], `${ref}: ${label} ${ev.at}–${end}${ev.days ? ' ' + ev.days.join(',') : ' every day'}${set.length ? ` with its set (${what}): it appears at ${ev.at} and is packed away at ${end}` : ''}; whatson and the calendar list it`);
+}
 export async function own(ref, whom, f) {
   if (!ref) throw new Error('own <thing> <soul|god|group:name|none> [--private|--public]');
   const owner = await who(whom), op = { op: 'set', id: ref, owner };
@@ -97,12 +144,13 @@ export async function layers(f) {
   const lines = [`clock ${c}${L.currency ? ` · currency ${L.currency}` : ' · no economy (LAYERS=1 opts in)'}`];
   if (L.zones.length) lines.push(`zones: ${L.zones.map((z) => `${z.name} (${z.use})`).join(', ')}`);
   for (const t of L.things) lines.push(`  ${t.name}: ${[t.owner ? `${t.owner}${t.access === 'private' ? ' (private)' : ''}` : t.access, t.price ? `${t.price.service ? t.price.service + ' ' : ''}${t.price.amount} ${L.currency}` : '', t.hours ?? '', ...(t.schedule?.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].filter(Boolean).join(' · ')}`);
+  for (const x of L.sets ?? []) lines.push(`  set: ${x.thing} ${x.label}: ${x.out}/${x.pieces} things out${x.on ? ' (on now)' : ''}${x.refused?.length ? ` · refused: ${x.refused.join('; ')}` : ''}`);
   if (L.relations?.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join('; ')}`);
   const w = Object.entries(L.wallets ?? {}); if (w.length) lines.push(`wallets: ${w.map(([k, v]) => `${k} ${v}`).join(', ')}`);
   if (L.souls?.length) lines.push(`souls: ${L.souls.map((s) => s.name).join(', ')}`);
   return lines.join('\n');
 }
-export const LAYERS_FLAGS = { hours: 'open event follow clear note', own: 'private public', access: '', price: 'service', currency: '', give: '', pay: '', zone: 'rect circle area', 'zone-suggest': '', relate: 'off', layers: '' };
+export const LAYERS_FLAGS = { hours: 'open event follow clear note', event: 'set piece shift label remove', own: 'private public', access: '', price: 'service', currency: '', give: '', pay: '', zone: 'rect circle area', 'zone-suggest': '', relate: 'off', layers: '' };
 export const LAYERS_BOOLS = ['clear', 'private', 'public', 'off'];
-export const LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, 'zone-suggest': 1, relate: 3, layers: 0 };
-export const LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] · own <ref> <soul|god|group:x|none> [--private|--public] · access <ref> private|public|none · zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area · zone-suggest <use> · layers · only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] · currency <name> · give <soul> <n> · pay <from> <to> <n> · relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
+export const LAYERS_POS = { hours: 1, event: 2, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, 'zone-suggest': 1, relate: 3, layers: 0 };
+export const LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) · event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "…"] (adds one event; its set appears while it is on) · event <ref> <name> --remove · own <ref> <soul|god|group:x|none> [--private|--public] · access <ref> private|public|none · zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area · zone-suggest <use> · layers · only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] · currency <name> · give <soul> <n> · pay <from> <to> <n> · relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;

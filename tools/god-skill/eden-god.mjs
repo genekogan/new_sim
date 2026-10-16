@@ -2516,6 +2516,63 @@ async function hours(ref, f) {
   if (!Object.keys(s).length) throw new Error("hours: give --open, --event or --follow (or --clear)");
   return edit([{ op: "set", id: ref, schedule: s }], `${ref}: ${[...(s.open ?? []).map((o) => `open ${o.from}\u2013${o.to}${o.days ? " " + o.days.join(",") : ""}`), ...(s.events ?? []).map((e) => `${e.label} ${e.at} ${e.minutes}m${e.days ? " " + e.days.join(",") : ""}`), ...(s.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].join("; ")}`);
 }
+var EVENT_SETS = {
+  market: (label) => [
+    ...[-9, -3, 3, 9].map((x) => ({ def: "core/market-stall@1", p: [x, 0] })),
+    ...[[-6, 2], [0.5, 2.2], [6, 1.8]].map((p) => ({ def: "core/crate@1", p })),
+    { def: "core/banner@1", p: [0, -4], state: { text: label.slice(0, 60) } }
+  ],
+  concert: () => [
+    // the stage at the back faces +z; the audience benches, under string lights, in front of it
+    { def: "core/stage@1", p: [0, -5] },
+    { def: "core/floodlight@1", p: [-8, -1], r: Math.PI, state: { on: true } },
+    { def: "core/floodlight@1", p: [8, -1], r: Math.PI, state: { on: true } },
+    { def: "core/speaker@1", p: [-5.5, -1.5], state: { playing: true } },
+    { def: "core/speaker@1", p: [5.5, -1.5], state: { playing: true } },
+    { def: "core/string-lights@1", p: [-4.5, 3.5], state: { on: true } },
+    { def: "core/string-lights@1", p: [4.5, 3.5], state: { on: true } },
+    ...[-4, 0, 4].map((x) => ({ def: "core/bench@1", p: [x, 6] }))
+  ]
+};
+var piece = (s) => {
+  const m = /^([a-z0-9][a-z0-9._/-]*@\d+|sha:[0-9a-f]{16,64})@(-?[\d.]+),(-?[\d.]+)(?:@(-?[\d.]+))?$/.exec(String(s).trim());
+  if (!m) throw new Error(`--piece takes def@x,z[@yawdeg] (core/lantern-post@1@4,-2@90), got "${s}"`);
+  return { def: m[1], p: [Number(m[2]), Number(m[3])], ...m[4] !== void 0 ? { r: Number(m[4]) * Math.PI / 180 } : {} };
+};
+async function event(ref, spec, f) {
+  if (!ref) throw new Error('event <thing> "name HH:MM [minutes] [days]" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] \xB7 event <thing> --remove <name>');
+  const L = ok(await call("/v1/god/layers"), "layers"), t = L.things.find((x) => x.id === ref || x.name === ref);
+  const s = structuredClone(t?.schedule ?? {}), events = s.events ?? [];
+  if (f.remove) {
+    const name2 = String(f.remove === true ? spec ?? "" : f.remove).toLowerCase();
+    if (!events.some((e) => e.name === name2)) throw new Error(`event: ${ref} has no event "${name2}" (it has ${events.map((e) => e.name).join(", ") || "none"})`);
+    s.events = events.filter((e) => e.name !== name2);
+    if (!s.events.length) delete s.events;
+    return edit([{ op: "set", id: ref, schedule: Object.keys(s).length ? s : null }], `${ref}: no ${name2} any more (its set is packed away if it was out)`);
+  }
+  const w = String(spec ?? "").trim().split(/\s+/);
+  if (w.length < 2) throw new Error(`event: give "name HH:MM [minutes] [days]" (e.g. "market 09:00 240 sat"), got "${spec ?? ""}"`);
+  const name = w[0].toLowerCase().replace(/[^a-z0-9-]+/g, "-"), minutes = w[2] && /^\d+$/.test(w[2]) ? Number(w[2]) : 60, d = w[2] && !/^\d+$/.test(w[2]) ? w[2] : w[3];
+  const label = String(f.label ?? w[0].replace(/-/g, " ")).slice(0, 80);
+  if (f.set && !EVENT_SETS[f.set]) throw new Error(`--set is one of ${Object.keys(EVENT_SETS).join(", ")} (or give --piece def@x,z \u2026)`);
+  const [sx, sz] = f.shift ? String(f.shift).split(",").map(Number) : [0, 0];
+  if (!Number.isFinite(sx) || !Number.isFinite(sz)) throw new Error("--shift takes dx,dz (metres)");
+  const set2 = [...f.set ? EVENT_SETS[f.set](label) : [], ...list(f.piece).map(piece)].map((p) => ({ ...p, p: [p.p[0] + sx, p.p[1] + sz] }));
+  if (set2.length > 24) throw new Error(`event: a set has at most 24 things (this one has ${set2.length})`);
+  const ev = { name, label, at: hhmm(w[1], "event"), minutes, ...d ? { days: days(d, "event") } : {}, ...set2.length ? { set: set2 } : {} };
+  s.events = [...events.filter((e) => e.name !== name), ev];
+  const end2 = (() => {
+    const [h, m] = ev.at.split(":").map(Number), x = (h * 60 + m + minutes) % 1440;
+    return `${String(Math.floor(x / 60)).padStart(2, "0")}:${String(x % 60).padStart(2, "0")}`;
+  })();
+  const counts = {};
+  for (const p of set2) {
+    const k = p.def.replace(/^core\//, "").replace(/@\d+$/, "");
+    counts[k] = (counts[k] ?? 0) + 1;
+  }
+  const what = Object.entries(counts).map(([k, n]) => `${n} ${k}`).join(", ");
+  return edit([{ op: "set", id: ref, schedule: s }], `${ref}: ${label} ${ev.at}\u2013${end2}${ev.days ? " " + ev.days.join(",") : " every day"}${set2.length ? ` with its set (${what}): it appears at ${ev.at} and is packed away at ${end2}` : ""}; whatson and the calendar list it`);
+}
 async function own(ref, whom, f) {
   if (!ref) throw new Error("own <thing> <soul|god|group:name|none> [--private|--public]");
   const owner = await who(whom), op = { op: "set", id: ref, owner };
@@ -2575,16 +2632,17 @@ async function layers(f) {
   const lines = [`clock ${c}${L.currency ? ` \xB7 currency ${L.currency}` : " \xB7 no economy (LAYERS=1 opts in)"}`];
   if (L.zones.length) lines.push(`zones: ${L.zones.map((z) => `${z.name} (${z.use})`).join(", ")}`);
   for (const t of L.things) lines.push(`  ${t.name}: ${[t.owner ? `${t.owner}${t.access === "private" ? " (private)" : ""}` : t.access, t.price ? `${t.price.service ? t.price.service + " " : ""}${t.price.amount} ${L.currency}` : "", t.hours ?? "", ...(t.schedule?.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].filter(Boolean).join(" \xB7 ")}`);
+  for (const x of L.sets ?? []) lines.push(`  set: ${x.thing} ${x.label}: ${x.out}/${x.pieces} things out${x.on ? " (on now)" : ""}${x.refused?.length ? ` \xB7 refused: ${x.refused.join("; ")}` : ""}`);
   if (L.relations?.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join("; ")}`);
   const w = Object.entries(L.wallets ?? {});
   if (w.length) lines.push(`wallets: ${w.map(([k, v]) => `${k} ${v}`).join(", ")}`);
   if (L.souls?.length) lines.push(`souls: ${L.souls.map((s) => s.name).join(", ")}`);
   return lines.join("\n");
 }
-var LAYERS_FLAGS = { hours: "open event follow clear note", own: "private public", access: "", price: "service", currency: "", give: "", pay: "", zone: "rect circle area", "zone-suggest": "", relate: "off", layers: "" };
+var LAYERS_FLAGS = { hours: "open event follow clear note", event: "set piece shift label remove", own: "private public", access: "", price: "service", currency: "", give: "", pay: "", zone: "rect circle area", "zone-suggest": "", relate: "off", layers: "" };
 var LAYERS_BOOLS = ["clear", "private", "public", "off"];
-var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
-var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
+var LAYERS_POS = { hours: 1, event: 2, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
+var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) \xB7 event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] (adds one event; its set appears while it is on) \xB7 event <ref> <name> --remove \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/version.mjs
 var SKILL_VERSION = "1.4";
@@ -4188,6 +4246,7 @@ var COMMANDS = {
     return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? " (offline)" : ""}`;
   },
   hours: (r, f) => hours(r[0], f),
+  event: (r, f) => event(r[0], r[1], f),
   own: (r, f) => own(r[0], r[1], f),
   access: (r) => access(r[0], r[1]),
   price: (r, f) => price(r[0], r[1], f),
