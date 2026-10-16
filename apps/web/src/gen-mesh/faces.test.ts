@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
-import { GENERATORS, type Value } from '@sim/generators';
+import { GENERATORS, kitArgs, type Value } from '@sim/generators';
 import { CORE_KIT, WorldModel, type Entity } from '@sim/world-compiler';
 import { buildKit } from './kit.mesh.ts';
 import { decalGroups, faceImagePath, patternPixels, patternSize, shapeFaceMeshes } from './faces.ts';
@@ -141,6 +141,11 @@ test('mirrored copies carry faces to the mirror side and stay readable; role fac
   assert.ok(centre(faces(door)[0]).distanceTo(new THREE.Vector3(0, 1.4, 0.029)) < 1e-6, 'the face is placed in the kit frame under its pivot');
   const awning = { v: 2, round: 0, shapes: [{ kind: 'box', at: [0, 1, 0], size: [1, 0.3, 0.05], when: 'awning', faces: [{ text: 'OPEN' }] }] };
   assert.equal(faces(draw(awning, { awning: true })).length, 1); assert.equal(faces(draw(awning, { awning: false })).length, 0);
+  // A stored contract-1 kit with a stray `faces` still renders (as it did before XP8) and draws no face.
+  for (const stray of [[{ text: 'OPEN' }], 'legacy']) {
+    const legacy = { shapes: [{ kind: 'box', at: [0, 1, 0], size: [1, 0.3, 0.05], faces: stray }, { kind: 'box', at: [0, 1, 0], size: [0.2, 0.2, 0.2], role: 'door', faces: stray }] };
+    assert.equal(kitArgs.safeParse(legacy).success, true); assert.equal(faces(draw(legacy)).length, 0);
+  }
 });
 
 test('network log: faces, patterns and decals request only this world\'s /assets/ images, and zero external URLs', async t => {

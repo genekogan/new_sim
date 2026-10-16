@@ -54,7 +54,8 @@ test('side names are in the kit frame after the shape turns; scale is ignored so
 });
 
 test('faces refuse at their field with a fix: legacy contract, wrong primitive, two contents, inert and unknown fields', () => {
-  refusal(board([{ text: 'Hi' }], {}, 1), ['shapes', 0, 'faces'], /requires kit contract 2/);
+  refusal(kitGen.args!.safeParse({ v: 1, shapes: [{ kind: 'box', at: [0, 1, 0], size: [1.2, 0.8, 0.05], faces: [{ text: 'Hi' }] }] }) as ReturnType<typeof board>, ['shapes', 0, 'faces'], /requires kit contract 2/);
+  refusal(board('not a list' as never), ['shapes', 0, 'faces'], /faces: .*fix: give faces as a list/);
   refusal(board([{ text: 'Hi' }], { kind: 'cyl', size: undefined, r: 0.5, h: 1 }), ['shapes', 0, 'faces'], /no effect on cyl/);
   refusal(board([{ text: 'Hi', pattern: 'mosaic' }]), ['shapes', 0, 'faces', 0, 'pattern'], /one thing/);
   refusal(board([{ side: 'front' }]), ['shapes', 0, 'faces', 0, 'text'], /needs text, image or pattern/);
@@ -73,6 +74,17 @@ test('images are only this world\'s /assets/<sha>.png|jpg paths; everything else
   for (const image of [`/assets/${sha}.png`, `/assets/${sha}.jpg`]) assert.equal(board([{ image }]).success, true, image);
   for (const image of ['https://example.invalid/a.png', '//example.invalid/a.png', 'data:image/png;base64,AAAA', 'blob:x', `/w/other/assets/${sha}.png`, `/assets/${sha}.svg`, `/assets/${sha}.png?x=1`, `/assets/../${sha}.png`, 'javascript:alert(1)']) {
     refusal(board([{ image }]), ['shapes', 0, 'faces', 0, 'image'], /POST \/v1\/god\/assets/);
+  }
+});
+
+test('a stored contract-1 kit with a stray `faces` still parses, bakes and counts as before; only admission refuses it', () => {
+  // Before XP8 a v1 shape skipped unknown fields; stored defs may carry any value there.
+  for (const stray of [[{ text: 'Hi' }], 'legacy', { side: 'front' }, [{ bogus: 1 }]]) {
+    const def = { shapes: [{ kind: 'box', at: [0, 0.5, 0], size: [1, 1, 0.2], faces: stray }] }, plain = { shapes: [{ kind: 'box', at: [0, 0.5, 0], size: [1, 1, 0.2] }] };
+    assert.equal(kitArgs.safeParse(def).success, true, JSON.stringify(stray));
+    assert.deepEqual(kitPhysics(def), kitPhysics(plain), 'the bake ignores it (tris and colliders as before)');
+    assert.equal(expandKitProgram(def).shapes.length, 1);
+    refusal(kitGen.args!.safeParse(def) as ReturnType<typeof board>, ['shapes', 0, 'faces'], /requires kit contract 2/);
   }
 });
 

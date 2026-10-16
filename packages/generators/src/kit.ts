@@ -10,6 +10,7 @@ import { CREATION_LIMITS } from './creation-limits.ts';
 import { expandKitProgram, withKitPrograms } from './kit-program.ts';
 import { kitFootprint, kitFootprintSchema } from './kit-footprint.ts'; // XP5 hook
 import { FACE_LIMITS, boxSideSize, faceContentIssues, faceLocalSide, faceTriangles, shapeFaceSchema } from './faces.ts'; // XP8 hook
+const shapeFaces = z.array(shapeFaceSchema).min(1).max(FACE_LIMITS.perShape);
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep', 'loft'] as const;
 export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
@@ -54,8 +55,10 @@ const shape = z.object({
    *  "variant=tall", "variant=tall|wide", "condition!=new", "awning", "!awning", "floors>1". A leading `@` reads entity
    *  state instead ("@open", "@sign=closed"): drawn by the viewer only, never a collider. */
   when: z.string().max(80).optional(),
-  /** XP8 (v2; box, rbox, extrude): text, a world image or a seeded pattern on one of the shape's sides. */
-  faces: z.array(shapeFaceSchema).min(1).max(FACE_LIMITS.perShape).optional(),
+  /** XP8 (v2; box, rbox, extrude): text, a world image or a seeded pattern on one of the shape's sides. Checked by
+   *  validateKit for v2 only: a stray `faces` on a stored contract-1 shape stays ignored (admission refuses new ones). */
+  // Typed as the face list it is on v2 (validateKit checks it); a contract-1 value of any shape is accepted and never read.
+  faces: z.union([shapeFaces, z.unknown()]).optional() as unknown as z.ZodOptional<typeof shapeFaces>,
 }).passthrough();
 export type KitShape = z.infer<typeof shape>;
 
@@ -91,7 +94,7 @@ const outlinesCross = (a: Point2[], b: Point2[]) => a.some((p, i) => b.some((q, 
 
 /** An upper bound on rendered triangles, including caps, holes, bevels and path subdivisions. */
 export function kitShapeTriangles(sh: KitShape, round: number, v = 1): number {
-  return shapeTriangles(sh, round, v) + faceTriangles(sh); // XP8 hook
+  return shapeTriangles(sh, round, v) + (v === 2 ? faceTriangles(sh) : 0); // XP8 hook: contract-1 faces are never drawn
 }
 function shapeTriangles(sh: KitShape, round: number, v: number): number {
   const seg = sh.segments ?? 10, r = sh.round ?? (v === 2 && sh.kind === 'rbox' ? Math.max(round, 0.06) : round);
@@ -120,7 +123,7 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
   for (const [i, sh] of args.shapes.entries()) {
     // Never silently accept v2 content with the legacy renderer. Existing v1 fields remain grandfathered.
     if (args.v === 1) {
-      for (const f of ['holes', 'top', 'faces'] as const) if (sh[f] !== undefined) issue(i, f, 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
+      for (const f of ['holes', 'top'] as const) if (sh[f] !== undefined) issue(i, f, 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
       if (sh.kind === 'loft' || (sh.kind === 'sweep' && sh.profile)) issue(i, sh.kind === 'loft' ? 'kind' : 'profile', 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
       continue;
     }
@@ -156,7 +159,11 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
       else if (sh.polygon.length !== sh.top.length || Math.sign(area(sh.polygon)) !== Math.sign(area(sh.top))) issue(i, 'top', 'loft outlines need matching vertex counts and winding', 'pair corresponding vertices in the same winding order');
       else { for (const t of [0.25, 0.5, 0.75]) { const p = sh.polygon.map((p, j) => [p[0] * (1 - t) + sh.top![j][0] * t, p[1] * (1 - t) + sh.top![j][1] * t] as Point2); if (outlineProblem(p)) { issue(i, 'top', 'loft twists through an invalid intermediate outline', 'align corresponding vertices without crossing'); break; } } }
     }
-    if (sh.faces) faceIssues(sh, args.round, (path, message, fix) => ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces', ...path], message: `faces${path.length ? '.' + path.join('.') : ''}: ${message}; fix: ${fix}` })); // XP8 hook
+    if (sh.faces !== undefined) { // XP8 hook
+      const faces = shapeFaces.safeParse(sh.faces);
+      if (!faces.success) for (const e of faces.error.issues) ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces', ...e.path] as (string | number)[], message: `faces${e.path.length ? '.' + e.path.join('.') : ''}: ${e.message}; fix: give faces as a list of 1..${FACE_LIMITS.perShape} {side?, text|image|pattern, …}` });
+      else faceIssues({ ...sh, faces: faces.data }, args.round, (path, message, fix) => ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces', ...path], message: `faces${path.length ? '.' + path.join('.') : ''}: ${message}; fix: ${fix}` }));
+    }
     for (const [j, hole] of (sh.holes ?? []).entries()) {
       const problem = outlineProblem(hole);
       if (problem) issue(i, 'holes', `hole ${j}: ${problem}`, 'use a simple nonzero-area interior outline');
@@ -218,6 +225,8 @@ export function setKitViewerContract(manifest: unknown): number {
 }
 const admissionArgs = kitArgs.superRefine((args, ctx) => {
   if (args.v > viewerContract) ctx.addIssue({ code: 'custom', path: ['v'], message: `v: served viewer supports kit contract ${viewerContract}; fix: build and serve the matching viewer before defining contract ${args.v} content` });
+  // XP8: stored contract-1 kits keep rendering with a stray `faces` (ignored); new definitions are told plainly.
+  if (args.v === 1) for (const [i, sh] of args.shapes.entries()) if ((sh as { faces?: unknown }).faces !== undefined) ctx.addIssue({ code: 'custom', path: ['shapes', i, 'faces'], message: 'faces: requires kit contract 2; fix: set make.args.v to 2 and serve the matching viewer bundle' });
 });
 
 /** Axis-aligned extent of a shape in its own frame (before yaw/pitch/roll), half sizes. */

@@ -160,7 +160,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   };
   for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; root.add(mesh); }
   // XP8 hook: faces (text, this world's images, seeded glass/mosaic) sit on their shapes; role faces follow the pivot below.
-  for (const sh of args.shapes) if (sh.faces && !sh.role && (!sh.when || kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {}))) for (const face of shapeFaceMeshes(sh, args.round)) root.add(face);
+  if (args.v === 2) for (const sh of args.shapes) if (sh.faces && !sh.role && (!sh.when || kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {}))) for (const face of shapeFaceMeshes(sh, args.round)) root.add(face);
   for (const [role, shapes] of byRole) {
     // pivot: explicit on any shape, else the top centre of the role's parts (legs swing from the hip)
     const explicit = shapes.find((s) => s.pivot)?.pivot;
@@ -174,7 +174,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
       const classes = new Map<string, THREE.BufferGeometry[]>();
       for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv)); classes.set(k, list); }
       for (const [k, geos] of classes) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = !k.startsWith('glass:') && !k.startsWith('water:'); mesh.receiveShadow = true; mesh.name = `kit:${k}`; pivot.add(mesh); }
-      for (const sh of shapes) for (const face of shapeFaceMeshes(sh, args.round, pv)) pivot.add(face); // XP8 hook
+      if (args.v === 2) for (const sh of shapes) for (const face of shapeFaceMeshes(sh, args.round, pv)) pivot.add(face); // XP8 hook
     }
     root.add(pivot);
   }
