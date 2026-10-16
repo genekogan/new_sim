@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { registerHooks } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { WorldModel, type Entity, type OBB } from '@sim/world-compiler';
 import { WorldBuildSites, parseBuildFeed, SITE_REFINEMENT, type PublicSite, type SiteDelta, type SiteModel } from './WorldBuildSites.ts';
 
@@ -256,6 +257,42 @@ test('a label that changes size gets a fresh texture (the old one disposed once)
   sites.apply(edge(delta(3, { say: { text: 'raising the lighthouse lamps', at: SERVER_NOW } })));
   assert.equal(sprite().material.map, second); assert.ok(second.version > version); assert.match(painted.at(-1)![1], /lamps$/);
   sites.dispose(); assert.equal(disposed, 1);
+});
+
+// R2F: the server's own feed for the walk (apps/server/src/god/builds.test.ts "R2F", fixtures/build-messages.json `walk`):
+// started, paused after a 12-minute look, the lead's step --say (resumed + step), reads (alive) and more steps, a committed
+// batch with a note, a step. Production defaults: 10 min pause, 30 min closure. Delivered in order at server time, no reload.
+test('visitors apply the real step feed live: narration and pulse appear, "paused" never shows while narrating, and the batch moves reopensAt', () => {
+  const walk = JSON.parse(readFileSync(new URL('../../server/src/god/fixtures/build-messages.json', import.meta.url), 'utf8')).walk as { kind: string; event?: string; now: number }[];
+  const T0 = walk[0].now; let mono = 1000;
+  const sites = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => mono, createCanvas: () => fakeCanvas(), search: '?sites=ring,label' });
+  const at = (serverMs: number) => { mono = 1000 + serverMs - T0; sites.update(mono); };
+  const text = () => sites.inspect().sites[0]?.text ?? '';
+  const pulse = () => { const faces = sites.group.children[0].children[1] as THREE.Mesh; return Array.from(faces.geometry.getAttribute('buildDesigning').array).some(n => n === 1); };
+  sites.setWorldClock('2026-10-15T21:00:00', 1); // the world's clock at the build's start (T0)
+  const seen: string[] = []; let narrating = false;
+  for (const m of walk) {
+    // between messages the viewer runs on its own clock, sampled every 10 s of real time
+    for (let t = mono - 1000 + T0 + 10_000; t < m.now; t += 10_000) {
+      at(t);
+      if (narrating) { assert.doesNotMatch(text(), /paused|quiet/, `while narrating at +${(t - T0) / 1000}s: ${text()}`); assert.match(text().split('\n')[1], /^designing: /); assert.ok(pulse() || !/Raising/.test(text())); }
+    }
+    at(m.now); sites.apply(m); seen.push(`${m.kind === 'world-diff' ? 'diff' : m.event}: ${text()}`);
+    if (m.event === 'step') narrating = true;
+    if (m.event === 'paused') assert.match(text(), /^Release walk lighthouse · massing 1\/3 · paused 2 min · open again Thu · 9:30 pm$/, 'what the walk saw, legitimately: the build was paused');
+    if (m.event === 'step' && /Raising/.test(JSON.stringify(m))) {
+      assert.equal(text(), 'Release walk lighthouse · massing 1/3\ndesigning: Raising the lighthouse tower'); assert.equal(pulse(), true, 'the tower mass pulses');
+    }
+    if (m.kind === 'world-diff') { assert.equal(text().split('\n').at(-1), 'Placed the lighthouse'); assert.match(text(), /\ndesigning: Designing course 2\n/); }
+  }
+  assert.deepEqual(seen.map(line => line.split(':')[0]), ['started', 'paused', 'resumed', 'step', 'alive', 'step', 'alive', 'step', 'alive', 'step', 'diff', 'step']);
+  assert.equal(sites.maxRev, 12); assert.equal(sites.stats.refetches, 0, 'contiguous revisions: no snapshot refetch, no reload');
+  // the lead stops: narration (8 min) ends before the pause (10 min after the last activity) — then paused, closed until
+  // the committed batch's deadline (T0 + 25 min + 30 min = 9:55 pm world time), not the start's 9:30 pm
+  const lastStep = walk.at(-1)!.now;
+  at(lastStep + 8 * 60_000 - 1); assert.doesNotMatch(text(), /paused/); assert.match(text(), /designing: Shaping the lantern/);
+  at(lastStep + 10 * 60_000); assert.equal(text(), 'Release walk lighthouse · tower 2/3 · paused 0 min · open again Thu · 9:55 pm');
+  sites.dispose();
 });
 
 test('one canvas per site, one texture per label size; ordinary frames and alive/claim updates do not repaint unchanged text', () => {

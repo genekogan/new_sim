@@ -2146,5 +2146,1068 @@
         }
       ]
     }
+  ],
+  "walk": [
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "started",
+      "rev": 1,
+      "now": 1000000,
+      "site": {
+        "id": "walk1",
+        "title": "Release walk lighthouse",
+        "status": "active",
+        "rev": 1,
+        "lastAt": 1000000,
+        "pauseAfterMs": 600000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "site": {
+          "at": [
+            24,
+            30
+          ],
+          "size": [
+            16,
+            16
+          ],
+          "yaw": 0
+        },
+        "massing": [
+          {
+            "name": "tower",
+            "at": [
+              0,
+              0
+            ],
+            "size": [
+              8,
+              8
+            ],
+            "h": 15,
+            "roof": "pyramid"
+          }
+        ],
+        "roots": [],
+        "claims": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "paused",
+      "rev": 2,
+      "now": 1720000,
+      "delta": {
+        "id": "walk1",
+        "rev": 2,
+        "status": "paused",
+        "lastAt": 1000000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "resumed",
+      "rev": 3,
+      "now": 1720000,
+      "site": {
+        "id": "walk1",
+        "title": "Release walk lighthouse",
+        "status": "active",
+        "rev": 3,
+        "lastAt": 1720000,
+        "pauseAfterMs": 600000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "site": {
+          "at": [
+            24,
+            30
+          ],
+          "size": [
+            16,
+            16
+          ],
+          "yaw": 0
+        },
+        "massing": [
+          {
+            "name": "tower",
+            "at": [
+              0,
+              0
+            ],
+            "size": [
+              8,
+              8
+            ],
+            "h": 15,
+            "roof": "pyramid"
+          }
+        ],
+        "roots": [],
+        "claims": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "step",
+      "rev": 4,
+      "now": 1720000,
+      "delta": {
+        "id": "walk1",
+        "rev": 4,
+        "status": "active",
+        "lastAt": 1720000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Raising the lighthouse tower",
+          "at": 1720000
+        },
+        "designing": [
+          "tower"
+        ],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "alive",
+      "rev": 5,
+      "now": 1960000,
+      "delta": {
+        "id": "walk1",
+        "rev": 5,
+        "status": "active",
+        "lastAt": 1960000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Raising the lighthouse tower",
+          "at": 1720000
+        },
+        "designing": [
+          "tower"
+        ],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "step",
+      "rev": 6,
+      "now": 1960000,
+      "delta": {
+        "id": "walk1",
+        "rev": 6,
+        "status": "active",
+        "lastAt": 1960000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Designing course 0",
+          "at": 1960000
+        },
+        "designing": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "alive",
+      "rev": 7,
+      "now": 2200000,
+      "delta": {
+        "id": "walk1",
+        "rev": 7,
+        "status": "active",
+        "lastAt": 2200000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Designing course 0",
+          "at": 1960000
+        },
+        "designing": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "step",
+      "rev": 8,
+      "now": 2200000,
+      "delta": {
+        "id": "walk1",
+        "rev": 8,
+        "status": "active",
+        "lastAt": 2200000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Designing course 1",
+          "at": 2200000
+        },
+        "designing": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "alive",
+      "rev": 9,
+      "now": 2440000,
+      "delta": {
+        "id": "walk1",
+        "rev": 9,
+        "status": "active",
+        "lastAt": 2440000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Designing course 1",
+          "at": 2200000
+        },
+        "designing": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "step",
+      "rev": 10,
+      "now": 2440000,
+      "delta": {
+        "id": "walk1",
+        "rev": 10,
+        "status": "active",
+        "lastAt": 2440000,
+        "closed": true,
+        "step": {
+          "n": 1,
+          "label": "massing",
+          "of": 3
+        },
+        "say": {
+          "text": "Designing course 2",
+          "at": 2440000
+        },
+        "designing": [],
+        "reopensAt": 2800000
+      }
+    },
+    {
+      "type": "edge",
+      "kind": "world-diff",
+      "seq": 1,
+      "tick": 100,
+      "at": 2500000,
+      "now": 2500000,
+      "diff": {
+        "upserts": [
+          {
+            "id": "e_0df38658",
+            "def": "core-bench@1",
+            "in": {
+              "parent": "world"
+            },
+            "by": "god",
+            "born": 100,
+            "v": 1,
+            "name": "lighthouse-stand",
+            "p": [
+              24,
+              0,
+              30
+            ],
+            "params": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            }
+          }
+        ],
+        "removes": [],
+        "defs": [
+          {
+            "schema": "def/1",
+            "name": "core-bench",
+            "version": 1,
+            "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+            "tags": [
+              "prop",
+              "street",
+              "seat",
+              "bench",
+              "furniture",
+              "park"
+            ],
+            "form": "point",
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      -0.72,
+                      0.015,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        0.235
+                      ],
+                      [
+                        -0.02,
+                        0.235
+                      ]
+                    ],
+                    "h": 0.41,
+                    "tint": "iron"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0.72,
+                      0.015,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        -0.235
+                      ],
+                      [
+                        0.02,
+                        0.235
+                      ],
+                      [
+                        -0.02,
+                        0.235
+                      ]
+                    ],
+                    "h": 0.41,
+                    "tint": "iron"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.72,
+                      0.62,
+                      -0.24
+                    ],
+                    "size": [
+                      0.06,
+                      0.5,
+                      0.06
+                    ],
+                    "round": 0,
+                    "tint": "iron",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.72,
+                      0.62,
+                      -0.24
+                    ],
+                    "size": [
+                      0.06,
+                      0.5,
+                      0.06
+                    ],
+                    "round": 0,
+                    "tint": "iron",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      0.16
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0.433,
+                      -0.16
+                    ],
+                    "polygon": [
+                      [
+                        -0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        -0.05
+                      ],
+                      [
+                        0.785,
+                        0.05
+                      ],
+                      [
+                        -0.785,
+                        0.05
+                      ]
+                    ],
+                    "h": 0.015,
+                    "tint": "wood"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.62,
+                      -0.25
+                    ],
+                    "size": [
+                      1.6,
+                      0.11,
+                      0.03
+                    ],
+                    "round": 0,
+                    "tint": "wood",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.79,
+                      -0.28
+                    ],
+                    "size": [
+                      1.6,
+                      0.11,
+                      0.03
+                    ],
+                    "round": 0,
+                    "tint": "wood",
+                    "pitch": -0.18
+                  },
+                  {
+                    "kind": "capsule",
+                    "at": [
+                      -0.74,
+                      0.64,
+                      -0.02
+                    ],
+                    "r": 0.025,
+                    "h": 0.38,
+                    "segments": 5,
+                    "tint": "iron",
+                    "pitch": 1.5707963267948966
+                  },
+                  {
+                    "kind": "capsule",
+                    "at": [
+                      0.74,
+                      0.64,
+                      -0.02
+                    ],
+                    "r": 0.025,
+                    "h": 0.38,
+                    "segments": 5,
+                    "tint": "iron",
+                    "pitch": 1.5707963267948966
+                  }
+                ],
+                "round": 0.015
+              }
+            },
+            "params": {
+              "iron": {
+                "type": "color",
+                "default": "#2f3633",
+                "doc": "iron colour"
+              },
+              "wood": {
+                "type": "color",
+                "default": "#9a6b46",
+                "doc": "wood colour"
+              }
+            },
+            "state": {},
+            "slots": [
+              {
+                "id": "seat-1",
+                "kind": "seat",
+                "p": [
+                  -0.4,
+                  0.465,
+                  0.02
+                ],
+                "yaw": 0,
+                "height": 0.465,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "seat-2",
+                "kind": "seat",
+                "p": [
+                  0.4,
+                  0.465,
+                  0.02
+                ],
+                "yaw": 0,
+                "height": 0.465,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              }
+            ],
+            "components": {
+              "seat": {
+                "height": 0.465
+              }
+            },
+            "actions": [],
+            "anchor": "base",
+            "palette": {
+              "iron": "#2f3633",
+              "wood": "#9a6b46"
+            },
+            "layer": "solid",
+            "size": {
+              "box": [
+                1.6,
+                0.871,
+                0.549
+              ],
+              "scale": [
+                1,
+                1
+              ]
+            },
+            "overlaps": [],
+            "budget": {
+              "tris": 0,
+              "bytes": 0,
+              "textures": 0
+            },
+            "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+            "ref": "core-bench@1",
+            "by": "core",
+            "born": 0
+          }
+        ],
+        "tiles": [],
+        "answers": []
+      },
+      "by": "god",
+      "defs": [
+        {
+          "schema": "def/1",
+          "name": "core-bench",
+          "version": 1,
+          "description": "A park bench for two: wooden slats on cast-iron ends with a curved back.",
+          "tags": [
+            "prop",
+            "street",
+            "seat",
+            "bench",
+            "furniture",
+            "park"
+          ],
+          "form": "point",
+          "make": {
+            "kind": "gen",
+            "gen": "kit/2",
+            "args": {
+              "shapes": [
+                {
+                  "kind": "extrude",
+                  "at": [
+                    -0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0.72,
+                    0.015,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      -0.235
+                    ],
+                    [
+                      0.02,
+                      0.235
+                    ],
+                    [
+                      -0.02,
+                      0.235
+                    ]
+                  ],
+                  "h": 0.41,
+                  "tint": "iron"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    -0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0.72,
+                    0.62,
+                    -0.24
+                  ],
+                  "size": [
+                    0.06,
+                    0.5,
+                    0.06
+                  ],
+                  "round": 0,
+                  "tint": "iron",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    0
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "extrude",
+                  "at": [
+                    0,
+                    0.433,
+                    -0.16
+                  ],
+                  "polygon": [
+                    [
+                      -0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      -0.05
+                    ],
+                    [
+                      0.785,
+                      0.05
+                    ],
+                    [
+                      -0.785,
+                      0.05
+                    ]
+                  ],
+                  "h": 0.015,
+                  "tint": "wood"
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.62,
+                    -0.25
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "box",
+                  "at": [
+                    0,
+                    0.79,
+                    -0.28
+                  ],
+                  "size": [
+                    1.6,
+                    0.11,
+                    0.03
+                  ],
+                  "round": 0,
+                  "tint": "wood",
+                  "pitch": -0.18
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    -0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                },
+                {
+                  "kind": "capsule",
+                  "at": [
+                    0.74,
+                    0.64,
+                    -0.02
+                  ],
+                  "r": 0.025,
+                  "h": 0.38,
+                  "segments": 5,
+                  "tint": "iron",
+                  "pitch": 1.5707963267948966
+                }
+              ],
+              "round": 0.015
+            }
+          },
+          "params": {
+            "iron": {
+              "type": "color",
+              "default": "#2f3633",
+              "doc": "iron colour"
+            },
+            "wood": {
+              "type": "color",
+              "default": "#9a6b46",
+              "doc": "wood colour"
+            }
+          },
+          "state": {},
+          "slots": [
+            {
+              "id": "seat-1",
+              "kind": "seat",
+              "p": [
+                -0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            },
+            {
+              "id": "seat-2",
+              "kind": "seat",
+              "p": [
+                0.4,
+                0.465,
+                0.02
+              ],
+              "yaw": 0,
+              "height": 0.465,
+              "accepts": {
+                "tags": [
+                  "body"
+                ]
+              },
+              "capacity": 1
+            }
+          ],
+          "components": {
+            "seat": {
+              "height": 0.465
+            }
+          },
+          "actions": [],
+          "anchor": "base",
+          "palette": {
+            "iron": "#2f3633",
+            "wood": "#9a6b46"
+          },
+          "layer": "solid",
+          "size": {
+            "box": [
+              1.6,
+              0.871,
+              0.549
+            ],
+            "scale": [
+              1,
+              1
+            ]
+          },
+          "overlaps": [],
+          "budget": {
+            "tris": 0,
+            "bytes": 0,
+            "textures": 0
+          },
+          "hash": "56d594e2e8ff5c129672b0e5cf90b5abb73574eb2ca75cd09bd451562dc1f809",
+          "ref": "core-bench@1",
+          "born": 0
+        }
+      ],
+      "builds": [
+        {
+          "id": "walk1",
+          "rev": 11,
+          "status": "active",
+          "lastAt": 2500000,
+          "closed": true,
+          "step": {
+            "n": 1,
+            "label": "massing",
+            "of": 3
+          },
+          "note": {
+            "text": "Placed the lighthouse",
+            "at": 2500000
+          },
+          "reopensAt": 4300000,
+          "rootsAdded": [
+            "e_0df38658"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "edge",
+      "kind": "world-build",
+      "event": "step",
+      "rev": 12,
+      "now": 2620000,
+      "delta": {
+        "id": "walk1",
+        "rev": 12,
+        "status": "active",
+        "lastAt": 2620000,
+        "closed": true,
+        "step": {
+          "n": 2,
+          "label": "tower",
+          "of": 3
+        },
+        "say": {
+          "text": "Shaping the lantern",
+          "at": 2620000
+        },
+        "designing": [],
+        "note": {
+          "text": "Placed the lighthouse",
+          "at": 2500000
+        },
+        "reopensAt": 4300000
+      }
+    }
   ]
 }

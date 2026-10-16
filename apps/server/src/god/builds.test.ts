@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -196,8 +196,54 @@ test('batch echo, rev and receipt share one commit; retry does not count again; 
     const dir = new URL('./fixtures/', import.meta.url); mkdirSync(dir, { recursive: true }); const started = f.emitted.find(m => m.kind === 'world-build')!;
     assert.equal(f.god.builds.step('church', { lease: s.lease, n: 3, say: 'Designing the stone vault', masses: ['nave'] }).ok, true); const narration = f.emitted.at(-1);
     assertAccepted((await f.req('/v1/god/act', { ops: [{ op: 'set', id: 'bench-0', name: 'bench-caption' }], build: f.field(s.lease), note: 'Placed the first vault rib' })).data); const caption = f.emitted.at(-1);
-    writeFileSync(new URL('build-messages.json', dir), JSON.stringify({ started, diff, narration, caption, revGap: [started, { ...diff, builds: diff.builds!.map(d => ({ ...d, rev: d.rev + 1 })) }] }, null, 2) + '\n');
+    const file = new URL('build-messages.json', dir), existing = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+    writeFileSync(file, JSON.stringify({ ...existing, started, diff, narration, caption, revGap: [started, { ...diff, builds: diff.builds!.map(d => ({ ...d, rev: d.rev + 1 })) }] }, null, 2) + '\n');
   }
+});
+
+// R2F (release 1.1 walk, release-check-1015): a visitor's feed while the lead narrates after a pause, then commits.
+// Production defaults (10 min pause, 30 min closure). `walk` in fixtures/build-messages.json is exactly this feed; the
+// viewer test (apps/web/src/WorldBuildSites.test.ts) replays it. BUILD_EXPORT_FIXTURES=1 rewrites it.
+test('R2F: a step after a pause reaches visitors live as contiguous world-build messages; only committed batches move reopensAt', async t => {
+  const f = fixture({ buildPauseMs: 600_000, buildClosureMs: 1_800_000 }); t.after(() => f.db.close());
+  const t0 = f.now(), MIN = 60_000, closure = 30 * MIN;
+  const s = await f.start({ id: 'walk1', title: 'Release walk lighthouse', steps: ['massing', 'tower', 'lantern'], site: { at: [24, 30], size: [16, 16] }, massing: [{ name: 'tower', at: [0, 0], size: [8, 8], h: 15, roof: 'pyramid' }] });
+  assert.equal(s.ok, true, JSON.stringify(s)); const build = { id: 'walk1', lease: s.lease };
+  const reopens = async () => {
+    const pub = (await f.req('/v1/world/builds', undefined, null)).data.builds[0], god = (await f.req('/v1/god/builds/walk1')).data.build;
+    assert.equal(pub.reopensAt, god.reopensAt, 'the public list and the god view agree'); return { reopensAt: pub.reopensAt as number, lastAt: pub.lastAt as number };
+  };
+  assert.equal((await reopens()).reopensAt, t0 + closure);
+  // a 701 s look: nothing reaches the server for 12 minutes; the next read finds the build paused
+  f.advance(12 * MIN); assert.equal((await f.req('/v1/world/builds', undefined, null)).data.builds[0].status, 'paused');
+  const said = (await f.req('/v1/god/builds/walk1/step', { lease: s.lease, say: 'Raising the lighthouse tower', masses: ['tower'] })).data; assert.equal(said.ok, true);
+  let r = await reopens(); assert.equal(r.lastAt, f.now(), 'narration is activity'); assert.equal(r.reopensAt, t0 + closure, 'narration does not extend the closure');
+  // reads and more narration move lastAt, never reopensAt
+  for (let i = 0; i < 3; i++) { f.advance(4 * MIN); await f.req('/v1/god/snapshot'); await f.req('/v1/god/builds/walk1'); assert.equal((await f.req('/v1/god/builds/walk1/step', { lease: s.lease, n: 1, say: `Designing course ${i}` })).data.ok, true); r = await reopens(); assert.equal(r.reopensAt, t0 + closure); assert.equal(r.lastAt, f.now()); }
+  const walk = f.emitted.filter(m => m.kind === 'world-build').map(m => structuredClone(m)) as unknown[];
+  // every committed batch with the build field moves it: a plain act, a sealed preview, a claim-less step jump
+  f.advance(MIN); const placed = (await f.req('/v1/god/act', { ops: [f.place('lighthouse-stand', 24, 30)], build, note: 'Placed the lighthouse' })).data; assertAccepted(placed);
+  const diff = f.emitted.at(-1) as WorldDiffMessage; walk.push(structuredClone(diff));
+  assert.equal(diff.builds![0].reopensAt, f.now() + closure); assert.equal(diff.builds![0].note!.text, 'Placed the lighthouse'); assert.equal((await reopens()).reopensAt, f.now() + closure);
+  const firstBatch = f.now();
+  f.advance(2 * MIN); assert.equal((await f.req('/v1/god/builds/walk1/step', { lease: s.lease, n: 2, say: 'Shaping the lantern' })).data.ok, true); walk.push(structuredClone(f.emitted.at(-1)));
+  assert.equal((await reopens()).reopensAt, firstBatch + closure, 'a step call after a batch keeps the batch deadline');
+  f.advance(MIN); const p = (await f.req('/v1/god/preview', { ops: [f.place('lantern-bench', 26, 30)], build })).data; assert.equal(p.accepted, true);
+  assert.equal((await reopens()).reopensAt, firstBatch + closure, 'a preview is not a commit');
+  f.advance(MIN); assertAccepted((await f.req('/v1/god/act', { preview: p.id })).data); assert.equal((await reopens()).reopensAt, f.now() + closure, 'a sealed commit moves it');
+  f.advance(MIN); assertAccepted((await f.req('/v1/god/act', { ops: [f.place('gallery-bench', 22, 30)], build: { ...build, step: 3 } })).data); assert.equal((await reopens()).reopensAt, f.now() + closure);
+  // a refused batch and a replay do not
+  const last = f.now(); f.advance(MIN);
+  assert.equal((await f.req('/v1/god/act', { ops: [{ op: 'remove', id: 'no-such-thing' }], build })).data.accepted, false);
+  assert.equal((await reopens()).reopensAt, last + closure);
+  // the feed a visitor's viewer applied: started, paused, resumed (the lead's request), step, then reads (alive) and steps,
+  // the committed diff, a step
+  assert.deepEqual(walk.map((m: any) => m.kind === 'world-diff' ? 'diff' : m.event), ['started', 'paused', 'resumed', 'step', 'alive', 'step', 'alive', 'step', 'alive', 'step', 'diff', 'step']);
+  const revs = walk.map((m: any) => m.kind === 'world-diff' ? m.builds[0].rev : m.rev); assert.deepEqual(revs, revs.map((_, i) => i + 1), 'contiguous revisions: no refetch needed');
+  const step = walk[3] as WorldBuildMessage; assert.equal(step.delta!.status, 'active'); assert.deepEqual(step.delta!.say, { text: 'Raising the lighthouse tower', at: t0 + 12 * MIN }); assert.deepEqual(step.delta!.designing, ['tower']);
+  const fixtureFile = new URL('./fixtures/build-messages.json', import.meta.url);
+  if (process.env.BUILD_EXPORT_FIXTURES === '1') writeFileSync(fixtureFile, JSON.stringify({ ...JSON.parse(readFileSync(fixtureFile, 'utf8')), walk }, null, 2) + '\n');
+  assert.deepEqual(JSON.parse(readFileSync(fixtureFile, 'utf8')).walk, walk, 'fixtures/build-messages.json walk is stale: BUILD_EXPORT_FIXTURES=1 node --test --test-name-pattern=R2F apps/server/src/god/builds.test.ts');
 });
 
 test('preview seals build/group, checks lease and claim in preview and dryrun, and never mutates progress', async t => {
