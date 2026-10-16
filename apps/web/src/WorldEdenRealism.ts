@@ -96,9 +96,15 @@ const GOD_PATTERNS=/* glsl */`
    float tone=.82+.26*edenHash(vec2(b,ei)+sd0*11.),g=detail?mix(edenNoise(vec2(q.x*1.1,q.y*34.)+b*3.1),.5,far):.5;
    tint=vec3(tone)*mix(vec3(1.),vec3(1.05,.98,.9),tone-.82)*(.86+.24*g)*mix(1.,.5,gap);
    edenRough=.84+.16*g;edenBump=-gap*.006;edenBumpAmt=near*fade;
-  }else if(pat<4.5){ // shingles: courses up the slope, staggered tabs, a shadow under each butt
-   vec2 sd=normalize(n.xz+vec2(1e-5));float u=cyl?q.x:dot(L.xz,vec2(-sd.y,sd.x)),s=L.y/max(sqrt(max(1.-n.y*n.y,0.)),.25);
-   if(abs(n.y)>.97){u=q.x;s=q.y;}
+  }else if(pat<4.5){ // shingles: courses up the world slope (pitched slabs too), staggered tabs, a shadow under each butt
+   float u=q.x,s=q.y;
+   if(ring>.5){if(abs(n.y)<=.97){u=atan(L.z,L.x)*length(L.xz);s=L.y/max(sqrt(max(1.-n.y*n.y,0.)),.25);}} // round: around, by height
+   else{ // flat faces: world up projected on the face, carried back into shape metres through the screen derivatives
+    vec3 a1=dFdx(L),a2=dFdy(L),b1=dFdx(vEdenW),b2=dFdy(vEdenW),nw=cross(b1,b2);nw*=inversesqrt(max(dot(nw,nw),1e-30));
+    vec3 tw=vec3(0.,1.,0.)-nw.y*nw;float g11=dot(b1,b1),g12=dot(b1,b2),g22=dot(b2,b2);
+    vec3 up=(g22*dot(b1,tw)-g12*dot(b2,tw))*a1+(g11*dot(b2,tw)-g12*dot(b1,tw))*a2;float ul=length(up);
+    if(abs(nw.y)<.97&&ul>0.){vec3 e=up/ul;s=dot(L,e);u=dot(L,normalize(cross(n,e)));}
+   }
    float rh=.2,tw=.3,row=floor(s/rh),fy=fract(s/rh),xx=u/tw+row*.5+edenHash(vec2(row,sd0*3.))*.3,c=floor(xx),fx=fract(xx),fade=1.-smoothstep(.03,.08,px);
    float slot=(1.-smoothstep(.005,.006+px*1.5,min(fx,1.-fx)*tw))*(1.-smoothstep(.7,.85,fy))*fade,butt=smoothstep(.7,1.,fy)*fade,f=detail?mix(edenNoise(vec2(u,s)*6.),.5,far):.5;
    tint=vec3(.8+.3*edenHash(vec2(c,row)+sd0*17.))*(.92+.14*f)*mix(1.,.62,butt)*mix(1.,.6,slot);
