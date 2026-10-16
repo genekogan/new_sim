@@ -28,6 +28,9 @@ export type VocabContext = {
   me: [number, number] | null;
   /** Ids of the places the Soul is standing in (innermost first), when known: a stroll named for one of them is in place. */
   here?: string[];
+  /** r3 quality (cases 23/29): where the nearest thing for a spot-based verb (swing, fish, cycle = a bicycle dock…) is anywhere in
+   *  this world, ignoring offer reach. `null`: none exists in this world (the refusal is terminal); `undefined`: not spot-based. */
+  elsewhere?: (verb: string) => {label: string; place?: string; placeId?: string; distance: number} | null | undefined;
 };
 export type VocabResult =
   | {kind: 'exact'; cap: EdgeCapability}
@@ -225,7 +228,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const bike = colon < 0 ? /\b(?:cycl(?:e|es|ing)|bik(?:e|es|ing)|bicycl(?:e|es|ing)|bike ride)\b/.exec(text) : null;
   if (bike && !/\b(?:skateboard\w*|motor ?bike|motorcycle|exercise bike)\b/.test(text)) {
     const offered = ctx.caps.filter(c => c.verb === 'cycle' || c.verb === 'cycle-around');
-    if (!offered.length) return {kind: 'unknown', code: 'bike.no-dock', reason: 'No bicycle is offered here: a ride starts from a bicycle dock within 120 m; nothing else was chosen.', didYouMean: []};
+    if (!offered.length) return {kind: 'unknown', code: 'bike.no-dock', reason: elsewhereReason('cycle', ctx, 'No bicycle is offered here: a ride starts from a bicycle dock within 120 m; nothing else was chosen.', 'There are no bicycles anywhere in this world; nothing else was chosen.'), didYouMean: []};
     const loop = /\b(?:around|round|loop)\b/.test(text);
     const target = text.replace(/\b(?:let'?s|i want to|please|go|going|take|have|do|for|a|an|the|my|ride|riding|on|cycle|cycles|cycling|bike|bikes|biking|bicycle|bicycles|bicycling|around|round|loop|to|and|back|from|dock|rack)\b/g, ' ').replace(/[:.!,]/g, ' ').trim().replace(/\s+/g, ' ');
     if (!target) {
@@ -259,7 +262,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // Unsupported motions are refused honestly, with the nearest real things to do.
   // Quality 22/29/30: a refusal for something that exists nowhere is terminal (NOWHERE); one whose verb a world can
   // offer (fish, swing, picnic…) may exist elsewhere, so it keeps todo's place-specific wording.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? reason : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? elsewhereReason(offer, ctx, reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
@@ -393,6 +396,15 @@ function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined)
 }
 /** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
  *  obvious first (by name over description, walkable, outermost, larger). */
+/** A refusal for a spot-based thing (a swing, a bicycle) that is not offered from here: say where the nearest one is, or that
+ *  none exists in this world at all (terminal, NOWHERE). Without world knowledge the place-specific wording stays. */
+function elsewhereReason(verb: string, ctx: VocabContext, here: string, none?: string): string {
+  const e = ctx.elsewhere?.(verb);
+  if (e === undefined) return here;
+  if (e === null) return (none ?? here) + NOWHERE;
+  const where = e.place ? ` in ${e.place}` : '', go = e.placeId ? ` (walk:${e.placeId})` : '';
+  return `${here.replace(/[.\s]+$/, '')}. The nearest is ${e.label}${where}, about ${Math.round(e.distance)} m away: walk there first${go}, then ask again.`;
+}
 export function placeMatch(words: string[], places: VocabPlace[], withheld: readonly string[] = []): VocabPlace[] {
   if (!words.length) return [];
   const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id)], descT = (p: VocabPlace) => tokens(p.description ?? '');

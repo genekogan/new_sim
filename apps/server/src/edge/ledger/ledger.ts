@@ -16,7 +16,7 @@ import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
-import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, type SpotsData} from './activities.ts';
+import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
 import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
 import {classWords} from '../intents/class-words.ts';
@@ -998,7 +998,18 @@ export class EdgeLedger implements EdgeLedgerHooks {
     for (const p of all) if (p.parent !== null) {if (this.knowledge.knows(soul.soulId, p.id)) known.push(p); else withheld.push(tokens(p.name).join(' '), tokens(p.id).join(' '));}
     const objects = new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]));
     const around = (x: number, z: number) => {const p = this.places.containing(x, z, 0).find(q => q.parent !== null); return p ? [p.id, p.name] : [];};
-    return {caps, me: me ? [me.pose.p[0], me.pose.p[2]] : null, root: root ? [...tokens(root.id), ...tokens(root.name)] : [],
+    const here: [number, number] | null = me ? [me.pose.p[0], me.pose.p[2]] : null;
+    // r3 quality (23/29): the nearest spot (or bicycle dock) for a spot-based verb anywhere in this world, beyond offer reach
+    const elsewhere = (verb: string) => {
+      const marks = verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
+        : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined;
+      if (!marks) return undefined;
+      const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
+        return {label: m.label, distance: here ? Math.hypot(m.at[0] - here[0], m.at[1] - here[1]) : 0, ...(pl && known.includes(pl) ? {place: pl.name, placeId: pl.id} : {})};})
+        .sort((a, b) => a.distance - b.distance || a.label.localeCompare(b.label))[0];
+      return best ?? null;
+    };
+    return {caps, me: here, root: root ? [...tokens(root.id), ...tokens(root.name)] : [], elsewhere,
       withheld, places: known.map(p => ({id: p.id, name: p.name, aliases: aliases[p.id] ?? [], center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
