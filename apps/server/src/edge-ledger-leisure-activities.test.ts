@@ -111,7 +111,7 @@ test('group life: story circle needs a teller, book club, cooking together, yoga
   const [a, b, c, d] = w.souls;
   const pair = async (x: typeof a, xw: string, y: typeof a, yw: string, verb: string, pose: string) => {
     const p = await w.act(x, xw, {seconds: 6}), q = await w.act(y, yw, {seconds: 6});
-    for (const [r, words] of [[p, xw], [q, yw]] as const) {assert.equal(r.accepted, true, words + ' ' + JSON.stringify(r)); assert.match(r.resolved?.to, new RegExp('^' + verb + ':'), words);}
+    for (const [r, words] of [[p, xw], [q, yw]] as const) {assert.equal(r.accepted, true, words + ' ' + JSON.stringify(r)); assert.match(r.resolved?.to, new RegExp('^' + verb + ':'), words + ' ' + JSON.stringify(r.resolved ?? r).slice(0, 500));}
     let both = 0; await w.run([{soulId: x.soulId, id: p.receipt.id}, {soulId: y.soulId, id: q.receipt.id}], 20 * 60 * 6, () => {if (w.body(x).human.activity === pose && w.body(y).human.activity === pose) both++;});
     for (const [s, r] of [[x, p], [y, q]] as const) assert.equal(w.ledger.receipt(s.soulId, r.receipt.id)!.phase, 'completed', `${verb}: ${JSON.stringify(w.ledger.receipt(s.soulId, r.receipt.id))}`);
     assert.ok(both >= 20 * 5, `${verb} together for ${both} ticks`);
