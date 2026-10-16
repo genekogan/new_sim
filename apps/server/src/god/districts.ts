@@ -151,7 +151,9 @@ export class GodDistricts {
   /** Chapters are build rows naming the district (follow-ups via --root inherit it), oldest first. */
   private chapters(id: string): Chapter[] {
     const builds = this.h.builds(), now = this.h.now(), model = this.h.model(), closing = new Set(builds.closingSites(now).map(s => s.id)), out: Chapter[] = [];
-    for (const r of this.h.store.builds()) {
+    // SQLite filters the retained build rows (open + last 200 closed) before any body is parsed here.
+    const rows = this.sql.prepare("SELECT id,status,rev,created_at,last_at,body FROM god_builds_v1 WHERE world_id=? AND json_extract(body,'$.district.id')=?").all(this.h.store.worldId, id) as BuildRow[];
+    for (const r of rows) {
       let b: BuildBody; try { b = JSON.parse(r.body); } catch { continue; }
       if (b.district?.id !== id) continue;
       const roots = b.roots.filter(root => model.entities.has(root));
@@ -208,7 +210,7 @@ export class GodDistricts {
     if (prior) return prior.hash === hash ? { ok: true as const, district: this.view(plan.id)!, warnings: [] as string[], replayed: true } : refuse('district.exists', `District ${plan.id} already has a different plan.`, 'id');
     const count = (this.sql.prepare('SELECT count(*) AS n FROM god_districts_v1 WHERE world_id=?').get(this.h.store.worldId) as { n: number }).n;
     if (count >= DISTRICT_LIMITS.districts) return refuse('district.limit', `At most ${DISTRICT_LIMITS.districts} districts per world.`, 'id', { measured: count, limit: DISTRICT_LIMITS.districts });
-    const builds = this.h.builds(), checked = checkPlan(plan, this.h.model(), builds.closingSites().map(s => ({ id: s.id, site: s.site })));
+    const checked = checkPlan(plan, this.h.model(), this.h.builds().publicList().builds.map(b => ({ id: b.id, site: b.site })));
     if (checked.failures.length) return { ok: false as const, failures: checked.failures };
     const body = JSON.stringify({ plan, by: { label: caller.label, hash8: caller.hash.slice(0, 8) }, at: this.h.now() } satisfies DistrictBody), bytes = Buffer.byteLength(body);
     if (bytes > DISTRICT_LIMITS.bodyBytes) return refuse('district.limit', `The plan needs ${bytes} bytes; the limit is ${DISTRICT_LIMITS.bodyBytes}.`, 'plots', { measured: bytes, limit: DISTRICT_LIMITS.bodyBytes, fix: 'Shorten texts or road paths, or split the area into two districts.' });
@@ -233,7 +235,7 @@ export class GodDistricts {
     }
     const group = chapterGroupFailure(plan, ids, 'district.plots'); if (group) return { failures: [group] };
     const plots = ids.map(id => plan.plots.find(x => x.id === id)!), shape = chapterShape(plots);
-    const title = typeof raw.title === 'string' ? raw.title : `${plan.title}: ${plots.map(x => x.title ?? x.id).join(', ')}`.slice(0, 80);
+    const title = raw.title ?? `${plan.title}: ${plots.map(x => x.title ?? x.id).join(', ')}`.slice(0, 80);
     const steps = raw.steps ?? plan.steps ?? (plots.length === 1 ? plots[0].steps : undefined) ?? ['massing', 'buildings', 'details'];
     return { raw: { ...raw, district: { id: plan.id, plots: ids }, title, steps, site: shape.site, massing: shape.massing } };
   }

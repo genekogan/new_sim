@@ -64,9 +64,9 @@ test('Y3: a district plan is validated with fields, recorded once, replayed, pri
 test('Y3: plan warnings cover roads, the closure margin and the ground extent without blocking', () => {
   const plan = districtPlanSchema.parse({ ...streetPlan(), plots: [{ id: 'a', at: [0, -6], size: [10, 10], massing: [{ at: [4, 0], size: [2, 2], h: 3 }] }, { id: 'b', at: [10.5, -6], size: [10, 10], massing: [{ at: [-4, 0], size: [2, 2], h: 3 }] }, { id: 'far', at: [5000, 0], size: [10, 10] }], chapters: undefined });
   const fake = { ground: () => ({ extent: [-500, -500, 500, 500] }) } as never;
-  const { failures, warnings } = checkPlan(plan, fake);
+  const { failures, warnings } = checkPlan(plan, fake, [{ id: 'church', site: { at: [0, -6], size: [4, 4], yaw: 0 } }]);
   assert.deepEqual(failures, []);
-  assert.ok(warnings.some(w => /plot a overlaps road high/.test(w))); assert.ok(warnings.some(w => /plots a and b have masses within 1.5 m/.test(w))); assert.ok(warnings.some(w => /far centre is outside the ground/.test(w)));
+  assert.ok(warnings.some(w => /plot a overlaps road high/.test(w))); assert.ok(warnings.some(w => /plots a and b have masses within 1.5 m/.test(w))); assert.ok(warnings.some(w => /far centre is outside the ground/.test(w))); assert.ok(warnings.some(w => /plot a overlaps open build church/.test(w)));
 });
 
 test('Y3: chapter shapes keep plot massing in place, including yawed plots', () => {
@@ -89,6 +89,7 @@ test('Y3: chapters take site and massing from plots, refuse taken plots, close o
   assert.equal(code(start({ id: 'x', district: { id: 'high', plots: ['p1', 'p1'] } })), 'district.plot');
   assert.equal(code(start({ id: 'x', district: { id: 'high', plots: ['p9'] } })), 'district.plot');
   assert.equal(code(start({ id: 'x', district: { id: 'high', plots: [] } })), 'schema');
+  assert.equal(code(start({ id: 'x', district: { id: 'high' }, title: 7 })), 'schema', 'filled values are still validated');
   const input = { id: 'high-1', district: { id: 'high' }, brief: 'Chapter one: bakery and smithy' };
   const s = (await f.req('/v1/god/builds', input)).data;
   assert.equal(s.ok, true, JSON.stringify(s));
@@ -153,4 +154,18 @@ test('Y3: one undo per chapter; abandoned and undone chapters free their plots; 
   assert.equal(restarted.undoGroup('high-1').accepted, true); assert.equal(restarted.undoGroup('high-3').accepted, true);
   assert.equal(restarted.model.get('n-1'), undefined); assert.equal(restarted.model.get('s-3'), undefined);
   assert.equal(restarted.districts.view('high')!.counts.built, 0);
+});
+
+test('Y3: without plan chapters each plot is its own chapter, in plan order; unnamed plots follow the named chapters', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const caller = f.god.godIdentity(f.token)!, { chapters: _chapters, ...plain } = streetPlan();
+  assert.equal(f.god.districts.record({ ...plain, id: 'solo' }, caller).ok, true);
+  assert.deepEqual(f.god.districts.view('solo')!.next, { action: 'start', id: 'solo-1', plots: ['p1'] });
+  const one = f.god.builds.start({ id: 'solo-1', district: { id: 'solo' } }, caller) as any; assert.deepEqual(one.build.district.plots, ['p1']); assert.equal(one.build.title, 'High Street: Bakery');
+  assert.equal(f.god.districts.record({ ...plain, id: 'mixed', plots: plain.plots.map((p: any) => ({ ...p, at: [p.at[0], p.at[1] + 300] })), chapters: [['p4', 'p3']] }, caller).ok, true);
+  assert.deepEqual(f.god.districts.view('mixed')!.next!.plots, ['p4', 'p3']);
+  const mixed = f.god.builds.start({ id: 'mixed-1', district: { id: 'mixed' } }, caller) as any; assert.equal(mixed.ok, true, JSON.stringify(mixed));
+  assert.deepEqual(f.god.districts.view('mixed')!.next, { action: 'resume', id: 'mixed-1', plots: ['p4', 'p3'] });
+  assert.equal(f.god.act({ ops: [bench('mixed-bench', 0, 284)], build: { id: 'mixed-1', lease: mixed.lease } }).accepted, true);
+  assert.equal(f.god.builds.done('mixed-1', {}, caller).ok, true); assert.deepEqual(f.god.districts.view('mixed')!.next!.plots, ['p1'], 'after the named chapter, unnamed plots follow in plan order');
 });
