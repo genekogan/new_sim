@@ -18,6 +18,26 @@ export function inPoly(x: number, z: number, poly: V2[]) {let c = false; for (le
 const area = (p: V2[]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 export const centroid = (p: V2[]): V2 => [p.reduce((s, v) => s + v[0], 0) / p.length, p.reduce((s, v) => s + v[1], 0) / p.length];
 
+/** An outline's bounding box and area, kept per outline array (places are replaced, never edited in place). `box` is
+ *  false when the outline is not plain finite numbers of a sane size: then every point goes to inPoly. */
+type Outline = {poly: V2[]; box: boolean; minX: number; maxX: number; minZ: number; maxZ: number; eps: number; area: number};
+const OUTLINES = new WeakMap<V2[], Outline>();
+function outlineOf(poly: V2[]): Outline {
+  let o = OUTLINES.get(poly); if (o) return o;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, box = poly.length > 0;
+  for (const v of poly) {const x = v?.[0], z = v?.[1]; if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z)) {box = false; break;} if (x < minX) minX = x; if (x > maxX) maxX = x; if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;}
+  const big = Math.max(Math.abs(minX), Math.abs(maxX), Math.abs(minZ), Math.abs(maxZ)); if (!(big <= 1e12)) box = false;
+  o = {poly, box, minX, maxX, minZ, maxZ, eps: 1e-9 * (1 + big), area: area(poly)}; OUTLINES.set(poly, o); return o;
+}
+/** inPoly(x, z, poly), the same answer, but a point outside the outline's bounding box is answered without the edge
+ *  walk: above or below it no edge straddles z; left or right of it (by more than float rounding) every straddling
+ *  edge, or none, is crossed, and a closed outline has an even number of them. */
+export function inOutline(x: number, z: number, poly: V2[]): boolean {
+  const o = outlineOf(poly);
+  if (o.box && (z < o.minZ || z > o.maxZ || x < o.minX - o.eps || x > o.maxX + o.eps)) return false;
+  return inPoly(x, z, poly);
+}
+
 /** Rules 1–6 of PLACE-DATA-v1. With `world`, also checks occupiers against live native fixtures. */
 export function validatePlaceData(raw: unknown, world?: NativeWorld): string[] {
   const errs: string[] = [], d = raw as PlaceData;
@@ -81,7 +101,7 @@ export class PlaceIndex {
   add(p: Place) {this.byId.set(p.id, p); for (const o of p.occupiers ?? []) this.occupierOf.set(o.fixture + '#' + o.slot, {occ: o, place: p}); if (p.carrier) this.carrierPlaces.set(p.carrier.entity, p);}
   /** Places containing the point, innermost (smallest) first; occupier (if seated) prepended by caller. Carrier places never contain by geometry. */
   containing(x: number, z: number, level = 0): Place[] {
-    return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inPoly(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || area(a.polygon) - area(b.polygon));
+    return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inOutline(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || outlineOf(a.polygon).area - outlineOf(b.polygon).area);
   }
   ref(p: Place): PlaceRef {return {id: p.id, name: p.name, kind: p.kind};}
 }

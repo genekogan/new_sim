@@ -86,10 +86,11 @@ export class Perception {
       const d = this.dist(s.at); if (d > radius) continue;
       out.push({kind: 'spot', id: s.id, name: s.label ?? s.activity, at: s.at, distance: d, capability: `${s.activity}:${s.id}`});
     }
+    let mine: Set<string> | undefined;   // the places I am in: the same for every object, so read once
     for (const o of this.L.comms?.objects.all() ?? []) {
       const st = o.state as {at?: V2; removed?: boolean}; if (st?.removed) continue;
       const at = Array.isArray(st?.at) ? st.at : this.w.entities[o.id] ? [this.w.entities[o.id].pose.p[0], this.w.entities[o.id].pose.p[2]] as V2 : null;
-      const place = this.L.places.byId.get(o.placeId), here = new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
+      const place = this.L.places.byId.get(o.placeId), here = mine ??= new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
       const point = at ?? (place && here.has(o.placeId) ? centroid(place.polygon) : null); if (!point) continue;
       const d = this.dist(point); if (d > radius && !(here.has(o.placeId) && !at)) continue;
       out.push({kind: 'object', id: o.id, name: (o as {name?: string}).name ?? o.kind, at: point, distance: d});
