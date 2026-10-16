@@ -99,6 +99,8 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
       return true;};
     authority();deps.ledger.ownerControlGrace(s.soulId);
     const guard=():true=>{authority();
+      // a faded Soul (an hour without an accepted action) has no commitment to finish: tell its owner the real way back
+      if(!deps.host.quietBarrier&&deps.ledger.faded.has(s.soulId))throw new EdgeError(409,'body.safe-standing-required','This Soul has faded from the world; act once (any accepted action) to bring it back, then change its body');
       if(deps.host.quietBarrier||!deps.ledger.bodyAssignmentReady(s))throw new EdgeError(409,'body.safe-standing-required','Finish the current commitment before changing bodies');
       if(!deps.host.engine.bodyAssignmentProblemV1)throw new EdgeError(503,'body.unavailable','This engine cannot assign bodies');
       const issue=deps.host.engine.bodyAssignmentProblemV1(s.entityId,body);if(issue)throw new EdgeError(409,issue,'Finish safely standing with free hands and clear space before changing bodies');return true;

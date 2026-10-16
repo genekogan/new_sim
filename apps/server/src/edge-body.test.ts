@@ -42,3 +42,8 @@ test('BODY same content hash deduplicates bytes while preserving each owner mani
  const ownedA=await(await w.req(a,'body')).json(),ownedB=await(await w.req(b,'body')).json();assert.equal(ownedA.uploads[0].type,'ceramic');assert.equal(ownedA.uploads[0].license,'owned');assert.equal(ownedB.uploads[0].type,'floater');assert.equal(ownedB.uploads[0].license,'CC0');assert.equal(ownedB.uploads[0].rightsConfirmed,true);
  const aa=await accept(w.f.host,w.req(a,'body',{assetId:x.assetId},'PUT')),bb=await accept(w.f.host,w.req(b,'body',{assetId:y.assetId},'PUT'));assert.equal((await aa.json()).body.type,'ceramic');assert.equal((await bb.json()).body.type,'floater');
 });
+test('BODY a faded Soul is told to act once to come back, not to finish a commitment (release-3.1 walk)',async t=>{
+ const w=await setup(t),[a]=w.ss;w.ledger.faded.add(a.soul.soulId);
+ const r=await w.req(a,'body',{look:{hat:'cap'}},'PUT');assert.equal(r.status,409);const e=(await r.json()).error;assert.equal(e.code,'body.safe-standing-required');assert.match(e.message,/faded.*act once/);
+ w.ledger.faded.delete(a.soul.soulId);
+});
