@@ -229,3 +229,49 @@ test('Y5 measure: rewinding most of a 60-edit build is one bounded call', async 
   console.log('REWIND_BENCH ' + JSON.stringify({ edits: 60, reverted: 36, dryMs: Math.round(dryMs), commitMs: Math.round(ms) }));
   assert.ok(ms < 30_000, `rewind took ${ms} ms`);
 });
+
+test('Y5: a redone edit is rewound by its redo row (the redo chain leads back to the original edit\'s step)', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const s = await threeSteps(f);
+  accepted(f.god.undo()); assert.equal(f.god.model.get('tower/bell'), undefined);
+  const redo = accepted(f.god.redo()).seq as number; assert.ok(f.god.model.get('tower/bell'));
+  const r = await f.rewind({ to: 2 }); assert.equal(r.ok, true, JSON.stringify(r));
+  assert.deepEqual(r.rewind.edits, [redo, s.tower], 'the live redo row stands for the bell; the undone original is skipped');
+  for (const gone of ['tower', 'tower/bell']) assert.equal(f.god.model.get(gone), undefined, gone);
+  assert.ok(f.god.model.get('roof-2')); assert.equal(f.body().step.n, 2);
+});
+
+test('Y5: after a rewind the build continues, and the next rewind reverts only what came after it', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const s = await threeSteps(f);
+  assert.equal((await f.rewind({ to: 1 }, 0)).ok, true);
+  // The lead keeps building: more step-1 work (its step-1 record now spans the undone seqs) and a new step 2.
+  const porch = accepted(await f.act([place('porch', -10)], f.lead(1))).seq as number;
+  const roof = accepted(await f.act([place('new-roof', 14)], f.lead(2))).seq as number;
+  const dry = await f.rewind({ to: 1, dry: true }, 0);
+  assert.deepEqual(dry.rewind.edits, [roof]); assert.deepEqual(dry.rewind.removes.names, ['new-roof']);
+  assert.equal((await f.rewind({ to: 1 }, 0)).ok, true); assert.ok(f.god.model.get('porch')); assert.equal(f.god.model.get('new-roof'), undefined);
+  const start = await f.rewind({ to: 0 }, 0); assert.equal(start.ok, true, JSON.stringify(start));
+  assert.deepEqual(start.rewind.edits, [porch, s.shell]); assert.equal(f.god.model.get('shell'), undefined);
+  assert.deepEqual([f.body().step.n, f.body().steps.length, f.body().rewinds!.length], [1, 0, 3]);
+});
+
+test('Y5: an edit whose step record was trimmed refuses a partial rewind (never guesses); --to 0 still rewinds it', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  // 66 lead steps: the build keeps its newest 64 step records, so steps 1 and 2 lose theirs.
+  for (let step = 1; step <= 66; step++) accepted(f.god.as({ identity: f.ids[0] }, () => f.god.act({ ops: [place(`s${step}`, step - 33, 90)], build: f.lead(step) })));
+  assert.equal(f.body().steps.length, 64); assert.equal(Math.min(...f.body().steps.map(x => x.n)), 3);
+  const before = f.state(), partial = await f.rewind({ to: 40 });
+  assert.equal(code(partial), 'build.rewind'); assert.match(partial.failures[0].detail, /has no recorded step/); assert.match(partial.failures[0].fix, /Rewind to 0/); assert.equal(f.state(), before);
+  const all = await f.rewind({ to: 0 }); assert.equal(all.ok, true, JSON.stringify(all)); assert.equal(all.rewind.edits.length, 66);
+  assert.equal(f.god.model.get('s1'), undefined); assert.equal(f.god.model.get('s66'), undefined);
+});
+
+test('Y5: a resident-made thing inside work the rewind removes refuses it (nothing changes)', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  await threeSteps(f);
+  accepted(f.god.engineAct([{ op: 'place', def: 'part@1', name: 'mug', p: [0, 0], in: { parent: 'tower' }, mode: 'strict' } as never], 'a resident left a mug'));
+  const before = f.state(), r = await f.rewind({ to: 2 });
+  assert.equal(code(r), 'build.depends'); assert.equal(r.failures[0].field, 'to'); assert.match(r.failures[0].detail, /tower\/mug was made by a resident/); assert.equal(f.state(), before);
+  assert.equal((await f.rewind({ to: 3 })).replayed, true, 'rewinding to the current step touches nothing');
+});
