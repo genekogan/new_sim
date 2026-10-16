@@ -60,6 +60,12 @@ function band(path: Vec2[], half: number): Vec2[] {
   }
   return [...L, ...R.reverse()];
 }
+/** Per-derive facts about one entity, computed once and shared by every place's description and seat count
+ *  (Eden 2026: ~1.5k places x 3.6k entities re-baked per place made one derive take seconds). */
+type Fact = { e: Entity; def: StoredDef | undefined; x: number; z: number; s: number; seatSkip: boolean; describeSkip: boolean; building: string | null; seats?: number; w?: number };
+type Box = [number, number, number, number];
+const boxOf = (poly: Vec2[]): Box => { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
+const inBoxPoly = (x: number, z: number, b: Box, poly: Vec2[]) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3] && inPoly(x, z, poly);
 function across(poly: Vec2[]) { const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]); return [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)]; }
 
 export type PlacesHost = {
@@ -78,6 +84,7 @@ export type PlacesHost = {
 export class GodPlaces {
   private h: PlacesHost;
   private cache: { key: string; list: GodPlace[]; byRef: Map<string, GodPlace>; byEntity: Map<string, GodPlace> } | null = null;
+  private facts: Fact[] | null = null;
   /** Ids of the places this layer put in the ledger's index (and only those: a boot place keeps its own). */
   private installed = new Set<string>();
   constructor(h: PlacesHost) { this.h = h; }
@@ -105,10 +112,11 @@ export class GodPlaces {
     const m = this.h.model, things = this.h.nav.things();
     const out: GodPlace[] = [];
     const base = { parent: null as string | null, enclosed: false, capacity: null as number | null, starting: false };
+    const firstByRef = new Map<string, GodPlace>(), push = (p: GodPlace) => { out.push(p); if (!firstByRef.has(p.ref)) firstByRef.set(p.ref, p); };
     for (const t of things) {
-      if (t.kind === 'area' && t.area && t.area.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'area', entity: t.id, name: t.ref, kind: placeKind(m, t.id) ?? 'outdoor', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
-      else if (t.kind === 'water' && t.area && t.area.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
-      else if (t.kind === 'room' && t.poly && t.poly.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
+      if (t.kind === 'area' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'area', entity: t.id, name: t.ref, kind: placeKind(m, t.id) ?? 'outdoor', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
+      else if (t.kind === 'water' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
+      else if (t.kind === 'room' && t.poly && t.poly.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
     }
     // GOD-ENV: the god's landforms are places Souls can name and climb: a mountain or hill (round its top), a range, a
     // valley, a ditch or a cliff (a band along it), a plateau or a terrace (its area: already an area place, renamed)
@@ -117,13 +125,13 @@ export class GodPlaces {
       const def = m.resolvedDef(e.def); if (!def) continue;
       let lf: any; try { lf = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).landform; } catch { continue; }
       if (!lf || lf.kind === 'brush') continue;
-      const kind = shortDef(def), have = out.find((p) => p.ref === t.ref);
+      const kind = shortDef(def), have = firstByRef.get(t.ref);
       if (have) { if (have.of === 'area') { have.of = 'landform'; have.kind = kind; } continue; }
       let poly: Vec2[] | null = null;
       if (lf.kind === 'bump') poly = circle(t.at, Math.max(6, Number(lf.r ?? 20) * m.worldPose(e).s * 0.5));
       else if (t.path?.length) poly = band(t.path, Math.max(2, (lf.kind === 'channel' ? Number(lf.w ?? 2) + Number(lf.edge ?? 2) / 2 : lf.kind === 'cliff' ? Number(lf.face ?? 3) + 2 : Number(lf.w ?? t.width ?? 10) / 2)));
       if (!poly || poly.length < 3) continue;
-      out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landform', entity: t.id, name: t.ref, kind, polygon: poly, level: 0 });
+      push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landform', entity: t.id, name: t.ref, kind, polygon: poly, level: 0 });
     }
     // GOD-ENV: land the god added beyond the world's first square (extend east/west/north/south): a place per side
     { const half = m.constants.extent / 2, [x0, z0, x1, z1] = m.ground().extent, sides: [string, Vec2[]][] = [];
@@ -131,20 +139,20 @@ export class GodPlaces {
       if (x0 < -half - 1) sides.push(['west', [[x0, z0], [-half, z0], [-half, z1], [x0, z1]]]);
       if (z0 < -half - 1) sides.push(['north', [[Math.max(x0, -half), z0], [Math.min(x1, half), z0], [Math.min(x1, half), -half], [Math.max(x0, -half), -half]]]);
       if (z1 > half + 1) sides.push(['south', [[Math.max(x0, -half), half], [Math.min(x1, half), half], [Math.min(x1, half), z1], [Math.max(x0, -half), z1]]]);
-      for (const [side, polygon] of sides) out.push({ ...base, id: `g-new-land-${side}`, ref: `new-land-${side}`, of: 'land', entity: `world:${side}`, name: `new land to the ${side}`, kind: 'land', polygon: polygon.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 }); }
+      for (const [side, polygon] of sides) push({ ...base, id: `g-new-land-${side}`, ref: `new-land-${side}`, of: 'land', entity: `world:${side}`, name: `new land to the ${side}`, kind: 'land', polygon: polygon.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 }); }
     // a water's shore: a band round it (where its walk ends, and where a swim starts), as Eden's bank by its pond
-    for (const w of out.filter((p) => p.of === 'water')) out.push({ ...base, id: `${w.id}.shore-bank`.slice(0, 100), ref: w.ref, of: 'shore', entity: w.entity, name: `${w.ref} shore`, kind: 'shore', polygon: grow(w.polygon, SHORE), level: 0 });
+    for (const w of out.filter((p) => p.of === 'water')) push({ ...base, id: `${w.id}.shore-bank`.slice(0, 100), ref: w.ref, of: 'shore', entity: w.entity, name: `${w.ref} shore`, kind: 'shore', polygon: grow(w.polygon, SHORE), level: 0 });
     // buildings: round their ground-floor rooms (a little out, for the walls)
     for (const t of things) {
       if (t.kind !== 'building') continue;
       const rooms = out.filter((p) => p.of === 'room' && p.entity === t.id && p.level === t.level);
       const pts = rooms.flatMap((p) => p.polygon); if (pts.length < 3) continue;
       const poly = grow(hull(pts), 0.4); if (poly.length < 3) continue;
-      out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'building', entity: t.id, name: t.ref, kind: 'building', polygon: poly, level: t.level });
+      push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'building', entity: t.id, name: t.ref, kind: 'building', polygon: poly, level: t.level });
     }
     // things whose def says they are a place (a gazebo, a pergola, a pavilion, a dome; a pier's deck): their footprint
     for (const t of things) {
-      if ((t.kind !== 'thing' && t.kind !== 'seat' && t.kind !== 'path') || out.some((p) => p.ref === t.ref)) continue;
+      if ((t.kind !== 'thing' && t.kind !== 'seat' && t.kind !== 'path') || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id), def = e ? m.resolvedDef(e.def) : undefined, pc = (def?.components as Record<string, any> | undefined)?.place;
       if (!e || !def || !pc) continue;
       let poly: Vec2[] | null = null;
@@ -154,29 +162,31 @@ export class GodPlaces {
           poly = ([[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]] as Vec2[]).map(([x, z]) => [r2(wp.x + (x * c + z * sn) * wp.s), r2(wp.z + (-x * sn + z * c) * wp.s)] as Vec2); }
       } catch { continue; }
       if (!poly || poly.length < 3) continue;
-      out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'thing', entity: t.id, name: t.ref, kind: String(pc.kind ?? 'outdoor'), enclosed: pc.enclosed === true, capacity: Number.isInteger(pc.capacity) ? pc.capacity : null, polygon: poly, level: t.level });
+      push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'thing', entity: t.id, name: t.ref, kind: String(pc.kind ?? 'outdoor'), enclosed: pc.enclosed === true, capacity: Number.isInteger(pc.capacity) ? pc.capacity : null, polygon: poly, level: t.level });
     }
     // landmarks: big named things standing on their own (not in an area, a building, a water or another place)
-    const outer = () => out.filter((p) => p.of !== 'room' && p.of !== 'landmark');
+    const outer = out.filter((p) => p.of !== 'room' && p.of !== 'landmark').map((p) => ({ p, box: boxOf(p.polygon) }));
     for (const t of things) {
-      if (t.kind !== 'thing' || t.level !== 0 || out.some((p) => p.ref === t.ref)) continue;
+      if (t.kind !== 'thing' || t.level !== 0 || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
       const def = m.resolvedDef(e.def); if (!def || NOT_LANDMARKS.test(shortDef(def))) continue;
       const c = def.components as Record<string, unknown>; if (c.carryable || c.seat || c.item) continue;
       let w = 0; try { const b = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).box, s = m.worldPose(e).s; w = Math.max(b[0], b[2]) * s; } catch { continue; }
-      if (w < LANDMARK_MIN || outer().some((p) => inPoly(t.at[0], t.at[1], p.polygon))) continue;
-      out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landmark', entity: t.id, name: t.ref, kind: 'landmark', polygon: circle(t.at, Math.max(4, w / 2 + 3)), level: 0 });
+      if (w < LANDMARK_MIN || outer.some((o) => inBoxPoly(t.at[0], t.at[1], o.box, o.p.polygon))) continue;
+      push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landmark', entity: t.id, name: t.ref, kind: 'landmark', polygon: circle(t.at, Math.max(4, w / 2 + 3)), level: 0 });
     }
     // parents: the smallest bigger place (god-built or the world's own) that holds its centre; else the root
     const boot = [...(this.h.edge?.places.byId.values() ?? [])].filter((p) => !this.installed.has(p.id) && !p.carrier);
     const root = boot.find((p) => p.parent === null)?.id ?? null;
+    const geo = new Map<object, { area: number; box: Box }>(), g = (q: { polygon: Vec2[] }) => { let v = geo.get(q); if (!v) geo.set(q, v = { area: areaOf(q.polygon), box: boxOf(q.polygon) }); return v; };
+    const candidates = [...out.filter((q) => q.of !== 'room'), ...boot.filter((q) => q.parent !== null)].filter((q) => (q.level ?? 0) === 0);
     for (const p of out) {
-      const c = centroid(p.polygon), a = areaOf(p.polygon);
-      const holders = [...out.filter((q) => q !== p && q.of !== 'room'), ...boot.filter((q) => q.parent !== null)]
-        .filter((q) => (q.level ?? 0) === 0 && areaOf(q.polygon) > a && inPoly(c[0], c[1], q.polygon)).sort((x, y) => areaOf(x.polygon) - areaOf(y.polygon));
+      const c = centroid(p.polygon), a = g(p).area;
+      const holders = candidates.filter((q) => q !== p && g(q).area > a && inBoxPoly(c[0], c[1], g(q).box, q.polygon)).sort((x, y) => g(x).area - g(y).area);
       p.parent = p.of === 'room' ? (out.find((q) => q.of === 'building' && q.entity === p.entity)?.id ?? holders[0]?.id ?? root) : holders[0]?.id ?? root;
     }
-    for (const p of out) { p.description = this.describe(p, out, things); if (p.of === 'room') { const n = this.seatsIn(p); p.capacity = n || null; } }
+    this.facts = this.entityFacts(out);
+    try { for (const p of out) { p.description = this.describe(p, out, things); if (p.of === 'room') { const n = this.seatsIn(p); p.capacity = n || null; } } } finally { this.facts = null; }
     if (this.h.layers?.active()) this.layer(out);
     return out.sort((a, b) => (a.id < b.id ? -1 : 1));
   }
@@ -207,32 +217,40 @@ export class GodPlaces {
 
   /** Seats (seat slots of things) whose position is inside a place. */
   private seatsIn(p: GodPlace): number {
-    const m = this.h.model; let n = 0;
-    for (const e of m.entities.values()) {
-      const def = m.resolvedDef(e.def); if (!def || def.components.body || this.h.engineOwned(e)) continue;
-      const wp = m.worldPose(e); if (!inPoly(wp.x, wp.z, p.polygon)) continue;
-      try { n += m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).slots.filter((s) => s.kind === 'seat').length; } catch { /* odd def */ }
+    const m = this.h.model, facts = this.facts ?? this.entityFacts([]), box = boxOf(p.polygon); let n = 0;
+    for (const f of facts) {
+      if (f.seatSkip || !inBoxPoly(f.x, f.z, box, p.polygon)) continue;
+      if (f.seats === undefined) { try { f.seats = m.bake(f.def!, f.e.params ?? {}, f.e.seed ?? 0, f.e.shape).slots.filter((s) => s.kind === 'seat').length; } catch { f.seats = 0; /* odd def */ } }
+      n += f.seats;
     }
     return n;
+  }
+
+  /** What derive's descriptions and seat counts need from each entity, once (same order as the model's entities). */
+  private entityFacts(all: GodPlace[]): Fact[] {
+    const m = this.h.model, buildings = new Set(all.filter((q) => q.of === 'building').map((q) => q.entity)), out: Fact[] = [];
+    const inBuilding = (e: Entity) => { for (let cur: Entity | undefined = e; cur && cur.in.parent !== 'world'; ) { cur = m.entities.get(cur.in.parent); if (cur && buildings.has(cur.id)) return cur.id; } return null; };
+    for (const e of m.entities.values()) {
+      const def = m.resolvedDef(e.def), owned = this.h.engineOwned(e), wp = m.worldPose(e);
+      const c = def?.components as Record<string, unknown> | undefined, sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
+      out.push({ e, def, x: wp.x, z: wp.z, s: wp.s, seatSkip: !def || !!def.components.body || owned,
+        describeSkip: !def || !!c!.body || /^core[-/]flag@/.test(def.ref) || owned || (def.form !== 'point' && e.in.parent === 'world' && !!sh), building: inBuilding(e) });
+    }
+    return out;
   }
 
   /** "a plaza with a fountain, two benches, a lamp-post and a sign" (what stands in it, by kind). */
   private describe(p: GodPlace, all: GodPlace[], things: Thing[]): string {
     const m = this.h.model, own = m.entities.get(p.entity), ownDef = own ? m.resolvedDef(own.def) : undefined, kind = ownDef ? shortDef(ownDef) : p.of;
-    const counts = new Map<string, number>(), sizes = new Map<string, number>();
-    const inBuilding = (e: Entity) => { for (let cur: Entity | undefined = e; cur && cur.in.parent !== 'world'; ) { cur = m.entities.get(cur.in.parent); if (cur && all.some((q) => q.of === 'building' && q.entity === cur!.id)) return cur.id; } return null; };
-    for (const e of m.entities.values()) {
-      if (e.id === p.entity) continue;
-      const def = m.resolvedDef(e.def); if (!def) continue;
-      const c = def.components as Record<string, unknown>;
-      if (c.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
-      const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
-      if (def.form !== 'point' && e.in.parent === 'world' && sh) continue;            // areas, roads, waters are places or ground
-      const wp = m.worldPose(e); if (!inPoly(wp.x, wp.z, p.polygon)) continue;
-      const b = inBuilding(e);
+    const counts = new Map<string, number>(), sizes = new Map<string, number>(), facts = this.facts ?? this.entityFacts(all), box = boxOf(p.polygon);
+    // areas, roads, waters are places or ground; bodies, flags and engine-owned things are not described (entityFacts)
+    for (const f of facts) {
+      const e = f.e, def = f.def!;
+      if (e.id === p.entity || f.describeSkip || !inBoxPoly(f.x, f.z, box, p.polygon)) continue;
+      const b = f.building;
       if (p.of === 'room' || p.of === 'building' ? b !== p.entity : b !== null) continue;  // a house's furniture is in its rooms
       const k = shortDef(def); counts.set(k, (counts.get(k) ?? 0) + 1);
-      if (!sizes.has(k)) { let w = 0; try { const bx = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).box; w = Math.max(bx[0], bx[2]) * wp.s; } catch { /* odd def */ } sizes.set(k, w); }
+      if (!sizes.has(k)) { if (f.w === undefined) { f.w = 0; try { const bx = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).box; f.w = Math.max(bx[0], bx[2]) * f.s; } catch { /* odd def */ } } sizes.set(k, f.w); }
     }
     // the biggest things first ("a fountain, two benches, a lamp-post and a sign")
     const parts = [...counts.entries()].sort((a, b) => (sizes.get(b[0]) ?? 0) - (sizes.get(a[0]) ?? 0) || b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).map(([k, n]) => counted(k, n));
