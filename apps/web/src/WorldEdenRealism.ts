@@ -75,13 +75,14 @@ const GOD_PATTERNS=/* glsl */`
   float pat=edenPattern,ring=floor(vEdenKS.x+.5),sd0=vEdenKS.y;vec3 L=vEdenL;
   float px=max(max(fwidth(L.x),fwidth(L.y)),fwidth(L.z));bool cyl=ring>.5&&abs(n.y)<.7;
   vec2 q=cyl?vec2(atan(L.z,L.x)*length(L.xz),L.y):edenPlane(L,n);
-  if(pat<1.5){ // marble: solid turbulent veins (seam-free), hairlines, a soft cloud; polished
-   vec3 P=L*1.3+sd0*17.;float t=edenNoise(P.xy)*.5+edenNoise(P.yz*2.1+3.7)*.3+edenNoise(P.zx*4.3+9.1)*.2;
-   float s=dot(P,vec3(.55,1.,.35))*1.6+t*7.,a=fwidth(s),th=.05+.09*edenNoise(P.xz*.8+5.);
-   float vein=(1.-smoothstep(th,th+a*1.5+.02,abs(sin(s))))*(1.-smoothstep(.9,2.6,a));
-   float s2=dot(P,vec3(-.4,.7,.9))*3.4+t*10.,a2=fwidth(s2),hair=(1.-smoothstep(.025,.05+a2*1.5,abs(sin(s2))))*(1.-smoothstep(.6,1.6,a2));
-   float cloud=edenNoise(P.xz*.5+P.y*.37+11.);
-   tint=vec3(.95+.09*cloud)*mix(vec3(1.),vec3(.48,.5,.55),max(vein*.85,hair*.45));edenRough=.55+.2*cloud;
+  if(pat<1.5){ // marble: thin turbulent veins with a soft halo (solid, so seam-free), broken hairlines, a faint cloud
+   vec3 P=L*1.1+sd0*17.;float t=edenNoise(P.xy*1.3)*.5+edenNoise(P.yz*2.7+3.7)*.3+edenNoise(P.zx*5.9+9.1)*.2;
+   float s=dot(P,vec3(.55,1.,.35))*2.7+t*4.2,a=fwidth(s),v=abs(sin(s)),th=.015+.03*edenNoise(P.xz*1.7+5.),far2=1.-smoothstep(1.,3.,a);
+   float vein=(1.-smoothstep(th,th+a*1.2+.008,v))*far2,halo=(1.-smoothstep(th,th+.3,v))*far2;
+   float s2=dot(P,vec3(-.4,.7,.9))*4.6+t*6.,a2=fwidth(s2);
+   float hair=(1.-smoothstep(.01,.02+a2*1.2,abs(sin(s2))))*(1.-smoothstep(.6,1.6,a2))*smoothstep(.42,.58,edenNoise(P.xy*.9+2.));
+   float cloud=edenNoise(P.xz*.45+P.y*.31+11.)*.6+edenNoise(P.xy*1.9+4.)*.4;
+   tint=vec3(.97+.06*cloud)*mix(vec3(1.),vec3(.6,.62,.67),max(max(vein*.85,halo*.28),hair*.45));edenRough=.5+.2*cloud;
   }else if(pat<2.5){ // ashlar: coursed blocks, offset joints, per-block tone, recessed mortar
    float ch=.42,bw=.9,row=floor(q.y/ch),fy=fract(q.y/ch),xx=q.x/bw+row*.5+edenHash(vec2(row,sd0*7.+1.))*.6,col=floor(xx),fx=fract(xx);
    float d=min(min(fx,1.-fx)*bw,min(fy,1.-fy)*ch),fade=1.-smoothstep(.02,.06,px);
