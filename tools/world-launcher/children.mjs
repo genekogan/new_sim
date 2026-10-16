@@ -261,6 +261,8 @@ export function defaultCommand(world, port, o) {
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
     // Travel between worlds (M3): the launcher's loopback relay and this run's site key (docs/sim/TRAVEL.md)
     ...(o.site?.url && o.site?.key ? { SIM_SITE_URL: o.site.url, SIM_SITE_KEY: o.site.key } : {}),
+    // M4 shared library: one directory per launcher, <data>/library (Gene 2026-10-16 default)
+    ...(o.libraryDir ? { SIM_LIBRARY_DIR: o.libraryDir } : {}),
   };
   return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }
