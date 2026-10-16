@@ -1,0 +1,11 @@
+{
+  "schema": "mars-add-patch/1",
+  "id": "mars-field-20261016",
+  "note": "M2: make the Chiba field's baked fire bowl burn (light / put out) and its baked beanbag a seat, as in the sim.mars.college 2026 reference (details-2026-ground-life.ts)",
+  "defs": "defs.json",
+  "anchors": ["chiba", "field-chair", "field-chair-4"],
+  "items": [
+    { "name": "field-fire-bowl", "def": "mars-fire-bowl-fire@1", "in": "chiba", "at": [-18.87, 0, -13.055], "r": 0 },
+    { "name": "field-beanbag", "def": "mars-beanbag-seat@1", "in": "chiba", "at": [-19.37, 0, -14.955], "r": 0.258 }
+  ]
+}

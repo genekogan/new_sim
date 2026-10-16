@@ -4,7 +4,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { setImmediate } from 'node:timers/promises';
-import { coreRef } from '@sim/world-compiler';
 import { fixture, invite, accept, factory } from '../../test/native-owner-fixture.ts';
 import { Hono } from 'hono';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -51,7 +50,9 @@ test('a Soul fills a watering can from the Mars tank and waters the planter; not
     // 6 L left in a 1,500 L tank: one can's worth, not a full one
     { op: 'place', def: 'mars-water-tank@1', name: 'tank', p: [8, 0], state: { level: 0.004 } },
     { op: 'place', def: 'mars-planter@1', name: 'garden-bed', p: [4, 6] },
-    { op: 'place', def: coreRef('watering-can'), name: 'can', p: [3, 0], state: { level: 0 } }] }, 'water');
+    { op: 'place', def: 'mars-watering-can@1', name: 'can', p: [3, 0], state: { level: 0 } },
+    // a catalogue can (its own fill/empty actions) lying 6 m from the tank: its fill draws only from a source beside it
+    { op: 'place', def: 'core/watering-can@1', name: 'old-can', p: [2, -2], state: { level: 0 } }] }, 'water');
   assert.equal(placed.accepted, true, JSON.stringify(placed.failures));
   await settle(3);
   await invite(f, 'ana');
@@ -59,7 +60,7 @@ test('a Soul fills a watering can from the Mars tank and waters the planter; not
   const ana = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
   await settle(3);
   const id = (n: string) => ([...god.model.entities.values()].find((e: any) => e.name === n) as any).id as string;
-  const tank = id('tank'), bed = id('garden-bed'), can = id('can');
+  const tank = id('tank'), bed = id('garden-bed'), can = id('can'), oldCan = id('old-can');
   const st = (e: string) => god.model.entities.get(e)!.state as any;
   const cap = (c: string) => edge.capabilities(ana).find((x: any) => x.id === c) as any;
   const run = async (rid: string) => { for (let i = 0; i < 6000; i++) { f.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); f.host.drainInputs(); const r: any = edge.receipt(ana.soulId, rid); if (r?.outcome) return r; } } return edge.receipt(ana.soulId, rid); };
@@ -69,12 +70,15 @@ test('a Soul fills a watering can from the Mars tank and waters the planter; not
   // empty-handed: the tank and the bed say what is missing; the can lying 5 m from the tank does not fill from nothing
   refused(`object:${tank}:draw-water`, 'water.no-vessel');
   refused(`object:${bed}:water`, 'water.no-vessel');
-  refused(`object:${can}:fill`, 'water.no-source');
+  refused(`object:${oldCan}:fill`, 'water.no-source');
   assert.match(cap(`object:${tank}:draw-water`).blocked.reason, /not holding a watering can/);
 
   const pk: any = await act(`pick-up:${can}`);
   assert.equal(pk.phase, 'completed', JSON.stringify(pk));
+  const inHand = (when: string) => { const x: any = (f.host.engine as any).world.entities[can]; assert.deepEqual([x?.support?.kind, x?.support?.by], ['in-hand', ana.entityId], `${when}: the can is in Ana's hand (engine) ${JSON.stringify(x?.support)}`); assert.equal(god.model.entities.get(can)!.in.parent, ana.entityId, `${when}: the entity world has the can in her hand too (viewers draw it there)`); };
+  await settle(30); inHand('after pick-up');
   const dr: any = await act(`object:${tank}:draw-water`);
+  await settle(30); inHand('after drawing water');
   assert.equal(dr.phase, 'completed', JSON.stringify(dr));
   assert.ok(Math.abs(st(can).level - 0.6) < 1e-6, JSON.stringify(st(can)));
   assert.equal(st(tank).level, 0, 'the tank gave its last 6 L');
@@ -82,6 +86,7 @@ test('a Soul fills a watering can from the Mars tank and waters the planter; not
   assert.match(cap(`object:${tank}:draw-water`).blocked.reason, /water delivery/);
 
   const wt: any = await act(`object:${bed}:water`);
+  await settle(30); inHand('after watering');
   assert.equal(wt.phase, 'completed', JSON.stringify(wt));
   assert.ok(Math.abs(st(bed).moisture - 0.95) < 1e-6, JSON.stringify(st(bed)));
   assert.equal(st(can).level, 0);

@@ -5,6 +5,7 @@
 //    into a can a resident holds (server god/water.ts `draw-water`) and only arrives by a delivery (the creator's `set`).
 //  - mars-planter: the core raised planter with lower shrubs, a soil bed and a damp patch (kit role `fill`) that spreads
 //    with its `moisture` state (viewer vocab-look.ts); residents water it from a can (`water`).
+//  - mars-watering-can: the core can, tagged `item` so a hand can hold it in the entity world too; no magic fill/empty.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const ROOT = new URL('../../', import.meta.url).pathname;
 const kit = (f) => JSON.parse(readFileSync(`${ROOT}packages/world-compiler/src/core-kit/${f}`, 'utf8'));
@@ -24,8 +25,9 @@ Object.assign(tank, {
 const planter = strip(pick(kit('props.json'), 'core-planter-box'));
 const shapes = planter.make.args.shapes.filter((s) => s.kind !== 'sphere');
 shapes.push(
-  { kind: 'box', at: [0, 0.495, 0], size: [1.34, 0.02, 0.54], round: 0, tint: 'soil' },
-  { kind: 'box', at: [0, 0.507, 0], size: [1.3, 0.012, 0.5], round: 0, tint: 'wet', role: 'fill', pivot: [0, 0.501, 0] },
+  // above the rim slab (its top is at .51 m): dry soil, then the damp patch that spreads with `moisture`
+  { kind: 'box', at: [0, 0.522, 0], size: [1.34, 0.024, 0.54], round: 0, tint: 'soil' },
+  { kind: 'box', at: [0, 0.539, 0], size: [1.3, 0.01, 0.5], round: 0, tint: 'wet', role: 'fill', pivot: [0, 0.539, 0] },
   ...[-0.5, -0.17, 0.17, 0.5].flatMap((x, i) => [
     { kind: 'sphere', at: [x, 0.6, i % 2 ? 0.12 : -0.12], r: 0.11, segments: 6, tint: i % 2 ? 'leaf2' : 'leaf', scale: [1, 0.9, 1] },
     { kind: 'cyl', at: [x, 0.53, i % 2 ? 0.12 : -0.12], r: 0.012, h: 0.08, segments: 4, tint: 'leaf' },
@@ -43,7 +45,18 @@ Object.assign(planter, {
 });
 planter.size = { box: [planter.size.box[0], 0.72, planter.size.box[2]] };
 
+// the core can's tags (object, tool) lack `item`, which a body's carry slot requires: the engine puts it in the hand but the
+// entity world refuses the write-back (slot.incompatible), so viewers keep drawing it on the ground. This copy is tagged.
+const can = strip(pick(kit('vocab-w1.json'), 'core-watering-can'));
+Object.assign(can, {
+  name: 'mars-watering-can',
+  description: 'A galvanised watering can (10 L) with a long spout and a rose; fill it at the water tank, carry it and water the garden beds.',
+  tags: [...new Set([...can.tags, 'item', 'garden', 'mars'])],
+  params: { ...can.params, litres: { type: 'number', min: 1, max: 50, default: 10, doc: 'capacity in litres' } },
+  actions: [],
+});
+
 const out = `${ROOT}worlds/patches/mars-water-20261016`;
 mkdirSync(out, { recursive: true });
-writeFileSync(`${out}/defs.json`, JSON.stringify([tank, planter], null, 1) + '\n');
+writeFileSync(`${out}/defs.json`, JSON.stringify([tank, planter, can], null, 1) + '\n');
 console.log('wrote', `${out}/defs.json`);

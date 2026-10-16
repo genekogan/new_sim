@@ -1,0 +1,13 @@
+{
+  "schema": "mars-add-patch/1",
+  "id": "mars-water-20261016",
+  "note": "W5 water: the camp water tank, two garden beds and a watering can by Freeside's hydroponic cart; residents carry water from the tank to the beds (finite, by the litre)",
+  "defs": "defs.json",
+  "anchors": ["freeside", "freeside-hydro-cart-chrome"],
+  "items": [
+    { "name": "water-tank", "def": "mars-water-tank@1", "at": [101.6, -38.6], "r": -1.571, "state": { "level": 0.6 } },
+    { "name": "garden-bed", "def": "mars-planter@1", "at": [99.0, -39.6], "r": 0 },
+    { "name": "garden-bed-2", "def": "mars-planter@1", "at": [99.0, -41.1], "r": 0 },
+    { "name": "watering-can", "def": "mars-watering-can@1", "at": [97.9, -39.5], "r": 0.6, "state": { "level": 0 } }
+  ]
+}
