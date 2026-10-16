@@ -71,7 +71,7 @@ import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt, whenShotClock
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ConstitutionCard } from './god-ui/Constitution.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
@@ -241,7 +241,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     }
     // Lane phones (V4): a phone draws fewer pixels, a smaller shadow map and less far detail (quality-tier.ts).
     const quality=browserQuality(),phoneOff=new Set((new URLSearchParams(location.search).get('phoneOff')??'').split(',')),distanceDetail=quality.detail&&!phoneOff.has('detail')?new WorldDistanceDetail(quality.detail):null;  // ?phoneOff=detail,lod,cards isolates one phone-tier part
-    const meshLod=quality.detail&&!phoneOff.has('lod')?new WorldMeshLod(PHONE_MESH_LOD,()=>import('meshoptimizer/simplifier').then(async m=>{await m.MeshoptSimplifier.ready;return m.MeshoptSimplifier.supported?m.MeshoptSimplifier as unknown as Simplifier:null;})):null;
+    const meshLod=quality.detail&&!phoneOff.has('lod')?new WorldMeshLod(PHONE_MESH_LOD,async()=>(!phoneOff.has('worker')&&await workerSimplifier(()=>new Worker(new URL('./mesh-lod.worker.ts',import.meta.url),{type:'module'})))||import('meshoptimizer/simplifier').then(async m=>{await m.MeshoptSimplifier.ready;return m.MeshoptSimplifier.supported?m.MeshoptSimplifier as unknown as Simplifier:null;})):null;  // levels built in a worker (?phoneOff=worker: in-thread)
     (window as unknown as {__simQuality?:unknown}).__simQuality={tier:quality.tier,reason:quality.reason,maxPixelRatio:quality.maxPixelRatio,detail:()=>distanceDetail?{...distanceDetail.stats}:null,lod:()=>meshLod?{...meshLod.stats}:null,standIns:()=>farStandIns?{...farStandIns.stats}:null};
     const shotMode=new URLSearchParams(location.search).has('shot');
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution

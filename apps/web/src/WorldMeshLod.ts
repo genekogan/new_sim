@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { simplifyLevels, type AsyncSimplifier, type LodInput, type LodLevel, type Simplifier } from './mesh-lod-core.ts';
+export type { Simplifier, AsyncSimplifier } from './mesh-lod-core.ts';
 /** Lane phones (V4): lower geometric detail at a distance, for the phone quality tier.
  *
  * The heavy triangles in a world are a few large static meshes: terrain sectors (32k triangles each, 25 of them on a
@@ -8,39 +10,49 @@ import * as THREE from 'three';
  * locked so neighbouring terrain sectors never crack), records each level's geometric error in metres, and just before
  * renderer.render swaps in the coarsest level whose error projects below `maxErrorPx` CSS pixels at that mesh's nearest
  * distance from the camera. `restore` puts the original geometry back right after rendering, so picking, raycasts,
- * static batching checks and tests never see a level. Levels are built lazily, one mesh per frame within a small time
- * budget, after the simplifier has loaded; until then, and for anything unsuitable, the original is drawn. */
+ * static batching checks and tests never see a level. Levels are built lazily after the simplifier has loaded: in a
+ * worker when one is given (`workerSimplifier`, release 3.1: no main-thread stalls), else one mesh per frame within a
+ * small time budget; until then, and for anything unsuitable, the original is drawn. */
 export type MeshLodOptions={minTriangles:number;maxErrorPx:number;ratios:readonly number[];rescanFrames:number;budgetMs:number;
   /** Hard cap on any level's deviation in metres: decals (tyre tracks, paths, shadows painted on the ground) sit ~2.5 cm
    * above the terrain and must stay above a simplified surface. */
   maxWorldError:number};
 export const PHONE_MESH_LOD:MeshLodOptions=Object.freeze({minTriangles:6000,maxErrorPx:1,ratios:[0.3,0.1,0.03],rescanFrames:120,budgetMs:6,maxWorldError:0.015});
-export type Simplifier={simplify(indices:Uint32Array,positions:Float32Array,stride:number,targetIndexCount:number,targetError:number,flags?:string[]):[Uint32Array,number];
-  simplifyWithAttributes?(indices:Uint32Array,positions:Float32Array,stride:number,attributes:Float32Array,attributeStride:number,weights:number[],lock:Uint8Array|null,targetIndexCount:number,targetError:number,flags?:string[]):[Uint32Array,number]};
 /** Vertex colours carry painted ground (tyre tracks, paths, soil patches): a colour step of ~0.03 counts like a 1.5 cm
  * displacement, so painted detail survives simplification. Normals keep the shading of folds. */
 const COLOUR_WEIGHT=0.5,NORMAL_WEIGHT=0.05;
 type Level={geometry:THREE.BufferGeometry;error:number;triangles:number};
-type Entry={mesh:THREE.Mesh;base:THREE.BufferGeometry;centre:THREE.Vector3;radius:number;levels:Level[]|null};
+type Entry={mesh:THREE.Mesh;base:THREE.BufferGeometry;centre:THREE.Vector3;radius:number;levels:Level[]|null;pending?:boolean};
 
-/** Coarser index levels for one geometry: [{index, error (model units), triangles}], coarsest last. Pure (tests). */
-export function buildLevels(s:Simplifier,geometry:THREE.BufferGeometry,ratios:readonly number[],maxError=Number.MAX_VALUE):{index:Uint32Array;error:number;triangles:number}[]{
+/** Copies of what the simplifier needs from a geometry (transferable to a worker; the geometry itself is untouched). */
+export function lodInput(geometry:THREE.BufferGeometry):LodInput{
+  const flat=(a:THREE.BufferAttribute,n:number)=>a.array instanceof Float32Array&&a.itemSize===n&&!a.normalized?a.array.slice(0,a.count*n):Float32Array.from({length:a.count*n},(_,i)=>a.getComponent(Math.floor(i/n),i%n));
   const pos=geometry.attributes.position as THREE.BufferAttribute,src=geometry.index!.array;
-  const positions=pos.array instanceof Float32Array&&pos.itemSize===3?pos.array:Float32Array.from({length:pos.count*3},(_,i)=>pos.getComponent(Math.floor(i/3),i%3));
-  const indices=src instanceof Uint32Array?src:Uint32Array.from(src as ArrayLike<number>);
-  const out:{index:Uint32Array;error:number;triangles:number}[]=[];let last=indices.length;
   const colour=geometry.attributes.color as THREE.BufferAttribute|undefined,normal=geometry.attributes.normal as THREE.BufferAttribute|undefined;
-  const parts=[...(colour?[{a:colour,n:3,w:COLOUR_WEIGHT}]:[]),...(normal?[{a:normal,n:3,w:NORMAL_WEIGHT}]:[])];
-  const stride=parts.reduce((k,p)=>k+p.n,0),attributes=stride&&s.simplifyWithAttributes?new Float32Array(pos.count*stride):null;
-  if(attributes)for(let v=0;v<pos.count;v++){let o=v*stride;for(const p of parts)for(let c=0;c<p.n;c++)attributes[o++]=p.a.getComponent(v,c);}
-  const weights=parts.flatMap(p=>Array(p.n).fill(p.w));
-  for(const r of ratios){
-    const target=Math.max(3,Math.floor(indices.length*r/3)*3);
-    const [index,error]=attributes?s.simplifyWithAttributes!(indices,positions,3,attributes,stride,weights,null,target,maxError,['LockBorder','ErrorAbsolute']):s.simplify(indices,positions,3,target,maxError,['LockBorder','ErrorAbsolute']);
-    if(!(index.length>0)||index.length>=last*0.8||!Number.isFinite(error))continue;   // not meaningfully coarser than the previous level
-    out.push({index,error,triangles:index.length/3});last=index.length;
-  }
-  return out;
+  return {positions:flat(pos,3),indices:Uint32Array.from(src as ArrayLike<number>),
+    parts:[...(colour&&colour.itemSize>=3?[{array:flat(colour,3),n:3,w:COLOUR_WEIGHT}]:[]),...(normal?[{array:flat(normal,3),n:3,w:NORMAL_WEIGHT}]:[])]};
+}
+/** Coarser index levels for one geometry: [{index, error (model units), triangles}], coarsest last. Pure (tests). */
+export function buildLevels(s:Simplifier,geometry:THREE.BufferGeometry,ratios:readonly number[],maxError=Number.MAX_VALUE):LodLevel[]{
+  return simplifyLevels(s,lodInput(geometry),ratios,maxError);
+}
+/** A simplifier running in a module worker; resolves null when workers or the simplifier are unavailable (the caller
+ * then falls back to the in-thread simplifier). */
+export function workerSimplifier(make:()=>Worker,timeoutMs=15000):Promise<AsyncSimplifier|null>{
+  let w:Worker;try{w=make();}catch{return Promise.resolve(null);}
+  const jobs=new Map<number,{ok:(l:LodLevel[])=>void;no:(e:Error)=>void}>();let next=1,broken=false;
+  return new Promise(resolve=>{
+    const timer=setTimeout(()=>{broken=true;w.terminate();resolve(null);},timeoutMs);
+    w.onerror=()=>{broken=true;clearTimeout(timer);for(const j of jobs.values())j.no(new Error('worker failed'));jobs.clear();resolve(null);};
+    w.onmessage=(ev:MessageEvent<{id:number;ready?:boolean;levels?:LodLevel[];error?:string}>)=>{
+      const {id,ready,levels,error}=ev.data;
+      if(id===0){clearTimeout(timer);if(!ready){w.terminate();resolve(null);return;}
+        resolve({isAsync:true,levels:(input,ratios,maxError)=>broken?Promise.reject(new Error('worker failed')):new Promise((ok,no)=>{const id=next++;jobs.set(id,{ok,no});
+          w.postMessage({id,input,ratios:[...ratios],maxError},[input.positions.buffer,input.indices.buffer,...input.parts.map(p=>p.array.buffer)]);})});return;}
+      const j=jobs.get(id);if(!j)return;jobs.delete(id);if(levels)j.ok(levels);else j.no(new Error(error??'failed'));
+    };
+    w.postMessage({id:0});
+  });
 }
 const suitable=(m:THREE.Mesh,min:number)=>{
   const mat=m.material as THREE.Material;if(Array.isArray(mat)||mat.polygonOffset||mat.transparent)return false;   // decals and see-through layers draped on other surfaces keep their exact shape
@@ -50,10 +62,10 @@ const suitable=(m:THREE.Mesh,min:number)=>{
 };
 export class WorldMeshLod{
   private entries=new Map<THREE.Mesh,Entry>();private frame=0;private swapped:Entry[]=[];private world=new THREE.Vector3();
-  private o:MeshLodOptions;private simplifier:Simplifier|null=null;
+  private o:MeshLodOptions;private simplifier:Simplifier|AsyncSimplifier|null=null;private inFlight=0;
   /** Last apply(): meshes with levels, meshes drawn coarser, triangles drawn vs. the originals', CPU ms (incl. building). */
   readonly stats={meshes:0,ready:0,coarser:0,triangles:0,fullTriangles:0,cpuMs:0,buildMs:0};
-  constructor(o:MeshLodOptions,load:()=>Promise<Simplifier|null>){this.o=o;void load().then(s=>{this.simplifier=s;},()=>{this.simplifier=null;});}
+  constructor(o:MeshLodOptions,load:()=>Promise<Simplifier|AsyncSimplifier|null>){this.o=o;void load().then(s=>{this.simplifier=s;},()=>{this.simplifier=null;});}
   private scan(root:THREE.Object3D){
     const seen=new Set<THREE.Mesh>();
     root.traverse(o=>{const m=o as THREE.Mesh;if(!m.isMesh||!suitable(m,this.o.minTriangles))return;seen.add(m);
@@ -66,7 +78,16 @@ export class WorldMeshLod{
   private drop(e:Entry){this.entries.delete(e.mesh);for(const l of e.levels??[])l.geometry.dispose();e.levels=null;}
   private build(e:Entry){
     const el=e.mesh.matrixWorld.elements,scale=Math.sqrt(Math.max(el[0]*el[0]+el[1]*el[1]+el[2]*el[2],el[4]*el[4]+el[5]*el[5]+el[6]*el[6],el[8]*el[8]+el[9]*el[9]+el[10]*el[10]))||1;
-    const levels=buildLevels(this.simplifier!,e.base,this.o.ratios,this.o.maxWorldError/scale);
+    const s=this.simplifier!;
+    if('isAsync' in s){
+      // off the main thread: the entry keeps drawing its original until the levels come back (and is skipped if it was replaced meanwhile)
+      e.pending=true;this.inFlight++;
+      s.levels(lodInput(e.base),this.o.ratios,this.o.maxWorldError/scale).then(levels=>{if(this.entries.get(e.mesh)===e)this.attach(e,levels);},()=>{e.levels=[];}).finally(()=>{e.pending=false;this.inFlight--;});
+      return;
+    }
+    this.attach(e,buildLevels(s,e.base,this.o.ratios,this.o.maxWorldError/scale));
+  }
+  private attach(e:Entry,levels:LodLevel[]){
     e.levels=levels.map(({index,error,triangles})=>{
       const g=new THREE.BufferGeometry();for(const [k,a] of Object.entries(e.base.attributes))g.setAttribute(k,a);
       g.setIndex(new THREE.BufferAttribute(index,1));g.boundingSphere=e.base.boundingSphere;g.boundingBox=e.base.boundingBox;g.name=`${e.base.name||'mesh'} lod ${triangles}`;
@@ -76,7 +97,7 @@ export class WorldMeshLod{
   apply(root:THREE.Object3D,camera:THREE.PerspectiveCamera,viewHeight:number){
     const t0=performance.now();
     if(this.frame++%this.o.rescanFrames===0)this.scan(root);
-    if(this.simplifier){const b0=performance.now();for(const e of this.entries.values()){if(e.levels)continue;if(performance.now()-b0>this.o.budgetMs)break;try{this.build(e);}catch{e.levels=[];}}this.stats.buildMs+=performance.now()-b0;}
+    if(this.simplifier){const b0=performance.now(),async='isAsync' in this.simplifier;for(const e of this.entries.values()){if(e.levels||e.pending)continue;if(async?this.inFlight>=2:performance.now()-b0>this.o.budgetMs)break;try{this.build(e);}catch{e.levels=[];}}this.stats.buildMs+=performance.now()-b0;}
     const cam=camera.position,pxPerUnit=viewHeight/(2*Math.tan(camera.fov*Math.PI/360))*(camera.zoom||1);let coarser=0,tris=0,full=0,ready=0;
     for(const e of this.entries.values()){
       const m=e.mesh,n=e.base.index!.count/3;full+=n;

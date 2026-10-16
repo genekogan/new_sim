@@ -75,7 +75,9 @@ const summarize = (frames, render, gpu, longtasks, ms) => {
 
 const mobile = args.includes('--mobile'), throttle = Number(opt('cpu', mobile ? '4' : '1'));
 const target = new URL(url);
-if (!['localhost', '127.0.0.1'].includes(target.hostname) || Number(target.port) < 5890 || Number(target.port) > 5899) throw new Error('speed probe only accepts lane ports 5890–5899 on localhost');
+// SPEED_PORTS="6342,6343" lets another lane probe its own fixtures (never the live 4930–4970).
+const lanePorts = (process.env.SPEED_PORTS ?? '').split(',').filter(Boolean).map(Number);
+if (!['localhost', '127.0.0.1'].includes(target.hostname) || !((Number(target.port) >= 5890 && Number(target.port) <= 5899) || lanePorts.includes(Number(target.port))) || (Number(target.port) >= 4930 && Number(target.port) <= 4990)) throw new Error('speed probe only accepts lane ports 5890–5899 (or SPEED_PORTS) on localhost');
 console.log('Waiting for speed Chrome lease');
 const release = await chromeLease('speed', { waitMs: Number(opt('lease-wait', '2700000')), staleMs: Infinity });
 console.log('Speed Chrome lease acquired');
