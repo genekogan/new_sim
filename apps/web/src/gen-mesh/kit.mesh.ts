@@ -6,6 +6,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { expandKitProgram, kitArgs, kitWhen, type KitArgs, type KitProgramArgs, type KitShape } from '@sim/generators';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { shapeFaceMeshes } from './faces.ts'; // XP8 hook
+import { kitClassSurface, kitSurfaceAttribute, kitSurfaceSuffix } from './kit-surfaces.ts'; // Y1 / XP7 hook
 
 const cache = new Map<string, THREE.Object3D>();
 
@@ -98,8 +99,9 @@ function loft(sh: KitShape): THREE.BufferGeometry {
 }
 
 /** Transform a primitive by scale, rotation (YXZ: yaw, pitch, roll) and position; returns non-indexed geometry with vertex colours. */
-function placed(sh: KitShape, round: number, v: number, color: THREE.Color, offset?: THREE.Vector3): THREE.BufferGeometry {
+function placed(sh: KitShape, round: number, v: number, color: THREE.Color, offset?: THREE.Vector3, surface = false): THREE.BufferGeometry {
   const g0 = primitive(sh, round, v); const g = g0.index ? g0.toNonIndexed() : g0; if (g !== g0) g0.dispose();
+  if (surface) g.setAttribute('edenSurf', kitSurfaceAttribute(sh, g)); // Y1: shape-local metres, before placement
   const m = new THREE.Matrix4().compose(
     new THREE.Vector3(sh.at[0], sh.at[1], sh.at[2]).sub(offset ?? new THREE.Vector3()),
     new THREE.Quaternion().setFromEuler(new THREE.Euler(sh.pitch ?? 0, sh.yaw ?? 0, sh.roll ?? 0, 'YXZ')),
@@ -118,23 +120,25 @@ function placed(sh: KitShape, round: number, v: number, color: THREE.Color, offs
   const n = g.attributes.position.count, cols = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { cols[i * 3] = color.r; cols[i * 3 + 1] = color.g; cols[i * 3 + 2] = color.b; }
   g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color' && k !== 'edenSurf') g.deleteAttribute(k);
   return g;
 }
 function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
   let count = 0; for (const g of geos) count += g.attributes.position.count;
   const pos = new Float32Array(count * 3), nor = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  const surf = geos.every((g) => g.attributes.edenSurf) ? new Float32Array(count * 4) : null; // Y1
   let o = 0;
-  for (const g of geos) { pos.set(g.attributes.position.array as Float32Array, o * 3); nor.set(g.attributes.normal.array as Float32Array, o * 3); col.set(g.attributes.color.array as Float32Array, o * 3); o += g.attributes.position.count; g.dispose(); }
+  for (const g of geos) { pos.set(g.attributes.position.array as Float32Array, o * 3); nor.set(g.attributes.normal.array as Float32Array, o * 3); col.set(g.attributes.color.array as Float32Array, o * 3); surf?.set(g.attributes.edenSurf.array as Float32Array, o * 4); o += g.attributes.position.count; g.dispose(); }
   const out = new THREE.BufferGeometry();
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); out.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  if (surf) out.setAttribute('edenSurf', new THREE.BufferAttribute(surf, 4)); // Y1
   out.computeBoundingSphere(); out.computeBoundingBox();
   return out;
 }
 /** Material class of a shape: shapes of one class merge into one draw. */
 // Four bounded emissive classes, so glow does not add one draw per numerical value.
 const glowLevel = (value: number | undefined) => value ? Math.min(4, Math.ceil(value * 4)) : 0;
-const classOf = (sh: KitShape, v: number) => v === 2 ? `${sh.material ?? 'paint'}:${glowLevel(sh.glow ?? (sh.material === 'emissive' ? 1 : 0))}` : (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
+const classOf = (sh: KitShape, v: number) => v === 2 ? `${sh.material ?? 'paint'}:${glowLevel(sh.glow ?? (sh.material === 'emissive' ? 1 : 0))}${kitSurfaceSuffix(sh)}` : (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
 
 /** VOCAB-MECH: which `when` shapes are on for these params/state (a cache key part; '' when the kit has none). */
 export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
@@ -151,12 +155,12 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     if (sh.when && !kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {})) continue;
     if (sh.role) { const list = byRole.get(sh.role) ?? []; list.push(sh); byRole.set(sh.role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
-    const k = classOf(sh, args.v); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color)); byClass.set(k, list);
+    const k = classOf(sh, args.v); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k))); byClass.set(k, list);
   }
   const matFor = (k: string) => {
     if (args.v !== 2) return k === 'glass' ? ctx.materials.get('glass', undefined, { vertexColors: true }) : k === 'water' ? ctx.materials.get('water', undefined, { vertexColors: true }) : k === 'glow' ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8 }) : ctx.materials.get('paint', undefined, { vertexColors: true });
     const [kind, level] = k.split(':');
-    return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}) });
+    return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}), surface: kitClassSurface(k) });
   };
   for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; root.add(mesh); }
   // XP8 hook: faces (text, this world's images, seeded glass/mosaic) sit on their shapes; role faces follow the pivot below.
@@ -172,7 +176,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
       mesh.castShadow = true; pivot.add(mesh);
     } else {
       const classes = new Map<string, THREE.BufferGeometry[]>();
-      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv)); classes.set(k, list); }
+      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv, !!kitClassSurface(k))); classes.set(k, list); }
       for (const [k, geos] of classes) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = !k.startsWith('glass:') && !k.startsWith('water:'); mesh.receiveShadow = true; mesh.name = `kit:${k}`; pivot.add(mesh); }
       if (args.v === 2) for (const sh of shapes) for (const face of shapeFaceMeshes(sh, args.round, pv)) pivot.add(face); // XP8 hook
     }
