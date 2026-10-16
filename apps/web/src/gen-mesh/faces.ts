@@ -12,7 +12,12 @@ const UP: Record<FaceSide, V3> = { front: [0, 1, 0], back: [0, 1, 0], left: [0, 
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const textures = new Map<string, THREE.Texture>();
 const materials = new Map<string, THREE.MeshStandardMaterial>();
-let loader: THREE.TextureLoader | null | undefined;
+let loader: THREE.TextureLoader | undefined;
+/** Bounded caches: past the cap everything is released (a texture still in use re-uploads on its next draw). */
+function remember(key: string, t: THREE.Texture): THREE.Texture {
+  if (textures.size >= 384) { for (const x of textures.values()) x.dispose(); for (const m of materials.values()) m.dispose(); textures.clear(); materials.clear(); }
+  textures.set(key, t); return t;
+}
 
 /** Same rule as world-path.ts, resolved per call so offline meshers (no `location`) can import this module. */
 export function faceImagePath(image: unknown): string | null {
@@ -97,7 +102,7 @@ function patternTexture(face: FaceContent, wM: number, hM: number, outline: [num
   const hit = textures.get(key); if (hit) return hit;
   const t = new THREE.DataTexture(patternPixels(face.pattern!, w, h, { seed: face.seed, palette: face.palette, cells: face.cells, outline: pxOutline }), w, h, THREE.RGBAFormat);
   t.colorSpace = THREE.SRGBColorSpace; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter; t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
-  textures.set(key, t); return t;
+  return remember(key, t);
 }
 
 // ---------------------------------------------------------------- text and images
@@ -127,15 +132,15 @@ function textTexture(face: FaceContent, wM: number, hM: number): THREE.Texture |
     else if (face.align === 'left') { g.textAlign = 'left'; g.fillText(cells[0], margin, y); }
     else { g.textAlign = 'center'; g.fillText(cells[0], cw / 2, y); }
   });
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; textures.set(key, t); return t;
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return remember(key, t);
 }
 function imageTexture(image: unknown): THREE.Texture | null {
   const url = faceImagePath(image);
   if (!url) return null;
-  if (loader === undefined) loader = typeof document !== 'undefined' ? new THREE.TextureLoader() : null;
-  if (!loader) return null;
+  if (typeof document === 'undefined') return null;
+  loader ??= new THREE.TextureLoader();
   let t = textures.get(url);
-  if (!t) { t = loader.load(url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; textures.set(url, t); }
+  if (!t) { t = loader.load(url); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; remember(url, t); }
   return t;
 }
 
@@ -148,6 +153,7 @@ function faceMaterial(face: FaceContent, wM: number, hM: number, outline: [numbe
   if (!m) {
     m = new THREE.MeshStandardMaterial({ map, color: map ? '#ffffff' : fallback, roughness: face.pattern === 'stained-glass' ? 0.35 : 0.85, metalness: 0, transparent: clear && !!map, opacity: clear && !map ? 0 : 1, alphaTest: clear ? 0.4 : 0, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     if (level > 0 && map) { m.emissive.set('#ffffff'); m.emissiveMap = map; m.emissiveIntensity = level * 1.2; }
+    m.userData.face = face.pattern ?? (face.text !== undefined ? 'text' : 'image'); // survives instancing (probes count faces)
     materials.set(key, m);
   }
   return m;

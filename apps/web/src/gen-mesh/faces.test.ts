@@ -163,3 +163,16 @@ test('building decals sit on their wall slots, in their storey\'s group, turned 
   }
   assert.deepEqual(decalGroups([{ slot: 'ridge', w: 1, h: 1, text: 'X' }, { slot: 'nowhere', w: 1, h: 1, text: 'X' }, { bogus: true }], w.bake(def, {}, 7).slots, 0), [], 'roof slots, unknown slots and bad entries draw nothing');
 });
+
+test('face textures are cached per content and bounded: past the cap they are released, never leaked', () => {
+  const box = sandbox();
+  try {
+    const board = (text: string) => shapeFaceMeshes({ kind: 'box', at: [0, 0, 0], size: [1, 0.5, 0.05], faces: [{ text }] } as never, 0)[0].material as THREE.MeshStandardMaterial;
+    const first = board('cap-0'), disposed: string[] = [];
+    assert.equal(board('cap-0').map, first.map, 'same content, same texture');
+    first.map!.addEventListener('dispose', () => disposed.push('texture'));
+    for (let i = 1; i < 400; i++) board(`cap-${i}`);
+    assert.deepEqual(disposed, ['texture'], 'the oldest texture was released once the cache filled');
+    assert.notEqual(board('cap-0').map, first.map, 'and is rebuilt on demand');
+  } finally { box.restore(); }
+});
