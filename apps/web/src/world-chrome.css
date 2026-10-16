@@ -195,3 +195,26 @@
 /* Keep the existing panels below a header that can now occupy several rows. */
 .human-world:not(.has-advanced) .world-viewer>.gp-card{top:calc(var(--app-hud-bottom,50px) + 12px);max-width:calc(100% - 24px);max-height:calc(100% - var(--app-hud-bottom,50px) - 88px)}
 @media(max-width:700px){.human-world:not(.has-advanced) .gp-card.god-bolt-panel{top:calc(var(--app-hud-bottom,50px) + 8px);max-height:calc(100dvh - var(--app-hud-bottom,50px) - 24px)}}
+
+/* Touch devices: every interactive control is at least 44x44 CSS px (desktop mouse layouts stay as designed). */
+@media (pointer:coarse){
+ .human-world:not(.has-advanced) .world-hud.slim .viewer-status,
+ .human-world:not(.has-advanced) .world-hud.slim .viewer-broadcast,
+ .human-world:not(.has-advanced) .world-hud.slim .viewer-following,
+ .human-world:not(.has-advanced) .world-hud.slim .bring-agent-open,
+ .human-world:not(.has-advanced) .world-hud.slim .eden-tour select,
+ .human-world:not(.has-advanced) .world-hud.slim .hud-explore-group .explore-open,
+ .human-world .world-hud .god-bolt-open,
+ .human-world .account-sign-in{min-height:44px;box-sizing:border-box}
+ .human-world:not(.has-advanced) .world-hud.slim .hud-camera,
+ .human-world .account-avatar,
+ .human-world .my-souls>button{width:44px;height:44px;min-height:44px;flex:0 0 44px}
+ .human-world .god-bolt-open{min-width:44px}
+ .human-world:not(.has-advanced) .viewer-following button{width:44px;height:44px;min-height:44px;margin:-3px -4px -3px 0}
+ .human-world .my-souls{gap:4px}
+ .human-world .my-souls-more>button,.human-world .my-souls-more summary{min-height:44px;min-width:44px}
+ .gp-card .gp-btn,.gp-card .gp-icon,.gp-card .gp-copy,.gp-card summary,.gp-card button,button.gp-card.gp-collapsed,
+ /* doubled classes outrank styles.css `.human-world button{min-height:38px}`, which loads later */
+ .explore-modal.explore-modal button,.dialogue-dock.dialogue-dock button,.soul-card.soul-card button,.account-menu-items.account-menu-items button{min-height:44px;min-width:44px;box-sizing:border-box}
+ .gp-card summary{display:flex;align-items:center}
+}

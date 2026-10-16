@@ -17,7 +17,8 @@ export class WorldFollow {
    * opaque() always rejects: hidden ancestry or own cameraTransparent. */
   private collect(roots:readonly THREE.Object3D[]){
     this.objects.length=0;const seen=new Set<THREE.Object3D>();
-    const visit=(o:THREE.Object3D)=>{if(!o.visible||seen.has(o))return;seen.add(o);if(o.userData.cameraTransparent!==true)this.objects.push(o);for(const c of o.children)visit(c);};
+    // Sprites (speech bubbles, labels) never block the camera, and Sprite.raycast needs raycaster.camera, which this ray lacks.
+    const visit=(o:THREE.Object3D)=>{if(!o.visible||seen.has(o))return;seen.add(o);if(o.userData.cameraTransparent!==true&&!(o as THREE.Sprite).isSprite)this.objects.push(o);for(const c of o.children)visit(c);};
     for(const root of roots){let shown=true;for(let p=root.parent;p;p=p.parent)if(!p.visible)shown=false;if(shown)visit(root);}
     this.instances.retain(this.objects);
   }
