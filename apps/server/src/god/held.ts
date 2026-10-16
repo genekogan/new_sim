@@ -8,6 +8,7 @@
 //   - `put-down:here` (on the ground in front of you) while holding a god thing.
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { WorldModel } from '@sim/world-compiler';
+import { groundPutDistance, groundPutNeed } from '../../../../mars/viewer/engine/items/actions.ts';
 
 type Ents = Record<string, any>;
 export type HeldHost = { engine: { world: { entities: Ents }; standableNearV1?: (at: [number, number], level?: number, except?: string, minClear?: number, maxRing?: number) => [number, number] | null }; model: WorldModel; minds: Map<string, { entityId: string }> };
@@ -41,9 +42,10 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
     prev?.(soul, caps, plans);
     const x = heldGodThing(ents(), soul.entityId); if (!x || caps.some((c) => c.id === 'put-down:here')) return;
     const me = ents()[soul.entityId], seated = me?.human?.activity === 'sit' || me?.human?.baseActivity === 'sit';
-    // the item goes on the ground 0.55 m in front of the body (mars put_item): face the clearest way first
-    const p = me.pose.p, level = me.human?.level ?? 0, yaw0 = me.pose.yaw;
-    const clear = (yaw: number) => !!h.engine.standableNearV1?.([p[0] + Math.cos(yaw) * 0.55, p[2] + Math.sin(yaw) * 0.55], level, soul.entityId, 0.2, 0);
+    // the item goes on the ground in front of the body (mars put_item: 0.55 m, further for a long thing) where it has its
+    // own clear radius: face the clearest way first
+    const p = me.pose.p, level = me.human?.level ?? 0, yaw0 = me.pose.yaw, ahead = groundPutDistance(x.def, me), need = Math.max(0.2, groundPutNeed(x.def));
+    const clear = (yaw: number) => !!h.engine.standableNearV1?.([p[0] + Math.cos(yaw) * ahead, p[2] + Math.sin(yaw) * ahead], level, soul.entityId, need, 0);
     const face = [0, 1, -1, 2, -2, 3, -3, 4].map((k) => yaw0 + (k * Math.PI) / 4).find(clear);
     const label = `Put ${name(x.id)} down on the ground here`;
     caps.push({ id: 'put-down:here', verb: 'put-down', label, target: { id: x.id, kind: 'item' }, available: face !== undefined,
