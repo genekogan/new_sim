@@ -58,21 +58,22 @@ vec3 waterSwim(vec3 w){
 float waterHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 /** Twinkling glitter: sparse cells catch the light for a moment; view-angle weighted, fades before aliasing. */
 float waterGlitter(vec3 w,vec3 n,vec3 eye,float t){
- vec2 c=floor(w.xz*3.2),f=fract(w.xz*3.2)-.5;float h=waterHash(c);
+ vec2 c=floor(w.xz*5.),f=fract(w.xz*5.)-.5;float h=waterHash(c);
  float blink=pow(max(0.,sin(t*(1.7+h*2.3)+h*31.)),24.);
- float spot=smoothstep(.22,.0,length(f+vec2(h-.5,fract(h*7.)-.5)*.5));
+ vec2 o=f+vec2(h-.5,fract(h*7.)-.5)*.5;float spot=smoothstep(.13,.0,length(o*vec2(1.,2.2)));
  float graze=.35+.65*pow(clamp(1.-abs(dot(n,eye)),0.,1.),1.5);
  float far=1.-smoothstep(28.,70.,length(cameraPosition-w));
- return blink*spot*graze*far*step(.62,h);
+ return blink*spot*graze*far*step(.7,h);
 }
 `;
 
 /** GLSL for body materials: `float waterDepthAt(vec3 w)` and the fade applied to gl_FragColor. */
 const BODY_HEAD=/* glsl */`
 uniform vec4 uWaterRect[${REGIONS}];uniform vec4 uWaterLevel[${REGIONS}];uniform vec3 uWaterTint;varying vec3 vWaterBodyW;
-float waterDepthAt(vec3 w){float d=0.;
+// overlapping boxes: the smallest box containing the point is the most specific water there
+float waterDepthAt(vec3 w){float d=0.,area=1e12;
  for(int i=0;i<${REGIONS};i++){vec4 r=uWaterRect[i];vec4 l=uWaterLevel[i];if(l.y<=0.)continue;
-  if(w.x>=r.x&&w.x<=r.z&&w.z>=r.y&&w.z<=r.w)d=max(d,l.x-w.y);}
+  float a=(r.z-r.x)*(r.w-r.y);if(w.x>=r.x&&w.x<=r.z&&w.z>=r.y&&w.z<=r.w&&a<area){area=a;d=l.x-w.y;}}
  return d;}
 `;
 const BODY_FADE=/* glsl */`
@@ -166,10 +167,16 @@ export function findWaterRegions(root:THREE.Object3D):WaterRegion[]{
   out.push({minX:box.min.x,minZ:box.min.z,maxX:box.max.x,maxZ:box.max.z,level:box.max.y,mesh});});
  return out;
 }
-/** Is this point in the water: inside a surface's bounds and below its level (recorded contact, never invented). */
+const probe=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0),from=new THREE.Vector3();
+/** Is this point in the water: below a drawn water surface that lies directly above it (recorded contact, never
+ * invented). The box is a quick reject; where a region has its mesh, a short vertical ray confirms the surface is
+ * really overhead (a lake's box can cover a lower pond or a dry bank). */
 export function waterUnder(regions:readonly WaterRegion[],x:number,y:number,z:number):WaterRegion|null{
  let best:WaterRegion|null=null;
- for(const r of regions)if(x>=r.minX&&x<=r.maxX&&z>=r.minZ&&z<=r.maxZ&&y<r.level+.05&&y>r.level-3&&(!best||r.level<best.level))best=r;
+ for(const r of regions){if(!(x>=r.minX&&x<=r.maxX&&z>=r.minZ&&z<=r.maxZ&&y<r.level+.05&&y>r.level-3))continue;
+  if(best&&(r.maxX-r.minX)*(r.maxZ-r.minZ)>=(best.maxX-best.minX)*(best.maxZ-best.minZ))continue;
+  if(r.mesh){probe.set(from.set(x,r.level+.5,z),down);probe.near=0;probe.far=1;if(!probe.intersectObject(r.mesh,false).length)continue;}
+  best=r;}
  return best;
 }
 const phase=(id:string)=>{let h=2166136261;for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);return ((h>>>0)%1000)/1000*2.4;};
@@ -197,11 +204,7 @@ export class WorldWaterDetail{
   const t=Number.isFinite(seconds)?((seconds%WRAP)+WRAP)%WRAP:0;WATER_DETAIL.uSwimTime.value=this.reduced()?0:t;
   const day=daylight===null||!Number.isFinite(daylight)?1:Math.max(0,Math.min(1,daylight));
   WATER_DETAIL.uWaterTint.value.copy(TINT_NIGHT).lerp(TINT_DAY,day);WATER_DETAIL.uWaterDay.value=day;
-  // regions nearest the camera fill the fixed slots
-  const cx=camera.position.x,cz=camera.position.z,dist=(r:WaterRegion)=>Math.hypot(Math.max(r.minX-cx,0,cx-r.maxX),Math.max(r.minZ-cz,0,cz-r.maxZ));
-  const regions=this.regions.length>REGIONS?[...this.regions].sort((a,b)=>dist(a)-dist(b)).slice(0,REGIONS):this.regions;
-  for(let i=0;i<REGIONS;i++){const r=regions[i],rect=WATER_DETAIL.uWaterRect.value[i],lv=WATER_DETAIL.uWaterLevel.value[i];
-   if(r){rect.set(r.minX,r.minZ,r.maxX,r.maxZ);lv.set(r.level,1,0,0);}else lv.set(0,0,0,0);}
+  const cx=camera.position.x,cz=camera.position.z;
   // swimmers: Souls whose recorded activity is swimming/treading/wading, or whose body stands below a water surface
   const wet:{s:WaterSwimmer;r:WaterRegion;d:number}[]=[];
   for(const s of souls){const r=waterUnder(this.regions,s.p[0],s.p[1],s.p[2]);
@@ -209,6 +212,11 @@ export class WorldWaterDetail{
    if(!r)continue;if(!SWIM.test(s.activity)&&s.p[1]>r.level-.25)continue;
    wet.push({s,r,d:Math.hypot(s.p[0]-cx,s.p[2]-cz)});}
   wet.sort((a,b)=>a.d-b.d);
+  // The fade uses only the water each wet Soul is actually in (nearest first): a wider surface whose bounds happen
+  // to cover a lower pond (an expansion lake's box around the commons pond) must never tint bodies in that pond.
+  const used:WaterRegion[]=[];for(const w of wet)if(!used.includes(w.r)&&used.length<REGIONS)used.push(w.r);
+  for(let i=0;i<REGIONS;i++){const r=used[i],rect=WATER_DETAIL.uWaterRect.value[i],lv=WATER_DETAIL.uWaterLevel.value[i];
+   if(r){rect.set(r.minX,r.minZ,r.maxX,r.maxZ);lv.set(r.level,1,0,0);}else lv.set(0,0,0,0);}
   const seen=new Set<string>();let n=0;
   for(const w of wet){if(n>=SWIMMERS||w.d>140)break;const {s,r}=w;seen.add(s.id);
    const prev=this.last.get(s.id);let vx=0,vz=0;

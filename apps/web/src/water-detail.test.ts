@@ -45,7 +45,10 @@ void test('bodies: underwater fade is a per-material patch, below the level only
 });
 
 void test('swimmers: only recorded contact makes ripples; fixed slots; same displayed time gives the same water',()=>{
- const o=shore();const scene=new THREE.Scene();scene.add(o.group);scene.updateMatrixWorld(true);
+ const o=shore();const scene=new THREE.Scene();scene.add(o.group);
+ // a wider, higher lake whose box covers the pond (as an Eden expansion lake's does): must not tint pond bodies
+ const lake=new THREE.RingGeometry(25,60,32);lake.rotateX(-Math.PI/2);lake.translate(-54,0,0);const lakeMesh=new THREE.Mesh(lake,new THREE.MeshStandardMaterial({transparent:true}));lakeMesh.name='lake surface';scene.add(lakeMesh);
+ scene.updateMatrixWorld(true);
  const camera=new THREE.PerspectiveCamera();camera.position.set(-40,4,0);
  const body=()=>{const g=new THREE.Group();g.add(new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial()));return g;};
  const souls=[
@@ -55,7 +58,8 @@ void test('swimmers: only recorded contact makes ripples; fixed slots; same disp
   {id:'wader',root:body(),p:[-50,-2.8,-4] as const,activity:'stand'},   // standing in the water: recorded contact
  ];
  const w=new WorldWaterDetail();w.update(scene,camera,souls,100,1,0);
- assert.equal(w.stats.regions,1);assert.equal(w.stats.surfaces,1);assert.equal(w.stats.swimmers,2);assert.equal(w.stats.bodies,2);
+ assert.equal(w.stats.regions,2);assert.equal(w.stats.surfaces,1,'the lake waits for its realism pass');
+ assert.deepEqual(WATER_DETAIL.uWaterLevel.value.map(v=>[v.x,v.y]),[[-2,1],[0,0],[0,0],[0,0],[0,0],[0,0]],'only the pond the swimmers are in');assert.equal(w.stats.swimmers,2);assert.equal(w.stats.bodies,2);
  const meta=WATER_DETAIL.uSwimMeta.value;assert.equal(meta.length,SWIMMERS);assert.deepEqual(meta.slice(0,2).map(v=>v.x),[-2,-2]);
  assert.ok(meta.slice(2).every(v=>v.z===0));
  const snap=()=>[WATER_DETAIL.uSwimTime.value,...WATER_DETAIL.uSwim.value.flatMap(v=>v.toArray())];
