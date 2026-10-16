@@ -470,7 +470,9 @@ export async function calendar(){const r=await call(EDGE.calendar,{as:'none'});i
 export async function wait(seconds='45'){
  const s=load(),soul=need(s,'soul','No Soul yet.'),until=Date.now()+Math.min(60,Math.max(1,Number(seconds)||45))*1000;
  if(await mode()==='edge'){
-  const events=[];let cursor=s.cursor,gap,waitUnavailable;
+  // r3 quality (case 26): a folder that has never read its stream starts at the stream's beginning (c_0), not "from now":
+  // an invitation that arrived between `here` and the first wait was skipped, so the guest never saw it and it expired.
+  const events=[];let cursor=s.cursor??'c_0',gap,waitUnavailable;
   while(Date.now()<until){
    const t=Math.max(1,Math.min(55,Math.round((until-Date.now())/1000)));
    let r;try{r=await call(EDGE.wait(cursor,t),{timeoutMs:(t+10)*1000});}catch(error){if(!events.length)throw error;waitUnavailable={status:null,error:{code:'wait.unavailable',message:String(error.message)},cursor};break;}
