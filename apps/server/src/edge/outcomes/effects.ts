@@ -31,5 +31,7 @@ export function confirmedObjectEffects(before:unknown,after:unknown,action:strin
  const detail:Record<string,unknown>={object:{id,kind,action,version}},changed:NonNullable<ConfirmedEffects['changed']>=[{id,kind:'object-updated',summary:`${id} accepted ${action}; version ${version}.`,source:`object:${id}:v${version}`}];
  if(kind==='project'&&typeof state.progress==='number')detail.project={id,progress:state.progress,status:state.status};
  if(kind==='chess'){const game:Record<string,unknown>={id};for(const key of ['status','turn','fullmove','halfmove','check','winner'])if(typeof state[key]==='string'||typeof state[key]==='number'||typeof state[key]==='boolean')game[key]=state[key];detail.game=game;}
+ // A joined ride is a boarding, not a finished ride: say so in the world's own verdict so a seated, parked body is never reported as "ride completed".
+ if(kind==='ride'&&action==='join')return{changed,detail,untrusted:true,summary:`Boarded ${id} and seated; the ride has not left the ground yet and is not finished.`};
  return{changed,detail,untrusted:true};
 }

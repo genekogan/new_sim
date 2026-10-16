@@ -68,6 +68,10 @@ const ITEM_WORDS: [ItemKind, RegExp][] = [['book', /\b(?:book|books|novel)\b/], 
 /** Bounds (Gene: simple, deterministic, bounded). */
 export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, consumableMinutes: 20, keepHours: 4, nearItems: 20};
 const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45;
+/** A shared walk is only "together" when the guest ends beside the host: follow standoff is 1.5 m, so 2.2 m leaves slack but not 2.8 m apart. */
+export const TOGETHER_RADIUS = 2.2;
+export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
+
 /** Activity verbs an invitation may carry (params.with). */
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
   'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
@@ -534,7 +538,7 @@ export class Together {
   private arrivedTogether(f: Follow) {
     if (!f.withHost || ['started', 'waiting'].includes(this.p.receipt(f.target, f.withHost)?.phase ?? 'gone')) return false;
     const a = this.posOf(f.soulId), b = this.posOf(f.target);
-    if (a && b && Math.hypot(a[0] - b[0], a[1] - b[1]) > 3) {f.untilTick = Math.min(f.untilTick, this.tick + 60 * 20); return false;}
+    if (a && b && !besideEachOther(a, b)) {f.untilTick = Math.min(f.untilTick, this.tick + 60 * 20); return false;}
     return true;
   }
   private endFollow(f: Follow, phase: 'completed' | 'failed', code?: string, reason?: string) {
