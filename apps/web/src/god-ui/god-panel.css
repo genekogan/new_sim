@@ -125,10 +125,12 @@
 .gp-ops-link code { overflow-wrap: anywhere; font-size: 11px; }
 .gp-owner-ops input { flex: 1; min-width: 0; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; padding: 5px 8px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .18); }
 .gp-btn.gp-danger:not(:disabled) { border-color: #a33; color: #a33; }
+.gp-ops-link .gp-copy { flex: none; border-color: rgba(0, 0, 0, .18); background: #fff; color: #1c1c1a; }
 @media (prefers-color-scheme: dark) {
   .gp-owner-ops { border-top-color: rgba(255, 255, 255, .12); }
   .gp-owner-ops > summary { color: #9b9b92; }
   .gp-ops-link { background: rgba(255, 255, 255, .06); }
+  .gp-ops-link .gp-copy { border-color: rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #ecebe4; }
   .gp-owner-ops input { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
   .gp-btn.gp-danger:not(:disabled) { border-color: #e88; color: #f2a0a0; }
 }
