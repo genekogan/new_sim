@@ -9,6 +9,7 @@ import {furnishBatch} from '../../lib/furnish.mjs';
 import {LANDSCAPE_BATCHES,LANDMARKS,LANDSCAPE_NOTES} from './landscape.mjs';
 import {BUILDING_BATCHES,BUILDINGS,COURTYARDS} from './buildings.mjs';
 import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
+import {SCENERY_BATCHES} from './scenery.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
 const db=new Db(':memory:');
@@ -23,7 +24,7 @@ function apply(label,input,droppable=false){if(!input.length)return;const ops=st
     // street setback. Never drop a source landmark or bypass admission.
     if(f?.code==='overlap.solid'&&p&&op?.op==='place'&&start?.length===2&&Math.hypot(p[0]-start[0],p[1]-start[1])<=4){adjustments.push({name:op.name,from:op.p,to:p,reason:f.detail});op.p=p;continue;}
     // Furniture is optional: a piece the compiler refuses is dropped (with anything on it) and recorded, never forced.
-    if(droppable&&f&&ops[f.op]&&f.code==='overlap.solid'){const gone=new Set([ops[f.op].name]);let n=-1;while(gone.size!==n){n=gone.size;for(const o of ops)if(o.in&&gone.has(o.in.parent))gone.add(o.name);}adjustments.push({dropped:[...gone],reason:f.detail});for(let i=ops.length-1;i>=0;i--)if(gone.has(ops[i].name))ops.splice(i,1);continue;}
+    if(droppable&&f&&ops[f.op]&&(f.code==='overlap.solid'||droppable==='any')){const gone=new Set([ops[f.op].name]);let n=-1;while(gone.size!==n){n=gone.size;for(const o of ops)if(o.in&&gone.has(o.in.parent))gone.add(o.name);}adjustments.push({dropped:[...gone],code:f.code,reason:f.detail});if(droppable==='any')console.log('  dropped',[...gone].join(','),f.code,String(f.detail).slice(0,160));for(let i=ops.length-1;i>=0;i--)if(gone.has(ops[i].name))ops.splice(i,1);if(!ops.length)return;continue;}
     writeFileSync(`${out}/REFUSAL.json`,JSON.stringify({label,ops,result:r},null,2));throw Error(`${label}: ${JSON.stringify(r.failures)}`);
   }
   if(!r?.accepted)throw Error(`collision-setback limit: ${label}`);
@@ -40,6 +41,7 @@ const courtOps=[];for(const c of COURTYARDS){courtOps.push({op:'place',def:'core
 for(let i=0;i<courtOps.length;i+=10)apply(`courtyard planting ${i/10+1}`,courtOps.slice(i,i+10));
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='detail'))apply(b.name,b.ops);
 apply('suburb streets',[...[[[172,34],[244,34]],[[172,74],[244,74]],[[172,112],[244,112]],[[206,34],[206,112]]].map((path,i)=>({op:'place',def:'core/footpath@1',name:`land-suburb-street-${i+1}`,shape:{path},params:{width:3,material:'cobble',maxGrade:0,autoBridge:false,edging:false}}))]);
+for(const b of SCENERY_BATCHES)apply(b.label,b.ops,'any');
 const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).places;
 // Invisible native land-use regions preserve outdoor destinations without
 // painting duplicate plazas over the gardens/water. Interior destinations are

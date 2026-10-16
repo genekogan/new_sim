@@ -26,7 +26,7 @@ for(const [i,x,z,r] of [[0,24,-10,0],[1,24,-4,Math.PI],[2,20.5,-7,Math.PI/2],[3,
 put('long-table','social-eden-dining-table',[23,6]);
 for(let i=0;i<3;i++)for(const [j,z,r] of [[0,4.6,0],[1,7.4,Math.PI]])put('chair',`social-eden-dining-chair-${i}-${j}`,[21.9+i*1.1,z],{r});
 put('notice-board','commons-notices',[10,-24]);
-ops.push({op:'place',def:'eden-launch-balloon@1',name:'eden-balloon',p:[-20,-9],s:1.3,params:{env:'#e66a3b',stripe:'#edc35b'}});
+ops.push({op:'place',def:'eden-launch-balloon@1',name:'eden-balloon',p:[-20,-9],s:1.3,params:{env:'#cf3b30',stripe:'#f4efe6'}});
 for(const [def,id] of [['fountain','region-old-town.fountain'],['tiered-fountain','region-campus.fountain'],['campfire','region-campsite.fire-circle']])if(P.some(p=>p.id===id))at(def,id);
 put('fountain','campus-quad-fountain',[-12,-97]);
 put('chess-table','commons-chess-table',[14,14]);

@@ -203,7 +203,7 @@ for (const [id, def, w, d, floors, floorHeight, wall, roofColor, roof, material,
 
 // Campus quad: the annex and two long lecture halls retain their distinctive
 // enclosing proportions and outward street entrances as well as quad entries.
-named('region-campus.library-annex', 'hall', { w: 24, d: 11, floors: 2, floorHeight: 3.6, material: 'stone', wall: '#efe4cf', trim: '#e8e2d2', roof: 'gable', roofColor: '#7a8a8f', plan: twoRooms(24, 11, 'reading', 'stacks', 2) }, { furnishStyle: 'library' });
+named('region-campus.library-annex', 'hall', { w: 24, d: 11, floors: 2, floorHeight: 3.6, material: 'stone', wall: '#efe4cf', trim: '#e8e2d2', roof: 'flat', roofColor: '#7a8a8f', plan: twoRooms(24, 11, 'reading', 'stacks', 2) }, { furnishStyle: 'library' });
 for (const [side, x, r] of [['east', 13, -Math.PI / 2], ['west', -37, Math.PI / 2]]) named(`region-campus.${side}-hall`, 'hall', { w: 24, d: 10, floors: 2, floorHeight: 3.6, material: 'brick', wall: side === 'east' ? '#b9785a' : '#a0563f', trim: '#efe9dc', roof: 'gable', roofColor: '#5a5f66', plan: openPlan(24, 10, 'classroom', 2) }, { coords: [x, -97], r, furnishStyle: 'school' });
 named('region-campus.clock-tower', 'tower', { w: 4, d: 4, floors: 5, floorHeight: 3, material: 'stone', wall: '#b9785a', trim: '#efe9dc', roof: 'hip', roofColor: '#5a5f66' }, { furnishStyle: 'hall', metadata: { clockFacePreferred: true } });
 for (const [x, i] of [[-36, 1], [12, 2]]) add(`campus-residence-${i}`, 'cottage', [x, -119], { w: 9, d: 7, floors: 3, roof: 'flat', wall: i === 1 ? '#efe4cf' : '#a9c3b0', trim: '#3a5a4a', balcony: true }, { r: Math.PI / 2, district: 'region-campus', originalPlaceId: 'region-campus', furnishStyle: 'cottage' });
