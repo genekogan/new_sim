@@ -58,12 +58,12 @@ export const EVENT_SETS = {
     ...[[-6, 2], [0.5, 2.2], [6, 1.8]].map((p) => ({ def: 'core/crate@1', p })),
     { def: 'core/banner@1', p: [0, -4], state: { text: label.slice(0, 60) } },
   ],
-  concert: () => [
-    { def: 'core/stage@1', p: [0, 6] },
-    { def: 'core/floodlight@1', p: [-7, 2], r: Math.PI, state: { on: true } }, { def: 'core/floodlight@1', p: [7, 2], r: Math.PI, state: { on: true } },
-    { def: 'core/string-lights@1', p: [-4.5, -1], state: { on: true } }, { def: 'core/string-lights@1', p: [4.5, -1], state: { on: true } },
-    { def: 'core/speaker@1', p: [-5.5, 6], state: { playing: true } }, { def: 'core/speaker@1', p: [5.5, 6], state: { playing: true } },
-    ...[-4, 0, 4].map((x) => ({ def: 'core/bench@1', p: [x, -4] })),
+  concert: () => [   // the stage at the back faces +z; the audience benches, under string lights, in front of it
+    { def: 'core/stage@1', p: [0, -5] },
+    { def: 'core/floodlight@1', p: [-8, -1], r: Math.PI, state: { on: true } }, { def: 'core/floodlight@1', p: [8, -1], r: Math.PI, state: { on: true } },
+    { def: 'core/speaker@1', p: [-5.5, -1.5], state: { playing: true } }, { def: 'core/speaker@1', p: [5.5, -1.5], state: { playing: true } },
+    { def: 'core/string-lights@1', p: [-4.5, 3.5], state: { on: true } }, { def: 'core/string-lights@1', p: [4.5, 3.5], state: { on: true } },
+    ...[-4, 0, 4].map((x) => ({ def: 'core/bench@1', p: [x, 6] })),
   ],
 };
 const piece = (s) => {   // def@x,z[@yawdeg]  (core/lantern-post@1 is a def ref: the position follows the second @)

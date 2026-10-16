@@ -61,6 +61,15 @@ export class EventSets {
     return out;
   }
 
+  /** Does a standing piece still match its set entry (the same def, place, turn and state)? */
+  private matches(e: Entity, host: Entity, piece: SetPiece): boolean {
+    const [cx, cz] = centreOf(host), p = e.p ?? [0, 0], ez = p.length === 3 ? p[2] : p[1];
+    if (Math.abs(p[0] - (cx + piece.p[0])) > 0.01 || Math.abs((ez ?? 0) - (cz + piece.p[1])) > 0.01) return false;
+    if ((typeof e.r === 'number' ? e.r : 0) !== (piece.r ?? 0)) return false;
+    if (this.m.resolvedDef(e.def)?.hash !== this.m.resolvedDef(piece.def)?.hash) return false;
+    for (const [k, v] of Object.entries(piece.state ?? {})) if (JSON.stringify(e.state?.[k]) !== JSON.stringify(v)) return false;
+    return true;
+  }
   /** Is any event set in play (scheduled, or still standing)? Cheap enough to gate the step. */
   active(): boolean {
     for (const e of this.m.entities.values()) if (isSetPiece(e) || e.schedule?.events?.some((ev) => ev.set?.length)) return true;
@@ -85,7 +94,8 @@ export class EventSets {
       if (!isSetPiece(e)) continue;
       const parent = this.m.entities.get(e.in.parent);
       if (parent && isSetPiece(parent)) continue;                 // goes with its piece
-      if (want.has(`${e.in.parent}/${e.name ?? ''}`)) continue;
+      const w = want.get(`${e.in.parent}/${e.name ?? ''}`);
+      if (w && this.matches(e, w.host, w.piece)) continue;          // a set the god changed while it is out is set up again
       packOps.push({ op: 'remove', id: e.id, cascade: true } as Op); packed.push(e.name ?? e.id);
     }
     const stand = this.standing();

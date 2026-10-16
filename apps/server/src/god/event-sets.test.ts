@@ -55,6 +55,11 @@ test('event sets: a dusk concert on a point thing brings its stage with lights o
   assert.equal(f.model.get('green-lamp/concert-floodlight-2')!.state?.on, true);
   assert.equal(f.model.get('green-lamp/concert-speaker-1')!.state?.playing, true);
   const st = f.layers.publicView().sets!; assert.deepEqual(st.map((x) => [x.event, x.pieces, x.out, x.on]), [['concert', 4, 4, true]]);
+  // the god moves the stage while the concert is on: it is set up again where the set now says
+  f.god([{ op: 'set', id: 'green-lamp', schedule: { events: [{ ...concert, set: [{ ...concert.set[0], p: [0, -5] }, ...concert.set.slice(1)] }] } }]);
+  f.at('20:01'); f.layers.step(); f.layers.step();
+  const stage = f.model.get('green-lamp/concert-stage-1')!; assert.deepEqual([stage.p![0], stage.p![stage.p!.length - 1]], [0, -5]);
+  assert.equal(f.pieces().length, 4, 'still four pieces, the stage moved');
   f.god([{ op: 'set', id: 'green-lamp', schedule: null }]);
   f.at('20:10'); assert.equal(f.layers.step().packed, 4, 'a removed event leaves nothing behind'); assert.equal(f.pieces().length, 0);
   assert.equal(f.layers.active(), false, 'and no layer work remains');
