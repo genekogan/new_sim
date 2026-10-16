@@ -2,10 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { chromeLease, chromeSlotCount, chromeSlotDirs } from './chrome-lease.mjs';
+import { processStart } from './locks.mjs';
 
 // Every lease lives under a unique test directory, never the machine-wide lease. The single-directory contract is
 // tested with one slot; the slot tests below use the machine's default of three.
@@ -154,29 +156,60 @@ test('slot directories and count follow the team scheme; a bad CHROME_LEASE_SLOT
   for (const [v, n] of [['1', 1], ['5', 5], ['0', 3], ['-2', 3], ['2.5', 3], ['many', 3], ['99', 16]]) assert.equal(chromeSlotCount({ CHROME_LEASE_SLOTS: v }), n, v);
 });
 
-test('three looks hold three slots at once; a fourth waits for the first free slot and each release frees only its own', async t => {
+test('three looks hold three slots at once, slot 0 last; a fourth waits for the first free slot and each release frees only its own', async t => {
   const { leaseDir, options } = fixture(t, 3), dirs = chromeSlotDirs(leaseDir, 3);
   const held = [await chromeLease('look a', options), await chromeLease('look b', options), await chromeLease('look c', options)];
   for (const r of held) t.after(r);
-  assert.deepEqual(held.map(r => r.dir), dirs);
-  for (const [i, dir] of dirs.entries()) assert.equal(JSON.parse(readFileSync(join(dir, 'holder'), 'utf8')).holder.label, `look ${'abc'[i]}`);
+  assert.deepEqual(held.map(r => r.dir), [dirs[2], dirs[1], dirs[0]], 'highest slot first: slot 0 stays free for single-slot clients while there is room');
+  for (const [i, r] of held.entries()) assert.equal(JSON.parse(readFileSync(join(r.dir, 'holder'), 'utf8')).holder.label, `look ${'abc'[i]}`);
   const busy = await chromeLease('look d', options).catch(e => e);
-  assert.equal(busy.code, 'lock.busy'); assert.match(busy.message, /^chrome lease busy: all 3 slots held \(.*look a.*look b.*look c.*\); run doctor$/); assert.equal(busy.locks.length, 3);
+  assert.equal(busy.code, 'lock.busy'); assert.match(busy.message, /^chrome lease busy: all 3 slots held \(.*look c.*look b.*look a.*\); run doctor$/, 'named in slot order'); assert.equal(busy.locks.length, 3);
   const waiting = chromeLease('look d', { ...options, waitMs: 5000 });
   await new Promise(r => setTimeout(r, 50)); held[1]();
   const fourth = await waiting; t.after(fourth);
   assert.equal(fourth.dir, dirs[1]); assert.ok(existsSync(dirs[0]) && existsSync(dirs[2]));
-  held[0](); assert.equal(existsSync(dirs[0]), false); assert.ok(existsSync(dirs[1]) && existsSync(dirs[2]));
+  held[0](); assert.equal(existsSync(dirs[2]), false); assert.ok(existsSync(dirs[0]) && existsSync(dirs[1]));
 });
 
 test('a team-lease holder (plain text) in a slot is respected while alive and reclaimed once dead; other slots still serve', async t => {
   const { leaseDir, options } = fixture(t, 2), [zero, one] = chromeSlotDirs(leaseDir, 2);
-  occupied(zero, holder(process.pid, 'team lane'));
+  occupied(one, holder(process.pid, 'team lane'));
   const release = await chromeLease('god look', options); t.after(release);
-  assert.equal(release.dir, one); assert.equal(readFileSync(join(zero, 'holder'), 'utf8'), holder(process.pid, 'team lane'));
-  release(); rmSync(zero, { recursive: true }); occupied(zero, holder(exitedPid(), 'team lane'));
+  assert.equal(release.dir, zero); assert.equal(readFileSync(join(one, 'holder'), 'utf8'), holder(process.pid, 'team lane'));
+  release(); rmSync(one, { recursive: true }); occupied(one, holder(exitedPid(), 'team lane'));
   const next = await chromeLease('god look', options); t.after(next);
-  assert.equal(next.dir, zero, 'a dead holder of slot 0 is reclaimed first');
+  assert.equal(next.dir, one, 'a dead holder of the highest slot is reclaimed before slot 0 is taken'); assert.equal(existsSync(zero), false);
+});
+
+test('a slot that fails other than busy is skipped; its error is thrown only when no slot is merely busy', async t => {
+  const { leaseDir, options } = fixture(t, 3), [zero, one, two] = chromeSlotDirs(leaseDir, 3);
+  symlinkSync(two, two); // stat fails with ELOOP: a non-busy failure, like EACCES on another user's slot in sticky /tmp
+  occupied(one, holder(process.pid, 'team lane'));
+  const release = await chromeLease('god look', options); t.after(release);
+  assert.equal(release.dir, zero, 'slot 2 fails, slot 1 is busy, slot 0 serves');
+  const busy = await chromeLease('other look', options).catch(e => e);
+  assert.equal(busy.code, 'lock.busy'); assert.equal(busy.locks.length, 2);
+  assert.match(busy.message, /^chrome lease busy: all 3 slots held or unusable \(.*lease held by god look pid=\d+.*; .*lease\.1 held by legacy-live-pid; .*lease\.2 unusable: ELOOP\); run doctor$/);
+  release(); rmSync(one, { recursive: true }); for (const d of [zero, one]) symlinkSync(d, d);
+  const failed = await chromeLease('other look', options).catch(e => e);
+  assert.equal(failed.code, 'ELOOP'); assert.match(failed.message, /^chrome lease: no slot usable \(.*lease: .*; .*lease\.1: .*; .*lease\.2: .*\)$/);
+  assert.equal((await chromeLease('old look', { ...options, slots: 1 }).catch(e => e)).code, 'ELOOP', 'one slot: its own error, as before');
+});
+
+test('polling probes each busy holder once per scan; only the final scan reads its full detail for the error', { timeout: 10_000 }, async t => {
+  const { leaseDir } = fixture(t, 3), dirs = chromeSlotDirs(leaseDir, 3);
+  const other = spawn('sleep', ['30'], { stdio: 'ignore' }); t.after(() => other.kill());
+  const start = processStart(other.pid); assert.ok(start);
+  for (const d of dirs) { mkdirSync(d); writeFileSync(join(d, 'holder'), JSON.stringify({ schema: 'eden-lock/1', holder: { pid: other.pid, host: hostname(), start, label: 'another look' }, heartbeatAt: Date.now(), ttlMs: 30_000 })); }
+  const require = createRequire(import.meta.url), cp = require('node:child_process'), fs = require('node:fs'), real = { spawnSync: cp.spawnSync, mkdirSync: fs.mkdirSync };
+  let ps = 0, scans = 0;
+  cp.spawnSync = (cmd, ...rest) => { if (cmd === 'ps') ps++; return real.spawnSync(cmd, ...rest); };
+  fs.mkdirSync = (path, ...rest) => { if (path === dirs[0]) scans++; return real.mkdirSync(path, ...rest); };
+  syncBuiltinESMExports();
+  let busy; try { busy = await chromeLease('waiting look', { leaseDir, slots: 3, waitMs: 900 }).catch(e => e); }
+  finally { Object.assign(cp, { spawnSync: real.spawnSync }); Object.assign(fs, { mkdirSync: real.mkdirSync }); syncBuiltinESMExports(); }
+  assert.equal(busy.code, 'lock.busy'); assert.equal(busy.locks.length, 3); assert.ok(busy.locks.every(l => l.liveness === 'alive' && l.holder.pid === other.pid), 'the error still names every holder');
+  assert.ok(scans >= 3, `${scans} scans`); assert.equal(ps, 3 * scans + 3, `${ps} ps for ${scans} scans: one per busy slot per scan, plus one per slot for the final detail`);
 });
 
 test('machine-wide: of four processes taking a lease at once, exactly three hold one', { timeout: 15_000 }, async t => {

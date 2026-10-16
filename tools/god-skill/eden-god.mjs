@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { hostname } from "node:os";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 var CHROME_LOCK = "/tmp/eden-chrome-lease";
 var LOCK_TTL_MS = 3e4;
 var ownStart = new Date(Date.now() - process.uptime() * 1e3).toISOString();
@@ -117,7 +117,7 @@ var LockBusy = class extends Error {
   }
 };
 var owned = /* @__PURE__ */ new Map();
-function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant = false } = {}) {
+function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant = false, detail = true } = {}) {
   path = resolve(path);
   if (reentrant && owned.has(path)) return () => {
   };
@@ -128,7 +128,7 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
     } catch (e) {
       if (e.code !== "EEXIST") throw e;
       if (breakLock(path, { ttlMs })) continue;
-      throw new LockBusy(path, inspectLock(path, ttlMs));
+      throw new LockBusy(path, detail ? inspectLock(path, ttlMs) : { present: true, holder: null, reason: "held" });
     }
   }
   const record = { schema: "eden-lock/1", holder: holder(label), acquiredAt: Date.now(), heartbeatAt: Date.now(), ttlMs, nonce: randomUUID() };
@@ -142,8 +142,10 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
   const heartbeat = setInterval(() => {
     try {
       if (!same(original, snapshot(path))) return;
-      record.heartbeatAt = Date.now();
+      const now = Date.now();
+      record.heartbeatAt = now;
       writeFileSync(`${path}/holder`, JSON.stringify(record) + "\n", { mode: 384 });
+      utimesSync(path, new Date(now), new Date(now));
       original = snapshot(path);
     } catch {
     }
@@ -178,23 +180,27 @@ function chromeSlotCount(env2 = process.env) {
 }
 var chromeSlotDirs = (base = CHROME_LOCK, slots = chromeSlotCount()) => Array.from({ length: slots }, (_, i) => i === 0 ? base : `${base}.${i}`);
 async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TTL_MS, leaseDir = CHROME_LOCK, slots = chromeSlotCount() } = {}) {
-  const started = Date.now(), dirs = chromeSlotDirs(leaseDir, slots);
+  const started = Date.now(), dirs = chromeSlotDirs(leaseDir, slots), order = dirs.slice().reverse();
   for (; ; ) {
-    const busy = [];
-    for (const dir of dirs) {
+    const last = Date.now() - started >= waitMs, busy = /* @__PURE__ */ new Map(), failed = /* @__PURE__ */ new Map();
+    for (const dir of order) {
       try {
-        const release = acquireLock(dir, { label, ttlMs: staleMs });
+        const release = acquireLock(dir, { label, ttlMs: staleMs, detail: last });
         release.dir = dir;
         return release;
       } catch (e) {
-        if (e.code !== "lock.busy") throw e;
-        busy.push(e);
+        (e.code === "lock.busy" ? busy : failed).set(dir, e);
       }
     }
-    if (Date.now() - started >= waitMs) {
-      const e = busy[0];
-      e.message = `chrome lease busy: ${dirs.length === 1 ? e.message : `all ${dirs.length} slots held (${busy.map((b) => b.message.replace(/^lock\.busy: /, "").replace(/; run doctor$/, "")).join("; ")}); run doctor`}`;
-      e.locks = busy.map((b) => b.lock);
+    if (!busy.size) {
+      const e = failed.get(dirs[0]) ?? [...failed.values()][0];
+      if (failed.size > 1) e.message = `chrome lease: no slot usable (${dirs.map((d) => `${d}: ${failed.get(d).message}`).join("; ")})`;
+      throw e;
+    }
+    if (last) {
+      const e = busy.get(dirs.find((d) => busy.has(d))), why = dirs.map((d) => busy.has(d) ? busy.get(d).message.replace(/^lock\.busy: /, "").replace(/; run doctor$/, "") : `${d} unusable: ${failed.get(d).code ?? failed.get(d).message}`);
+      e.message = `chrome lease busy: ${dirs.length === 1 ? e.message : `all ${dirs.length} slots ${failed.size ? "held or unusable" : "held"} (${why.join("; ")}); run doctor`}`;
+      e.locks = dirs.filter((d) => busy.has(d)).map((d) => busy.get(d).lock);
       throw e;
     }
     await new Promise((r) => setTimeout(r, Math.min(200 + Math.random() * 200, Math.max(1, waitMs - (Date.now() - started)))));
@@ -1673,7 +1679,7 @@ function exportGenesis(snapshot3, { name } = {}) {
 
 // lib/look.mjs
 import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync3, utimesSync } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve as resolve4 } from "node:path";
@@ -1856,7 +1862,7 @@ async function keeper(worldUrl, port) {
       if (last !== lastUse) lastUse = last;
       if (Date.now() - lastUse > IDLE_MS || readKeeper()?.pid !== process.pid) break;
       write();
-      utimesSync(KEEPER, new Date(lastUse), new Date(lastUse));
+      utimesSync2(KEEPER, new Date(lastUse), new Date(lastUse));
     }
   } finally {
     if (browser) await browser.close().catch(() => {
@@ -1870,7 +1876,7 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
   if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && k.world === worldUrl && await alive(k.port)) {
     const now = /* @__PURE__ */ new Date();
     try {
-      utimesSync(KEEPER, now, now);
+      utimesSync2(KEEPER, now, now);
     } catch {
     }
     return k;
