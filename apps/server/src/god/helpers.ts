@@ -7,8 +7,9 @@ import type { Failure, Op } from '@sim/world-compiler';
 import type { Db } from '../db.ts';
 
 export const HELPER_LIMITS = { defaultTtlMs: 2 * 3_600_000, minTtlMs: 60_000, maxTtlMs: 12 * 3_600_000, perClaim: 4, perWorld: 64, verifyBudget: 3, maxVerifyBudget: 10, mintPerMinute: 12 } as const;
-/** Entity and definition ops only. World state, terrain, economy, prayers and def retirement stay with the lead. */
-export const HELPER_OPS: ReadonlySet<string> = new Set(['place', 'remove', 'move', 'set', 'clone', 'define', 'relate']);
+/** Entity and definition ops only. World state, terrain, economy, relationships, prayers and def retirement stay with the lead
+ *  (`relate` writes world-wide layers, which no claim may touch). */
+export const HELPER_OPS: ReadonlySet<string> = new Set(['place', 'remove', 'move', 'set', 'clone', 'define']);
 export type HelperScope = { parent: string; parentLabel: string; build: string; claim: string; part: string; expiresAt: number; verify: { budget: number; used: number } };
 type Row = { token_hash: string; parent_hash: string; parent_label: string; label: string; build: string; claim: string; part: string; created_at: number; expires_at: number; verify_budget: number; verify_used: number };
 export type ClaimState = 'held' | 'released' | 'done' | 'taken' | 'closed' | 'unknown';
@@ -76,7 +77,7 @@ export function helperScopeFailure(scope: HelperScope, field: { id: string; clai
   if (!field || field.id !== scope.build || field.claim !== scope.claim || field.lease !== undefined)
     return helperFailure('helper.scope', `This helper token may edit only through claim ${scope.claim} (${scope.part}) of build ${scope.build}; got ${field ? `${field.lease !== undefined ? 'a lead lease' : `claim ${field.claim ?? 'none'}`} on build ${field.id}` : 'no build field'}.`, { limit: { build: scope.build, claim: scope.claim, part: scope.part } });
   for (const [i, op] of (ops ?? []).entries()) if (!HELPER_OPS.has(op.op))
-    return helperFailure('helper.scope', `Helper tokens cannot submit ${op.op} ops; world, terrain, economy, prayer and def-retirement edits belong to the lead.`, { op: i, field: 'op' });
+    return helperFailure('helper.scope', `Helper tokens cannot submit ${op.op} ops; world, terrain, economy, relationship, prayer and def-retirement edits belong to the lead.`, { op: i, field: 'op' });
   return null;
 }
 

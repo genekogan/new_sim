@@ -201,15 +201,22 @@ function overlappingClaim(model: WorldModel, scope: Scope, others: readonly Live
   });
 }
 
-/** WD7 slice 3: explicit existing targets (move/set/remove ids, place parents) must already lie inside the claim. */
+/** WD7 slice 3: explicit existing targets (move/set/remove ids; place/move/clone parents) must already lie inside the claim. */
 function outsideClaim(model: WorldModel, mine: LiveClaim, ops: readonly Op[]): Failure | null {
   for (const [i, op] of ops.entries()) {
     // A root-only claim cannot adopt a new world-root thing; only a region claim can (decided geometrically in claimCheck).
-    if (op.op === 'place' && (op.in?.parent ?? 'world') === 'world' && !mine.region) return { op: i, code: 'helper.scope', field: 'in.parent', detail: `A new thing at the world root is outside claim ${mine.id} (${mine.part}); place it under ${mine.root ?? 'the claim root'}.`, limit: { claim: mine.id, root: mine.root }, fix: 'Place under the claim root, or ask the lead.' };
-    const ref = op.op === 'move' || op.op === 'set' || op.op === 'remove' ? op.id : op.op === 'place' && op.in?.parent && op.in.parent !== 'world' ? op.in.parent : undefined;
-    if (!ref || ref.startsWith('$')) continue;
-    const e = model.get(ref); if (!e || inScope(model, e.id, mine.scope.roots)) continue;
-    return { op: i, code: 'helper.scope', field: op.op === 'place' ? 'in.parent' : 'id', entity: e.id, detail: `${model.pathOf(e.id) || e.id} is outside claim ${mine.id} (${mine.part}); a helper token edits only inside its claim.`, limit: { claim: mine.id, root: mine.root, region: mine.region }, fix: 'Edit only under the claim root or inside its region, or ask the lead.' };
+    // Where the op puts things: place/move/clone parents (a clone defaults to its source's parent). Reading a clone source is fine.
+    const source = op.op === 'clone' && !op.id.startsWith('$') ? model.get(op.id) : undefined;
+    const parent = op.op === 'place' ? op.in?.parent ?? 'world' : op.op === 'move' ? op.in?.parent : op.op === 'clone' ? op.in?.parent ?? source?.in.parent : undefined;
+    if (parent === 'world' && !mine.region) return { op: i, code: 'helper.scope', field: 'in.parent', detail: `A new thing at the world root is outside claim ${mine.id} (${mine.part}); place it under ${mine.root ?? 'the claim root'}.`, limit: { claim: mine.id, root: mine.root }, fix: 'Place under the claim root, or ask the lead.' };
+    const targets: [string, string][] = [];
+    if (op.op === 'move' || op.op === 'set' || op.op === 'remove') targets.push([op.id, 'id']);
+    if (parent && parent !== 'world') targets.push([parent, 'in.parent']);
+    for (const [ref, field] of targets) {
+      if (ref.startsWith('$')) continue;
+      const e = model.get(ref); if (!e || inScope(model, e.id, mine.scope.roots)) continue;
+      return { op: i, code: 'helper.scope', field, entity: e.id, detail: `${model.pathOf(e.id) || e.id} is outside claim ${mine.id} (${mine.part}); a helper token edits only inside its claim.`, limit: { claim: mine.id, root: mine.root, region: mine.region }, fix: 'Edit only under the claim root or inside its region, or ask the lead.' };
+    }
   }
   return null;
 }

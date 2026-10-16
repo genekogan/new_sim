@@ -88,6 +88,13 @@ test('Y4 scope: a helper edits inside its claim; every out-of-scope edit is refu
     ['economy', { ops: [{ op: 'economy', currency: 'shell' }] }],
     ['undefine', { ops: [{ op: 'undefine', ref: 'part@1' }] }],
     ['lead preview', { preview: preview.id }],
+    // Review fix: where a move or clone puts things is authorised too, not only the thing it names.
+    ['move into another claim', { ops: [{ op: 'move', id: 'shell/east/pew', in: { parent: 'shell/west' } }] }],
+    ['move to the world root', { ops: [{ op: 'move', id: 'shell/east/pew', in: { parent: 'world' }, p: [70, 70] }] }],
+    ['clone the claim root beside itself', { ops: [{ op: 'clone', id: 'shell/east' }] }],
+    ['clone into another claim', { ops: [{ op: 'clone', id: 'shell/east/pew', in: { parent: 'shell/west' } }] }],
+    ['clone an outside thing in place', { ops: [{ op: 'clone', id: 'outside', p: [45, 45] }] }],
+    ['relate', { ops: [{ op: 'relate', a: 'thing:shell/east/pew', rel: 'works-at', b: 'thing:outside' }] }],
   ];
   for (const [what, body] of attempts) for (const path of ['/v1/god/act', '/v1/god/dryrun', '/v1/god/preview']) {
     if (path !== '/v1/god/act' && 'preview' in (body as object)) continue;
@@ -108,6 +115,9 @@ test('Y4 scope: a helper edits inside its claim; every out-of-scope edit is refu
   const yard = (await f.mint(regional.claim.id)).token;
   assert.equal((await f.post('/v1/god/act', yard, { ops: [place('bench', -60, -60)] })).accepted, true);
   assert.equal(code(await f.post('/v1/god/act', yard, { ops: [{ op: 'move', id: 'bench', p: [-30, -60] }] })), 'build.claimed');
+  // Reading from outside is fine: a clone of an outside thing put into the claim, and a move within it, are accepted.
+  const copied = await f.post('/v1/god/act', helper, { ops: [{ op: 'clone', id: 'outside', in: { parent: 'shell/east' }, p: [2, 2] }, { op: 'move', id: 'shell/east/pew', in: { parent: 'shell/east' }, p: [1, 1] }] });
+  assert.equal(copied.accepted, true, JSON.stringify(copied)); assert.equal(f.god.store.edits(1)[0].hash8, h.hash8);
 });
 
 test('Y4 measure: seeded fuzz of helper edits — every out-of-scope edit refused before planning', async t => {
@@ -205,6 +215,16 @@ test('Y4 TTL: a helper token ends at its time limit, with its claim (release, ta
   assert.equal((await f.post('/v1/god/builds/church/done', f.lead, { force: true })).ok, true);
   await expired(closed.token, /is closed/);
   assert.equal(f.god.helpers.live().length, 1, 'each mint prunes ended helper rows; only the last (ended) one remains');
+});
+
+test('Y4 TTL: a helper token ends when its lead token is gone; the claim and other tokens are unaffected', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const east = await f.claim('east', 'shell/east', f.rival), { token: helper } = await f.mint(east, {}, f.rival);
+  assert.equal((await f.call('GET', '/v1/god/builds', helper)).status, 200);
+  f.db.db.prepare('DELETE FROM god_tokens_v1 WHERE world_id=? AND token_hash=?').run('helpers', hashToken(f.rival));
+  const r = await f.call('POST', '/v1/god/act', helper, { ops: [place('pew', 1, 0, 'shell/east')] });
+  assert.equal(r.status, 401, r.text); assert.equal(r.data.code, 'helper.expired'); assert.match(r.data.message, /lead token is no longer valid/);
+  assert.equal(f.god.builds.claimState('church', east), 'held'); assert.equal((await f.call('GET', '/v1/god/builds', f.lead)).status, 200);
 });
 
 test('Y4 pooled limits: helpers draw from the lead\'s buckets; verify-use has a small per-helper budget', async t => {
