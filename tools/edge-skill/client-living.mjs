@@ -4,6 +4,21 @@ import {createHash} from 'node:crypto';
 import {parseSchedule,nextReview} from './client-schedule.mjs';
 import {clockAt,timePair,routineOccurrences} from './client-cadence.mjs';
 import {replySteps} from './client-queue.mjs';
+import {bodyStep} from './client-execution.mjs';
+/** Longrun 2026-10-16 (friction 1, 6): routine steps bound to places that do not exist were kept silently and refused at
+ *  every occurrence. After a compile, each body step is dry-run through the server's resolve; one that names nothing in
+ *  this world is reported (the binding is still saved: the place may be built later). `resolve(capability)` → the
+ *  server's resolve answer ({ok, code, reason}); a failed lookup flags nothing. */
+export async function unresolvedBindingSteps(bindings,resolve,limit=8){
+ const out=[];
+ for(const b of Array.isArray(bindings)?bindings:[]){let steps;try{steps=replySteps({do:b.steps});}catch{continue;}
+  for(const s of steps.filter(x=>bodyStep(x)&&typeof x.act==='string'&&!/:here$/.test(x.act))){
+   if(out.length>=limit)return out;
+   let r;try{r=await resolve(s.act);}catch{continue;}
+   if(r?.ok===false&&/^(?:capability\.unknown|place\.(?:unknown|unreachable)|target\.not-in-sight|not-found)$/.test(String(r.code)))out.push({id:b.id,act:s.act,code:r.code,reason:String(r.reason??'').slice(0,160)});
+  }}
+ return out;
+}
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const done=s=>['completed','cancelled','skipped','superseded'].includes(s.status);
 const safe=path=>{try{const st=lstatSync(path);if(st.isSymbolicLink()||st.isFile()&&st.nlink>1)throw Error('linked cadence file refused');}catch(e){if(e.code!=='ENOENT')throw e;}return path;};

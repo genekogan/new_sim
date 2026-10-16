@@ -26,6 +26,8 @@ export type VocabContext = {
   withheld?: string[];
   root: string[];
   me: [number, number] | null;
+  /** Ids of the places the Soul is standing in (innermost first), when known: a stroll named for one of them is in place. */
+  here?: string[];
 };
 export type VocabResult =
   | {kind: 'exact'; cap: EdgeCapability}
@@ -39,6 +41,8 @@ const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk'
   hangout: 'hang-out', 'hang-around': 'hang-out', linger: 'hang-out', 'go-near': 'go-near', approach: 'go-near', join: 'go-near',
   'sit-on': 'sit', 'sit-at': 'sit', 'sit-down': 'sit', 'take-a-seat': 'sit', 'have-a-seat': 'sit', 'take-seat': 'sit', 'be-seated': 'sit', seat: 'sit', relax: 'rest',
   stroll: 'stroll', 'take-a-walk': 'stroll', 'take-a-stroll': 'stroll', 'go-for-a-walk': 'stroll', 'go-for-a-stroll': 'stroll', 'walk-through': 'stroll', 'stroll-through': 'stroll', wander: 'stroll', ramble: 'stroll', meander: 'stroll', explore: 'stroll',
+  // R2 stroll (longrun 2026-10-16): "walk around the Green field", "tour the field" are strolls, not a walk to its centre
+  'walk-around': 'stroll', 'walk-about': 'stroll', 'walk-round': 'stroll', tour: 'stroll', 'take-a-tour': 'stroll',
   'warm': 'warm-by-fire', 'warm-up': 'warm-by-fire', fire: 'warm-by-fire',
   'sit-ups': 'situps', situp: 'situps', 'sit-up': 'situps', 'push-ups': 'pushups', pushup: 'pushups', 'push-up': 'pushups', 'press-ups': 'pushups', 'star-jumps': 'jumping-jacks', 'jumping-jack': 'jumping-jacks', 'do-yoga': 'yoga', boogie: 'dance', hop: 'jump',
   'lie-down': 'lie', 'lay-down': 'lie', 'have-a-nap': 'nap', 'take-a-nap': 'nap', snooze: 'nap', doze: 'nap', sleep: 'nap',
@@ -51,7 +55,7 @@ const SYNONYMS: Record<string, string[]> = {
   woods: ['woodland', 'wood', 'forest', 'grove'], wood: ['woodland', 'woods', 'forest'], forest: ['woodland', 'woods', 'grove'], trees: ['woodland', 'grove', 'orchard'], grove: ['woodland', 'orchard'],
   campfire: ['fire'], bonfire: ['fire', 'campfire'], fireplace: ['fire'], fire: ['campfire'], firepit: ['fire'], 'fire-pit': ['fire'],
   lake: ['pond'], pool: ['pond'], water: ['pond'], swim: ['pond'],
-  meadow: ['lawn', 'field', 'green', 'commons'], field: ['commons', 'lawn', 'green'], lawn: ['commons', 'green'], green: ['lawn', 'commons'], grass: ['lawn', 'commons', 'green'],
+  meadow: ['lawn', 'field', 'green', 'commons'], park: ['green', 'commons', 'lawn', 'field', 'meadow', 'gardens'], field: ['commons', 'lawn', 'green'], lawn: ['commons', 'green'], green: ['lawn', 'commons'], grass: ['lawn', 'commons', 'green'],
   square: ['plaza', 'quad', 'green', 'commons'], plaza: ['square'], centre: ['commons'], center: ['commons'], middle: ['commons'],
   market: ['kiosks', 'market'], shops: ['kiosks', 'market'], shop: ['kiosks', 'market'], stalls: ['kiosks'],
   stage: ['deck', 'bandstand'], gazebo: ['bandstand', 'pavilion'], bandstand: ['gazebo'], garden: ['gardens'], gardens: ['garden'],
@@ -104,7 +108,7 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
   [/\b(?:eat|eating|meal|lunch|dinner|breakfast|snack)\b/, 'eat'], [/\b(?:drink|coffee|tea)\b/, 'drink'],
   [/\b(?:nap|snooze|doze|sleep|sleeping|siesta|rest my eyes)\b/, 'nap'], [/\b(?:lie|lay|lying|laying)\b/, 'lie'],
   [/\bsit\b.*\b(?:ground|grass|floor|lawn|sand)\b/, 'sit-ground'], [/\b(?:sit|seat|seated)\b/, 'sit'],
-  [/\b(?:stroll|wander|ramble|meander|explore|take a walk|go for a walk|walk (?:around|through|about))\b/, 'stroll'],
+  [/\b(?:stroll|wander|ramble|meander|explore|tour|take a walk|go for a walk|walk (?:around|through|about))\b/, 'stroll'],
   [/\b(?:stand up|get up|stand)\b/, 'stand'], [/\b(?:swim|dip|bathe)\b/, 'swim'], [/\b(?:warm up|warm)\b/, 'warm-by-fire'],
   [/\b(?:go|walk|head|come|return|visit|travel)\b/, 'walk'],
 ];
@@ -112,13 +116,13 @@ const INTENTS: [RegExp, string, ('keep')?][] = [
 const FILLER = new Set(['find', 'somewhere', 'someplace', 'place', 'spot', 'quiet', 'nice', 'good', 'cozy', 'cosy', 'comfy', 'book', 'books', 'novel', 'down', 'up', 'read', 'reading',
   'nap', 'snooze', 'doze', 'sleep', 'sleeping', 'siesta', 'lie', 'lay', 'lying', 'laying', 'sit', 'seat', 'seated', 'piano', 'play', 'paint', 'painting', 'easel', 'cook', 'cooking', 'bake',
   'music', 'instrument', 'craft', 'crafts', 'game', 'games', 'cards', 'eat', 'meal', 'lunch', 'dinner', 'breakfast', 'snack', 'drink', 'coffee', 'tea', 'post', 'send', 'mail',
-  'letter', 'card', 'write', 'writing', 'stroll', 'wander', 'walk', 'go', 'take', 'have', 'let', 'lets', 'me', 'i', 'want', 'like', 'would', 'could', 'can', 'you', 'we', 'he', 'she', 'they',
+  'letter', 'card', 'write', 'writing', 'stroll', 'wander', 'walk', 'tour', 'explore', 'go', 'take', 'have', 'let', 'lets', 'me', 'i', 'want', 'like', 'would', 'could', 'can', 'you', 'we', 'he', 'she', 'they',
   'him', 'her', 'them', 'just', 'now', 'something', 'thing', 'do', 'get', 'grab', 'head', 'come', 'return', 'visit', 'travel', 'around', 'about', 'quick', 'short', 'long', 'while',
   'use', 'using', 'check', 'work', 'join', 'game', 'round', 'throw', 'toss', 'catch', 'sing', 'song', 'songs', 'listen', 'watch', 'show', 'set', 'reps', 'exercise', 'exercises', 'workout', 'concert', 'performance', 'audience', 'band']);
 
 /** "go for a X", "take a X", "have a X": X decides the verb (a swim is a swim, a balloon ride is the ride, never a stroll). */
 const GO_FOR = /^(?:let'?s\s+|i\s+want\s+to\s+|please\s+)?(?:go|going|take|have|do|try)\s+(?:for\s+|on\s+|in\s+)?(?:a|an|some|the)\s+(.+)$/i;
-const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
+const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|tour|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
   [/^(?:seat|sit)\b/, 'sit'], [/^(?:dance|boogie)\b/, 'dance'], [/^(?:stretch)\b/, 'stretch'], [/^(?:read|book)\b/, 'read'], [/^(?:look|wander around)\b/, 'stroll'], [/^(?:rest|break|breather)\b/, 'rest'], [/^(?:drink|coffee|tea|cuppa)\b/, 'drink'], [/^(?:meal|bite|snack|lunch|dinner|breakfast)\b/, 'eat']];
 /** R5 group activities whose phrase decides even after a plain verb ("dance on the bandstand" is the bandstand dance). */
 const GROUP_VERBS = new Set(['tell-story', 'hear-story', 'book-club', 'cook-together', 'social-dance', 'yoga-class']);
@@ -181,6 +185,16 @@ const PLACE_VERBS = new Set(['walk', 'jog', 'run', 'jog-around', 'run-around', '
 const GAIT_VERBS = new Set(['jog', 'run', 'jog-around', 'run-around', 'cycle', 'cycle-around']);
 
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
+  const r = resolveWords(input, ctx);
+  // R2 stroll (longrun 2026-10-16: nobody moved for 70 minutes): a stroll named for the place the Soul is already in, whose
+  // own loop is closed right now (a construction site covers one of its stops), is a wander right where it stands; never a
+  // refusal that leaves it standing. An exact id, a different place and a via chain keep their own answer.
+  if (r.kind !== 'alias' || r.params || r.cap.available || r.cap.verb !== 'stroll' || r.cap.target?.kind !== 'place' || !ctx.here?.includes(r.cap.target.id)) return r;
+  const wander = ctx.caps.find(c => c.id === 'wander:here' && c.available); if (!wander) return r;
+  const name = ctx.places.find(p => p.id === r.cap.target!.id)?.name ?? r.cap.target.id;
+  return {kind: 'alias', cap: wander, note: `${input}: you are in ${name} already and its loop (${r.cap.id}) is closed right now (${(r.cap.blocked?.reason ?? 'unavailable').replace(/[.\s]+$/, '')}); wandering around where you are instead (${wander.id}).`};
+}
+function resolveWords(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
   // CN5 (acceptance): "A, then B" is two things. Walks and strolls chain (the earlier ones become `via` legs of the last);
   // anything else does the first and says to act again for the rest (never a mix-up of the two).
