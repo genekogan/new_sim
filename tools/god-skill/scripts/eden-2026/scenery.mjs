@@ -92,7 +92,7 @@ group('scenery: lighthouse stripes', put => {
 group('scenery: campus dome', put => {
   // old north.ts: the library annex has a domed central roof over its portico; the annex is a 2-storey 7.2 m hall
   const [x, z] = mid('region-campus.library-annex');
-  put('dome-roof', 'campus-library-dome', [x, 7.7, z], { params: { sx: 1.8, sy: 1.6, sz: 1.8, roof: '#8fa6a0', drum: '#efe4cf', trim: '#e8e2d2' } });
+  put('dome-roof', 'campus-library-dome', [0, 0, 0], { in: { parent: 'region-campus-library-annex', slot: 'roof' }, params: { sx: 1.8, sy: 1.6, sz: 1.8, roof: '#8fa6a0', drum: '#efe4cf', trim: '#e8e2d2' } });
 });
 group('scenery: lawns', (put, ops) => {
   // old commons and south lawn are mown in broad stripes

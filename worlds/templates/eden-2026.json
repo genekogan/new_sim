@@ -5670,8 +5670,7 @@
             "floors": 2,
             "floorHeight": 3.6,
             "material": "stone",
-            "roof": "hip",
-            "roofPitch": 14,
+            "roof": "flat",
             "plan": {
               "floors": [
                 {
@@ -55676,10 +55675,14 @@
           "def": "core/dome-roof@1",
           "name": "campus-library-dome",
           "p": [
-            -12,
-            7.7,
-            -121
+            0,
+            0,
+            0
           ],
+          "in": {
+            "parent": "region-campus-library-annex",
+            "slot": "roof"
+          },
           "params": {
             "sx": 1.8,
             "sy": 1.6,
