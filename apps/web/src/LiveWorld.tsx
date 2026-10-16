@@ -65,6 +65,7 @@ import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
+import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
@@ -285,6 +286,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false;
+    // E2 #3: shy animals in a god world run from where the Souls' figures are now
+    if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
     const godLightning=newWorld?new WorldLightning(entityLayer):null;if(godLightning)scene.add(godLightning.group);  // GOD-ENV: bolts, flash, thunder (new worlds only)
     // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
@@ -951,7 +954,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       labels.clear();
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
-      edgeItems.dispose();entityLayer.dispose();
+      edgeItems.dispose();entityLayer.dispose();setFleeSources(null);
       initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();

@@ -31,6 +31,7 @@ export function creatureObject(def: StoredDef, params: Record<string, Value>, ti
     speed: opts.speed ?? num('speed') ?? b?.speed ?? 1,
     radius: opts.radius ?? num('radius') ?? b?.radius ?? 6,
     follow: opts.follow ?? str('follow') ?? b?.ref,
+    flee: num('flee') ?? b?.flee,
     seed, model, species: SPECIES.exec(def.name)?.[1],
     box: def.size.box as [number, number, number],
   });

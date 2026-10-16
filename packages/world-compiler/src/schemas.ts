@@ -54,7 +54,9 @@ export const componentsSchema = z.object({
   /** Follow the entity's own path shape (or a ref's) at `speed` m/s; loop or ping-pong. Balloons, boats, carts, trains. */
   route: z.object({ ref: z.string().optional(), speed: num.positive().default(2), loop: z.boolean().default(true), altitude: num.default(0) }).optional(),
   /** Creature behaviour, client-side deterministic: needs a gait in kit args (or a pack animal). */
-  behavior: z.object({ kind: z.enum(['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle']), speed: num.positive().default(1), radius: num.positive().default(8), ref: z.string().optional() }).optional(),
+  behavior: z.object({ kind: z.enum(['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle']), speed: num.positive().default(1), radius: num.positive().default(8), ref: z.string().optional(),
+    /** E2 #3: shy animals run from people who come closer than this (m) and wander back once they have gone. */
+    flee: num.min(0).max(40).optional() }).optional(),
   /** VOCAB-W2 sound layer (viewer, procedural WebAudio, new worlds): a loop while state `when` holds ('on', '!open', 'lit'),
    *  or a one-shot each time that field changes (mode 'change'); heard within `radius` m of the thing (path/area: its outline). */
   sound: z.object({ kind: z.enum(['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music']), radius: num.positive().max(200).default(14), volume: num.min(0).max(1).default(0.5), when: z.string().regex(/^!?[a-z][a-zA-Z0-9]*$/).optional(), mode: z.enum(['loop', 'change']).default('loop') }).optional(),

@@ -206,7 +206,7 @@ function behaviours(def: StoredDef): { supported: string[]; missing: Record<stri
   if (media.includes('walk')) for (const b of ['wander', 'follow', 'idle']) { supported.push(b); delete missing[b]; }
   if (media.includes('fly')) { supported.push('fly'); delete missing.fly; }
   if (media.includes('swim') || def.anchor === 'float') { supported.push('swim'); delete missing.swim; }
-  if (def.components.spin) supported.push('spin'); if (def.components.swing) supported.push('working parts'); if (def.components.sway) supported.push('sway'); if (def.components.hover) supported.push('hover'); if (def.components.route) supported.push('route');
+  if (def.components.spin) supported.push('spin'); if (def.components.swing) supported.push('working parts'); if (def.components.behavior?.flee) supported.push('flee'); if (def.components.sway) supported.push('sway'); if (def.components.hover) supported.push('hover'); if (def.components.route) supported.push('route');
   if (def.components.seat) supported.push('sit'); if (def.components.bed) supported.push('lie'); if (def.components.carryable) supported.push('carry'); if (def.components.surface) supported.push('put-on');
   if (def.components.light) supported.push('light on/off'); if (def.components.opening) supported.push('open/close');
   return { supported: [...new Set(supported)], missing, ...extra };
