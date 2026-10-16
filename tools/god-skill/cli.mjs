@@ -227,19 +227,21 @@ export function walkLine(walk) {
   if (!walk) return '';
   if (walk.state === 'pending' || walk.state === 'unchecked') return `  walk: not checked — ${walk.note}`;
   if (walk.state === 'ok') return `  walk: all ${walk.rooms.length} room${walk.rooms.length === 1 ? '' : 's'} can be walked into from the front door and out again (the engine's own route check: it overrides "reachable from outside" in the notes, which only reads the design's doors and stairs)`;
-  // R2F: an end the engine cannot stand at is said plainly. Into a room, the room is the `to` end; out of it, the `from` end.
-  const noFloor = (r) => r.in === 'reach.bad-to' || r.out === 'reach.bad-from' || r.in === 'room.no-standing-room' || r.out === 'room.no-standing-room';
-  const noStand = (r) => r.in === 'reach.bad-from' || r.out === 'reach.bad-to';
-  const bad = walk.rooms.filter((r) => r.in !== true || r.out !== true), floorless = bad.filter(noFloor);
-  const route = (code) => code !== true && !['reach.bad-to', 'reach.bad-from', 'room.no-standing-room'].includes(code);
-  const why = (r) => [route(r.in) && `no way in (${r.in})`, route(r.out) && `no way out (${r.out})`].filter(Boolean).join(', ');
-  const routes = bad.filter((r) => why(r)), at = walk.from ? ` (${walk.from.map(r2).join(', ')})` : '';
+  // R2F: an end the engine cannot stand at is said plainly. The server marks it: a room end with no standing room carries
+  // why.<side>.endpoint (into a room the room is the `to` end, out of it the `from` end), or room.no-standing-room when the
+  // engine's nearest spot is outside the room. Any other failure (a route, a missing room or entity) keeps its code, with
+  // the detail for reach.bad-*. The front-door stand is a point, which the engine never refuses as an end.
+  const floorIn = (r) => r.in === 'room.no-standing-room' || r.why?.in?.endpoint?.side === 'to';
+  const floorOut = (r) => r.out === 'room.no-standing-room' || r.why?.out?.endpoint?.side === 'from';
+  const bad = walk.rooms.filter((r) => r.in !== true || r.out !== true), floorless = bad.filter((r) => floorIn(r) || floorOut(r));
+  const failure = (code, w) => (/^reach\.bad-/.test(code) && w?.detail ? `${code}: ${w.detail}` : code);
+  const why = (r) => [r.in !== true && !floorIn(r) && `no way in (${failure(r.in, r.why?.in)})`, r.out !== true && !floorOut(r) && `no way out (${failure(r.out, r.why?.out)})`].filter(Boolean).join(', ');
+  const routes = bad.filter((r) => why(r));
   const parts = [
     floorless.length && `the engine has no floor to stand on in room${floorless.length > 1 ? 's' : ''} ${floorless.map((r) => `${r.id} (floor ${r.floor})`).join(', ')}`,
-    bad.some(noStand) && `the engine has no ground to stand on at the stand outside the front door${at}`,
     ...routes.map((r) => `${r.id} (floor ${r.floor}): ${why(r)}`),
   ].filter(Boolean);
-  const fix = [floorless.length && `give ${floorless.length > 1 ? 'those rooms' : 'that room'} a floor the engine can stand on (the floor may be missing for the engine, or the room filled wall to wall; describe --json shows where it looked)`, bad.some(noStand) && 'clear the stand outside the front door', routes.length && 'fix the stairs, doors or whatever stands in the way'].filter(Boolean).join('; ');
+  const fix = [floorless.length && `give ${floorless.length > 1 ? 'those rooms' : 'that room'} a floor the engine can stand on (the floor may be missing for the engine, or the room filled wall to wall; describe --json shows where it looked)`, routes.length && 'fix the stairs, doors or whatever stands in the way'].filter(Boolean).join('; ');
   return `  walk: NOT WALKABLE — ${parts.join('; ')}. This is the engine's own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; ${fix}, then describe again.`;
 }
 

@@ -1188,25 +1188,32 @@ test('measure dryruns for a first-choice place and blocked candidate search', as
 // were the problem (reach.bad-to in, reach.bad-from out): no floor the engine could stand on.
 test('describe walk says "no floor to stand on in room X (floor n)" for missing standing room, and keeps route wording', async () => {
   const { walkLine } = await import('./cli.mjs');
-  const from = [24, 33.99], ok = { in: true, out: true }, floorless = (id, floor) => ({ id, floor, in: 'reach.bad-to', out: 'reach.bad-from', why: { in: { code: 'reach.bad-to', detail: `no standing room in walk-lighthouse:${id}`, endpoint: { side: 'to', what: `walk-lighthouse:${id}`, at: [24, 30], y: 3.1 * floor, level: 0, levelY: 0 } } } });
+  // what the server sends for a room end with no standing room (stairs-reach.test.ts R2F): both sides carry the endpoint
+  const end = (id, floor, side) => ({ code: side === 'to' ? 'reach.bad-to' : 'reach.bad-from', detail: `no standing room in walk-lighthouse:${id}`, endpoint: { side, what: `walk-lighthouse:${id}`, at: [24, 30], y: 3.1 * floor, level: 0, levelY: 0 } });
+  const from = [24, 33.99], ok = { in: true, out: true }, floorless = (id, floor) => ({ id, floor, in: 'reach.bad-to', out: 'reach.bad-from', why: { in: end(id, floor, 'to'), out: end(id, floor, 'from') } });
   const walk = { state: 'failed', from, note: '', rooms: [{ id: 'entrance', floor: 0, ...ok }, floorless('room', 1), floorless('room-2', 2), floorless('lantern', 3)] };
   const line = walkLine(walk);
   assert.equal(line, '  walk: NOT WALKABLE — the engine has no floor to stand on in rooms room (floor 1), room-2 (floor 2), lantern (floor 3). This is the engine\'s own route check, so a resident cannot use these rooms whatever "reachable from outside" in the notes says; give those rooms a floor the engine can stand on (the floor may be missing for the engine, or the room filled wall to wall; describe --json shows where it looked), then describe again.');
-  // one room (describe house/room), the engine's spot outside the room, the front stand, and a real route failure
+  // one room (describe house/room); the engine's nearest spot outside the room
   assert.match(walkLine({ ...walk, rooms: [floorless('bedroom', 1)] }), /no floor to stand on in room bedroom \(floor 1\)\. .*give that room a floor/);
   assert.match(walkLine({ ...walk, rooms: [{ id: 'attic', floor: 2, in: 'room.no-standing-room', out: 'room.no-standing-room' }] }), /no floor to stand on in room attic \(floor 2\)/);
-  const mixed = walkLine({ ...walk, rooms: [{ id: 'hall', floor: 0, in: 'reach.bad-from', out: 'reach.bad-to' }, { id: 'loft', floor: 1, in: 'reach.no-route', out: true }] });
-  assert.match(mixed, /^ {2}walk: NOT WALKABLE — the engine has no ground to stand on at the stand outside the front door \(24, 33\.99\); loft \(floor 1\): no way in \(reach\.no-route\)\. /);
-  assert.match(mixed, /; clear the stand outside the front door; fix the stairs, doors or whatever stands in the way, then describe again\.$/);
-  assert.doesNotMatch(mixed, /no floor to stand on/);
+  // a bad end for another reason (no such room, a missing entity) or a bare code is not "no floor": its code and detail
+  const missing = { code: 'reach.bad-to', detail: 'walk-lighthouse has no room hall' };
+  const other = walkLine({ ...walk, rooms: [{ id: 'hall', floor: 0, in: 'reach.bad-to', out: 'reach.bad-from', why: { in: missing, out: { ...missing, code: 'reach.bad-from' } } }, { id: 'den', floor: 0, in: 'reach.bad-to', out: true }, { id: 'loft', floor: 1, in: 'reach.no-route', out: true, why: { in: { code: 'reach.no-route', detail: 'no stairs up' } } }] });
+  assert.match(other, /^ {2}walk: NOT WALKABLE — hall \(floor 0\): no way in \(reach\.bad-to: walk-lighthouse has no room hall\), no way out \(reach\.bad-from: walk-lighthouse has no room hall\); den \(floor 0\): no way in \(reach\.bad-to\); loft \(floor 1\): no way in \(reach\.no-route\)\. /);
+  assert.match(other, /; fix the stairs, doors or whatever stands in the way, then describe again\.$/); assert.doesNotMatch(other, /no floor|front door \(/);
+  // one side without standing room, the other a route failure: both said
+  const mixed = walkLine({ ...walk, rooms: [{ id: 'study', floor: 1, in: 'room.no-standing-room', out: 'reach.no-route' }] });
+  assert.match(mixed, /no floor to stand on in room study \(floor 1\); study \(floor 1\): no way out \(reach\.no-route\)\. .*give that room a floor .*; fix the stairs/);
 });
 
 test('describe <house>/<room> --json carries that room\'s walk verdict with the engine end it could not stand at', async t => {
-  const why = { in: { code: 'reach.bad-to', detail: 'no standing room in walk-lighthouse:room', endpoint: { side: 'to', what: 'walk-lighthouse:room', at: [24, 30], y: 3.1, level: 0, levelY: 0 } } };
+  const end = (side) => ({ code: side === 'to' ? 'reach.bad-to' : 'reach.bad-from', detail: 'no standing room in walk-lighthouse:room', endpoint: { side, what: 'walk-lighthouse:room', at: [24, 30], y: 3.1, level: 0, levelY: 0 } });
+  const why = { in: end('to'), out: end('from') };
   const house = { path: 'walk-lighthouse', rooms: [{ id: 'room', name: 'Room 1', floor: 1, y: 3.1, size: [5.37, 5.37], height: 2.82, occupants: [], doors: [] }], walk: { state: 'failed', from: [24, 33.99], note: '', rooms: [{ id: 'room', floor: 1, in: 'reach.bad-to', out: 'reach.bad-from', why }] } };
   await buildFixture(t, (c) => c.path === '/v1/god/query' && c.body.describe ? { describe: c.body.describe === 'walk-lighthouse' ? house : { error: `no such entity ${c.body.describe}` } } : null);
   const room = await COMMANDS.describe(['walk-lighthouse/room'], { json: true });
   assert.equal(room.id, 'room'); assert.equal(room.walk.state, 'failed'); assert.deepEqual(room.walk.from, [24, 33.99]); assert.deepEqual(room.walk.why, why);
   const text = await COMMANDS.describe(['walk-lighthouse/room'], {});
-  assert.match(text, /walk: NOT WALKABLE — the engine has no floor to stand on in room room \(floor 1\)\./);
+  assert.match(text, /walk: NOT WALKABLE — the engine has no floor to stand on in room room \(floor 1\)\./); assert.doesNotMatch(text, /no way (in|out)/);
 });
