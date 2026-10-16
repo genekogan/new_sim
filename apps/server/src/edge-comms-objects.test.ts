@@ -40,6 +40,28 @@ test('objects are read by entitlement and reach; actions appear as capabilities'
   } finally { f.destroy(); }
 });
 
+test('a listing asks for the Soul\'s place path once, however many objects there are', async () => {
+  const f = chessWorld();
+  try {
+    for (let i = 0; i < 30; i++) f.runtime.objects.create({id: `chess-x${i}`, kind: 'chess', name: `Table ${i}`, placeId: i % 2 ? 'parlour' : 'eden-commons'});
+    let asked = 0; const real = f.ledger.placePathOf.bind(f.ledger);
+    f.ledger.placePathOf = (id: string) => { asked++; return real(id); };
+    const soul = (name: string) => ({soulId: f.id(name), entityId: '', name, owner: ''});
+    // Cleo stands in both the parlour and the commons: all 31 objects, two actions each
+    asked = 0; const cleo = f.runtime.objects.capabilities(soul('Cleo'));
+    assert.equal(cleo.length, 31 * 2); assert.equal(new Set(cleo.map(c => c.object)).size, 31); assert.equal(asked, 1);
+    asked = 0; const seen = f.runtime.objects.visibleTo(soul('Cleo'));
+    assert.equal(seen.length, 31); assert.ok(seen.every(o => o.here)); assert.equal(asked, 1);
+    // Dan stands only in the commons: the 15 commons tables, not the parlour's
+    asked = 0; const dan = f.runtime.objects.capabilities(soul('Dan'));
+    assert.deepEqual([...new Set(dan.map(c => c.object))].sort(), Array.from({length: 15}, (_, i) => `chess-x${i * 2}`).sort()); assert.equal(asked, 1);
+    asked = 0; assert.equal(f.runtime.objects.visibleTo(soul('Dan')).length, 15); assert.equal(asked, 1);
+    // a Soul who is nowhere sees nothing, and a path lookup that throws is treated as nowhere (as before)
+    f.ledger.placePathOf = () => { throw new Error('no body'); };
+    assert.equal(f.runtime.objects.capabilities(soul('Dan')).length, 0);
+  } finally { f.destroy(); }
+});
+
 test('clientRef makes a retried object act return the original result', async () => {
   const f = chessWorld();
   try {

@@ -1,0 +1,124 @@
+{
+  "tag": "base-load",
+  "node": "v22.20.0",
+  "genesis": "<worktrees>/edge-capability-stall-base/worlds/templates/eden-district.json",
+  "extra": 0,
+  "reps": 0,
+  "port": 5380,
+  "startedAt": "2026-10-16T00:48:19.097Z",
+  "world": {
+    "entities": 159,
+    "godStatus": {
+      "worldId": "capstall-1",
+      "name": "Capstall",
+      "hasOwner": true,
+      "you": "god",
+      "entities": 159,
+      "seq": 21,
+      "base": "http://127.0.0.1:5380/w/capstall",
+      "template": "Eden district",
+      "agents": 1
+    }
+  },
+  "placed": {
+    "church-0": [
+      20.54,
+      5.71
+    ],
+    "church-1": [
+      70,
+      38
+    ],
+    "gazebo": [
+      8,
+      -14
+    ]
+  },
+  "soulAt": [
+    0,
+    0
+  ],
+  "idle": {
+    "seconds": 8,
+    "gaps": 2,
+    "maxGapMs": 32.7
+  },
+  "capabilities": {
+    "total": 334,
+    "byVerb": {
+      "sit-ground": 1,
+      "sit": 35,
+      "lie": 5,
+      "nap": 1,
+      "dance": 1,
+      "jump": 1,
+      "stretch": 1,
+      "jumping-jacks": 1,
+      "yoga": 1,
+      "pushups": 1,
+      "situps": 1,
+      "read": 1,
+      "stroll": 2,
+      "walk": 153,
+      "hang-out": 47,
+      "rest": 1,
+      "stand": 1,
+      "go-near": 7,
+      "make": 2,
+      "wave": 8,
+      "wander": 1,
+      "face": 7,
+      "gather": 1,
+      "hug": 7,
+      "high-five": 7,
+      "handshake": 7,
+      "dance-with": 7,
+      "follow": 7,
+      "bow": 1,
+      "clap": 1,
+      "nod": 1,
+      "shake-head": 1,
+      "cheer": 1,
+      "point": 1,
+      "swim": 1,
+      "pray": 1,
+      "pick-up": 7,
+      "sleep": 4
+    },
+    "targets": {
+      "sit": "sit:e_eb7dd29c",
+      "walk": "walk:commons-pavilion/pavilion",
+      "hang-out": "hang-out:commons-pavilion"
+    }
+  },
+  "firstListing": {
+    "clientMs": 2978.8,
+    "binds": [
+      {
+        "ms": 2971,
+        "hit": false,
+        "standableN": 200,
+        "standableMs": 1206.5,
+        "gridsOverN": 18,
+        "gridsOverMs": 2382.4,
+        "goalN": 152,
+        "goalMs": 2804.8
+      }
+    ]
+  },
+  "samples": [],
+  "summary": {},
+  "load": {
+    "souls": 8,
+    "seconds": 60,
+    "acts": 16,
+    "bindsMisses": 86,
+    "bindsMsTotal": 60718.4,
+    "blockedFraction": 101.2,
+    "gapsOver100ms": 48,
+    "gapsOver500ms": 40,
+    "maxGapMs": 4784.7,
+    "medianActClientMs": 3515.1,
+    "maxActClientMs": 9867.5
+  }
+}

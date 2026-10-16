@@ -126,7 +126,7 @@ export class GroundNav {
   /** Tiles the engine-facing grids cover (inclusive); grows only. */
   window: TileRect | null = null;
   /** Counters for tests and the status page. */
-  stats = { fineBuilds: 0, fineHits: 0, composites: 0, coarseExpanded: 0 };
+  stats = { fineBuilds: 0, fineHits: 0, composites: 0, coarseExpanded: 0, levelBuilds: 0 };
   private fine = new Map<string, FineTile>();
   private composed = new Map<string, LevelGrid>();
   /**
@@ -343,6 +343,19 @@ export class GroundNav {
     const upper = scene.levels.filter((l) => l.id !== 0 && scene.surfaces.some((s) => s.level === l.id && touches(s.obb, b)));
     if (upper.length) for (const [id, g] of buildGrids({ ...scene, bounds: b, levels: upper }, this.cell).levels) levels.set(id, g);
     return { cell: this.cell, levels };
+  }
+
+  /**
+   * One level of `gridsOver(r, scene)` without building the others: level 0 composed from tiles; an upper level only when
+   * a surface of it reaches the rect (else undefined, as the full set has no entry). Every level is built on its own
+   * (grid.ts buildLevel), so this equals `gridsOver(r, scene).levels.get(id)` cell for cell.
+   */
+  levelOver(r: TileRect, id: number, scene: SpatialScene): LevelGrid | undefined {
+    if (id === 0) return this.compose(r, scene.obstacles);
+    const b = rectBounds(r), lv = scene.levels.find((l) => l.id === id);
+    if (!lv || !scene.surfaces.some((s) => s.level === id && touches(s.obb, b))) return undefined;
+    this.stats.levelBuilds++;
+    return buildGrids({ ...scene, bounds: b, levels: [lv] }, this.cell).levels.get(id);
   }
 
   // ---------------------------------------------------------------- coarse routing

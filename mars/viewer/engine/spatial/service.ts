@@ -52,6 +52,8 @@ function sameNav(s: NavSnap, e: Entity): boolean {
 
 /** Bounded memo of people-augmented grids (each holds full-size rasters). */
 const AROUND_CACHE = 8;
+/** Bounded memo of upper-level grids over tiles no paged window holds (levelAt): ~2 MB each. */
+const OUTSIDE_LEVELS = 12;
 /** routeAround: how far the start of a people-avoiding route may snap (path.ts RouteOpts.startTolerance). */
 const AROUND_START_TOL = 1.0;
 /** Height band a standing person blocks above their feet. */
@@ -398,12 +400,30 @@ export class Spatial {
   levelAt(id: number, p: Vec2) {
     if (this.ground?.paged && this.pages) {
       const i = this.pageAt(p), r = this.pages.rects[i], tx = Math.floor(p[0] / 64), tz = Math.floor(p[1] / 64);
-      // a point no window holds (a recovery target, a far arrival): its own small window, the engine's focus unchanged
-      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.gridsOver(rectOf([p]), this.pages.all).levels.get(id);
+      // a point no window holds (a recovery target, a far arrival, a far thing a Soul is offered): its own small window, the engine's focus unchanged
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.outsideLevel(id, p);
       this.focusPage(i);
     }
     return this.grids.levels.get(id);
   }
+
+  /**
+   * The grid of `id` over the tile holding `p`, which no paged window holds. Building an upper level costs ~0.1 s (raster
+   * and EDT) and a Soul's capability listing, a ring search or a slot check asks for the same few tiles again and again,
+   * so each is built once per navigation epoch (the epoch moves whenever the static world does). Level 0 is already
+   * memoised tile by tile (GroundNav.compose). Read-only, like every grid levelAt returns; same cells as a fresh build.
+   */
+  private outsideLevel(id: number, p: Vec2): LevelGrid | undefined {
+    const rect = rectOf([p]), g = this.ground!, scene = this.pages!.all;
+    if (id === 0) return g.levelOver(rect, 0, scene);
+    const key = `${this.epoch}|${id}|${rect.join(',')}`, hit = this.outside.get(key);
+    if (hit !== undefined) { this.outside.delete(key); this.outside.set(key, hit); return hit ?? undefined; }
+    const built = g.levelOver(rect, id, scene);
+    for (const k of this.outside.keys()) if (this.outside.size >= OUTSIDE_LEVELS || !k.startsWith(`${this.epoch}|`)) this.outside.delete(k);
+    this.outside.set(key, built ?? null);
+    return built;
+  }
+  private outside = new Map<string, LevelGrid | null>();
 
   /** Paged ground diagnostics: the windows (tile rects) and the bytes their built grids hold. */
   pagesInfo(): { rects: TileRect[]; built: number; bytes: number } | null {

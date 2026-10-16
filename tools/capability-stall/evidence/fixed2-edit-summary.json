@@ -1,0 +1,171 @@
+{
+  "tag": "fixed2-edit",
+  "node": "v22.20.0",
+  "genesis": "<worktrees>/edge-capability-stall/worlds/templates/eden-district.json",
+  "extra": 0,
+  "reps": 0,
+  "port": 5380,
+  "startedAt": "2026-10-16T01:32:42.991Z",
+  "world": {
+    "entities": 152,
+    "godStatus": {
+      "worldId": "capstall-1",
+      "name": "Capstall",
+      "hasOwner": true,
+      "you": "god",
+      "entities": 152,
+      "seq": 14,
+      "base": "http://127.0.0.1:5380/w/capstall",
+      "template": "Eden district",
+      "agents": 1
+    }
+  },
+  "placed": {
+    "church-0": [
+      20.54,
+      5.71
+    ],
+    "church-1": [
+      70,
+      38
+    ],
+    "gazebo": [
+      8,
+      -14
+    ]
+  },
+  "soulAt": [
+    0,
+    0
+  ],
+  "idle": {
+    "seconds": 8,
+    "gaps": 0,
+    "maxGapMs": 0
+  },
+  "capabilities": {
+    "total": 278,
+    "byVerb": {
+      "sit-ground": 1,
+      "sit": 35,
+      "lie": 5,
+      "nap": 1,
+      "dance": 1,
+      "jump": 1,
+      "stretch": 1,
+      "jumping-jacks": 1,
+      "yoga": 1,
+      "pushups": 1,
+      "situps": 1,
+      "read": 1,
+      "stroll": 2,
+      "walk": 153,
+      "hang-out": 47,
+      "rest": 1,
+      "stand": 1,
+      "make": 2,
+      "wave": 1,
+      "wander": 1,
+      "gather": 1,
+      "bow": 1,
+      "clap": 1,
+      "nod": 1,
+      "shake-head": 1,
+      "cheer": 1,
+      "point": 1,
+      "swim": 1,
+      "pray": 1,
+      "pick-up": 7,
+      "sleep": 4
+    },
+    "targets": {
+      "sit": "sit:e_eb7dd29c",
+      "walk": "walk:commons-pavilion/pavilion",
+      "hang-out": "hang-out:commons-pavilion"
+    }
+  },
+  "firstListing": {
+    "clientMs": 1013.8,
+    "binds": [
+      {
+        "ms": 1010.2,
+        "cpuMs": 1638,
+        "hit": false,
+        "clearSpotsMs": 2.4,
+        "clearSpotsN": 3,
+        "standableMs": 76,
+        "standableN": 200,
+        "goalMs": 967.9,
+        "goalN": 152,
+        "reachMs": 891.1,
+        "reachN": 29,
+        "roomGoalMs": 896.3,
+        "roomGoalN": 29,
+        "gridsOverMs": 643.6,
+        "gridsOverN": 11,
+        "gridsOverFrompagedRouteMs": 643.6,
+        "gridsOverFrompagedRouteN": 11,
+        "navMs": 979.7,
+        "navN": 1,
+        "bridgeMs": 985.7,
+        "bridgeN": 1
+      }
+    ]
+  },
+  "samples": [],
+  "summary": {},
+  "editTax": [
+    {
+      "round": 0,
+      "placed": [
+        -20,
+        30
+      ],
+      "firstAfterEditMs": 879.6,
+      "bindsMs": 877.5,
+      "levelBuildN": 0,
+      "pagedRouteBuilds": 11,
+      "secondMs": 42.7,
+      "secondBindsMs": 21.2
+    },
+    {
+      "round": 1,
+      "placed": [
+        -26,
+        34
+      ],
+      "firstAfterEditMs": 863.4,
+      "bindsMs": 861.2,
+      "levelBuildN": 0,
+      "pagedRouteBuilds": 11,
+      "secondMs": 41,
+      "secondBindsMs": 20
+    },
+    {
+      "round": 2,
+      "placed": [
+        -32,
+        38
+      ],
+      "firstAfterEditMs": 860.5,
+      "bindsMs": 858.3,
+      "levelBuildN": 0,
+      "pagedRouteBuilds": 11,
+      "secondMs": 42.4,
+      "secondBindsMs": 19.6
+    },
+    {
+      "round": 3,
+      "placed": [
+        -38,
+        42
+      ],
+      "firstAfterEditMs": 855.5,
+      "bindsMs": 853.6,
+      "levelBuildN": 0,
+      "pagedRouteBuilds": 11,
+      "secondMs": 44.1,
+      "secondBindsMs": 20.7
+    }
+  ]
+}
