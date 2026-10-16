@@ -7,7 +7,7 @@ import type { BuildReceipt } from './build-integrity.ts';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
-export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside'] as const;
+export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside', 'build.rewind', 'build.depends'] as const;
 const fixes: Record<typeof buildCodes[number], string> = {
   'build.outside': 'Name the existing entity with build start --include <ref> or build step --include <ref>, then retry.',
   'build.unknown': '`build` lists open builds; use `build start <id>`.',
@@ -23,6 +23,8 @@ const fixes: Record<typeof buildCodes[number], string> = {
   'build.claim-unknown': 'Use `build resume <id>` to see the claims.',
   'build.claims-open': 'Release live claims, or use --force.',
   'build.undo-incomplete': 'The build stays open; see notReverted.',
+  'build.rewind': '`build show` lists the steps; rewind --to takes 0 (the start) up to the newest step.',
+  'build.depends': 'Undo the later edit first, or rewind to a later step.',
 };
 export const buildFailure = (code: typeof buildCodes[number], detail: string, field = 'build', extra: Partial<Failure> = {}): Failure => ({ op: -1, code, detail, field, fix: fixes[code], ...extra });
 /** Leave room for lazy pause/closure markers on all author-controlled writes. */
@@ -51,6 +53,7 @@ export const buildActionSchemas = {
   abandon: z.object({ undo: z.boolean().optional(), force: z.boolean().optional() }).strict(),
   claim: z.object({ part: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/), root: z.string().min(1).max(300).optional(), region: siteSchema.optional(), take: z.string().regex(/^c_[0-9a-f]{8}$/).optional() }).strict().refine(c => !!(c.root || c.region || c.take), 'Supply a root, region, or stale claim to take.'),
   release: z.object({ done: z.boolean().optional() }).strict(),
+  rewind: z.object({ to: z.number().int().min(0).max(999), dry: z.boolean().optional(), force: z.boolean().optional() }).strict(),
 };
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
@@ -69,12 +72,14 @@ export type BuildBody = {
   lastBatchAt?: number; closureLapsedAt?: number; say?: Caption; sayAt?: number; designing?: string[]; note?: Caption; stepCalls?: string[];
   done?: { at: number; summary?: string; byLabel: string; receipt?: BuildReceipt };
   abandoned?: { at: number; undo?: { reverted: number[]; notReverted: number[] } }; startHash: string;
+  /** Y5: newest rewinds (owner card history). */
+  rewinds?: { at: number; to: number; from: number; edits: number; removed: number; byLabel: string }[];
 };
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
 export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[]; say?: Caption; designing?: string[]; note?: Caption; reopensAt?: number };
 export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt' | 'say' | 'designing' | 'note' | 'reopensAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
 export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group?: string; step: { n: number; label: string }; claim?: string };
-export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted';
+export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted' | 'rewound';
 export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
@@ -603,6 +608,60 @@ export class GodBuilds {
     if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo preflight failed; no build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
     row = this.row(id)!; const body = structuredClone(row.body); if (p.data.force) for (const c of body.claims) if (c.status === 'held') c.status = 'released'; body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
   }
+  /** Y5: which live build edits (lead and claim subgroups) a rewind to after step k reverts. `journal` is every row of
+   *  the build's groups. An edit's step is the recorded step range that holds its original edit (redo chains are
+   *  followed); the group separates the lead's ranges from interleaved claim ranges. Never writes. */
+  rewindPlan(id: string, raw: unknown, journal: readonly EditRow[]) {
+    const now = this.host.now(); this.sweep(now);
+    const p = buildActionSchemas.rewind.safeParse(raw); if (!p.success) return schemaFailure(p.error);
+    const row = this.row(id); if (!row) return fail('build.unknown', id);
+    if (!open(row)) return fail('build.closed', `${id} is ${row.status}; only an open build can be rewound.`, 'build', { fix: `Start a linked chapter with build continue ${id} --brief "…", or undo --group ${id}.` });
+    const { to } = p.data, b = row.body;
+    const newest = Math.max(b.step.n, ...b.steps.map(s => s.n), ...b.claims.map(c => c.step.n));
+    if (to > newest) return fail('build.rewind', `${id} is at step ${b.step.n}${newest > b.step.n ? ` (helpers reached ${newest})` : ''}; --to takes 0..${newest}.`, 'to', { measured: to, limit: newest });
+    const bySeq = new Map(journal.map(r => [r.seq, r])), claimGroups = new Map(b.claims.map(c => [c.id, `${id}/${c.part}`])), claimed = new Set(claimGroups.values());
+    const origin = (r: EditRow) => { let e: EditRow | undefined = r; for (let i = 0; e && e.kind !== 'edit' && i < 256; i++) e = e.undo_of === null ? undefined : bySeq.get(e.undo_of); return e?.kind === 'edit' ? e : undefined; };
+    const stepOf = (r: EditRow): number | undefined => {
+      const e = origin(r); if (!e) return undefined;
+      const hits = b.steps.filter(s => s.firstSeq <= e.seq && e.seq <= s.lastSeq), mine = hits.filter(s => s.claim ? claimGroups.get(s.claim) === e.grp : !claimed.has(e.grp ?? ''));
+      // An unresolvable overlap (a claim dropped from retention) takes the later step: rewind removes more, never less.
+      return hits.length ? Math.max(...(mine.length ? mine : hits).map(s => s.n)) : undefined;
+    };
+    const targets: (EditRow & { step: number })[] = [];
+    for (const r of journal) {
+      if (r.undone || (r.kind !== 'edit' && r.kind !== 'redo')) continue;
+      const n = stepOf(r);
+      if (n === undefined && to > 0) return fail('build.rewind', `Edit ${r.seq} has no recorded step (a build keeps its newest 64 step records).`, 'to', { measured: { seq: r.seq }, fix: `Rewind to 0 (the start), or undo the newer edits with undo --group ${r.grp ?? id}.` });
+      if (to === 0 || n! > to) targets.push({ ...r, step: n ?? 0 });
+    }
+    const lead = to === 0 ? 1 : Math.min(b.step.n, to), claimStep = Math.max(to, 1);
+    const unchanged = !targets.length && b.step.n === lead && !b.steps.some(s => s.n > to) && !b.claims.some(c => c.step.n > claimStep || p.data.force && c.status === 'held');
+    return { ok: true as const, row, to, dry: !!p.data.dry, force: !!p.data.force, targets, newest, unchanged, steps: b.steps.filter(s => s.n > to).map(s => ({ n: s.n, label: s.label, ...(s.claim ? { part: b.claims.find(c => c.id === s.claim)?.part ?? s.claim } : {}) })) };
+  }
+  /** Pure: the open record left at step k (k = 0 is the start). Closure is re-armed and retained claims are clamped;
+   *  only the lead's own token refreshes lead liveness, so an owner's rewind never makes a dead lead look alive. */
+  rewoundBody(body: BuildBody, to: number, at: number, caller: Identity | undefined, force: boolean, info: { from: number; edits: number; removed: number }) {
+    const b = structuredClone(body), lead = caller?.hash === b.lead.tokenHash, n = to === 0 ? 1 : Math.min(b.step.n, to), claimStep = Math.max(to, 1);
+    b.steps = b.steps.filter(s => s.n <= to);
+    const label = (k: number, claim?: string) => [...b.steps].reverse().find(s => s.n === k && s.claim === claim)?.label ?? b.plan.steps[k - 1] ?? `step ${k}`;
+    const kept = [...b.steps].reverse().find(s => s.n === n && !s.claim);
+    b.step = { n, label: n === body.step.n ? body.step.label : label(n), at, seq: kept?.lastSeq ?? null };
+    for (const c of b.claims) { if (force && c.status === 'held') c.status = 'released'; if (c.step.n > claimStep) c.step = { n: claimStep, label: label(claimStep, c.id) }; }
+    b.lastBatchAt = at; delete b.closureLapsedAt; b.stepCalls = []; b.designing = []; delete b.note;
+    b.say = { text: (to === 0 ? 'Rewound to the start' : `Rewound to step ${to}${to === n ? `: ${b.step.label}` : ''}`).slice(0, 140), at };
+    if (lead) delete b.paused;
+    b.rewinds = [...(b.rewinds ?? []), { at, to, from: info.from, edits: info.edits, removed: info.removed, byLabel: caller?.label ?? 'owner' }].slice(-16);
+    return { body: b, lead };
+  }
+  /** Y5 with nothing to revert: only the record moves back (same body rules as the chain's final write). */
+  saveRewound(id: string, to: number, at: number, caller: Identity | undefined, force: boolean, info: { from: number; edits: number; removed: number }) {
+    const row = this.row(id); if (!row || !open(row)) return fail('build.closed', id);
+    const { body, lead } = this.rewoundBody(row.body, to, at, caller, force, info);
+    const saved = this.save(row, body, lead ? 'active' : row.status, lead ? at : row.last_at, 'rewound'); if (!saved.ok) return saved;
+    const build = this.view(saved.row, at); this.announce(saved.row, 'rewound', { added: [], removed: [] }, false, build);
+    return { ok: true as const, build };
+  }
+  leadLive(id: string) { const row = this.rows.get(id); return row ? { label: row.body.lead.label, tokenHash: row.body.lead.tokenHash, live: !lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale } : undefined; }
   breakStaleLead(id: string) {
     const row = this.row(id); if (!row || !open(row)) return false;
     if (!lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale) return false;

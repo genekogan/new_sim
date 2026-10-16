@@ -19,6 +19,7 @@ import { GodBuilds, buildFieldSchema, type BuildBody, type BuildField, type Buil
 import { Parts } from './parts.ts';
 import { buildReceipt } from './build-integrity.ts';
 import { definitionUseClosure } from './unused-defs.ts';
+import { rewindChanges, rewindDependents } from './rewind.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -413,6 +414,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const notReverted = targets.map(e => e.seq), preflight = this.preflightUndo(targets, this.model, true, releaseClaims);
     if (!preflight.ok) return { accepted: false, reverted: [] as number[], notReverted, failed: preflight.failed, failures: preflight.failures };
     if (!targets.length && !emptyOK) return { accepted: false, reverted: [], notReverted, failures: [{ op: -1, code: 'undo.conflict', detail: 'no edits in group' }] };
+    return this.commitUndo(preflight, notReverted);
+  }
+  /** Commit a clean preflight in one SQL transaction, then install and notify (observers never see a half chain). */
+  private commitUndo(preflight: Extract<ReturnType<GodMode['preflightUndo']>, { ok: true }>, notReverted: number[]) {
     const refusal = this.store.commitSequence(this.owner, preflight.entries);
     if (refusal) return { accepted: false, reverted: [] as number[], notReverted, ...(!refusal.accepted ? { failures: refusal.failures } : {}) };
     // Make the complete result visible before invoking observers; an observer cannot expose a half-reverted world.
@@ -430,7 +435,48 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   undoGroup(group: string) {
     // A build owns its lead group and every claim/subgroup, including after finish.
-    return this.store.build(group) ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
+    const build = this.store.build(group);
+    // Y5 panel semantics: undoing an OPEN build's whole group keeps it open and rewinds it to the start (rewind --to 0),
+    // rather than closing it as abandoned-with-undo. Undo stays reversible (redo re-adds the parts into a still-open
+    // site whose roots and closure protect them; a closed record cannot be reopened), a live lead keeps its lease instead
+    // of meeting build.closed mid-batch, and Abandon remains the owner's explicit end. The record moves back with the
+    // world (step 1, no step history, closure re-armed), so the card never shows "towers 4/5" over an empty site, and
+    // the same dependency check refuses rather than destroys later work outside the build. Finished builds are unchanged.
+    if (build && (build.status === 'active' || build.status === 'paused')) {
+      const r = this.rewind(group, { to: 0 });
+      if (!r.ok) return { accepted: false, reverted: [] as number[], notReverted: 'edits' in r ? r.edits ?? [] : [], failures: r.failures, ...('failed' in r ? { failed: r.failed } : {}) };
+      return { accepted: true, reverted: r.rewind.edits, notReverted: [] as number[], rewound: r.rewind, ...('echo' in r && r.echo ? { build: r.echo } : {}), ...('warnings' in r && r.warnings?.length ? { warnings: r.warnings } : {}) };
+    }
+    return build ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
+  }
+  /** Y5 (CE3): rewind an open build to after step k. Every live edit of the build (lead and claim subgroups) recorded
+   *  after step k is reverted by one atomic R1 chain; later live edits that depend on them refuse the whole rewind.
+   *  The build stays open at step k with closure re-armed; `dry` returns the same summary and changes nothing. */
+  rewind(id: string, raw: unknown) {
+    const plan = this.builds.rewindPlan(id, raw, this.store.groupEditsUnder(id, true, 2_147_483_647));
+    if (!plan.ok) return plan;
+    const { targets, to, force } = plan, edits = targets.map(t => t.seq), at = this.now(), from = plan.row.body.step.n;
+    const preflight = this.preflightUndo(targets, this.model, true, force ? id : undefined);
+    if (!preflight.ok) return { ok: false as const, failures: preflight.failures, failed: preflight.failed, edits };
+    const dependents = targets.length ? rewindDependents(id, to, this.model, preflight.model, preflight.entries, targets, this.store.liveEditsAfter(Math.min(...edits))) : [];
+    if (dependents.length) return { ok: false as const, failures: dependents, edits };
+    const rewind = { to, from, edits, steps: plan.steps, ...rewindChanges(this.model, preflight.model, preflight.entries) };
+    const lead = this.builds.leadLive(id), warnings = lead?.live && lead.tokenHash !== this.caller.identity?.hash ? [`lead ${lead.label} is live; it should run build resume ${id} before its next edit`] : [];
+    if (plan.dry || plan.unchanged) return { ok: true as const, ...(plan.dry ? { dry: true } : { replayed: true }), build: this.builds.status(id)!.build, rewind, ...(warnings.length ? { warnings } : {}) };
+    const info = { from, edits: edits.length, removed: rewind.removes.count };
+    if (!preflight.entries.length) {
+      const saved = this.builds.saveRewound(id, to, at, this.caller.identity, force, info);
+      return saved.ok ? { ok: true as const, build: saved.build, rewind, ...(warnings.length ? { warnings } : {}) } : { ...saved, edits };
+    }
+    // The record moves back in the chain's final build write: same SQL transaction, same revision sequence.
+    const write = preflight.entries.at(-1)!.updates.writes.find(w => w.id === id)!;
+    const { body, lead: byLead } = this.builds.rewoundBody(write.next, to, at, this.caller.identity, force, info);
+    Object.assign(write, { next: body, body: JSON.stringify(body), kind: 'rewound' as const, ...(byLead ? { status: 'active' as const, lastAt: at } : {}) });
+    const committed = this.commitUndo(preflight, edits);
+    if (!committed.accepted) return { ok: false as const, failures: ('failures' in committed ? committed.failures : undefined) ?? [{ op: -1, code: 'revision.stale', detail: 'The world changed while the rewind was planned; nothing was changed.', fix: 'Retry the rewind.' }], edits };
+    const echo = 'build' in committed ? committed.build : undefined;
+    warnings.push(...('warnings' in committed ? committed.warnings ?? [] : []));
+    return { ok: true as const, build: this.builds.status(id)!.build, rewind, ...(echo ? { echo } : {}), ...(warnings.length ? { warnings } : {}) };
   }
   /** No 200/500-entry truncation, and no prefix collision with a neighbouring build/chapter. */
   undoGroupUnder(group: string, force = false) { return this.undoTargets(this.store.groupEditsUnder(group, false, 2_147_483_647), true, force ? group : undefined); }
