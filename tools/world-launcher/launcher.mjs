@@ -163,7 +163,7 @@ export async function openLauncher(cfg = {}) {
     try {
       const p = await pool.ensure(worldEnv(w));
       const r = await fetch(`http://127.0.0.1:${p}${wp(w.slug)}/v1/me`, { headers: { authorization }, signal: AbortSignal.timeout(5000) });
-      const id = r.ok ? (await r.json())?.me?.id : null;
+      const id = r.ok ? (await r.json())?.me?.userId : null; // the world's /v1/me (auth.me): { me: { userId, … } }
       return typeof id === 'string' && id ? id : null;
     } catch { return null; }
   }
