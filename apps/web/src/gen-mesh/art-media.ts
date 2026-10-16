@@ -1,0 +1,95 @@
+// W6: art on world-engine worlds — what a frame shows (image or looping video) and who made it.
+// Frames, screens and gallery walls (defs tagged `sign-text` with `media` faces) read entity state:
+//   media  one URL per line (a face with `slot: n` shows line n; a plain media face shows line 0)
+//   title  one title per line, maker one maker per line (written by the server's art routes, never by the viewer)
+// Videos (.mp4/.webm/.mov/.m4v) loop muted. One <video> per URL is shared by every face that shows it; a video plays
+// only while one of its faces is in the scene, within PLAY_M of the camera, facing it, and the page is visible; at most
+// MAX_PLAYING play at once (nearest first); a video no face has used for RELEASE_MS is unloaded and its texture freed.
+import * as THREE from 'three';
+
+export type MediaKind = 'image' | 'video';
+export type ArtInfo = { frame: string; slot: number; url: string; kind: MediaKind; title: string; maker: string };
+
+const VIDEO = /\.(mp4|webm|mov|m4v)$/i;
+/** Accepted media references: http(s) URLs, same-site paths, and (images only) inline data URLs. */
+export function mediaKind(url: string): MediaKind | null {
+  if (!url || url.length > 500 || /\s/.test(url)) return null;
+  if (/^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,/.test(url)) return 'image';
+  if (!/^(https?:\/\/|\/)/.test(url)) return null;
+  const path = url.split(/[?#]/)[0];
+  return VIDEO.test(path) || /#video$/.test(url) ? 'video' : 'image';
+}
+const lineOf = (v: unknown, i: number) => (typeof v === 'string' ? (v.split('\n')[i] ?? '').trim() : '');
+/** What one media face of an entity shows. */
+export function artOf(frame: string, state: Record<string, unknown>, slot: number | undefined): ArtInfo | null {
+  const i = slot ?? 0, url = lineOf(state.media, i), kind = mediaKind(url);
+  return kind ? { frame, slot: i, url, kind, title: lineOf(state.title, i), maker: lineOf(state.maker, i) } : null;
+}
+/** How a maker record reads on hover: `soul:<id>:<name>` (a resident's agent), `creator:<…>` (the world's creator). */
+export function makerText(maker: string): string {
+  if (!maker) return '';
+  const soul = /^soul:[^:]*:(.+)$/.exec(maker); if (soul) return `by ${soul[1]} (a resident)`;
+  if (/^creator(:|$)/.test(maker)) { const n = maker.split(':')[2]; return n ? `by ${n} (world creator)` : 'by the world\'s creator'; }
+  return `by ${maker}`;
+}
+export function hoverText(a: Pick<ArtInfo, 'title' | 'maker' | 'kind'>): string {
+  const t = a.title || (a.kind === 'video' ? 'Untitled video' : 'Untitled');
+  const m = makerText(a.maker);
+  return m ? `${t} — ${m}` : t;
+}
+
+// ------------------------------------------------------------------ shared videos
+
+const PLAY_M = 30, MAX_PLAYING = 4, RELEASE_MS = 20_000;
+type Entry = { url: string; video: HTMLVideoElement; texture: THREE.VideoTexture; meshes: Map<THREE.Mesh, number>; lastUsed: number; requesting: boolean; retryAt: number };
+const videos = new Map<string, Entry>();
+let ticking = false;
+
+/** A looping, muted video texture for `url`, shared by every face that shows it. */
+export function videoTexture(url: string, mesh: THREE.Mesh): THREE.Texture {
+  let e = videos.get(url);
+  if (!e) {
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous'; video.src = url; video.muted = true; video.loop = true; video.playsInline = true; video.preload = 'metadata';
+    const texture = new THREE.VideoTexture(video); texture.colorSpace = THREE.SRGBColorSpace;
+    e = { url, video, texture, meshes: new Map(), lastUsed: performance.now(), requesting: false, retryAt: 0 };
+    videos.set(url, e);
+  }
+  e.meshes.set(mesh, performance.now()); e.lastUsed = performance.now();
+  startTicker();
+  return e.texture;
+}
+function inScene(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; while (p) { if (!p.visible) return false; if ((p as THREE.Scene).isScene) return true; p = p.parent; } return false; }
+const _cam = new THREE.Vector3(), _pos = new THREE.Vector3(), _n = new THREE.Vector3();
+/** Play what the camera can see up close; pause the rest; unload what nothing shows. */
+export function updateVideos(camera: THREE.Camera | null, now = performance.now()) {
+  const page = typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  if (camera) camera.getWorldPosition(_cam);
+  const want: { e: Entry; d: number }[] = [];
+  for (const e of videos.values()) {
+    let best = Infinity;
+    for (const [m, seen] of e.meshes) {
+      if (!inScene(m)) { if (now - seen > RELEASE_MS) e.meshes.delete(m); continue; }
+      e.meshes.set(m, now); e.lastUsed = now;
+      if (!camera || !page) continue;
+      m.getWorldPosition(_pos); const d = _pos.distanceTo(_cam);
+      _n.set(0, 0, 1).transformDirection(m.matrixWorld);
+      if (d < PLAY_M && _n.dot(_cam.clone().sub(_pos)) > 0) best = Math.min(best, d);
+    }
+    if (best < Infinity) want.push({ e, d: best });
+    else if (!e.meshes.size && now - e.lastUsed > RELEASE_MS) release(e);
+  }
+  want.sort((a, b) => a.d - b.d);
+  const play = new Set(want.slice(0, MAX_PLAYING).map((w) => w.e));
+  for (const e of videos.values()) {
+    if (!play.has(e)) { if (!e.video.paused) e.video.pause(); continue; }
+    if (e.video.paused && !e.requesting && now >= e.retryAt) { e.requesting = true; void e.video.play().catch(() => { e.retryAt = performance.now() + 2000; }).finally(() => { e.requesting = false; }); }
+  }
+}
+function release(e: Entry) { e.video.pause(); e.video.removeAttribute('src'); e.video.load(); e.texture.dispose(); videos.delete(e.url); }
+function startTicker() {
+  if (ticking || typeof window === 'undefined') return; ticking = true;
+  setInterval(() => { const cam = (window as unknown as { __simEntity?: { camera?: THREE.Camera } }).__simEntity?.camera ?? null; try { updateVideos(cam); } catch { /* mid-reload */ } }, 250);
+}
+/** For tests and proof: every shared video and whether it is playing. */
+export function videoState() { return [...videos.values()].map((e) => ({ url: e.url, faces: e.meshes.size, playing: !e.video.paused, readyState: e.video.readyState, time: +e.video.currentTime.toFixed(2) })); }

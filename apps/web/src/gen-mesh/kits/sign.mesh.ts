@@ -7,8 +7,9 @@ import { kitArgs } from '@sim/generators';
 import { buildKit } from '../kit.mesh.ts';
 import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
+import { artOf, videoTexture } from '../art-media.ts';
 
-type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean };
+type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
 const loader = typeof document !== 'undefined' ? new THREE.TextureLoader() : null;
 
@@ -47,14 +48,19 @@ registerMesh({
     const text = typeof st.text === 'string' && st.text.trim() ? st.text.split('\n') : (ctx.def.components.sign?.lines ?? []);
     for (const f of faces) {
       let map: THREE.Texture;
-      if (f.media) {
-        const url = typeof st.media === 'string' ? st.media : '';
-        if (url && loader && /^(https?:|\/|data:image)/.test(url)) { map = texCache.get(url) ?? loader.load(url); map.colorSpace = THREE.SRGBColorSpace; texCache.set(url, map); }
-        else if (text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
-        else map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
-      } else map = textTexture((f.line !== undefined ? [text[f.line] ?? ''] : text).slice(0, 6), f);
-      const plane = new THREE.Mesh(new THREE.PlaneGeometry(f.w, f.h), new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 }));
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(f.w, f.h));
+      // W6: a media face shows its slot's image or looping video; a gallery wall's empty slots stay plain
+      const art = f.media ? artOf(ctx.entity.id, st, f.slot) : null;
+      if (art && art.kind === 'video') map = videoTexture(art.url, plane);
+      else if (art && loader) { map = texCache.get(art.url) ?? loader.load(art.url); map.colorSpace = THREE.SRGBColorSpace; texCache.set(art.url, map); }
+      else if (f.media && f.slot !== undefined) map = textTexture([''], f);
+      else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
+      else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');
+      else map = textTexture((f.line !== undefined ? [text[f.line] ?? ''] : text).slice(0, 6), f);
+      // video and images glow a little so art reads in dim rooms; text keeps the matte board look
+      plane.material = art ? new THREE.MeshBasicMaterial({ map, toneMapped: false }) : new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 });
       plane.position.set(...f.at); plane.rotation.set(f.pitch ?? 0, f.yaw ?? 0, 0, 'YXZ'); plane.name = 'sign-face';
+      if (art) plane.userData.art = art;
       root.add(plane);
     }
     return root;

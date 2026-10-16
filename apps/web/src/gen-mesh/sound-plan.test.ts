@@ -8,12 +8,12 @@ import { ambienceAt, DEFAULT_SETTINGS, emittersOf, loadSettings, Movement, saveS
 
 test('a def may carry one sound or a list; unknown kinds are dropped; the schema accepts both', () => {
   assert.equal(specsOf({ components: { sound: { kind: 'water', radius: 10, volume: 0.5 } } } as never).length, 1);
-  const two = specsOf({ components: { sound: [{ kind: 'water', radius: 10, volume: 0.5 }, { kind: 'hum', radius: 6, volume: 0.2 }, { kind: 'nope' }] } } as never);
+  const two = specsOf({ components: { sound: { kind: 'water', radius: 10, volume: 0.5, also: [{ kind: 'hum', radius: 6, volume: 0.2 }, { kind: 'nope' }] } } } as never);
   assert.deepEqual(two.map((s) => s.kind), ['water', 'hum']);
-  assert.ok(componentsSchema.safeParse({ sound: [{ kind: 'water' }, { kind: 'chatter', variant: 2 }] }).success);
+  assert.ok(componentsSchema.safeParse({ sound: { kind: 'water', also: [{ kind: 'chatter', variant: 2 }] } }).success);
   assert.ok(componentsSchema.safeParse({ sound: { kind: 'crickets' } }).success);
   assert.ok(!componentsSchema.safeParse({ sound: { kind: 'kazoo' } }).success);
-  assert.ok(!componentsSchema.safeParse({ sound: [] }).success);
+  assert.ok(!componentsSchema.safeParse({ sound: { kind: 'water', also: [] } }).success);
 });
 
 test('every kind has more than one voicing, and instances spread over them', () => {
@@ -24,7 +24,7 @@ test('every kind has more than one voicing, and instances spread over them', () 
 });
 
 test('emittersOf: each spec of a multi-sound def is its own emitter with its own variant', () => {
-  const def = { components: { sound: [{ kind: 'water', radius: 10, volume: 0.5 }, { kind: 'birds', radius: 20, volume: 0.3 }] }, state: { on: { default: true } }, form: 'point', size: { box: [1, 2, 1] } };
+  const def = { components: { sound: { kind: 'water', radius: 10, volume: 0.5, also: [{ kind: 'birds', radius: 20, volume: 0.3 }] } }, state: { on: { default: true } }, form: 'point', size: { box: [1, 2, 1] } };
   const model = {
     entities: new Map([['f1', { id: 'f1', def: 'd', in: { parent: 'world' }, params: { soundVariant: 2 } }], ['f2', { id: 'f2', def: 'd', in: { parent: 'world' }, params: {} }]]),
     resolvedDef: () => def, worldPose: () => ({ x: 1, y: 0, z: 2, s: 1 }), terrain: { sample: () => 0 },

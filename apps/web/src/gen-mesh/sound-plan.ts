@@ -1,7 +1,7 @@
 // W7 soundscape, the pure half (no WebAudio, testable under node): which sounds a world makes and where.
 //
 // Three kinds of source, all procedural (no audio files, nothing to license):
-//   - objects: a def's `components.sound` — one spec or a list of specs (a fountain can splash *and* hum). Each instance
+//   - objects: a def's `components.sound` — one spec, plus up to 3 more in `also` (a fountain can splash *and* hum). Each instance
 //     gets a variant of its kind from its id (two birdbaths need not sing the same song); `params.sound`, `params.loudness`
 //     and `params.soundVariant` override per instance.
 //   - ambience: the world around the listener — a wind bed always, birds by day and crickets by night (spread over a fixed
@@ -58,10 +58,10 @@ export function distanceTo(e: Pick<Emitter, 'pts' | 'area'>, x: number, y: numbe
 /** Loudness 0..1 heard from distance d (smooth quadratic fall-off to 0 at the radius). */
 export const falloff = (d: number, radius: number, volume: number) => (d >= radius ? 0 : volume * (1 - d / radius) ** 2);
 
-/** A def's sound specs: `components.sound` may be one spec or a list (at most 4). Unknown kinds are dropped. */
+/** A def's sound specs: `components.sound` and its `also` list (at most 4 in all). Unknown kinds are dropped. */
 export function specsOf(def: Pick<StoredDef, 'components'> | undefined): SoundSpec[] {
   const raw = (def?.components as { sound?: unknown } | undefined)?.sound;
-  const list = Array.isArray(raw) ? raw.slice(0, 4) : raw ? [raw] : [];
+  const list = Array.isArray(raw) ? raw.slice(0, 4) : raw ? [raw, ...(Array.isArray((raw as { also?: unknown }).also) ? ((raw as { also: unknown[] }).also).slice(0, 3) : [])] : [];
   const out: SoundSpec[] = [];
   for (const s of list as Partial<SoundSpec>[]) {
     if (!s || !isKind(s.kind)) continue;
