@@ -327,18 +327,25 @@ export class Intents {
   /** POST /v1/edge/resolve: what act would do, without doing anything. */
   dryRun(soul: EdgeSoul, input: IntentInput & {capability?: unknown}): Record<string, unknown> {
     if (typeof input.capability === 'string' && input.verb === undefined) {
-      const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk)return this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});
+      const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk){const out=this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});if(out.ok!==false)return out;
+        // quality case 27: an ambiguous destination name ("the library") falls back to the walk the plain words resolve to, still inviting the companions
+        const alt=walkWithFallback(this.L,soul,walk);return alt?{ok:true,would:{capability:alt.cap.id,label:alt.cap.label,available:alt.cap.available,params:{with:walk.with},channel:'body',resolved:`${input.capability} is ${alt.cap.id} with ${(walk.with as string[]).join(', ')} invited ({"with": ${JSON.stringify(walk.with)}}); they join if they accept.`}}:out;}
       const {caps} = this.L.coreA.binds(soul), asked = input.capability.trim();
       const place=explicitPlaceCapability(this.L,soul,asked);if(place){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen}};}
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
       const plain = attentionWords(asked); if (plain) return this.dryRun(soul, plain);
       const strict = strictCheck(this.L, soul, asked, caps); if (strict) return {ok: false, ...strict};
-      const r = this.L.coreA.resolveText(soul, asked, caps);
+      // quality cases 21/28: resolve reads social phrasing exactly as act does ("ride the balloon with X" invites X; "hug X")
+      const social = caps.some(c => c.id === asked) ? null : this.L.together.resolve(soul, asked, caps);
+      if (social && 'code' in social) return {ok: false, code: social.code, reason: social.reason, did_you_mean: social.did_you_mean};
+      const text = social ? social.capability || social.rest || asked : asked, extra = social?.params;
+      const r = text === asked ? this.L.coreA.resolveText(soul, asked, caps) : caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : this.L.coreA.resolveText(soul, text, caps);
       if (r.kind === 'unknown') return {ok: false, code: (r as {code?: string}).code ?? 'capability.unknown', reason: r.reason, did_you_mean: r.didYouMean};
-      const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap);
-      return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
-        ...(r.kind === 'alias' ? {resolved: r.note} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
+      const params = {...(r.kind === 'alias' && r.params ? r.params : {}), ...(extra ?? {})};
+      const P = new Perception(this.L, soul), at = this.L.coreA.targetPoint(soul, r.cap), note = [social?.note, r.kind === 'alias' ? r.note : null].filter(Boolean).join('; ');
+      return {ok: true, would: {capability: r.cap.id, label: r.cap.label, available: r.cap.available, ...(r.cap.blocked ? {blocked: r.cap.blocked} : {}), ...(Object.keys(params).length ? {params} : {}), channel: r.cap.verb === 'face' ? 'attention' : 'body',
+        ...(note ? {resolved: note + (extra?.with ? `. Act it with these params (act ${r.cap.id} '${JSON.stringify(extra)}'), or act the same words; an act without "with" is solo.` : '')} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
     }
     const r = this.resolve(soul, input);
     if (!r.ok) return {...r};
@@ -375,6 +382,11 @@ export function attentionWords(text: string): IntentInput | null {
 }
 
 /** An explicit companion AND destination becomes a destination walk with a consent invitation. */
+/** "walk with X to <place>" whose place name is ambiguous for strict place resolution: the walk its plain words resolve to. */
+export function walkWithFallback(L:EdgeLedger,soul:EdgeSoul,walk:IntentInput):{cap:EdgeCapability}|null{
+ const place=(walk.target as {place?:unknown}|undefined)?.place;const companions=walk.with as string[]|undefined;if(typeof place!=='string'||!companions?.length)return null;
+ const {caps}=L.coreA.binds(soul),r=L.coreA.resolveText(soul,'walk to '+place,caps);return r.kind!=='unknown'&&r.cap.verb==='walk'?{cap:r.cap}:null;
+}
 export function walkWithDestinationWords(text:string,knownNames:readonly string[]=[]):IntentInput|null {
  if(text.includes(':'))return null;
  const whole=/^\s*(?:please\s+)?(?:walk|go)\s+with\s+(.+?)\s*$/i.exec(text)?.[1].replace(/[.!?]+$/,'').trim().toLowerCase();

@@ -236,19 +236,41 @@ export async function observe(){
   here:{nearby:(st.nearby??[]).slice(0,12).map(n=>({who:n.who,distance:n.distance,doing:n.doing||undefined})),untrusted:true},
   happening:st.happening,canDo:c.canDo};
 }
-function summarise(caps){
- const avail=caps.filter(c=>c.available!==false);
- return {available:avail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
-  blocked:caps.filter(c=>c.available===false).slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code}))};
+// Quality case 35: agents write grep alternation ("gift\\|give"). `|`, `\\|`, commas and spaces separate terms that match
+// any of them (tiny words ignored); the whole phrase still counts most, and the best matches come first.
+const SEARCH_STOP=new Set(['the','and','with','for','into','from','some']);
+export function searchTerms(query){const whole=String(query).trim().toLowerCase(),terms=[...new Set(whole.split(/\\\||\||,|\s+/).map(x=>x.trim()).filter(x=>x.length>=3&&!SEARCH_STOP.has(x)))];return {whole,terms:terms.length?terms:[whole]};}
+function summarise(caps,filters={}){
+ const avail=caps.filter(c=>c.available!==false),blocked=caps.filter(c=>c.available===false);
+ // Search the full response first: an omitted compact-list entry is still an offered action.
+ const q=filters.search?searchTerms(filters.search):null;
+ const score=c=>{if(!q)return 1;const hay=[c.id,c.verb,c.label].map(v=>String(v??'').toLowerCase()).join('\n');return (hay.includes(q.whole)?100:0)+q.terms.filter(t=>hay.includes(t)).length;};
+ const pick=list=>list.map((c,i)=>({c,i,s:(!filters.verb||c.verb===filters.verb)?score(c):0})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.i-b.i).map(x=>x.c);
+ const matchingAvail=pick(avail),matchingBlocked=pick(blocked),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
+ return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
+  blocked:matchingBlocked.slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code})),
+  totals:{available:avail.length,blocked:blocked.length},matchingTotals:{available:matchingAvail.length,blocked:matchingBlocked.length},truncated,
+  ...(q&&q.terms.length>1?{searchTerms:q.terms,searchNote:'Any of these terms matches; best matches first.'}:{}),
+  ...(truncated.available||truncated.blocked?{hint:'Some offered capabilities are omitted from this compact list; absence is not a refusal. Use capabilities --search "<ID, verb or label>" or capabilities --verb "<exact verb>" to filter all offers before the display limit.'}:{})};
 }
-/** capabilities: everything legal now (ids to pass to act) plus what's blocked and why. */
-export async function capabilities(){
+function capabilityFilters(args){
+ const filters={},usage='usage: capabilities [--search "<ID, verb or label>"] [--verb "<exact verb>"]';
+ for(let i=0;i<args.length;i++){
+  const flag=args[i];if(!['--search','--verb'].includes(flag)||Object.hasOwn(filters,flag.slice(2)))throw Error(usage);
+  const value=args[++i];if(typeof value!=='string'||!value.trim()||value.startsWith('--'))throw Error(usage);
+  filters[flag.slice(2)]=flag==='--search'?value.trim().toLowerCase():value.trim();
+ }
+ return filters;
+}
+/** capabilities: a compact list of current offers; filters search all offers before display limits. */
+export async function capabilities(...args){
+ const filters=capabilityFilters(args);
  const s=load(),soul=need(s,'soul','Create one with create-soul.');
- if(await mode()==='edge')return {canDo:summarise(ok(await call(EDGE.capabilities),'capabilities').capabilities??[])};
+ if(await mode()==='edge')return {canDo:summarise(ok(await call(EDGE.capabilities),'capabilities').capabilities??[],filters)};
  const goals=(await call(OWNER.caps(soul),{as:'owner'})).data?.goals??[];
  const caps=goals.flatMap(g=>(g.bindings??[]).map(b=>({id:b.id,verb:g.id,label:b.aliases?.[0]??b.label,available:b.available,blocked:b.blockedCode?{code:b.blockedCode}:undefined})));
  if(goals.some(g=>g.id==='rest'))caps.push({id:'rest:self',verb:'rest',label:'rest',available:true});
- return {canDo:summarise(caps)};
+ return {canDo:summarise(caps,filters)};
 }
 export async function map(){if(await mode()==='edge')return ok(await call(EDGE.map),'map');const c=await capabilities();return {places:c.canDo.available.filter(x=>x.verb==='walk').map(x=>x.label),note:'full map arrives with eden-edge/1'};}
 export async function digest(){if(await mode()==='edge'){const r=await call(EDGE.digest);if(r.status===200)return {...r.data,...(r.data.digest==null?{note:'No steward world digest is published. For private conversation history use converse list, then converse turns <conversationId>.'}:{})};if(r.status===404)return {digest:null,note:'This world does not publish a digest yet.'};ok(r,'digest');}return {digest:null,note:'not offered by this world yet'};}
@@ -317,7 +339,10 @@ export async function act(first,...rest){
  if(!d.accepted&&d.code==='soul.not-in-sight'){const at=/\(in ([^,()]+),/.exec(d.reason??'');
   if(at){const d2=ok(await call(EDGE.act,{body:{capability:`walk to ${at[1]}`,params:{},clientRef:randomUUID()}}),'act');if(d2.accepted){d=d2;rewritten={from:rewritten?.from??capability,then:rewritten?.from??capability};}}}
  const then=rewritten?.then?{then:rewritten.then,next:`wait until this completes, then: act ${JSON.stringify(rewritten.then)}`}:{};
- if(d.accepted){accepted();/* Accepted targets are not visits; observed arrival owns coverage. */if(d.receipt?.channel!=='attention'&&d.receipt?.channel!=='none')save({lastReceipt:d.receipt?.id,lastActAt:now()});return {accepted:true,receipt:d.receipt,...(d.resolved?{resolved:d.resolved}:{}),...(rewritten?{asked:rewritten.from}:{}),...(d.receipt?.object||d.object?{object:d.receipt?.object??d.object}:{}),next:'wait',...then};}
+ if(d.accepted){accepted();/* Accepted targets are not visits; observed arrival owns coverage. */if(d.receipt?.channel!=='attention'&&d.receipt?.channel!=='none')save({lastReceipt:d.receipt?.id,lastActAt:now()});
+  // A person reference in a manual act on a non-person capability is ignored by the world: say so, so a solo act is never reported as shared.
+  const personKey=['targetSoul','target'].find(k=>params?.[k]!==undefined);const solo=personKey&&!/:s_[A-Za-z0-9]+/.test(capability)&&!/^(?:hug|high-five|dance-with|handshake|wave|give|go-near|walk-with|invite)/.test(capability);
+  return {accepted:true,receipt:d.receipt,...(solo?{warning:`"${personKey}" did not make this a shared act: ${capability} is a solo action. Resolve the complete request and use the offered partner capability (capabilities --verb <verb>); do not report it as done with the other person.`}:{}),...(d.resolved?{resolved:d.resolved}:{}),...(rewritten?{asked:rewritten.from}:{}),...(d.receipt?.object||d.object?{object:d.receipt?.object??d.object}:{}),next:'wait',...then};}
  return hinted({accepted:false,code:d.code,reason:d.reason,...(d.did_you_mean?{did_you_mean:d.did_you_mean}:{}),...(d.retry_after?{retry_after:d.retry_after}:{}),next:'observe and choose something else'});
 }
 /** 1.7.1: everyday phrasings the world does not resolve yet, rewritten to ones it does (the world still decides).
@@ -450,7 +475,7 @@ export async function wait(seconds='45'){
   let lr=null,receiptUnavailable;
   if(s.lastReceipt)try{lr=await receipt(s.lastReceipt,{timeoutMs:1000});if(!lr||lr.error){receiptUnavailable={id:s.lastReceipt,status:lr?.status??null,error:lr?.error??{code:'receipt.unavailable',message:'No canonical receipt returned.'},canonicalState:'unknown'};lr=null;}}catch(error){receiptUnavailable={id:s.lastReceipt,status:null,error:{code:'receipt.unavailable',message:String(error.message)},canonicalState:'unknown'};}
 
-  const stalled=lr?.phase==='waiting'?{hint:'Your movement is waiting (often the world\'s quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends.'}:{};
+  const stalled=lr?.awaitingAnswer?{hint:`${lr.awaitingAnswer.note} Do not tell the owner it is happening; keep waiting for their answer (invite.accepted) or report that it is still pending.`}:lr?.phase==='waiting'?{hint:'Your movement is waiting (often the world\'s quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends.'}:{};
   const invites=events.filter(e=>e.kind==='invite'&&e.invite).map(e=>({id:e.invite.id,from:e.invite.from?.name,what:e.invite.what,expiresInSeconds:e.invite.expiresInSeconds,accept:`act ${e.invite.accept}`,decline:`act ${e.invite.decline}`}));
   return {...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(waitUnavailable?{waitUnavailable}:{}),...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
    ...(lr?{lastReceipt:lr}:{}),...(receiptUnavailable?{receiptUnavailable}:{}),next:'observe, decide, act'};
@@ -876,7 +901,7 @@ export async function live(...argv){
   if(S.identityGoal&&execution.results.some(r=>r.accepted==null&&r.readOnly!==true&&r.queueRetained!==true)){S.identityGoal.unconfirmedEffect=true;saveS();}
   if(plan.ownerGoal==='resolved'&&S.identityGoal){const goal=S.identityGoal,qs=bodyQueue.snapshot(),target=conversations.snapshot().groups.find(g=>g.id===goal.conversationId),unfinished=qs.steps.some(s=>!['completed','cancelled','skipped'].includes(s.status));if(!unfinished&&!target?.attached&&!goal.unconfirmedEffect&&!execution.results.some(r=>r.accepted===false)){logLive({identityGoalResolved:{ownerRequestId:goal.ownerRequestId,basis:'model-declared-resolution',physicalCompletionInferred:false}});S.identityGoal=null;saveS();}else logLive({identityGoalResolutionRefused:{ownerRequestId:goal.ownerRequestId,reason:'Owned unfinished/refused queue, attached target conversation, or refused current result remains.'}});}
   const bodies=steps.filter(bodyStep);
-  let ownerAnswerSource='model-unverified';if(typeof plan.owner==='string')plan.owner=perception.truthful(plan.owner);if(own&&(bodies.length||execution.results.some(r=>r.accepted===false||r.accepted==null&&r.readOnly!==true&&r.queueRetained!==true))){plan.owner=results.join('; ').slice(0,600);ownerAnswerSource='execution-verdict';}
+  let ownerAnswerSource='model-unverified';if(typeof plan.owner==='string')plan.owner=perception.truthful(plan.owner);if((own||later)&&(bodies.length||execution.results.some(r=>r.accepted===false||r.accepted==null&&r.readOnly!==true&&r.queueRetained!==true))){plan.owner=results.join('; ').slice(0,600);ownerAnswerSource='execution-verdict';}
   logLive({wakeEnd:{reason,loop,reviewKey:reviewTask?.key??null,sessionId:b.id,queueId:bodyQueue.snapshot().id,usage:{input:u.in,cached:u.read,cacheWrite:u.write,output:u.out,reasoning:u.reasoning??null},actualModel:ans.model??null,usd:rec.usd}});
   if(u.in==null||u.out==null){modelBudgetUnknown=true;logLive({modelPause:'token usage unknown; further model calls refused'});}
   if(plan.remember){let selector=rememberSelector(plan.remember);try{const judgments=Array.isArray(plan.remember)?plan.remember:[plan.remember];if(judgments.length>3)throw Error('at most3 remember judgments per reply');for(const j of judgments){selector=rememberSelector(j);clientMemory.remember(j);localResult('remember',true,'Judgment saved.',selector);localOwnerResult('remember',true,`Memory judgment saved (${selector}).`);}}catch(error){localResult('remember',false,error.message,selector);localOwnerResult('remember',false,'Memory judgment not saved: '+clip(error.message,240));logLive({memoryProblem:{error:error.message,choice:boundedRememberChoice(plan.remember),fingerprint:createHash('sha256').update(JSON.stringify(plan.remember)).digest('hex')}});}}
@@ -887,7 +912,7 @@ export async function live(...argv){
   if(typeof plan.notes==='string'&&plan.notes.trim())try{clientMemory.remember({self:plan.notes.trim().split('\n').slice(0,20).map(line=>line.slice(0,200))});}catch(error){logLive({memoryProblem:error.message});}
   if(typeof plan.notes==='string'&&plan.notes.trim())writeFileSync(LIVE.notes,plan.notes.trim().slice(0,2500)+'\n');
   if(own){own.results.push(...results);if(typeof plan.owner==='string'&&plan.owner.trim()){own.answer=plan.owner.trim().slice(0,600);own.answerSource=ownerAnswerSource;}}
-  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?plan.owner.slice(0,600):null,answerSource:'model-unverified',results,receipt:steps.some(x=>x.act)?lastReceipt:null};
+  if(later&&(steps.length||plan.owner)){const r={id:later.id,t:now(),text:later.text,continued:true,answer:typeof plan.owner==='string'?plan.owner.slice(0,600):null,answerSource:ownerAnswerSource,results,receipt:steps.some(x=>x.act)?lastReceipt:null};
    appendFileSync(LIVE.replies,JSON.stringify(r)+'\n');logLive({owner:{...r,continued:true}});}
   const hm=(ob.clock??'')+' ';
   S.history.push(clip(`${hm}${reason}${evText.length?' ('+clip(evText.filter(l=>!l.startsWith('receipt')).join('; '),140)+')':''}: ${results.length?results.join('; '):'nothing'}`,330));S.history=S.history.slice(-12);

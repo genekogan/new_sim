@@ -18,7 +18,7 @@ const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {con
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
-import {Intents,walkWithDestinationWords, attentionWords, type IntentInput} from '../intents/intents.ts';
+import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
 import {strictCheck} from '../intents/strict.ts';
 import {bodyEnd} from '../perception/here.ts';
 import {explicitPlaceCapability,resolvePlaceForVerb} from '../boot/world-places.ts';
@@ -35,6 +35,7 @@ const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pen
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
+const WITH_PARAM = {type: 'array', items: 'Soul id or name', optional: true, description: 'Invite Souls near you; each joins only if they accept (shared walk / ride).'};
 type Row = {created_at: number; receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
 type StandReleaseV1={actor:string;owner:string;seats:{action:string;slot:string}[]};
@@ -180,7 +181,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- receipts
   private rows(where: string, ...args: (string | number | null)[]): Row[] {return this.db.db.prepare(`SELECT * FROM edge_receipts_v1 WHERE world_id=? AND ${where}`).all(this.host.worldId, ...args) as Row[];}
-  private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{})};}
+  private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);
+    // An invitation nobody has answered yet is not a shared activity: the host's receipt stays `waiting` (quality case 32).
+    const awaiting=r.phase==='started'?this.together?.awaitingAnswer(r.receipt_id,r.capability)??null:null;
+    return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: awaiting?'waiting':r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{}),...(awaiting?{awaitingAnswer:{...awaiting,note:`Invitation sent; ${awaiting.waitingFor.map(g=>g.name).join(', ')} has not accepted yet. Nothing shared has started.`}}:{})};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
   private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {},contentParams:Record<string,unknown>={},receiptId?:string): EdgeReceipt {
@@ -441,7 +445,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   invalidateBodies(){this.capCache.clear();}
   bodyAssignmentReady(soul:EdgeSoul){return !this.faded.has(soul.soulId)&&!this.pending.has(soul.soulId)&&!this.openReceipts(soul.soulId).length&&!this.together.awaiting(soul.soulId)&&!this.together.heldBy(soul.soulId);}
   bodyVerbProblem(soul:EdgeSoul,verb:string){return bodyVerbProblem(this.body(soul.entityId),verb);}
-  capabilities(soul: EdgeSoul): EdgeCapability[] {return this.binds(soul).caps;}
+  /** Walks and ride boardings advertise `with` (quality cases 21/27: the invitation was there but undiscoverable). */
+  capabilities(soul: EdgeSoul): EdgeCapability[] {return this.binds(soul).caps.map(c => (c.verb === 'walk' && c.target?.kind === 'place') || (c.verb === 'object' && c.action === 'join') ? {...c, params: {...(c.params ?? {}), with: WITH_PARAM}} : c);}
   private activityErrors = 0;
   private strollSpots = new Map<string, {key: string; spots: [number, number][]}>();
   /** Up to 5 clear stops spread over a place (cached until the static scene changes), visited from the nearest as a loop. */
@@ -511,7 +516,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const receipt=this.coreA.setDetail(out.receipt.id,{chosen:place.chosen})??out.receipt;return {...out,receipt};
       }
     }
-    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.capCache.clear();return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}return out;}}
+    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.capCache.clear();return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}
+      // quality case 27: an ambiguous destination ("the library") falls back to the walk its plain words resolve to, still inviting
+      const alt=walkWithFallback(this,soul,walk);if(alt){const again=await this.actOnce(soul,{capability:alt.cap.id,params:{...(input.params&&typeof input.params==='object'?input.params as Record<string,unknown>:{}),with:walk.with},clientRef:input.clientRef});if(again.accepted){this.capCache.clear();return {...again,resolved:{from:input.capability,to:alt.cap.id,note:`Walk to ${alt.cap.label}; ${(walk.with as string[]).join(', ')} receive an invitation and choose whether to join.`}};}}
+      return out;}}
     const out = await this.actOnce(soul, input);
     if (out.accepted) this.capCache.clear();     // invitations, items and follows change what others can do this tick
     return out;

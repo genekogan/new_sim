@@ -22,7 +22,9 @@ export function confirmedTogetherEffects(ledger:EdgeLedger,r:EdgeReceipt,op:Item
   const counterparts=actorHost?inv.guests.filter(g=>inv.responses[g.soulId]==='accepted'&&inv.guestReceipts[g.soulId]):[inv.host];if(!counterparts.length)continue;
   const place=(r.endedAt as {place?:string}|null)?.place??null;met.push(...counterparts.map(s=>({soulId:s.soulId,name:s.name,placeId:place})));detail.together={inviteId:inv.id,activity:inv.activity,what:inv.what,acceptedParticipants:[inv.host,...inv.guests.filter(g=>inv.responses[g.soulId]==='accepted')],programmeId:r.programId};
  }
- return{changed,met,detail,untrusted:met.length>0,...(met.length?{summary:`Completed ${String((detail.together as {what?:string}).what??r.capability)} with ${met.map(s=>s.name).join(', ')}.`}:{})};
+ // quality case 33: accepting a ride invitation is a boarding too, never a finished ride (the host's join already says so)
+ const boarded=linked&&linked.kind==='ride'&&linked.guestReceipts[r.soulId]===r.id&&linked.responses[r.soulId]==='accepted'?`Accepted ${linked.host.name}'s invitation and boarded ${linked.ride?.object??'the ride'}; the ride has not left the ground yet and is not finished.`:null;
+ return{changed,met,detail,untrusted:met.length>0||!!boarded,...(met.length?{summary:`Completed ${String((detail.together as {what?:string}).what??r.capability)} with ${met.map(s=>s.name).join(', ')}.`}:boarded?{summary:boarded}:{})};
 }
 const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
 /** Entitled action response/state only; never raw hidden object fields. */
@@ -31,5 +33,7 @@ export function confirmedObjectEffects(before:unknown,after:unknown,action:strin
  const detail:Record<string,unknown>={object:{id,kind,action,version}},changed:NonNullable<ConfirmedEffects['changed']>=[{id,kind:'object-updated',summary:`${id} accepted ${action}; version ${version}.`,source:`object:${id}:v${version}`}];
  if(kind==='project'&&typeof state.progress==='number')detail.project={id,progress:state.progress,status:state.status};
  if(kind==='chess'){const game:Record<string,unknown>={id};for(const key of ['status','turn','fullmove','halfmove','check','winner'])if(typeof state[key]==='string'||typeof state[key]==='number'||typeof state[key]==='boolean')game[key]=state[key];detail.game=game;}
+ // A joined ride is a boarding, not a finished ride: say so in the world's own verdict so a seated, parked body is never reported as "ride completed".
+ if(kind==='ride'&&action==='join')return{changed,detail,untrusted:true,summary:`Boarded ${id} and seated; the ride has not left the ground yet and is not finished.`};
  return{changed,detail,untrusted:true};
 }

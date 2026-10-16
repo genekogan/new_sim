@@ -68,6 +68,10 @@ const ITEM_WORDS: [ItemKind, RegExp][] = [['book', /\b(?:book|books|novel)\b/], 
 /** Bounds (Gene: simple, deterministic, bounded). */
 export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, consumableMinutes: 20, keepHours: 4, nearItems: 20};
 const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45;
+/** A shared walk is only "together" when the guest ends beside the host: follow standoff is 1.5 m, so 2.2 m leaves slack but not 2.8 m apart. */
+export const TOGETHER_RADIUS = 2.2;
+export const besideEachOther = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= TOGETHER_RADIUS;
+
 /** Activity verbs an invitation may carry (params.with). */
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
   'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
@@ -168,6 +172,18 @@ export class Together {
   private pending(): Invite[] {return (this.p.db.db.prepare("SELECT body FROM edge_invites_v1 WHERE world_id=? AND state='pending' ORDER BY created_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Invite);}
   private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
   inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
+  /** A paired gesture or a give whose host receipt is open while nobody has answered yet (quality case 32): the host is
+   *  only walking over / holding out a hand, so the receipt reads `waiting` and `here` reads `inviting` until a guest
+   *  accepts. Cheap for every other receipt: only paired/give capabilities ever look at the invitation table. */
+  awaitingAnswer(receiptId: string, capability: string): {invite: string; what: string; waitingFor: {soulId: string; name: string}[]; expiresInSeconds: number} | null {
+    const verb = capability.split(':')[0]!;
+    if (verb !== 'give' && !Object.hasOwn(PAIRED, verb)) return null;
+    const inv = this.pending().find(i => i.hostReceipt === receiptId && (i.kind === 'paired' || i.kind === 'give'));
+    if (!inv || Object.values(inv.responses).includes('accepted')) return null;
+    const open = inv.guests.filter(g => !inv.responses[g.soulId]);
+    if (!open.length) return null;
+    return {invite: inv.id, what: inv.what, waitingFor: open.map(g => ({soulId: g.soulId, name: this.p.host.minds.get(g.soulId)?.name ?? g.name})), expiresInSeconds: Math.max(0, Math.round((inv.expiresTick - this.tick) / 20))};
+  }
   /** Pending invitations addressed to this Soul that it has not answered. */
   invitesFor(soulId: string): Invite[] {return this.pending().filter(i => i.guests.some(g => g.soulId === soulId) && !i.responses[soulId]).map(i=>({...i,host:{...i.host,name:this.p.host.minds.get(i.host.soulId)?.name??i.host.name},guests:i.guests.map(g=>({...g,name:this.p.host.minds.get(g.soulId)?.name??g.name}))}));}
   item(id: string): Item | null {const r = this.p.db.db.prepare('SELECT body FROM edge_items_v1 WHERE world_id=? AND item_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
@@ -534,7 +550,7 @@ export class Together {
   private arrivedTogether(f: Follow) {
     if (!f.withHost || ['started', 'waiting'].includes(this.p.receipt(f.target, f.withHost)?.phase ?? 'gone')) return false;
     const a = this.posOf(f.soulId), b = this.posOf(f.target);
-    if (a && b && Math.hypot(a[0] - b[0], a[1] - b[1]) > 3) {f.untilTick = Math.min(f.untilTick, this.tick + 60 * 20); return false;}
+    if (a && b && !besideEachOther(a, b)) {f.untilTick = Math.min(f.untilTick, this.tick + 60 * 20); return false;}
     return true;
   }
   private endFollow(f: Follow, phase: 'completed' | 'failed', code?: string, reason?: string) {

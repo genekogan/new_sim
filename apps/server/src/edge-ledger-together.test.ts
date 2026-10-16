@@ -8,6 +8,7 @@ import {writeFileSync} from 'node:fs';
 import {kernelHash} from '@sim/kernel';
 import {edenNavWorld, factory} from '../test/eden-nav-fixture.ts';
 import {WorldHost} from './world.ts';
+import {besideEachOther, TOGETHER_RADIUS} from './edge/ledger/together.ts';
 import {mountEdgeRoutes, edgeSoulResolver} from './edge/routes.ts';
 
 async function world(n: number) {
@@ -142,7 +143,7 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   assert.equal((w.ledger.observe(c, new Set()) as any).self.following?.soulId, a.soulId);
   await w.run([{soulId: a.soulId, id: go.receipt.id}, {soulId: c.soulId, id: along.receipt.id}], 8000);
   assert.equal(w.phase(a, go).phase, 'completed'); assert.equal(w.phase(c, along).phase, 'completed', JSON.stringify(w.phase(c, along)));
-  assert.ok(w.gap(a, c) < 5, 'c walked with a: ' + w.gap(a, c).toFixed(1));
+  assert.ok(w.gap(a, c) <= 2.2, 'shared outing ends beside the host: ' + w.gap(a, c).toFixed(1));
   // follow: c walks with a (no invitation needed; a is told and can ask c to stop)
   const fo = await w.act(c, 'walk with ' + a.name); assert.equal(fo.resolved?.to, 'follow:' + a.soulId);
   assert.ok(w.events(a, 'follow').length, 'a hears c is walking with them');
@@ -204,4 +205,12 @@ test('together: pick up, carry, give (accepted), put down, pick up again, eat; h
   assert.deepEqual(w.ledger.together.publicItems(), []);
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
   await w.replayExact();
+});
+
+// Quality lane (cases 27/34): a walk with a partner completed with the two bodies 2.8 m apart; that must not count as arriving together.
+test('a shared walk only completes with the guest beside the host', () => {
+  assert.equal(TOGETHER_RADIUS, 2.2);
+  assert.equal(besideEachOther([0, 0], [1.5, 0]), true, 'follow standoff is beside');
+  assert.equal(besideEachOther([0, 0], [2.2, 0]), true);
+  assert.equal(besideEachOther([0, 0], [2.8, 0]), false, '2.8 m apart is not together');
 });
