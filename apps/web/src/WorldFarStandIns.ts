@@ -55,7 +55,9 @@ export class WorldFarStandIns{
   constructor(o:StandInOptions,snapshot:Snapshotter){this.o=o;this.snapshot=snapshot;this.group.name='far-stand-ins';this.group.visible=false;}
   private eligible(m:THREE.InstancedMesh){
     const g=m.geometry,mat=m.material;
-    return m.count>=this.o.minInstances&&!Array.isArray(mat)&&!!g?.attributes.position&&triangles(g)>=this.o.minTriangles&&!m.userData.keepDetail&&!Object.keys(g.morphAttributes).length&&m.parent!==null;
+    // decals and see-through things (tyre tracks pressed into the ground, glass) do not survive as an alpha-tested card
+    if(Array.isArray(mat)||mat.transparent||mat.polygonOffset||!mat.depthWrite||mat.blending!==THREE.NormalBlending||mat.alphaTest>0)return false;
+    return m.count>=this.o.minInstances&&!!g?.attributes.position&&triangles(g)>=this.o.minTriangles&&!m.userData.keepDetail&&!Object.keys(g.morphAttributes).length&&m.parent!==null;
   }
   private scan(root:THREE.Object3D){
     const seen=new Set<THREE.InstancedMesh>();

@@ -22,6 +22,12 @@ test('levels are coarser, keep the vertices, and report their error in metres', 
   assert.ok(levels.at(-1)!.error<1,'a 3% terrain level stays within a metre of the original');
 });
 
+test('the error cap keeps every level within 1.5 cm, under the decals lifted 2.5 cm above the ground', () => {
+  const g=terrain(),levels=buildLevels(simplifier,g,PHONE_MESH_LOD.ratios,PHONE_MESH_LOD.maxWorldError);
+  assert.ok(levels.length>=1);for(const l of levels)assert.ok(l.error<=0.0151,`error ${l.error}`);
+  assert.ok(levels.at(-1)!.triangles<g.index!.count/3*0.6,'still meaningfully coarser');
+});
+
 test('far terrain draws a coarse level, near terrain the original; render-time only', async () => {
   const scene=new THREE.Scene(),mesh=new THREE.Mesh(terrain(),new THREE.MeshBasicMaterial());scene.add(mesh);
   const camera=new THREE.PerspectiveCamera(45,390/844,0.1,2400);camera.position.set(0,40,600);camera.lookAt(0,0,0);scene.updateMatrixWorld(true);
@@ -42,6 +48,23 @@ test('small meshes, skinned and instanced meshes are left alone; a replaced geom
   frame(lod,scene,camera);assert.equal(lod.stats.meshes,1);lod.restore();
   big.geometry=terrain();frame(lod,scene,camera,3);assert.equal(lod.stats.meshes,1);assert.equal(lod.stats.coarser,1);lod.restore();
   lod.dispose();
+});
+
+test('painted vertex colours (a track across flat ground) survive simplification', () => {
+  const g=new THREE.PlaneGeometry(200,200,128,128).rotateX(-Math.PI/2),n=g.attributes.position.count,col=new Float32Array(n*3);
+  for(let i=0;i<n;i++){const x=g.attributes.position.getX(i),z=g.attributes.position.getZ(i),track=Math.abs(z-20*Math.sin(x/9))<1.6?0.7:1;col.set([0.8*track,0.75*track,0.7*track],i*3);}
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const plain=buildLevels({simplify:simplifier.simplify} as Simplifier,g,[0.03],PHONE_MESH_LOD.maxWorldError);
+  const painted=buildLevels(simplifier,g,[0.03],PHONE_MESH_LOD.maxWorldError);
+  assert.ok(painted[0].triangles>plain[0].triangles*1.5,`with colours the track keeps its vertices: ${painted[0].triangles} vs ${plain[0].triangles}`);
+  assert.ok(painted[0].triangles<32768*0.3,'and the rest of the ground still simplifies');
+});
+
+test('decals (polygon offset) and transparent layers are never simplified', async () => {
+  const scene=new THREE.Scene(),decal=new THREE.Mesh(terrain(),new THREE.MeshBasicMaterial({polygonOffset:true,polygonOffsetFactor:-2})),glass=new THREE.Mesh(terrain(),new THREE.MeshBasicMaterial({transparent:true}));scene.add(decal,glass);
+  const camera=new THREE.PerspectiveCamera(45,1,0.1,2400);camera.position.set(0,40,900);scene.updateMatrixWorld(true);
+  const lod=new WorldMeshLod({...PHONE_MESH_LOD,budgetMs:1e9},async()=>simplifier);await new Promise(r=>setTimeout(r,0));
+  frame(lod,scene,camera);assert.equal(lod.stats.meshes,0);
 });
 
 test('without a simplifier everything is drawn as before', async () => {

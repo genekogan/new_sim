@@ -52,6 +52,11 @@ test('a removed source is dropped with its derived meshes; nothing changes when 
   assert.equal(standIns.group.children.length,0);standIns.dispose();
 });
 
+test('decals and transparent instances are never replaced by cards', () => {
+  const w=world();(w.bushes.material as THREE.Material).polygonOffset=true;frame(w,2);assert.equal(w.standIns.stats.sources,0);
+  const v=world();(v.bushes.material as THREE.Material).transparent=true;frame(v,2);assert.equal(v.standIns.stats.sources,0);assert.equal(v.bushes.visible,true);
+});
+
 test('a mesh that cannot be photographed keeps its full detail', () => {
   const w=world(),standIns=new WorldFarStandIns(PHONE_STAND_INS,()=>null);w.scene.add(standIns.group);
   standIns.apply(w.scene,w.camera,844);standIns.restore();standIns.apply(w.scene,w.camera,844);
