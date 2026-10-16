@@ -111,7 +111,8 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
     if (ownerOnly[sub] !== method) return null;
     const a = await owner(w, authorization);
     if (!a) return [403, { ok: false, code: 'forbidden', message: "only this world's owner" }];
-    if (sub === 'cobuilders') return [200, { ok: true, enabled: cobuilders, cobuilders: w.cobuilders ?? [], offers: live(w).map(({ hash: _h, ...o }) => o) }];
+    // an old co-build invitation cannot be used while co-builders are off, so it is not shown as open either
+    if (sub === 'cobuilders') return [200, { ok: true, enabled: cobuilders, cobuilders: w.cobuilders ?? [], offers: live(w).filter((o) => cobuilders || o.kind !== 'cobuild').map(({ hash: _h, ...o }) => o) }];
     if (sub === 'cobuilders/invite' && !cobuilders) return [403, COBUILDERS_OFF];
     if (sub === 'cobuilders/invite') {
       const to = typeof body?.to === 'string' && body.to ? body.to : undefined;
