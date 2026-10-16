@@ -28,6 +28,7 @@ import {resolveMailRecipient} from '../outcomes/recipients.ts';
 import {terminalSnapshot} from '../outcomes/providers.ts';
 import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
 import {tx,afterCommit} from '../comms/store.ts';
+import {PlaceKnowledge} from '../perception/knowledge.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
@@ -106,6 +107,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   readonly host: WorldHost; readonly db: Db;
   /** together/1 (core-next4): gestures between Souls, invitations, follows, carried items. */
   readonly together: Together;
+  /** knowledge/1: memory of visits per Soul, and the places the world's creator keeps secret. */
+  readonly knowledge: PlaceKnowledge;
   /** Ambient life reflex (Gene: Souls visibly alive between agent decisions); the edge server turns it on. */
   readonly ambient: boolean;
   private idleSince = new Map<string, number>();
@@ -133,6 +136,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'detail')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN detail TEXT');
     this.intents = new Intents(this);
     this.places = new PlaceIndex(this.loadPlaces(placeData));
+    this.knowledge = new PlaceKnowledge(this);
+    {const paths = new Map<string, string[]>(), path = (sid: string) => this.placePathOf(sid).filter(p => p.kind !== 'occupier').map(p => p.id);
+      this.placeListeners.push(e => {if (!e.to) {paths.delete(e.soulId); return;} const now = path(e.soulId); this.knowledge.arrive(e.soulId, now, e.tick, paths.get(e.soulId) ?? []); paths.set(e.soulId, now);});}
     this.outcomes=new ActionOutcomes(db.db,host.worldId);
     this.syncCarrierPlaces();
     // together/1: gestures, invitations, follows and items (core-next4)
@@ -414,6 +420,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       for(const verb of ['hover','settle']){const id=verb+':here',label=verb==='hover'?'Hover here':'Settle here (hold position while hovering)';caps.unshift({id,verb,label,available:true,params:secondsParam});plans.set(id,{label,steps:[{verb:'rest',params:{seconds:60}}],seconds:true});}
       for(const c of caps)if(c.verb==='walk')c.label=c.label.replace(/walk/ig,'Glide');else if(c.id==='stand:here')c.label='Stop / release my current hover slot';
     }
+    // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
+    if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {const t = caps[i]!.target; if (t?.kind === 'place' && !this.knowledge.knows(soul.soulId, t.id)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
     const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
   }
   invalidateBodies(){this.capCache.clear();}
@@ -943,7 +951,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return {soul: {soulId, name: row.name ?? m?.name ?? soulId, description: row.description ?? null, untrusted: true}, fade: this.comms?.fading.status(soulId) ?? null, lastAcceptedAt: last.at,
       self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle')} : null, receipts, events: events.slice(0, 30)};
   }
-  map() {this.beforeMap?.(); const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions || !!this.placeWalkable?.(p.id), center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
+  map() {this.beforeMap?.(); const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].filter(p => !this.knowledge.isSecret(p.id)).map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions || !!this.placeWalkable?.(p.id), center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
 
   /** PM-R055: happening (with walk capability) and a few inviting places elsewhere. Counts only, never identities;
    *  project titles are listed objects (untrusted), marks are counted. Deterministic for a given world state. */
