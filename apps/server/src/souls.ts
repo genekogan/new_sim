@@ -26,6 +26,8 @@ type Pairing =
   | { kind: 'owner'; code: string; soulId: string; owner: string; issuer: string; expires: number }
   | { kind: 'agent'; code: string; poll: string; agent: string; expires: number; token?: string; soulId?: string; owner?: string; issuer?: string };
 const PAIR_TTL = 15 * 60_000;
+/** A body left in water when its activity ends is swimming, or treading water when still, not "standing around". */
+const IN_WATER: Record<string, string> = { swim: 'swimming', tread: 'treading water', wade: 'wading' };
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 const humanCode = () => { const b = randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHABET[b[i] % ALPHABET.length]; return `${s.slice(0, 4)}-${s.slice(4)}`; };
 const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2');
@@ -393,7 +395,7 @@ export class Souls {
     const location=e.observeBodyLocation?.(m.entityId);
     return {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
-      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: location?.region?.id??s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : 'standing around',
+      position: { x: ent.pose.p[0], z: ent.pose.p[2], region: location?.region?.id??s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : IN_WATER[ent.human!.activity] ?? 'standing around',
       mood: m.mood, energy: energyWord(m.energy), wants_company: m.wantsCompany,
       ...(m.life ? { needs: m.life.needs, journal: m.life.journal, reflected_day: m.life.reflectedDay, customs: this.host.living?.customs } : {}),
       mandate:mandateOf(this.host.kernel,soul.id),

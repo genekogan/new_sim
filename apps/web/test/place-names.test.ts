@@ -22,6 +22,24 @@ test('VF1: ids in a doing line read as human names, never raw ids', () => {
     assert.doesNotMatch(doingText(raw, 'sit'), /[a-z]-[a-z]/, raw);
 });
 
+test('swimwall: a body in water reads Swimming / Treading water, never the idle "Standing around"', () => {
+  // the server's doing once a swim program ends is "standing around" while the body treads water (both engines, any body)
+  assert.equal(doingText('standing around', 'tread', 's_0123456789'), 'Treading water');
+  assert.equal(doingText('standing around', 'swim'), 'Swimming');
+  assert.equal(doingText('standing around', 'mars:tread'), 'Treading water');
+  assert.equal(doingText('Standing around', 'wade'), 'Wading');
+  assert.equal(doingText(undefined, 'tread'), 'Treading water');
+  assert.equal(activityWords('tread'), 'Treading water');                    // history labels and the profile card
+  assert.equal(activityWords('swim'), 'Swimming');
+  // the idle placeholder yields only to a named pose; a running activity's own words and unknown activities stay
+  assert.equal(doingText('standing around', 'sit'), 'Sitting');
+  assert.equal(doingText('standing around', 'idle'), 'Standing around');
+  assert.equal(doingText('standing around', 'wait'), 'Standing around');
+  assert.equal(doingText('standing around', undefined), 'Standing around');
+  assert.equal(doingText('Swim in the supported pond', 'tread'), 'Swim in the supported pond');
+  assert.equal(doingText('swim:shore-water', 'tread'), 'Treading water · '+placeName('shore-water'));
+});
+
 test('VF1: "Reconnecting" only after a lost open socket stays down past the grace', () => {
   const conn = { stats: { state: 'connecting', reconnects: 0 } };
   assert.equal(connectionLost(conn, 0), false);           // first connect is arriving
