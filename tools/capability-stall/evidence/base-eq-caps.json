@@ -1,0 +1,4506 @@
+[
+ {
+  "id": "sit-ground:here",
+  "verb": "sit-ground",
+  "available": true,
+  "blocked": null,
+  "label": "Sit down on the ground here",
+  "target": null
+ },
+ {
+  "id": "sit:here",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "Sit down on the nearest free seat (cs-church-0/nave-pew-6-1 (by commons and cs-church-0/nave-pew-5-1; 14 m))",
+  "target": {
+   "id": "e_6361e00a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "lie:here",
+  "verb": "lie",
+  "available": true,
+  "blocked": null,
+  "label": "Lie down on the grass here",
+  "target": null
+ },
+ {
+  "id": "nap:here",
+  "verb": "nap",
+  "available": true,
+  "blocked": null,
+  "label": "Take a nap on the grass here",
+  "target": null
+ },
+ {
+  "id": "dance:here",
+  "verb": "dance",
+  "available": true,
+  "blocked": null,
+  "label": "Dance here",
+  "target": null
+ },
+ {
+  "id": "jump:here",
+  "verb": "jump",
+  "available": true,
+  "blocked": null,
+  "label": "Jump on the spot",
+  "target": null
+ },
+ {
+  "id": "stretch:here",
+  "verb": "stretch",
+  "available": true,
+  "blocked": null,
+  "label": "Stretch",
+  "target": null
+ },
+ {
+  "id": "jumping-jacks:here",
+  "verb": "jumping-jacks",
+  "available": true,
+  "blocked": null,
+  "label": "Do jumping jacks",
+  "target": null
+ },
+ {
+  "id": "yoga:here",
+  "verb": "yoga",
+  "available": true,
+  "blocked": null,
+  "label": "Do yoga on the ground",
+  "target": null
+ },
+ {
+  "id": "pushups:here",
+  "verb": "pushups",
+  "available": true,
+  "blocked": null,
+  "label": "Do push-ups",
+  "target": null
+ },
+ {
+  "id": "situps:here",
+  "verb": "situps",
+  "available": true,
+  "blocked": null,
+  "label": "Do sit-ups",
+  "target": null
+ },
+ {
+  "id": "read:here",
+  "verb": "read",
+  "available": true,
+  "blocked": null,
+  "label": "Read this world's constitution, standing here",
+  "target": null
+ },
+ {
+  "id": "stroll:field",
+  "verb": "stroll",
+  "available": true,
+  "blocked": null,
+  "label": "Stroll through Green field (a loop of 5 stops)",
+  "target": {
+   "id": "field",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:field",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Green field",
+  "target": {
+   "id": "field",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:field",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Green field",
+  "target": {
+   "id": "field",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "rest:here",
+  "verb": "rest",
+  "available": true,
+  "blocked": null,
+  "label": "Rest here",
+  "target": null
+ },
+ {
+  "id": "stand:here",
+  "verb": "stand",
+  "available": true,
+  "blocked": null,
+  "label": "Stand up / stop what I am doing",
+  "target": null
+ },
+ {
+  "id": "make:mark",
+  "verb": "make",
+  "available": true,
+  "blocked": null,
+  "label": "Leave a note, sign, offering or proposal here (lasting; others can read and respond; the steward may calendar proposals)",
+  "target": null
+ },
+ {
+  "id": "make:project",
+  "verb": "make",
+  "available": true,
+  "blocked": null,
+  "label": "Start a shared project here (others can contribute steps)",
+  "target": null
+ },
+ {
+  "id": "wave:here",
+  "verb": "wave",
+  "available": true,
+  "blocked": null,
+  "label": "Wave (to nobody in particular, or {\"to\": a name} to face someone)",
+  "target": null
+ },
+ {
+  "id": "wander:here",
+  "verb": "wander",
+  "available": true,
+  "blocked": null,
+  "label": "Stroll around nearby",
+  "target": null
+ },
+ {
+  "id": "gather:field",
+  "verb": "gather",
+  "available": true,
+  "blocked": null,
+  "label": "Gather with others at Green field",
+  "target": {
+   "id": "field",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "bow:here",
+  "verb": "bow",
+  "available": true,
+  "blocked": null,
+  "label": "Bow (params.to: someone to bow to)",
+  "target": null
+ },
+ {
+  "id": "clap:here",
+  "verb": "clap",
+  "available": true,
+  "blocked": null,
+  "label": "Clap / applaud (params.to: someone to applaud)",
+  "target": null
+ },
+ {
+  "id": "nod:here",
+  "verb": "nod",
+  "available": true,
+  "blocked": null,
+  "label": "Nod (params.to: someone)",
+  "target": null
+ },
+ {
+  "id": "shake-head:here",
+  "verb": "shake-head",
+  "available": true,
+  "blocked": null,
+  "label": "Shake your head (params.to: someone)",
+  "target": null
+ },
+ {
+  "id": "cheer:here",
+  "verb": "cheer",
+  "available": true,
+  "blocked": null,
+  "label": "Cheer (params.to: someone)",
+  "target": null
+ },
+ {
+  "id": "point:here",
+  "verb": "point",
+  "available": true,
+  "blocked": null,
+  "label": "Point at someone, a place or a thing (params.at)",
+  "target": null
+ },
+ {
+  "id": "swim:shore-water",
+  "verb": "swim",
+  "available": true,
+  "blocked": null,
+  "label": "Swim in shore-water (walk to its shore, then swim out to the middle)",
+  "target": {
+   "id": "e_f6804171",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:commons",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to commons, a lawn, by commons-path and festival-balloon (0 m)",
+  "target": {
+   "id": "g-commons",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:commons",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at commons (a lawn; 0 m)",
+  "target": {
+   "id": "g-commons",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "stroll:commons",
+  "verb": "stroll",
+  "available": true,
+  "blocked": null,
+  "label": "Stroll through commons (a loop of 5 stops)",
+  "target": {
+   "id": "g-commons",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:commons-path",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to commons-path, a footpath, by commons and cs-church-0/nave-pew-2-2 (5 m)",
+  "target": {
+   "id": "e_77e26a68",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:commons-pavilion",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to commons-pavilion, a pavilion: to its front door (closed) (1 rooms, each walk:commons-pavilion/<room>; 10 m)",
+  "target": {
+   "id": "g-commons-pavilion",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:commons-pavilion",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at commons-pavilion (a pavilion; 10 m)",
+  "target": {
+   "id": "g-commons-pavilion",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-6-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-6-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-5-1 (14 m)",
+  "target": {
+   "id": "e_6361e00a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-5-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-5-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-4-1 (15 m)",
+  "target": {
+   "id": "e_936cdec0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-6-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-6-2, a pew in cs-church-0, by commons and commons-path (16 m)",
+  "target": {
+   "id": "e_2ba4d1d6",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-gazebo",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-gazebo, a gazebo, by commons and commons-pavilion (16 m)",
+  "target": {
+   "id": "g-cs-gazebo",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-gazebo",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-gazebo (a gazebo; 16 m)",
+  "target": {
+   "id": "g-cs-gazebo",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:festival-balloon",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to festival-balloon, a balloon, by commons (17 m)",
+  "target": {
+   "id": "e_da9f0bf1",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-4-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-4-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-5-1 (17 m)",
+  "target": {
+   "id": "e_03a9dd35",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-5-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-5-2, a pew in cs-church-0, by commons and commons-path (17 m)",
+  "target": {
+   "id": "e_60d7698c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-3-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-3-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-2-1 (19 m)",
+  "target": {
+   "id": "e_254f9297",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-4-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-4-2, a pew in cs-church-0, by commons and commons-path (19 m)",
+  "target": {
+   "id": "e_bf5d377f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-3-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-3-2, a pew in cs-church-0, by commons and commons-path (20 m)",
+  "target": {
+   "id": "e_b6ce8823",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-2-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-2-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-3-1 (20 m)",
+  "target": {
+   "id": "e_510e5e47",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0, a church: in at its front door (2 rooms, each walk:cs-church-0/<room>; 21 m)",
+  "target": {
+   "id": "g-cs-church-0",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-0",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-0 (a church; 21 m)",
+  "target": {
+   "id": "g-cs-church-0",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-2-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-2-2, a pew in cs-church-0, by commons and commons-path (22 m)",
+  "target": {
+   "id": "e_3410ce62",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-1-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-1-1, a pew in cs-church-0, by commons and cs-church-0/nave-pew-2-1 (22 m)",
+  "target": {
+   "id": "e_11f6ea98",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-pew-1-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-pew-1-2, a pew in cs-church-0, by commons and commons-path (23 m)",
+  "target": {
+   "id": "e_19e4f9c5",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-lectern",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-lectern, a lectern in cs-church-0, by commons and cs-church-0/nave-lamp-l (25 m)",
+  "target": {
+   "id": "e_9cac87d7",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-lamp-l",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-lamp-l, a floor-lamp in cs-church-0, by commons and cs-church-0/nave-lectern (25 m)",
+  "target": {
+   "id": "e_da4e0bbb",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-piano",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-piano, a piano in cs-church-0, by commons and cs-church-0/nave-pew-1-2 (25 m)",
+  "target": {
+   "id": "e_fe33cc89",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:oak-3",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to oak-3, an oak-tree-1-pack, by commons (26 m)",
+  "target": {
+   "id": "g-oak-3",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:oak-3",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at oak-3 (an oak-tree-1-pack; 26 m)",
+  "target": {
+   "id": "g-oak-3",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-altar",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-altar, an altar in cs-church-0, by commons and cs-church-0/vestry-chair (26 m)",
+  "target": {
+   "id": "e_cbe3740e",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave-lamp-r",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/nave-lamp-r, a floor-lamp in cs-church-0, by commons and cs-church-0/nave-piano (27 m)",
+  "target": {
+   "id": "e_3ded5f02",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-housing",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-housing, a street, by region-old-town.plaza and cafe-table-3 (27 m)",
+  "target": {
+   "id": "g-eden-housing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-housing",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-housing (a street; 27 m)",
+  "target": {
+   "id": "g-eden-housing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/vestry-chair",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/vestry-chair, a chair in cs-church-0, by cs-church-0/vestry-table and commons (28 m)",
+  "target": {
+   "id": "e_79789a57",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:oak-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to oak-1, an oak-tree-1-pack, by commons and cs-gazebo (28 m)",
+  "target": {
+   "id": "g-oak-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:oak-1",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at oak-1 (an oak-tree-1-pack; 28 m)",
+  "target": {
+   "id": "g-oak-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/vestry-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/vestry-table, a table in cs-church-0, by cs-church-0/vestry-chair and commons (29 m)",
+  "target": {
+   "id": "e_a68b8627",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/vestry-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/vestry-wardrobe, a wardrobe in cs-church-0, by commons and cs-church-0/nave-lamp-l (29 m)",
+  "target": {
+   "id": "e_71bf0773",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/vestry-shelf",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-0/vestry-shelf, a bookshelf in cs-church-0, by eden-house-1/bedroom-lamp and commons (31 m)",
+  "target": {
+   "id": "e_bbc8fbe7",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/bedroom-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/bedroom-lamp, a floor-lamp in eden-house-1, by eden-house-1/bedroom-rug and eden-house-1/bedroom-wardrobe (33 m)",
+  "target": {
+   "id": "e_a0b38116",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/bedroom-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/bedroom-wardrobe, a wardrobe in eden-house-1, by eden-house-1/bedroom-rug and eden-house-1/kitchen-counter (34 m)",
+  "target": {
+   "id": "e_d4bc3980",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/bedroom-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/bedroom-rug, a rug in eden-house-1, by eden-house-1/bedroom-wardrobe and eden-house-1/bedroom-lamp (35 m)",
+  "target": {
+   "id": "e_ca0c8e15",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:street-lamp-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to street-lamp-1, a lamp-post, by eden-housing and eden-house-1/kitchen-table/kitchen-bowl (35 m)",
+  "target": {
+   "id": "e_542bded4",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen-counter",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/kitchen-counter, a workbench in eden-house-1, by eden-house-1/bedroom-wardrobe and eden-house-1/kitchen-chair-1 (35 m)",
+  "target": {
+   "id": "e_b0cd83f8",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen-table/kitchen-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/kitchen-table/kitchen-bowl, a bowl in eden-house-1/kitchen-table, by eden-house-1/kitchen-chair-1 and street-lamp-1 (35 m)",
+  "target": {
+   "id": "e_6c168b65",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/kitchen-table, a table in eden-house-1, by eden-house-1/kitchen-table/kitchen-bowl and eden-house-1/kitchen-chair-1 (36 m)",
+  "target": {
+   "id": "e_60e2f4ee",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen-chair-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/kitchen-chair-1, a chair in eden-house-1, by eden-house-1/kitchen-table and eden-house-1/kitchen-chair-2 (36 m)",
+  "target": {
+   "id": "e_4c7bfd2c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen-chair-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/kitchen-chair-2, a chair in eden-house-1, by eden-house-1/kitchen-chair-1 and eden-house-1/living-lamp (37 m)",
+  "target": {
+   "id": "e_3f0cc362",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1, a cottage: in at its front door (3 rooms, each walk:eden-house-1/<room>; 37 m)",
+  "target": {
+   "id": "g-eden-house-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-1",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-1 (a cottage; 37 m)",
+  "target": {
+   "id": "g-eden-house-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/living-lamp, a floor-lamp in eden-house-1, by eden-house-1/kitchen-chair-2 and eden-housing (38 m)",
+  "target": {
+   "id": "e_66a9e7ef",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/living-table, a round-table in eden-house-1, by eden-house-1/living-table/living-bowl and eden-house-1/living-rug (38 m)",
+  "target": {
+   "id": "e_c5194d9c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living-table/living-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/living-table/living-bowl, a bowl in eden-house-1/living-table, by eden-house-1/living-rug and eden-house-1/living-sofa (38 m)",
+  "target": {
+   "id": "e_6ca57562",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/living-rug, a rug in eden-house-1, by eden-house-1/living-table and eden-house-1/living-table/living-bowl (38 m)",
+  "target": {
+   "id": "e_601f36d3",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-sofa",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-sofa, a sofa in eden-house-3, by eden-housing and eden-house-3/bedroom-2-dresser (40 m)",
+  "target": {
+   "id": "e_c45e32ac",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living-sofa",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-1/living-sofa, a sofa in eden-house-1, by eden-house-1/living-table and eden-house-1/living-table/living-bowl (40 m)",
+  "target": {
+   "id": "e_02040300",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-armchair",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-armchair, an armchair in eden-house-3, by eden-house-3/bath-2-rug and eden-house-3/eden-house-3-roof-planter-1 (40 m)",
+  "target": {
+   "id": "e_6c3d4bc2",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:bank-bench",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to bank-bench, a bench, by commons and shore-water (40 m)",
+  "target": {
+   "id": "e_f2bc7295",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/eden-house-3-roof-planter-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/eden-house-3-roof-planter-1, a planter-box in eden-house-3, by eden-house-3/bath-2-rug and eden-house-3/living-rug (42 m)",
+  "target": {
+   "id": "e_39c16e97",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath-2-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bath-2-rug, a rug in eden-house-3, by eden-house-3/eden-house-3-roof-planter-1 and eden-house-3/living-armchair (42 m)",
+  "target": {
+   "id": "e_d32892c1",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2-dresser",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-2-dresser, a dresser in eden-house-3, by eden-house-3/bedroom-2-bed and eden-house-3/eden-house-3-roof-planter-1 (42 m)",
+  "target": {
+   "id": "e_3dc08814",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-shelf",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-shelf, a bookshelf in eden-house-3, by eden-house-3/bath-2-rug and eden-house-3/bath-2-stool (43 m)",
+  "target": {
+   "id": "e_94e6e1e1",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2-bed",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-2-bed, a bed in eden-house-3, by eden-house-3/bedroom-2-wardrobe and eden-house-3/bedroom-2-dresser (43 m)",
+  "target": {
+   "id": "e_4e42c619",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-rug, a rug in eden-house-3, by eden-house-3/living-table and eden-house-3/living-table/living-bowl (43 m)",
+  "target": {
+   "id": "e_1b17224a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-table, a round-table in eden-house-3, by eden-house-3/living-table/living-bowl and eden-house-3/living-rug (43 m)",
+  "target": {
+   "id": "e_6a966532",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-table/living-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-table/living-bowl, a bowl in eden-house-3/living-table, by eden-house-3/living-rug and eden-house-3/eden-house-3-roof-planter-1 (43 m)",
+  "target": {
+   "id": "e_485a232e",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:street-lamp-5",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to street-lamp-5, a lamp-post, by eden-house-3/living-lamp and eden-housing (44 m)",
+  "target": {
+   "id": "e_fed8380d",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:pond-reeds",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to pond-reeds, a reedbed, by shore-water and shore-bank (44 m)",
+  "target": {
+   "id": "g-pond-reeds",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:pond-reeds",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at pond-reeds (a reedbed; 44 m)",
+  "target": {
+   "id": "g-pond-reeds",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/living-lamp, a floor-lamp in eden-house-3, by street-lamp-5 and eden-house-3/bedroom-2-wardrobe (44 m)",
+  "target": {
+   "id": "e_90a34ac6",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-2-wardrobe, a wardrobe in eden-house-3, by eden-house-3/bedroom-dresser and eden-house-3/living-lamp (44 m)",
+  "target": {
+   "id": "e_373ea460",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-2-rug, a rug in eden-house-3, by eden-house-3/living-rug and eden-house-3/living-table (45 m)",
+  "target": {
+   "id": "e_6965fda2",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-dresser",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-dresser, a dresser in eden-house-3, by eden-house-3/bedroom-2-wardrobe and eden-house-3/living-lamp (45 m)",
+  "target": {
+   "id": "e_a4a63c9c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3, a cottage: in at its front door (7 rooms, each walk:eden-house-3/<room>; 45 m)",
+  "target": {
+   "id": "g-eden-house-3",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3 (a cottage; 45 m)",
+  "target": {
+   "id": "g-eden-house-3",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath-2-stool",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bath-2-stool, a stool in eden-house-3, by eden-house-3/living-shelf and eden-house-3/living-table (45 m)",
+  "target": {
+   "id": "e_96d68292",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:street-lamp-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to street-lamp-2, a lamp-post, by eden-housing and eden-house-1/living-sofa (46 m)",
+  "target": {
+   "id": "e_ed3ca2fe",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:shore-bank",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to shore-bank, a shore, by shore-water and ducklings (46 m)",
+  "target": {
+   "id": "g-shore-bank",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:shore-bank",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at shore-bank (a shore; 46 m)",
+  "target": {
+   "id": "g-shore-bank",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:shore-water",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to the shore of shore-water, a pond (46 m)",
+  "target": {
+   "id": "g-shore-water.shore-bank",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-bed",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-bed, a bed in eden-house-3, by eden-house-3/kitchen-table and eden-house-3/kitchen-table/kitchen-bowl (46 m)",
+  "target": {
+   "id": "e_08f9c36a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/eden-house-3-roof-planter-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/eden-house-3-roof-planter-2, a planter-box in eden-house-3, by eden-house-3/kitchen-chair-2 and eden-house-3/bedroom-rug (46 m)",
+  "target": {
+   "id": "e_44ce4b74",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-table, a table in eden-house-3, by eden-house-3/kitchen-table/kitchen-bowl and eden-house-3/bedroom-bed (47 m)",
+  "target": {
+   "id": "e_452fe81a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-table/kitchen-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-table/kitchen-bowl, a bowl in eden-house-3/kitchen-table, by eden-house-3/kitchen-chair-1 and eden-house-3/bedroom-bed (47 m)",
+  "target": {
+   "id": "e_c01e639f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-wardrobe, a wardrobe in eden-house-3, by eden-house-3/kitchen-chair-1 and eden-house-3/kitchen-table/kitchen-bowl (47 m)",
+  "target": {
+   "id": "e_d764819b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:region-seaside-resort.ferris-wheel",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to region-seaside-resort.ferris-wheel, a ferris-wheel (48 m)",
+  "target": {
+   "id": "g-region-seaside-resort.ferris-wheel",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:region-seaside-resort.ferris-wheel",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at region-seaside-resort.ferris-wheel (a ferris-wheel; 48 m)",
+  "target": {
+   "id": "g-region-seaside-resort.ferris-wheel",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-chair-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-chair-2, a chair in eden-house-3, by eden-house-3/bedroom-rug and eden-house-3/kitchen-counter (48 m)",
+  "target": {
+   "id": "e_d2e0f8d9",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-chair-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-chair-1, a chair in eden-house-3, by eden-house-3/bedroom-wardrobe and eden-house-3/kitchen-table/kitchen-bowl (48 m)",
+  "target": {
+   "id": "e_78335a09",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-rug, a rug in eden-house-3, by eden-house-3/kitchen-chair-2 and eden-house-3/kitchen-counter (48 m)",
+  "target": {
+   "id": "e_8a4b90b8",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-counter",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-counter, a workbench in eden-house-3, by eden-house-3/bedroom-rug and eden-house-3/kitchen-chair-2 (48 m)",
+  "target": {
+   "id": "e_0ac54798",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-2-lamp, a floor-lamp in eden-house-3, by eden-house-3/bath-rug and eden-house-3/bedroom-lamp (48 m)",
+  "target": {
+   "id": "e_4aaf501e",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bath-stool",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bath-stool, a stool in eden-house-2, by eden-house-2/landing-lamp and eden-house-2/bedroom-lamp (49 m)",
+  "target": {
+   "id": "e_13d800f0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/landing-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/landing-lamp, a floor-lamp in eden-house-2, by eden-house-2/bath-stool and eden-house-2/bedroom-lamp (49 m)",
+  "target": {
+   "id": "e_08cd8f65",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-lamp, a floor-lamp in eden-house-2, by eden-house-2/bath-rug and eden-house-2/landing-lamp (49 m)",
+  "target": {
+   "id": "e_530b6837",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen-stool",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/kitchen-stool, a stool in eden-house-3, by eden-house-3/kitchen-counter and eden-house-3/bedroom-rug (49 m)",
+  "target": {
+   "id": "e_e7b0d2f3",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bath-rug, a rug in eden-house-3, by eden-house-3/bedroom-lamp and eden-house-3/bedroom-2-lamp (50 m)",
+  "target": {
+   "id": "e_0570100f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:ducklings",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to ducklings, an animals, by shore-water and shore-bank (50 m)",
+  "target": {
+   "id": "g-ducklings",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:ducklings",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at ducklings (an animals; 50 m)",
+  "target": {
+   "id": "g-ducklings",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bath-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bath-rug, a rug in eden-house-2, by eden-house-2/bedroom-lamp and eden-house-2/landing-lamp (50 m)",
+  "target": {
+   "id": "e_a4a548fe",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-table/kitchen-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-table/kitchen-bowl, a bowl in eden-house-2/kitchen-table, by eden-house-2/bedroom-wardrobe and eden-house-2/kitchen-chair-2 (51 m)",
+  "target": {
+   "id": "e_06c2ce7b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-counter",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-counter, a workbench in eden-house-2, by eden-house-2/bedroom-bed and eden-house-2/bedroom-rug (51 m)",
+  "target": {
+   "id": "e_2e4c51f5",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-table, a table in eden-house-2, by eden-house-2/kitchen-table/kitchen-bowl and eden-house-2/bedroom-wardrobe (51 m)",
+  "target": {
+   "id": "e_b0ad597d",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-bed",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-bed, a bed in eden-house-2, by eden-house-2/kitchen-counter and eden-house-2/kitchen-chair-2 (51 m)",
+  "target": {
+   "id": "e_a711dedc",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-chair-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-chair-2, a chair in eden-house-2, by eden-house-2/bedroom-bed and eden-house-2/bedroom-rug (51 m)",
+  "target": {
+   "id": "e_9900b7f1",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bedroom-lamp, a floor-lamp in eden-house-3, by eden-house-3/bath-rug and eden-house-3/landing-lamp (51 m)",
+  "target": {
+   "id": "e_2a5fe6f9",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-wardrobe, a wardrobe in eden-house-2, by eden-house-2/kitchen-chair-1 and eden-house-2/kitchen-stool (51 m)",
+  "target": {
+   "id": "e_951e6060",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-stool",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-stool, a stool in eden-house-2, by eden-house-2/kitchen-chair-1 and eden-house-2/bedroom-wardrobe (52 m)",
+  "target": {
+   "id": "e_dba846b0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-rug, a rug in eden-house-2, by eden-house-2/bedroom-bed and eden-house-2/kitchen-counter (52 m)",
+  "target": {
+   "id": "e_da8a8fd5",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen-chair-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/kitchen-chair-1, a chair in eden-house-2, by eden-house-2/bedroom-wardrobe and eden-house-2/kitchen-stool (52 m)",
+  "target": {
+   "id": "e_5a3e8c18",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/landing-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/landing-lamp, a floor-lamp in eden-house-3, by eden-house-3/bath-stool and eden-house-3/bedroom-lamp (52 m)",
+  "target": {
+   "id": "e_8a42edd0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath-stool",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-3/bath-stool, a stool in eden-house-3, by eden-house-3/landing-lamp and eden-house-3/bedroom-lamp (52 m)",
+  "target": {
+   "id": "e_1b1aff4b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-2-lamp, a floor-lamp in eden-house-2, by eden-house-2/bath-rug and eden-house-2/living-shelf (53 m)",
+  "target": {
+   "id": "e_585cb1e6",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:mother-duck",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to mother-duck, a duck, by shore-water and shore-bank (53 m)",
+  "target": {
+   "id": "e_7b827c14",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2, a cottage: in at its front door (6 rooms, each walk:eden-house-2/<room>; 53 m)",
+  "target": {
+   "id": "g-eden-house-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2 (a cottage; 53 m)",
+  "target": {
+   "id": "g-eden-house-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-lamp",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-lamp, a floor-lamp in eden-house-2, by eden-housing and eden-house-2/kitchen-chair-1 (54 m)",
+  "target": {
+   "id": "e_1e0354db",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:street-lamp-6",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to street-lamp-6, a lamp-post, by eden-housing and eden-house-4/living-sofa (54 m)",
+  "target": {
+   "id": "e_1316708b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-dresser",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-dresser, a dresser in eden-house-2, by eden-house-2/bedroom-2-wardrobe and eden-house-2/living-lamp (54 m)",
+  "target": {
+   "id": "e_ec34de4b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-table",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-table, a round-table in eden-house-2, by eden-house-2/living-table/living-bowl and eden-house-2/living-rug (55 m)",
+  "target": {
+   "id": "e_9ae55e42",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-table/living-bowl",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-table/living-bowl, a bowl in eden-house-2/living-table, by eden-house-2/living-rug and eden-house-2/bedroom-2-rug (55 m)",
+  "target": {
+   "id": "e_4b859f9a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-rug, a rug in eden-house-2, by eden-house-2/living-table and eden-house-2/living-table/living-bowl (55 m)",
+  "target": {
+   "id": "e_fae2447c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2-wardrobe",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-2-wardrobe, a wardrobe in eden-house-2, by eden-house-2/bedroom-dresser and eden-house-2/bedroom-2-bed (55 m)",
+  "target": {
+   "id": "e_2b5657e8",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-2-rug, a rug in eden-house-2, by eden-house-2/living-table and eden-house-2/living-table/living-bowl (55 m)",
+  "target": {
+   "id": "e_bd423acf",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/living-armchair",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4/living-armchair, an armchair in eden-house-4, by eden-house-4/bath-2-rug and eden-house-4/eden-house-4-roof-planter-1 (56 m)",
+  "target": {
+   "id": "e_72e83161",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/living-sofa",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4/living-sofa, a sofa in eden-house-4, by eden-housing and street-lamp-6 (56 m)",
+  "target": {
+   "id": "e_88fff61b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-shelf",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-shelf, a bookshelf in eden-house-2, by eden-house-2/living-sofa and eden-house-2/bedroom-2-lamp (56 m)",
+  "target": {
+   "id": "e_dfba4d4f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2-bed",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-2-bed, a bed in eden-house-2, by street-lamp-3 and eden-house-2/bedroom-2-wardrobe (56 m)",
+  "target": {
+   "id": "e_8e760655",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-sofa",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-sofa, a sofa in eden-house-2, by eden-house-2/bedroom-2-rug and eden-house-2/living-armchair (57 m)",
+  "target": {
+   "id": "e_02b00aad",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:street-lamp-3",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to street-lamp-3, a lamp-post, by eden-housing and eden-house-2/bedroom-2-bed (57 m)",
+  "target": {
+   "id": "e_4878c3cf",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living-armchair",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/living-armchair, an armchair in eden-house-2, by eden-house-2/bedroom-2-dresser and eden-house-2/living-sofa (57 m)",
+  "target": {
+   "id": "e_68731f6f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2-dresser",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-2/bedroom-2-dresser, a dresser in eden-house-2, by eden-house-2/living-armchair and eden-house-2/bedroom-2-bed (58 m)",
+  "target": {
+   "id": "e_4ccab421",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/bath-2-rug",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4/bath-2-rug, a rug in eden-house-4, by eden-house-4/eden-house-4-roof-planter-1 and eden-house-4/living-armchair (58 m)",
+  "target": {
+   "id": "e_2954c921",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/living-shelf",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4/living-shelf, a bookshelf in eden-house-4, by eden-house-4/bath-2-rug and eden-house-4/bath-2-stool (58 m)",
+  "target": {
+   "id": "e_bbf86321",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/eden-house-4-roof-planter-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4/eden-house-4-roof-planter-1, a planter-box in eden-house-4, by eden-house-4/bath-2-rug and eden-house-4/living-rug (58 m)",
+  "target": {
+   "id": "e_e4224c29",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:lilypads",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to lilypads, a lilypad-pack, by shore-water and shore-bank (58 m)",
+  "target": {
+   "id": "e_0f5e8eb4",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "walk:eden-house-4",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-house-4, a cottage: in at its front door (7 rooms, each walk:eden-house-4/<room>; 62 m)",
+  "target": {
+   "id": "g-eden-house-4",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4 (a cottage; 62 m)",
+  "target": {
+   "id": "g-eden-house-4",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-library-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to eden-library-1, a hall: in at its front door (1 rooms, each walk:eden-library-1/<room>; 74 m)",
+  "target": {
+   "id": "g-eden-library-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-library-1",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-library-1 (a hall; 74 m)",
+  "target": {
+   "id": "g-eden-library-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-1",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-church-1, a church: in at its front door (2 rooms, each walk:cs-church-1/<room>; 80 m)",
+  "target": {
+   "id": "g-cs-church-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-1",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-1 (a church; 80 m)",
+  "target": {
+   "id": "g-cs-church-1",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-50",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-50, a house: in at its front door (6 rooms, each walk:cs-house-50/<room>; 106 m)",
+  "target": {
+   "id": "g-cs-house-50",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-50",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-50 (a house; 106 m)",
+  "target": {
+   "id": "g-cs-house-50",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-40",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-40, a house: in at its front door (6 rooms, each walk:cs-house-40/<room>; 119 m)",
+  "target": {
+   "id": "g-cs-house-40",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-40",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-40 (a house; 119 m)",
+  "target": {
+   "id": "g-cs-house-40",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-51",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-51, a house: in at its front door (6 rooms, each walk:cs-house-51/<room>; 120 m)",
+  "target": {
+   "id": "g-cs-house-51",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-51",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-51 (a house; 120 m)",
+  "target": {
+   "id": "g-cs-house-51",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-41",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-41, a house: in at its front door (6 rooms, each walk:cs-house-41/<room>; 132 m)",
+  "target": {
+   "id": "g-cs-house-41",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-41",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-41 (a house; 132 m)",
+  "target": {
+   "id": "g-cs-house-41",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-30",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-30, a house: in at its front door (6 rooms, each walk:cs-house-30/<room>; 133 m)",
+  "target": {
+   "id": "g-cs-house-30",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-30",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-30 (a house; 133 m)",
+  "target": {
+   "id": "g-cs-house-30",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-52",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-52, a house: in at its front door (6 rooms, each walk:cs-house-52/<room>; 135 m)",
+  "target": {
+   "id": "g-cs-house-52",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-52",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-52 (a house; 135 m)",
+  "target": {
+   "id": "g-cs-house-52",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-31",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-31, a house: in at its front door (6 rooms, each walk:cs-house-31/<room>; 144 m)",
+  "target": {
+   "id": "g-cs-house-31",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-31",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-31 (a house; 144 m)",
+  "target": {
+   "id": "g-cs-house-31",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-42",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-42, a house: in at its front door (6 rooms, each walk:cs-house-42/<room>; 146 m)",
+  "target": {
+   "id": "g-cs-house-42",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-42",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-42 (a house; 146 m)",
+  "target": {
+   "id": "g-cs-house-42",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-house-20",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Walk to cs-house-20, a house: in at its front door (6 rooms, each walk:cs-house-20/<room>; 148 m)",
+  "target": {
+   "id": "g-cs-house-20",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-house-20",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-house-20 (a house; 148 m)",
+  "target": {
+   "id": "g-cs-house-20",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:commons-pavilion/pavilion",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Pavilion of commons-pavilion (commons-pavilion/pavilion; 7 m)",
+  "target": {
+   "id": "g-commons-pavilion.pavilion",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:commons-pavilion/pavilion",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at commons-pavilion/pavilion (Pavilion of commons-pavilion; 7 m)",
+  "target": {
+   "id": "g-commons-pavilion.pavilion",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/nave",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Nave of cs-church-0 (cs-church-0/nave; 12 m)",
+  "target": {
+   "id": "g-cs-church-0.nave",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-0/nave",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-0/nave (Nave of cs-church-0; 12 m)",
+  "target": {
+   "id": "g-cs-church-0.nave",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-0/vestry",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Vestry of cs-church-0 (cs-church-0/vestry; 27 m)",
+  "target": {
+   "id": "g-cs-church-0.vestry",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-0/vestry",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-0/vestry (Vestry of cs-church-0; 27 m)",
+  "target": {
+   "id": "g-cs-church-0.vestry",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/living",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Living room of eden-house-1 (eden-house-1/living; 35 m)",
+  "target": {
+   "id": "g-eden-house-1.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-1/living",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-1/living (Living room of eden-house-1; 35 m)",
+  "target": {
+   "id": "g-eden-house-1.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/kitchen",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Kitchen of eden-house-1 (eden-house-1/kitchen; 34 m)",
+  "target": {
+   "id": "g-eden-house-1.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-1/kitchen",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-1/kitchen (Kitchen of eden-house-1; 34 m)",
+  "target": {
+   "id": "g-eden-house-1.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-1/bedroom",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom of eden-house-1 (eden-house-1/bedroom; 33 m)",
+  "target": {
+   "id": "g-eden-house-1.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-1/bedroom",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-1/bedroom (Bedroom of eden-house-1; 33 m)",
+  "target": {
+   "id": "g-eden-house-1.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/living",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Living room of eden-house-3 (eden-house-3/living; 38 m)",
+  "target": {
+   "id": "g-eden-house-3.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/living",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/living (Living room of eden-house-3; 38 m)",
+  "target": {
+   "id": "g-eden-house-3.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/kitchen",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Kitchen of eden-house-3 (eden-house-3/kitchen; 44 m)",
+  "target": {
+   "id": "g-eden-house-3.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/kitchen",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/kitchen (Kitchen of eden-house-3; 44 m)",
+  "target": {
+   "id": "g-eden-house-3.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bathroom of eden-house-3 (eden-house-3/bath; 47 m)",
+  "target": {
+   "id": "g-eden-house-3.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/bath",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/bath (Bathroom of eden-house-3; 47 m)",
+  "target": {
+   "id": "g-eden-house-3.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom 2 of eden-house-3, floor 1 (eden-house-3/bedroom-2; 41 m)",
+  "target": {
+   "id": "g-eden-house-3.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/bedroom-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/bedroom-2 (Bedroom 2 of eden-house-3, floor 1; 41 m)",
+  "target": {
+   "id": "g-eden-house-3.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bath-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bathroom 2 of eden-house-3, floor 1 (eden-house-3/bath-2; 38 m)",
+  "target": {
+   "id": "g-eden-house-3.bath-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/bath-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/bath-2 (Bathroom 2 of eden-house-3, floor 1; 38 m)",
+  "target": {
+   "id": "g-eden-house-3.bath-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/bedroom",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom of eden-house-3, floor 1 (eden-house-3/bedroom; 44 m)",
+  "target": {
+   "id": "g-eden-house-3.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/bedroom",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/bedroom (Bedroom of eden-house-3, floor 1; 44 m)",
+  "target": {
+   "id": "g-eden-house-3.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-3/landing",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Landing of eden-house-3, floor 1 (eden-house-3/landing; 43 m)",
+  "target": {
+   "id": "g-eden-house-3.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-3/landing",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-3/landing (Landing of eden-house-3, floor 1; 43 m)",
+  "target": {
+   "id": "g-eden-house-3.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/living",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Living room of eden-house-2 (eden-house-2/living; 51 m)",
+  "target": {
+   "id": "g-eden-house-2.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/living",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/living (Living room of eden-house-2; 51 m)",
+  "target": {
+   "id": "g-eden-house-2.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/kitchen",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Kitchen of eden-house-2 (eden-house-2/kitchen; 50 m)",
+  "target": {
+   "id": "g-eden-house-2.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/kitchen",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/kitchen (Kitchen of eden-house-2; 50 m)",
+  "target": {
+   "id": "g-eden-house-2.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bath",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bathroom of eden-house-2 (eden-house-2/bath; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/bath",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/bath (Bathroom of eden-house-2; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom 2 of eden-house-2, floor 1 (eden-house-2/bedroom-2; 53 m)",
+  "target": {
+   "id": "g-eden-house-2.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/bedroom-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/bedroom-2 (Bedroom 2 of eden-house-2, floor 1; 53 m)",
+  "target": {
+   "id": "g-eden-house-2.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/bedroom",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom of eden-house-2, floor 1 (eden-house-2/bedroom; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/bedroom",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/bedroom (Bedroom of eden-house-2, floor 1; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-2/landing",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Landing of eden-house-2, floor 1 (eden-house-2/landing; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-2/landing",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-2/landing (Landing of eden-house-2, floor 1; 49 m)",
+  "target": {
+   "id": "g-eden-house-2.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/living",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Living room of eden-house-4 (eden-house-4/living; 54 m)",
+  "target": {
+   "id": "g-eden-house-4.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/living",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/living (Living room of eden-house-4; 54 m)",
+  "target": {
+   "id": "g-eden-house-4.living",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/kitchen",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Kitchen of eden-house-4 (eden-house-4/kitchen; 62 m)",
+  "target": {
+   "id": "g-eden-house-4.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/kitchen",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/kitchen (Kitchen of eden-house-4; 62 m)",
+  "target": {
+   "id": "g-eden-house-4.kitchen",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/bath",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bathroom of eden-house-4 (eden-house-4/bath; 64 m)",
+  "target": {
+   "id": "g-eden-house-4.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/bath",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/bath (Bathroom of eden-house-4; 64 m)",
+  "target": {
+   "id": "g-eden-house-4.bath",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/bedroom-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom 2 of eden-house-4, floor 1 (eden-house-4/bedroom-2; 58 m)",
+  "target": {
+   "id": "g-eden-house-4.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/bedroom-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/bedroom-2 (Bedroom 2 of eden-house-4, floor 1; 58 m)",
+  "target": {
+   "id": "g-eden-house-4.bedroom-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/bath-2",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bathroom 2 of eden-house-4, floor 1 (eden-house-4/bath-2; 54 m)",
+  "target": {
+   "id": "g-eden-house-4.bath-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/bath-2",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/bath-2 (Bathroom 2 of eden-house-4, floor 1; 54 m)",
+  "target": {
+   "id": "g-eden-house-4.bath-2",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/bedroom",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Bedroom of eden-house-4, floor 1 (eden-house-4/bedroom; 61 m)",
+  "target": {
+   "id": "g-eden-house-4.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/bedroom",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/bedroom (Bedroom of eden-house-4, floor 1; 61 m)",
+  "target": {
+   "id": "g-eden-house-4.bedroom",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-house-4/landing",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Landing of eden-house-4, floor 1 (eden-house-4/landing; 58 m)",
+  "target": {
+   "id": "g-eden-house-4.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-house-4/landing",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-house-4/landing (Landing of eden-house-4, floor 1; 58 m)",
+  "target": {
+   "id": "g-eden-house-4.landing",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:eden-library-1/hall",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Hall of eden-library-1 (eden-library-1/hall; 69 m)",
+  "target": {
+   "id": "g-eden-library-1.hall",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:eden-library-1/hall",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at eden-library-1/hall (Hall of eden-library-1; 69 m)",
+  "target": {
+   "id": "g-eden-library-1.hall",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-1/nave",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Nave of cs-church-1 (cs-church-1/nave; 70 m)",
+  "target": {
+   "id": "g-cs-church-1.nave",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-1/nave",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-1/nave (Nave of cs-church-1; 70 m)",
+  "target": {
+   "id": "g-cs-church-1.nave",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "walk:cs-church-1/vestry",
+  "verb": "walk",
+  "available": true,
+  "blocked": null,
+  "label": "Go into Vestry of cs-church-1 (cs-church-1/vestry; 83 m)",
+  "target": {
+   "id": "g-cs-church-1.vestry",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "hang-out:cs-church-1/vestry",
+  "verb": "hang-out",
+  "available": true,
+  "blocked": null,
+  "label": "Hang out at cs-church-1/vestry (Vestry of cs-church-1; 83 m)",
+  "target": {
+   "id": "g-cs-church-1.vestry",
+   "kind": "place"
+  }
+ },
+ {
+  "id": "pray",
+  "verb": "pray",
+  "available": true,
+  "blocked": null,
+  "label": "Pray to the god of this world (params: {\"text\": \"…\"}); answers come back under GET /v1/god/prayers/mine",
+  "target": null
+ },
+ {
+  "id": "sit:e_6361e00a",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-6-1 (by commons and cs-church-0/nave-pew-5-1; 14 m)",
+  "target": {
+   "id": "e_6361e00a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_936cdec0",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-5-1 (by commons and cs-church-0/nave-pew-4-1; 15 m)",
+  "target": {
+   "id": "e_936cdec0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_2ba4d1d6",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-6-2 (by commons and commons-path; 16 m)",
+  "target": {
+   "id": "e_2ba4d1d6",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_76ce5154",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-gazebo (by commons and commons-pavilion; 16 m)",
+  "target": {
+   "id": "e_76ce5154",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_03a9dd35",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-4-1 (by commons and cs-church-0/nave-pew-5-1; 17 m)",
+  "target": {
+   "id": "e_03a9dd35",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_60d7698c",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-5-2 (by commons and commons-path; 17 m)",
+  "target": {
+   "id": "e_60d7698c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_254f9297",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-3-1 (by commons and cs-church-0/nave-pew-2-1; 19 m)",
+  "target": {
+   "id": "e_254f9297",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_bf5d377f",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-4-2 (by commons and commons-path; 19 m)",
+  "target": {
+   "id": "e_bf5d377f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_b6ce8823",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-3-2 (by commons and commons-path; 20 m)",
+  "target": {
+   "id": "e_b6ce8823",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_510e5e47",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-2-1 (by commons and cs-church-0/nave-pew-3-1; 20 m)",
+  "target": {
+   "id": "e_510e5e47",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_3410ce62",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-2-2 (by commons and commons-path; 22 m)",
+  "target": {
+   "id": "e_3410ce62",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_11f6ea98",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-1-1 (by commons and cs-church-0/nave-pew-2-1; 22 m)",
+  "target": {
+   "id": "e_11f6ea98",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_19e4f9c5",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-pew-1-2 (by commons and commons-path; 23 m)",
+  "target": {
+   "id": "e_19e4f9c5",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_fe33cc89",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/nave-piano (by commons and cs-church-0/nave-pew-1-2; 25 m)",
+  "target": {
+   "id": "e_fe33cc89",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_79789a57",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "cs-church-0/vestry-chair (by cs-church-0/vestry-table and commons; 28 m)",
+  "target": {
+   "id": "e_79789a57",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_6c168b65",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-1/kitchen-table/kitchen-bowl (35 m)",
+  "target": {
+   "id": "e_6c168b65",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "sit:e_4c7bfd2c",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-1/kitchen-chair-1 (by eden-house-1/kitchen-table and eden-house-1/kitchen-chair-2; 36 m)",
+  "target": {
+   "id": "e_4c7bfd2c",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_3f0cc362",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-1/kitchen-chair-2 (by eden-house-1/kitchen-chair-1 and eden-house-1/living-lamp; 37 m)",
+  "target": {
+   "id": "e_3f0cc362",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_6ca57562",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-1/living-table/living-bowl (38 m)",
+  "target": {
+   "id": "e_6ca57562",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "sit:e_c45e32ac",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/living-sofa (by eden-housing and eden-house-3/bedroom-2-dresser; 40 m)",
+  "target": {
+   "id": "e_c45e32ac",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_02040300",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-1/living-sofa (by eden-house-1/living-table and eden-house-1/living-table/living-bowl; 40 m)",
+  "target": {
+   "id": "e_02040300",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_6c3d4bc2",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/living-armchair (by eden-house-3/bath-2-rug and eden-house-3/eden-house-3-roof-planter-1; 40 m)",
+  "target": {
+   "id": "e_6c3d4bc2",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_f2bc7295",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "bank-bench (by commons and shore-water; 40 m)",
+  "target": {
+   "id": "e_f2bc7295",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "lie:e_4e42c619",
+  "verb": "lie",
+  "available": true,
+  "blocked": null,
+  "label": "Lie down on eden-house-3/bedroom-2-bed (43 m, floor 1)",
+  "target": {
+   "id": "e_4e42c619",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sleep:e_4e42c619",
+  "verb": "sleep",
+  "available": true,
+  "blocked": null,
+  "label": "Sleep in eden-house-3/bedroom-2-bed (43 m, floor 1)",
+  "target": {
+   "id": "e_4e42c619",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_485a232e",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-3/living-table/living-bowl (43 m)",
+  "target": {
+   "id": "e_485a232e",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "sit:e_96d68292",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/bath-2-stool (by eden-house-3 and eden-house-3/living-shelf; 45 m, floor 1)",
+  "target": {
+   "id": "e_96d68292",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "lie:e_08f9c36a",
+  "verb": "lie",
+  "available": true,
+  "blocked": null,
+  "label": "Lie down on eden-house-3/bedroom-bed (46 m, floor 1)",
+  "target": {
+   "id": "e_08f9c36a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sleep:e_08f9c36a",
+  "verb": "sleep",
+  "available": true,
+  "blocked": null,
+  "label": "Sleep in eden-house-3/bedroom-bed (46 m, floor 1)",
+  "target": {
+   "id": "e_08f9c36a",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_c01e639f",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-3/kitchen-table/kitchen-bowl (47 m)",
+  "target": {
+   "id": "e_c01e639f",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "sit:e_d2e0f8d9",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/kitchen-chair-2 (by eden-house-3/bedroom-rug and eden-house-3/kitchen-counter; 48 m)",
+  "target": {
+   "id": "e_d2e0f8d9",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_78335a09",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/kitchen-chair-1 (by eden-house-3/bedroom-wardrobe and eden-house-3/kitchen-table/kitchen-bowl; 48 m)",
+  "target": {
+   "id": "e_78335a09",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_13d800f0",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/bath-stool (by eden-house-2/landing-lamp and eden-house-2/bedroom-lamp; 49 m)",
+  "target": {
+   "id": "e_13d800f0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_e7b0d2f3",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/kitchen-stool (by eden-house-3/kitchen-counter and eden-house-3/bedroom-rug; 49 m)",
+  "target": {
+   "id": "e_e7b0d2f3",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_06c2ce7b",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-2/kitchen-table/kitchen-bowl (51 m)",
+  "target": {
+   "id": "e_06c2ce7b",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "lie:e_a711dedc",
+  "verb": "lie",
+  "available": true,
+  "blocked": null,
+  "label": "Lie down on eden-house-2/bedroom-bed (51 m, floor 1)",
+  "target": {
+   "id": "e_a711dedc",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sleep:e_a711dedc",
+  "verb": "sleep",
+  "available": true,
+  "blocked": null,
+  "label": "Sleep in eden-house-2/bedroom-bed (51 m, floor 1)",
+  "target": {
+   "id": "e_a711dedc",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_9900b7f1",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/kitchen-chair-2 (by eden-house-2/bedroom-bed and eden-house-2/bedroom-rug; 51 m)",
+  "target": {
+   "id": "e_9900b7f1",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_dba846b0",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/kitchen-stool (by eden-house-2/kitchen-chair-1 and eden-house-2/bedroom-wardrobe; 52 m)",
+  "target": {
+   "id": "e_dba846b0",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_5a3e8c18",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/kitchen-chair-1 (by eden-house-2/bedroom-wardrobe and eden-house-2/kitchen-stool; 52 m)",
+  "target": {
+   "id": "e_5a3e8c18",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_1b1aff4b",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-3/bath-stool (by eden-house-3/landing-lamp and eden-house-3/bedroom-lamp; 52 m)",
+  "target": {
+   "id": "e_1b1aff4b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_4b859f9a",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-2/living-table/living-bowl (55 m)",
+  "target": {
+   "id": "e_4b859f9a",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "sit:e_72e83161",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-4/living-armchair (by eden-house-4/bath-2-rug and eden-house-4/eden-house-4-roof-planter-1; 56 m)",
+  "target": {
+   "id": "e_72e83161",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_88fff61b",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-4/living-sofa (by eden-housing and street-lamp-6; 56 m)",
+  "target": {
+   "id": "e_88fff61b",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "lie:e_8e760655",
+  "verb": "lie",
+  "available": true,
+  "blocked": null,
+  "label": "Lie down on eden-house-2/bedroom-2-bed (56 m, floor 1)",
+  "target": {
+   "id": "e_8e760655",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sleep:e_8e760655",
+  "verb": "sleep",
+  "available": true,
+  "blocked": null,
+  "label": "Sleep in eden-house-2/bedroom-2-bed (56 m, floor 1)",
+  "target": {
+   "id": "e_8e760655",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_02b00aad",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/living-sofa (by eden-house-2/bedroom-2-rug and eden-house-2/living-armchair; 57 m)",
+  "target": {
+   "id": "e_02b00aad",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "sit:e_68731f6f",
+  "verb": "sit",
+  "available": true,
+  "blocked": null,
+  "label": "eden-house-2/living-armchair (by eden-house-2/bedroom-2-dresser and eden-house-2/living-sofa; 57 m)",
+  "target": {
+   "id": "e_68731f6f",
+   "kind": "object"
+  }
+ },
+ {
+  "id": "pick-up:e_574cac3e",
+  "verb": "pick-up",
+  "available": true,
+  "blocked": null,
+  "label": "Pick up eden-house-4/living-table/living-bowl (60 m)",
+  "target": {
+   "id": "e_574cac3e",
+   "kind": "item"
+  }
+ },
+ {
+  "id": "object:e_066ab0ad:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-41/bath-bath)",
+  "target": {
+   "id": "e_066ab0ad",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_066ab0ad:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-41/bath-bath)",
+  "target": {
+   "id": "e_066ab0ad",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_0ccb13ce:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-59/bath-bath)",
+  "target": {
+   "id": "e_0ccb13ce",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_0ccb13ce:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-59/bath-bath)",
+  "target": {
+   "id": "e_0ccb13ce",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_1b08f0bc:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-8/bath-bath)",
+  "target": {
+   "id": "e_1b08f0bc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_1b08f0bc:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-8/bath-bath)",
+  "target": {
+   "id": "e_1b08f0bc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_1fe1f81f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-49/bath-bath)",
+  "target": {
+   "id": "e_1fe1f81f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_1fe1f81f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-49/bath-bath)",
+  "target": {
+   "id": "e_1fe1f81f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_21948cc7:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-6/bath-bath)",
+  "target": {
+   "id": "e_21948cc7",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_21948cc7:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-6/bath-bath)",
+  "target": {
+   "id": "e_21948cc7",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_26a3b797:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-7/bath-bath)",
+  "target": {
+   "id": "e_26a3b797",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_26a3b797:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-7/bath-bath)",
+  "target": {
+   "id": "e_26a3b797",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_2cdc0e5c:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-5/bath-bath)",
+  "target": {
+   "id": "e_2cdc0e5c",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_2cdc0e5c:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-5/bath-bath)",
+  "target": {
+   "id": "e_2cdc0e5c",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3279ed13:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-47/bath-bath)",
+  "target": {
+   "id": "e_3279ed13",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3279ed13:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-47/bath-bath)",
+  "target": {
+   "id": "e_3279ed13",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_38b3f73f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-17/bath-bath)",
+  "target": {
+   "id": "e_38b3f73f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_38b3f73f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-17/bath-bath)",
+  "target": {
+   "id": "e_38b3f73f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3d41dafc:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-52/bath-bath)",
+  "target": {
+   "id": "e_3d41dafc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3d41dafc:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-52/bath-bath)",
+  "target": {
+   "id": "e_3d41dafc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3e46e79e:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-56/bath-bath)",
+  "target": {
+   "id": "e_3e46e79e",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3e46e79e:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-56/bath-bath)",
+  "target": {
+   "id": "e_3e46e79e",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3fddc5e5:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-37/bath-bath)",
+  "target": {
+   "id": "e_3fddc5e5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_3fddc5e5:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-37/bath-bath)",
+  "target": {
+   "id": "e_3fddc5e5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_51ad79b2:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-0/bath-bath)",
+  "target": {
+   "id": "e_51ad79b2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_51ad79b2:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-0/bath-bath)",
+  "target": {
+   "id": "e_51ad79b2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5ca2b013:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-26/bath-bath)",
+  "target": {
+   "id": "e_5ca2b013",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5ca2b013:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-26/bath-bath)",
+  "target": {
+   "id": "e_5ca2b013",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5d659bb0:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-55/bath-bath)",
+  "target": {
+   "id": "e_5d659bb0",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5d659bb0:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-55/bath-bath)",
+  "target": {
+   "id": "e_5d659bb0",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5db5ed70:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-9/bath-bath)",
+  "target": {
+   "id": "e_5db5ed70",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_5db5ed70:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-9/bath-bath)",
+  "target": {
+   "id": "e_5db5ed70",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_61cd3ca5:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-58/bath-bath)",
+  "target": {
+   "id": "e_61cd3ca5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_61cd3ca5:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-58/bath-bath)",
+  "target": {
+   "id": "e_61cd3ca5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_672c31a6:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-10/bath-bath)",
+  "target": {
+   "id": "e_672c31a6",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_672c31a6:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-10/bath-bath)",
+  "target": {
+   "id": "e_672c31a6",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_6d2d871b:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-2/bath-bath)",
+  "target": {
+   "id": "e_6d2d871b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_6d2d871b:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-2/bath-bath)",
+  "target": {
+   "id": "e_6d2d871b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_6f133dc7:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-53/bath-bath)",
+  "target": {
+   "id": "e_6f133dc7",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_6f133dc7:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-53/bath-bath)",
+  "target": {
+   "id": "e_6f133dc7",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_70908a7b:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-13/bath-bath)",
+  "target": {
+   "id": "e_70908a7b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_70908a7b:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-13/bath-bath)",
+  "target": {
+   "id": "e_70908a7b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_70914ba2:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-11/bath-bath)",
+  "target": {
+   "id": "e_70914ba2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_70914ba2:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-11/bath-bath)",
+  "target": {
+   "id": "e_70914ba2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_722aaa64:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-38/bath-bath)",
+  "target": {
+   "id": "e_722aaa64",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_722aaa64:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-38/bath-bath)",
+  "target": {
+   "id": "e_722aaa64",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_75e73658:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-35/bath-bath)",
+  "target": {
+   "id": "e_75e73658",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_75e73658:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-35/bath-bath)",
+  "target": {
+   "id": "e_75e73658",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_76b6b327:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-18/bath-bath)",
+  "target": {
+   "id": "e_76b6b327",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_76b6b327:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-18/bath-bath)",
+  "target": {
+   "id": "e_76b6b327",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_805de6a0:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-23/bath-bath)",
+  "target": {
+   "id": "e_805de6a0",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_805de6a0:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-23/bath-bath)",
+  "target": {
+   "id": "e_805de6a0",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_86a2d811:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-21/bath-bath)",
+  "target": {
+   "id": "e_86a2d811",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_86a2d811:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-21/bath-bath)",
+  "target": {
+   "id": "e_86a2d811",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_8b41166b:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-14/bath-bath)",
+  "target": {
+   "id": "e_8b41166b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_8b41166b:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-14/bath-bath)",
+  "target": {
+   "id": "e_8b41166b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_8f0e5fcd:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-15/bath-bath)",
+  "target": {
+   "id": "e_8f0e5fcd",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_8f0e5fcd:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-15/bath-bath)",
+  "target": {
+   "id": "e_8f0e5fcd",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_98c825b9:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-48/bath-bath)",
+  "target": {
+   "id": "e_98c825b9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_98c825b9:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-48/bath-bath)",
+  "target": {
+   "id": "e_98c825b9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_994d377d:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-51/bath-bath)",
+  "target": {
+   "id": "e_994d377d",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_994d377d:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-51/bath-bath)",
+  "target": {
+   "id": "e_994d377d",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_99f4a9ac:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-57/bath-bath)",
+  "target": {
+   "id": "e_99f4a9ac",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_99f4a9ac:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-57/bath-bath)",
+  "target": {
+   "id": "e_99f4a9ac",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_9c15c3e9:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-20/bath-bath)",
+  "target": {
+   "id": "e_9c15c3e9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_9c15c3e9:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-20/bath-bath)",
+  "target": {
+   "id": "e_9c15c3e9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_9fd7af97:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-50/bath-bath)",
+  "target": {
+   "id": "e_9fd7af97",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_9fd7af97:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-50/bath-bath)",
+  "target": {
+   "id": "e_9fd7af97",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_a3ff17f1:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-43/bath-bath)",
+  "target": {
+   "id": "e_a3ff17f1",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_a3ff17f1:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-43/bath-bath)",
+  "target": {
+   "id": "e_a3ff17f1",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_a4cbdaa1:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-44/bath-bath)",
+  "target": {
+   "id": "e_a4cbdaa1",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_a4cbdaa1:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-44/bath-bath)",
+  "target": {
+   "id": "e_a4cbdaa1",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ae9caeef:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-33/bath-bath)",
+  "target": {
+   "id": "e_ae9caeef",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ae9caeef:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-33/bath-bath)",
+  "target": {
+   "id": "e_ae9caeef",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_b43fd0df:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-22/bath-bath)",
+  "target": {
+   "id": "e_b43fd0df",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_b43fd0df:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-22/bath-bath)",
+  "target": {
+   "id": "e_b43fd0df",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_bb12236f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-24/bath-bath)",
+  "target": {
+   "id": "e_bb12236f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_bb12236f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-24/bath-bath)",
+  "target": {
+   "id": "e_bb12236f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_bb8076fc:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-40/bath-bath)",
+  "target": {
+   "id": "e_bb8076fc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_bb8076fc:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-40/bath-bath)",
+  "target": {
+   "id": "e_bb8076fc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c0f4ed12:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-1/bath-bath)",
+  "target": {
+   "id": "e_c0f4ed12",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c0f4ed12:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-1/bath-bath)",
+  "target": {
+   "id": "e_c0f4ed12",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c2e056fc:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-39/bath-bath)",
+  "target": {
+   "id": "e_c2e056fc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c2e056fc:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-39/bath-bath)",
+  "target": {
+   "id": "e_c2e056fc",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c5d9ab5e:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-30/bath-bath)",
+  "target": {
+   "id": "e_c5d9ab5e",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c5d9ab5e:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-30/bath-bath)",
+  "target": {
+   "id": "e_c5d9ab5e",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c696c275:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-19/bath-bath)",
+  "target": {
+   "id": "e_c696c275",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c696c275:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-19/bath-bath)",
+  "target": {
+   "id": "e_c696c275",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c729ce56:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-29/bath-bath)",
+  "target": {
+   "id": "e_c729ce56",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_c729ce56:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-29/bath-bath)",
+  "target": {
+   "id": "e_c729ce56",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_cf88a3b8:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-25/bath-bath)",
+  "target": {
+   "id": "e_cf88a3b8",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_cf88a3b8:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-25/bath-bath)",
+  "target": {
+   "id": "e_cf88a3b8",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d70d1e37:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-12/bath-bath)",
+  "target": {
+   "id": "e_d70d1e37",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d70d1e37:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-12/bath-bath)",
+  "target": {
+   "id": "e_d70d1e37",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d73bbee9:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-3/bath-bath)",
+  "target": {
+   "id": "e_d73bbee9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d73bbee9:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-3/bath-bath)",
+  "target": {
+   "id": "e_d73bbee9",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d7ca3384:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-16/bath-bath)",
+  "target": {
+   "id": "e_d7ca3384",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_d7ca3384:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-16/bath-bath)",
+  "target": {
+   "id": "e_d7ca3384",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_da7d982f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-28/bath-bath)",
+  "target": {
+   "id": "e_da7d982f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_da7d982f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-28/bath-bath)",
+  "target": {
+   "id": "e_da7d982f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_e3c9a93f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-42/bath-bath)",
+  "target": {
+   "id": "e_e3c9a93f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_e3c9a93f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-42/bath-bath)",
+  "target": {
+   "id": "e_e3c9a93f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_e4be479b:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-31/bath-bath)",
+  "target": {
+   "id": "e_e4be479b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_e4be479b:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-31/bath-bath)",
+  "target": {
+   "id": "e_e4be479b",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ea312e42:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-27/bath-bath)",
+  "target": {
+   "id": "e_ea312e42",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ea312e42:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-27/bath-bath)",
+  "target": {
+   "id": "e_ea312e42",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ee9f4d6f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-46/bath-bath)",
+  "target": {
+   "id": "e_ee9f4d6f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_ee9f4d6f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-46/bath-bath)",
+  "target": {
+   "id": "e_ee9f4d6f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_f1191feb:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-54/bath-bath)",
+  "target": {
+   "id": "e_f1191feb",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_f1191feb:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-54/bath-bath)",
+  "target": {
+   "id": "e_f1191feb",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_f43df10f:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-4/bath-bath)",
+  "target": {
+   "id": "e_f43df10f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_f43df10f:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-4/bath-bath)",
+  "target": {
+   "id": "e_f43df10f",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fb7a1df2:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-36/bath-bath)",
+  "target": {
+   "id": "e_fb7a1df2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fb7a1df2:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-36/bath-bath)",
+  "target": {
+   "id": "e_fb7a1df2",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fca6f011:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-32/bath-bath)",
+  "target": {
+   "id": "e_fca6f011",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fca6f011:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-32/bath-bath)",
+  "target": {
+   "id": "e_fca6f011",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fcc733b5:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-34/bath-bath)",
+  "target": {
+   "id": "e_fcc733b5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fcc733b5:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-34/bath-bath)",
+  "target": {
+   "id": "e_fcc733b5",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fcfefa4c:fill",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Fill the bath (cs-house-45/bath-bath)",
+  "target": {
+   "id": "e_fcfefa4c",
+   "kind": "bathtub"
+  }
+ },
+ {
+  "id": "object:e_fcfefa4c:empty",
+  "verb": "object",
+  "available": false,
+  "blocked": "object.out-of-reach",
+  "label": "Empty the bath (cs-house-45/bath-bath)",
+  "target": {
+   "id": "e_fcfefa4c",
+   "kind": "bathtub"
+  }
+ }
+]
