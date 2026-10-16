@@ -115,7 +115,8 @@ test('batch captions fade for six seconds inside the existing label draw without
   h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0.5); assert.equal(h.sites.stats.labelRedraws, redraws);
   h.sites.apply(edge(delta(2), SERVER_NOW + 5000)); assert.equal(h.sites.stats.labelRedraws, redraws);
   h.advance(1000); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 0); assert.doesNotMatch(h.sites.inspect().sites[0].text, /shell committed/);
-  assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.equal(sprite.material.map, texture); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
+  // The canvas shrank to two lines: same canvas, a fresh texture (WebGL texture storage keeps its first size).
+  assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.notEqual(sprite.material.map, texture); assert.equal(sprite.material.map!.image, canvas); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
   h.sites.apply(edge(delta(3, { note: { text: 'next batch', at: SERVER_NOW + 6000 } }), SERVER_NOW + 6000));
   assert.match(h.sites.inspect().sites[0].text, /next batch$/); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 1);
   h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
@@ -232,15 +233,43 @@ for (const skew of [-600_000, 600_000]) test(`pause and alive deadline use serve
   } finally { h.sites.dispose(); Date.now = realDateNow; }
 });
 
-test('one canvas and texture per site; ordinary frames and alive/claim updates do not repaint unchanged text', () => {
+// Release 1.1 walk: after `build step --say` the label grew to two lines on the same CanvasTexture; Chrome refused the
+// upload (glCopySubTextureCHROMIUM: Offset overflow) and a visitor kept the old one-line "paused" label, stretched.
+test('a label that changes size gets a fresh texture (the old one disposed once) carrying exactly the new text', () => {
+  const painted: string[][] = []; let frame: string[] = [];
+  const canvas = fakeCanvas(((text: string) => { frame.push(text); }) as () => void);
+  const context = canvas.getContext('2d')! as unknown as { roundRect: () => void };
+  context.roundRect = () => { frame = []; painted.push(frame); };
+  const sites = new WorldBuildSites({ model: () => fakeModel(), groundAt: () => 0, now: () => 1000, createCanvas: () => canvas, search: '?sites=ring,label' });
+  const sprite = () => sites.group.children[0].children.find(o => o instanceof THREE.Sprite) as THREE.Sprite;
+  sites.apply(start(site({ title: 'Release walk lighthouse', step: { n: 1, label: 'massing', of: 3 } })));
+  const first = sprite().material.map!; let disposed = 0; first.addEventListener('dispose', () => disposed++);
+  assert.deepEqual(painted.at(-1), ['Release walk lighthouse · massing 1/3']); assert.equal(canvas.height, 44);
+  sites.apply(edge(delta(2, { step: { n: 1, label: 'massing', of: 3 }, say: { text: 'raising the lighthouse tower', at: SERVER_NOW }, designing: ['nave'] })));
+  const second = sprite().material.map!;
+  assert.notEqual(second, first); assert.equal(disposed, 1); assert.equal(second.image, canvas); assert.equal(second.colorSpace, THREE.SRGBColorSpace);
+  assert.ok(second.version > 0, 'the fresh texture uploads the new canvas'); assert.equal(canvas.height, 88);
+  assert.deepEqual(painted.at(-1), ['Release walk lighthouse · massing 1/3', 'designing: raising the lighthouse tower']);
+  assert.deepEqual(painted.at(-1), sites.inspect().sites[0].text.split('\n'));
+  // same size again (another narration of equal length): the texture is reused, only re-uploaded
+  const version = second.version;
+  sites.apply(edge(delta(3, { say: { text: 'raising the lighthouse lamps', at: SERVER_NOW } })));
+  assert.equal(sprite().material.map, second); assert.ok(second.version > version); assert.match(painted.at(-1)![1], /lamps$/);
+  sites.dispose(); assert.equal(disposed, 1);
+});
+
+test('one canvas per site, one texture per label size; ordinary frames and alive/claim updates do not repaint unchanged text', () => {
   const h = harness(); h.sites.apply(start());
   const sprite = group(h).children.find(o => o instanceof THREE.Sprite) as THREE.Sprite, texture = sprite.material.map;
   for (let i = 0; i < 1000; i++) h.advance(16);
   h.sites.apply(edge(delta(2))); h.sites.apply(edge(delta(3, { claim: { part: 'tower', status: 'held' } })));
   assert.equal(h.canvases, 1); assert.equal(h.paints, 1); assert.equal(sprite.material.map, texture);
   h.advance(180_000); assert.match(h.sites.inspect().sites[0].text, /quiet 3 min/); assert.equal(h.paints, 2);
+  const wider = sprite.material.map; assert.notEqual(wider, texture, 'a wider label gets its own texture');
+  h.advance(60_000); assert.match(h.sites.inspect().sites[0].text, /quiet 4 min/); assert.equal(h.paints, 3);
+  assert.equal(sprite.material.map, wider, 'a same-size repaint reuses the texture');
   h.sites.apply(edge(delta(4, { step: { n: 3, of: 6, label: 'roof' } })));
-  assert.equal(h.paints, 3); assert.equal(h.canvases, 1); assert.equal(sprite.material.map, texture);
+  assert.equal(h.paints, 4); assert.equal(h.canvases, 1); assert.equal(sprite.material.map!.image, texture!.image);
   h.sites.dispose();
 });
 
