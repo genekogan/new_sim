@@ -215,9 +215,9 @@ class DogRig extends Rig {
     for (const l of this.legs) {
       const diag = (l.front ? 1 : -1) * l.side > 0 ? 0 : Math.PI, k = Math.sin(g + diag);
       const swing = 0.55 * amp * k * (1 - w) + w * 0.9 * Math.sin(g * 2 + diag);
-      // lying down: front legs stretch forward, hind legs tuck under
-      l.hip.rotation.z = swing * (1 - s) + s * (l.front ? 1.45 : -1.2);
-      l.knee.rotation.z = (l.front ? -1 : 1) * 0.7 * amp * Math.max(0, Math.cos(g + diag)) * (1 - s) + s * (l.front ? 0.1 : 2.2) * (l.front ? 1 : 1);
+            // lying down: front legs stretched forward, hind thighs forward under the belly with the shins folded back
+      l.hip.rotation.z = swing * (1 - s) + s * (l.front ? 1.45 : 1.15);
+      l.knee.rotation.z = (l.front ? -1 : 1) * 0.7 * amp * Math.max(0, Math.cos(g + diag)) * (1 - s) + s * (l.front ? 0.05 : -2.5);
     }
     const wag = f.mode === 'walk' ? 0.35 : f.mode === 'swim' ? 0.15 : 0.6;
     this.tail.rotation.x = wag * Math.sin(t * (f.mode === 'idle' ? 9 : 7));

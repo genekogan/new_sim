@@ -263,8 +263,9 @@ export class MarsEngine implements Engine {
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
     for (const id of Object.keys(this.ents)) {
       const e = this.ents[id]; if (e.kind !== 'human') continue;
-      // creatures (bodies/creatures.ts) show a rest as 'settle' (the duck sits, the snail withdraws, the dog lies down)
-      if (e.body?.type === 'creature') { const resting = this.bodyResting(id); if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }
+      // creatures (bodies/creatures.ts) show a rest of 5 s or more as 'settle' (the duck sits, the snail withdraws, the dog lies
+      // down); the short pauses inside a walk-with are not a rest
+      if (e.body?.type === 'creature') { const resting = this.bodyResting(id) && this.restSecondsOf(id) >= 5; if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }
       const act: string = e.human.activity;
       if (this.acts.get(id) !== act) { this.acts.set(id, act); this.out.changes.push([tick, id, 'activity', act]); }
       const on: string | null = e.human.on ?? null;
@@ -794,6 +795,8 @@ export class MarsEngine implements Engine {
     return {tick:this.rt.tick,programId:p.id,actor:p.actor,step:p.index,
       action:{id:r.id as string,verb:r.verb as string,status:r.status as ActionRecord['status'],...(r.phase?{phase:r.phase as string}:{})}};
   }
+  /** Seconds of the rest step a program is on (0 when it is not resting). */
+  private restSecondsOf(actor:string):number { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined,s=p?.steps[p.index]; return s?.verb==='rest'?Number(s.params?.seconds??0):0; }
   bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
   observeLocalClassroomV1(observer:string){return readLocalClassroomV1(this.rt,observer,this.rulesVersion);}
   gatheringObservation() { return readNativeGathering(this.rt,this.rulesVersion,this.dt); }

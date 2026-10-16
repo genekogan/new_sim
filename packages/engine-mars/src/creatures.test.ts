@@ -86,7 +86,9 @@ test('creatures refuse limb programs with a species reason and rest (settle) lik
   const sit = e.perform({ actor: 'h_pet', label: 'sit', steps: [{ verb: 'sit', params: {} }] });
   assert.equal(sit.ok, false);
   assert.match(String((sit as { diagnostic: { message: string } }).diagnostic.message), /snail cannot do that; it can slide/);
-  const rest = run(e, [{ verb: 'rest', params: { seconds: 2 } }]);
+  const pause = run(e, [{ verb: 'rest', params: { seconds: 2 } }]);
+  assert.ok(!pause.acts.has('settle'), 'a 2 s pause (inside a walk-with) is not a settle');
+  const rest = run(e, [{ verb: 'rest', params: { seconds: 6 } }]);
   assert.equal(rest.end?.kind, 'completed');
   assert.ok(rest.acts.has('settle'), `a resting creature shows 'settle' (the viewer draws its settle pose): ${[...rest.acts]}`);
   assert.equal(body(e).human.activity, 'idle', 'and gets up again when the rest ends');

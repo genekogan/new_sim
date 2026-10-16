@@ -128,15 +128,15 @@ try {
     report.shots.push({ stage, dpr, name, path, renderer }); await page.close();
   }
   for (const dpr of [1, 2]) {
-    await shoot('rex-follows-ana', 'Rex', dpr, 3);
-    await shoot('pip-swims', 'Pip', dpr, 4);
-    await shoot('shelly-slides', 'Shelly', dpr, 5);
+    await shoot('rex-follows-ana', 'Rex', dpr, 6);
+    await shoot('pip-swims', 'Pip', dpr, 12);
+    await shoot('shelly-slides', 'Shelly', dpr, 14);
   }
   await step('Shelly settles: the snail withdraws into her shell', async () => {
     const r = await act('Shelly', { capability: 'settle:here', params: { seconds: 300 } });
     assert.ok(r.value?.accepted, JSON.stringify(r.value)); await wait(4000); return 'settled';
   });
-  for (const dpr of [1, 2]) await shoot('shelly-settled', 'Shelly', dpr, 5);
+  for (const dpr of [1, 2]) await shoot('shelly-settled', 'Shelly', dpr, 14);
   report.finishedAt = new Date().toISOString();
   assert.deepEqual(report.pageErrors, [], 'no page errors');
 } finally {
