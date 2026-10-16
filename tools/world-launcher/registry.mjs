@@ -55,6 +55,7 @@ export class Registry {
   remove(slug) { this.worlds = this.worlds.filter((w) => w.slug !== slug); this.save(); }
   worldDir(slug) { return join(this.dataDir, 'worlds', slug); }
   save() {
+    if (this.frozen) return;   // handing over to a newer launcher (keeper.mjs): it owns the file now
     const tmp = `${this.file}.${process.pid}.tmp`;
     writeFileSync(tmp, JSON.stringify({ schema: 'world-launcher-registry/1', worlds: this.worlds }, null, 2) + '\n');
     renameSync(tmp, this.file);

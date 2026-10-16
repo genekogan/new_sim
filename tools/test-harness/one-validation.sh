@@ -41,7 +41,7 @@ step V2-build-worlds 900 bash -c "cd apps/web && npx vite build --base /worlds/ 
 step V3-packages 2400 bash tools/test-harness/package-suite.sh
 step V3-mars-engine 2400 bash -c 'cd mars/viewer && node --test --test-concurrency=4 engine/test/*.test.ts'
 step V3-client-cli 1800 node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs
-step V3-launcher-unit 1200 node --test --test-concurrency=1 tools/world-launcher/launcher.test.mjs tools/world-launcher/launcher-auth.test.mjs   # lane ports 5210-5259
+step V3-launcher-unit 1200 node --test --test-concurrency=1 tools/world-launcher/launcher.test.mjs tools/world-launcher/launcher-auth.test.mjs tools/world-launcher/keeper.test.mjs   # lane ports 5210-5259, keeper 6017-6019
 # V4 web tests: node runner (compare the failure set with the baseline's, F6) and bundled .tsx tests
 step V4-web 900 bash -c 'cd apps/web && node --test --test-concurrency=1 $(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v "\.tsx$" | sort -u)'
 step V4-web-baseline 900 bash -c "cd $BASELINE/apps/web && node --test --test-concurrency=1 \$(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v '\.tsx$' | sort -u)"

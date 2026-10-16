@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # Option B (production on eden2; NOT run unless Codex chooses it): ship this worktree's HEAD to eden2 as a
 # world-launcher release and (by default) switch a stage to it.
-#   tools/world-launcher/deploy/release.sh [staging|production] [--no-activate]
+#   tools/world-launcher/deploy/release.sh [staging|production] [--no-activate] [--restart]   (--restart: no handover)
 #   tools/world-launcher/deploy/release.sh --local <dir>     assemble only (Option A: run it on the laptop)
 # Run from a clean worktree. The release: `git archive HEAD` (committed files only, so no .env, data or keys),
 # the web app built with --base /worlds/ (every URL under the launcher's prefix), the Mars web assets the worlds
 # read (.lane/mars-web, dereferenced) and BUILD. Dependencies are installed on the box for Linux.
-# Rollback of code: ln -sfn "$(readlink -f /srv/sim-worlds/<stage>.previous)" /srv/sim-worlds/<stage> && systemctl restart sim-worlds@<stage>
+# Activation is deploy/activate.sh on the box: `systemctl reload` hands the worlds over without closing the port (keeper.mjs).
+# Rollback of code: ln -sfn "$(readlink -f /srv/sim-worlds/<stage>.previous)" /srv/sim-worlds/<stage> && systemctl reload sim-worlds@<stage>
+# (restart instead of reload if the keeper is not running; settings in /etc/sim-worlds/<stage>.conf change only on restart).
 # Take it away entirely: remove the Caddy routes, then systemctl disable --now sim-worlds@<stage> (data stays in /srv/sim-worlds-data/<stage>).
 set -euo pipefail
 HOST="${SIM_WORLDS_HOST:-root@eden2}"
-STAGE=staging; ACTIVATE=1; LOCAL=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
-while [ $# -gt 0 ]; do case "$1" in staging|production) STAGE="$1";; --no-activate) ACTIVATE=0;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production] [--no-activate] | --local <dir>"; exit 2;; esac; shift; done
+STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
+while [ $# -gt 0 ]; do case "$1" in staging|production) STAGE="$1";; --no-activate) ACTIVATE=0;; --restart) RESTART=1;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production] [--no-activate] [--restart] | --local <dir>"; exit 2;; esac; shift; done
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "commit first: the release is exactly HEAD"; exit 1; }
@@ -61,19 +63,13 @@ ssh "$HOST" "set -e; bash $REL/tools/world-launcher/deploy/install.sh; chown -R 
 
 if [ "$ACTIVATE" = 0 ]; then echo "uploaded $BUILD (not activated)"; exit 0; fi
 echo "== activate $STAGE -> $BUILD"
+# activate.sh (in the release): switch the stage link, then `systemctl reload` (the keeper hands the worlds over one at a
+# time; no port closes, viewers reconnect) or, for a first keeper install / a changed keeper / --restart, a restart; then
+# health + every world's boot smoke, with automatic rollback to <stage>.previous by the same route (lane C4, G9).
 ssh "$HOST" "set -e
   [ '$STAGE' != production ] || test -f /etc/sim-worlds/production-auth.env || { echo 'production needs /etc/sim-worlds/production-auth.env (the account provider settings) first'; exit 1; }
-  cur=\$(readlink /srv/sim-worlds/$STAGE 2>/dev/null || true); [ -z \"\$cur\" ] || [ \"\$cur\" = '$REL' ] || ln -sfn \"\$cur\" /srv/sim-worlds/$STAGE.previous
-  ln -sfn $REL /srv/sim-worlds/$STAGE.next && mv -Tf /srv/sim-worlds/$STAGE.next /srv/sim-worlds/$STAGE
-  systemctl enable sim-worlds@$STAGE >/dev/null 2>&1; systemctl restart sim-worlds@$STAGE
-  port=\$(sed -n 's/.*--port \([0-9]*\).*/\1/p' /etc/sim-worlds/$STAGE.conf)
-  for i in \$(seq 1 60); do if curl -fsS http://127.0.0.1:\$port$BASE/__sim/healthz 2>/dev/null | grep -q '\"build\":\"$BUILD\"'; then echo \"healthy on 127.0.0.1:\$port\"; break; fi; [ \$i != 60 ] || { journalctl -u sim-worlds@$STAGE -n 30 --no-pager; exit 1; }; sleep 1; done
-  # boot smoke: every registered world must answer on the new release, else roll back to the previous one (2026-10-11)
-  data=\$(sed -n 's/.*--data \([^ ]*\).*/\1/p' /etc/sim-worlds/$STAGE.conf)
-  for slug in \$(node -e \"const d=require(process.argv[1]);for(const w of (Array.isArray(d)?d:(d.worlds||Object.values(d))))console.log(w.slug)\" \$data/worlds.json 2>/dev/null); do
-    ok=0; for i in \$(seq 1 90); do if curl -fsS -m 5 http://127.0.0.1:\$port$BASE/w/\$slug/v1/config >/dev/null 2>&1; then ok=1; break; fi; sleep 1; done
-    if [ \$ok = 1 ]; then echo \"world \$slug boots\"; else echo \"world \$slug FAILED to boot on $BUILD; rolling back\"; tail -15 \$data/logs/\$slug.log; prev=\$(readlink /srv/sim-worlds/$STAGE.previous); ln -sfn \$prev /srv/sim-worlds/$STAGE; systemctl restart sim-worlds@$STAGE; echo \"rolled back to \$prev\"; exit 1; fi
-  done
+  systemctl enable sim-worlds@$STAGE >/dev/null 2>&1
+  bash $REL/tools/world-launcher/deploy/activate.sh $STAGE $REL ${RESTART:+--restart}
   # retention: keep what a stage points at plus the three newest others
   keep=\$(for s in staging production staging.previous production.previous; do readlink -f /srv/sim-worlds/\$s 2>/dev/null; done)
   ls -1dt /srv/sim-worlds/releases/we-*/ | sed 's:/\$::' | tail -n +4 | while read -r d; do echo \"\$keep\" | grep -qx \"\$d\" || { rm -rf \"\$d\" \"\$d.deps.log\"; echo \"pruned \$d\"; }; done"

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
 import {createStationConnection,type StationConnection} from './score/station-connection.mjs';
 import * as stationCodec from '@sim/protocol';
+import { PROTO } from '@sim/protocol';
 import type { StationLiveContract, BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, PlayView, ServerStats, TalkLine, TickerLine } from '@sim/protocol';
 
 declare const __BUILD__: string;
@@ -22,6 +23,21 @@ export type Sim = {
 };
 /** One `{type:'edge', …}` viewer message (EDGE-CONTRACT-v1 §7). Open shape: renderers read only what they know. */
 export type EdgeMsg = { type: 'edge'; kind?: string; [k: string]: unknown };
+
+/** This page runs an older bundle than the server's build: reload now if the protocol changed, else the next time the
+ *  page has stayed hidden for a minute (a quick tab switch never reloads). Once per build. */
+let staleWatch: string | null = null;
+export function staleBundle(build: string, incompatible: boolean, hiddenMs = 60_000) {
+  const reload = () => { sessionStorage.setItem('sim.reloaded', build); location.reload(); };
+  if (incompatible) { reload(); return; }
+  if (staleWatch === build) return; staleWatch = build;
+  let t: ReturnType<typeof setTimeout> | null = null;
+  const check = () => {
+    if (document.visibilityState === 'hidden') { t ??= setTimeout(reload, hiddenMs); }
+    else if (t) { clearTimeout(t); t = null; }
+  };
+  document.addEventListener('visibilitychange', check); check();
+}
 
 /** One connection for the page. Re-renders about 5 times a second while the world runs. */
 export function useSim(getToken: () => Promise<string | null>, authed: boolean,identity:string|null=null,worldId?:string,stationCapabilities?:{stationContracts?:StationLiveContract[]}): Sim {
@@ -59,8 +75,10 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
         if (w.epoch !== st.takeEpoch) st.takes.chunks = [];
         st.takeEpoch = w.epoch;
         acceptPrivateAuthority(st,authedRef.current,identityRef.current,me);
-        // after a deploy, a page still running the old bundle reloads itself (once)
-        if (w.build && w.build !== 'dev' && __BUILD__ !== 'dev' && w.build !== __BUILD__ && sessionStorage.getItem('sim.reloaded') !== w.build) { sessionStorage.setItem('sim.reloaded', w.build); location.reload(); }
+        // after a deploy, a page still running the old bundle: a new protocol needs the new bundle now (reload once); a
+        // compatible release keeps this viewer running (it reconnected and resumed) and swaps the bundle unseen, once the
+        // page has been hidden for a minute (lane C4: releases without visible downtime)
+        if (w.build && w.build !== 'dev' && __BUILD__ !== 'dev' && w.build !== __BUILD__ && sessionStorage.getItem('sim.reloaded') !== w.build) staleBundle(w.build, w.proto !== undefined && w.proto !== PROTO);
       },
       onLog: (ev) => { const seen = new Set(st.log.map((e) => e.seq)); st.log = [...st.log, ...ev.filter((e) => !seen.has(e.seq))].slice(-400); },
       onBrain: (calls) => { const current=matchingMe(authedRef.current,identityRef.current,st.me);if(!current)return;const own=new Set(current.souls);const seen = new Set(st.brain.map((c) => c.id)); st.brain = [...st.brain, ...calls.filter((c) => !seen.has(c.id)&&(current.role==='admin'||(typeof c.soulId==='string'&&own.has(c.soulId))))].slice(-300); },
