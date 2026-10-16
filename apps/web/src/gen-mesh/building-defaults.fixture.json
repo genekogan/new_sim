@@ -2,240 +2,280 @@
   {
     "name": "core-cottage",
     "hash": "6b83b52cd4d8af10bf9040052199a73da7e714ed973a91920d070c421451a031",
+    "grid": "941b6df2469875724b12660e8fae856ee63def6a895ff2d2bcc6b225a310aa14",
     "tris": 2130,
     "draws": 9
   },
   {
     "name": "core-roundhouse",
     "hash": "c0d83c1020e604848dcf5cd318f3a4ddc3bf0bc43a10b19cf18c94776ee4d8c1",
+    "grid": "8407405be7297524337a9e0e9a5590f53deb4d984a28abed68e40f496a0e0c53",
     "tris": 1222,
     "draws": 9
   },
   {
     "name": "core-townhouse",
     "hash": "30e2551ac3b321d795663ddf1b0f2d3b681d4b6bbd5841dfb40d7eb7d9bb0633",
+    "grid": "bd5edf8ede11778c5664d9dfb0c75f814be6d4f5bcca1195031e6c94acf8857f",
     "tris": 4426,
     "draws": 19
   },
   {
     "name": "core-shop",
     "hash": "5e22d2cbf927c239a11fc80fbcd53cff8208a093429db14c5c5d859f1c25c3d3",
+    "grid": "cf5099f4e34f1761b3a7501a403cf6e4b09bf14180a150e24a7aa5e772c43270",
     "tris": 4048,
     "draws": 15
   },
   {
     "name": "core-hall",
     "hash": "42b9e84309930047e3424140b2b2718a9182450bc1f8cfb89871c66096b97c45",
+    "grid": "9b9c49c900c3de7619a5da1767512ce2a04d83c4654ba7c440eaa21e842beeb7",
     "tris": 2700,
     "draws": 8
   },
   {
     "name": "core-chapel",
     "hash": "f118c1f0ef5cca4d61e5fb1877b38b64feccdb1cf8cafea5d24e1940ef82a42e",
+    "grid": "a99aee4ee82530d3d39885cb3e02977aabafc0a0d6f2a5f306b2039c2bce0f92",
     "tris": 2774,
     "draws": 9
   },
   {
     "name": "core-barn",
     "hash": "bc0125c08b5f1862cdc122039dbf39991da15b844b04768009095826ee73318f",
+    "grid": "7692e55adfa2b7785acbc0dbb4e850c94ae923b19d920a936a6bc433df9e4f18",
     "tris": 1016,
     "draws": 9
   },
   {
     "name": "core-shed",
     "hash": "0abedd7744d2cb805e030d08707c98537231fe7a067e8549dffb7c9e6df7c0be",
+    "grid": "12cd2938ee79f12cab6411e18d9a002d17e57d7beac5a08e89bc3adefef6e267",
     "tris": 552,
     "draws": 9
   },
   {
     "name": "core-greenhouse",
     "hash": "4fe879bb02004809df413d224790eb71f95ec376e6097410a3d3bf530fd96d9f",
+    "grid": "071480ba85608a4ace6a91242d89e9f77121662a5e8979d8bbb2d52f634723d5",
     "tris": 760,
     "draws": 10
   },
   {
     "name": "core-pavilion",
     "hash": "6662885a480abc16b238477daa94604775cf3dc2261e4e0ec336d91d7ff42b64",
+    "grid": "4c7855293073f19b0d4d6b5f19cc6055735590e9f9034a709cb5e1c43c1af1c6",
     "tris": 480,
     "draws": 4
   },
   {
     "name": "core-tower",
     "hash": "04b66fde6a32ff5f3fd26ec913d70eec5605113116515ca6c8ed8ff8654b3764",
+    "grid": "776a9816126ffb20622fa45921fdd5fc289c3650e3a1ba12f92451ebd9b1e4b5",
     "tris": 3468,
     "draws": 21
   },
   {
     "name": "core-lighthouse",
     "hash": "3e175790eb31800db80741c8844fb52a2a146943e4b55bc4b5d0ef1db85fed4c",
+    "grid": "a8e35b5ab150605248688027a4e8dc401331e04c319034d70a8dc0b615d4f001",
     "tris": 4932,
     "draws": 33
   },
   {
     "name": "core-house",
     "hash": "a1963811de660ff2e4a2e5a71d5da5b9585af3a31486bf9ed565de5b2951cc1b",
+    "grid": "7285e4a75095a9dd64cf90b65e548c3864bf858b06a40cc08aeac434ee3bf063",
     "tris": 4454,
     "draws": 15
   },
   {
     "name": "core-apartment-block",
     "hash": "1f87b26ffb48961b558f927ce7af0f5d4f8da809c2f6c49507d54706db6e7a32",
+    "grid": "3b572cdf448732c983240c673336a8f35d5b59ce14496f93842e4eeaf51345d8",
     "tris": 6214,
     "draws": 19
   },
   {
     "name": "core-townhouse-row",
     "hash": "7d9a6c08dd4d1137dabfd0a6d010a8309a038e7b07d614be56e27dd59270c2c5",
+    "grid": "8fb300a65322907706ffd622d18fa96df4590264de2945a8114b1e1ae395666c",
     "tris": 5676,
     "draws": 13
   },
   {
     "name": "core-cabin",
     "hash": "34576ab7bfba9f4f39dff10ab4ddfa49eb095b1903827a22c14cf02c0f4ee7ae",
+    "grid": "1674152838f73b707880c7631e91a89e9f1479eeef3ce449b7160e9f6542cb1c",
     "tris": 1782,
     "draws": 9
   },
   {
     "name": "core-mansion",
     "hash": "38d58b830f3123fa64c891395ebc79b7b0f98a0d174a6ef7e3267840e368f218",
+    "grid": "9cfe385ceea2695ee8d69f8fa4f651b2fb5fb8551d6e65795ff98b1c2780cb00",
     "tris": 6196,
     "draws": 12
   },
   {
     "name": "core-dormitory",
     "hash": "cbf9cb0de912fd3e3353bf003b339eb7a02458aaf13645c7934ea63d5cb84e9f",
+    "grid": "31065ca2883aa56db12f2260d6a0db6ab42a20e1e743243250df6574787108c0",
     "tris": 5352,
     "draws": 15
   },
   {
     "name": "core-hotel",
     "hash": "485ef49287091c30d57cf391c3145a50db76af9b231bf4eb20b2f42a41e5452e",
+    "grid": "01fa2a8fca5eba241e35f448119104e5083a25dbb3f15073e566cb5ae6e5aa49",
     "tris": 7450,
     "draws": 18
   },
   {
     "name": "core-mobile-home",
     "hash": "30359c5ac693a1a6f46ae6a246efbf0d8a7f653fd4891bf1c30c7bef2dc7fa24",
+    "grid": "56f6760fe93506061dd0c1bee50b6d9ca13830e8bf02292cbb0ea10a8e4bc6c0",
     "tris": 2312,
     "draws": 9
   },
   {
     "name": "core-corner-shop",
     "hash": "b6e71fee3d47c972872c84dfbe5c32e40e9d56b823af2b8974e2e8ae5a924d2c",
+    "grid": "3aafa64bd7cf7be129fb9e5b7291071d1af0715de8271b789f3d58fb9f0a3647",
     "tris": 3248,
     "draws": 9
   },
   {
     "name": "core-supermarket",
     "hash": "7cb2e245728ac34027dda47dc78ed84db77585980aadc1579f6611b58a440fe5",
+    "grid": "c552075d1facde1c73b2ed5ee62d5a4727b4aace1ef83c142c50ebcbb2a918d3",
     "tris": 3936,
     "draws": 9
   },
   {
     "name": "core-restaurant",
     "hash": "24b4ef3b54559de555f04a5d6255c7e2be23f9c216e97800b2c259a7f367c3fa",
+    "grid": "4b6dd8e595fb310bcdea91b2b7b670225743b196bec7eddea91d6bac823a585e",
     "tris": 3924,
     "draws": 9
   },
   {
     "name": "core-cafe",
     "hash": "e1f4e3960e9cf26cfeb059eb21d713e6847aa2003f940c45981937c12ec92bd9",
+    "grid": "db58cdff6b106a2230f5b817280102fd80aa05b5108b4682764cb641f4f9e702",
     "tris": 2736,
     "draws": 9
   },
   {
     "name": "core-bar",
     "hash": "756c0395a49ec0ae5af1ef09d5eb89e63da3fb9ed89ba0b1716fd4e4c87a8c70",
+    "grid": "4ce8e648ada4c4591c5f9b15950f366d69704df279044b2182e3164e41e9c357",
     "tris": 3574,
     "draws": 9
   },
   {
     "name": "core-bank",
     "hash": "bd83e9d70a3d237e2210a62d6ade0dad5697931bae9da28c3ccd19a991fb5fe7",
+    "grid": "40dda5b276b71c377450f59fe96e3d6104f0c77afbf18e10f61d5489887ea24c",
     "tris": 2878,
     "draws": 9
   },
   {
     "name": "core-office-block",
     "hash": "619cf9446f7042310345c5f06c947c6a4b198265792da71b878ade8ecb2d273f",
+    "grid": "5ef8e33c3a91089306cf83d7a935119a6665705afe37b6afaef956f3bdac7df5",
     "tris": 5590,
     "draws": 22
   },
   {
     "name": "core-mall",
     "hash": "05457fc5fd310fcd089b7c404dfffcc6767d10f8046e1cab8e8d8ab45a68ae4e",
+    "grid": "10f299d9a763e2f88d6a12063c3ebe77b490b28413baf9f3f6c2420f63822bf0",
     "tris": 5538,
     "draws": 9
   },
   {
     "name": "core-garage",
     "hash": "2acc5da080f9510dcc2797b61b681677d17ba358a1d00b58bfd75285ad51504e",
+    "grid": "4e5b622a24073bfed8c221d80964e4756338ef6b2c5bc8d057545d32bf3ed29a",
     "tris": 1788,
     "draws": 9
   },
   {
     "name": "core-petrol-station",
     "hash": "869b352f7d50947434c84b563235869327cc6b67d39aef6641cffe2253763adb",
+    "grid": "001c45331057c7ccc57cf85679ec30b3f1a92046ee57eb2c7bd0fea1b712556c",
     "tris": 2500,
     "draws": 9
   },
   {
     "name": "core-school",
     "hash": "cefa6bf90eb42df2208ef24dfa63b0afc51fe8de32ea10c10fbc1248dc82503a",
+    "grid": "84b52425c1264951b30eb5d85f9b097ad58cbd77b4fa48c4820772688be7c5d7",
     "tris": 5878,
     "draws": 13
   },
   {
     "name": "core-hospital",
     "hash": "e49ca4fe4ccbd5fb04efa8c923fe178e743b6a0424be8dd50df222ea98e2c4a7",
+    "grid": "e2b3e440753b95db85c848b7d5214d7ddc37d2181bf8fc93e8d741696e1e8819",
     "tris": 5636,
     "draws": 13
   },
   {
     "name": "core-library",
     "hash": "30bfd1e42870af9528f6d73fde7b18d7bfea32dacda65a7f57c177211a0d2c1a",
+    "grid": "eb2a8b7c500a9dd4123330f7ffc6dad4c606a3db21b3c9f1e897b58774312f8d",
     "tris": 4936,
     "draws": 9
   },
   {
     "name": "core-town-hall",
     "hash": "ea44a159207c518fc149589e7e781e5c8bdf375780baa90ab290ccddaf0fc0bd",
+    "grid": "99ebfb3d39b8558d9d85e9a6c4f2d24f4b0d353efdd8de482c56d99065ede979",
     "tris": 5318,
     "draws": 8
   },
   {
     "name": "core-police-station",
     "hash": "56ad3e8efa13b9d608bd460f883f7433588892a7411bd0316a9145a2e41bb693",
+    "grid": "ea8a0b0cfc9ca303ac8f18e5c10b0bae98e2b92bfbc53296f441e6429cfb632c",
     "tris": 3552,
     "draws": 9
   },
   {
     "name": "core-fire-station",
     "hash": "d0d6d6a7efa42a9dfdc43484f613a371970eb2d58dfeee6aeeaf970f54c3a769",
+    "grid": "0d97561c8deb6d1e838d9e284408ef007d66aa17fd03bc700cdebbb8e10d4bcb",
     "tris": 4820,
     "draws": 15
   },
   {
     "name": "core-church",
     "hash": "75cd8a066af3c30e146390121329c7854010aa9d6ed4e4a8262128c6ed1dd8c8",
+    "grid": "8d9026f78744747994fa8a9899e6e982af2b8700bde9d6c630027333f0f0b530",
     "tris": 4242,
     "draws": 9
   },
   {
     "name": "core-prison",
     "hash": "2c880e59066abbcf8613c66134b3963540ef29864e081b12242e77287d7dc5b4",
+    "grid": "52b514fcefb8d31c8179491a7974b412b8a43963f41ce70b456649d4159ec26d",
     "tris": 3596,
     "draws": 9
   },
   {
     "name": "core-theatre",
     "hash": "88803fa16f817dd9481e25f5ccb7fdb04938dcc514af669b4548e2d4c2e6bb39",
+    "grid": "3d02f7a0ebd0849646c58d119217e83704cd186ba38e2eaa6e7c237bd72fde9a",
     "tris": 3348,
     "draws": 9
   },
   {
     "name": "core-museum",
     "hash": "b2708435149ca96d7c6cc5a7213d2eec414c8beacfa49da0cc5963a34713a77f",
+    "grid": "4dd716ca9704cb7045a24c44b4d593aa2fe45f0470bb334cac58642b7e8e5b1c",
     "tris": 3208,
     "draws": 9
   }
