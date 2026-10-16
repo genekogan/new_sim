@@ -177,6 +177,8 @@ test('Y4 routes: helper tokens never reach env, land, strike, prayers, lifecycle
   const scope = f.god.godIdentity(helper)!.child!;
   assert.equal(helperRoute('POST', '/w/helpers/v1/god/act', scope), null); assert.match(helperRoute('POST', '/w/helpers/v1/god/env', scope)!, /cannot use POST \/v1\/god\/env/);
   assert.equal(helperRoute('POST', `/v1/god/builds/church/claims/${east}/release`, scope), null);
+  // Gene 2026-10-16: helper agents may read the god trace (read-only).
+  assert.equal(helperRoute('GET', '/v1/god/trace', scope), null); assert.match(helperRoute('POST', '/v1/god/trace', scope)!, /cannot use POST/);
 });
 
 test('Y4 undo: helpers undo and redo only their own edits inside their claim group', async t => {

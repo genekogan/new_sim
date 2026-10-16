@@ -81,7 +81,7 @@ export function helperScopeFailure(scope: HelperScope, field: { id: string; clai
   return null;
 }
 
-const READS: RegExp[] = [/^\/v1\/god\/(status|schema|parts|edits|previews|recommend|snapshot)$/, /^\/v1\/god\/(defs|catalog|assets)(\/.*)?$/, /^\/v1\/god\/preview\/[^/]+$/, /^\/v1\/god\/requests\/.*$/, /^\/v1\/god\/builds(\/[^/]+)?$/];
+const READS: RegExp[] = [/^\/v1\/god\/(status|schema|parts|edits|previews|recommend|snapshot|trace)$/, /^\/v1\/god\/(defs|catalog|assets)(\/.*)?$/, /^\/v1\/god\/preview\/[^/]+$/, /^\/v1\/god\/requests\/.*$/, /^\/v1\/god\/builds(\/[^/]+)?$/];
 const WRITES: RegExp[] = [/^\/v1\/god\/(act|preview|dryrun|query|undo|redo|verify-use|look|kit\/render|assets)$/];
 /** Route authorisation for helper tokens (deny by default). Returns the refusal text, or null when allowed. */
 export function helperRoute(method: string, rawPath: string, scope: HelperScope): string | null {
