@@ -8,6 +8,7 @@
 // PLAYWRIGHT_BROWSERS_PATH, EDGE_EYES_RELOAD_HOURS (default 6), EDGE_EYES_HEADLESS_SHELL=1 (old headless shell).
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
+import {eyesBrowserLaunch, eyesBrowserModes} from './browser-config.mjs';
 
 const viewer = process.env.EDGE_EYES_URL;
 const from = process.env.EDGE_EYES_PLAYWRIGHT || fileURLToPath(new URL('../../../../../mars/viewer/package.json', import.meta.url));
@@ -16,24 +17,18 @@ const log = (...a) => console.error(new Date().toISOString(), ...a);
 if (!viewer || !process.send) {log('eyes worker needs EDGE_EYES_URL and an IPC parent'); process.exit(2);}
 const {chromium} = createRequire(from)('@playwright/test');
 
-const FLAGS = {
-  metal: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'],
-  gl: ['--use-angle=gl', '--enable-gpu', '--ignore-gpu-blocklist'],
-  swiftshader: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
-};
-const order = (process.env.EDGE_EYES_GPU || 'auto') === 'auto' ? ['metal', 'swiftshader'] : [process.env.EDGE_EYES_GPU];
+const order = eyesBrowserModes();
 let browser = null, page = null, renderer = null, ready = false, closing = false, loadedAt = 0, busy = false;
 const queue = [];
 
 async function launch() {
   for (const mode of order) {
     try {
-      const b = await chromium.launch({headless: true, ...(process.env.EDGE_EYES_HEADLESS_SHELL === '1' ? {} : {channel: 'chromium'}),
-        args: [...FLAGS[mode] ?? [], '--mute-audio', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows']});
+      const b = await chromium.launch(eyesBrowserLaunch(mode));
       const p = await b.newPage({viewport: {width: 512, height: 320}, deviceScaleFactor: 1});
       const gl = await p.evaluate(() => {const c = document.createElement('canvas').getContext('webgl2'); if (!c) return null; const x = c.getExtension('WEBGL_debug_renderer_info'); return x ? c.getParameter(x.UNMASKED_RENDERER_WEBGL) : c.getParameter(c.RENDERER);});
       if (!gl) {await b.close(); log('no WebGL with', mode); continue;}
-      if (mode === 'metal' && /swiftshader/i.test(gl) && order.length > 1) {await b.close(); log('metal fell back to', gl); continue;}
+      if (mode === 'metal' && /swiftshader|llvmpipe|software/i.test(gl)) {await b.close(); log('Metal hardware required, got', gl); continue;}
       browser = b; page = p; renderer = `${mode}: ${gl}`; log('browser up', renderer);
       p.on('crash', () => {log('page crashed'); fail('page crashed');});
       p.on('pageerror', e => log('page error:', String(e.message).slice(0, 200)));
@@ -95,4 +90,4 @@ setInterval(async () => {
   try {await Promise.race([page.evaluate(() => window.edenEyes?.ready?.()), new Promise((_, r) => setTimeout(() => r(new Error('page not answering')), 15_000))]);}
   catch (e) {log(e.message); fail('page not answering');}
 }, 60_000).unref();
-start().catch(e => {log('eyes worker failed to start:', e.message); send({t: 'status', ready: false, renderer, detail: e.message}); process.exit(1);});
+start().catch(e => {log('eyes worker failed to start:', e.message); send({t: 'status', ready: false, renderer, detail: e.message}); void shutdown(1);});
