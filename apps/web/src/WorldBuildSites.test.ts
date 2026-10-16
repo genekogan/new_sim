@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { registerHooks } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { WorldModel, type Entity, type OBB } from '@sim/world-compiler';
-import { WorldBuildSites, parseBuildFeed, SITE_REFINEMENT, type PublicSite, type SiteDelta, type SiteModel } from './WorldBuildSites.ts';
+import { WorldBuildSites, parseBuildFeed, SITE_REFINEMENT, thingEnvelope, type PublicSite, type SiteDelta, type SiteModel } from './WorldBuildSites.ts';
 
 const SERVER_NOW = 1_800_000_000_000;
 function site(overrides: Partial<PublicSite> = {}): PublicSite {
@@ -495,7 +495,9 @@ test('coverage unions overlapping/nested subtree OBBs and clips footprints/heigh
   h.model.boxes.set(child.id, [{ ...box, y0: 2, y1: 6 }, { ...box, y0: 2, y1: 6 }, { ...box, y0: 8, y1: 12 }, { ...box, c: [6, 0], y0: 10, y1: 20 }]);
   h.model.boxes.set(unrelated.id, [{ c: [0, 0], half: [4, 4], yaw: 0, y0: 0, y1: 10 }]);
   h.sites.apply(start(site({ site: { at: [0, 0], size: [26, 14], yaw: 0 }, roots: [root.id, child.id], massing: [{ at: [0, 0], size: [8, 8], h: 10 }] })));
-  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.4], 'half the base × 8/10 height; duplicate roots/OBBs and unrelated geometry add nothing');
+  // r2.1: one entity's boxes fill their plan hull (x −12..12 here), so the member covers the whole base in [2,6] and
+  // [8,10] (its 6–8 gap stays open); the root adds [0,2] on the left half: (8 + 6) / 2 / 10 = 0.7 (was 0.4 box-by-box)
+  assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.7], 'hull per entity, vertical gaps unbridged; duplicate roots/OBBs and unrelated geometry add nothing');
   const d = diff([delta(2, { rootsRemoved: [root.id, child.id] })]); h.sites.apply(d); h.sites.refitDiff(d);
   assert.deepEqual(h.sites.inspect().sites[0].coverage, [0]); h.sites.dispose();
 });
@@ -726,4 +728,25 @@ test('real applyEdge draws root-subtree OBB outlines alongside declared massing,
   assert.equal(layer.sites.inspect().sites[0].draws, 3);
   layer.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(layer.sites.inspect().sites[0].draws, 5);
   layer.dispose();
+});
+
+test('r2.1 a finished building of thin walls fills its mass and fades the ghost; separate things are never bridged', () => {
+  // A cottage's colliders are four 0.2 m walls round an 8 × 6 plan (the walk measured 0.03–0.05 coverage, faces stayed on).
+  const h = harness(); const cottage = entity('e_cottage'), lamp = entity('e_lamp'); h.model.entities.set(cottage.id, cottage); h.model.entities.set(lamp.id, lamp);
+  const walls = [{ c: [103, 16.1], half: [4, 0.1] }, { c: [103, 21.9], half: [4, 0.1] }, { c: [99.1, 19], half: [0.1, 3] }, { c: [106.9, 19], half: [0.1, 3] }]
+    .map(w => ({ ...w, c: w.c as [number, number], half: w.half as [number, number], yaw: 0, y0: 0, y1: 3 }));
+  h.model.boxes.set(cottage.id, walls);
+  h.sites.apply(start(site({ site: { at: [103, 19], size: [26, 14], yaw: 0 }, roots: [cottage.id, lamp.id], massing: [{ at: [0, 0], size: [8, 6], h: 3 }, { at: [10, 0], size: [4, 4], h: 3 }] })));
+  const [filled, empty] = h.sites.inspect().sites[0].coverage;
+  assert.ok(filled > 0.95, `walls enclose the whole mass (coverage ${filled})`); assert.equal(empty, 0);
+  assert.equal(faces(h).geometry.getAttribute('color').getW(0), 0, 'the filled mass has no ghost face');
+  // a lantern standing in the empty mass covers only its own small box, and never joins the cottage's hull
+  h.model.boxes.set(lamp.id, [{ c: [113, 19], half: [0.2, 0.2], yaw: 0, y0: 0, y1: 2 }]);
+  const d = diff([delta(2)], [lamp]); h.sites.apply(d); h.sites.refitDiff(d);
+  assert.ok(h.sites.inspect().sites[0].coverage[1] < 0.05); h.sites.dispose();
+  // rotated walls keep their exact hull in the frame of the largest box; a lone box is returned as is
+  const r = Math.PI / 6, rotated = thingEnvelope([{ c: [0, 0], half: [4, 0.1], yaw: r, y0: 0, y1: 3 }, { c: [Math.sin(r) * 2.9, Math.cos(r) * 2.9], half: [4, 0.1], yaw: r, y0: 2.9, y1: 6 }, { c: [0, 0], half: [1, 1], yaw: r, y0: 9, y1: 10 }]);
+  assert.equal(rotated.length, 2, 'touching storeys merge; the floating box above keeps its gap');
+  assert.ok(Math.abs(rotated[0].half[0] - 4) < 1e-9 && Math.abs(rotated[0].half[1] - 2) < 1e-9 && rotated[0].yaw === r);
+  const lone = [{ c: [1, 2] as [number, number], half: [1, 1] as [number, number], yaw: 0.3, y0: 0, y1: 1 }]; assert.equal(thingEnvelope(lone), lone);
 });
