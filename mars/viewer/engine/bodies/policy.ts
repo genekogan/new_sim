@@ -12,6 +12,10 @@
 // child verbs. A verb with no floater among its params is not this module's business: 'works' (humanoid).
 // Pure and deterministic: no Runtime, no registry import (the table is checked against it in tests).
 import type { Body } from '../world/types.ts';
+import { creatureOf } from './creatures.ts';
+
+/** Ground-world swimming verbs, judged by body (creatures that swim) rather than by the table. */
+const SWIM_VERBS: ReadonlySet<string> = new Set(['swim_to', 'ground_travel']);
 
 export type Verdict = 'works' | 'approximates' | 'refuses';
 export type Rule = { status: Verdict; reason: string; note: string };
@@ -193,6 +197,12 @@ export function admitFloaters(verb: string, params: unknown, bodyOf: BodyLookup)
   const isFloater = (id: string) => bodyOf(id)?.family === 'floater';
   const named = [...strings(params, new Set())].filter(isFloater).sort();
   const policy = FLOATER_POLICY[verb];
+  if (named.length && SWIM_VERBS.has(verb)) {
+    // ground-world swimming (locomotion/swim.ts, registered by the ground bridge): creatures whose species swims
+    const dry = named.filter((id) => !creatureOf(bodyOf(id))?.swimSpeed);
+    if (!dry.length) return { verb, status: 'works', reason: 'creature.swims', note: 'a swimming creature paddles at its own pace', floaters: named };
+    return { verb, status: 'refuses', reason: 'floater.no-swim', note: creatureOf(bodyOf(dry[0]))?.cannot.swim ?? 'this body does not swim', floaters: named, blockedBy: dry.map((id) => ({ id, role: '*', reason: 'floater.no-swim' })) };
+  }
   if (!named.length) return { verb, status: 'works', reason: 'floater.not-involved', note: 'no floater among the params; ordinary validation applies', floaters: [] };
   if (!policy) return { verb, status: 'refuses', reason: 'floater.unknown-verb', note: `no floater policy for ${verb}`, floaters: named, blockedBy: named.map((id) => ({ id, role: '*', reason: 'floater.unknown-verb' })) };
   const p = (params ?? {}) as Record<string, unknown>;

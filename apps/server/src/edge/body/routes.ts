@@ -4,6 +4,7 @@ import {EDGE_CONTRACT,EdgeError,edgeBody,type EdgeDeps} from '../contract.ts';
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import {admitBodyGLB,BodyAdmissionError,BODY_LIMITS} from './admission.ts';
 import {FLOATER_MODELS} from '../../../../../mars/viewer/engine/bodies/models.ts';
+import {CREATURES,CREATURE_IDS,creatureBody} from '../../../../../mars/viewer/engine/bodies/creatures.ts';
 import {addSchemaPart} from '../events/schema.ts';
 import {intakeUpload,recordIntake} from '../../moderation/intake.ts';
 import {moderationFor} from '../../moderation/store.ts';
@@ -15,7 +16,9 @@ export const BODY_PRESETS=[{id:'humanoid',name:'Humanoid',body:null},...FLOATER_
   // Trusted flat aliases retain the same shipped bytes; placement roles stay in the world catalog.
   const modelUrl=`/world-assets/littlemartians/characters/${m.file.replace(/^kin\//,'')}`;
   return {id:m.id,name:m.name,body:{family:'floater',type:'ceramic',model:m.id,modelUrl,avatar:{kind:'body',modelUrl,bodyType:'ceramic'},radius:.35,hoverHeight:1.45} as Entity['body']};
-})];
+}),
+// Creatures (R11a): procedurally drawn animals with their own gait, speed and abilities (bodies/creatures.ts).
+...CREATURE_IDS.map(id=>{const c=CREATURES[id];return {id,name:c.name,body:creatureBody(id) as Entity['body'],creature:{moves:c.moves,speed:c.speed,swims:c.swimSpeed!==null,swimSpeed:c.swimSpeed,settles:c.settles,cannot:c.cannot}};})];
 const ASSET=/^body_[a-f0-9]{64}$/;
 const MAX_UPLOAD_REQUEST=BODY_LIMITS.bytes+64*1024;
 
@@ -54,7 +57,7 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
   /** core/humanoid@2: the look being worn (resolved params) and the choices an owner or Soul may set. */
   const lookOf=(body:Entity['body']|null|undefined)=>(body as {params?:unknown}|null|undefined)?.params?resolveLook((body as {params:unknown}).params):null;
   const lookChoices=Object.fromEntries(Object.entries(HUMANOID_PARAMS).map(([k,f])=>[k,f.type==='enum'?f.values:f.type==='number'?{min:f.min,max:f.max}:f.type]));
-  app.get('/v1/edge/body',wrap(c=>{const s=deps.soul(c);return {available,body:current(s.entityId),look:lookOf(current(s.entityId)),lookDef:HUMANOID_REF,lookChoices,types:available?['humanoid','ceramic','floater']:[],presets:available?BODY_PRESETS:[],limits:BODY_LIMITS,
+  app.get('/v1/edge/body',wrap(c=>{const s=deps.soul(c);return {available,body:current(s.entityId),look:lookOf(current(s.entityId)),lookDef:HUMANOID_REF,lookChoices,types:available?['humanoid','ceramic','floater','creature']:[],presets:available?BODY_PRESETS:[],limits:BODY_LIMITS,
     uploads:(db.prepare('SELECT descriptor FROM edge_body_owners_v1 WHERE world_id=? AND owner=? ORDER BY asset_id').all(world,s.owner) as {descriptor:string}[]).map(r=>JSON.parse(r.descriptor))};}));
   app.post('/v1/edge/body/uploads',wrap(async c=>{
     const s=deps.soul(c);if(!available)throw new EdgeError(503,'body.unavailable','This world engine cannot assign bodies');if(!deps.souls.limits.allow(`edge-body-upload:${s.soulId}`,2,60000).ok)throw new EdgeError(429,'rate-limited','At most two body uploads per minute');
@@ -109,5 +112,5 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
     const row=db.prepare('SELECT content FROM edge_body_assets_v1 WHERE world_id=? AND asset_id=?').get(world,file.slice(0,-4)) as {content:Uint8Array}|undefined;if(!row)return c.notFound();
     return c.body(new Uint8Array(row.content),200,{'Content-Type':'model/gltf-binary','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'"});
   });
-  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater'],limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)','PUT /v1/souls/:id/look (the owner: a look request)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
+  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater','creature'],creatures:CREATURE_IDS,limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)','PUT /v1/souls/:id/look (the owner: a look request)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
 }

@@ -72,6 +72,7 @@ import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
 import {humanRadius} from '../../../mars/viewer/engine/bodies/humanoid.ts';
+import {creatureOf} from '../../../mars/viewer/engine/bodies/creatures.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
@@ -264,6 +265,9 @@ export class MarsEngine implements Engine {
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
     for (const id of Object.keys(this.ents)) {
       const e = this.ents[id]; if (e.kind !== 'human') continue;
+      // creatures (bodies/creatures.ts) show a rest of 5 s or more as 'settle' (the duck sits, the snail withdraws, the dog lies
+      // down); the short pauses inside a walk-with are not a rest
+      if (e.body?.type === 'creature') { const resting = this.bodyResting(id) && this.restSecondsOf(id) >= 5; if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }
       const act: string = e.human.activity;
       if (this.acts.get(id) !== act) { this.acts.set(id, act); this.out.changes.push([tick, id, 'activity', act]); }
       const on: string | null = e.human.on ?? null;
@@ -854,6 +858,8 @@ export class MarsEngine implements Engine {
     return {tick:this.rt.tick,programId:p.id,actor:p.actor,step:p.index,
       action:{id:r.id as string,verb:r.verb as string,status:r.status as ActionRecord['status'],...(r.phase?{phase:r.phase as string}:{})}};
   }
+  /** Seconds of the rest step a program is on (0 when it is not resting). */
+  private restSecondsOf(actor:string):number { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined,s=p?.steps[p.index]; return s?.verb==='rest'?Number(s.params?.seconds??0):0; }
   bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
   observeLocalClassroomV1(observer:string){return readLocalClassroomV1(this.rt,observer,this.rulesVersion);}
   gatheringObservation() { return readNativeGathering(this.rt,this.rulesVersion,this.dt); }
@@ -871,7 +877,9 @@ export class MarsEngine implements Engine {
   bodyProgramProblemV1(program:Program):Diag|null {
     const body=this.ents[program.actor]?.body;
     if(body?.family!=='floater'||body.type===undefined&&body.modelUrl===undefined)return null;
-    for(const s of program.steps)if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(s.verb))return {code:'body.unsupported',message:'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};
+    // creatures (bodies/creatures.ts) whose species swims may also swim and come ashore
+    const swims=!!creatureOf(body)?.swimSpeed;
+    for(const s of program.steps){const verb=s.verb.replace(/^mars:/,'');if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(verb)&&!(swims&&['swim_to','ground_travel'].includes(verb)))return {code:'body.unsupported',message:creatureOf(body)?(['swim_to','ground_travel'].includes(verb)&&creatureOf(body)!.cannot.swim||`A ${creatureOf(body)!.id} cannot do that; it can ${creatureOf(body)!.moves}, settle, turn and follow.`):'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};}
     return null;
   }
   /** BODY-v1: never interrupt holders, commitments or unsafe postures to swap a body. */

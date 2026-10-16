@@ -32,7 +32,7 @@ export type Entity = {
   pose: Pose;
   provenance: Provenance;
   human?: HumanState;
-  body?: {family:'humanoid'|'floater';type?:'humanoid'|'ceramic'|'floater';model?:string;modelUrl?:string;
+  body?: {family:'humanoid'|'floater';type?:'humanoid'|'ceramic'|'floater'|'creature';model?:string;modelUrl?:string;
     avatar?:{kind:'body';modelUrl:string;bodyType:'humanoid'|'ceramic'|'floater'};radius?:number;hoverHeight?:number;
     /** core/humanoid@2 look params (compact), with model = the look key (engine bodies/humanoid.ts). */
     params?:Record<string,string|number>};

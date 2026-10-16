@@ -7,3 +7,4 @@ export * from './pose.ts';
 export * from './policy.ts';
 export * from './float.ts';
 export * from './take.ts';
+export * from './creatures.ts';

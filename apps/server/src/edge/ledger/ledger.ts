@@ -1,7 +1,7 @@
 // Core-Ledger: capabilities v2, direct act with durable receipts, Tier 1 observe, map,
 // and the read-only hooks Core-Comms routes events and speech with. No model calls.
 import {randomUUID} from 'node:crypto';
-import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody} from '../body/actions.ts';
+import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody,shapeRigidCapabilities} from '../body/actions.ts';
 import {interiorShellPolygon} from './nav.ts';
 import {inPoly} from './places.ts';
 import type {Program} from '@sim/engine-contract';
@@ -478,11 +478,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const ride = this.aboard(soul.entityId);
     if (ride) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are travelling in ${ride.label}; it returns by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
-    if(isRigidBody(me)){
-      for(let i=caps.length-1;i>=0;i--)if(bodyCapabilityProblem(me,caps[i]!,plans.get(caps[i]!.id)?.steps)){plans.delete(caps[i]!.id);caps.splice(i,1);}
-      for(const verb of ['hover','settle']){const id=verb+':here',label=verb==='hover'?'Hover here':'Settle here (hold position while hovering)';caps.unshift({id,verb,label,available:true,params:secondsParam});plans.set(id,{label,steps:[{verb:'rest',params:{seconds:60}}],seconds:true});}
-      for(const c of caps)if(c.verb==='walk')c.label=c.label.replace(/walk/ig,'Glide');else if(c.id==='stand:here')c.label='Stop / release my current hover slot';
-    }
+    shapeRigidCapabilities(me,caps,plans as never,secondsParam);
     // knowledge/1: an offer that leads to (or names) a secret place this Soul has not been to or found is not offered
     if (this.knowledge.marked().size) for (let i = caps.length - 1; i >= 0; i--) {const t = caps[i]!.target; if (t?.kind === 'place' && !this.knowledge.knows(soul.soulId, t.id)) {plans.delete(caps[i]!.id); caps.splice(i, 1);}}
     const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;

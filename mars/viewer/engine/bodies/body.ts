@@ -5,11 +5,12 @@
 // `hoverHeight` above that pose with a bob, tilt and yaw computed from the sampled tick (pose.ts).
 import type { Body, Entity } from '../world/types.ts';
 import { humanoidParamsProblem } from './humanoid.ts';
+import { CREATURE_EYE_RANGE, creatureSpecies } from './creatures.ts';
 
 export type BodyFamily = Body['family'];
 
 /** A floater's body with every default filled in. */
-export type FloaterBody = { family: 'floater'; model?: string; radius: number; hoverHeight: number };
+export type FloaterBody = { family: 'floater'; type?: 'ceramic' | 'floater' | 'creature'; model?: string; radius: number; hoverHeight: number };
 
 /** Head radius (m): a 0.7 m head clears a 0.9 m door with margin and reads at human scale. */
 export const FLOATER_RADIUS = 0.35;
@@ -30,7 +31,7 @@ export const isFloater = (e: Pick<Entity, 'body'> | undefined): boolean => e?.bo
 /** Defaults for a floater body; throws on a non-floater (callers check isFloater first). */
 export function floaterBody(body: Body | undefined): FloaterBody {
   if (body?.family !== 'floater') throw new Error(`not a floater body: ${JSON.stringify(body)}`);
-  return { family: 'floater', ...(body.model !== undefined ? { model: body.model } : {}), radius: body.radius ?? FLOATER_RADIUS, hoverHeight: body.hoverHeight ?? FLOATER_HOVER };
+  return { family: 'floater', ...(body.type === 'creature' ? { type: 'creature' as const } : {}), ...(body.model !== undefined ? { model: body.model } : {}), radius: body.radius ?? FLOATER_RADIUS, hoverHeight: body.hoverHeight ?? FLOATER_HOVER };
 }
 
 /** Structural check of a body value (for world edits / seeds); returns an error code or null. */
@@ -40,14 +41,16 @@ export function bodyProblem(body: unknown): string | null {
   const b = body as Record<string, unknown>;
   for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight', 'params'].includes(k)) return `body.unknown-field:${k}`;
   if (b.family !== 'humanoid' && b.family !== 'floater') return 'body.family';
-  if (b.type !== undefined && !(b.family==='humanoid' ? b.type==='humanoid' : b.type==='ceramic'||b.type==='floater')) return 'body.type';
+  if (b.type !== undefined && !(b.family==='humanoid' ? b.type==='humanoid' : b.type==='ceramic'||b.type==='floater'||b.type==='creature')) return 'body.type';
+  // creature bodies (bodies/creatures.ts): a known species, drawn procedurally (no model URL), eye height as hoverHeight
+  if (b.type === 'creature' && (!creatureSpecies(b.model) || b.modelUrl !== undefined || b.avatar !== undefined || b.params !== undefined)) return 'body.creature';
   if (b.model !== undefined && (typeof b.model !== 'string' || !/^(?:[a-z0-9-]{1,64}|body_[a-f0-9]{64})$/.test(b.model))) return 'body.model';
   const safeUrl=(v:unknown)=>typeof v==='string' && /^\/(?:w\/[a-z0-9-]+\/)?(?:v1\/edge\/body\/assets\/body_[a-f0-9]{64}\.glb|world-assets\/littlemartians\/characters\/[a-z0-9-]+\.glb)$/.test(v);
   if (b.modelUrl!==undefined && !safeUrl(b.modelUrl)) return 'body.model-url';
   if(b.avatar!==undefined){const a=b.avatar as Record<string,unknown>;if(!a||typeof a!=='object'||Object.keys(a).some(k=>!['kind','modelUrl','bodyType'].includes(k))||a.kind!=='body'||!safeUrl(a.modelUrl)||a.modelUrl!==b.modelUrl||a.bodyType!==(b.type??b.family))return 'body.avatar';}
   const inRange = (v: unknown, [lo, hi]: readonly [number, number]) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
   if (b.radius !== undefined && !inRange(b.radius, FLOATER_RADIUS_RANGE)) return 'body.radius';
-  if (b.hoverHeight !== undefined && !inRange(b.hoverHeight, FLOATER_HOVER_RANGE)) return 'body.hover-height';
+  if (b.hoverHeight !== undefined && !inRange(b.hoverHeight, b.type === 'creature' ? CREATURE_EYE_RANGE : FLOATER_HOVER_RANGE)) return 'body.hover-height';
   // core/humanoid@2 look: compact params with model = the look key (bodies/humanoid.ts reads the physical ones)
   if (b.params !== undefined) {
     if (b.family !== 'humanoid' || b.modelUrl !== undefined || b.avatar !== undefined || typeof b.model !== 'string' || !/^humanoid2-[0-9a-f]{16}$/.test(b.model)) return 'body.params';
