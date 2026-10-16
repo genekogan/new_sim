@@ -29,7 +29,7 @@ import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
 import { intakeUpload, recordIntake } from '../moderation/intake.ts';
 import { moderationFor } from '../moderation/store.ts';
-import { assetPolicy, UploadRejected } from '../moderation/validate.ts';
+import { assetPolicy, UploadRejected, validateUpload } from '../moderation/validate.ts';
 
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 export const CORE_ASSET_INDEX = join(REPO_ROOT, 'worlds/core-assets/index.json');
@@ -648,7 +648,11 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     if (!rest.endsWith('/thumb.png')) throw new ApiError(404, 'not-found', 'POST /v1/god/defs/<ref>/thumb.png with a PNG body');
     const def = findDef(rest.slice(0, -'/thumb.png'.length));
     if (!def) throw new ApiError(404, 'not-found', 'no such def');
-    store.putThumb(def.hash, new Uint8Array(await c.req.arrayBuffer()));
+    // G8 moderation: the same gate as every upload (a well-formed PNG, metadata stripped)
+    let png: Uint8Array;
+    try { png = validateUpload(new Uint8Array(await c.req.arrayBuffer()), { formats: ['png'], maxBytes: 400_000, maxTris: 0, maxTextures: 1, maxTexPx: 512, maxImageBytes: 400_000 }).bytes; }
+    catch (e) { if (e instanceof UploadRejected) throw new ApiError(e.status, e.code, e.message); throw e; }
+    store.putThumb(def.hash, png);
     return c.json({ ok: true, thumb: `/v1/god/defs/${publicRef(def)}/thumb.png`, immutable: `/thumbs/${def.hash}.png` }, 200, noStore);
   });
   mountCatalogRoutes(app, { god: d.god, requireGod: d.requireGod, store, library, ownDefs });
