@@ -195,12 +195,14 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
     return hAt(g, c % g.nx, Math.floor(c / g.nx));
   };
   const ms = mask?.stamp, mg = mask?.gen ?? 0;
+  const maxExpand = opts.maxExpand ?? 4_000_000;
+  const memo = !mask && !opts.nameObstacles ? strandedKey(grids, prep) : null, side = memo ? stranded.get(memo) : undefined;
+  if (side && side.size <= maxExpand && !(side.cells[goalId >> 3] & (1 << (goalId & 7)))) return null;
   stamp[startId] = gen;
   gScore[startId] = 0;
   came[startId] = -1;
   heap.push(startId, h(sLv, s), false);
   let expanded = 0;
-  const maxExpand = opts.maxExpand ?? 4_000_000;
   const hasEdges = edges.size > 0;
   let rev = opts.proveUnreachable && !mask && startId !== goalId && total <= maxExpand ? reverseFlood(S, prep, Ls, startId, goalId) : null;
   while (heap.size) {
@@ -260,11 +262,35 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
       }
     }
   }
-  if (shut[goalId] !== gen) { failRegion = { cells: shut, gen }; return null; }
+  if (shut[goalId] !== gen) { failRegion = { cells: shut, gen }; if (memo) remember(memo, shut, gen, total, expanded); return null; }
   const chain: number[] = [];
   for (let id = goalId; id !== -1; id = came[id]) chain.push(id);
   chain.reverse();
   return { goalId, chain, viaLink, expanded };
+}
+
+/**
+ * Engine P4: the start's side of a failed exhaustive search. An unmasked A* that runs out of cells has closed exactly the
+ * cells its start reaches (passability and link edges do not depend on the goal), so a later goal outside that set on the
+ * same level grids, radius, start cell and link edges fails the same way (null) without searching again, as long as that
+ * side fits the call's expansion limit. A Soul's capabilities try up to 14 standing points in each room the stairs do not
+ * reach (Eden 2026: ~0.8 s each). Grids are never mutated after they are built, so they are told apart by identity.
+ */
+const gridSerials = new WeakMap<LevelGrid, number>();
+let gridSerialNext = 0;
+const serialOf = (g: LevelGrid) => { let k = gridSerials.get(g); if (k === undefined) gridSerials.set(g, (k = ++gridSerialNext)); return k; };
+const STRANDED_MAX = 6;
+const stranded = new Map<string, { cells: Uint8Array; size: number }>();
+function strandedKey(grids: GridSet, prep: Prep): string {
+  let k = `${prep.r}|${prep.sLv}:${prep.s}|${prep.lvIds.map((id) => `${id}:${serialOf(grids.levels.get(id)!)}`).join(',')}|`;
+  for (const [from, list] of prep.edges) for (const e of list) k += `${from}>${e.toLevel}:${e.toCell};`;
+  return k;
+}
+function remember(key: string, shut: Uint32Array, gen: number, total: number, size: number) {
+  const cells = new Uint8Array((total + 7) >> 3);
+  for (let i = 0; i < total; i++) if (shut[i] === gen) cells[i >> 3] |= 1 << (i & 7);
+  stranded.delete(key); stranded.set(key, { cells, size });
+  while (stranded.size > STRANDED_MAX) stranded.delete(stranded.keys().next().value!);
 }
 
 /** The region the last failed `search` exhausted: cells with cells[id] === gen (the start's side, or the goal's side). */

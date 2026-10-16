@@ -93,6 +93,7 @@ test('the memo is bounded and keeps the most recently used tiles', () => {
   assert.ok(E.outside.size <= 12, `memo holds ${E.outside.size}`);
   assert.ok(E.levelAt(1, tiles[15]) === grids[15], 'the newest is still held');
   assert.equal(w.ground.stats.levelBuilds, 16);
-  assert.ok(E.levelAt(1, tiles[0]) !== grids[0], 'the oldest was dropped and is rebuilt on demand');
+  // the oldest left this memo and is asked of the ground again (whose own floor memo, freeze P4, may still hold its cells)
+  E.levelAt(1, tiles[0]); assert.equal(w.ground.stats.levelBuilds, 17, 'the oldest was dropped and is asked for again on demand');
   same(E.levelAt(1, tiles[0]), fresh(w, 1, tiles[0]));
 });

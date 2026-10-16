@@ -3,7 +3,7 @@
 // Object as well as the browser. Rebuilt (or patched) when construction
 // changes the scene.
 import { hashOf } from '../core/hash.ts';
-import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2, hypot } from '../core/math.ts';
+import { obbCorners, obbOverlapAt, pointInObb, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { Level, Obstacle, SpatialScene, Surface } from './types.ts';
 
 export type LevelGrid = {
@@ -494,10 +494,13 @@ function obbRange(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz:
 export function rasterObb(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz: number, fn: (i: number) => void, conservative = false, clip?: Rect) {
   let [i0, i1, j0, j1] = obbRange(o, ox, oz, cell, nx, nz);
   if (clip) { i0 = Math.max(i0, clip[0]); i1 = Math.min(i1, clip[1]); j0 = Math.max(j0, clip[2]); j1 = Math.min(j1, clip[3]); }
+  if (i0 > i1 || j0 > j1) return;
+  // conservative: obbOverlap(o, the cell's box) with o's corners and the axes computed once (same answers, engine P4)
+  const overlaps = conservative ? obbOverlapAt(o, [cell / 2 - 1e-9, cell / 2 - 1e-9], 0) : null;
   for (let j = j0; j <= j1; j++)
     for (let i = i0; i <= i1; i++) {
       const p: Vec2 = [latticeCentre(ox + i, cell), latticeCentre(oz + j, cell)];
-      if (conservative ? obbOverlap(o, { c: p, half: [cell / 2 - 1e-9, cell / 2 - 1e-9], yaw: 0 }) : pointInObb(p, o, 1e-9)) fn(j * nx + i);
+      if (overlaps ? overlaps(p) : pointInObb(p, o, 1e-9)) fn(j * nx + i);
     }
 }
 

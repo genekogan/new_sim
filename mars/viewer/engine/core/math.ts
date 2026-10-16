@@ -73,6 +73,32 @@ export function obbOverlap(a: OBB2, b: OBB2, margin = 0): boolean {
   return true;
 }
 
+/**
+ * `obbOverlap(a, { c, half, yaw }, margin)` for many centres `c` of one box shape (a raster's cells): a's corners, both
+ * boxes' axes and the box's corner offsets are computed once, with the same float operations in the same order, so every
+ * answer equals obbOverlap's.
+ */
+export function obbOverlapAt(a: OBB2, half: Vec2, yaw: number, margin = 0): (c: Vec2) => boolean {
+  const ca = obbCorners(a), [hx, hz] = half;
+  const off = ([[hx, hz], [-hx, hz], [-hx, -hz], [hx, -hz]] as Vec2[]).map((p) => rot2(p, yaw));
+  const axes: Vec2[] = [rot2([1, 0], a.yaw), rot2([0, 1], a.yaw), rot2([1, 0], yaw), rot2([0, 1], yaw)];
+  const amins: number[] = [], amaxs: number[] = [];
+  for (const ax of axes) {
+    let amin = Infinity, amax = -Infinity;
+    for (const p of ca) { const d = dot2(p, ax); amin = Math.min(amin, d); amax = Math.max(amax, d); }
+    amins.push(amin); amaxs.push(amax);
+  }
+  return (c) => {
+    for (let k = 0; k < 4; k++) {
+      const ax = axes[k];
+      let bmin = Infinity, bmax = -Infinity;
+      for (let q = 0; q < 4; q++) { const d = (c[0] + off[q][0]) * ax[0] + (c[1] + off[q][1]) * ax[1]; bmin = Math.min(bmin, d); bmax = Math.max(bmax, d); }
+      if (amaxs[k] + margin < bmin || bmax + margin < amins[k]) return false;
+    }
+    return true;
+  };
+}
+
 export function pointInObb(p: Vec2, o: OBB2, margin = 0): boolean {
   const l = rot2(sub2(p, o.c), -o.yaw);
   return Math.abs(l[0]) <= o.half[0] + margin && Math.abs(l[1]) <= o.half[1] + margin;
