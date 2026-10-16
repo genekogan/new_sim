@@ -7,9 +7,9 @@ export const EDEN_CONTENT_VERSION = 'eden-authored-content/1' as const;
 export const EDEN_CONTENT_PROVENANCE = {
   kind: 'authored-fiction',
   author: 'Eden world editorial collection',
-  sourceRevision: '619bc87e405530c6ff0a65c241a6efa04ff841f7',
+  sourceRevision: '925a7d2b7b1248801074bc4da41b0a89db774494',
   placeDataPath: 'worlds/eden/places.v1.json',
-  placeDataSHA256: '2ec44c187ac041d734e0b039754087ec5e199af0eb067a640e9eacb7bda6d78b',
+  placeDataSHA256: '9f40261f5a266d1b57a2dd8709569973d902d9c026211f055383312d495508bf',
   note: 'Original Eden fiction anchored to public place names and scenery. No archival excerpts, private history, harvest schedule, inventory, or economic promises.',
 } as const;
 
