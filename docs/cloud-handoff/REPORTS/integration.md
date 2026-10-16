@@ -32,5 +32,5 @@ Base `release/2-20261016` @ `dc6595a2`. One `--no-ff` merge per lane in INTEGRAT
 | 26 | edge/capability-stall | yes | — (adds root `REPORT.md` + evidence JSON) | 2 files + mars navigation |
 
 **Typecheck:** tsc clean for server, world-compiler, generators, web, catalog, engine-mars, mars/viewer.
-**Godmode gate (`node tools/god-gate.mjs`):** GATE_RESULT
-**Needs `pnpm install`** (esbuild + meshoptimizer added by gate/phones). **To do locally:** browser/visual proofs (polish, phones, bugs E2, parity visual), laptop-path tests above, descriptor-pair pins + proof rerun, artsound decision.
+**Godmode gate (`node tools/god-gate.mjs`, headless): 11/12 suites PASS.** god 380/0 (7 skipped), world-compiler 119, generators 68, kit-mesh 11, faces 10, gallery-diff 2, CLI-lib 243, tsc server/world-compiler/generators, skill-build. **catalog FAIL (1 case):** bugs' E2 #3 `flee` made a new `core-badger@1` revision (`47ba41ee…`). Its 7 > 4 gallery draws finding is already documented under the old hash `d6e2414e…` in `known-20261015.json`; that record needs review (left untouched). gallery-pixels not run (needs recorded galleries).
+**Needs `pnpm install`** (esbuild + meshoptimizer added by gate/phones). **To do locally:** browser/visual proofs (polish, phones, bugs E2, parity visual), laptop-path tests above, descriptor-pair pins + proof rerun, badger conformance record, artsound decision.
