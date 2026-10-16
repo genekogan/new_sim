@@ -12,6 +12,7 @@ import { GENERATORS, type Value } from '@sim/generators';
 import { buildingFacadeSlots, type BuildingLayout } from '../../../../packages/generators/src/building.ts';
 import { Builder, hashStr, mix, rng, type Col } from './building-kit.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
+import { decalGroups } from './faces.ts'; // XP8 hook
 
 type V2 = [number, number];
 type Wall = BuildingLayout['walls'][number];
@@ -56,6 +57,7 @@ registerMesh({
       let built: { group: THREE.Group; tris: number } | null = null;
       for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }
       tpl = built!.group;
+      for (const group of decalGroups(ctx.params.decals, ctx.baked?.slots, L.yaw)) tpl.children[0].add(group); // XP8 hook: wall decals
       tpl.userData.tris = built!.tris;
       if (templates.size > 64) { for (const g of templates.values()) disposeGroup(g); templates.clear(); }
       templates.set(key, tpl);
