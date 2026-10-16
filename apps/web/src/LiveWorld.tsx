@@ -755,7 +755,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         alive.add(soul.id);
         const drawnBody=recordedBody(rec?.body,at.entities[soul.entityId]?.state??{});
         const lift = drawnBody?.family === 'floater' ? (() => { const b = floaterBody(drawnBody); return b.hoverHeight + b.radius + 0.15; })() : 2.05;
-        if(refresh&&!eyes)portraits.capture(soul.id,JSON.stringify([drawnBody,soul.entityId]),people?.bodyObject(soul.entityId)??floaters.object(soul.entityId)??standIns.getObjectByName(soul.entityId)??null,drawnBody?.family==='floater',now);
+        if(refresh&&!eyes&&!soul.profilePhoto)portraits.capture(soul.id,JSON.stringify([drawnBody,soul.entityId]),people?.bodyObject(soul.entityId)??floaters.object(soul.entityId)??standIns.getObjectByName(soul.entityId)??null,drawnBody?.family==='floater',now);
         const l = labelFor(soul);
         l.obj.position.set(pos[0], pos[1] + lift, pos[2]);
         l.obj.visible = true;

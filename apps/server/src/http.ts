@@ -1,3 +1,4 @@
+import {AutoPortraits} from './portrait/auto-portraits.ts';
 import {SoulProfiles} from './soul-profile.ts';
 import {WorldAccounts} from './accounts/service.ts';
 import {mountAccountRoutes} from './accounts/routes.ts';
@@ -55,6 +56,8 @@ export function buildApp(d: Deps) {
   if(d.souls.accounts)d.auth.legacyOwnerAllowed=owner=>d.souls.ownedRows(owner).length>0;
   d.host.profileWorldPath=d.cfg.worldPath;
   const profiles=new SoulProfiles(d.host,d.souls);
+  // resident looks v2: automatic portraits for humanoid looks (SIM_AUTO_PORTRAITS=0 turns them off)
+  const portraits=new AutoPortraits(d.host);profiles.autoBytes=(id,hash)=>portraits.bytes(id,hash);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
   mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
@@ -133,7 +136,7 @@ export function buildApp(d: Deps) {
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>d.cfg.publicUrl:baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
-  app.get('/v1/config', (c) => c.json({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  app.get('/v1/config', (c) => c.json({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',resetPhoto:'DELETE /v1/souls/:id/photo',autoPortrait:portraits.enabled,photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => {
@@ -264,6 +267,7 @@ export function buildApp(d: Deps) {
   const profileIdentity=async(c:Context)=>{const u=await requireUser(c);if(!d.cfg.accountAuthRequired)return {u,guard:undefined};const token=bearer(c)!;if(token.startsWith('dev:'))return {u,guard:undefined};const account=await d.auth.accountFromToken(token);if(!account)throw new ApiError(401,'account-signin-required','Sign in first.');return {u,guard:()=>{if(account.identity.expiresAt<=Date.now())throw new ApiError(401,'unauthorized','Sign in first.');return true as const;}};};
   app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
+  app.delete('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.clearPhoto(u.id,c.req.param('id'),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.get('/v1/souls/:id/profile-photo/:hash',c=>{const bytes=profiles.photoBytes(c.req.param('id'),c.req.param('hash'));return bytes?c.body(bytes as never,200,{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}):c.json({ok:false,code:'not-found'},404);});
   app.get('/v1/account/session',async c=>{
     c.header('Cache-Control','no-store');
@@ -408,6 +412,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/account-me',c=>{const s=agentSoul(c),credential=d.souls.agentCredential(bearer(c)!)!;return c.json({me:{id:credential.grant?.id??s.id,email:null,wallet:null,role:'user',invited:true,souls:[s.id]},souls:[{id:s.id,name:s.name,description:s.description,entityId:s.entity_id,profile:profiles.view(s.id)}]});});
   app.get('/v1/agent/soul',c=>{const s=agentSoul(c);if(!d.intentV2)return c.json(d.souls.dashboard(s));const service=d.intentV2,scope=service.agentScope(bearer(c)),result={status:d.souls.status(s),intentHistory:service.historyCapability(scope)};service.guard(scope);return c.json(result);});
   app.patch('/v1/agent/profile',async c=>{const s=agentSoul(c),principal=d.souls.agentCredential(bearer(c)!)!.grant?.accountId??s.owner,guard=d.souls.agentControlGuard(s,bearer(c)),profile=await profiles.update(principal,s.id,await body(c),guard);d.hub.refreshMe(principal);return c.json({ok:true,profile});});
+  app.delete('/v1/agent/photo',async c=>{const s=agentSoul(c),principal=d.souls.agentCredential(bearer(c)!)!.grant?.accountId??s.owner,guard=d.souls.agentControlGuard(s,bearer(c)),profile=await profiles.clearPhoto(principal,s.id,guard);d.hub.refreshMe(principal);return c.json({ok:true,profile});});
   app.post('/v1/agent/photo',async c=>{const s=agentSoul(c),principal=d.souls.agentCredential(bearer(c)!)!.grant?.accountId??s.owner,guard=d.souls.agentControlGuard(s,bearer(c)),profile=await profiles.photo(principal,s.id,await body(c),guard);d.hub.refreshMe(principal);return c.json({ok:true,profile});});
   app.get('/v1/agent/status', (c) => c.json(d.souls.status(agentSoul(c))));
   app.get('/v1/agent/perceive',c=>{

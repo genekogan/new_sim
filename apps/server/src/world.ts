@@ -1369,7 +1369,13 @@ export class WorldHost {
   }
   publicNameMetadata(id:string){const name=this.minds.get(id)?.name;return name&&this.soulNameRefusal(name)==='soul.name-ambiguous'?{nameAmbiguous:true as const}:{};}
   profileWorldPath='';
-  profilePhoto(id:string){const p=this.profileFact(id)?.photo;return p?{...p,url:`${this.profileWorldPath}/v1/souls/${encodeURIComponent(id)}/profile-photo/${p.hash}`}:null;}
+  /** Set by AutoPortraits: the stored automatic portrait of a Soul wearing a humanoid look (null when there is none). */
+  autoProfilePhoto?:(id:string)=>{hash:string;mime:'image/png';width:number;height:number;bytes:number}|null;
+  /** The owner's uploaded photo; otherwise the automatic portrait. */
+  profilePhoto(id:string){const p=this.profileFact(id)?.photo??this.autoProfilePhoto?.(id)??null;return p?{...p,url:`${this.profileWorldPath}/v1/souls/${encodeURIComponent(id)}/profile-photo/${p.hash}`}:null;}
+  profilePhotoSource(id:string):'custom'|'auto'|null{return this.profileFact(id)?.photo?'custom':this.autoProfilePhoto?.(id)?'auto':null;}
+  /** Re-send this Soul's public card with the next batch (e.g. a new automatic portrait). */
+  markSoulDirty(id:string){if(this.minds.has(id))this.acc.dirty.add(id);}
   publicSoul(m: Mind): PublicSoul {
     const nameOf = (id: string) => this.nameOf(id);
     return {

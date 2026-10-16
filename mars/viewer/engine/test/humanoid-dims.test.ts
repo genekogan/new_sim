@@ -89,3 +89,19 @@ test('walking speed: a slow body takes longer, a fast one stays under the per-ti
   }
   assert.ok(slow.maxStep <= 0.9 * DT + 1e-6, `slow max step ${slow.maxStep}`);
 });
+
+test('looks v2 body shape: the widest of shoulders/chest/hips/weight widens the collider, clamped so every body fits a 0.9 m door; narrower never shrinks it', () => {
+  for (const k of ['shoulders', 'chest', 'hips', 'weight'] as const) {
+    const [lo, hi] = HUMANOID_DIM_RANGES[k];
+    const wide = humanoidDims(look({ [k]: hi })), narrow = humanoidDims(look({ [k]: lo }));
+    assert.ok(wide.radius > HUMAN_RADIUS && !wide.standard, `${k} ${hi} widens (${wide.radius})`);
+    assert.equal(narrow.radius, HUMAN_RADIUS, `${k} ${lo} keeps today's radius`); assert.equal(narrow.standard, true, 'and is today\'s body');
+    assert.deepEqual(wide.seat, [0.2, 1.2], 'shape never changes seat fit'); assert.equal(wide.eyeHeight, 1.62, 'nor eye height');
+  }
+  const widest = humanoidDims(look({ height: 1.85, build: 1.1, shoulders: 1.12, chest: 1.15, hips: 1.15, weight: 1.25 }));
+  assert.equal(widest.radius, HUMANOID_RADIUS_RANGE[1], 'the widest body is clamped');
+  assert.ok(2 * (widest.radius + 0.06) < 0.9, 'and still passes a 0.9 m door with the plan margin');
+  assert.equal(humanoidProfile(look({ weight: 1.2 })).speed, HUMAN_PROFILE.speed, 'shape is not speed');
+  assert.match(String(bodyProblem(look({ weight: 1.6 }))), /weight/, 'out-of-range shape is refused');
+  assert.equal(bodyProblem(look({ weight: 1.2, shoulders: 1.1 })), null);
+});

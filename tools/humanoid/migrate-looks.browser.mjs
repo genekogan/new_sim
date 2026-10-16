@@ -6,10 +6,10 @@ import {mkdirSync,openSync,readFileSync,writeFileSync,rmSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
-import {chromeLease} from '../god-skill/lib/chrome-lease.mjs';
+import {chromeLease} from '<team>/ops/chrome-lease.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const out=resolve(process.env.BODIES_PROOF_OUT??'<team>/scratch/bodies/migration');
-const port=5940,slug='bodies',base=`http://127.0.0.1:${port}/w/${slug}`;
+const port=Number(process.env.BODIES_PROOF_PORT??5940),slug='bodies',base=`http://127.0.0.1:${port}/w/${slug}`;
 mkdirSync(out,{recursive:true});
 const data=resolve(out,'data');rmSync(data,{recursive:true,force:true});
 const report={startedAt:new Date().toISOString(),steps:[],shots:[],pageErrors:[]};
@@ -48,7 +48,7 @@ async function frame(page,name){
 }
 async function shoot(stage,names){
   const {chromium}=createRequire(resolve(root,'mars/viewer/package.json'))('@playwright/test');
-  release=await chromeLease('bodies');
+  release=await chromeLease('r3d-legacy');
   try{
     browser=await chromium.launch({channel:'chrome',headless:true,args:['--ignore-gpu-blocklist']});
     for(const dpr of [1,2])for(const name of names){
@@ -80,6 +80,11 @@ try{
   await step('apply logs three exact legacy looks with no deferrals',async()=>{
     const line=readFileSync(resolve(out,'server-apply.log'),'utf8').split('\n').find(l=>l.startsWith('[legacy-looks]'));
     const r=JSON.parse(line.slice('[legacy-looks]'.length));assert.equal(r.migrated.length,3);assert.equal(r.deferred.length,0);return r;
+  });
+  await step('looks v2: migrated residents get their automatic portrait',async()=>{
+    const got={};for(const name of names){for(let n=0;n<300&&!got[name];n++){const me=await req('/v1/me',undefined,name),p=me.souls[0]?.profile;if(p?.photoSource==='auto')got[name]=p.photo.hash;else await wait(200);}
+      assert.ok(got[name],'auto portrait for '+name);writeFileSync(resolve(out,`after-portrait-${name}.png`),Buffer.from(await (await fetch(`http://127.0.0.1:${port}${(await req('/v1/me',undefined,name)).souls[0].profile.photo.url}`)).arrayBuffer()));}
+    return got;
   });
   await shoot('after',names);await halt();await boot('rollback');
   await step('rollback compensates all three assignments',async()=>{

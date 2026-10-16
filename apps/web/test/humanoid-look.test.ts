@@ -11,7 +11,7 @@ test('the def is core/humanoid@2, extends @1, and the compiler defines it', () =
   const w = new WorldModel({constants: {extent: 1000, ground: 'land'}, seed: 'look'}); for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
   const d = w.resolvedDef('core/humanoid@2')!; assert.ok(d, 'core/humanoid@2 resolves');
   assert.equal(d.components.body?.rig, 'humanoid', 'body component inherited unchanged from @1');
-  assert.equal(Object.keys(L.HUMANOID_PARAMS).length, 26); assert.ok(Object.keys(L.HUMANOID_PARAMS).length <= 32);
+  assert.equal(Object.keys(L.HUMANOID_PARAMS).length, 26 + L.V2_KEYS.length, 'v1 params + looks v2 additions'); assert.ok(Object.keys(L.HUMANOID_PARAMS).length <= 48);
   for (const p of L.PRESETS) assert.deepEqual(L.checkLook(L.PRESET_LOOKS[p]), L.PRESET_LOOKS[p], p + ' preset fits the def');
 });
 test('appearanceFromSeed is stable, complete and varied', () => {

@@ -10,7 +10,7 @@ import {intakeUpload,recordIntake} from '../../moderation/intake.ts';
 import {moderationFor} from '../../moderation/store.ts';
 import {BODY_UPLOAD_POLICY,UploadRejected} from '../../moderation/validate.ts';
 import {randomInt} from 'node:crypto';
-import {lookRequest,resolveLook,legacyPreset,LookError,HUMANOID_PARAMS,HUMANOID_REF} from '../../../../web/src/humanoid/look.ts';
+import {lookRequest,resolveLook,legacyPreset,LookError,HUMANOID_PARAMS,HUMANOID_REF,OUTFITS} from '../../../../web/src/humanoid/look.ts';
 
 export const BODY_PRESETS=[{id:'humanoid',name:'Humanoid',body:null},...FLOATER_MODELS.map(m=>{
   // Trusted flat aliases retain the same shipped bytes; placement roles stay in the world catalog.
@@ -56,7 +56,7 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
   const record=(id:string,owner:string)=>db.prepare('SELECT descriptor FROM edge_body_owners_v1 WHERE world_id=? AND owner=? AND asset_id=?').get(world,owner,id) as {descriptor:string}|undefined;
   /** core/humanoid@2: the look being worn (resolved params) and the choices an owner or Soul may set. */
   const lookOf=(body:Entity['body']|null|undefined)=>(body as {params?:unknown}|null|undefined)?.params?resolveLook((body as {params:unknown}).params):null;
-  const lookChoices=Object.fromEntries(Object.entries(HUMANOID_PARAMS).map(([k,f])=>[k,f.type==='enum'?f.values:f.type==='number'?{min:f.min,max:f.max}:f.type]));
+  const lookChoices={...Object.fromEntries(Object.entries(HUMANOID_PARAMS).map(([k,f])=>[k,f.type==='enum'?f.values:f.type==='number'?{min:f.min,max:f.max}:f.type])),outfit:Object.keys(OUTFITS)};
   app.get('/v1/edge/body',wrap(c=>{const s=deps.soul(c);return {available,body:current(s.entityId),look:lookOf(current(s.entityId)),lookDef:HUMANOID_REF,lookChoices,types:available?['humanoid','ceramic','floater','creature']:[],presets:available?BODY_PRESETS:[],limits:BODY_LIMITS,
     uploads:(db.prepare('SELECT descriptor FROM edge_body_owners_v1 WHERE world_id=? AND owner=? ORDER BY asset_id').all(world,s.owner) as {descriptor:string}[]).map(r=>JSON.parse(r.descriptor))};}));
   app.post('/v1/edge/body/uploads',wrap(async c=>{
@@ -112,5 +112,5 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
     const row=db.prepare('SELECT content FROM edge_body_assets_v1 WHERE world_id=? AND asset_id=?').get(world,file.slice(0,-4)) as {content:Uint8Array}|undefined;if(!row)return c.notFound();
     return c.body(new Uint8Array(row.content),200,{'Content-Type':'model/gltf-binary','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'"});
   });
-  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater','creature'],creatures:CREATURE_IDS,limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)','PUT /v1/souls/:id/look (the owner: a look request)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
+  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater','creature'],creatures:CREATURE_IDS,limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)','PUT /v1/souls/:id/look (the owner: a look request)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look',outfit:'{look:{outfit:<id>}} sets top, bottom, shoes and their colours',outfits:Object.keys(OUTFITS)},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
 }

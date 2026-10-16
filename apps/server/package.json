@@ -27,7 +27,9 @@
     "@aws-sdk/client-s3": "^3.1146.0",
     "@sim/generators": "workspace:*",
     "@gltf-transform/core": "^4.5.1",
-    "@gltf-transform/functions": "^4.5.1"
+    "@gltf-transform/functions": "^4.5.1",
+    "three": "^0.185.1",
+    "esbuild": "0.28.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",
