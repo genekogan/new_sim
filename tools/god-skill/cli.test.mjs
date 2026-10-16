@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
 import { view, invalidate, mirror } from './lib/mirror.mjs';
 import { build, buildWait, EXAMPLES, examples, group, act, dryrun, importWorld, look, lookOverrides, parseFlags, parseMassing, planBatch } from './cli.mjs';
-import { buildSuffix, call, claimFile, load, save } from './lib/state.mjs';
+import { buildSuffix, call, claimFile, helperFile, load, save } from './lib/state.mjs';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 
@@ -174,7 +174,7 @@ async function buildFixture(t, handler = () => null) {
   const server = createServer(async (req, res) => {
     try {
       let raw = ''; for await (const part of req) raw += part;
-      const c = { method: req.method, path: req.url, raw, body: raw ? JSON.parse(raw) : undefined };
+      const c = { method: req.method, path: req.url, raw, body: raw ? JSON.parse(raw) : undefined, auth: req.headers.authorization };
       calls.push(c);
       let reply = await handler(c, calls);
       if (!reply) {
@@ -560,6 +560,45 @@ test('abandon clears state only after success and reports partial undo on refusa
   assert.equal(load().build, undefined); assert.equal(load().group, undefined);
 });
 
+test('Y5: build rewind previews with --dry, prints removed parts and keeps local progress at the rewound step', async t => {
+  const rewind = { to: 1, from: 3, edits: [12, 11, 10], steps: [{ n: 2, label: 'roof and tower' }, { n: 3, label: 'openings', part: 'east' }], removes: { count: 18, names: ['nave', 'tower'], more: 2 }, restores: { count: 0, names: [] }, changes: { count: 1, names: ['oak'] } };
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/rewind') ? { ok: true, ...(c.body.dry ? { dry: true } : {}), build: serverBuild({ step: { n: 1, label: 'shell' } }), rewind } : null);
+  save({ build: { ...localBuild(), n: 3, label: 'openings' }, group: 'church/roof' });
+  const dry = await build('rewind', [], { to: '1', dry: true });
+  assert.equal(calls.at(-1).path, '/v1/god/builds/church/rewind'); assert.deepEqual(calls.at(-1).body, { to: 1, dry: true });
+  assert.match(dry, /rewind to step 1 — dry run, nothing changed/); assert.match(dry, /would remove 18 parts \(nave, tower \+2 more\)/); assert.match(dry, /apply: build rewind church --to 1/);
+  assert.equal(load().build.n, 3, 'a dry run never moves local progress');
+  const out = await build('rewind', ['church'], { to: '1', force: true });
+  assert.deepEqual(calls.at(-1).body, { to: 1, force: true });
+  assert.match(out, /church: rewound to step 1; now at step 1\/5 shell, still open, closure re-armed/);
+  assert.match(out, /removes 18 parts \(nave, tower \+2 more\); reverts 1 change \(oak\)/);
+  assert.match(out, /3 edits undone \(10, 11, 12\); steps: 2 roof and tower, 3 openings \(east\)/);
+  assert.deepEqual([load().build.n, load().build.label, load().build.lease], [1, 'shell', 'l_1234abcd']); assert.equal(load().group, 'church/roof');
+  assert.deepEqual((await build('rewind', [], { to: '1', json: true })).rewind, rewind);
+});
+
+test('Y5: build rewind validates --to, refuses claim holders and prints dependency refusals with their fix', async t => {
+  const failure = { op: -1, code: 'build.depends', field: 'to', entity: 'e_tower', detail: 'edit 14 (ungrouped) changed tower after edit 11 (step 3); rewinding to step 2 would remove it.', fix: 'Rewind to step 3 or later, or undo edit 14 first (`undo` while it is the newest edit), then retry.' };
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/rewind') ? { ok: false, failures: [failure], edits: [12, 11] } : null);
+  save({ build: localBuild() });
+  checkArgs('build', { to: '2', dry: true, force: true }, ['rewind', 'church']);
+  assert.match(readFileSync(new URL('./SKILL.md', import.meta.url), 'utf8'), /`build rewind \[id\] --to k \[--dry\]`/);
+  for (const to of [undefined, true, '-1', 'two', '1000']) await assert.rejects(build('rewind', [], to === undefined ? {} : { to }), /--to <step>/);
+  await assert.rejects(build('rewind', [], { to: '1', undo: true }), /no option --undo/);
+  const before = calls.length, refused = await build('rewind', [], { to: '2' });
+  assert.equal(calls.length, before + 1); assert.match(refused, /^REFUSED: .*build\.depends/); assert.match(refused, /field to/); assert.match(refused, /Rewind to step 3 or later/); assert.match(refused, /nothing was undone \(2 edit\(s\) checked\)/);
+  assert.equal(load().build.n, 1);
+  save({ build: { ...localBuild(), claim: 'c_1234abcd', part: 'east' } });
+  await assert.rejects(build('rewind', [], { to: '1' }), /claim holders cannot build rewind/);
+});
+
+test('Y5: undo --group of the whole open build follows the server back to its first step', async t => {
+  const calls = fixture(t, { accepted: true, reverted: [12, 11], notReverted: [], rewound: { to: 0, edits: [12, 11], step: { n: 1, label: 'shell' } } });
+  save({ build: { ...localBuild(), n: 4, label: 'interior' } });
+  assert.equal(await undo({ group: 'church' }), 'undid group "church": edits 12, 11; build church stays open at step 1 (rewound to the start; closure re-armed)');
+  assert.equal(String(calls.at(-1).url).endsWith('/v1/god/undo?group=church'), true); assert.deepEqual([load().build.n, load().build.label], [1, 'shell']);
+});
+
 test('resume reconstructs local progress from server and prints unfinished step, roots, claims, masses and next', async t => {
   const current = { n: 3, label: 'openings', batches: 2, firstSeq: 40, lastSeq: 41, recent: [{ seq: 41, note: 'north door' }] };
   const b = serverBuild({ step: { n: 3, label: 'openings' }, current, roots: [{ id: 'e_church', path: 'church' }], claims: [{ id: 'c_11111111', part: 'tower', status: 'held' }], massing: [{ name: 'nave', parts: 7 }], next: { n: 4, label: 'interior' } });
@@ -692,6 +731,40 @@ test('claim bootstrap, per-claim steps, local guards, group undo and release nev
   assert.equal(load().build, null);
   assert.equal(readFileSync('.eden-god.json', 'utf8'), original);
   assert.equal(JSON.parse(readFileSync(claimFile('c_1234abcd'), 'utf8')).build, null);
+});
+
+test('WD7 build claim --helper writes a 0600 helper file, prints only its env line, and the helper uses only its own token', async t => {
+  const secret = 'god_stub_helper-scoped-fixture', previous = process.env.EDEN_GOD_HELPER;
+  t.after(() => { if (previous === undefined) delete process.env.EDEN_GOD_HELPER; else process.env.EDEN_GOD_HELPER = previous; });
+  const helper = { label: 'lead/helper:east-aisle', hash8: 'abcd1234', build: 'church', claim: 'c_1234abcd', part: 'east-aisle', expiresAt: Date.UTC(2026, 9, 16, 2), verifyBudget: 3 };
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds/church/claims/c_1234abcd/helper' ? { ok: true, token: secret, helper } : null);
+  save({ build: localBuild() }); const lead = readFileSync('.eden-god.json', 'utf8');
+  await assert.rejects(build('claim', ['east-aisle'], { root: 'church/east-aisle', ttl: '30' }), /needs --helper/);
+  await assert.rejects(build('claim', ['east-aisle'], { root: 'church/east-aisle', helper: 'yes' }), /takes no value/);
+  assert.equal(calls.length, 0);
+  const text = await build('claim', ['east-aisle'], { root: 'church/east-aisle', helper: true, ttl: '30' });
+  const file = join(process.cwd(), helperFile('c_1234abcd'));
+  assert.ok(text.includes(`export EDEN_GOD_HELPER=${file}`), text);
+  for (const token of [secret, 'fixture-only']) assert.ok(!text.includes(token), 'no token is ever printed');
+  assert.deepEqual(calls.map(c => [c.path, c.body]), [['/v1/god/builds/church/claims', { part: 'east-aisle', root: 'church/east-aisle' }], ['/v1/god/builds/church/claims/c_1234abcd/helper', { ttlMs: 1_800_000 }]]);
+  assert.ok(calls.every(c => c.auth === 'Bearer fixture-only'), 'the lead mints with its own token');
+  const saved = JSON.parse(readFileSync(file, 'utf8')); assert.equal(saved.token, secret); assert.equal(saved.world, load().world); assert.equal(saved.helper.claim, 'c_1234abcd'); assert.equal(saved.build.claim, 'c_1234abcd');
+  assert.equal(statSync(file).mode & 0o777, 0o600); assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+  // The sub-agent: only EDEN_GOD_HELPER, never the lead's file credentials.
+  process.env.EDEN_GOD_HELPER = file;
+  assert.equal(load().token, secret); assert.equal(load().build.claim, 'c_1234abcd'); assert.equal(load().build.lease, undefined);
+  await act({ ops: [{ op: 'remove', id: 'pew' }] });
+  assert.equal(calls.at(-1).auth, `Bearer ${secret}`); assert.deepEqual(calls.at(-1).body.build, { id: 'church', claim: 'c_1234abcd', step: 1, label: 'shell' });
+  const count = calls.length;
+  await assert.rejects(build('start', ['chapel'], startFlags()), /claim holders cannot build start/);
+  await assert.rejects(build('done'), /claim holders cannot build done/);
+  await assert.rejects(undo(), /undo --group church\/east-aisle/);
+  assert.equal(calls.length, count);
+  await build('release', [], { done: true });
+  assert.equal(calls.at(-1).path, '/v1/god/builds/church/claims/c_1234abcd/release'); assert.equal(calls.at(-1).auth, `Bearer ${secret}`);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+  process.env.EDEN_GOD_CLAIM = 'c_99999999'; assert.throws(() => load(), /differs from the helper file/); delete process.env.EDEN_GOD_CLAIM;
+  process.env.EDEN_GOD_HELPER = join(process.cwd(), 'missing.json'); assert.throws(() => load(), /missing file/);
 });
 
 test('claim overrides a local claim and independent subprocesses keep all twenty step updates', async t => {

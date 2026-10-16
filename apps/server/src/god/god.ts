@@ -9,7 +9,9 @@ import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryR
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
-import { WorldStore, GOD_EDIT_OUTCOME_BYTES, type EditRow, type PrayerRow } from './store.ts';
+import { WorldStore, GOD_EDIT_OUTCOME_BYTES, type EditRow, type JournalWho, type PrayerRow } from './store.ts';
+import { HelperTokens, HELPER_LIMITS, helperFailure, helperMintSchema, helperScopeFailure } from './helpers.ts';
+import { accountKey, cobuilderFailure, cobuilderOf, cobuilderOpFailure, COBUILDER_PREFIX, whose } from './cobuilders.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
 import { submissionSchema, type Expectations } from './submission.ts';
@@ -18,6 +20,7 @@ import { Parts } from './parts.ts';
 import { GodDistricts } from './districts.ts'; // Y3 districts
 import { buildReceipt } from './build-integrity.ts';
 import { definitionUseClosure } from './unused-defs.ts';
+import { rewindChanges, rewindDependents } from './rewind.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -73,7 +76,10 @@ export class GodMode {
   readonly builds: GodBuilds;
   readonly districts: GodDistricts; // Y3 districts
   readonly parts: Parts;
+  readonly helpers: HelperTokens;
   private caller: BuildCaller = {};
+  /** Journal label for edits made without a token (genesis import); 'server' otherwise. */
+  private system: string | null = null;
   private buildListeners: ((e: BuildNotice) => void)[] = [];
   onBuild(fn: (e: BuildNotice) => void): () => void { this.buildListeners.push(fn); return () => { this.buildListeners = this.buildListeners.filter(f => f !== fn); }; }
   as<T>(caller: BuildCaller, fn: () => T): T { const previous = this.caller; this.caller = caller; try { return fn(); } finally { this.caller = previous; } }
@@ -131,6 +137,7 @@ export class GodMode {
     this.builds.districtStart = raw => this.districts.expand(raw);
     this.onBuild(e => { if (e.kind === 'done' || e.kind === 'abandoned') this.districts.onClosed(e.id); }); // Y3: closed chapters outlive the build-row prune
     this.parts = new Parts(this.store, { model: () => this.model, now: () => this.now() });
+    this.helpers = new HelperTokens(db, opts.worldId);
     this.onBuild(e => { if (e.kind === 'done') this.parts.onDone(e.id); });
     this.parts.backfill();
     if (!loaded && opts.genesis) this.applyGenesis(opts.genesis);
@@ -145,12 +152,66 @@ export class GodMode {
       this.owner = user.id; this.store.setOwner(this.model, this.owner);
     }
   }
-  godIdentity(token: string | undefined): Identity | null { if (!token?.startsWith('god_')) return null; const hash = hashToken(token); return this.store.hasToken(hash) ? { hash, label: this.store.tokenLabel(hash) ?? 'an agent' } : null; }
+  godIdentity(token: string | undefined): Identity | null {
+    if (!token?.startsWith('god_')) return null;
+    // Y4b: a co-builder token (label `cobuilder:<account>:…`, set by the launcher) and its helpers carry their account.
+    const scoped = (identity: Identity, rootLabel: string | null) => { const account = cobuilderOf(rootLabel); return account === null ? identity : { ...identity, cobuilder: account }; };
+    const hash = hashToken(token); if (this.store.hasToken(hash)) { const label = this.store.tokenLabel(hash); return scoped({ hash, label: label ?? 'an agent' }, label); }
+    const helper = this.helpers.scope(hash, this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent));
+    return helper ? scoped({ hash, label: helper.label, child: helper.scope }, helper.scope.parentLabel) : null;
+  }
+  /** Why a helper token is refused (expired, claim no longer held, lead token gone); null for any other token. */
+  helperRefusal(token: string | undefined): string | null {
+    if (!token?.startsWith('god_')) return null;
+    return this.helpers.refusal(hashToken(token), this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent));
+  }
+  /** WD7 slice 3: a root token mints a helper token for a claim it holds. The lead's token is never echoed. */
+  mintHelper(build: string, claim: string, raw: unknown, caller: Identity) {
+    if (caller.child) return { ok: false as const, failures: [helperFailure('helper.scope', 'Helper tokens cannot mint tokens.')] };
+    if (caller.cobuilder !== undefined) return { ok: false as const, failures: [cobuilderFailure('Co-builder tokens cannot mint tokens; give a sub-agent EDEN_GOD_CLAIM instead, or ask the world owner.')] };
+    const p = helperMintSchema.safeParse(raw ?? {});
+    if (!p.success) return { ok: false as const, failures: p.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: `{ label?: 1..60 chars, ttlMs?: ${HELPER_LIMITS.minTtlMs}..${HELPER_LIMITS.maxTtlMs}, verify?: 0..${HELPER_LIMITS.maxVerifyBudget} }` })) };
+    this.builds.sweep();
+    const held = this.builds.heldClaim(build, claim, caller); if ('failure' in held) return { ok: false as const, failures: [held.failure] };
+    const token = newGodToken(this.opts.worldId), hash = hashToken(token), label = (p.data.label ?? `${caller.label.slice(0, 30)}/helper:${held.claim.part}`).slice(0, 60);
+    const ttlMs = p.data.ttlMs ?? HELPER_LIMITS.defaultTtlMs, verify = p.data.verify ?? HELPER_LIMITS.verifyBudget;
+    const minted = this.helpers.mint({ tokenHash: hash, parent: { hash: caller.hash, label: caller.label }, label, build, claim, part: held.claim.part, ttlMs, verify }, this.now(), (b, c) => this.builds.claimState(b, c));
+    if ('code' in minted) return { ok: false as const, failures: [minted] };
+    return { ok: true as const, token, helper: { label, hash8: hash.slice(0, 8), build, claim, part: held.claim.part, expiresAt: minted.expiresAt, verifyBudget: verify, pooledWith: caller.hash.slice(0, 8), ends: 'when the claim is released, done or taken, when the build closes, or at expiresAt' } };
+  }
+  /** A helper caller always edits through its claim: fill the field when absent; admission refuses any other field. */
+  private callerField(explicit?: BuildField): BuildField | undefined {
+    const child = this.caller.identity?.child;
+    return explicit ?? this.caller.build ?? (child ? { id: child.build, claim: child.claim } : undefined);
+  }
+  /** Helper (and Y4b co-builder) authorisation runs before any other admission rule, so its refusal is the same on every path. */
+  private helperGate(field: BuildField | undefined, ops: readonly Op[]): Failure | null {
+    const id = this.caller.identity, child = id?.child;
+    return (child ? helperScopeFailure(child, field, ops) : null) ?? (id?.cobuilder !== undefined ? cobuilderOpFailure(ops) : null);
+  }
+  /** WD7 slice 2: every journal row names the token (hash8 + label) or the system that made it; Y4b adds the co-builder account. */
+  private who(): JournalWho { const id = this.caller.identity; return id ? { hash8: id.hash.slice(0, 8), label: id.label, acct: accountKey(id.cobuilder) } : { hash8: null, label: this.system ?? 'server' }; }
+  /** Helpers undo and redo only their own journal rows inside their own claim group. */
+  private foreignEdit(targets: EditRow[]) {
+    const id = this.caller.identity, child = id?.child;
+    // Y4b: a co-builder undoes and redoes only its own account's rows (never the owner's, another co-builder's or the system's).
+    if (id?.cobuilder !== undefined) {
+      // Rows written before accounts were journaled still count as its own when its own token made them.
+      const mine = accountKey(id.cobuilder), other = targets.find(t => (t.acct ?? null) !== mine && t.hash8 !== id.hash.slice(0, 8));
+      if (other) return cobuilderFailure(`Edit ${other.seq} is ${whose(other.acct ?? null)} work (by ${other.label ? `${other.label}${other.hash8 ? '#' + other.hash8 : ''}` : 'an earlier agent'}); a co-builder undoes and redoes only its own account's edits.`, { measured: { seq: other.seq } });
+    }
+    if (!child) return null;
+    const group = `${child.build}/${child.part}`;
+    const foreign = targets.find(t => t.hash8 !== id.hash.slice(0, 8) || t.grp !== group);
+    return foreign ? helperFailure('helper.scope', `Edit ${foreign.seq} was made by ${foreign.label ? `${foreign.label}${foreign.hash8 ? '#' + foreign.hash8 : ''}` : 'another agent'}${foreign.grp !== group ? ` in group ${foreign.grp ?? '(none)'}` : ''}; helper tokens undo only their own edits in ${group}.`, { measured: { seq: foreign.seq } }) : null;
+  }
   godFromToken(token: string | undefined): boolean { return this.godIdentity(token) !== null; }
 
   pairStart(agent: string | undefined, base: string) {
     const code = humanCode(), poll = randomBytes(24).toString('base64url');
-    this.pairings.set(code, { code, poll, agent: agent?.slice(0, 60) || 'an agent', expires: Date.now() + PAIR_TTL });
+    // Y4b: `cobuilder:` labels come only from the launcher's co-builder pairing, never from an agent naming itself.
+    const name = agent?.startsWith(COBUILDER_PREFIX) ? `agent-${agent.slice(COBUILDER_PREFIX.length)}` : agent;
+    this.pairings.set(code, { code, poll, agent: name?.slice(0, 60) || 'an agent', expires: Date.now() + PAIR_TTL });
     return { user_code: code, approve_url: `${base}/#godpair/${code}`, poll_token: poll, interval_s: 3, expires_in: PAIR_TTL / 1000, tell_your_human: `Open ${base}/#godpair/${code} , sign in as this world's owner, and approve me as its god.` };
   }
   pairInfo(codeRaw: string) {
@@ -240,9 +301,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false as const, failures: [inputFailure] };
     const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
+    const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { accepted: false as const, failures: [gate] };
     const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { accepted: false as const, failures: [off] };
-    const admission = this.builds.admit(parsed.data.build ?? this.caller.build, parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
+    const admission = this.builds.admit(this.callerField(parsed.data.build), parsed.data, this.caller.identity); if (admission.failures) return { accepted: false as const, failures: admission.failures };
     let scratch: WorldModel | undefined;
     const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
     if (!p.ok) return { accepted: false as const, failures: p.failures };
@@ -276,8 +338,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       if ((input.ops && hashOf(input.ops) !== hashOf(preview.ops.ops)) || (input.group !== undefined && input.group !== preview.ops.group) || (input.note !== undefined && input.note !== preview.ops.note) || (input.build !== undefined && hashOf(input.build) !== hashOf(preview.build ?? null))) return { accepted: false, failures: [{ op: -1, code: 'schema', field: 'preview', detail: 'The submitted operations or batch metadata differ from the sealed preview.', fix: 'Commit with {preview, clientRef}, or create a new preview for the changed batch.' }] };
       normalized = { ...preview.ops, clientRef: input.clientRef };
     } else normalized = batchSchema.parse(input);
+    const field = preview ? preview.build : this.callerField(input.build);
+    const gate = this.helperGate(field, normalized.ops); if (gate) return { accepted: false, failures: [gate] };
     const retirement = this.retirementFailure(normalized.ops); if (retirement) return { accepted: false, failures: [retirement] };
-    const field = preview ? preview.build : input.build ?? this.caller.build;
     const stale = [...this.stale(preview?.expect ?? {}), ...this.staleSubtrees(preview), ...this.stale(input.expect ?? {})];
     if (stale.length) return { accepted: false, failures: [...new Map(stale.map(f => [f.entity, f])).values()] };
     for (const [i, op] of normalized.ops.entries()) if (op.op === 'answer' && !this.store.prayer(op.prayer)) return { accepted: false, failures: [{ op: i, code: 'params.invalid', field: 'prayer', detail: `Unknown prayer ${op.prayer}.`, fix: 'Use an id from GET /v1/god/prayers.' }] };
@@ -314,7 +377,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const updates = this.builds.writes(admission, roots, result.seq, at, this.caller.identity, undefined, false, made, journalNote);
     if (updates.failures) return { accepted: false, failures: updates.failures };
     for (const w of updates.writes) if (w.status === 'done' && w.next.done) {
-      const pending: EditRow = { seq: result.seq, by: 'god', at, note: journalNote ?? null, grp: normalized.group ?? null, ops: normalized.ops, inverse: r.inverse!, kind: 'edit', undone: 0, undo_of: null };
+      const pending: EditRow = { seq: result.seq, by: 'god', at, note: journalNote ?? null, grp: normalized.group ?? null, ops: normalized.ops, inverse: r.inverse!, kind: 'edit', undone: 0, undo_of: null, ...this.who() };
       const targets = [pending, ...this.store.groupEditsUnder(w.id, false, 2_147_483_647)], undo = this.preflightUndo(targets, next, false);
       w.next.done.receipt = buildReceipt(next.fork(), { ...this.builds.body(w.id)!, ...w.next }, targets, undo.ok ? { ok: true, baseline: undo.model } : undo, at); w.receipt = w.next.done.receipt;
       const durable = structuredClone(w.next); delete durable.done!.receipt; w.body = JSON.stringify(durable);
@@ -329,7 +392,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8') + (updates.echo ? String(Number.MAX_SAFE_INTEGER).length - 1 : 0);
     if (normalized.clientRef !== undefined && bytes > GOD_EDIT_OUTCOME_BYTES) return { accepted: false, failures: [{ op: -1, code: 'request.budget', field: 'result', detail: `Accepted result would require ${bytes} bytes; receipt limit is ${GOD_EDIT_OUTCOME_BYTES}.`, measured: bytes, limit: GOD_EDIT_OUTCOME_BYTES, fix: 'Submit a smaller batch using a fresh clientRef.' }] };
     const { ops, group, clientRef } = normalized;
-    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes, origins: this.parts.origins(ops, next, this.caller.identity) }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
+    const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes, origins: this.parts.origins(ops, next, this.caller.identity), who: this.who() }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
     if (concurrent) return concurrent;
     // A resident the engine could not land where planned is named in the receipt too (best effort: never unsends it).
     const late = this.bodies?.apply?.(moved) ?? [];
@@ -355,7 +418,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
     this.builds.sweep();
-    const field = this.caller.build;
+    const foreign = this.foreignEdit([target]); if (foreign) return { accepted: false, failures: [foreign] };
+    const field = this.callerField();
     // Undo keeps the journal's original group. Only a supplied build needs admission; ordinary undo remains legal.
     const admission = this.builds.admit(field, {}, this.caller.identity);
     if (admission.failures) return { accepted: false, failures: admission.failures };
@@ -374,7 +438,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (updates.failures) return { accepted: false, failures: updates.failures };
     r.result.warnings.push(...roots.warnings, ...updates.warnings);
     if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
-    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes });
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes, who: this.who() });
     if (refused) return refused;
     r.result.warnings.push(...this.bodies?.apply?.(moved) ?? []);
     Object.assign(this.model, next);
@@ -395,7 +459,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (!r.result.accepted) return r.result;
     const roots = this.builds.rootsDelta(this.model, next, r.diff!, 'engine'), updates = this.builds.writes({ warnings: [] }, roots, r.result.seq, this.now());
     if (updates.failures) return { accepted: false, failures: updates.failures };
-    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes });
+    const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: this.now(), note, ops, inverse: [], kind: 'engine', builds: updates.writes, who: { hash8: null, label: 'engine' } });
     if (refused) return refused;
     Object.assign(this.model, next);
     const deltas = this.builds.accepted(updates.writes);
@@ -408,7 +472,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   preflightUndo(targets: EditRow[], source = this.model, withCaller = true, releaseClaims?: string) {
     let model = source.fork(), rev = this.store.buildsRev();
     const builds = this.builds.fork(() => model, releaseClaims), entries = [];
-    const field = withCaller ? this.caller.build : undefined, tick = this.opts.tick(), at = this.now();
+    const field = withCaller ? this.callerField() : undefined, tick = this.opts.tick(), at = this.now();
     for (const target of targets) {
       const admission = builds.admit(field, {}, this.caller.identity);
       if (admission.failures) return { ok: false as const, failed: target.seq, failures: admission.failures };
@@ -425,7 +489,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       // Mirror SQL's global revision sequence so each later planned row expects the preceding write.
       for (const w of updates.writes) w.rev = ++rev;
       r.result.warnings.push(...roots.warnings, ...updates.warnings);
-      entries.push({ model: next, diff: r.diff!, edit: { seq: r.result.seq, by: 'god', at, note: `undo of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind: 'undo' as const, undoOf: target.seq, builds: updates.writes }, updates, tick });
+      entries.push({ model: next, diff: r.diff!, edit: { seq: r.result.seq, by: 'god', at, note: `undo of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind: 'undo' as const, undoOf: target.seq, builds: updates.writes, who: this.who() }, updates, tick });
       model = next; builds.accepted(updates.writes);
     }
     return { ok: true as const, entries, model };
@@ -437,12 +501,17 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return { ...status, receipt };
   }
   private undoTargets(targets: EditRow[], emptyOK: boolean, releaseClaims?: string) {
+    const foreign = this.foreignEdit(targets); if (foreign) return { accepted: false, reverted: [] as number[], notReverted: targets.map(e => e.seq), failures: [foreign] };
     const notReverted = targets.map(e => e.seq), preflight = this.preflightUndo(targets, this.model, true, releaseClaims);
     if (!preflight.ok) return { accepted: false, reverted: [] as number[], notReverted, failed: preflight.failed, failures: preflight.failures };
     if (!targets.length && !emptyOK) return { accepted: false, reverted: [], notReverted, failures: [{ op: -1, code: 'undo.conflict', detail: 'no edits in group' }] };
+    return this.commitUndo(preflight, notReverted);
+  }
+  /** Commit a clean preflight in one SQL transaction, then install and notify (observers never see a half chain). */
+  private commitUndo(preflight: Extract<ReturnType<GodMode['preflightUndo']>, { ok: true }>, notReverted: number[]) {
     // Clear residents once for the complete inverse chain, after every conflict check has passed.
     const combined: Diff = { upserts: [...new Set(preflight.entries.flatMap(e => e.diff.upserts.map(x => x.id)))].flatMap(id => preflight.model.entities.has(id) ? [preflight.model.entities.get(id)!] : []), removes: [...new Set(preflight.entries.flatMap(e => e.diff.removes))].filter(id => !preflight.model.entities.has(id)), defs: [], tiles: [...new Set(preflight.entries.flatMap(e => e.diff.tiles))], answers: [] };
-    const walkouts = this.bodies?.prepare?.(this.model, preflight.model, combined, targets.flatMap(e => e.inverse)) ?? NO_WALKOUTS, moved = walkouts.moved;
+    const walkouts = this.bodies?.prepare?.(this.model, preflight.model, combined, preflight.entries.flatMap(e => e.edit.ops)) ?? NO_WALKOUTS, moved = walkouts.moved;
     // What the planner set down in the would-be world (released by a walk-out, or kept out of a resident's hands) is
     // journaled with the chain's last entry.
     const last = preflight.entries.at(-1);
@@ -469,7 +538,53 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   undoGroup(group: string) {
     // A build owns its lead group and every claim/subgroup, including after finish.
-    return this.store.build(group) ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
+    const build = this.store.build(group);
+    // Y5 panel semantics: undoing an OPEN build's whole group keeps it open and rewinds it to the start (rewind --to 0),
+    // rather than closing it as abandoned-with-undo. Undo stays reversible (redo re-adds the parts into a still-open
+    // site whose roots and closure protect them; a closed record cannot be reopened), a live lead keeps its lease instead
+    // of meeting build.closed mid-batch, and Abandon remains the owner's explicit end. The record moves back with the
+    // world (step 1, no step history, closure re-armed), so the card never shows "towers 4/5" over an empty site, and
+    // the same dependency check refuses rather than destroys later work outside the build. Finished builds are unchanged.
+    if (build && (build.status === 'active' || build.status === 'paused')) {
+      const r = this.rewind(group, { to: 0 });
+      if (!r.ok) return { accepted: false, reverted: [] as number[], notReverted: 'edits' in r ? r.edits ?? [] : [], failures: r.failures, ...('failed' in r ? { failed: r.failed } : {}) };
+      return { accepted: true, reverted: r.rewind.edits, notReverted: [] as number[], rewound: { ...r.rewind, step: { n: r.build.step.n, label: r.build.step.label } }, ...('echo' in r && r.echo ? { build: r.echo } : {}), ...('warnings' in r && r.warnings?.length ? { warnings: r.warnings } : {}) };
+    }
+    return build ? this.undoGroupUnder(group) : this.undoTargets(this.store.groupEdits(group), false);
+  }
+  /** Y5 (CE3): rewind an open build to after step k. Every live edit of the build (lead and claim subgroups) recorded
+   *  after step k is reverted by one atomic R1 chain; later live edits that depend on them refuse the whole rewind.
+   *  The build stays open at step k with closure re-armed; `dry` returns the same summary and changes nothing. */
+  rewind(id: string, raw: unknown) {
+    // Y4/Y4b: rewind is a build-wide undo. Helpers never rewind (not even through `undo --group <build>`); a co-builder
+    // rewinds only builds its account leads, and only when every edit to revert is its account's own.
+    if (this.caller.identity?.child) return { ok: false as const, failures: [helperFailure('helper.scope', `Helper tokens cannot rewind build ${id}; ask the lead.`)] };
+    const foreignBuild = this.builds.foreignTo(this.caller.identity, id, undefined, 'rewind'); if (foreignBuild) return { ok: false as const, failures: [foreignBuild] };
+    const plan = this.builds.rewindPlan(id, raw, this.store.groupEditsUnder(id, true, 2_147_483_647));
+    if (!plan.ok) return plan;
+    const { targets, to, force } = plan, edits = targets.map(t => t.seq), at = this.now(), from = plan.row.body.step.n;
+    const foreign = this.foreignEdit(targets); if (foreign) return { ok: false as const, failures: [foreign], edits };
+    const preflight = this.preflightUndo(targets, this.model, true, force ? id : undefined);
+    if (!preflight.ok) return { ok: false as const, failures: preflight.failures, failed: preflight.failed, edits };
+    const dependents = targets.length ? rewindDependents(id, to, this.model, preflight.model, preflight.entries, targets, this.store.liveEditsAfter(Math.min(...edits))) : [];
+    if (dependents.length) return { ok: false as const, failures: dependents, edits };
+    const rewind = { to, from, edits, steps: plan.steps, ...rewindChanges(this.model, preflight.model, preflight.entries) };
+    const lead = this.builds.leadLive(id), warnings = lead?.live && lead.tokenHash !== this.caller.identity?.hash ? [`lead ${lead.label} is live; it should run build resume ${id} before its next edit`] : [];
+    if (plan.dry || plan.unchanged) return { ok: true as const, ...(plan.dry ? { dry: true } : { replayed: true }), build: this.builds.status(id)!.build, rewind, ...(warnings.length ? { warnings } : {}) };
+    const info = { from, edits: edits.length, removed: rewind.removes.count };
+    if (!preflight.entries.length) {
+      const saved = this.builds.saveRewound(id, to, at, this.caller.identity, force, info);
+      return saved.ok ? { ok: true as const, build: saved.build, rewind, ...(warnings.length ? { warnings } : {}) } : { ...saved, edits };
+    }
+    // The record moves back in the chain's final build write: same SQL transaction, same revision sequence.
+    const write = preflight.entries.at(-1)!.updates.writes.find(w => w.id === id)!;
+    const { body, lead: byLead } = this.builds.rewoundBody(write.next, to, at, this.caller.identity, force, info);
+    Object.assign(write, { next: body, body: JSON.stringify(body), kind: 'rewound' as const, ...(byLead ? { status: 'active' as const, lastAt: at } : {}) });
+    const committed = this.commitUndo(preflight, edits);
+    if (!committed.accepted) return { ok: false as const, failures: ('failures' in committed ? committed.failures : undefined) ?? [{ op: -1, code: 'revision.stale', detail: 'The world changed while the rewind was planned; nothing was changed.', fix: 'Retry the rewind.' }], edits };
+    const echo = 'build' in committed ? committed.build : undefined;
+    warnings.push(...('warnings' in committed ? committed.warnings ?? [] : []));
+    return { ok: true as const, build: this.builds.status(id)!.build, rewind, ...(echo ? { echo } : {}), ...(warnings.length ? { warnings } : {}) };
   }
   /** No 200/500-entry truncation, and no prefix collision with a neighbouring build/chapter. */
   undoGroupUnder(group: string, force = false) { return this.undoTargets(this.store.groupEditsUnder(group, false, 2_147_483_647), true, force ? group : undefined); }
@@ -483,9 +598,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { id: null, accepted: false as const, failures: [inputFailure] };
     const parsed = previewBatchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
+    const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { id: null, accepted: false as const, failures: [gate] };
     const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { id: null, accepted: false as const, failures: [retirement] };
     const off = deferredOp(parsed.data); if (off) return { id: null, accepted: false as const, failures: [off] };
-    const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
+    const build = this.callerField(parsed.data.build), admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
     let scratch: WorldModel | undefined;
     const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
@@ -572,12 +688,16 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   /** Apply a template's batches through the compiler (each atomic, journaled like a god edit). Throws on the first refusal. */
   applyGenesis(g: Genesis) {
     if (g.schema !== 'genesis/1') throw new Error('genesis: schema must be genesis/1');
+    const previous = this.system; this.system = 'genesis';
+    try { this.genesisBatches(g); } finally { this.system = previous; }
+    this.template = g.name ?? 'custom';
+  }
+  private genesisBatches(g: Genesis) {
     if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], group: 'genesis' }, 'genesis: state'); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
     for (const [i, b] of g.batches.entries()) {
       const r = this.commitBatch({ ops: b.ops, group: b.group ?? 'genesis' }, `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}`, true);
       if (!r.accepted) throw new Error(`genesis batch ${i + 1} (${b.note ?? ''}) refused: ${JSON.stringify(r.failures).slice(0, 600)}`);
     }
-    this.template = g.name ?? 'custom';
   }
 
   // ---------- reads ----------

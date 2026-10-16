@@ -582,7 +582,8 @@ test('C1b #7: reverts of unrelated, ungrouped and grouped edits report the actua
     }
   }
   const undone = f.god.as({ identity: f.god.godIdentity(f.token)!, build }, () => f.god.undoGroup('church')); assert.equal(undone.accepted, true);
-  assert.deepEqual(body(f).steps, before.steps); assert.equal(f.god.store.build('church')!.status, 'active');
+  // Y5: a whole-group undo of an open build rewinds it to the start; the revert's field (step 9, done) still never applies.
+  assert.deepEqual(body(f).steps, []); assert.equal(body(f).step.n, 1); assert.equal(body(f).done, undefined); assert.equal(f.god.store.build('church')!.status, 'active');
 });
 
 test('C1b #8: identical start replay refuses both done and abandoned records', async t => {

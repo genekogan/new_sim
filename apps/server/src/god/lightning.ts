@@ -6,6 +6,7 @@ import type { Context, Hono } from 'hono';
 import { boundsOf, strikesBetween, SOUND_MPS, type Strike, type WorldState } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
+import { callerOf } from './builds.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { godTokenLimiter } from './rate-limit.ts';
@@ -63,11 +64,11 @@ export function installLightning(god: GodMode, edge: EdgeLedger | undefined, tic
   (edge as EdgeLedger & { lightningNear?: (x: number, z: number) => unknown }).lightningNear = (x: number, z: number) => lightningNear(god, x, z, tick());
 }
 
-export function mountLightningRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => void; tick: () => number }) {
+export function mountLightningRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => unknown; tick: () => number }) {
   const limitGod = godTokenLimiter(d.requireGod);
   app.post('/v1/god/strike', async (c) => {
     limitGod(c, 'strike', CREATION_LIMITS.strikesPerMinute);
     let b: { at?: unknown } = {}; try { b = await c.req.json(); } catch { /* no body: anywhere */ }
-    return c.json(strike(d.god, b?.at, d.tick()), 200, { 'cache-control': 'no-store' });
+    return c.json(d.god.as(callerOf(d.requireGod(c)), () => strike(d.god, b?.at, d.tick())), 200, { 'cache-control': 'no-store' });
   });
 }

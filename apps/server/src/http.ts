@@ -80,7 +80,7 @@ export function buildApp(d: Deps) {
   // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
   if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
   if (d.god) mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp, verifyUse: new VerifyUse(d.host, d.souls, d.god, d.edge), lookWorldUrl: `http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}` /* W2 remote looks */ });
-  if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { if (!god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); } }); }  // R4-LIVE env setter
+  if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change the environment'); return who; } }); }  // R4-LIVE env setter; WD7: helpers refused, edits attributed
 
   app.onError((err, c) => {
     if (err instanceof ApiError) { if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }

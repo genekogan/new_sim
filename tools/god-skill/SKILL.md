@@ -96,12 +96,17 @@ only after reading, and do not claim the requested work is complete before verif
    `build.outside`: preserve the named thing, or explicitly name it with start/step `--include ref,ref` and retry.
    `build check [id]` and done return a checked receipt; unverified asks and check warnings do not block done.
    Group undo is atomic: a conflict reverts nothing. Start's site report rides on the same response.
+   `build rewind [id] --to k [--dry]` atomically undoes every build edit after step k (lead and helpers) and keeps the
+   build open at step k; `--dry` lists what it removes. A later outside edit that depends on that work refuses it
+   (undo that edit first). `undo --group <open build>` rewinds it to the start.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
 
 Helpers only for ≥2 independent parts each taking >3 minutes. Claim from the massing at `build start` so helpers
-start in the first minute; pass their printed `EDEN_GOD_CLAIM=c_…`. Each brief gives a time box and shape budget
+start in the first minute: `build claim <part> --root … --helper` prints `EDEN_GOD_HELPER=<file>`, a token scoped to
+that claim (no env, land, strike or build lifecycle; undoes only its own edits; ends with the claim). Pass that line,
+never your token. Each brief gives a time box and shape budget
 ("about 5 minutes, ≤ 30 shapes"). Lead takes the largest part; helpers end `build release --done`.
 Never poll: `build wait [--timeout 15m]` when nothing remains to do.
 
@@ -512,6 +517,8 @@ Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` befor
 | `wallet.insufficient` | the wallet has less than that (a Soul spent it); `layers` shows wallets |
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
 | `build.claim` · `build.claimed` | stay in your scope; `build wait` for others |
+| `helper.scope` · `helper.expired` | a helper token: stay in its claim; when it ends, ask the lead |
+| `cobuilder.scope` | a co-builder token: no env, weather or strike; act only on your account's builds, claims and edits; ask the owner |
 | `build.lease` · `build.leased` | `build resume <id>`; `--take` only after the lead stops |
 | other `build.*` | follow `fix`; `build show <id>` for state |
 | `site.under-construction` | finish the build before residents use it |

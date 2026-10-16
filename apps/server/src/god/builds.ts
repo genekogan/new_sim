@@ -5,9 +5,11 @@ import { z } from 'zod';
 import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldModel, type OBB, type Op } from '@sim/world-compiler';
 import type { BuildReceipt } from './build-integrity.ts';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
+import { helperScopeFailure, type ClaimState, type HelperScope } from './helpers.ts';
+import { accountKey, cobuilderFailure, labelAccount, whose } from './cobuilders.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
-export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside'] as const;
+export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside', 'build.rewind', 'build.depends'] as const;
 const fixes: Record<typeof buildCodes[number], string> = {
   'build.outside': 'Name the existing entity with build start --include <ref> or build step --include <ref>, then retry.',
   'build.unknown': '`build` lists open builds; use `build start <id>`.',
@@ -23,6 +25,8 @@ const fixes: Record<typeof buildCodes[number], string> = {
   'build.claim-unknown': 'Use `build resume <id>` to see the claims.',
   'build.claims-open': 'Release live claims, or use --force.',
   'build.undo-incomplete': 'The build stays open; see notReverted.',
+  'build.rewind': '`build show` lists the steps; rewind --to takes 0 (the start) up to the newest step.',
+  'build.depends': 'Undo the later edit first, or rewind to a later step.',
 };
 export const buildFailure = (code: typeof buildCodes[number], detail: string, field = 'build', extra: Partial<Failure> = {}): Failure => ({ op: -1, code, detail, field, fix: fixes[code], ...extra });
 /** Leave room for lazy pause/closure markers on all author-controlled writes. */
@@ -53,11 +57,19 @@ export const buildActionSchemas = {
   abandon: z.object({ undo: z.boolean().optional(), force: z.boolean().optional() }).strict(),
   claim: z.object({ part: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/), root: z.string().min(1).max(300).optional(), region: siteSchema.optional(), take: z.string().regex(/^c_[0-9a-f]{8}$/).optional() }).strict().refine(c => !!(c.root || c.region || c.take), 'Supply a root, region, or stale claim to take.'),
   release: z.object({ done: z.boolean().optional() }).strict(),
+  rewind: z.object({ to: z.number().int().min(0).max(999), dry: z.boolean().optional(), force: z.boolean().optional() }).strict(),
 };
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
 export type Site = z.infer<typeof siteSchema>;
-export type Identity = { hash: string; label: string; holder?: Holder };
+/** `child`: a helper token minted for one claim (WD7 slice 3); its rate limits and claim custody pool with `child.parent`.
+ *  `cobuilder`: the co-builder account of the token (or of a helper's lead), Y4b; absent for owner tokens. */
+export type Identity = { hash: string; label: string; holder?: Holder; child?: HelperScope; cobuilder?: string };
+/** The token whose claim custody and rate limits a caller shares: the lead for a helper, otherwise itself. */
+export const poolOf = (caller: Identity) => caller.child?.parent ?? caller.hash;
+export const isIdentity = (v: unknown): v is Identity => !!v && typeof v === 'object' && typeof (v as Identity).hash === 'string';
+/** Attribution for routes whose requireGod returns the caller (WD7 slice 2: every journal row names its token). */
+export const callerOf = (v: unknown): BuildCaller => isIdentity(v) ? { identity: v } : {};
 export type BuildCaller = { identity?: Identity; build?: BuildField };
 export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string; process?: Holder }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
 type Caption = { text: string; at: number };
@@ -71,12 +83,14 @@ export type BuildBody = {
   lastBatchAt?: number; closureLapsedAt?: number; say?: Caption; sayAt?: number; designing?: string[]; note?: Caption; stepCalls?: string[];
   done?: { at: number; summary?: string; byLabel: string; receipt?: BuildReceipt };
   abandoned?: { at: number; undo?: { reverted: number[]; notReverted: number[] } }; startHash: string;
+  /** Y5: newest rewinds (owner card history). */
+  rewinds?: { at: number; to: number; from: number; edits: number; removed: number; byLabel: string }[];
 };
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
 export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[]; say?: Caption; designing?: string[]; note?: Caption; reopensAt?: number };
 export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt' | 'say' | 'designing' | 'note' | 'reopensAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
 export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group?: string; step: { n: number; label: string }; claim?: string };
-export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted';
+export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted' | 'rewound';
 export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
@@ -196,6 +210,26 @@ function overlappingClaim(model: WorldModel, scope: Scope, others: readonly Live
   });
 }
 
+/** WD7 slice 3: explicit existing targets (move/set/remove ids; place/move/clone parents) must already lie inside the claim. */
+function outsideClaim(model: WorldModel, mine: LiveClaim, ops: readonly Op[]): Failure | null {
+  for (const [i, op] of ops.entries()) {
+    // A root-only claim cannot adopt a new world-root thing; only a region claim can (decided geometrically in claimCheck).
+    // Where the op puts things: place/move/clone parents (a clone defaults to its source's parent). Reading a clone source is fine.
+    const source = op.op === 'clone' && !op.id.startsWith('$') ? model.get(op.id) : undefined;
+    const parent = op.op === 'place' ? op.in?.parent ?? 'world' : op.op === 'move' ? op.in?.parent : op.op === 'clone' ? op.in?.parent ?? source?.in.parent : undefined;
+    if (parent === 'world' && !mine.region) return { op: i, code: 'helper.scope', field: 'in.parent', detail: `A new thing at the world root is outside claim ${mine.id} (${mine.part}); place it under ${mine.root ?? 'the claim root'}.`, limit: { claim: mine.id, root: mine.root }, fix: 'Place under the claim root, or ask the lead.' };
+    const targets: [string, string][] = [];
+    if (op.op === 'move' || op.op === 'set' || op.op === 'remove') targets.push([op.id, 'id']);
+    if (parent && parent !== 'world') targets.push([parent, 'in.parent']);
+    for (const [ref, field] of targets) {
+      if (ref.startsWith('$')) continue;
+      const e = model.get(ref); if (!e || inScope(model, e.id, mine.scope.roots)) continue;
+      return { op: i, code: 'helper.scope', field, entity: e.id, detail: `${model.pathOf(e.id) || e.id} is outside claim ${mine.id} (${mine.part}); a helper token edits only inside its claim.`, limit: { claim: mine.id, root: mine.root, region: mine.region }, fix: 'Edit only under the claim root or inside its region, or ask the lead.' };
+    }
+  }
+  return null;
+}
+
 /** Pure: scope is read from both worlds; speculative made ids never enter the cached claim. */
 export function claimCheck(before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], mine: LiveClaim | undefined, others: readonly LiveClaim[]): { failure: Failure } | { made: string[] } {
   if (!mine && !others.length) return { made: [] };
@@ -273,7 +307,7 @@ export function advance(body: BuildBody, field: BuildField | undefined, made: st
   const claim = field.claim ? b.claims.find(c => c.id === field.claim)! : undefined;
   if (claim && caller?.holder) claim.holder.process = caller.holder;
   if (!claim && caller?.holder) b.lead.holder = caller.holder;
-  if (claim) { claim.made = [...new Set([...claim.made, ...made])]; claim.lastAt = at; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
+  if (claim) { claim.made = [...new Set([...claim.made, ...made])]; claim.lastAt = at; if (caller) claim.user = { hash8: poolOf(caller).slice(0, 8), tokenHash: poolOf(caller) }; }
   if (revert) return b;
   const current = claim?.step ?? b.step, n = Math.max(current.n, field.step ?? current.n);
   const label = field.step !== undefined && field.step < current.n ? current.label : field.label ?? (n > current.n ? b.plan.steps[n - 1] ?? `step ${n}` : current.label);
@@ -515,7 +549,7 @@ export class GodBuilds {
     const label = input.n !== undefined && input.n < current.n ? current.label : input.label ?? (n > current.n ? body.plan.steps[n - 1] ?? `step ${n}` : current.label);
     if (claim && caller?.holder) claim.holder.process = caller.holder;
     if (!claim && caller?.holder) body.lead.holder = caller.holder;
-    if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
+    if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: poolOf(caller).slice(0, 8), tokenHash: poolOf(caller) }; }
     else body.step = { n, label, at: now, seq: null };
     // Keep the last STEP_CALLS accepted tuples (16 hex each): a retry cannot replace a newer announcement, and a long,
     // chatty build can never grow its body to the 64 KiB guard (which would refuse every later batch).
@@ -610,10 +644,91 @@ export class GodBuilds {
     if (reverted && !reverted.accepted) return { ...fail('build.undo-incomplete', 'Undo preflight failed; no build edits were reverted.'), reverted: reverted.reverted, notReverted: reverted.notReverted, causes: reverted.failures };
     row = this.row(id)!; const body = structuredClone(row.body); if (p.data.force) for (const c of body.claims) if (c.status === 'held') c.status = 'released'; body.abandoned = { at: now, ...(reverted ? { undo: { reverted: reverted.reverted, notReverted: [] } } : {}) }; return this.savedView(this.save(row, body, 'abandoned', row.last_at, 'abandoned'));
   }
+  /** Y5: which live build edits (lead and claim subgroups) a rewind to after step k reverts. `journal` is every row of
+   *  the build's groups. An edit's step is the recorded step range that holds its original edit (redo chains are
+   *  followed); the group separates the lead's ranges from interleaved claim ranges. Never writes. */
+  rewindPlan(id: string, raw: unknown, journal: readonly EditRow[]) {
+    const now = this.host.now(); this.sweep(now);
+    const p = buildActionSchemas.rewind.safeParse(raw); if (!p.success) return schemaFailure(p.error);
+    const row = this.row(id); if (!row) return fail('build.unknown', id);
+    if (!open(row)) return fail('build.closed', `${id} is ${row.status}; only an open build can be rewound.`, 'build', { fix: `Start a linked chapter with build continue ${id} --brief "…", or undo --group ${id}.` });
+    const { to } = p.data, b = row.body;
+    const newest = Math.max(b.step.n, ...b.steps.map(s => s.n), ...b.claims.map(c => c.step.n));
+    if (to > newest) return fail('build.rewind', `${id} is at step ${b.step.n}${newest > b.step.n ? ` (helpers reached ${newest})` : ''}; --to takes 0..${newest}.`, 'to', { measured: to, limit: newest });
+    const bySeq = new Map(journal.map(r => [r.seq, r])), claimGroups = new Map(b.claims.map(c => [c.id, `${id}/${c.part}`])), claimed = new Set(claimGroups.values());
+    const origin = (r: EditRow) => { let e: EditRow | undefined = r; for (let i = 0; e && e.kind !== 'edit' && i < 256; i++) e = e.undo_of === null ? undefined : bySeq.get(e.undo_of); return e?.kind === 'edit' ? e : undefined; };
+    const stepOf = (r: EditRow): number | undefined => {
+      const e = origin(r); if (!e) return undefined;
+      const hits = b.steps.filter(s => s.firstSeq <= e.seq && e.seq <= s.lastSeq), mine = hits.filter(s => s.claim ? claimGroups.get(s.claim) === e.grp : !claimed.has(e.grp ?? ''));
+      // An unresolvable overlap (a claim dropped from retention) takes the later step: rewind removes more, never less.
+      return hits.length ? Math.max(...(mine.length ? mine : hits).map(s => s.n)) : undefined;
+    };
+    const targets: (EditRow & { step: number })[] = [];
+    for (const r of journal) {
+      if (r.undone || (r.kind !== 'edit' && r.kind !== 'redo')) continue;
+      const n = stepOf(r);
+      if (n === undefined && to > 0) return fail('build.rewind', `Edit ${r.seq} has no recorded step (a build keeps its newest 64 step records).`, 'to', { measured: { seq: r.seq }, fix: `Rewind to 0 (the start), or undo the newer edits with undo --group ${r.grp ?? id}.` });
+      if (to === 0 || n! > to) targets.push({ ...r, step: n ?? 0 });
+    }
+    const lead = to === 0 ? 1 : Math.min(b.step.n, to), claimStep = Math.max(to, 1);
+    const unchanged = !targets.length && b.step.n === lead && !b.steps.some(s => s.n > to) && !b.claims.some(c => c.step.n > claimStep || p.data.force && c.status === 'held');
+    return { ok: true as const, row, to, dry: !!p.data.dry, force: !!p.data.force, targets, newest, unchanged, steps: b.steps.filter(s => s.n > to).map(s => ({ n: s.n, label: s.label, ...(s.claim ? { part: b.claims.find(c => c.id === s.claim)?.part ?? s.claim } : {}) })) };
+  }
+  /** Pure: the open record left at step k (k = 0 is the start). Closure is re-armed and retained claims are clamped;
+   *  only the lead's own token refreshes lead liveness, so an owner's rewind never makes a dead lead look alive. */
+  rewoundBody(body: BuildBody, to: number, at: number, caller: Identity | undefined, force: boolean, info: { from: number; edits: number; removed: number }) {
+    const b = structuredClone(body), lead = caller?.hash === b.lead.tokenHash, n = to === 0 ? 1 : Math.min(b.step.n, to), claimStep = Math.max(to, 1);
+    b.steps = b.steps.filter(s => s.n <= to);
+    const label = (k: number, claim?: string) => [...b.steps].reverse().find(s => s.n === k && s.claim === claim)?.label ?? b.plan.steps[k - 1] ?? `step ${k}`;
+    const kept = [...b.steps].reverse().find(s => s.n === n && !s.claim);
+    b.step = { n, label: n === body.step.n ? body.step.label : label(n), at, seq: kept?.lastSeq ?? null };
+    for (const c of b.claims) { if (force && c.status === 'held') c.status = 'released'; if (c.step.n > claimStep) c.step = { n: claimStep, label: label(claimStep, c.id) }; }
+    b.lastBatchAt = at; delete b.closureLapsedAt; b.stepCalls = []; b.designing = []; delete b.note;
+    b.say = { text: (to === 0 ? 'Rewound to the start' : `Rewound to step ${to}${to === n ? `: ${b.step.label}` : ''}`).slice(0, 140), at };
+    if (lead) delete b.paused;
+    b.rewinds = [...(b.rewinds ?? []), { at, to, from: info.from, edits: info.edits, removed: info.removed, byLabel: caller?.label ?? 'owner' }].slice(-16);
+    return { body: b, lead };
+  }
+  /** Y5 with nothing to revert: only the record moves back (same body rules as the chain's final write). */
+  saveRewound(id: string, to: number, at: number, caller: Identity | undefined, force: boolean, info: { from: number; edits: number; removed: number }) {
+    const row = this.row(id); if (!row || !open(row)) return fail('build.closed', id);
+    const { body, lead } = this.rewoundBody(row.body, to, at, caller, force, info);
+    const saved = this.save(row, body, lead ? 'active' : row.status, lead ? at : row.last_at, 'rewound'); if (!saved.ok) return saved;
+    const build = this.view(saved.row, at); this.announce(saved.row, 'rewound', { added: [], removed: [] }, false, build);
+    return { ok: true as const, build };
+  }
+  leadLive(id: string) { const row = this.rows.get(id); return row ? { label: row.body.lead.label, tokenHash: row.body.lead.tokenHash, live: !lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale } : undefined; }
   breakStaleLead(id: string) {
     const row = this.row(id); if (!row || !open(row)) return false;
     if (!lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale) return false;
     return this.pause(id, { lease: row.body.lead.lease, note: 'doctor: stale holder' }).ok;
+  }
+  /** Custody of one claim, for helper-token validity: only `held` in an open build keeps a helper alive. */
+  claimState(id: string, cid: string): ClaimState {
+    const row = this.rows.get(id); if (!row) return this.store.build(id) ? 'closed' : 'unknown';
+    return row.body.claims.find(c => c.id === cid)?.status ?? 'unknown';
+  }
+  /** Y4b: why a co-builder may not act on this build (lead account) or this claim (holder account); null for owner tokens,
+   *  its own account's work, and unknown ids (the action itself reports those). */
+  foreignTo(caller: Identity | undefined, id: string, cid?: string, verb = 'act on'): Failure | null {
+    if (caller?.cobuilder === undefined) return null;
+    const row = this.rows.get(id); if (!row) return null;
+    const mine = accountKey(caller.cobuilder);
+    if (cid === undefined) {
+      const owner = labelAccount(row.body.lead.label);
+      return owner === mine ? null : cobuilderFailure(`${id} is ${whose(owner)} build (led by ${row.body.lead.label}); a co-builder cannot ${verb} it.`, { limit: { build: id } });
+    }
+    const claim = row.body.claims.find(c => c.id === cid); if (!claim) return null;
+    const owner = labelAccount(claim.holder.label);
+    return owner === mine ? null : cobuilderFailure(`Claim ${cid} (${claim.part}) is ${whose(owner)} (held by ${claim.holder.label}); a co-builder cannot ${verb} it.`, { limit: { build: id, claim: cid } });
+  }
+  /** The claim a root token holds (directly or through its helpers), for minting. */
+  heldClaim(id: string, cid: string, caller: Identity): { claim: Claim } | { failure: Failure } {
+    const row = this.rows.get(id); if (!row) return { failure: buildFailure(this.store.build(id) ? 'build.closed' : 'build.unknown', id) };
+    const claim = row.body.claims.find(c => c.id === cid);
+    if (!claim || claim.status !== 'held') return { failure: buildFailure('build.claim-unknown', `${cid} is unknown or no longer held.`) };
+    if (claim.user.tokenHash !== poolOf(caller)) return { failure: buildFailure('build.claimed', `${cid} (${claim.part}) is held by ${claim.holder.label}; only its holder can mint a helper for it.`, 'build.claim') };
+    return { claim };
   }
   private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && !lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale); }
   private overlap(scope: Scope, now: number, except?: string) {
@@ -621,9 +736,14 @@ export class GodBuilds {
     for (const row of this.rows.values()) for (const c of this.liveClaims(row, now)) if (c.id !== except) others.push(scoped(c));
     return overlappingClaim(this.host.model(), scope, others);
   }
-  admit(field: BuildField | undefined, batch: Pick<Batch, 'group'>, _caller?: Identity): Admission {
-    const warnings: string[] = []; if (!field) { const owned = [...this.rows.values()].find(r => batch.group === r.id || batch.group?.startsWith(r.id + '/')); return { group: batch.group, warnings, ...(owned ? { failures: [buildFailure('build.group', `${batch.group} belongs to open build ${owned.id}.`)] } : {}) }; }
+  admit(field: BuildField | undefined, batch: Pick<Batch, 'group'> & { ops?: readonly Op[] }, caller?: Identity): Admission {
+    const warnings: string[] = [];
+    // WD7 slice 3: a helper token is authorised only through its own claim, before any planning.
+    if (caller?.child) { const refused = helperScopeFailure(caller.child, field, batch.ops); if (refused) return { warnings, failures: [refused] }; }
+    if (!field) { const owned = [...this.rows.values()].find(r => batch.group === r.id || batch.group?.startsWith(r.id + '/')); return { group: batch.group, warnings, ...(owned ? { failures: [buildFailure('build.group', `${batch.group} belongs to open build ${owned.id}.`)] } : {}) }; }
     const row = this.row(field.id); if (!row) return { warnings, failures: [buildFailure('build.unknown', field.id)] }; if (!open(row)) return { warnings, failures: [buildFailure('build.closed', field.id)] };
+    // Y4b: a co-builder edits only through builds it leads and claims it holds.
+    const foreign = this.foreignTo(caller, row.id, field.claim, 'edit through'); if (foreign) return { warnings, failures: [foreign] };
     if (field.claim) {
       const claim = row.body.claims.find(c => c.id === field.claim);
       if (!claim || claim.status !== 'held') return { warnings, failures: [buildFailure('build.claim-unknown', `${field.claim}${claim?.takenBy ? ` was taken by ${claim.takenBy.label} at ${claim.takenBy.at}` : ' is unknown or released'}.`)] };
@@ -632,7 +752,10 @@ export class GodBuilds {
         if (overlap) return { warnings, failures: [buildFailure('build.claimed', `Claim ${claim.id} cannot resume: overlaps ${overlap.id} (${overlap.part}).`, 'build.claim', { limit: { claim: overlap.id, part: overlap.part } })] };
       }
       const group = `${row.id}/${claim.part}`; if (batch.group && batch.group !== group) warnings.push(`group ${batch.group} ignored; claim group is ${group}`);
-      return { row, field, mine: scoped(claim), group, warnings };
+      const mine = scoped(claim);
+      // A helper's named targets are checked before planning; claimCheck remains the geometric backstop.
+      if (caller?.child && batch.ops) { const outside = outsideClaim(this.host.model(), mine, batch.ops); if (outside) return { warnings, failures: [outside] }; }
+      return { row, field, mine, group, warnings };
     }
     if (field.lease !== row.body.lead.lease) return { warnings, failures: [buildFailure('build.lease', `${field.id} was resumed by ${row.body.lead.label} at ${row.body.lead.since}.`)] };
     let group = batch.group;

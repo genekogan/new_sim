@@ -26,6 +26,8 @@ import { siteReport } from './build-integrity.ts';
 import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
+import { HELPER_LIMITS, helperRoute } from './helpers.ts';
+import { cobuilderRoute } from './cobuilders.ts';
 import { mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
 import { mountDistrictRoutes, withDistrict } from './districts.ts'; // Y3 districts
@@ -52,10 +54,42 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   for (const path of ['/v1/god/builds', '/v1/god/builds/*']) app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   app.use('/v1/god/*', godBodyLimit(() => d.god.model.constants.limits.budget));
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
-  const identities = new WeakMap<Context, Identity>();
+  const identities = new WeakMap<Context, Identity>(), resolved = new WeakMap<Context, Identity | null>();
+  const identityOf = (c: Context) => { if (!resolved.has(c)) resolved.set(c, d.god.godIdentity(bearer(c))); return resolved.get(c)!; };
+  // WD7 slice 3: helper tokens are authorised per route (deny by default) before any handler runs.
+  app.use('/v1/god/*', async (c, next) => {
+    const token = bearer(c);
+    if (token?.startsWith('god_')) {
+      const identity = identityOf(c);
+      if (identity?.child) { const denied = helperRoute(c.req.method, c.req.path, identity.child); if (denied) throw new ApiError(403, 'helper.scope', denied, { build: identity.child.build, claim: identity.child.claim }); }
+      else if (!identity) { const ended = d.god.helperRefusal(token); if (ended) throw new ApiError(401, 'helper.expired', ended); }
+      // Y4b: co-builder tokens (and their helpers) never reach env, weather or lightning, and never mint.
+      if (identity?.cobuilder !== undefined) { const denied = cobuilderRoute(c.req.method, c.req.path); if (denied) throw new ApiError(403, 'cobuilder.scope', denied); }
+    }
+    await next();
+  });
+  // Y4b: a co-builder pauses, resumes, finishes and abandons only builds its account leads, and takes or releases only its
+  // account's claims. Refused like any other build action ({ok:false, failures}); owner tokens pass untouched.
+  const lifecycle = { pause: 'pause', resume: 'resume', done: 'finish', abandon: 'abandon' } as const;
+  app.use('/v1/god/builds/:id/:action{pause|resume|done|abandon|claims}', async (c, next) => {
+    const who = c.req.method === 'POST' ? identityOf(c) : null;
+    if (who?.cobuilder !== undefined) {
+      const id = c.req.param('id'), action = c.req.param('action') as keyof typeof lifecycle | 'claims';
+      const take = action === 'claims' ? (await c.req.json().catch(() => null) as { take?: unknown } | null)?.take : undefined;
+      const refused = action === 'claims' ? (typeof take === 'string' ? d.god.builds.foreignTo(who, id, take, 'take') : null) : d.god.builds.foreignTo(who, id, undefined, lifecycle[action]);
+      if (refused) return c.json({ ok: false, failures: [refused] }, 200, noStore);
+    }
+    await next();
+  });
+  app.use('/v1/god/builds/:id/claims/:cid/release', async (c, next) => {
+    const who = c.req.method === 'POST' ? identityOf(c) : null;
+    const refused = who?.cobuilder !== undefined ? d.god.builds.foreignTo(who, c.req.param('id'), c.req.param('cid'), 'release') : null;
+    if (refused) return c.json({ ok: false, failures: [refused] }, 200, noStore);
+    await next();
+  });
   const requireGod = (c: Context) => {
     const cached = identities.get(c); if (cached) return cached;
-    const identity = d.god.godIdentity(bearer(c));
+    const identity = identityOf(c);
     if (!identity) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start');
     identity.holder = parseHolder(c.req.header('x-eden-god-holder'));
     identities.set(c, identity); d.god.builds.touch(identity.hash, d.god.now()); return identity;
@@ -110,8 +144,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/god/examples/:file{[a-z0-9-]+\\.(mjs|log)}', (c) => { const f = c.req.param('file'); return serveFile(`examples/${f.endsWith('.mjs') ? '' : 'shots/'}${f}`, f.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'text/plain; charset=utf-8')(c); });
   app.get('/v1/god/status', async (c) => {
     let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
-    const god = d.god.godIdentity(bearer(c)); if (god) d.god.builds.touch(god.hash);
-    const you = god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
+    const god = identityOf(c); if (god) d.god.builds.touch(god.hash);
+    const you = god?.child ? 'helper' : god?.cobuilder !== undefined ? 'cobuilder' : god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
     const owner = you === 'owner' || you === 'god';
     return c.json({ versions: godVersions, worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: owner ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c), template: d.god.template, ...(owner ? { agents: d.god.store.tokens().filter((t) => t.label !== 'browser').length, builds: d.god.builds.summaries() } : {}) }, 200, noStore);
   });
@@ -147,11 +181,17 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/builds/:id/resume', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(withDistrict(d.god.districts, d.god.builds.resume(c.req.param('id'), await optionalBody(c), requireGod(c))), 200, noStore); });
   app.post('/v1/god/builds/:id/done', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const r = d.god.builds.done(c.req.param('id'), await optionalBody(c), requireGod(c)); const reuse = r.ok ? d.god.parts.reuseOf(r.build.id) : undefined; return c.json(r.ok ? withDistrict(d.god.districts, { ...r, receipt: r.build.done?.receipt, reuse, build: { ...r.build, reuse } }) : r, 200, noStore); });
   app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id, b.force === true))), 200, noStore); });
+  // Y5: atomic rewind to after step k ({to, dry?, force?}); any god token, like done/abandon (the owner card).
+  app.post('/v1/god/builds/:id/rewind', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await body(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.rewind(id, b)), 200, noStore); });
   app.post('/v1/god/builds/:id/claims', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.claim(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
+  // WD7 slice 3: the claim's holder mints a scoped helper token; the response carries only the new token.
+  app.post('/v1/god/builds/:id/claims/:cid/helper', async c => { limitGod(c, 'helper-mint', HELPER_LIMITS.mintPerMinute); return c.json(d.god.mintHelper(c.req.param('id'), c.req.param('cid'), await optionalBody(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/claims/:cid/release', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.release(c.req.param('id'), c.req.param('cid'), await optionalBody(c)), 200, noStore); });
   app.get('/v1/god/schema', (c) => c.json(godSchema(d.god.model.constants.limits), 200, { 'cache-control': 'public, max-age=60' }));
   app.post('/v1/god/verify-use', async (c) => {
     limitGod(c, 'verify-use', CREATION_LIMITS.verifyPerMinute);
+    const who = requireGod(c);
+    if (who.child && !d.god.helpers.spendVerify(who.hash)) throw new ApiError(403, 'helper.budget', `helper token ${who.label} has used its ${who.child.verify.budget} verify-use calls; ask the lead to verify`, { budget: who.child.verify.budget });
     const raw = await c.req.json().catch(() => null);
     const receipt = d.verifyUse ? await d.verifyUse.run(raw) : {ok: false, target: typeof raw?.target === 'string' ? raw.target : '', uses: [], probe: {created: false, removed: true, removal: 'done' as const}, timings: {birth: 0, start: 0, enter: 0, sit: 0, retire: 0}, ms: 0, notes: [], reason: {code: 'verify.refused' as const, engineCode: 'unavailable', message: 'Resident verification is unavailable in this world.'}};
     d.god.parts.recordVerify(receipt, requireGod(c));
@@ -161,7 +201,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/preview', async (c) => { limitGod(c, 'preview', CREATION_LIMITS.previewsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.preview(b)), 200, noStore); });
   app.get('/v1/god/preview/:id', (c) => { if (!d.god.canViewPreview(c.req.param('id'), c.req.header('x-preview-key'))) requireGod(c); const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
-  app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
+  app.get('/v1/god/snapshot', (c) => { const who = requireGod(c), snapshot = d.god.godSnapshot(); return c.json(who.child ? { ...snapshot, prayers: [] } : snapshot, 200, noStore); });
   app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.dryrun(b)), 200, noStore); });
   app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const b = await body(c); const r = asGod(c, b, () => d.god.act(b, typeof b?.note === 'string' ? b.note : undefined)); return c.json(r, 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });

@@ -8,7 +8,7 @@ import { doctor } from './lib/doctor.mjs';
 import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
+import { activeClaim, atomicWrite, buildHeader, call, claimFile, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
@@ -702,6 +702,15 @@ const districtReportText = d => [`district ${d.id}: chapter ${d.chapter} builds 
 const siteReportText = r => [...(r.district ? districtReportText(r.district) : []), `site report: ground ${r.ground.min}..${r.ground.max} m${r.ground.sampled ? ' (sampled)' : ''}; neighbour eaves median ${r.eaves.median ?? 'n/a'}, max ${r.eaves.max ?? 'n/a'} m`, ...r.neighbours.map(n => `near ${n.path}: ${n.footprint.map(f => f.size.join('×')).join(', ')} m; eave ${n.eave} m (${n.eaveSource})`), ...r.masses.map(m => `${m.name}: ${m.fits ? 'fits' : 'outside site'}; height/neighbours median ${m.medianRatio ?? 'n/a'}, max ${m.maxRatio ?? 'n/a'}`), `closure: ${Object.entries(r.closure.counts ?? {}).map(([k,v]) => `${v} ${k}`).join(', ')}; ${(r.closure.things ?? []).map(x => x.path).join(', ')}`, ...(r.approach ? [`approach: ${r.approach.from ?? r.approach.note}${r.approach.checked ? '' : ' (not checked)'}`] : []), ...(r.library ?? []).map(x => `library: ${x.ref} (${x.category})`), ...(r.truncated ? ['site report shortened; inspect closure inventory for all returned rows'] : [])].join('\n');
 const checkedReceipt = r => r ? [`checked receipt at seq ${r.seq}: ${r.exists.count} parts exist; ${r.undoability.ok ? 'undo preflight OK' : 'undo CONFLICT'} (${r.undoability.edits} edits)`, `exists: ${r.exists.paths.join(', ') || 'none'}`, ...r.preservation.outside.map(x => `changed outside: ${x.path}${x.included ? ' (included)' : ''}`), ...r.undoability.conflicts.map(explainFailure), ...r.massing.map(m => `mass ${m.name}: ${m.parts} parts; ${m.height}/${m.plannedHeight} m; ${m.fits ? 'fits' : 'warning'}`), ...r.uses.map(u => `uses ${u.path}: ${JSON.stringify(u.walk ?? u.behaviours ?? u.error ?? 'no compiled uses')}`), `viewer cost: ${JSON.stringify(r.viewerCost)}`, `refused: ${r.refused.count}; ${r.refused.recent.map(x => `${x.code}${x.entity ? ' on ' + x.entity : ''}: ${x.detail}`).join('; ')}`, ...r.warnings.map(w => `WARNING: ${w}`)].join('\n') : '';
 const buildValues = (value, separator, flag, max, size) => { if (value === undefined) return undefined; if (typeof value !== 'string') throw new Error(`--${flag} needs text`); const values = value.split(separator).map(x => x.trim()); if (values.length > max || values.some(x => !x || x.length > size)) throw new Error(`--${flag} needs 1..${max} values, each at most ${size} characters`); return values; };
+/** Y5: "removes 18 parts (…)", what else moves back, and which edits and steps go. */
+const rewindReport = (id, r, dry) => {
+  const w = r.rewind, names = x => `${x.names.join(', ')}${x.more ? ` +${x.more} more` : ''}`, verb = (now, would) => dry ? would : now;
+  const steps = [...new Set(w.steps.map(s => `${s.n} ${s.label}${s.part ? ` (${s.part})` : ''}`))];
+  return [`${id}: ${dry ? `rewind to step ${w.to} — dry run, nothing changed` : r.replayed ? `already at step ${w.to}; nothing to rewind` : `rewound to step ${w.to}; now at step ${r.build.step.n}/${r.build.plan.steps.length} ${r.build.step.label}, still open, closure re-armed`}`,
+    [`${verb('removes', 'would remove')} ${w.removes.count} part${w.removes.count === 1 ? '' : 's'}${w.removes.count ? ` (${names(w.removes)})` : ''}`, ...(w.restores.count ? [`${verb('restores', 'would restore')} ${w.restores.count} (${names(w.restores)})`] : []), ...(w.changes.count ? [`${verb('reverts', 'would revert')} ${w.changes.count} change${w.changes.count === 1 ? '' : 's'} (${names(w.changes)})`] : []), ...(w.world?.length ? [`world: ${w.world.join(', ')}`] : [])].join('; '),
+    `${w.edits.length} edit${w.edits.length === 1 ? '' : 's'} ${verb('undone', 'to undo')}${w.edits.length ? ` (${[...w.edits].sort((a, b) => a - b).join(', ')})` : ''}${steps.length ? `; steps: ${steps.join(', ')}` : ''}`,
+    ...(r.warnings ?? []).map(x => `WARNING: ${x}`), ...(dry ? [`apply: build rewind ${id} --to ${w.to}${w.to ? '' : ' (the start)'}`] : [])].join('\n');
+};
 const reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(', ') || 'none'}${r.recorded === false ? `; not fully recorded${r.code ? ' (' + r.code + ')' : ''}` : ''}` : '';
 function buildReport(r) {
   if (r.open) return [...r.open.flatMap(b => [...buildWords(b), buildListLine(b)]), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
@@ -760,15 +769,15 @@ export async function buildWait(id, flags = {}, runtime = {}) {
 }
 export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
   const s = load(), b = s.build, arg = args[0];
-  const options = { start: 'title steps at offset size yaw mass brief root asks include district plots', district: 'file delete', continue: 'brief asks include title steps', check: '', step: 'say mass asks include', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take', release: 'done', pause: '', done: 'force', abandon: 'undo force' };
-  if (!Object.hasOwn(options, sub)) throw new Error('build: start|district|continue|step|check|show|wait|resume|claim|release|pause|done|abandon');
+  const options = { start: 'title steps at offset size yaw mass brief root asks include district plots', district: 'file delete', continue: 'brief asks include title steps', check: '', step: 'say mass asks include', show: '', wait: 'timeout', resume: 'take', claim: 'root at offset size yaw take helper ttl', release: 'done', pause: '', done: 'force', abandon: 'undo force', rewind: 'to dry force' };
+  if (!Object.hasOwn(options, sub)) throw new Error('build: start|district|continue|step|check|show|wait|resume|claim|release|pause|done|abandon|rewind');
   if (args.length > (['release', 'abandon', 'wait'].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
   for (const [k, v] of Object.entries(f)) {
     if (!['json', 'no-build', ...options[sub].split(' ')].includes(k)) throw new Error(`build ${sub} has no option --${k}`);
     if (Array.isArray(v)) throw new Error(`build ${sub} --${k} takes one value`);
   }
   if (sub === 'resume' && f.take !== undefined && f.take !== true) throw new Error('build resume --take takes no value');
-  if ((process.env.EDEN_GOD_CLAIM || b?.claim) && (['start', 'continue', 'resume', 'claim', 'done', 'abandon'].includes(sub) || (sub === 'district' && (f.file !== undefined || f.delete !== undefined)))) throw new Error(`claim holders cannot build ${sub}${sub === 'resume' ? ': it would take the lead lease' : '; edit your claim, then build release --done'}`);
+  if ((activeClaim() || b?.claim) && (['start', 'continue', 'resume', 'claim', 'done', 'abandon', 'rewind'].includes(sub) || (sub === 'district' && (f.file !== undefined || f.delete !== undefined)))) throw new Error(`claim holders cannot build ${sub}${sub === 'resume' ? ': it would take the lead lease' : '; edit your claim, then build release --done'}`);
   if (sub === 'step') {
     if (!b) throw new Error('no current build; build start or build resume first');
     const n = !arg && f.say === undefined && (f.include !== undefined || f.asks !== undefined) ? b.n : b.n + 1;
@@ -839,6 +848,16 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
     if (response.status === 404) return unknown();
     const r = ok(response, 'build district'); return f.json ? r : districtLines(r.district).join('\n');
   }
+  if (sub === 'rewind') {
+    const id = arg ?? b?.id; if (!id) throw new Error('build rewind needs an id or a current build');
+    if (typeof f.to !== 'string' || !/^\d{1,3}$/.test(f.to)) throw new Error('build rewind needs --to <step>: 0 (the start) up to the current step');
+    const response = await call(BUILD_API.path(id, 'rewind'), { body: { to: Number(f.to), ...(f.dry ? { dry: true } : {}), ...(f.force ? { force: true } : {}) } });
+    if (BUILD_API.unknown(response)) return buildChoices(sub, `unknown build: ${id}`, f);
+    const r = ok(response, 'build rewind');
+    if (r.ok === false) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join('; ')}${r.edits?.length ? `; nothing was undone (${r.edits.length} edit(s) checked)` : ''}`;
+    if (!f.dry) { if (b?.id === id) save({ build: { ...b, n: r.build.step.n, label: r.build.step.label, status: r.build.status }, buildPreviews: undefined }); invalidate(); }
+    return f.json ? r : rewindReport(id, r, !!f.dry);
+  }
   if (sub === 'continue') {
     if (!arg) throw new Error('build continue needs a previous build id');
     if (f.brief === undefined) throw new Error('build continue needs --brief with the follow-up words');
@@ -893,6 +912,8 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
       if (f.take !== undefined && (typeof f.take !== 'string' || !/^c_[0-9a-f]{8}$/.test(f.take))) throw new Error('build claim --take needs a claim id');
       const region = f.at !== undefined || f.size !== undefined ? await buildSite(f) : undefined;
       if (!f.root && !region) throw new Error('build claim needs --root <path> or --at <ref> --size w,d');
+      if (f.helper !== undefined && f.helper !== true) throw new Error('build claim --helper takes no value');
+      if (f.ttl !== undefined && (!f.helper || !/^\d+(\.\d+)?$/.test(String(f.ttl)) || Number(f.ttl) < 1 || Number(f.ttl) > 720)) throw new Error('build claim --ttl <minutes> (1..720) needs --helper');
       action = 'claims'; body = { part: arg, ...(f.root ? { root: f.root } : {}), ...(region ? { region } : {}), ...(f.take ? { take: f.take } : {}) };
     } else if (sub === 'release') {
       if (!b.claim) throw new Error('build release needs EDEN_GOD_CLAIM or a local claim');
@@ -915,6 +936,7 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
       // A replay never resets an active helper's local step.
       if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + '\n');
     } finally { release(); }
+    if (f.helper) return helperEnv(s, r, f);
     return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
   }
   if (['release', 'done', 'abandon'].includes(sub)) save({ build: undefined, group: undefined, buildPreviews: undefined });
@@ -923,6 +945,17 @@ export async function build(sub = 'show', args = [], f = {}, inheritedMassing) {
   if (sub === 'start') return buildStartReport(r.build, r.parts, r.report);
   if (sub === 'resume') return buildReport(r);
   return `${id}: ${sub === 'release' ? 'claim released' : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(', ') || 'none'}; not undone edits: ${r.build.abandoned.undo.notReverted.join(', ') || 'none'}` : ''}${sub === 'done' && (r.receipt ?? r.build.done?.receipt) ? '\n' + checkedReceipt(r.receipt ?? r.build.done?.receipt) : ''}${sub === 'done' && (r.reuse ?? r.build.reuse) ? '\n' + reuseReport(r.reuse ?? r.build.reuse) : ''}${sub === 'done' && r.district ? '\n' + districtLines(r.district, id).join('\n') : ''}`;
+}
+/** WD7 slice 3: mint a scoped helper token for a claim just taken, write it to a 0600 helper file, print only the env line. */
+async function helperEnv(s, r, f) {
+  const m = ok(await call(BUILD_API.path(r.build.id, `claims/${encodeURIComponent(r.claim.id)}/helper`), { body: { ...(f.ttl !== undefined ? { ttlMs: Math.round(Number(f.ttl) * 60_000) } : {}) } }), 'build claim --helper');
+  if (!m.ok) return f.json ? m : `${r.claim.id}: ${r.claim.part} claimed, but no helper token: ${m.failures.map(explainFailure).join('; ')}`;
+  const file = resolve(helperFile(r.claim.id));
+  atomicWrite(file, JSON.stringify({ world: s.world, token: m.token, helper: m.helper, build: BUILD_API.claim(r.build, r.claim) }, null, 2) + '\n');
+  if (f.json) return { ...r, helper: m.helper, helperFile: file };
+  return [`${r.claim.id}: ${r.claim.part}; helper ${m.helper.label} (#${m.helper.hash8}) may edit only this claim; its own token is in the file (never printed, never the lead's).`,
+    `sub-agent: export EDEN_GOD_HELPER=${file}`,
+    `ends ${new Date(m.helper.expiresAt).toISOString()} or when the claim is released, done or taken, or the build closes; then build release --done`].join('\n');
 }
 /** group <name>: label every following edit (until `group --off`); `undo --group <name>` reverts them all. */
 export async function group(name, flags = {}) {
@@ -937,10 +970,12 @@ const movedHow = (m) => m.how === 'walked' ? 'walked out of the way' : m.how ===
 export const movedNote = (r) => (r?.moved ?? []).map((m) => `\n  ${m.name} ${movedHow(m)} ${m.how === 'stopped' ? 'at' : 'to'} (${m.to.join(', ')}${m.level ? `, floor level ${m.level}` : ''}): "${m.reason}"`).join('');
 export async function undo(flags = {}) {
   const g = flags.group === true ? load().group : flags.group;
-  if ((process.env.EDEN_GOD_CLAIM || load().build?.claim) && !g) { const b = load().build; throw new Error(`a plain undo reverts anyone's newest edit; use \`undo --group ${b?.id ?? '<build>'}/${b?.part ?? '<part>'}\``); }
+  if ((activeClaim() || load().build?.claim) && !g) { const b = load().build; throw new Error(`a plain undo reverts anyone's newest edit; use \`undo --group ${b?.id ?? '<build>'}/${b?.part ?? '<part>'}\``); }
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ''}`, { method: 'POST' }), 'undo'); invalidate();
   if (g) {
-    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(', ')}${movedNote(r)}`;
+    // Y5: a whole open build's group rewinds it to the start; keep the local step in line with the server.
+    if (r.rewound?.step && load().build?.id === g) save({ build: { ...load().build, n: r.rewound.step.n, label: r.rewound.step.label }, buildPreviews: undefined });
+    if (r.accepted && !r.failures?.length && !r.notReverted?.length) return `undid group "${g}": edits ${r.reverted.join(', ') || 'none'}${r.rewound ? `; build ${g} stays open at step ${r.rewound.step?.n ?? 1} (rewound to the start; closure re-armed)` : ''}${movedNote(r)}`;
     return `group "${g}" undo incomplete; undone edits: ${r.reverted?.join(', ') || 'none'}; not undone edits: ${r.notReverted?.join(', ') || (r.failed !== undefined ? r.failed : 'unknown (server did not list them)')}\n${r.failures?.map(explainFailure).join('; ') || 'Undo did not complete.'}`;
   }
   return r.accepted ? `undid edit ${r.reverted}${movedNote(r)}` : `nothing undone: ${r.failures?.map(explainFailure).join('; ')}`;
@@ -1196,7 +1231,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['once', 'follow', 'fix', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+const BOOL = new Set(['once', 'follow', 'fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -1219,7 +1254,7 @@ export function parseFlags(argv, bools = BOOL) {
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
   doctor: 'fix local',
-  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete',
+  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry',
   listen: 'after timeout once follow', ack: '',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -1282,7 +1317,7 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force] · build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open). Global --no-build skips automatic metadata.
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
