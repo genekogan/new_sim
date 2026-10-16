@@ -192,7 +192,7 @@ test('decals never reshuffle the building: adding one or editing its text leaves
   const body = (root: THREE.Object3D) => { const out: string[] = []; root.traverse(o => { const m = o as THREE.Mesh; if (!m.isMesh || m.name === 'building-decal') return; const g = m.geometry; out.push(`${m.parent?.name}/${m.name}:${createHash('sha256').update(new Uint8Array((g.attributes.position.array as Float32Array).buffer)).update(g.attributes.color ? new Uint8Array((g.attributes.color.array as Float32Array).buffer) : new Uint8Array()).digest('hex')}`); }); return out; };
   for (const ref of ['core/shop@1', 'core/house@1', 'core/cottage@1']) {
     const slot = ref === 'core/shop@1' ? 'opening-front-door' : building(w, ref).baked.slots.find(s => s.id.startsWith('facade-f0-'))!.id;
-    const sign = (text: string) => [{ slot, w: 1.2, h: 0.3, at: [0, slot.startsWith('opening-') ? 2.75 : 0.9], text, bg: 'none' }];
+    const sign = (text: string) => [{ slot, w: 1.2, h: 0.3, at: [0, slot.startsWith('opening-') ? 3.05 : 0.9], text, bg: 'none' }];
     const plain = building(w, ref), signed = building(w, ref, { decals: sign('BAKERY') }), edited = building(w, ref, { decals: sign('BAKERX') });
     assert.equal(faces(signed.root, 'building-decal').length, 1, ref); assert.equal(faces(plain.root, 'building-decal').length, 0, ref);
     const base = body(plain.root);

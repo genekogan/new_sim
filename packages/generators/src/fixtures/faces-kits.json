@@ -35,7 +35,7 @@
     ] } }
   },
   "shopDecals": [
-    { "slot": "opening-front-door", "w": 2.2, "h": 0.3, "at": [0, 2.75], "text": "BAKERY", "font": "serif", "ink": "#3a2a22", "bg": "none" },
+    { "slot": "opening-front-door", "w": 2.2, "h": 0.36, "at": [0, 3.05], "text": "BAKERY", "font": "serif", "ink": "#3a2a22", "bg": "none" },
     { "slot": "gable-s", "w": 0.9, "h": 0.9, "at": [0, -1.2], "pattern": "mosaic", "seed": 5, "cells": 12 }
   ]
 }

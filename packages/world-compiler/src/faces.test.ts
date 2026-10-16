@@ -80,8 +80,8 @@ test('decals stay on their wall: refused when they hang off its ends, float abov
     assert.equal(act(w, set(decal)).result.accepted, true, JSON.stringify(decal));
   // A turned shop measures along its own front.
   const turned = world();
-  assert.equal(act(turned, [{ op: 'place', def: 'core/shop@1', name: 'bakery', at: [0, 0], params: { front: 'e', decals: [{ slot: 'opening-front-door', w: 2.2, h: 0.3, at: [0, 2.75], text: 'BAKERY' }] } }]).result.accepted, true);
-  refused(turned, set({ slot: 'opening-front-door', w: 2.2, h: 0.3, at: [4, 2.75] }), /^params\.decals\.0\.at$/, /Keep at\[0\]/);
+  assert.equal(act(turned, [{ op: 'place', def: 'core/shop@1', name: 'bakery', at: [0, 0], params: { front: 'e', decals: [{ slot: 'opening-front-door', w: 2.2, h: 0.36, at: [0, 3.05], text: 'BAKERY' }] } }]).result.accepted, true);
+  refused(turned, set({ slot: 'opening-front-door', w: 2.2, h: 0.36, at: [4, 3.05] }), /^params\.decals\.0\.at$/, /Keep at\[0\]/);
   // A round tower's walls are flat chords: a decal fits one chord, never wraps the curve.
   const tower = world();
   assert.equal(act(tower, [{ op: 'place', def: 'core/lighthouse@1', name: 'light', at: [0, 0], params: { decals: [{ slot: 'facade-f0-s-1', w: 1.2, h: 0.4, text: 'PIER' }] } }]).result.accepted, true);
