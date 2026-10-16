@@ -52,14 +52,15 @@ export class ChildPool {
   }
   /** Take an adopted world over: `release(slug)` makes the previous launcher stop it (snapshot saved, process gone);
    *  then it boots here on the same data. Requests that arrive meanwhile wait on `ready` instead of failing. */
-  takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
+  async takeOver(slug, release, { timeoutMs = 180_000 } = {}) {
     const k = this.kids.get(slug);
-    if (!k?.adopted) return Promise.resolve(k?.port ?? null);
+    if (!k?.adopted) return k?.port ?? null;
+    // pre-warm: the next process loads its code while the previous one still serves (no database, no port yet); until
+    // it is ready the world stays 'running' on the old process, so visitors' requests do not wait for the warm-up
+    const warm = !this.o.prewarm ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
     k.status = 'handover'; this.o.onChange?.(slug);
     k.ready = (async () => {
-      // pre-warm: the next process loads its code while the previous one still serves (no database, no port yet)
-      const warm = !this.o.prewarm ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
-      const paused = Date.now(); k.pauseStart = paused;   // from here the world does not answer until the new process does
+      k.pauseStart = Date.now();   // from here the world does not answer until the new process does
       try { await release(slug); }
       catch (e) { warm?.child.kill('SIGTERM'); k.status = 'failed'; k.lastError = `handover: ${e.message}`; this.o.onChange?.(slug); throw e; }
       k.adopted = null; this.savePids();
