@@ -72,8 +72,17 @@ export class Objects {
   private inPlace(soulId: string, placeId: string): boolean {
     try { return this.core.deps.ledger.placePathOf(soulId).some(p => p.id === placeId); } catch { return false; }
   }
-  private ctx(o: ObjectRecord, kind: ObjectKind, soul: EdgeSoul): ActionCtx {
-    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: this.inPlace(soul.soulId, o.placeId), carrier: this.carrierRead};
+  /** `inPlace` for one Soul over one listing. Its place path is the same for every object, and computing it (every place
+   *  polygon, sorted) costs far more than the object around it: a listing over a built-up world asked for it twice per object. */
+  private inPlaceFor(soulId: string): (placeId: string) => boolean {
+    let ids: Set<string> | undefined;
+    return (placeId) => {
+      if (!ids) { try { ids = new Set(this.core.deps.ledger.placePathOf(soulId).map(p => p.id)); } catch { ids = new Set(); } }
+      return ids.has(placeId);
+    };
+  }
+  private ctx(o: ObjectRecord, kind: ObjectKind, soul: EdgeSoul, inPlace: (placeId: string) => boolean = id => this.inPlace(soul.soulId, id)): ActionCtx {
+    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: inPlace(o.placeId), carrier: this.carrierRead};
   }
   /** Apply time-driven transitions and persist them (with their events). */
   private advanced(o: ObjectRecord,persist=true): ObjectRecord {
@@ -98,13 +107,13 @@ export class Objects {
     }
   }
 
-  private visible(o: ObjectRecord, soulId: string, kind: ObjectKind): boolean {
-    return kind.listed || this.inPlace(soulId, o.placeId) || kind.rolesOf(o.state, soulId).length > 0;
+  private visible(o: ObjectRecord, soulId: string, kind: ObjectKind, inPlace: (placeId: string) => boolean = id => this.inPlace(soulId, id)): boolean {
+    return kind.listed || inPlace(o.placeId) || kind.rolesOf(o.state, soulId).length > 0;
   }
   /** What a Soul may read: public fields, fields its roles entitle, its own derived fields, actions. */
-  view(o: ObjectRecord, soul: EdgeSoul) {
+  view(o: ObjectRecord, soul: EdgeSoul, inPlace?: (placeId: string) => boolean) {
     const kind = this.kinds.get(o.kind)!;
-    const ctx = this.ctx(o, kind, soul);
+    const ctx = this.ctx(o, kind, soul, inPlace);
     const state: Record<string, unknown> = {};
     for (const [field, spec] of Object.entries(kind.schema)) if (entitled(spec, ctx.roles)) state[field] = (o.state as Record<string, unknown>)[field];
     return {id: o.id, kind: o.kind, name: o.name, description: o.description, placeId: o.placeId, version: o.version,
@@ -130,11 +139,12 @@ export class Objects {
   }
   /** Objects this Soul can see (for observe `here.objects` and GET /v1/edge/objects). */
   visibleTo(soul: EdgeSoul) {
+    const inPlace = this.inPlaceFor(soul.soulId);
     return this.fresh().flatMap(o => {
       const kind = this.kinds.get(o.kind);
-      if (!kind || !this.visible(o, soul.soulId, kind)) return [];
-      const v = this.view(o, soul);
-      return [{id: v.id, kind: v.kind, name: v.name, placeId: v.placeId, here: this.inPlace(soul.soulId, o.placeId), public: publicState(kind, o.state), untrusted: true}];
+      if (!kind || !this.visible(o, soul.soulId, kind, inPlace)) return [];
+      const v = this.view(o, soul, inPlace);
+      return [{id: v.id, kind: v.kind, name: v.name, placeId: v.placeId, here: inPlace(o.placeId), public: publicState(kind, o.state), untrusted: true}];
     });
   }
 
@@ -206,10 +216,11 @@ export class Objects {
 
   /** Object actions as capabilities (`object:<id>:<action>`), merged by Ledger. */
   capabilities(soul: EdgeSoul): EdgeCapability[] {
+    const inPlace = this.inPlaceFor(soul.soulId);
     return this.fresh().flatMap(o => {
       const kind = this.kinds.get(o.kind);
-      if (!kind || !this.visible(o, soul.soulId, kind)) return [];
-      const ctx = this.ctx(o, kind, soul);
+      if (!kind || !this.visible(o, soul.soulId, kind, inPlace)) return [];
+      const ctx = this.ctx(o, kind, soul, inPlace);
       return this.actionsFor(o, kind, ctx).map(a => ({id: `object:${o.id}:${a.action}`, verb: 'object', label: `${a.label} (${o.name})`, object: o.id, action: a.action,
         target: {id: o.id, kind: o.kind}, available: a.available, ...(a.blocked ? {blocked: a.blocked} : {}), ...(Object.keys(a.params).length ? {params: a.params as Record<string, unknown>} : {})}));
     });
