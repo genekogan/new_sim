@@ -193,8 +193,11 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
               const y = slot.level === 0 && sp.ground ? sp.ground.standY(p[0], p[1]) : floor.y;
               for (const o of sp.scene.obstacles) {
                 if (o.id === slot.owner || o.y1 <= y + STEP || o.y0 >= y + profile.height) continue;
+                // A seat tucked under a table (a bus seat 5 cm inside its table's footprint): that table is the seat's own
+                // workspace, so the slide may end inside it. Thin walls never qualify.
+                if (Math.min(...o.obb.half) >= 0.2) { const sl = rot2(sub2(slot.p, o.obb.c), -o.obb.yaw); if (Math.abs(sl[0]) <= o.obb.half[0] + 0.1 && Math.abs(sl[1]) <= o.obb.half[1] + 0.1) continue; }
                 const l = rot2(sub2(p, o.obb.c), -o.obb.yaw);
-                if (hypot(Math.max(0, Math.abs(l[0]) - o.obb.half[0]), Math.max(0, Math.abs(l[1]) - o.obb.half[1])) < profile.radius + pad) {
+                if (hypot(Math.max(0, Math.abs(l[0]) - o.obb.half[0]), Math.max(0, Math.abs(l[1]) - o.obb.half[1])) < profile.radius * TRANSITION_BODY + pad) {
                   routeIssue ??= { code: 'slot.transition-blocked', message: `${slot.id} sit/stand approach crosses ${o.id}`, subjects: [slot.id, o.id] };
                   return false;
                 }
@@ -399,6 +402,8 @@ type Circle = { centre: Vec2; r: number; moves: { actor: string; p: Vec2; yaw: n
 type ConversationReturn = { actor: string; directive: string; station: Circle['moves'][number]; child?: string };
 type ConverseExec = { retired?: string[]; departures?: ConversationReturn[]; id: string; actors: string[]; phase: 'gathering' | 'talking'; child?: Children; error?: Diagnostic; t: number; duration?: number; circle: Circle };
 
+/** The sit/stand slide moves the torso only (arms and legs tuck in), so the sweep tests half the walking body radius; a bus seat 0.23 m from a table edge is legitimate. */
+const TRANSITION_BODY = 0.5;
 /** Circle radius: at least 0.8 m between neighbours, within 0.6–1.0 m. */
 export const circleRadius = (n: number) => clamp(0.4 / dsin(Math.PI / n), 0.6, 1.0);
 
