@@ -17,6 +17,8 @@ function fixture(live,paused,verdict={accepted:false,code:'canonical-refusal'}){
   IN_LIVE:live,leaseHeld:()=>paused,assertLiveDispatch,delegatedOwnerPath,
   load:()=>{loads++;return {world:'http://synthetic/w/eden',accountAuth:true,soul:'s_selected',token:'sim_s_selected_synthetic'};},
   need:(state,key)=>state[key],AbortSignal,Buffer,telemetry:null,
+  // the inbox lane's response hooks (client-inbox.mjs), imported by eden-agent.mjs; this harness only reads the dispatch
+  noticeInboxHeader:()=>false,noticeOwnerInbox:()=>{},
   fetch:async(url,options)=>{sent.push({url,options});return {status:200,text:async()=>JSON.stringify(verdict),headers:new Headers()};},
  });
  return {call,sent,loads:()=>loads};
