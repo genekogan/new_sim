@@ -34,13 +34,11 @@ const UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, 
 const INIT = `(() => {
   const P = window.__phone = { frames: [], perFrame: [], recording: true, firstDraw: null, draws: 0, tris: 0, tex: 0, buf: 0, rb: 0, texCount: 0, contexts: 0 };
   P.gpu = []; let qPending = [], qOpen = null;
-  const gpuTick = () => { const gl = P.gl, ext = P.timer; if (!gl || !ext) return; try {
+  const gpuTick = () => { if (!P.gl) { const c = document.querySelector('canvas[aria-label="Live 3D view of the world"]'); const g = c?.getContext('webgl2'); const e = g?.getExtension('EXT_disjoint_timer_query_webgl2'); if (e) { P.gl = g; P.timer = e; } } const gl = P.gl, ext = P.timer; if (!gl || !ext) return; try {
     if (qOpen) { gl.endQuery(ext.TIME_ELAPSED_EXT); qPending.push(qOpen); qOpen = null; }
     const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
     qPending = qPending.filter((q) => { if (!disjoint && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) return true; if (!disjoint && P.recording) P.gpu.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(q); return false; });
-    if (qPending.length < 4) { qOpen = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, qOpen); } } catch {} };
-  const gc = HTMLCanvasElement.prototype.getContext;
-  HTMLCanvasElement.prototype.getContext = function (type, ...rest) { const ctx = gc.call(this, type, ...rest); if (ctx && type === 'webgl2' && !P.gl && this.width * this.height > 0) { const e = ctx.getExtension('EXT_disjoint_timer_query_webgl2'); if (e) { P.gl = ctx; P.timer = e; } } return ctx; };
+    if (qPending.length < 4) { qOpen = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, qOpen); } P.gpuState = { pending: qPending.length, disjoint }; } catch (err) { P.gpuErr = String(err).slice(0, 120); } };
   const tick = (t) => { gpuTick(); if (P.recording) P.frames.push(t); if (P.draws) { P.perFrame.push([P.draws, P.tris]); if (P.perFrame.length > 600) P.perFrame.shift(); } P.lastDraws = P.draws; P.lastTris = P.tris; P.draws = 0; P.tris = 0; requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
   const bpp = (fmt, type, gl) => {
@@ -152,7 +150,7 @@ try {
       return { ...summarize(d.frames, ms), drawsP50: q(d.perFrame.map((x) => x[0]), 0.5), drawsMax: d.perFrame.length ? Math.max(...d.perFrame.map((x) => x[0])) : null, trisP50k: q(d.perFrame.map((x) => x[1] / 1000), 0.5), gpuP50: q(d.gpu, 0.5), gpuP95: q(d.gpu, 0.95), gpuN: d.gpu.length };
     };
     const still = await win(() => page.waitForTimeout(seconds * 1000));
-    const mem = await page.evaluate(() => { const P = window.__phone; const c = document.querySelector('canvas[aria-label="Live 3D view of the world"]'); const fb = c ? c.width * c.height * (4 + 4) * 4 + c.width * c.height * 4 * 2 : 0; return { texMB: +(P.tex / 1048576).toFixed(1), textures: P.texCount, bufMB: +(P.buf / 1048576).toFixed(1), rbMB: +(P.rb / 1048576).toFixed(1), canvasMB: +(fb / 1048576).toFixed(1), totalMB: +((P.tex + P.buf + P.rb + fb) / 1048576).toFixed(1), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, quality: window.__simQuality?.tier ?? null }; });
+    const mem = await page.evaluate(() => { const P = window.__phone; const c = document.querySelector('canvas[aria-label="Live 3D view of the world"]'); const fb = c ? c.width * c.height * (4 + 4) * 4 + c.width * c.height * 4 * 2 : 0; return { texMB: +(P.tex / 1048576).toFixed(1), textures: P.texCount, bufMB: +(P.buf / 1048576).toFixed(1), rbMB: +(P.rb / 1048576).toFixed(1), canvasMB: +(fb / 1048576).toFixed(1), totalMB: +((P.tex + P.buf + P.rb + fb) / 1048576).toFixed(1), heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, quality: window.__simQuality?.tier ?? null, gpuState: P.gpuState ?? null, gpuErr: P.gpuErr ?? null, gpuGl: !!P.gl }; });
     const audit = await page.evaluate(AUDIT);
     await page.screenshot({ path: resolve(out, `${tag}-still.png`) });
     // one-finger touch orbit across the middle of the view, then a two-finger pinch in
@@ -181,11 +179,17 @@ try {
         const pair = await (await ctx.request.post(`${base}/v1/souls/${soul.id}/pair`, { headers: owner, data: {} })).json();
         const cred = await (await ctx.request.post(base + '/v1/agent/pair', { data: { code: pair.code, agent: 'phones-probe' } })).json();
         const open = page.locator(`[aria-label="Open ${soul.name}"]`).first();
-        if (await open.count()) { const tapped = await open.tap({ timeout: 4000 }).then(() => true, () => false); if (!tapped) await open.click({ force: true }).catch(() => {}); speechTap = tapped ? 'tapped' : 'covered (forced)'; await page.waitForTimeout(2500); }
+        const collapse = page.getByRole('button', { name: 'collapse', exact: true });
+        if (await collapse.count()) await collapse.first().tap({ timeout: 4000 }).catch(() => {});
+        if (await open.count()) speechTap = await open.tap({ timeout: 4000, trial: true }).then(() => 'avatar tappable', () => 'avatar covered by another control');
+        // Frame the speaker at a phone-chat distance (entity worlds expose the camera): the tag's anchor is the head.
+        speechTap += ' / ' + await page.evaluate((id) => { const w = window.__simEntity; let at = null; w?.scene.traverse((o) => { if (o.isCSS2DObject && o.element?.dataset?.soulId === id) at = o.position.clone(); }); if (!at) return 'speaker not found'; w.controls.target.copy(at); w.camera.position.set(at.x + 5, at.y + 2.5, at.z + 7); w.camera.lookAt(at); w.controls.update?.(); return 'framed'; }, soul.id);
+        await page.waitForTimeout(2000);
         const said = await ctx.request.post(base + '/v1/edge/say', { headers: { authorization: `Bearer ${cred.token}` }, data: { text: 'Hello from this phone. Can you read these two lines while walking through the world?' } });
-        await page.waitForTimeout(2500);
+        await page.waitForFunction(() => [...document.querySelectorAll('.dialogue-popup')].some((e) => !e.hidden && e.getClientRects().length), null, { timeout: 30000 }).catch(() => {});
+        await page.waitForTimeout(600);
         speech = await page.evaluate(() => ({ bubbles: [...document.querySelectorAll('.dialogue-popup, .dialogue-popping, .dialogue-dock')].filter((e) => e.getClientRects().length && !e.hidden).map((e) => { const b = e.getBoundingClientRect(); return { cls: e.className.slice(0, 40), text: (e.textContent || '').slice(0, 60), font: getComputedStyle(e).fontSize, box: [b.x, b.y, b.width, b.height].map(Math.round), clipped: e.scrollHeight > e.clientHeight + 1 }; }) }));
-        speech.sayStatus = said.status(); speech.avatarTap = speechTap;
+        speech.sayStatus = said.status(); speech.sayBody = (await said.text()).slice(0, 160); speech.avatarTap = speechTap;
         await page.screenshot({ path: resolve(out, `${tag}-speech.png`) });
       } else speech = { unverified: 'no resident' };
     }
