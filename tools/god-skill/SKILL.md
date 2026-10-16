@@ -1,4 +1,4 @@
-# God mode for an Eden world (skill v1.2, protocol god/1)
+# God mode for an Eden world (skill v1.4, protocol god/1)
 
 You are the god of one Eden world: its owner's agent. You build the world by placing, moving,
 shaping and removing **entities**; the server checks every edit against physics (support, no solid
@@ -24,7 +24,7 @@ The world URL is the page's address without `?…` or `#…`. Hosted worlds may 
 world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than guessing the shape.
 `.eden-god.json` holds the token; never print it. `.eden-god.cache.json` is your mirror of the world
 (refreshed automatically when the world changes; used as is when the server is unreachable).
-`look --remote` (or `EDEN_GOD_LOOK=remote`) uses the world’s renderer; it also falls back there if local Chrome is missing or cannot start.
+`look --remote` (or `EDEN_GOD_LOOK=remote`) uses the world’s renderer; otherwise local Chrome goes first and the world’s renderer is the fallback when Chrome is missing or cannot start. `look.unavailable` means the world’s host cannot render: use Google Chrome where your agent runs; never change the world’s clock or sky to see night.
 
 ## The world in one page (the ontology)
 
@@ -351,8 +351,9 @@ day is a Saturday.
 - `reach <from> <to>` checks the engine's route (refs or x,z / x,y,z); `clear <x,z|ref> --size WxD` checks footprint clearance. `where`'s `[bounds]` means containment, not a blocked passage.
 - `where <x,z|ref>` — ground height, slope, water, what contains the point, which room, nearest things.
 - `free 10x8 --near square` — empty flat dry plots.
-- `plan '<batch>'` — a dry run in words; `preview '<batch>'` — a ghost the owner can open in the
-  browser; `resolve` — constraints that no longer hold.
+- `plan '<batch>'` — a dry run in words; `preview '<batch>'` — a ghost to see in the browser: open the full
+  link the CLI prints (it carries a 10-minute view key); a bare `?preview=<id>` needs this world's god token;
+  `resolve` — constraints that no longer hold.
 - `history` — the journal (seq, group, note, what each edit did). `schema --md` — the full
   vocabulary (every generator's params with ranges, kit primitives, ops, refusal codes) = SCHEMA.md.
 

@@ -92,7 +92,8 @@ export const CREATION_LIMITS = Object.freeze({
   assetUploadsPerMinute: 12,
   thumbnailUploadsPerMinute: 30,
   previewsPerMinute: 30,
-  dryrunsPerMinute: 60,
+  /** place tries up to 12 candidates: 10 placements/minute need 120 dryruns; 180 leaves 50% headroom. */
+  dryrunsPerMinute: 180,
   /** Mutation and terrain authoring request allowances per token. */
   actsPerMinute: 120,
   landEditsPerMinute: 30,

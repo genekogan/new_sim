@@ -44,10 +44,28 @@ test('Chrome launch failure falls back after releasing local lease', async t => 
   assert.deepEqual(readFileSync(f.args.out), png);
 });
 
-test('missing Chrome goes remote before Playwright discovery/npx and does not need a lease', async t => {
-  const f = fixture(t); let leased = false, spawned = false;
-  const result = await shoot(f.args, { ...f.runtime, chromeExists: () => false, lease: async () => { leased = true; }, spawnSync: () => { spawned = true; throw Error('must not spawn npx'); } });
+test('Chrome pre-check mirrors Playwright: per-user Windows installs are candidates, unknown platforms try local', async () => {
+  const { chromeCandidates } = await import('./remote-look.mjs');
+  const win = chromeCandidates('win32', { LOCALAPPDATA: String.raw`C:\Users\ann\AppData\Local`, PROGRAMFILES: String.raw`D:\Apps`, HOMEDRIVE: 'E:' });
+  assert.equal(win[0], String.raw`C:\Users\ann\AppData\Local\Google\Chrome\Application\chrome.exe`);
+  for (const p of [String.raw`D:\Apps\Google\Chrome\Application\chrome.exe`, String.raw`E:\Program Files (x86)\Google\Chrome\Application\chrome.exe`, String.raw`C:\Program Files\Google\Chrome\Application\chrome.exe`]) assert.ok(win.includes(p), p);
+  assert.ok(chromeCandidates('linux', {}).includes('/opt/google/chrome/chrome'));
+  assert.equal(chromeCandidates('freebsd', {}), null);
+});
+
+test('local is tried whenever any Playwright candidate exists (or the platform is unknown); absent Chrome goes remote before npx', async t => {
+  const f = fixture(t), { withRemoteLook } = await import('./remote-look.mjs');
+  const installed = join(f.dir, 'per-user-chrome.exe'); writeFileSync(installed, '');
+  for (const runtime of [{ chromeCandidates: () => [join(f.dir, 'missing.exe'), installed] }, { chromeCandidates: () => null }, { chromeExists: () => true }]) {
+    let attempted = false;
+    const result = await withRemoteLook(f.args, { ...f.runtime, ...runtime }, async () => { attempted = true; return { via: 'local' }; });
+    assert.equal(result.via, 'local'); assert.equal(attempted, true);
+  }
+  assert.equal(f.calls.length, 0);
+  let leased = false, spawned = false;
+  const result = await shoot(f.args, { ...f.runtime, chromeCandidates: () => [join(f.dir, 'missing.exe')], lease: async () => { leased = true; }, spawnSync: () => { spawned = true; throw Error('must not spawn npx'); } });
   assert.equal(result.via, 'remote'); assert.equal(leased, false); assert.equal(spawned, false);
+  await assert.rejects(withRemoteLook(f.args, { ...f.runtime, chromeExists: () => false, fetch: async () => Response.json({ code: 'look.unavailable', message: "This world's host cannot render pictures" }, { status: 503 }) }, async () => { throw Error('must not run local'); }), /local: no Google Chrome where Playwright looks.*; remote: look: look.unavailable: This world's host cannot render pictures/);
 });
 
 test('sheets, frame strips and workbench clearly require local Chrome instead of returning one remote view', async t => {
@@ -128,7 +146,7 @@ test('unrelated local rendering errors remain visible and do not trigger another
 test('remote refusal, malformed PNG and missing token do not write a screenshot', async t => {
   const f = fixture(t);
   await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => Response.json({ code: 'look.unavailable', message: 'Install Google Chrome on world host' }, { status: 503 }) }), /look.unavailable.*Install Google Chrome/);
-  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => Response.json({ code: 'rate-limited', message: 'too many looks', retry_after: 5 }, { status: 429 }) }), /rate-limited.*retry in 5s/);
+  await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, sleep: async () => {}, fetch: async () => Response.json({ code: 'rate-limited', message: 'too many looks', retry_after: 5 }, { status: 429 }) }), /rate-limited.*retry in 5s/);
   await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, fetch: async () => new Response('not a PNG', { headers: { 'content-type': 'image/png' } }) }), /did not return a PNG/);
   await assert.rejects(shoot({ ...f.args, remote: true }, { ...f.runtime, load: () => ({}) }), /needs a god token/);
   assert.equal(existsSync(f.args.out), false);
@@ -164,4 +182,16 @@ test('the remote body must finish inside the same look deadline', { timeout: 200
   assert.ok(signal.aborted); body(png);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(existsSync(f.args.out), false);
+});
+
+test('local and remote failure reasons both survive fallback', async t => {
+  const f = fixture(t);
+  const { withRemoteLook } = await import('./remote-look.mjs');
+  await assert.rejects(withRemoteLook(f.args, { ...f.runtime, chromeExists: () => true, fetch: async () => Response.json({ code: 'look.unavailable', message: 'No Google Chrome executable on world host; use a local browser.' }, { status: 503 }) }, async () => { throw Error('browserType.launch: local sandbox denied'); }), /local: browserType.launch: local sandbox denied; remote: look: look.unavailable: No Google Chrome executable/);
+});
+
+test('remote look retries 429 before writing the returned PNG', async t => {
+  const f = fixture(t); let calls = 0; const waits = [];
+  const result = await shoot({ ...f.args, remote: true }, { ...f.runtime, sleep: async ms => waits.push(ms), fetch: async (...args) => ++calls === 1 ? Response.json({ retryAfterMs: 30 }, { status: 429 }) : f.runtime.fetch(...args) });
+  assert.equal(result.via, 'remote'); assert.equal(calls, 2); assert.deepEqual(waits, [30]); assert.deepEqual(readFileSync(f.args.out), png);
 });

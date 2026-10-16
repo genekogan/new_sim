@@ -133,7 +133,9 @@ node eden-god.mjs preview '{"ops":[{"op":"place","def":"core/cottage@1","name":"
 **They see:** the panel's **Previews** tab lists it; **show** draws it as a
 translucent green ghost (amber for things that would move, red for removals,
 blue sheets where the ground would change), with a bar *Preview pv_… — +1 new —
-not built*. `?preview=<id>` on the world URL shows the same ghost to anyone.
+not built*. To see the same ghost in a browser, open the full link the CLI
+prints (it carries a 10-minute view key); a bare `?preview=<id>` needs this
+world's god token.
 
 ## 8:30 — look, undo
 

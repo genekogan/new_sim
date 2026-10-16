@@ -25,7 +25,6 @@ import { recentStrikes } from './lightning.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { godTokenLimiter } from './rate-limit.ts';
 import { syncWorldClock } from './world-clock.ts';
-import type { BuildBody } from './builds.ts';
 
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 export type EnvInput = {
@@ -140,10 +139,9 @@ export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; re
     try { b = await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); }
     const r = setEnv(d.god, b, typeof b?.note === 'string' ? b.note : 'environment');
     const identity = d.god.godIdentity(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''));
-    const shared = r.accepted && identity && d.god.store.builds(true).some(row => (JSON.parse(row.body) as BuildBody).lead.tokenHash === identity.hash);
+    const warnings = r.accepted ? d.god.sharedClockWarnings(identity ?? undefined) : [];
     // onCommit queues the logged engine rules. Read the clock only after those rules have applied.
     if (r.accepted) await syncWorldClock(d.god);
-    const warning = 'env.shared-clock: this changes the world\'s clock for everyone; for a picture use look --hour';
-    return c.json({ ...r, ...(shared ? { warnings: [...(r.accepted ? r.warnings : []), warning] } : {}), env: envView(d.host, d.god) }, 200, noStore);
+    return c.json({ ...r, ...(warnings.length ? { warnings: [...(r.accepted ? r.warnings : []), ...warnings] } : {}), env: envView(d.host, d.god) }, 200, noStore);
   });
 }

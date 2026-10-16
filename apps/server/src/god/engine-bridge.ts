@@ -503,7 +503,7 @@ export class EngineBridge {
     if (!this.model.entities.has(p.entityId)) return;
     const ops: Op[] = [...(this.model.children.get(p.entityId) ?? [])].map((c) => ({ op: 'move', id: c, in: { parent: 'world' }, p: [r3(this.model.worldPose(this.model.entities.get(c)!).x), r3(this.model.worldPose(this.model.entities.get(c)!).z)], mode: 'nudge' } as Op));
     ops.push({ op: 'remove', id: p.entityId, cascade: true } as Op);
-    const r = this.engineAct(ops, p.entityId.startsWith('h_verify_') ? `retire: verifier probe ${p.entityId} body removed` : 'retire: body removed');
+    const r = this.engineAct(ops, p.entityId.startsWith('h_vp') ? `retire: verifier probe ${p.entityId} body removed` : 'retire: body removed');
     if (!r.accepted) this.log(`retire ${p.entityId}: ${JSON.stringify(r.failures).slice(0, 200)}`);
   }
 

@@ -3,7 +3,7 @@
 // world process, persists commits, hands out god tokens by the same pairing
 // pattern Souls use, keeps undo/redo, routes prayers, and publishes diffs to
 // viewers (hub) and to gods (SSE).
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
 import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
@@ -29,7 +29,7 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
-type Preview = { at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; build?: BuildField; failures?: Failure[] };
+type Preview = { viewKeyHash: string; at: number; baseEditSeq: number; expect: Expectations; subtrees: Record<string, string[]>; affected: string[]; diff: Diff; ops: Batch; build?: BuildField; failures?: Failure[] };
 export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; now: number; builds?: SiteDelta[]; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
 /** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
 export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
@@ -304,6 +304,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     }
     result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
     result.warnings.push(...this.parts.warnings(normalized.ops));
+    if (normalized.ops.some(o => o.op === 'world' && ['sky', 'time', 'weather'].some(k => Object.hasOwn(o.state, k)))) {
+      result.warnings.push(...this.sharedClockWarnings(this.caller.identity));
+    }
     if (updates.echo) (result as typeof result & { build: BuildEcho }).build = updates.echo;
     // SQL fills in the real revision. Reserve its widest safe integer representation before admission.
     const bytes = Buffer.byteLength(JSON.stringify(result), 'utf8') + (updates.echo ? String(Number.MAX_SAFE_INTEGER).length - 1 : 0);
@@ -434,6 +437,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** No 200/500-entry truncation, and no prefix collision with a neighbouring build/chapter. */
   undoGroupUnder(group: string, force = false) { return this.undoTargets(this.store.groupEditsUnder(group, false, 2_147_483_647), true, force ? group : undefined); }
+  sharedClockWarnings(identity?: Identity): string[] {
+    return identity && this.store.builds(true).some(row => (JSON.parse(row.body) as { lead: { tokenHash: string } }).lead.tokenHash === identity.hash)
+      ? ["env.shared-clock: this changes the world's clock for everyone; for a picture use look --hour"] : [];
+  }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
     this.builds.sweep();
@@ -445,18 +452,23 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const build = parsed.data.build ?? this.caller.build, admission = this.builds.admit(build, parsed.data, this.caller.identity);
     if (admission.failures) return { id: null, accepted: false as const, failures: admission.failures };
     const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
-    const id = 'pv_' + randomBytes(6).toString('hex');
-    for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
+    const id = 'pv_' + randomBytes(6).toString('hex'), viewKey = randomBytes(32).toString('base64url');
+    for (const [k, v] of this.previews) if (this.now() - v.at >= 600_000) this.previews.delete(k);
     while (this.previews.size >= 100) this.previews.delete(this.previews.keys().next().value!);
     const baseEditSeq = this.model.editSeq;
     const diff: Diff = p.ok ? p.diff : { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
     const { expect, subtrees } = this.captureRevisions(parsed.data, diff);
     const affected = [...new Set([...diff.upserts.map(e => e.id), ...diff.removes])].filter(id => this.model.entities.has(id));
-    this.previews.set(id, { at: Date.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
+    this.previews.set(id, { viewKeyHash: hashToken(viewKey), at: this.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
-    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), url: `?preview=${id}` };
+    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), viewKey, expiresAt: this.now() + 600_000, url: `?preview=${id}#previewKey=${viewKey}` };
   }
-  getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
+  getPreview(id: string) { const v = this.previews.get(id); if (!v || this.now() - v.at >= 600_000) return null; return v; }
+  /** A read-only capability for exactly one retained preview; expires with its payload. */
+  canViewPreview(id: string, key?: string): boolean {
+    const v = this.getPreview(id);
+    return !!v && !!key && key.length <= 128 && timingSafeEqual(Buffer.from(v.viewKeyHash, 'hex'), Buffer.from(hashToken(key), 'hex'));
+  }
   /** Revision guards check only referenced/touched entities, never the world's global edit sequence. */
   private stale(expect: Expectations): Failure[] {
     return Object.entries(expect).flatMap(([ref, expected]) => {
@@ -506,7 +518,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return { expect, subtrees };
   }
   /** The god's recent previews, newest first (the panel lists them to show as ghosts). */
-  listPreviews() { const now = Date.now(); return [...this.previews].filter(([, v]) => now - v.at <= 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
+  listPreviews() { const now = this.now(); return [...this.previews].filter(([, v]) => now - v.at < 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
   private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
     for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
   }

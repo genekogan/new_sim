@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PassThrough } from 'node:stream';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync, mkdirSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import vm from 'node:vm';
@@ -11,7 +11,7 @@ import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
 import { LOOK_LIMITS, LookQueue, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
-import { PipeCDP, renderLook, pngSize } from './look-renderer.ts';
+import { PipeCDP, renderLook, pngSize, sweepLookProfiles } from './look-renderer.ts';
 import { readyExpression, captureExpression } from './look-page.ts';
 
 const shot = { eye: [0, 10, 20], at: [0, 0, 0] };
@@ -150,7 +150,7 @@ test('renderer refuses external configuration or a host without Chrome before op
   const settings = lookSchema.parse(shot);
   for (const url of ['https://example.invalid', 'http://localhost:5368', 'http://127.0.0.1:5368?url=other']) await assert.rejects(renderLook(url, settings, 0, new AbortController().signal), (e: ApiError) => e.code === 'look.unavailable');
   const previous = process.env.GOD_LOOK_CHROME; process.env.GOD_LOOK_CHROME = '/does-not-exist/w2-chrome';
-  try { await assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 0, new AbortController().signal), (e: ApiError) => e.code === 'look.unavailable' && /Install Google Chrome/.test(e.message)); }
+  try { await assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 0, new AbortController().signal), (e: ApiError) => e.code === 'look.unavailable' && /No Google Chrome executable.*local browser.*Never change/.test(e.message)); }
   finally { if (previous === undefined) delete process.env.GOD_LOOK_CHROME; else process.env.GOD_LOOK_CHROME = previous; }
 });
 
@@ -204,7 +204,7 @@ input.on('data', b => { buffer += b; for (;;) {
 } });`;
   writeFileSync(executable, source, { mode: 0o700 }); process.env.GOD_LOOK_CHROME = executable;
   const settings = lookSchema.parse({ ...shot, width: 1024, height: 640, hideRoofs: true, cut: 2, span: 10, hour: '21:00', weather: 'rain' });
-  const rendered = await renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(5000));
+  const rendered = await renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.timeout(30_000));
   assert.deepEqual(rendered, png, 'a valid 1x1 PNG is returned even when the renderer requested 1024x640');
   const messages = readFileSync(transcript, 'utf8').trim().split('\n').map(s => JSON.parse(s));
   const owned = messages.find(m => m.method === 'test.started').params;
@@ -221,12 +221,51 @@ input.on('data', b => { buffer += b; for (;;) {
   // A stuck host still exits and loses its temporary profile at the request deadline.
   writeFileSync(executable, source.replace("input.on('data', b => {", "input.on('data', b => { return;"), { mode: 0o700 });
   const deadline = new AbortController();
-  const stopped = assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.any([deadline.signal, AbortSignal.timeout(5000)])), { name: 'TimeoutError' });
+  const stopped = assert.rejects(renderLook('http://127.0.0.1:5368/w/looks', settings, 1, AbortSignal.any([deadline.signal, AbortSignal.timeout(30_000)])), { name: 'TimeoutError' });
   // Wait for the child handshake before firing the deadline: a fixed 300 ms also measured Node startup under load.
-  const until = Date.now() + 4000;
+  const until = Date.now() + 25_000; // a loaded host (load ~70) measured >4 s Node startup
   while (readFileSync(transcript, 'utf8').split('\n').filter(s => s.includes('test.started')).length < 2 && Date.now() < until) await new Promise(r => setTimeout(r, 10));
   deadline.abort(new DOMException('test render deadline', 'TimeoutError')); await stopped;
   const timedOut = JSON.parse(readFileSync(transcript, 'utf8').trim().split('\n').at(-1)!);
   assert.equal(timedOut.method, 'test.started');
   assert.equal(existsSync(timedOut.params.profile), false); assert.throws(() => process.kill(timedOut.params.pid, 0), { code: 'ESRCH' });
+});
+
+test('server normalizes every accepted hour format before rendering', async t => {
+  const f = fixture(t);
+  for (const [input, expected] of [['7', '07:00'], ['07', '07:00'], ['7:05', '07:05'], ['21:30', '21:30']]) {
+    assert.equal((await f.request(f.a, { ...shot, hour: input })).status, 200);
+    assert.equal((f.renders.at(-1) as any[])[1].hour, expected);
+  }
+});
+
+test('a malformed CDP event rejects pending work without escaping the stream callback', async () => {
+  const input = new PassThrough(), output = new PassThrough(), cdp = new PipeCDP(input, output);
+  cdp.onEvent = () => { throw Error('malformed event URL'); };
+  const rejected = assert.rejects(cdp.send('waiting'), /malformed event URL/);
+  assert.doesNotThrow(() => output.write(JSON.stringify({ method: 'Fetch.requestPaused', params: {} }) + '\0'));
+  await rejected; await assert.rejects(cdp.send('after'), /malformed event URL/);
+});
+
+test('failed Chrome startup distinguishes an existing executable and logs exit code/signal', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'h1-look-start-')), executable = join(dir, 'chrome');
+  const previous = process.env.GOD_LOOK_CHROME, original = console.error, logs: string[] = [];
+  console.error = (...args) => logs.push(args.join(' ')); process.env.GOD_LOOK_CHROME = executable;
+  t.after(() => { console.error = original; if (previous === undefined) delete process.env.GOD_LOOK_CHROME; else process.env.GOD_LOOK_CHROME = previous; rmSync(dir, { recursive: true, force: true }); });
+  for (const source of ['process.exit(23)', "process.kill(process.pid, 'SIGTERM')"]) {
+    writeFileSync(executable, `#!${process.execPath}\n${source}\n`, { mode: 0o700 });
+    await assert.rejects(renderLook('http://127.0.0.1:5368', lookSchema.parse(shot), 0, AbortSignal.timeout(30_000)), (e: ApiError) => e.code === 'look.unavailable' && /executable failed to start.*local browser.*Never change/.test(e.message));
+  }
+  assert.ok(logs.some(s => s.includes('code=23 signal=null')), logs.join('\n'));
+  assert.ok(logs.some(s => s.includes('code=null signal=SIGTERM')), logs.join('\n'));
+});
+
+test('startup profile sweep reclaims dead owners and old legacy dirs, preserving live/recent/unrelated dirs', async t => {
+  const dir = mkdtempSync(join(tmpdir(), 'h1-profile-sweep-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dead = 'sim-god-look-2147483647-ABC123', live = `sim-god-look-${process.pid}-ABC123`, old = 'sim-god-look-Old123', recent = 'sim-god-look-New123', other = 'other-profile';
+  for (const name of [dead, live, old, recent, other]) mkdirSync(join(dir, name));
+  utimesSync(join(dir, old), new Date(0), new Date(0));
+  await sweepLookProfiles(dir);
+  assert.equal(existsSync(join(dir, dead)), false); assert.equal(existsSync(join(dir, old)), false);
+  for (const name of [live, recent, other]) assert.equal(existsSync(join(dir, name)), true, name);
 });

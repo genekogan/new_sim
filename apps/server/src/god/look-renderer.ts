@@ -1,6 +1,7 @@
 // Minimal null-delimited CDP pipe transport. No Playwright, downloads, debug listener or persistent profile.
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { mkdtemp, readdir, lstat, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Readable, Writable } from 'node:stream';
@@ -8,7 +9,26 @@ import { ApiError } from '../souls.ts';
 import type { Look } from './look.ts';
 import { preserveScript, readyExpression, captureExpression } from './look-page.ts';
 
-const unavailable = () => new ApiError(503, 'look.unavailable', 'Cannot start the world renderer. Install Google Chrome on the world host (or set GOD_LOOK_CHROME to its executable) and allow it to run headless.');
+export const lookAdvice = "This world's host cannot render pictures; take the picture with a local browser (Google Chrome where your agent runs). Never change the world's clock or sky to see night.";
+const unavailable = (reason: string) => new ApiError(503, 'look.unavailable', `${reason} ${lookAdvice}`);
+
+/** Dead-owner profiles can be reclaimed across worlds without touching a live renderer.
+ * Legacy profiles lack a pid, so retain them for a day (the render deadline is 60 s). */
+export async function sweepLookProfiles(directory = tmpdir(), now = Date.now()) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  await Promise.all(entries.map(async entry => {
+    const match = /^sim-god-look-(?:(\d+)-)?[a-zA-Z0-9]{6}$/.exec(entry.name);
+    if (!match || !entry.isDirectory()) return;
+    const path = join(directory, entry.name);
+    try {
+      if (match[1]) {
+        try { process.kill(Number(match[1]), 0); return; }
+        catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ESRCH') return; }
+      } else if (now - (await lstat(path)).mtimeMs < 86_400_000) return;
+      await rm(path, { recursive: true, force: true });
+    } catch (e) { console.warn('[god.look] stale profile cleanup failed:', (e as NodeJS.ErrnoException).code); }
+  }));
+}
 /** Validate the PNG header, but report the canvas's actual size instead of refusing a useful picture. */
 export function pngSize(bytes: Uint8Array) {
   const png = Buffer.from(bytes);
@@ -43,7 +63,10 @@ export class PipeCDP {
         let message; try { message = JSON.parse(frame); } catch { this.close(new Error('Invalid Chrome response')); return; }
         const p = this.pending.get(message.id);
         if (p) { this.pending.delete(message.id); if (message.error) p.reject(new Error(message.error.message)); else p.resolve(message.result); }
-        else if (message.method) this.onEvent(message.method, message.params, message.sessionId);
+        else if (message.method) {
+          try { this.onEvent(message.method, message.params, message.sessionId); }
+          catch (e) { this.close(e instanceof Error ? e : new Error(String(e))); return; }
+        }
       }
     });
     output.on('end', () => this.close(new Error('Chrome closed the render pipe')));
@@ -73,10 +96,11 @@ async function stopChrome(child: ChildProcess) {
 export async function renderLook(worldUrl: string, shot: Look, expect: number, signal: AbortSignal): Promise<Uint8Array> {
   // This is server configuration, never Host/X-Forwarded-Host or a request field.
   const url = new URL(worldUrl);
-  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash) throw new ApiError(503, 'look.unavailable', 'Configure a 127.0.0.1 HTTP URL for the world renderer');
-  const executable = chromeExecutable(); if (!executable) throw unavailable();
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.search || url.hash) throw unavailable('Configure a 127.0.0.1 HTTP URL for the world renderer.');
+  const executable = chromeExecutable(); if (!executable) throw unavailable('No Google Chrome executable was found on the world host.');
   signal.throwIfAborted();
-  const profile = mkdtempSync(join(tmpdir(), 'sim-god-look-'));
+  const profile = await mkdtemp(join(tmpdir(), `sim-god-look-${process.pid}-`));
+  if (signal.aborted) { await rm(profile, { recursive: true, force: true }); throw signal.reason; }
   const child = spawn(executable, [
     '--headless=new', '--remote-debugging-pipe', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--disable-component-update',
@@ -86,7 +110,15 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
     'about:blank',
   ], { detached: process.platform !== 'win32', stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'] });
   const cdp = new PipeCDP(child.stdio[3] as Writable, child.stdio[4] as Readable);
-  child.once('error', () => cdp.close(unavailable())); child.once('exit', () => cdp.close(new Error('Chrome exited')));
+  let startupFailed = false, disposing = false;
+  child.once('error', (e: NodeJS.ErrnoException) => {
+    console.error('[god.look] Chrome executable failed to start:', e.code);
+    cdp.close(unavailable('The Google Chrome executable failed to start on the world host.'));
+  });
+  child.once('exit', (code, exitSignal) => {
+    if ((!disposing || startupFailed) && !signal.aborted) console.error(`[god.look] Chrome exited: code=${code} signal=${exitSignal}`);
+    cdp.close(new Error('Chrome executable exited'));
+  });
   const abort = () => { cdp.close(signal.reason); child.kill('SIGTERM'); };
   signal.addEventListener('abort', abort, { once: true });
   let started = false;
@@ -131,11 +163,11 @@ export async function renderLook(worldUrl: string, shot: Look, expect: number, s
     return png;
   } catch (e) {
     if (signal.aborted) throw signal.reason;
-    if (!started) throw unavailable();
+    if (!started) { startupFailed = true; throw unavailable('The Google Chrome executable failed to start on the world host.'); }
     if (e instanceof ApiError) throw e;
     throw new ApiError(503, 'look.failed', `World screenshot failed: ${String((e as Error).message).split('\n')[0].slice(0, 200)}. Retry the look; check the host viewer if it persists.`);
   } finally {
-    signal.removeEventListener('abort', abort); cdp.close();
-    await stopChrome(child); rmSync(profile, { recursive: true, force: true });
+    disposing = true; signal.removeEventListener('abort', abort); cdp.close();
+    await stopChrome(child); await rm(profile, { recursive: true, force: true });
   }
 }

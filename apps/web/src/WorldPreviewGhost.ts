@@ -17,6 +17,22 @@ export type GhostSummary = { id: string; ok: boolean; added: number; changed: nu
 
 const COLORS = { added: 0x2fd27a, changed: 0xf0a92e, removed: 0xe2483d, terrain: 0x6fc3ff };
 
+/** `#previewKey=<key>` from a CLI preview link: a read capability for one preview (never put in a query or path). */
+export function previewKeyFrom(hash: string): string | null {
+  try { const key = new URLSearchParams(hash.replace(/^#/, '')).get('previewKey'); return key && /^[\w-]{16,128}$/.test(key) ? key : null; } catch { return null; }
+}
+
+type UrlPort = { location: Pick<Location, 'pathname' | 'search' | 'hash'>; history: Pick<History, 'replaceState'> };
+/** Read the landing view key, then drop `previewKey` from the address bar and this history entry: it is a 10-minute
+ * read capability and must not linger in history. The rest of the URL stays as it was; an emptied fragment becomes
+ * #watch, which Shell writes anyway (an empty one would turn a world served at the root into the world list). */
+export function takePreviewKey(port: UrlPort): string | null {
+  const { pathname, search, hash } = port.location, key = previewKeyFrom(hash);
+  const parts = hash.replace(/^#/, '').split('&'), rest = parts.filter(p => !/^previewKey(=|$)/.test(p));
+  if (rest.length !== parts.length) port.history.replaceState(null, '', `${pathname}${search}#${rest.join('&') || 'watch'}`);
+  return key;
+}
+
 export class WorldPreviewGhost {
   readonly group = new THREE.Group();
   private readonly lib = new MaterialLib();
@@ -31,10 +47,10 @@ export class WorldPreviewGhost {
   }
 
   /** Fetch a preview and draw it; replaces whatever was shown. */
-  async show(id: string): Promise<GhostSummary> {
+  async show(id: string, access: { token?: string | null; viewKey?: string | null } = {}): Promise<GhostSummary> {
     this.clear();
-    const pr = await fetch(this.api(`/v1/god/preview/${encodeURIComponent(id)}`));
-    if (!pr.ok) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: pr.status === 404 ? 'This preview has expired (previews last 10 minutes) or never existed.' : `The server answered ${pr.status}.` });
+    const pr = await fetch(this.api(`/v1/god/preview/${encodeURIComponent(id)}`), { cache: 'no-store', headers: { ...(access.token ? { authorization: `Bearer ${access.token}` } : {}), ...(access.viewKey ? { 'x-preview-key': access.viewKey } : {}) } });
+    if (!pr.ok) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, message: pr.status === 404 ? 'This preview has expired (previews last 10 minutes) or never existed.' : pr.status === 401 ? "This preview is private, or its 10 minutes are up: open the full link your agent printed (it carries a view key), or sign in as this world's god." : `The server answered ${pr.status}.` });
     const pv = await pr.json() as { diff: Diff; failures: GhostSummary['failures']; ground?: Ground; ops?: unknown };
     if (pv.failures?.length) return (this.current = { id, ok: false, added: 0, changed: 0, removed: 0, tiles: 0, drawn: 0, failures: pv.failures, message: 'The world would refuse this batch; nothing to show.' });
     const sr = await fetch(this.api('/v1/world/snapshot'));

@@ -34,8 +34,11 @@ export class AdaptiveResolution {
   private lastDown: { from: number; median: number } | null = null;
   private readonly started = performance.now();
   readonly log: { t: number; ratio: number; median: number }[] = [];
+  // An explicit field, not a parameter property, so Node's strip-only TypeScript loader can run the tests.
+  private readonly renderer: THREE.WebGLRenderer;
 
-  constructor(private renderer: THREE.WebGLRenderer, deviceRatio: number) {
+  constructor(renderer: THREE.WebGLRenderer, deviceRatio: number) {
+    this.renderer = renderer;
     this.max = Math.min(deviceRatio, 2);
     const pinned = MODE && Number.isFinite(Number(MODE)) ? Math.max(0.5, Math.min(2, Number(MODE))) : null;
     this.ratio = pinned ?? this.max;
