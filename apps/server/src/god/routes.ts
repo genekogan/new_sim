@@ -4,6 +4,7 @@ import type { Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { TILE_N } from '@sim/ground';
+import { drawableEntities } from './look.ts'; // r2.1 (own line: keeps clear of the cloud y5 import hunk)
 import { ApiError } from '../souls.ts';
 import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
@@ -26,7 +27,7 @@ import { siteReport } from './build-integrity.ts';
 import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
-import { drawableEntities, mountLookRoutes } from './look.ts'; // W2 remote looks
+import { mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
 
 export type GodDeps = {
