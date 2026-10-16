@@ -41,7 +41,8 @@ test('event sets: a Soul finds the market in the map and whatson, walks to it an
 
   time(9.5, 2); await settle(4);
   assert.equal(clock().minute, 9 * 60 + 30);
-  const s = bridge.layers.step(); assert.equal(s.set, 4, JSON.stringify(s));
+  bridge.layers.step();   // the bridge's own clock step (every 40 ticks) may have set it up already
+  assert.equal([...god.model.entities.values()].filter(isSetPiece).length, 4, 'the stalls and banner stand at 09:30');
   await settle(4); bridge.perceive.sync(true);
   assert.match(square().description, /^Market morning is on here now \(3 market stalls and a banner set up, until 13:00\)/, square().description);
 
@@ -61,7 +62,7 @@ test('event sets: a Soul finds the market in the map and whatson, walks to it an
   assert.match(seen, /market-stall/, `here shows the stalls: ${seen.slice(0, 1500)}`);
 
   time(13.0, 3); await settle(4);
-  const end = bridge.layers.step(); assert.equal(end.packed, 4, JSON.stringify(end));
+  bridge.layers.step();
   await settle(4); bridge.perceive.sync(true);
   assert.equal([...god.model.entities.values()].filter(isSetPiece).length, 0, 'packed away at 13:00');
   assert.doesNotMatch(square().description, /is on here now/);
