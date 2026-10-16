@@ -610,9 +610,9 @@ function page(csrf) {
 var signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 function dto(value, id3) {
   if (value?.contract !== "soul-profile/1" || value.soulId !== id3 || typeof value.name !== "string" || typeof value.description !== "string" || !Number.isSafeInteger(value.revision) || value.revision < 0) throw Error("Canonical own profile response is unavailable; no profile effect is inferred.");
-  const p = value.photo, url = p?.url?.match(/^\/(?:w\/[a-z0-9-]+\/)?v1\/souls\/([^/]+)\/profile-photo\/([a-f0-9]{64})$/);
+  const p = value.photo, url = p?.url?.match(/^(?:\/[a-z0-9-]+)?\/(?:w\/[a-z0-9-]+\/)?v1\/souls\/([^/]+)\/profile-photo\/([a-f0-9]{64})$/);
   if (p && (!url || url[1] !== encodeURIComponent(id3) || url[2] !== p.hash || !/^[a-f0-9]{64}$/.test(p.hash ?? "") || p.mime !== "image/png" || !Number.isSafeInteger(p.width) || p.width < 1 || p.width > 512 || !Number.isSafeInteger(p.height) || p.height < 1 || p.height > 512 || !Number.isSafeInteger(p.bytes) || p.bytes < 1 || p.bytes > 262144)) throw Error("Canonical bounded portrait metadata unavailable.");
-  return { contract: value.contract, soulId: id3, name: value.name, description: value.description, revision: value.revision, photo: p ? { hash: p.hash, mime: p.mime, width: p.width, height: p.height, bytes: p.bytes, ...typeof p.url === "string" && /^\/(?:w\/[a-z0-9-]+\/)?v1\/souls\/[^/]+\/profile-photo\/[a-f0-9]{64}$/.test(p.url) ? { url: p.url } : {} } : null };
+  return { contract: value.contract, soulId: id3, name: value.name, description: value.description, revision: value.revision, photo: p ? { hash: p.hash, mime: p.mime, width: p.width, height: p.height, bytes: p.bytes, ...typeof p.url === "string" && /^(?:\/[a-z0-9-]+)?\/(?:w\/[a-z0-9-]+\/)?v1\/souls\/[^/]+\/profile-photo\/[a-f0-9]{64}$/.test(p.url) ? { url: p.url } : {} } : null, ...["custom", "auto"].includes(value.photoSource) ? { photoSource: value.photoSource } : {} };
 }
 function refusal(r) {
   return { accepted: false, status: r.status, code: r.data?.error?.code ?? r.data?.code ?? "profile.unconfirmed", reason: String(r.data?.error?.message ?? r.data?.reason ?? "Profile operation was refused or its result is unconfirmed.").slice(0, 300) };
@@ -620,7 +620,7 @@ function refusal(r) {
 async function clientProfile(id3, args, { call: call2, directory = process.cwd() } = {}) {
   if (typeof id3 !== "string" || !/^s_[A-Za-z0-9_-]{1,100}$/.test(id3)) throw Error("Create and pair your Soul first.");
   const [command, value, ...extra] = args;
-  if (extra.length || command && !["name", "description", "photo"].includes(command) || command && (!value || typeof value !== "string")) throw Error('usage: profile | profile name "Name" | profile description "Text" | profile photo path.png');
+  if (extra.length || command && !["name", "description", "photo"].includes(command) || command && (!value || typeof value !== "string")) throw Error('usage: profile | profile name "Name" | profile description "Text" | profile photo path.png | profile photo auto');
   const me = await call2("/v1/me", { as: "owner" });
   if (me.status !== 200) return refusal(me);
   const owned = me.data?.souls?.find((s) => s.id === id3);
@@ -629,7 +629,11 @@ async function clientProfile(id3, args, { call: call2, directory = process.cwd()
   const current = dto(owned.profile, id3);
   if (!command) return { profile: current };
   let body2, method, path, photoBytes = null;
-  if (command === "photo") {
+  if (command === "photo" && value === "auto") {
+    method = "DELETE";
+    path = "/v1/souls/" + encodeURIComponent(id3) + "/photo";
+    body2 = void 0;
+  } else if (command === "photo") {
     if (!/\.png$/i.test(value) || /^https?:/i.test(value)) throw Error("Use an explicit local PNG path; no remote URL is fetched.");
     const file = resolve3(value), s = lstatSync3(file);
     if (!s.isFile() || s.isSymbolicLink() || s.nlink !== 1 || s.size < 33 || s.size > 262144) throw Error("Use a regular unlinked PNG file of at most256KiB.");
@@ -4341,7 +4345,7 @@ async function wait(seconds = "45") {
   const s = load(), soul = need(s, "soul", "No Soul yet."), until = Date.now() + Math.min(60, Math.max(1, Number(seconds) || 45)) * 1e3;
   if (await mode() === "edge") {
     const events2 = [];
-    let cursor = s.cursor, gap, waitUnavailable;
+    let cursor = s.cursor ?? "c_0", gap, waitUnavailable;
     while (Date.now() < until) {
       const t = Math.max(1, Math.min(55, Math.round((until - Date.now()) / 1e3)));
       let r;
@@ -6277,7 +6281,18 @@ async function body(cmd, ...args) {
     const r = ok(await call("/v1/edge/body", { method: "PUT", body: { look: look2 } }), "body");
     return { changed: r.changed, body: r.body };
   }
-  if (cmd !== "upload") throw new Error("usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...]|upload path.glb --type ceramic --license owned --rights-confirmed]");
+  if (cmd === "photo") {
+    const flag = args[0];
+    if (!flag && !args.length) {
+      const r = await clientProfile(load().soul, [], { call });
+      const p = r.profile;
+      return p ? { photo: p.photo, source: p.photoSource ?? (p.photo ? "custom" : null) } : r;
+    }
+    if (flag === "--auto" && args.length === 1) return clientProfile(load().soul, ["photo", "auto"], { call });
+    if (flag === "--upload" && args.length === 2) return clientProfile(load().soul, ["photo", args[1]], { call });
+    throw new Error("usage: body photo [--auto | --upload portrait.png]");
+  }
+  if (cmd !== "upload") throw new Error("usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...|--set outfit=<preset>]|photo [--auto|--upload x.png]|upload path.glb --type ceramic --license owned --rights-confirmed]");
   const path = args.shift(), opts = {};
   if (!path) throw new Error("body upload needs a GLB path");
   while (args.length) {

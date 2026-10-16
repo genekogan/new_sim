@@ -3,22 +3,22 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "c2bedf27e66af79b649df62cab97bf32967974c2e44f52cac3f1b9c119ca9f8f",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-976e838c.manifest.json)",
-    "source": "976e838cca1a54a3567e6a8112118e625ed3659e",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection and speech truth"
+    "sha256": "fb7ac1bc576f71c420632ec1d662b5e171fee073c497fd263415fe9df23cf19a",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-97479c1c.manifest.json)",
+    "source": "97479c1ca38096c33779d25237f118bdff608a36",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape)"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "6ab3372aac9769e476254c484a2adb7bacc99824121d163c8d71759ecd6662d6",
-    "from": "git show 976e838c:tools/edge-skill/SKILL.md",
-    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel and creature guidance."
+    "sha256": "7802ca66760bea0afe49c43e92c4f30ee3b71c5cff24bb52d5090385fe0667b0",
+    "from": "git show 97479c1c:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits."
   },
   "instructions": {
     "file": "instructions.md",
-    "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
-    "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md",
-    "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36…)"
+    "sha256": "3bf0fbd7fa70f8831d8259d869ac3a1ce1750f8919b7fbfac45739203d311502",
+    "from": "git show 97479c1c:tools/edge-skill/INSTRUCTIONS.md",
+    "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001."
   },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
 }
