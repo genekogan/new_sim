@@ -397,8 +397,20 @@ export async function project(title,...text){
  if(!title||!text.length)throw new Error('usage: project "<title>" "<what it is>"');
  return act('make:project',JSON.stringify({title,text:text.join(' ')}));
 }
-/** explore — suggest a walk to a place you have not visited yet (from what is offered now). */
-export async function explore(){
+/** knowledge/1 — the around frame, short: what is close in more detail, places near with whether you have been, secret
+ *  places just found, and a walk to a place you have not been. Owners' agents pay per token: --full for the raw frame. */
+export function compactAround(a){
+ const clip=(s,n)=>String(s??'').length>n?String(s).slice(0,n-1)+'…':String(s??'');
+ const places=(a.places??[]).map((p,i)=>`${p.name} · ${p.dir} ${p.m}m ${p.eta} · ${p.been===undefined?'new':p.been==='found'?'found':'been '+p.been+'×'}${i<3&&p.what?' · '+clip(p.what,80):''}${p.walk?` [${p.walk}]`:''}`);
+ const go=a.unvisited?.[0]??null;
+ return {...(a.found?.length?{found:a.found.map(f=>`${f.name}${f.what?' · '+clip(f.what,80):''} [walk:${f.id}]`)}:{}),places,people:(a.people??[]).slice(0,6),things:(a.things??[]).slice(0,6),
+  ...(go?{suggestion:go,next:`act ${go}, then leave a mark or meet someone there`}:{}),untrusted:true};
+}
+/** explore / look around — more of what is near (places with what they are and whether you have been there, the people
+ *  and things a little farther off) and any secret place close enough to find; suggests a walk to somewhere new.
+ *  Older worlds without /v1/edge/around: a walk to a place not visited yet (from what is offered now). */
+export async function explore(...args){
+ if(await mode()==='edge'){const r=await call('/v1/edge/around');if(r.status===200){const a=r.data.around??{};return args.includes('--full')?a:compactAround(a);}}
  const all=(await capabilities()).canDo.available.filter(c=>c.verb==='walk'),seen=new Set(load().visited??[]);
  const fresh=all.filter(c=>!seen.has(c.id));const pick=(fresh.length?fresh:all)[Math.floor(Math.random()*Math.max(1,(fresh.length?fresh:all).length))];
  if(!pick)return {suggestion:null,reason:'No walk is offered right now; observe again later.'};
@@ -1110,7 +1122,9 @@ export async function dashboard(...args){
  liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
-const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+/** look around — the same as explore. */
+export async function look(what,...rest){if(what!=='around')throw new Error('usage: look around [--full]   (a body action: act look <target>; your appearance: body look)');return explore(...rest);}
+const commands={look,body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}

@@ -1614,6 +1614,20 @@ warnings: ${r.warnings.join("; ")}` : ""}`;
 var ENV_FLAGS = { time: "speed pause resume", weather: "kind intensity clouds wind rain fog", strike: "at", land: LAND_FLAGS };
 var ENV_BOOLS = ["pause", "resume", "preview", "force"];
 
+// lib/secret.mjs
+var SECRET_HELP = "secret:  secret (list) \xB7 secret <place> [off] \u2014 a secret place is on no Soul's map until that Soul has been inside or found it by looking around";
+async function secret(place2, onOff) {
+  if (!place2) return ok(await call("/v1/god/places/secret"), "secret");
+  if (onOff !== void 0 && !["on", "off"].includes(onOff)) throw new Error("secret <place> [on|off]");
+  const tries = [place2, .../^g-/.test(place2) ? [] : [`g-${place2.toLowerCase().replace(/\//g, ".").replace(/[^a-z0-9._-]+/g, "-")}`]];
+  let last;
+  for (const p of tries) {
+    last = await call("/v1/god/places/secret", { method: "POST", body: { place: p, secret: onOff !== "off" } });
+    if (last.status !== 404) break;
+  }
+  return ok(last, "secret");
+}
+
 // lib/layers.mjs
 var RELS = ["friend", "neighbour", "family", "works-at", "lives-at", "member-of"];
 var USES = ["residential", "commercial", "park", "farm", "civic", "industrial", "wild"];
@@ -2780,6 +2794,7 @@ var COMMANDS = {
   "zone-suggest": (r) => zoneSuggest(r[0]),
   relate: (r, f) => relate(r[0], r[1], r[2], f),
   layers: (r, f) => layers(f),
+  secret: (r) => secret(r[0], r[1]),
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
@@ -2794,6 +2809,7 @@ pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
 ${LAYERS_HELP}
+${SECRET_HELP}
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);

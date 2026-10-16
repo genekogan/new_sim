@@ -26,14 +26,16 @@ export function aroundFrame(ledger: EdgeLedger, soul: EdgeSoul) {
   const people = P.souls(AROUND_RADIUS).slice(0, 12).map(o => `${o.name} · ${o.distance}m ${P.bearing(o.at)} · ${o.activity && o.activity !== 'idle' ? o.activity.replace(/[-_]/g, ' ') : o.state}`);
   const things = P.things(AROUND_RADIUS).slice(0, 16).map(t => `${t.name}${t.kind === 'seat' ? (t.free ? ' (free seat)' : ' (taken seat)') : t.kind === 'spot' ? ` (${t.capability?.split(':')[0] ?? 'spot'})` : ` (${t.kind})`} · ${t.distance}m ${P.bearing(t.at)}`);
   const inside = new Set(path);
+  // the walk to a place, only when one is offered now (a place in view is not always one you can walk into)
+  const walks = new Map(ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place').map(c => [c.target!.id, c.id]));
   const places = [...ledger.places.byId.values()]
     .filter(p => p.parent !== null && !p.carrier && Math.abs((p.level ?? 0) - level) <= 1 && p.kind !== 'sleeping-mat' && !/(^|-)mat-\d+$/.test(p.id) && K.knows(soul.soulId, p.id))
     .map(p => {const at = centroid(p.polygon); return {p, at, d: inPoly(pos[0], pos[1], p.polygon) ? 0 : dist2(pos, at)};})
     .filter(x => x.d <= PLACES_RADIUS && !inside.has(x.p.id)).sort((a, b) => a.d - b.d || a.p.id.localeCompare(b.p.id)).slice(0, 10)
     .map(({p, at, d}) => {const k = mem.get(p.id);
-      return {id: p.id, name: p.name, dir: compassPoint(compassOf(at[0] - pos[0], at[1] - pos[1])), m: Math.round(d), eta: '~' + durationWord(walkSeconds(d * 1.25)),
+      return {id: p.id, name: p.name, ...(walks.has(p.id) ? {walk: walks.get(p.id)} : {}), dir: compassPoint(compassOf(at[0] - pos[0], at[1] - pos[1])), m: Math.round(d), eta: '~' + durationWord(walkSeconds(d * 1.25)),
         ...(p.description ? {what: clip(p.description, 110)} : {}), ...(k ? {been: k.how === 'visited' ? k.visits : 'found'} : {}), ...(K.isSecret(p.id) ? {secret: true} : {})};});
-  const unvisited = places.filter(p => !mem.has(p.id)).slice(0, 3).map(p => p.id);
+  const unvisited = places.filter(p => !mem.has(p.id) && p.walk).slice(0, 3).map(p => p.walk!);
   return {tick, ...(found.length ? {found: found.map(p => ({id: p.id, name: p.name, ...(p.description ? {what: clip(p.description, 110)} : {})}))} : {}),
     people, things, places, ...(unvisited.length ? {unvisited} : {}), untrusted: true};
 }

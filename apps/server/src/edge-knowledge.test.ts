@@ -71,7 +71,8 @@ test('knowledge at scales: district summary, far names, memory of visits, look a
   // ---- look around: finds it (close enough), and remembers; B (not looking) still does not know
   const ar = await around(a), rawA = JSON.stringify(ar);
   assert.deepEqual(ar.found.map((x: any) => x.id), ['commons-deck'], rawA);
-  assert.ok(ar.places.some((p: any) => p.id === 'commons-deck' && p.secret === true && p.been === 'found'), 'listed as a found secret');
+  assert.ok(ar.places.some((p: any) => p.id === 'commons-deck' && p.secret === true && p.been === 'found' && p.walk === 'walk:commons-deck'), 'listed as a found secret, walkable now');
+  assert.ok(ar.unvisited.every((x: string) => x.startsWith('walk:')), 'suggestions are offered walks');
   assert.ok(ar.places.length > 0 && ar.places.every((p: any) => p.dir && p.eta && typeof p.m === 'number'), JSON.stringify(ar.places));
   assert.ok(Array.isArray(ar.things) && ar.things.length > 0 && ar.people.some((x: string) => x.startsWith(b.name)), rawA);
   assert.ok(!rawA.includes('region-park'), 'the park is far: not found from here');
