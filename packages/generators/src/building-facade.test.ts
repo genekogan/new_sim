@@ -76,7 +76,7 @@ test('facade frames sit on solid wall, clear of doors, windows and their dressin
   for (const style of ['cottage', 'townhouse', 'hall', 'barn', 'tower', 'shop', 'chapel', 'shed', 'greenhouse'])
     for (const front of ['s', 'e']) {
       const b = buildingPhysics({ style, front, floors: style === 'shed' ? 1 : 2 });
-      for (const slot of b.slots.filter(s => s.id.startsWith('facade-')))
+      for (const slot of b.slots.filter(s => s.id.startsWith('facade-') && !s.retired))
         for (const o of b.openings!.filter(o => o.exterior && onFacade(slot, o as never)))
           assert.ok(along(slot, o as never) >= o.width / 2 + FACADE_MOUNT_HALF + 0.15 - 2e-3, `${style}/${front} ${slot.id} is ${along(slot, o as never).toFixed(2)} m from ${o.id} (half-width ${o.width / 2})`);
     }
@@ -91,7 +91,32 @@ test('the dressed cottage keeps facade-f0-s-1 and -s-2 beside the front door, cl
     for (const w of b.openings!.filter(o => o.kind === 'window' && onFacade(s, o as never))) assert.ok(along(s, w as never) >= w.width / 2 + 0.55 + FACADE_MOUNT_HALF - 2e-3, `${s.id} clears ${w.id} and its shutters`);
   }
   assert.ok(Math.abs(slots[0].p[0] - slots[1].p[0]) >= 0.8 - 1e-6, 'two frames on one stretch of wall stay apart');
-  // a 3 m plaster shed has no wall clear of a shuttered window, so it has no frames; stone windows carry no shutters
-  assert.equal(buildingPhysics({ style: 'shed', w: 3, d: 3 }).slots.some(s => s.id.startsWith('facade-')), false);
-  assert.ok(buildingPhysics({ style: 'shed', w: 3, d: 3, material: 'stone' }).slots.some(s => s.id.startsWith('facade-')));
+  // a 3 m plaster shed has no wall clear of a shuttered window, so it has no live frames; stone windows carry no shutters
+  assert.equal(buildingPhysics({ style: 'shed', w: 3, d: 3 }).slots.some(s => s.id.startsWith('facade-') && !s.retired), false);
+  assert.ok(buildingPhysics({ style: 'shed', w: 3, d: 3, material: 'stone' }).slots.some(s => s.id.startsWith('facade-') && !s.retired));
+});
+
+// r2patch3: release 2 put every facade frame at its run's centre and worlds hold mounts on them. A run that has no clear
+// wall now keeps its frame, retired, exactly where release 2 put it, so those mounts stay put (world-compiler refuses
+// new mounts there; describe lists it only while occupied). Live frames keep their ids; every release-2 id still resolves.
+test('a run with no clear wall keeps its release-2 frame as a retired slot at the run centre; ids are those of release 2', () => {
+  for (const style of ['cottage', 'townhouse', 'hall', 'barn', 'tower', 'shop', 'chapel', 'shed', 'greenhouse'])
+    for (const front of ['s', 'e']) {
+      const p = { style, front, floors: style === 'shed' ? 1 : 2 }, L = buildingLayout(p), b = buildingPhysics(p);
+      const runs = L.walls.filter(w => w.exterior && w.out), frames = b.slots.filter(s => s.id.startsWith('facade-'));
+      assert.equal(frames.length, runs.length, `${style}/${front}: one frame per exterior run, live or retired`);
+      const n = new Map<string, number>(), c = Math.cos(L.yaw), s = Math.sin(L.yaw);
+      for (const w of runs) {
+        const key = `facade-f${w.floor}-${w.side ?? 'wall'}`, k = (n.get(key) ?? 0) + 1; n.set(key, k);
+        const slot = frames.find(f => f.id === `${key}-${k}`)!; assert.ok(slot, `${style}/${front} ${key}-${k}`);
+        if (!slot.retired) continue;
+        const d = w.thick / 2 + 0.02, x = (w.a[0] + w.b[0]) / 2 + w.out![0] * d, z = (w.a[1] + w.b[1]) / 2 + w.out![1] * d;
+        near(slot.p[0], x * c + z * s); near(slot.p[2], -x * s + z * c); near(slot.p[1], (w.y0 + w.y1) / 2);
+        assert.match(slot.label ?? '', /retired/);
+      }
+    }
+  // the default cottage: release 2 had facade-f0-w-1 at (-4.02, 1.4, -1.445); it is retired there, w-2 stays live
+  const cottage = buildingPhysics({ style: 'cottage' }).slots, w1 = cottage.find(s => s.id === 'facade-f0-w-1')!;
+  assert.equal(w1.retired, true); near(w1.p[0], -4.02); near(w1.p[1], 1.4); near(w1.p[2], -1.445);
+  assert.equal(cottage.find(s => s.id === 'facade-f0-w-2')!.retired, undefined);
 });

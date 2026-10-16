@@ -6,7 +6,7 @@
 // links; rooms with frames and `room` slots. The mesh half (apps/web/src/gen-mesh/building.mesh.ts)
 // draws the same layout via `buildingGen.layout`.
 import { n, s, b, segmentColliders, rectPoly } from './geom.ts';
-import type { Baked, Generator, LocalOBB, Opening, Room, Slot, Surface, Vec2, Link } from './types.ts';
+import type { Baked, BakedSlot, Generator, LocalOBB, Opening, Room, Slot, Surface, Vec2, Link } from './types.ts';
 import { autoPlan, explicitPlan, SLAB, FLOOR0 } from './building-plan.ts';
 import { realize, architectureChecks, type Layout, type Checks } from './building-layout.ts';
 
@@ -182,13 +182,13 @@ export function buildingPhysics(params: Record<string, unknown>, args: Record<st
 
 /** Additive facade frames. +z faces out; opening origins are at their sills, wall origins at
  * storey mid-height. Existing room and legacy wall slot ids always keep their meaning. */
-export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []): Slot[] {
-  const slots: Slot[] = [], ids = new Set(reserved), c = Math.cos(L.yaw), s = Math.sin(L.yaw);
+export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []): BakedSlot[] {
+  const slots: BakedSlot[] = [], ids = new Set(reserved), c = Math.cos(L.yaw), s = Math.sin(L.yaw);
   const round = (v: number) => Math.round(v * 1000) / 1000;
-  const add = (base: string, kind: Slot['kind'], x: number, y: number, z: number, yaw: number, floor: number, label: string) => {
+  const add = (base: string, kind: Slot['kind'], x: number, y: number, z: number, yaw: number, floor: number, label: string, retired = false) => {
     let id = base; for (let n = 2; ids.has(id); n++) id = `${base}-${n}`;
     ids.add(id);
-    slots.push({ id, kind, p: [round(x * c + z * s), round(y), round(-x * s + z * c)], yaw: round(yaw + L.yaw), floor, accepts: {}, capacity: 1, label });
+    slots.push({ id, kind, p: [round(x * c + z * s), round(y), round(-x * s + z * c)], yaw: round(yaw + L.yaw), floor, accepts: {}, capacity: 1, label, ...(retired ? { retired: true as const } : {}) });
   };
   for (const o of L.openings) {
     if (!o.exterior) continue;
@@ -200,9 +200,11 @@ export function buildingFacadeSlots(L: BuildingLayout, reserved: string[] = []):
     if (!w.exterior || !w.out) return;
     // numbering counts every run, so a frame keeps its id when a neighbour has no solid wall to sit on
     const key = `facade-f${w.floor}-${w.side ?? 'wall'}`, n = (counts.get(key) ?? 0) + 1; counts.set(key, n);
-    const at = centres[wi]; if (!at) return;
-    const d = w.thick / 2 + 0.02;
-    add(`${key}-${n}`, 'wall', at[0] + w.out[0] * d, (w.y0 + w.y1) / 2, at[1] + w.out[1] * d, Math.atan2(w.out[0], w.out[1]), w.floor, `${w.side ?? 'Outer'} wall, storey ${w.floor}`);
+    // a run with no clear wall keeps its release-2 frame (the run's centre) as a retired slot: what already hangs there
+    // stays where it was and stays editable; nothing new mounts there (world-compiler refuses it, describe hides it)
+    const at = centres[wi], d = w.thick / 2 + 0.02, label = `${w.side ?? 'Outer'} wall, storey ${w.floor}`;
+    const [x, z] = at ?? [(w.a[0] + w.b[0]) / 2, (w.a[1] + w.b[1]) / 2];
+    add(`${key}-${n}`, 'wall', x + w.out[0] * d, (w.y0 + w.y1) / 2, z + w.out[1] * d, Math.atan2(w.out[0], w.out[1]), w.floor, at ? label : `${label} (retired)`, !at);
   });
   if (!L.round && (L.roof === 'gable' || L.roof === 'hip')) {
     const alongX = L.W >= L.D, short = Math.min(L.W, L.D), long = Math.max(L.W, L.D), ov = L.open ? 0.4 : 0.35;
