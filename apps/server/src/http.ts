@@ -36,6 +36,8 @@ import { mountModeration } from './moderation/routes.ts';
 import { mountEnvRoutes } from './god/world-env.ts';
 import { mountJoinRoutes, PUBLISHED_SOUL_CLI, safeWorldName } from './god/join.ts';
 import type { GodMode } from './god/god.ts';
+import {Travel,TravelError,launcherSite} from './travel/travel.ts';
+import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
 
@@ -54,7 +56,20 @@ export function buildApp(d: Deps) {
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
   mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
   mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c), s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }});
-  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge, ownerSoul: async (c, id) => { try { const {u} = await profileIdentity(c); const s = ownSoul(u, id); return {soulId: s.id, entityId: s.entity_id, name: s.name, owner: s.owner}; } catch (e) { if (e instanceof ApiError) throw new EdgeError(e.status, e.code, e.message); throw e; } } }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
+  // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
+  let travel: Travel | undefined;
+  const travelGate = (resolve: ReturnType<typeof edgeSoulResolver>) => (c: Context) => { const s = resolve(c), t = travel?.inc(s.soulId); if (t && (t.state === 'away' || t.state === 'departing')) throw new EdgeError(409, t.state === 'away' ? 'travel.away' : 'travel.departing', `${s.name} is ${t.state === 'away' ? 'in' : 'on the way to'} ${t.at}: act there, or travel home (POST /v1/edge/travel {"to":"home"})`); return s; };
+  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: travelGate(edgeSoulResolver(d.host, d.souls, bearer)), ledger: d.edge, ownerSoul: async (c, id) => { try { const {u} = await profileIdentity(c); const s = ownSoul(u, id); return {soulId: s.id, entityId: s.entity_id, name: s.name, owner: s.owner}; } catch (e) { if (e instanceof ApiError) throw new EdgeError(e.status, e.code, e.message); throw e; } } }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
+  if (d.edge && d.god) {
+    const comms = (d.edge as unknown as {comms?: {fading?: ConstructorParameters<typeof Travel>[0]['fading']}}).comms, god = d.god;
+    travel = new Travel({ host: d.host, db: d.db, souls: d.souls, fading: comms?.fading ?? null, slug: d.cfg.worldKey, name: process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey,
+      site: launcherSite(process.env.SIM_SITE_URL, process.env.SIM_SITE_KEY), invalidateBodies: () => d.edge?.invalidateBodies() });
+    mountTravelRoutes(app, { travel, siteKey: process.env.SIM_SITE_KEY, baseOf: (c) => baseOf(c),
+      tokenSoul: (c) => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new TravelError(401, 'unauthorized', 'missing or invalid Soul token'); return s; },
+      ownerSoul: async (c, id) => { const u = await requireUser(c); return ownSoul(u, id); },
+      isGod: async (c) => { const t = bearer(c); if (t?.startsWith('god_')) { const w = god.godIdentity(t); return !!w && !w.child; } const u = t ? await d.auth.userFromToken(t) : null; return !!u && !!god.owner && u.id === god.owner; } });
+    const t = travel; setTimeout(() => { void t.reconcile().then((r) => { if (r.length) console.log(`[travel] reconciled ${r.join(', ')}`); }, () => {}); }, 3000).unref?.();
+  }
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
@@ -79,7 +94,7 @@ export function buildApp(d: Deps) {
 
   const worldName = process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
   // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
-  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
+  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId).filter((s) => !travel?.isAway(s.id)), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
   if (d.god) mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp, verifyUse: new VerifyUse(d.host, d.souls, d.god, d.edge), lookWorldUrl: `http://127.0.0.1:${d.cfg.port}${d.cfg.worldPath}` /* W2 remote looks */ });
   if (d.god && d.edge) { const god = d.god; mountSecretPlaceRoutes(app, { ledger: d.edge, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change secret places'); } }); }  // knowledge/1; WD7: helpers refused
   if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change the environment'); return who; } }); }  // R4-LIVE env setter; WD7: helpers refused, edits attributed

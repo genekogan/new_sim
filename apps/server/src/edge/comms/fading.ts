@@ -54,9 +54,40 @@ export class Fading {
     for (const l of this.listeners) { try { l(c); } catch { /* ledger listener faults never block the rule */ } }
   }
 
+  private away: ((soulId: string) => boolean)[] = [];
+  /** Travel (M3): a Soul whose body is in another world stays faded here; its acts never reclaim it. */
+  addAway(a: (soulId: string) => boolean) { this.away.push(a); }
+  private isAway(soulId: string) { return this.away.some(a => { try { return a(soulId); } catch { return false; } }); }
+  /** Travel (M3): take the body out of this world now (the fade's beam-up), with the Soul's own line. */
+  depart(soulId: string, text: string, data: Record<string, unknown> = {}) {
+    if (!this.enabled) return false;
+    const now = this.core.now();
+    tx(this.core.db, () => {
+      const prior = this.row(soulId);
+      this.set(soulId, prior?.last_at ?? now, 'gone', now);
+      if (prior?.colour === 'gone') return;
+      this.announce({soulId, colour: 'gone', change: 'removed', idleSeconds: 0}, text);
+      this.steward.narrate({soulId, what: 'departed', data});
+    });
+    return true;
+  }
+  /** Travel (M3): bring the body back into this world at a starting place, with the Soul's own line. */
+  arrive(soulId: string, text: string, data: Record<string, unknown> = {}) {
+    if (!this.enabled) return false;
+    const now = this.core.now();
+    tx(this.core.db, () => {
+      const prior = this.row(soulId);
+      this.set(soulId, now, 'green', now);
+      if (prior?.colour !== 'gone') return;
+      this.announce({soulId, colour: 'green', change: 'reclaimed', idleSeconds: 0}, text);
+      this.steward.narrate({soulId, what: 'arrived', data});
+    });
+    return true;
+  }
+
   /** Any accepted action by the Soul. Reclaims a faded Soul. */
   touch(soulId: string) {
-    if (!this.enabled) return;
+    if (!this.enabled || this.isAway(soulId)) return;
     const now = this.core.now();
     tx(this.core.db, () => {
       const prior = this.row(soulId);

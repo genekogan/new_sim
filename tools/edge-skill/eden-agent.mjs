@@ -32,6 +32,7 @@ import {codexExecBrain} from './client-codex-brain.mjs';
 import {openClientLiving} from './client-living.mjs';
 import {publishCompletedOwnerQueue} from './client-owner-result.mjs';
 import {openClientMemory} from './client-memory.mjs';
+import {travelCommand} from './client-travel.mjs';
 
 export const SKILL_VERSION='1.9.2';
 export const CONTRACT='eden-edge/1';
@@ -1145,6 +1146,8 @@ export async function body(cmd,...args){
  const response=await fetch(world+'/v1/edge/body/uploads',{method:'POST',headers:{authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(90000)});
  const data=await response.json().catch(()=>({}));noticeInboxHeader(response.headers);noticeOwnerInbox(data);if(!response.ok)throw new Error((data.error?.code??'body.unavailable')+': '+(data.error?.message??'Body upload refused'));return data.asset;
 }
+/** travel [<world>|home]: go to another world of this site (or home); this folder follows the Soul there. */
+export async function travel(...args){return travelCommand(args,{load,save,live:()=>!!liveRunning()});}
 export async function profile(...args){return clientProfile(load().soul,args,{call});}
 export async function dashboard(...args){
  let port=0;const liveArgs=[];for(let i=0;i<args.length;i++){if(args[i]==='--port'){port=Number(args[++i]);if(!Number.isSafeInteger(port)||port<0||port>65535)throw Error('dashboard port must be 0..65535');}else liveArgs.push(args[i]);}
@@ -1155,7 +1158,7 @@ export async function listen(...args){return clientListen(args,{call});}
 export async function ack(...args){return clientAck(args,{call});}
 /** look around — the same as explore. */
 export async function look(what,...rest){if(what!=='around')throw new Error('usage: look around [--full]   (a body action: act look <target>; your appearance: body look)');return explore(...rest);}
-const commands={look,listen,ack,body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+const commands={look,listen,ack,body,travel,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}
