@@ -22,6 +22,7 @@ import { GodMode } from './god/god.ts';
 import { installEngineBridge } from './god/engine-bridge.ts';
 import { installWorldEnv } from './god/world-env.ts';
 import { installLightning } from './god/lightning.ts';
+import { installGovernance } from './god/governance-edge.ts';
 import { GroundHost, installGroundCapabilities, loadGroundRecipes } from './god/ground-host.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
@@ -125,6 +126,7 @@ if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') instal
 if (god && process.env.BIRTH_LOOKS !== '0') installBirthLooks(host, edge);  // lane LOOKS: new Souls in new worlds get a varied kit look
 if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's weather
 if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
+if (god) installGovernance(god, { host, edge });  // GOVERN: versioned constitution, amendments, prayer states (god/governance.ts)
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} own defs + library ${god.model.library ? `${god.model.library.id}@${god.model.library.version} (${god.model.library.all().length})` : 'none'}, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 const listener = getRequestListener(app.fetch);
