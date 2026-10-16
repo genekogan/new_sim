@@ -89,3 +89,10 @@ test('CE8: the attention route has its own per-token rate limit', async t => {
   // Edits are not starved by looks.
   assert.equal((await f.req('/v1/god/act', { ops: [{ op: 'place', def: coreRef('bench'), name: 'b', p: [100, 100] }] })).data.accepted, true);
 });
+
+test('CE8: the schema advertises the attention endpoint and its body shape', async t => {
+  const f = fixture(); t.after(() => f.db.close());
+  const schema = (await f.req('/v1/god/schema', undefined, null)).data;
+  assert.ok(JSON.stringify(schema).includes('POST /v1/god/builds/:id/attention'));
+  assert.deepEqual(Object.keys(schema.builds.actions.attention.properties).sort(), ['at', 'eye', 'lease']);
+});
