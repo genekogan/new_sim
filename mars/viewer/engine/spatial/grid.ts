@@ -191,6 +191,12 @@ export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaste
 }
 
 /**
+ * Content keys of grids whose builder can name what they hold (tiled.ts: a composite's tile keys, a memoised floor's
+ * static generation), so per-grid memos (path.ts, a failed search's side) survive a rebuild of the same content.
+ */
+export const gridContentKeys = new WeakMap<LevelGrid, string>();
+
+/**
  * `buildGrids(scene, cell)` (no prefix, no columns), each level rasterised and transformed only over the cells its own
  * surfaces reach: a free cell has a floor under its centre, so every cell outside that crop is blocked in the full grid
  * too, and the exact EDT (out-of-grid = blocked) reads the same distances on the crop. Free, clearance and blockers are

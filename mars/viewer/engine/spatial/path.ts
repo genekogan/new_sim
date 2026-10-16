@@ -5,7 +5,7 @@
 // can smooth inside them and never needs collision sliding to make progress.
 import { add2, dist2, pointInObb, rot2, sub2, type Vec2, hypot } from '../core/math.ts';
 import type { Diagnostic } from '../actions/types.ts';
-import { cellOf, centreOf, latticeCentre, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
+import { cellOf, centreOf, gridContentKeys, latticeCentre, nearestBlocker, segmentClearance, type GridSet, type LevelGrid } from './grid.ts';
 import type { AgentProfile, Link, SpatialScene } from './types.ts';
 
 export type Place = { level: number; p: Vec2 };
@@ -197,7 +197,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   const ms = mask?.stamp, mg = mask?.gen ?? 0;
   const maxExpand = opts.maxExpand ?? 4_000_000;
   const memo = !mask && !opts.nameObstacles ? strandedKey(grids, prep) : null, side = memo ? stranded.get(memo) : undefined;
-  if (side && side.size <= maxExpand && !(side.cells[goalId >> 3] & (1 << (goalId & 7)))) return null;
+  if (side && side.size <= maxExpand && !(side.cells[goalId >> 3] & (1 << (goalId & 7)))) { strandedHits++; return null; }
   stamp[startId] = gen;
   gScore[startId] = 0;
   came[startId] = -1;
@@ -272,25 +272,33 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
 /**
  * Engine P4: the start's side of a failed exhaustive search. An unmasked A* that runs out of cells has closed exactly the
  * cells its start reaches (passability and link edges do not depend on the goal), so a later goal outside that set on the
- * same level grids, radius, start cell and link edges fails the same way (null) without searching again, as long as that
- * side fits the call's expansion limit. A Soul's capabilities try up to 14 standing points in each room the stairs do not
+ * same level grids (by identity, or the content key their builder gave them: grid.ts gridContentKeys), radius, start cell
+ * and link edges fails the same way (null) without searching again, as long as that side fits the call's expansion limit. A Soul's capabilities try up to 14 standing points in each room the stairs do not
  * reach (Eden 2026: ~0.8 s each). Grids are never mutated after they are built, so they are told apart by identity.
  */
 const gridSerials = new WeakMap<LevelGrid, number>();
 let gridSerialNext = 0;
-const serialOf = (g: LevelGrid) => { let k = gridSerials.get(g); if (k === undefined) gridSerials.set(g, (k = ++gridSerialNext)); return k; };
-const STRANDED_MAX = 6;
+const serialOf = (g: LevelGrid) => { const c = gridContentKeys.get(g); if (c) return c; let k = gridSerials.get(g); if (k === undefined) gridSerials.set(g, (k = ++gridSerialNext)); return `#${k}`; };
+const STRANDED_MAX = 8, STRANDED_BYTES = 48 * 1024 * 1024, STRANDED_CELLS = 64 * 1024 * 1024;
 const stranded = new Map<string, { cells: Uint8Array; size: number }>();
+let strandedBytes = 0, strandedHits = 0;
+/** Numeric diagnostics of the failed-search memo (tests, status). */
+export function strandedMetrics() { return { entries: stranded.size, bytes: strandedBytes, hits: strandedHits }; }
 function strandedKey(grids: GridSet, prep: Prep): string {
   let k = `${prep.r}|${prep.sLv}:${prep.s}|${prep.lvIds.map((id) => `${id}:${serialOf(grids.levels.get(id)!)}`).join(',')}|`;
   for (const [from, list] of prep.edges) for (const e of list) k += `${from}>${e.toLevel}:${e.toCell};`;
   return k;
 }
 function remember(key: string, shut: Uint32Array, gen: number, total: number, size: number) {
+  if (total > STRANDED_CELLS) return;
   const cells = new Uint8Array((total + 7) >> 3);
   for (let i = 0; i < total; i++) if (shut[i] === gen) cells[i >> 3] |= 1 << (i & 7);
-  stranded.delete(key); stranded.set(key, { cells, size });
-  while (stranded.size > STRANDED_MAX) stranded.delete(stranded.keys().next().value!);
+  const old = stranded.get(key); if (old) { strandedBytes -= old.cells.byteLength; stranded.delete(key); }
+  stranded.set(key, { cells, size }); strandedBytes += cells.byteLength;
+  while (stranded.size > STRANDED_MAX || strandedBytes > STRANDED_BYTES) {
+    const k = stranded.keys().next().value!;
+    strandedBytes -= stranded.get(k)!.cells.byteLength; stranded.delete(k);
+  }
 }
 
 /** The region the last failed `search` exhausted: cells with cells[id] === gen (the start's side, or the goal's side). */

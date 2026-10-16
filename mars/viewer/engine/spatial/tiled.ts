@@ -14,7 +14,7 @@
 //    Each hop is planned with the existing planner (findRoute) on a composite of
 //    just that hop's tiles, so a route never depends on how far the window has grown.
 import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
-import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
+import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, gridContentKeys, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
 import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES, coarseMedium, type GroundField } from './ground.ts';
@@ -23,6 +23,9 @@ import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES
 export const FINE_APRON_M = 2;
 /** Fine tiles kept (each 640 × 640 cells, ~2.9 MB). */
 export const FINE_LRU = 24;
+/** Paged: fine tiles kept at least (Spatial.syncPaged); a Soul's capabilities read ~30 tiles round it in one sweep, which
+ *  a smaller LRU misses on every pass (engine P4). */
+export const FINE_LRU_PAGED = 40;
 /** Paged: bytes of upper-floor grids kept over windows (GroundNav.floorsOver); a 2-tile window's floor is ~7 MB. */
 export const FLOORS_OVER_BYTES = 192 * 1024 * 1024;
 /** Largest window (tiles per side): 6 × 64 m = 384 m. Routes needing more are refused ('ground.too-far'). */
@@ -117,6 +120,8 @@ export function deckedField(base: GroundField, decks: Surface[], key: string): G
   };
 }
 
+let navSerials = 0;
+
 export class GroundNav {
   /** The recipe's field; `field` is it, or it overlaid with decks (setFloors). */
   readonly base: GroundField;
@@ -128,7 +133,7 @@ export class GroundNav {
   /** Tiles the engine-facing grids cover (inclusive); grows only. */
   window: TileRect | null = null;
   /** Counters for tests and the status page. */
-  stats = { fineBuilds: 0, fineHits: 0, composites: 0, coarseExpanded: 0, levelBuilds: 0 };
+  stats = { fineBuilds: 0, fineHits: 0, composites: 0, coarseExpanded: 0, levelBuilds: 0, floorBuilds: 0, floorHits: 0 };
   private fine = new Map<string, FineTile>();
   private composed = new Map<string, LevelGrid>();
   /**
@@ -138,6 +143,11 @@ export class GroundNav {
    */
   private floorsOver = new Map<string, { g: LevelGrid | undefined; bytes: number }>();
   private floorsOverBytes = 0;
+  /** This nav and its static generation (bumped with floorsOver), naming memoised floors (gridContentKeys). */
+  private readonly serial = ++navSerials;
+  private floorsGen = 0;
+  /** Each tile's relevant obstacles and key per (never mutated) obstacle list, as compose reads them per window. */
+  private tileKeys = new WeakMap<Obstacle[], Map<string, { rel: Obstacle[]; key: string }>>();
   /**
    * Paged navigation (lane NAV, worlds whose ground fact says `nav: 'paged/1'`): no single grow-only window. The engine
    * faces a set of small windows (Spatial clusters, one per group of nearby bodies and their current walk chunks), routes
@@ -300,7 +310,14 @@ export class GroundNav {
   compose(r: TileRect, obstacles: Obstacle[]): LevelGrid {
     const boxes = boxesOf(obstacles);
     const tiles: { tx: number; tz: number; rel: Obstacle[]; key: string }[] = [];
-    for (let tz = r[1]; tz <= r[3]; tz++) for (let tx = r[0]; tx <= r[2]; tx++) { const rel = this.relevant(obstacles, tx, tz, boxes); tiles.push({ tx, tz, rel, key: this.keyOf(tx, tz, rel) }); }
+    let known = this.tileKeys.get(obstacles);
+    if (!known) this.tileKeys.set(obstacles, (known = new Map()));
+    for (let tz = r[1]; tz <= r[3]; tz++) for (let tx = r[0]; tx <= r[2]; tx++) {
+      const k = `${this.field.id}|${obstacles.length}|${tx},${tz}`;
+      let t = known.get(k);
+      if (!t) { const rel = this.relevant(obstacles, tx, tz, boxes); known.set(k, (t = { rel, key: this.keyOf(tx, tz, rel) })); }
+      tiles.push({ tx, tz, rel: t.rel, key: t.key });
+    }
     const ckey = r.join(',') + '|' + tiles.map((t) => t.key).join(';');
     const memo = this.composed.get(ckey);
     if (memo) { this.composed.delete(ckey); this.composed.set(ckey, memo); return memo; }
@@ -329,6 +346,7 @@ export class GroundNav {
     if (lat.ox !== ox || lat.oz !== oz || lat.nx !== nx || lat.nz !== nz) throw new Error('ground: tile lattice mismatch');
     const grid: LevelGrid = { level: 0, y: 0, cell, nx, nz, ox, oz, x0: ox * cell, z0: oz * cell, free, clearance, blockers: new ComposedBlockers(fillBlockers) };
     this.stats.composites++;
+    gridContentKeys.set(grid, `compose|${cell}|${ckey}`);
     this.composed.set(ckey, grid);
     while (this.composed.size > this.composedMax) this.composed.delete(this.composed.keys().next().value!);
     return grid;
@@ -370,9 +388,11 @@ export class GroundNav {
    *  on its own; buildGridsOverFloors only crops to its floors, bit-identical), memoised (floorsOver). */
   private floorOver(r: TileRect, scene: SpatialScene, id: number): LevelGrid | undefined {
     const key = `${r.join(',')}|${id}`, hit = this.floorsOver.get(key);
-    if (hit) { this.floorsOver.delete(key); this.floorsOver.set(key, hit); return hit.g; }
+    if (hit) { this.floorsOver.delete(key); this.floorsOver.set(key, hit); this.stats.floorHits++; return hit.g; }
+    this.stats.floorBuilds++;
     const same = scene.levels.filter((l) => l.id === id);
     const g = buildGridsOverFloors({ ...scene, bounds: rectBounds(r), levels: same }, this.cell).levels.get(id);
+    if (g) gridContentKeys.set(g, `floor|${this.serial}.${this.floorsGen}|${key}`);
     const bytes = g ? g.free.byteLength + g.clearance.byteLength + g.nx * g.nz * 4 : 0;
     this.floorsOver.set(key, { g, bytes }); this.floorsOverBytes += bytes;
     while (this.floorsOverBytes > FLOORS_OVER_BYTES && this.floorsOver.size > 1) {
@@ -381,7 +401,7 @@ export class GroundNav {
     }
     return g;
   }
-  private clearFloorsOver() { this.floorsOver.clear(); this.floorsOverBytes = 0; }
+  private clearFloorsOver() { this.floorsOver.clear(); this.floorsOverBytes = 0; this.floorsGen++; }
 
   // ---------------------------------------------------------------- coarse routing
 

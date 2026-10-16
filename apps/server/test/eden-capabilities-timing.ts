@@ -63,7 +63,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       await w.settle(200);
       const c3 = timed(() => L.capabilities(w.soul)); console.log(`after 200 ticks of walking: ${c3.ms.toFixed(0)} ms`);
       const c4 = timed(() => L.capabilities(w.soul)); console.log(`again: ${c4.ms.toFixed(0)} ms`);
-      Object.assign(res, { walk: target.id, afterWalkMs: Math.round(c3.ms), afterWalkAgainMs: Math.round(c4.ms) });
+      Object.assign(res, { walk: target.id, afterWalkMs: Math.round(c3.ms), afterWalkAgainMs: Math.round(c4.ms), afterWalkCaps: c3.value });
     }
   }
   lag.disable();

@@ -12,7 +12,7 @@ import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './type
 import type { Profiler } from '../runtime/profile.ts';
 import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { sceneForWorld, worldBaseId } from './edits.ts';
-import { FINE_LRU, GroundNav, PAGED_DIRECT_M, clusterRects, groundRoute, pagedRoute, rectOf, type TileRect } from './tiled.ts';
+import { FINE_LRU_PAGED, GroundNav, PAGED_DIRECT_M, clusterRects, groundRoute, pagedRoute, rectOf, type TileRect } from './tiled.ts';
 import type { GroundField } from './ground.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
@@ -349,7 +349,7 @@ export class Spatial {
     }
     let tiles = 0;
     for (const r of rects) tiles += (r[2] - r[0] + 1) * (r[3] - r[1] + 1);
-    g.fineMax = Math.max(FINE_LRU, tiles + 8); g.composedMax = rects.length + 4;
+    g.fineMax = Math.max(FINE_LRU_PAGED, tiles + 8); g.composedMax = rects.length + 4;
     // a window whose rect is unchanged keeps its grids when the static world did not change
     const old = !changed && this.pages ? new Map(this.pages.rects.map((r, i) => [r.join(','), this.pages!.sets[i]])) : null;
     this.pages = { rects, key, sets: rects.map((r) => old?.get(r.join(',')) ?? null), scenes: rects.map((r) => ({ ...all, bounds: g.boundsOf(r) })), all };
