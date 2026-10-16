@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { CACHE } from './inventory.mjs';
 import { ENDPOINT, publish } from './publish.mjs';
 import { LICENCE, ORIGIN, evidence, mergeManifest, plan, publishScoped, readRecords, scopedKey, validateRecords } from './world-scoped.mjs';
+import { verify } from './verify.mjs';
 import { manifestAsset, readCdnManifest } from '../../apps/web/src/cdn-assets.ts';
 
 const hash = data => createHash('sha256').update(data).digest('hex');
@@ -145,4 +146,14 @@ test('tampered plans and receipts stop before any request; shared publisher refu
   assert.throws(() => mergeManifest({ version: 1, assets: {} }, { ...receipt, origin: 'http://127.0.0.1:1' }, { records: records() }), /receipt/);
   const scoped = (await planned()).objects[0];
   await assert.rejects(publish({ version: 1, bucket: 'eden-assets', objects: [{ ...scoped, file: '/dev/null', licence: 'CC0-1.0' }] }, { credentials, fetcher }), /Invalid or duplicate/);
+});
+
+test('public checker accepts world-scoped keys bound to their own SHA-256 and rejects mismatched ones', async () => {
+  const p = await planned(), o = p.objects[0], requests = [];
+  const headers = { 'content-type': o.contentType, 'cache-control': CACHE, 'access-control-allow-origin': '*', etag: '"e"' };
+  const report = await verify('https://assets.example.test', p, { key: o.key, wait: async () => {}, fetcher: async (url, opts) => {
+    requests.push(url); return new Response(campus, { headers: { ...headers, 'cf-cache-status': requests.length === 1 ? 'MISS' : 'HIT', ...(requests.length > 1 ? { age: '1' } : {}) } });
+  } });
+  assert.equal(report.ok, true); assert.deepEqual(requests, Array(2).fill('https://assets.example.test/' + o.key));
+  await assert.rejects(verify('https://assets.example.test', { objects: [{ ...o, key: o.key.replace(o.sha256, '0'.repeat(64)) }] }, { fetcher: async () => assert.fail('no request') }), /content-addressed/);
 });

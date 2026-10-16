@@ -5,6 +5,10 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { CACHE, TYPES, validKey } from './inventory.mjs';
 import { withNewReceipt } from './receipt.mjs';
+import { SCOPED_KEY } from './publish.mjs';
+
+// Shared catalogue keys, or world-scoped keys (world-scoped.mjs) whose file name is the object's own SHA-256.
+const publishedKey = (key, sha) => validKey(key, sha) || (/^[0-9a-f]{64}$/.test(sha) && SCOPED_KEY.test(key) && key.split('/').at(-1).startsWith(sha + '.'));
 
 export function checkHeaders(response, object, { hit = false } = {}) {
   const h = response.headers, errors = [];
@@ -26,7 +30,7 @@ export async function verify(origin, plan, { sample = 3, key, fetcher = fetch, a
   if (!Number.isSafeInteger(sample) || sample < 1 || !objects.length) throw Error('Empty CDN sample; choose a nonempty plan and positive sample');
   const results = [];
   for (const object of objects) {
-    if (!validKey(object.key, object.sha256)) throw Error('Invalid content-addressed key');
+    if (!publishedKey(object.key, object.sha256)) throw Error('Invalid content-addressed key');
     const url = new URL(object.key, u).href, requests = [], errors = [];
     // GET primes the edge. HEAD alone need not populate a CDN's body cache.
     for (let i = 0; i < 2; i++) {
