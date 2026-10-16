@@ -8,7 +8,7 @@ import { buildKit } from '../kit.mesh.ts';
 import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
 import { apiPath } from '../../world-path.ts';
-import { artOf, coverWhenReady, videoTexture } from '../art-media.ts';
+import { artOf, brokenLinkLines, coverWhenReady, imageBroken, imageFailed, imageLoaded, videoTexture, whenImageFails } from '../art-media.ts';
 import { frameMediaKind } from '@sim/world-compiler';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
@@ -63,8 +63,12 @@ registerMesh({
       // W6: a media face shows its slot's image or looping video; a gallery wall's empty slots stay plain
       const found = f.media ? artOf(ctx.entity.id, st, f.slot) : null, src = found ? signMediaPath(found.url) : null;
       const art = found && src ? { ...found, url: src } : null;
-      if (art && art.kind === 'video') map = videoTexture(art.url, plane);
-      else if (art && loader) { map = texCache.get(art.url) ?? loader.load(art.url); map.colorSpace = THREE.SRGBColorSpace; texCache.set(art.url, map); }
+      // a link the page cannot load (most often a web host without a CORS header, which WebGL needs) says so on the
+      // face instead of staying black; hover still names the piece and its maker
+      const broken = () => { const old = plane.material as THREE.MeshBasicMaterial; const t = textTexture(brokenLinkLines(art!.url), { ...f, bg: '#2f2a26', ink: '#e8dcc8' }); plane.material = new THREE.MeshStandardMaterial({ map: t, roughness: 0.85, metalness: 0 }); old?.dispose?.(); plane.userData.art = { ...plane.userData.art, broken: true }; const uv = (plane.geometry as THREE.PlaneGeometry).attributes.uv as THREE.BufferAttribute; uv.setXY(0, 0, 1); uv.setXY(1, 1, 1); uv.setXY(2, 0, 0); uv.setXY(3, 1, 0); uv.needsUpdate = true; };
+      if (art && art.kind === 'video') map = videoTexture(art.url, plane, broken);
+      else if (art && loader && imageBroken(art.url)) { map = textTexture(brokenLinkLines(art.url), { ...f, bg: '#2f2a26', ink: '#e8dcc8' }); art.broken = true; }
+      else if (art && loader) { const url = art.url; map = texCache.get(url) ?? loader.load(url, () => imageLoaded(url), undefined, () => { texCache.delete(url); imageFailed(url); }); map.colorSpace = THREE.SRGBColorSpace; texCache.set(url, map); whenImageFails(url, broken); }
       else if (f.media && f.slot !== undefined) map = textTexture([''], f);
       else if (f.media && text.length && typeof st.text === 'string' && st.text.trim()) map = textTexture(text.slice(0, 6), f);
       else if (f.media) map = paintingTexture(ctx.def.name.length + (ctx.entity.seed ?? 0), f.bg ?? '#7fa7c9');

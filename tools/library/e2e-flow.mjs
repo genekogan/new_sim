@@ -5,7 +5,7 @@
 //   beta  (:6121) — find "reading corner" from beta, place v1 and v2 through the CLI, read the god snapshot back:
 //                   each placement pins the version it placed. Optional: --shots <dir> takes real-Chrome screenshots of
 //                   beta (Chrome lease, dpr 1 and 2).
-//   node tools/library/e2e-flow.mjs <outDir> [--shots <dir>]
+//   node tools/library/e2e-flow.mjs <outDir> [--shots <dir>] [--ports <alpha>,<beta>]   (default 6120,6121)
 // Only stops the two world processes it started itself.
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
@@ -18,6 +18,7 @@ import { totemGlb } from './fixture-glb.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const out = resolve(process.argv[2] ?? `${root}/.lane/library-e2e`);
 const shotsAt = process.argv.indexOf('--shots'), shots = shotsAt > 0 ? resolve(process.argv[shotsAt + 1]) : null;
+const portsAt = process.argv.indexOf('--ports'), [alphaPort, betaPort] = portsAt > 0 ? process.argv[portsAt + 1].split(',').map(Number) : [6120, 6121];
 mkdirSync(out, { recursive: true });
 const libDir = join(out, 'lib'), report = { at: new Date().toISOString(), steps: [], checks: {} };
 process.env.SIM_LIBRARY_DIR = libDir;   // the worlds this flow starts serve the same library from inside Godmode (/v1/god/library…)
@@ -41,7 +42,7 @@ const corner = (extra = []) => ({ schema: 'def/1', name: 'reading-corner', versi
 
 try {
   // ---------------------------------------------------------------- alpha: the creator's world
-  const alpha = await startWorld({ slug: 'alpha', port: 6120, data: join(out, 'data-alpha'), fresh: true, log: join(out, 'alpha.log') }); started.push(alpha);
+  const alpha = await startWorld({ slug: 'alpha', port: alphaPort, data: join(out, 'data-alpha'), fresh: true, log: join(out, 'alpha.log') }); started.push(alpha);
   const ga = await god(alpha);
   const lmAsset = JSON.parse(readFileSync(join(root, 'worlds/core-assets/littlemartians-two.index.json'), 'utf8')).assets;
   const lmSha = Object.keys(lmAsset)[0];
@@ -70,7 +71,7 @@ try {
   check('alpha.stopped', alpha.child.exitCode !== null || alpha.child.signalCode !== null);
 
   // ---------------------------------------------------------------- beta: another world
-  const beta = await startWorld({ slug: 'beta', port: 6121, data: join(out, 'data-beta'), fresh: true, log: join(out, 'beta.log') }); started.push(beta);
+  const beta = await startWorld({ slug: 'beta', port: betaPort, data: join(out, 'data-beta'), fresh: true, log: join(out, 'beta.log') }); started.push(beta);
   c = cli('find', 'reading', 'corner', '--for', beta.base);
   step('find from beta', c); check('find.from-beta', c.code === 0 && /alpha\/reading-corner@2/.test(c.stdout) && /versions 1,2/.test(c.stdout));
   c = cli('find', 'martian', '--for', beta.base);

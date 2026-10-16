@@ -5,7 +5,7 @@
 .cn-v { font-weight: 500; color: #75756d; font-size: 12px; }
 .cn-new { font-weight: 600; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: #f3d36b; color: #3a2c05; overflow: hidden; text-overflow: ellipsis; }
 .cn-pill { font-weight: 500; font-size: 11px; padding: 1px 7px; border-radius: 9px; background: rgba(0, 0, 0, .07); color: #44443f; }
-.cn-card { position: absolute; left: 12px; top: 64px; z-index: 6; width: 360px; max-width: calc(100% - 24px); max-height: calc(100% - 140px); overflow: auto; box-sizing: border-box; background: rgba(252, 251, 247, .97); color: #1c1c1a; border-radius: 12px; box-shadow: 0 6px 28px rgba(0, 0, 0, .18), 0 0 0 1px rgba(0, 0, 0, .05); padding: 11px 14px 12px; font: 13px/1.45 system-ui, -apple-system, sans-serif; backdrop-filter: blur(6px); }
+.cn-card { position: absolute; left: 12px; top: 64px; z-index: 11; /* opened on purpose: above the welcome-back panel (.visitor-return, 10) it shares the left edge with; below menus (16) */ width: 360px; max-width: calc(100% - 24px); max-height: calc(100% - 140px); overflow: auto; box-sizing: border-box; background: rgba(252, 251, 247, .97); color: #1c1c1a; border-radius: 12px; box-shadow: 0 6px 28px rgba(0, 0, 0, .18), 0 0 0 1px rgba(0, 0, 0, .05); padding: 11px 14px 12px; font: 13px/1.45 system-ui, -apple-system, sans-serif; backdrop-filter: blur(6px); }
 .cn-card code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: rgba(0, 0, 0, .05); padding: 0 3px; border-radius: 3px; }
 .cn-head { display: flex; align-items: baseline; gap: 8px; }
 .cn-head > b { font-size: 15px; white-space: nowrap; }

@@ -2,7 +2,7 @@
 //   node --test apps/web/src/gen-mesh/art-media.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artOf, coverUv, hoverText, makerText, mediaKind } from './art-media.ts';
+import { artOf, brokenLinkLines, coverUv, hoverText, imageBroken, imageFailed, imageLoaded, makerText, mediaKind, whenImageFails } from './art-media.ts';
 
 test('media kinds: images, videos by extension; nothing scriptable or inline', () => {
   assert.equal(mediaKind('https://x.org/a.jpg'), 'image');
@@ -34,4 +34,21 @@ test('cover fit: a landscape video in a portrait frame is cropped at the sides, 
   assert.ok(Math.abs((u1 - u0) * (640 / 480) - 0.74 / 0.94) < 1e-9 && Math.abs(u0 + u1 - 1) < 1e-9);
   assert.deepEqual(coverUv(1, 1), [0, 0, 1, 1]);
   const t = coverUv(0.5, 2); assert.equal(t[0], 0); assert.ok(Math.abs(t[3] - t[1] - 0.25) < 1e-9);
+});
+
+test('a link the page cannot load says so instead of staying black (no CORS header, gone)', async () => {
+  assert.deepEqual(brokenLinkLines('https://www.example.org/logo.png'), ["Can't show this link here", 'www.example.org']);
+  assert.deepEqual(brokenLinkLines('/w/eden/art/abc.png'), ["Can't show this link here", 'not found']);
+  const calls: string[] = [];
+  whenImageFails('https://a.invalid/x.png', () => calls.push('face1'));
+  whenImageFails('https://a.invalid/x.png', () => calls.push('face2'));
+  whenImageFails('https://ok.invalid/y.png', () => calls.push('never'));
+  imageLoaded('https://ok.invalid/y.png');
+  imageFailed('https://a.invalid/x.png');
+  assert.deepEqual(calls, ['face1', 'face2'], 'every face waiting on the link is told once');
+  assert.equal(imageBroken('https://a.invalid/x.png'), true);
+  whenImageFails('https://a.invalid/x.png', () => calls.push('later'));   // a face built after the failure
+  whenImageFails('https://ok.invalid/y.png', () => calls.push('never'));
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls, ['face1', 'face2', 'later']);
 });

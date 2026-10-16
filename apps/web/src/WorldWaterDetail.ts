@@ -179,6 +179,10 @@ export function waterUnder(regions:readonly WaterRegion[],x:number,y:number,z:nu
   best=r;}
  return best;
 }
+/** Height to mark a point at (the selection ring): the water surface when the point is under drawn water, so the
+ * ring of a swimmer whose root sits 1.2 m under the surface (a duck drawn at the waterline) lies on the water around
+ * it, not on the lake bed below it; elsewhere the point itself. */
+export function markHeight(regions:readonly WaterRegion[],x:number,y:number,z:number):number{const r=waterUnder(regions,x,y,z);return r?Math.max(y,r.level):y;}
 const phase=(id:string)=>{let h=2166136261;for(let i=0;i<id.length;i++)h=Math.imul(h^id.charCodeAt(i),16777619);return ((h>>>0)%1000)/1000*2.4;};
 
 /** Per-view driver. Call `update` once per frame before rendering. */
