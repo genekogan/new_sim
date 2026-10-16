@@ -60,7 +60,7 @@ float waterHash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 float waterGlitter(vec3 w,vec3 n,vec3 eye,float t){
  vec2 c=floor(w.xz*5.),f=fract(w.xz*5.)-.5;float h=waterHash(c);
  float blink=pow(max(0.,sin(t*(1.7+h*2.3)+h*31.)),24.);
- vec2 o=f+vec2(h-.5,fract(h*7.)-.5)*.5;float spot=smoothstep(.13,.0,length(o*vec2(1.,2.2)));
+ vec2 o=f+vec2(h-.5,fract(h*7.)-.5)*.5;float spot=smoothstep(.09,.0,length(o*vec2(1.,2.2)));
  float graze=.35+.65*pow(clamp(1.-abs(dot(n,eye)),0.,1.),1.5);
  float far=1.-smoothstep(28.,70.,length(cameraPosition-w));
  return blink*spot*graze*far*step(.7,h);
@@ -145,7 +145,7 @@ export function patchWaterSurface(m:THREE.Material):'captured'|'standard'|null{
    shader.vertexShader='varying vec3 vWaterSurfW;\n'+shader.vertexShader.replace('#include <project_vertex>',SURFACE_VERTEX);
    shader.fragmentShader='varying vec3 vWaterSurfW;\n'+WATER_DETAIL_GLSL+shader.fragmentShader
     .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\nvec3 edenSw=waterSwim(vWaterSurfW);normal=normalize(normal-(viewMatrix*vec4(edenSw.x,0.,edenSw.y,0.)).xyz);')
-    .replace('#include <tonemapping_fragment>','gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.62,.74,.8)*mix(.2,1.,uWaterDay),clamp(edenSw.z,0.,1.)*.3);gl_FragColor.rgb+=vec3(.95,.92,.82)*waterGlitter(vWaterSurfW,vec3(0.,1.,0.),normalize(cameraPosition-vWaterSurfW),uSwimTime)*.8*uWaterDay;\n#include <tonemapping_fragment>');
+    .replace('#include <tonemapping_fragment>','gl_FragColor.rgb=mix(gl_FragColor.rgb,vec3(.62,.74,.8)*mix(.2,1.,uWaterDay),clamp(edenSw.z,0.,1.)*.3);gl_FragColor.rgb+=vec3(.95,.92,.82)*waterGlitter(vWaterSurfW,vec3(0.,1.,0.),normalize(cameraPosition-vWaterSurfW),uSwimTime)*.5*uWaterDay*uWaterDay;\n#include <tonemapping_fragment>');
   }
  };
  m.customProgramCacheKey=function(){return previousKey.call(this)+'|'+SURFACE_KEY;};
@@ -199,7 +199,8 @@ export class WorldWaterDetail{
    if(realismClassOf(m)===null&&classifyRealism(m,[r.mesh.name,r.mesh.parent?.name??''])==='water')continue;
    if(patchWaterSurface(m))this.stats.surfaces++;}
  }
- update(scene:THREE.Object3D,camera:THREE.Camera,souls:readonly WaterSwimmer[],seconds:number,daylight:number|null,now=performance.now()){
+ /** `fallbackBody` finds a Soul's drawn body when it is not a rigged person (a floater, or the simple stand-in figure). */
+ update(scene:THREE.Object3D,camera:THREE.Camera,souls:readonly WaterSwimmer[],seconds:number,daylight:number|null,now=performance.now(),fallbackBody?:(id:string)=>THREE.Object3D|null){
   this.scan(scene,now);
   const t=Number.isFinite(seconds)?((seconds%WRAP)+WRAP)%WRAP:0;WATER_DETAIL.uSwimTime.value=this.reduced()?0:t;
   const day=daylight===null||!Number.isFinite(daylight)?1:Math.max(0,Math.min(1,daylight));
@@ -208,7 +209,8 @@ export class WorldWaterDetail{
   // swimmers: Souls whose recorded activity is swimming/treading/wading, or whose body stands below a water surface
   const wet:{s:WaterSwimmer;r:WaterRegion;d:number}[]=[];
   for(const s of souls){const r=waterUnder(this.regions,s.p[0],s.p[1],s.p[2]);
-   if(s.root&&!this.roots.has(s.root)&&r){this.roots.add(s.root);s.root.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;for(const m of ([] as THREE.Material[]).concat(mesh.material))if(patchUnderwaterBody(m))this.stats.bodies++;});}
+   const root=s.root??(r&&fallbackBody?fallbackBody(s.id):null);
+   if(root&&!this.roots.has(root)&&r){this.roots.add(root);root.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;for(const m of ([] as THREE.Material[]).concat(mesh.material))if(patchUnderwaterBody(m))this.stats.bodies++;});}
    if(!r)continue;if(!SWIM.test(s.activity)&&s.p[1]>r.level-.25)continue;
    wet.push({s,r,d:Math.hypot(s.p[0]-cx,s.p[2]-cz)});}
   wet.sort((a,b)=>a.d-b.d);

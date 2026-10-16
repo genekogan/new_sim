@@ -836,7 +836,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         idleSouls.push({id:soul.id,root:people?.bodyObject(soul.entityId)??null,p:e.p,yaw:e.yaw??0,activity:String(e.activity??'idle'),speaking:speeches.some(sp=>sp.speaker===soul.id&&nowMs-sp.at<4000),attention:attentionTargets.get(soul.id)});}}
       if(refresh)idleLife.forget(new Set(idleSouls.map(s=>s.id)));
       idleLife.apply(idleSouls,atmosphereSeconds,step,!!reducedMotionQuery?.matches);
-      if(!waterDetailOff)try{waterDetail.update(scene,camera,idleSouls,shown.current.take?shown.current.tick*dt:atmosphereSeconds,light.daylight);}catch{}  // W11: ripples, glitter, underwater fade (render-time only)
+      if(!waterDetailOff)try{waterDetail.update(scene,camera,idleSouls,shown.current.take?shown.current.tick*dt:atmosphereSeconds,light.daylight,undefined,soulId=>{const e=s.conn.replica.souls.get(soulId)?.entityId;return e?floaters.object(e)??standIns.getObjectByName(e)??null:null;});}catch{}  // W11: ripples, glitter, underwater fade (render-time only)
       people?.setSpeaking(new Set(idleSouls.flatMap(x=>{const id=x.speaking?s.conn.replica.souls.get(x.id)?.entityId:undefined;return id?[id]:[];})));  // speakers talk with their hands (library clips)
       placeActivity.update(shown.current.datetime,atmosphereSeconds,light.daylight===null?0:1-light.daylight,!!expansion);
       // Shadow pass: no sub-texel plant stems, no small far casters (render-time only).
