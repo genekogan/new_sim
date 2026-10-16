@@ -331,7 +331,10 @@ try {
   await refuse('G8 unseat: the god rebuilds the house with one floor — a dry run names Ana', [{ op: 'set', id: 'house', params: { floors: 1 } }]);
   await refuse('G8 unseat: the god moves the house — a dry run names Ana', [{ op: 'move', id: 'house', p: [HOUSE[0] + 3, HOUSE[1]] }]);
   await refuse('G9 bury: the god raises a hill under the house she sits in — a dry run names Ana', [{ op: 'place', def: 'core/knoll@1', name: 'mound', p: HOUSE, params: { height: 4, radius: 9 } }]);
-  await refuse('G9 bury: the god drops a crate where she sits — a dry run names Ana', [{ op: 'place', def: 'core/crate@1', name: 'crate', in: { parent: 'house', slot: 'floor-1' }, p: [-2, 0, 1] }]);
+  // A crate on the chair's own spot is a solid overlap with the chair she sits on: refused as overlap.solid before any
+  // walk-out is considered (solid overlap is refused by default; god rules only walk residents out of edits that apply).
+  await step('G9 bury: the god drops a crate where she sits — refused: it would overlap the chair she sits on', async () => { const r = await dryrun([{ op: 'place', def: 'core/crate@1', name: 'crate', in: { parent: 'house', slot: 'floor-1' }, p: [-2, 0, 1] }]); refusals['G9 crate'] = r.data; return r; },
+    (r) => r.data?.accepted === false && r.data.failures?.some((f) => f.code === 'overlap.solid' && /house\/chair/.test(f.detail ?? '')));
   await step('G9 the dry runs left the world as it was: chair, house, bowl in her hands, ground unchanged', async () => {
     const chair = await entity('house/chair'), bowl = await entity(ids['house/table/bowl']), mound = await entity('mound'), crate = await entity('house/crate');
     const o = await observe();
