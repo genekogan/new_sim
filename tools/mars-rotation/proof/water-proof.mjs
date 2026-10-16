@@ -37,17 +37,17 @@ try {
   await addSoul(ctx);
   const caps0 = (await ctx.api('/v1/edge/capabilities', { as: 'soul' })).capabilities.filter((c) => /draw-water|:water$|:light$/.test(c.id));
   note('offered far away', caps0.map((c) => `${c.id} ${c.available ? 'available' : 'blocked:' + c.blocked?.code} | ${c.label}`));
-  for (const c of ['walk:freeside', 'walk:water-tank', `pick-up:${E('watering-can')}`, `object:${E('water-tank')}:draw-water`, `object:${E('garden-bed')}:water`]) { const r = await follow(ctx, c, { timeout: 400000 }); note(c, r.ok ?? r.accepted, r.code ?? '', r.phase ?? '', r.ms ?? ''); }
+  for (const c of ['walk:freeside', 'walk:water-tank', `pick-up:${E('watering-can')}`, `object:${E('water-tank')}:draw-water`, `object:${E('garden-bed')}:water`]) { const r = await follow(ctx, c, { timeout: 400000 }); note(c, r.ok ?? r.accepted, r.code ?? '', r.phase ?? '', r.ms ?? '', JSON.stringify(r.end?.map((v) => Math.round(v * 10) / 10) ?? null)); }
   note('levels after', { tank: await st('water-tank'), bed: await st('garden-bed'), can: await st('watering-can') });
   const caps1 = (await ctx.api('/v1/edge/capabilities', { as: 'soul' })).capabilities.filter((c) => /draw-water|:water$/.test(c.id));
   note('now offered', caps1.map((c) => `${c.id} ${c.available ? 'available' : 'blocked:' + c.blocked?.code + ' ' + c.blocked?.reason}`));
   await shoot('garden-watered', GARDEN.eye, GARDEN.at);
   note('rollback while holding the can', (() => { try { return tool('mars-water-20261016', 'water.receipt.json', '--rollback'); } catch (e) { return String(e.stderr || e.message).match(/rollback refused[^\n]*/)?.[0]; } })());
-  { const r = await follow(ctx, 'put-down:here', { timeout: 300000 }); note('put the can down by the beds', r.ok ?? r.accepted, r.code ?? '', r.phase ?? ''); }
-  note('can after put-down (parent)', (await ctx.api('/v1/world/snapshot', { as: 'public' })).entities.find((e) => e.id === E('watering-can')).in);
-  for (const c of ['walk:kitchen', 'walk:chiba/field-fire-bowl', `object:${E('field-fire-bowl')}:light`]) { const r = await follow(ctx, c, { timeout: 400000 }); note(c, r.ok ?? r.accepted, r.code ?? '', r.phase ?? '', r.ms ?? ''); }
+  for (const c of ['walk:kitchen', 'walk:chiba/field-fire-bowl', `object:${E('field-fire-bowl')}:light`]) { const r = await follow(ctx, c, { timeout: 400000 }); note(c, r.ok ?? r.accepted, r.code ?? '', r.phase ?? '', r.ms ?? '', JSON.stringify(r.end?.map((v) => Math.round(v * 10) / 10) ?? null)); }
   const sit = await follow(ctx, `sit:${E('field-beanbag')}`, { seated: true, params: { seconds: 900 } }); note('sit beanbag', sit.ok ?? sit.accepted, sit.code ?? '');
   note('bowl', await st('field-fire-bowl'));
   await shoot('field-fire', FIELD.eye, FIELD.at);
+  for (const c of ['stand:here', 'put-down:here']) { const r = await follow(ctx, c, { timeout: 300000 }); note(c, r.ok ?? r.accepted, r.code ?? '', r.phase ?? ''); }
+  note('can after put-down (parent)', (await ctx.api('/v1/world/snapshot', { as: 'public' })).entities.find((e) => e.id === E('watering-can')).in);
   for (const [spec, rc] of [['mars-water-20261016', 'water.receipt.json'], ['mars-field-20261016', 'field.receipt.json']]) { try { note('rollback', spec, tool(spec, rc, '--rollback', '--apply')); } catch (e) { note('rollback refused', spec, String(e.stdout || e.stderr || e.message).slice(0, 400)); } }
 } finally { writeFileSync(`${S}/proof.log`, log.join('\n') + '\n'); await browser?.close(); release(); await stop(ctx); rmSync(tokenFile, { force: true }); }
