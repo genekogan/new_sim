@@ -20,6 +20,7 @@ const out = resolve(process.argv[2] ?? `${root}/.lane/library-e2e`);
 const shotsAt = process.argv.indexOf('--shots'), shots = shotsAt > 0 ? resolve(process.argv[shotsAt + 1]) : null;
 mkdirSync(out, { recursive: true });
 const libDir = join(out, 'lib'), report = { at: new Date().toISOString(), steps: [], checks: {} };
+process.env.SIM_LIBRARY_DIR = libDir;   // the worlds this flow starts serve the same library from inside Godmode (/v1/god/library…)
 const step = (name, data) => { report.steps.push({ name, ...data }); console.log(`· ${name}${data?.stdout ? '\n' + data.stdout.trim().split('\n').map((l) => '    ' + l).join('\n') : ''}`); };
 const cli = (...args) => {
   const r = spawnSync(process.execPath, [join(root, 'tools/library/library.mjs'), ...args, '--lib', libDir], { encoding: 'utf8', env: { ...process.env, SIM_GOD_TOKEN: '' } });
@@ -92,6 +93,13 @@ try {
   check('record.author+licence', lib2.author.world === 'alpha' && lib2.author.name === 'Ana (alpha owner)' && lib2.licence.spdx === 'CC0-1.0', { author: lib2.author, licence: lib2.licence });
   const totem = byName('totem'), tlib = JSON.parse(readFileSync(join(libDir, 'entries/alpha/totem/1.json'), 'utf8'));
   check('beta.model-pinned', totem && defOf(totem)?.hash === tlib.hash && defOf(totem)?.make?.asset === tlib.assets[0].sha && (await fetch(`${beta.base}/assets/${tlib.assets[0].sha}.glb`)).status === 200, { asset: tlib.assets[0].sha.slice(0, 12), licence: tlib.assets[0].licence });
+  // from inside beta's Godmode (the god's own routes, same library, the same moderation seam)
+  const rf = await gb('/v1/god/library?q=reading%20corner');
+  check('route.find', rf.status === 200 && rf.data.hits[0]?.id === 'alpha/reading-corner' && rf.data.hits[0]?.placedHere === true, rf.data.hits?.map((h) => `${h.id}@${h.version}`));
+  const rp = await gb('/v1/god/library/place', { item: 'alpha/reading-corner@2', at: [0, 8], name: 'corner-route' });
+  check('route.place', rp.status === 200 && rp.data.accepted && rp.data.defines === 0 && rp.data.item.version === 2, { status: rp.status, defines: rp.data.defines, code: rp.data.code });
+  const rx = await gb('/v1/god/library/place', { item: 'alpha/my-martian', at: [0, 0] });
+  check('route.restricted-absent', rx.status === 404 && rx.data.code === 'library.missing', rx.data.code);
   report.ledger = readFileSync(join(libDir, 'ledger.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 
   // ---------------------------------------------------------------- what a visitor sees in beta (real Chrome)
