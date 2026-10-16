@@ -14,6 +14,7 @@ OUT="${1:?usage: one-validation.sh <outDir> [--baseline <tree>] [--skip V1,V2]}"
 BASELINE=<worktrees>/reconcile-main-e8; SKIP=""
 while [ $# -gt 0 ]; do case "$1" in --baseline) BASELINE="$2"; shift;; --skip) SKIP="$2"; shift;; esac; shift; done
 mkdir -p "$OUT"; SUM="$OUT/SUMMARY.tsv"; echo -e "step\texit\tseconds\tlog" > "$SUM"
+export SUITE_COVERAGE_DIR="$OUT"
 REMAP="--import=$ROOT/tools/test-harness/port-remap.mjs"
 DESCRIPTORS=<team>/pm-integration/auth-account-20261009/runtime-modern-context-prep-001
 cd "$ROOT" || exit 1
@@ -22,6 +23,10 @@ step() {  # step <id> <seconds> <command…>
   case ",$SKIP," in *",${id%%-*},"*|*",$id,"*) echo -e "$id\tSKIP\t0\t-" >> "$SUM"; return;; esac
   local s=$(date +%s); echo "== $id: $*"
   perl -e 'alarm shift; exec @ARGV' "$t" "$@" > "$OUT/$id.log" 2>&1; local rc=$?
+  if [[ "$id" == V6-* ]]; then
+    node "$ROOT/tools/test-harness/e2e-receipt.mjs" "$id" "$ROOT" "$OUT" "$s" >> "$OUT/$id.log" 2>&1
+    local report_rc=$?; [ "$rc" -ne 0 ] || rc=$report_rc
+  fi
   echo -e "$id\t$rc\t$(( $(date +%s) - s ))\t$OUT/$id.log" >> "$SUM"; tail -n 3 "$OUT/$id.log" | cut -c1-240
 }
 skipped() { case ",$SKIP," in *",$1,"*) return 0;; esac; return 1; }
@@ -38,37 +43,51 @@ step V1-types 1200 pnpm -r exec tsc --noEmit -p .
 step V2-build-root 900 pnpm --filter @sim/web build
 step V2-build-worlds 900 bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $ROOT/.lane/web-worlds --emptyOutDir"
 # V3 package and engine suites (no ports)
+step V3-harness 1200 node --test --test-reporter=tap --test-concurrency=1 tools/test-harness/*.test.mjs
 step V3-packages 2400 bash tools/test-harness/package-suite.sh
-step V3-mars-engine 2400 bash -c 'cd mars/viewer && node --test --test-concurrency=4 engine/test/*.test.ts'
-step V3-client-cli 1800 node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs
-step V3-launcher-unit 1200 node --test --test-concurrency=1 tools/world-launcher/launcher.test.mjs tools/world-launcher/launcher-auth.test.mjs tools/world-launcher/keeper.test.mjs   # lane ports 5210-5259, keeper 6017-6019
+step V3-mars-engine 2400 bash -c 'cd mars/viewer && node --test --test-reporter=tap --test-concurrency=4 engine/test/*.test.ts'
+step V3-client-cli 1800 node --test --test-reporter=tap --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs
+step V3-launcher-unit 1200 node --test --test-reporter=tap --test-concurrency=1 tools/world-launcher/*.test.mjs   # includes keeper.test (lane ports 5210-5259, keeper 6017-6019)
 # V4 web tests: node runner (compare the failure set with the baseline's, F6) and bundled .tsx tests
-step V4-web 900 bash -c 'cd apps/web && node --test --test-concurrency=1 $(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v "\.tsx$" | sort -u)'
-step V4-web-baseline 900 bash -c "cd $BASELINE/apps/web && node --test --test-concurrency=1 \$(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v '\.tsx$' | sort -u)"
-# V5 the FULL server suite, on the laptop, safely: every Codex-era port remapped, overrides set, serial
+step V4-web 900 bash tools/test-harness/web-suite.sh
+if [ "$BASELINE" != none ]; then
+  step V4-web-baseline 900 bash "$BASELINE/tools/test-harness/web-suite.sh"
+fi
+# V5 the FULL server suite, safely: every Codex-era port remapped, overrides set, serial.
+# Step cap 9000 s (main had 3600 s; the serial suite takes ~3100-3300 s on Modal CPU and a slower box hit 3600 at 1089/1094).
 server_tests() {
   local tree="$1"; shift
   cd "$tree/apps/server" || return 1
   local files=()
   if [ -n "${SERVER_TEST_FILES:-}" ]; then read -r -a files <<< "$SERVER_TEST_FILES";
-  else files=(src/*.test.ts src/god/*.test.ts); fi
-  env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 node --test --test-concurrency=1 "${files[@]}"
+  else shopt -s globstar nullglob; files=(src/**/*.test.ts); fi
+  [ "${#files[@]}" -gt 0 ] || return 1
+  env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 node --test --test-reporter=tap --test-concurrency=1 "${files[@]}"
 }
 export -f server_tests
 export REMAP
-step V5-server-full 3600 bash -c 'server_tests "$1"' _ "$ROOT"
-if [ -n "${SERVER_TEST_FILES:-}" ] && [ "$BASELINE" != "$ROOT" ]; then
-  step V5-server-baseline 3600 bash -c 'server_tests "$1"' _ "$BASELINE"
+step V5-server-full 9000 bash -c 'server_tests "$1"' _ "$ROOT"
+if [ -n "${SERVER_TEST_FILES:-}" ] && [ "$BASELINE" != none ] && [ "$BASELINE" != "$ROOT" ]; then
+  step V5-server-baseline 9000 bash -c 'server_tests "$1"' _ "$BASELINE"
 fi
 [ -z "$(busy)" ] || echo "WARNING: listeners left in 5400-5449 after V5" | tee -a "$OUT/V5-server-full.log"
 # V6 new worlds: god + Soul e2es (real servers, fake minds, $0), Clerk via synthetic issuer, under /worlds
 step V6-scenarios 1500 node tools/god-skill/e2e/scenarios.mjs --port 5420
-step V6-party 1500 node tools/god-skill/e2e/party.mjs --port 5421
-step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --port 5422
+step V6-party 1500 node tools/god-skill/e2e/party.mjs --no-shots --port 5421
+step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --no-shots --port 5422
 step V6-join-clerk 900 node tools/god-skill/e2e/join.mjs --mode clerk --base /worlds --port 5425 --range 5426-5429
-step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --port 5430 --range 5431-5434
-step V6-launcher 900 node tools/god-skill/e2e/launcher.mjs --port 5435 --range 5436-5440
-for e in souls-ux mars-two lm-two; do [ -f tools/god-skill/e2e/$e.mjs ] && step V6-$e 1500 node tools/god-skill/e2e/$e.mjs --port 5423; done
+step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --no-shots --port 5430 --range 5431-5434
+if skipped V6 || skipped V6-launcher; then
+  echo -e "V6-launcher\tSKIP\t0\t-" >> "$SUM"
+elif [ "${REMOTE_SUITE_CPU:-}" = 1 ]; then
+  # A named exclusion, never a green browser claim. The release gate validates the owner/reason.
+  reason=$(node -e 'const q=require("./tools/test-harness/quarantine.json").entries.find(e=>e.kind==="step"&&e.step==="V6-launcher");if(!q?.owner||!q.reason)process.exit(1);console.log(q.reason)') || exit 1
+  echo "$reason" > "$OUT/V6-launcher.log"
+  echo -e "V6-launcher\tQUARANTINE\t0\t$OUT/V6-launcher.log" >> "$SUM"
+else
+  step V6-launcher 900 node tools/god-skill/e2e/launcher.mjs --port 5435 --range 5436-5440
+fi
+for e in souls-ux mars-two lm-two; do [ -f tools/god-skill/e2e/$e.mjs ] && step V6-$e 1500 node tools/god-skill/e2e/$e.mjs --no-shots --port 5423; done
 # V7 real input in real Chrome (lease, GPU), dpr 1 and 2
 #   old worlds: local root-path eden/mars/LM from this tree (5401-5403) beside the baseline tree (5411-5413)
 #   new world:  launcher under /worlds (5441, children 5442-5444): home → New world → arrival, camera, Join line

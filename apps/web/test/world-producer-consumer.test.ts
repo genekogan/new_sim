@@ -42,7 +42,9 @@ test('real producer duplicates, shared boundaries and gaps retain documented bou
   const f = (await fixtures).find(f => f.key === 'eden')!;
   const all = validChunks((f.stream as { chunks: unknown[] }).chunks);
   const [a,b,c] = all; assert.ok(c);
-  assert.equal(chunkAt(all, b.fromTick)!.chunk, a, 'inclusive shared boundary chooses first chunk');
+  assert.equal(chunkAt(all, b.fromTick)!.chunk, b, 'latest-start chunk owns the shared endpoint and its scene era');
+  assert.equal(chunkAt([c,b,a], b.fromTick)!.chunk, b, 'boundary ownership is independent of input order');
+  assert.equal(chunkAt(all, b.fromTick)!.exact, true);
   const deduped = validChunks([c,a,b,a]); assert.equal(deduped.length, all.length);
   const gap = chunkAt([a,c], b.fromTick + 5)!;
   assert.equal(gap.exact, false);

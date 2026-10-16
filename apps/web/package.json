@@ -22,6 +22,7 @@
     "@sim/generators": "workspace:*"
   },
   "devDependencies": {
+    "esbuild": "0.28.1",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/three": "^0.185.4",

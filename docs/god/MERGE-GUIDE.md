@@ -349,7 +349,7 @@ Fixed in the first merge commit:
 - `pose.ts` seat fit: inert for default bodies.
 - These are intended engine fixes and stay. **Before any old-world backend runs this tree, prove a replay** of each
   production history on a read-only copy: `tools/core/multiworld/replay-proof.mjs`, copied with `copy-sqlite.mjs`
-  `VACUUM INTO`, run on ports outside 4930–4970.
+  (compact: every table verified, recordings `take_chunks`/`take_archives` left empty), run on ports outside 4930–4970.
 
 **F5. main's own type errors**
 - main has two type errors in `apps/server/src/edge-comms-manual-replay.test.ts` (TS2352 casts of `ConverseResult`):

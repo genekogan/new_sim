@@ -1,4 +1,4 @@
-// Qualify the exact Eden activity-data/descriptor pair on a read-only VACUUM
+// Qualify the exact Eden activity-data/descriptor pair on a compact read-only
 // copy. Every movement is an ordinary Edge act; never mutate the source DB.
 import assert from 'node:assert/strict';
 import {mkdtempSync,rmSync,readFileSync,mkdirSync,writeFileSync} from 'node:fs';

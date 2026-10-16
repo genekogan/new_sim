@@ -2,7 +2,7 @@
 # Keep raw Node TAP/spec output and propagate failures across every package.
 set -u
 rc=0
-packages=(engine-mars world-compiler generators ground kernel brain engine-toy engine-contract)
+packages=(engine-mars world-compiler generators ground kernel brain engine-toy engine-contract protocol engine-native)
 [ ! -d packages/catalog/src ] || packages+=(catalog)
 for p in "${packages[@]}"; do
   echo "## $p"
@@ -11,7 +11,7 @@ for p in "${packages[@]}"; do
     shopt -s nullglob
     files=(src/*.test.ts src/core-kit/*.test.ts)
     [ ${#files[@]} -gt 0 ] || { echo "no test files for $p"; exit 1; }
-    node --test --test-concurrency=4 "${files[@]}"
+    node --test --test-reporter=tap --test-concurrency=4 "${files[@]}"
   )
   package_rc=$?
   echo "## $p exit=$package_rc"
