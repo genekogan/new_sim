@@ -4351,7 +4351,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 1 (violin)",
    "instrument": "violin",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-2",
@@ -4369,7 +4375,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 2 (violin)",
    "instrument": "violin",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-3",
@@ -4387,7 +4399,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 3 (viola)",
    "instrument": "viola",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "band-chair-4",
@@ -4405,7 +4423,13 @@
    "seatHeight": 0.81,
    "label": "Bandstand quartet chair 4 (cello)",
    "instrument": "cello",
-   "platform": "bandstand-deck"
+   "platform": "bandstand-deck",
+   "together": {
+    "group": "concert-bandstand",
+    "need": 1,
+    "wait": 20,
+    "alone": "start"
+   }
   },
   {
    "id": "pc-office-1",
