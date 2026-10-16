@@ -18,6 +18,10 @@ export type Opening = { id: string; kind: 'door' | 'window' | 'gate' | 'arch'; w
 export type Link = { id: string; kind: 'stairs' | 'ramp' | 'ladder' | 'float'; from: number; to: number; path: Vec2[]; width: number; y0: number; y1: number };
 /** A room: floor index, polygon and frame in the def frame. Exposed as a `room` slot of the same id. */
 export type Room = { id: string; name: string; floor: number; y: number; polygon: Vec2[]; origin: Vec2; yaw: number; height: number };
+/** A baked slot. `retired`: a frame an earlier release offered where this one has none (building/1 facade frames on
+ *  a wall run with no clear wall, since r2.1). It still resolves at its old place, so whatever already hangs there
+ *  stays put and can be edited, but it takes no new mount and is not listed. */
+export type BakedSlot = Slot & { retired?: true };
 
 export type Baked = {
   /** Local bounds (x width, y height, z depth) at scale 1. */
@@ -27,7 +31,7 @@ export type Baked = {
   openings?: Opening[];
   links?: Link[];
   rooms?: Room[];
-  slots: Slot[];
+  slots: BakedSlot[];
   landform?: LandformBody;
   water?: { level: number; area?: Vec2[]; path?: Vec2[]; width?: number; /** path water: level per path point (rivers flow) */ levels?: number[] };
   /** Triangle estimate for budgets. */

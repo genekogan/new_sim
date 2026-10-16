@@ -383,7 +383,8 @@ export class WorldBuildSites {
       const old = v.members.get(id);
       if (old) { for (let k = 0; k < v.parts.length; k++) if (old.mask & (1 << k)) v.parts[k]--; v.members.delete(id); }
       const e = model.entities.get(id), root = e && this.rootOf(e, v, model); if (!e || !root) continue;
-      const boxes = model.footprintsOf(id); if (!boxes.length) continue; // empty prefab containers are not physical parts
+      const physical = model.footprintsOf(id); if (!physical.length) continue; // empty prefab containers are not physical parts
+      const boxes = thingEnvelope(physical); // r2.1: a placed thing fills its own footprint (walls enclose their rooms)
       const x = boxes.reduce((n, box) => n + box.c[0], 0) / boxes.length, z = boxes.reduce((n, box) => n + box.c[1], 0) / boxes.length;
       const [sx, sz] = localPoint(x, z, v.data.site.at, v.data.site.yaw);
       let mask = 0;
@@ -529,6 +530,24 @@ function worldPoint(x: number, z: number, at: [number, number], yaw: number): [n
 function localPoint(x: number, z: number, at: [number, number], yaw: number): [number, number] { return worldPoint(x - at[0], z - at[1], [0, 0], -yaw); }
 function lineGeometry(points: number[]) { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(points.length / 3 * 4), 4)); return g; }
 function replaceGeometry(obj: THREE.LineSegments, geometry: THREE.BufferGeometry) { obj.geometry.dispose(); obj.geometry = geometry; }
+/** r2.1 (release 2 walk): coverage was the volume of the thin wall colliders themselves (0.03–0.05 of a mass), so the
+ * ghost never faded over a finished building. A placed thing now fills the plan hull of its own colliders, taken in the
+ * frame of its largest box (exact for walls at 0°/90°; a lone box is itself), one box per merged vertical interval, so
+ * vertical gaps (a floating storey) stay unfilled. Per entity: separate entities are never bridged. */
+export function thingEnvelope(boxes: OBB[]): OBB[] {
+  if (boxes.length < 2) return boxes;
+  const frame = boxes.reduce((a, b) => (b.half[0] * b.half[1] > a.half[0] * a.half[1] ? b : a));
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const b of boxes) {
+    const [u, v] = localPoint(b.c[0], b.c[1], [0, 0], frame.yaw), c = Math.abs(Math.cos(b.yaw - frame.yaw)), s = Math.abs(Math.sin(b.yaw - frame.yaw));
+    const eu = c * b.half[0] + s * b.half[1], ev = s * b.half[0] + c * b.half[1];
+    u0 = Math.min(u0, u - eu); u1 = Math.max(u1, u + eu); v0 = Math.min(v0, v - ev); v1 = Math.max(v1, v + ev);
+  }
+  const centre = worldPoint((u0 + u1) / 2, (v0 + v1) / 2, [0, 0], frame.yaw), half: [number, number] = [(u1 - u0) / 2, (v1 - v0) / 2];
+  const spans: [number, number][] = [];
+  for (const b of [...boxes].sort((a, b) => a.y0 - b.y0)) { const last = spans.at(-1); if (last && b.y0 <= last[1] + 0.05) last[1] = Math.max(last[1], b.y1); else spans.push([b.y0, b.y1]); }
+  return spans.map(([y0, y1]) => ({ c: centre, half, yaw: frame.yaw, y0, y1 }));
+}
 /** 8×8 footprint samples, with exact vertical interval unions at each sample. The
  * column tops follow the declared roof; overlapping/nested OBBs never count twice.
  * Called on snapshots/shape or terrain refreshes and the site's diffs, never frames. */

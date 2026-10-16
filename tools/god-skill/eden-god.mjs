@@ -1297,6 +1297,10 @@ function relocate(v, row, wx, wz, wy) {
     const [lx, lz] = toLocal(F, wx, wz);
     return { F, lx, lz, r: wy === void 0 ? void 0 : r22(wy - F.RY) };
   };
+  if (parent && row.slot && (parent.slots ?? []).some((x) => x.id === row.slot && x.kind === "wall")) {
+    const L = local(parent, row.slot);
+    return { in: { parent: parent.path, slot: row.slot }, p: [r22(L.lx), r22(L.lz)], r: L.r, note: `on ${parent.path}/${row.slot}` };
+  }
   if (parent && row.slot && !(parent.slots ?? []).some((x) => x.id === row.slot && x.kind === "room")) {
     const L = local(parent, row.slot), hx = (parent.box?.[0] ?? 1) / 2, hz = (parent.box?.[2] ?? 1) / 2;
     const [ox, oz] = toLocal(frameOf(parent), L.F.O[0], L.F.O[1]);
@@ -1965,6 +1969,24 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
+function drawableCount(snapshot3 = {}) {
+  const lib = /* @__PURE__ */ new Map();
+  for (const d of [...snapshot3.defs ?? [], ...snapshot3.library ?? []]) {
+    if (!d?.ref) continue;
+    lib.set("sha:" + d.hash, d);
+    lib.set(d.ref, d);
+    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
+  }
+  const drawable = (ref) => {
+    let make, body = false;
+    for (let d = lib.get(ref), i = 0; d && i < 16; d = d.extends ? lib.get(d.extends) : null, i++) {
+      make ??= d.make;
+      body ||= !!d.components?.body;
+    }
+    return !!make && !body && make.kind !== "none" && make.kind !== "parts";
+  };
+  return (snapshot3.entities ?? []).filter((e) => drawable(e.def)).length;
+}
 function waitForShot({ expect = 0, timeoutMs = 6e5 } = {}) {
   return new Promise((resolve6, reject) => {
     let raf, timer, stable = 0, last = -1;
@@ -1991,8 +2013,9 @@ function waitForShot({ expect = 0, timeoutMs = 6e5 } = {}) {
       } else raf = requestAnimationFrame(tick);
     };
     timer = setTimeout(() => {
+      const w = window.__simEntity, drawn = w?.layer?.drawn;
       cleanup();
-      reject(Error("look: viewer did not initialize and settle before timeout"));
+      reject(Error(`look: viewer did not initialize and settle before timeout (drawn ${drawn?.size ?? 0} of ${expect ? Math.floor(expect * 0.6) : 0} needed from ${expect} drawable, viewer ready ${!!window.__shotReady}, entity layer ${w?.layer?.active ? "active" : "inactive"})`));
     }, timeoutMs);
     window.addEventListener("sim-shot-ready", tick, { once: true });
     tick();
@@ -2103,7 +2126,8 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
       writeFileSync4(resolve4(out), Buffer.from(result.data.split(",")[1], "base64"));
       return { file: resolve4(out), ms: now() - t0, via: "studio", ...result, data: void 0 };
     }
-    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs }) : page.evaluate(waitForShot, { expect, timeoutMs }));
+    const waitMs = Math.max(1e3, timeoutMs - (now() - t0) - 2e3);
+    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs: waitMs }) : page.evaluate(waitForShot, { expect, timeoutMs: waitMs }));
     runtime.signal?.throwIfAborted();
     if (!state?.ready) throw Error(`look: ${state?.why === "no entity world on this page" ? "this world has no entity layer" : "viewer did not initialize and settle before timeout"}`);
     const cells = [], receipts = [];
@@ -2819,11 +2843,18 @@ async function parts(words = "", flags2 = {}) {
   const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), "parts");
   return flags2.json ? d : d.parts.length ? d.parts.map(partLine).join("\n") : `no parts from finished builds${words ? ` matching "${words}"` : ""}`;
 }
+var MOTION_EXAMPLES = ["spin", "sway", "hover", "route", "sound", "twinkle"];
+function servedMotionExample(words = "") {
+  const name = MOTION_EXAMPLES.find((k) => String(words).toLowerCase().split(/[^a-z]+/).includes(k));
+  if (!name) return "";
+  return `
+ready def for "${name}" in every world: curl -s ${load().world}/god/examples/light-motion.mjs -o light-motion.mjs && node light-motion.mjs ${name} > ${name}.def.json && node eden-god.mjs define ${name}.def.json`;
+}
 async function find(words, flags2 = {}) {
   if (!words && !flags2.category && !flags2.has) throw new Error("find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]");
   const d = await searchDefs(words, { category: flags2.category, has: flags2.has, tag: flags2.tag, compact: 1, limit: flags2.all ? 500 : 25 });
   if (flags2.json) return d.defs;
-  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ""}${flags2.category ? ` in ${flags2.category}` : ""}${flags2.has ? ` with ${[].concat(flags2.has).join(", ")}` : ""}${d.hint ? `. ${d.hint}` : ""}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ""}${flags2.category ? ` in ${flags2.category}` : ""}${flags2.has ? ` with ${[].concat(flags2.has).join(", ")}` : ""}${d.hint ? `. ${d.hint}` : ""}. Try \`recommend <what you want>\` or \`taxonomy\`.${servedMotionExample(words)}`;
   return [`${d.defs.length} match${words ? ` "${words}"` : ""}:`, ...d.defs.map((r) => `${line(r)}${usedBadge(r)}${r.why?.length ? `  \u2039${r.why.join(" ")}\u203A` : ""}`)].join("\n");
 }
 async function map(opts = {}) {
@@ -4175,7 +4206,7 @@ async function lookInner(flags2 = {}, runtime = {}, signal) {
     worldUrl: load().world,
     ...cam,
     out,
-    expect: m.snapshot.entities.length,
+    expect: drawableCount(m.snapshot),
     cliPath: SELF,
     keep: !!flags2.keep,
     ...overrides,

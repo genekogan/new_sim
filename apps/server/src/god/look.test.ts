@@ -10,7 +10,7 @@ import { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { GodMode } from './god.ts';
 import { mountGodRoutes } from './routes.ts';
-import { LOOK_LIMITS, LookQueue, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
+import { LOOK_LIMITS, LookQueue, drawableEntities, lookSchema, mountLookRoutes, type LookRenderer } from './look.ts';
 import { PipeCDP, renderLook, pngSize, sweepLookProfiles } from './look-renderer.ts';
 import { readyExpression, captureExpression } from './look-page.ts';
 
@@ -268,4 +268,15 @@ test('startup profile sweep reclaims dead owners and old legacy dirs, preserving
   await sweepLookProfiles(dir);
   assert.equal(existsSync(join(dir, dead)), false); assert.equal(existsSync(join(dir, old)), false);
   for (const name of [live, recent, other]) assert.equal(existsSync(join(dir, name)), true, name);
+});
+
+test('r2.1 remote looks expect only drawable entities: resident bodies and prefab containers are never in layer.drawn', () => {
+  const defs: Record<string, { make: { kind: string }; components: { body?: unknown } }> = {
+    body: { make: { kind: 'none' }, components: { body: { rig: 'humanoid' } } }, set: { make: { kind: 'parts' }, components: {} },
+    lamp: { make: { kind: 'gen' }, components: {} }, chair: { make: { kind: 'mesh' }, components: {} } };
+  const entities = new Map(['body', 'body', 'body', 'set', 'lamp', 'gone'].map((def, i) => [`e${i}`, { def }]));
+  assert.equal(drawableEntities({ entities, resolvedDef: ref => defs[ref] }), 1, '3 bodies + 1 thing waits for the thing, not 60% of 6');
+  entities.set('e9', { def: 'chair' }); assert.equal(drawableEntities({ entities, resolvedDef: ref => defs[ref] }), 2);
+  const god = new GodMode(new Db(':memory:'), { worldId: 'r21', ownerId: 'dev:owner', tick: () => 0, emit: () => {} });
+  assert.equal(drawableEntities(god.model), 0, 'the real model satisfies the helper type');
 });

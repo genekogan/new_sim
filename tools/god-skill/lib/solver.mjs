@@ -606,6 +606,12 @@ export function relocate(v, row, wx, wz, wy) {
   const sub = new Set([row.id]); for (let grew = true; grew;) { grew = false; for (const r of v.rows) if (sub.has(r.parent) && !sub.has(r.id)) { sub.add(r.id); grew = true; } }
   const parent = row.parent === 'world' ? null : v.byId?.get(row.parent) ?? v.get(row.parent);
   const local = (host, slotId) => { const F = frameOf(host, slotId); const [lx, lz] = toLocal(F, wx, wz); return { F, lx, lz, r: wy === undefined ? undefined : r2(wy - F.RY) }; };
+  // a wall mount (a facade frame: lantern, sign, planter) stays on its wall frame; the point only slides it within the
+  // frame (r2.1: `move <mount> --by` used to drop it out of the building to the ground at the root)
+  if (parent && row.slot && (parent.slots ?? []).some((x) => x.id === row.slot && x.kind === 'wall')) {
+    const L = local(parent, row.slot);
+    return { in: { parent: parent.path, slot: row.slot }, p: [r2(L.lx), r2(L.lz)], r: L.r, note: `on ${parent.path}/${row.slot}` };
+  }
   if (parent && row.slot && !(parent.slots ?? []).some((x) => x.id === row.slot && x.kind === 'room')) {
     // on a surface (table top, shelf): stay if the point is over the host's top
     const L = local(parent, row.slot), hx = (parent.box?.[0] ?? 1) / 2, hz = (parent.box?.[2] ?? 1) / 2;

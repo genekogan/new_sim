@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { kitArgs, kitPhysics, KIT_PRIMITIVES, type KitProgramArgs } from '@sim/generators';
 import { buildKit } from './kit.mesh.ts';
 import { MaterialLib } from './materials.ts';
-import { animate } from './motion.ts';
+import { animate, bindMotionModel, setClockNight } from './motion.ts';
 import { WorldModel, applyBatch, defSchema, type Entity, type StoredDef } from '@sim/world-compiler';
 import examples from '../../../../tools/god-skill/scripts/gallery-language-examples.json' with { type: 'json' };
 
@@ -45,7 +45,7 @@ test('four glow classes preserve per-vertex colour, including mixed finishes on 
   const a = shapes([0.1, 0.3, 0.6, 0.9].map((glow, i) => ({ kind: 'sphere', at: [i * 2, 0, 0], color: '#e04020', glow })));
   const ms = meshes(draw(a)); assert.equal(ms.length, 4); assert.deepEqual(ms.map(m => m.material.emissiveIntensity), [0.2, 0.4, 0.65, 1]);
   const shader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader } as Parameters<THREE.Material['onBeforeCompile']>[0];
-  ms[0].material.onBeforeCompile(shader, {} as THREE.WebGLRenderer); assert.match(shader.fragmentShader, /totalEmissiveRadiance \*= vColor/);
+  ms[0].material.onBeforeCompile(shader, {} as THREE.WebGLRenderer); assert.match(shader.fragmentShader, /totalEmissiveRadiance \*= vColor\.rgb;/);
   assert.equal(ms[0].material.emissive.getHexString(), 'ffffff'); assert.ok(ms[0].geometry.attributes.color.getX(0) > ms[0].geometry.attributes.color.getY(0));
   const mixed = meshes(draw(shapes([{ kind: 'box', material: 'metal', role: 'head' }, { kind: 'sphere', material: 'glass', glow: 0.3, role: 'head' }])));
   assert.equal(mixed.length, 2); assert.equal(mixed[0].material.metalness, 0.25); assert.equal(mixed[1].material.transparent, true); assert.equal(mixed[1].material.emissiveIntensity, 0.4);
@@ -69,7 +69,7 @@ test('night motion retains the four glow levels and state/look clones retain the
   for (const m of meshes(obj)) {
     assert.equal(m.material.emissiveIntensity, 0);
     const shader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader } as Parameters<THREE.Material['onBeforeCompile']>[0];
-    m.material.onBeforeCompile(shader, {} as THREE.WebGLRenderer); assert.match(shader.fragmentShader, /totalEmissiveRadiance \*= vColor/);
+    m.material.onBeforeCompile(shader, {} as THREE.WebGLRenderer); assert.match(shader.fragmentShader, /totalEmissiveRadiance \*= vColor\.rgb;/);
   }
   e.state!.on = true; animate(obj, e, d, 1_000_000_002, { y: 0, yaw: 0 });
   assert.ok(Math.abs(meshes(obj)[0].material.emissiveIntensity / meshes(obj)[3].material.emissiveIntensity - 0.2) < 1e-10);
@@ -153,4 +153,30 @@ test('rotated/scaled off-centre outlines and spline overshoot stay inside conser
       assert.ok(b.colliders.some(c => { const dx = x - c.c[0], dz = z - c.c[1], co = Math.cos(c.yaw), si = Math.sin(c.yaw); return y >= c.y0 - 1e-5 && y <= c.y1 + 1e-5 && Math.abs(dx * co - dz * si) <= c.half[0] + 1e-5 && Math.abs(dx * si + dz * co) <= c.half[1] + 1e-5; }), `${sh.kind}: vertex ${[x, y, z]} outside colliders`);
     }
   }
+});
+
+// r2.1 walk: walk-lantern@1's glow body (an rbox with glow .75) drew nothing at night. three declares vColor as vec4,
+// so `vec3 *= vColor` failed to compile ("cannot convert from vec4 to vec3") and the glow program was dropped.
+test('the kit glow shader multiplies the vec3 radiance by a vec3 of the vertex colour, as three declares it', () => {
+  const m = new MaterialLib().get('paint', undefined, { vertexColors: true, glow: 0.65, vertexGlow: true });
+  const shader = { fragmentShader: THREE.ShaderLib.standard.fragmentShader } as Parameters<THREE.Material['onBeforeCompile']>[0];
+  m.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+  const expand = (src: string): string => src.replace(/#include <(\w+)>/g, (_, k: string) => expand((THREE.ShaderChunk as Record<string, string>)[k] ?? ''));
+  const src = expand(shader.fragmentShader), declared = /varying\s+(vec[34])\s+vColor\s*;/.exec(src)?.[1];
+  const line = src.split('\n').find(l => /totalEmissiveRadiance\s*\*=/.test(l) && l.includes('vColor'));
+  assert.ok(declared && line, 'the glow line and the vColor declaration are both in the compiled source');
+  assert.ok(/vec3\s+totalEmissiveRadiance/.test(src));
+  assert.ok(declared === 'vec3' || /vColor\.rgb\b/.test(line!), `${line!.trim()} multiplies a vec3 by a ${declared}`);
+});
+
+test('kit glow parts brighten at night from the world clock even when no motion model is bound', () => {
+  bindMotionModel(null);
+  const obj = draw(shapes([{ kind: 'rbox', size: [0.22, 0.3, 0.22], glow: 0.75, color: '#ffd27a' }]));
+  const e = { id: 'walk-lantern', state: {} } as Entity, d = { components: { light: { on: true } } } as StoredDef;
+  try {
+    setClockNight(0); animate(obj, e, d, 1_000_000_000, { y: 0, yaw: 0 }); const day = meshes(obj)[0].material.emissiveIntensity;
+    setClockNight(1); animate(obj, e, d, 1_000_000_000, { y: 0, yaw: 0 }); const night = meshes(obj)[0].material.emissiveIntensity;
+    assert.ok(night > 5 * day, `night ${night} vs day ${day}`);
+    assert.ok(Math.abs(night - (0.25 + 1.4 + 0.03 * Math.sin(1_000_000_000 * 3)) * 0.65) < 1e-9);
+  } finally { setClockNight(null); }
 });

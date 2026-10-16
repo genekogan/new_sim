@@ -130,6 +130,20 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
 }
 export function stopKeeper() { const k = readKeeper(); if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
+/** r2.1: how many snapshot entities the viewer's entity layer actually draws (its `layer.drawn`). Resident bodies
+ *  (`components.body`, make 'none'), prefab containers (make 'parts') and defs the snapshot cannot resolve are never
+ *  drawn there, so counting them made `look` wait out its whole deadline in worlds whose entities are mostly bodies. */
+export function drawableCount(snapshot = {}) {
+  const lib = new Map();
+  for (const d of [...(snapshot.defs ?? []), ...(snapshot.library ?? [])]) { if (!d?.ref) continue; lib.set('sha:' + d.hash, d); lib.set(d.ref, d); if (d.ref.startsWith('core-')) lib.set('core/' + d.ref.slice(5), d); }
+  const drawable = (ref) => {
+    let make, body = false;
+    for (let d = lib.get(ref), i = 0; d && i < 16; d = d.extends ? lib.get(d.extends) : null, i++) { make ??= d.make; body ||= !!d.components?.body; }
+    return !!make && !body && make.kind !== 'none' && make.kind !== 'parts';
+  };
+  return (snapshot.entities ?? []).filter((e) => drawable(e.def)).length;
+}
+
 /** Event-driven viewer startup, followed by render-frame settlement (no fixed minimum delay). */
 export function waitForShot({ expect = 0, timeoutMs = 600_000 } = {}) {
   return new Promise((resolve, reject) => {
@@ -145,7 +159,8 @@ export function waitForShot({ expect = 0, timeoutMs = 600_000 } = {}) {
       if (ready && stable >= 2) { cleanup(); resolve({ ready, drawn: drawn?.size ?? 0, want: expect, easing, shotReady: true }); }
       else raf = requestAnimationFrame(tick);
     };
-    timer = setTimeout(() => { cleanup(); reject(Error('look: viewer did not initialize and settle before timeout')); }, timeoutMs);
+    // r2.1: say what was missing (drawn vs expected, easing, viewer ready) instead of a bare timeout
+    timer = setTimeout(() => { const w = window.__simEntity, drawn = w?.layer?.drawn; cleanup(); reject(Error(`look: viewer did not initialize and settle before timeout (drawn ${drawn?.size ?? 0} of ${expect ? Math.floor(expect * .6) : 0} needed from ${expect} drawable, viewer ready ${!!window.__shotReady}, entity layer ${w?.layer?.active ? 'active' : 'inactive'})`)); }, timeoutMs);
     window.addEventListener('sim-shot-ready', tick, { once: true });
     tick();
   });
@@ -228,7 +243,9 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather, hideRoofs = f
       writeFileSync(resolve(out), Buffer.from(result.data.split(',')[1], 'base64'));
       return { file: resolve(out), ms: now() - t0, via: 'studio', ...result, data: undefined };
     }
-    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs }) : page.evaluate(waitForShot, { expect, timeoutMs }));
+    // r2.1: the in-page wait ends 2 s before the look deadline so its counted reason, not a bare look.timeout, is reported
+    const waitMs = Math.max(1000, timeoutMs - (now() - t0) - 2000);
+    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs: waitMs }) : page.evaluate(waitForShot, { expect, timeoutMs: waitMs }));
     runtime.signal?.throwIfAborted();
     if (!state?.ready) throw Error(`look: ${state?.why === 'no entity world on this page' ? 'this world has no entity layer' : 'viewer did not initialize and settle before timeout'}`);
     const cells = [], receipts = []; let capturedAt = 0, cameraFrames;

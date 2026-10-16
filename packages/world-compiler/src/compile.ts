@@ -33,6 +33,18 @@ export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseH
 export type Plan = { ok: true; apply: () => { seq: number; undoId: string; diff: Diff; inverse: Op[] }; ids: Record<string, string>; warnings: string[]; diff: Diff } | { ok: false; failures: Failure[] };
 
 const fail = (op: number, code: string, detail: string, suggest?: Failure['suggest']): Failure => ({ op, code, detail, suggest });
+/** A retired slot (building/1: a facade frame of an earlier release on a wall run with no clear wall) keeps only what
+ *  already hangs in it. Putting anything new there is refused as unknown, naming the slots of its kind that remain. */
+function retiredSlot(w: WorldModel, parentId: string, slotId: string | undefined, i: number): Failure | null {
+  const parent = slotId && parentId !== 'world' ? w.entities.get(parentId) : undefined; if (!parent) return null;
+  const slots = w.slotsOf(parent), slot = slots.find((x) => x.id === slotId);
+  if (!slot?.retired) return null;
+  const family = slot.id.split('-')[0] + '-', live = slots.filter((x) => !x.retired && x.kind === slot.kind);
+  const same = live.filter((x) => x.id.startsWith(family)).map((x) => x.id), other = live.filter((x) => !x.id.startsWith(family)).map((x) => x.id);
+  const names = [same.length ? `its ${family}* slots: ${same.join(', ')}` : '', other.length ? `other ${slot.kind} slots: ${other.join(', ')}` : ''].filter(Boolean).join('; ');
+  return { ...fail(i, 'slot.unknown', `${w.pathOf(parent.id)} has no slot ${slot.id}: that wall run has no clear wall, so the frame is retired and keeps only what already hangs there; ${names || 'no other slot of its kind'}`),
+    field: 'in.slot', fix: same.length || other.length ? `Mount on ${[...same, ...other][0]}, or another slot named above.` : 'Mount it elsewhere, or stand it on the ground.' };
+}
 
 /** Keep a generator's validation issues machine-addressable, without exposing a raw Zod dump. */
 function generatorFailure(op: number, error: unknown, def?: StoredDef, entity?: string, field = 'make'): Failure {
@@ -278,6 +290,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (!def) { failures.push(fail(i, 'def.unknown', op.def)); return; }
         const parentId = resolveId(op.in.parent, i); if (!parentId) return;
         if (op.name && scratch.names.has(`${parentId}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
+        { const retired = opts.trusted ? null : retiredSlot(scratch, parentId, op.in.slot, i); if (retired) { failures.push(retired); return; } }
         const fieldsOk = checkFields(def.params, op.params, true);
         if (!fieldsOk.ok) { failures.push(fail(i, 'params.invalid', fieldsOk.detail)); return; }
         const stateOk = checkFields(def.state, op.state, true);
@@ -337,6 +350,8 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (op.in) { const pid = resolveId(op.in.parent, i); if (!pid) return; if (scratch.subtree(id).includes(pid)) { failures.push(fail(i, 'parent.unknown', 'cannot move a thing into itself')); return; } next.in = { parent: pid, ...(op.in.slot ? { slot: op.in.slot } : {}) }; }
         if (op.p) next.p = op.p; if (op.r !== undefined) next.r = op.r; if (op.s !== undefined) next.s = op.s; if (op.shape) next.shape = op.shape;
         if (op.constraints) next.constraints = op.constraints;
+        // a thing already in a retired slot moves within it freely; moving something new into one is refused (undo/redo, trusted, may)
+        if (!opts.trusted && (next.in.parent !== prev.in.parent || next.in.slot !== prev.in.slot)) { const retired = retiredSlot(scratch, next.in.parent, next.in.slot, i); if (retired) { failures.push(retired); return; } }
         scratch.delete(id); clearGround(scratch, prev, diff);
         if (op.shape) prepareEntity(scratch, def, next, undefined);
         const problem = admit(scratch, next, def, i, op.mode, false, world);
@@ -421,6 +436,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
               if (copy.shape) copy.shape = shiftShape(copy.shape, x - (src.p?.[0] ?? 0), z - (src.p?.[src.p.length - 1] ?? 0));
               if (copy.seed !== undefined) copy.seed = (copy.seed + k + 1) | 0;
               const cdef = scratch.resolvedDef(copy.def)!;
+              { const retired = opts.trusted ? null : retiredSlot(scratch, parentId, copy.in.slot, i); if (retired) { failures.push(retired); return; } }
               if (copy.shape) prepareEntity(scratch, cdef, copy, undefined);
               const problem = admit(scratch, copy, cdef, i, op.mode, true, world);
               if (problem) { failures.push(problem); return; }

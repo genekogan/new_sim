@@ -12,7 +12,7 @@ import { activeClaim, atomicWrite, buildHeader, call, claimFile, helperFile, loa
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
-import { camera, shoot, keeper, stopKeeper, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
+import { camera, shoot, keeper, stopKeeper, drawableCount, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
 import { kitDefinition } from './lib/kit.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -94,12 +94,19 @@ export async function parts(words = '', flags = {}) {
   const d = ok(await call(`/v1/god/parts?${new URLSearchParams({ q: words })}`), 'parts');
   return flags.json ? d : d.parts.length ? d.parts.map(partLine).join('\n') : `no parts from finished builds${words ? ` matching "${words}"` : ''}`;
 }
+// r2.1: a catalogue (registry) world may predate the built-in motion/light kits (core/twinkle-lights@1 is not in
+// registry stable@3), so `find twinkle` finds nothing there. Every world serves a ready def for each motion word.
+const MOTION_EXAMPLES = ['spin', 'sway', 'hover', 'route', 'sound', 'twinkle'];
+function servedMotionExample(words = '') {
+  const name = MOTION_EXAMPLES.find(k => String(words).toLowerCase().split(/[^a-z]+/).includes(k)); if (!name) return '';
+  return `\nready def for "${name}" in every world: curl -s ${load().world}/god/examples/light-motion.mjs -o light-motion.mjs && node light-motion.mjs ${name} > ${name}.def.json && node eden-god.mjs define ${name}.def.json`;
+}
 // Keep the shared catalogue module unchanged: this CLI adds the reuse badge to its normal manifest lines.
 export async function find(words, flags = {}) {
   if (!words && !flags.category && !flags.has) throw new Error('find <words> [--category c] [--has slot:sit|action:open|actuator:door|comp:light]');
   const d = await searchDefs(words, { category: flags.category, has: flags.has, tag: flags.tag, compact: 1, limit: flags.all ? 500 : 25 });
   if (flags.json) return d.defs;
-  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.`;
+  if (!d.defs.length) return `nothing matches${words ? ` "${words}"` : ''}${flags.category ? ` in ${flags.category}` : ''}${flags.has ? ` with ${[].concat(flags.has).join(', ')}` : ''}${d.hint ? `. ${d.hint}` : ''}. Try \`recommend <what you want>\` or \`taxonomy\`.${servedMotionExample(words)}`;
   return [`${d.defs.length} match${words ? ` "${words}"` : ''}:`, ...d.defs.map(r => `${catalogLine(r)}${usedBadge(r)}${r.why?.length ? `  ‹${r.why.join(' ')}›` : ''}`)].join('\n');
 }
 
@@ -1145,7 +1152,7 @@ async function lookInner(flags = {}, runtime = {}, signal) {
   const cam = views[0];
   signal.throwIfAborted();
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides,
+  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: drawableCount(m.snapshot) /* r2.1: bodies are never in layer.drawn */, cliPath: SELF, keep: !!flags.keep, ...overrides,
     ...(flags.views || flags.site ? { views } : {}), frames: count, every,
     ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;

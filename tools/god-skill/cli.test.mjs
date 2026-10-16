@@ -304,8 +304,11 @@ test('find shows supplied titles/dates, supports the used alias and preserves mi
   assert.match(text, /used in: chapel \(done; 0 standing\)/);
   defs = [];
   assert.match(await COMMANDS.find(['spire']), /nothing matches "spire"\. define it here.*recommend/);
+  assert.doesNotMatch(await COMMANDS.find(['spire']), /ready def/);
+  // r2.1 walk: a registry world without core/twinkle-lights@1 answered `find twinkle` with nothing; it now names the served def
+  assert.match(await COMMANDS.find(['twinkle']), /nothing matches "twinkle".*\nready def for "twinkle" in every world: curl -s \S+\/god\/examples\/light-motion\.mjs -o light-motion\.mjs && node light-motion\.mjs twinkle > twinkle\.def\.json && node eden-god\.mjs define twinkle\.def\.json$/s);
   await assert.rejects(COMMANDS.find(), /find <words>/);
-  assert.equal(calls.length, 2, 'invalid empty searches stay local');
+  assert.equal(calls.length, 4, 'invalid empty searches stay local');
 });
 
 test('defs lists keep usedIn evidence in human and JSON output', async t => {

@@ -4,6 +4,7 @@ import type { Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { z } from 'zod';
 import { TILE_N } from '@sim/ground';
+import { drawableEntities } from './look.ts'; // r2.1 (own line: keeps clear of the cloud y5 import hunk)
 import { ApiError } from '../souls.ts';
 import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
@@ -133,7 +134,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountLandRoutes(app, { god: d.god, requireGod });
   mountDistrictRoutes(app, { districts: () => d.god.districts, requireGod, limitGod }); // Y3: POST/GET /v1/god/districts[/:id]
-  mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => d.god.model.entities.size }); // W2 remote looks
+  mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => drawableEntities(d.god.model) }); // W2 remote looks; r2.1: bodies are never drawn
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });
   // LAYERS: GET /v1/world/layers, /v1/world/layers/me (Soul), /v1/god/layers, /v1/god/layers/zone-suggest?use=
   mountLayerRoutes(app, { god: d.god, layers: () => (d.god as unknown as { layers?: GodLayers }).layers, requireGod, soulFromBearer: d.soulFromBearer, categoryOf: (x) => vocab.categoryOf(x as never) });   // GOD-ENV: POST /v1/god/strike   // GOD-ENV: POST /v1/god/land (raise, mountain, valley, move, water, extend …)
