@@ -54,6 +54,8 @@ export function faceContentIssues(face: Record<string, unknown>, decal: boolean)
     if (lines.length > FACE_LIMITS.lines) add('text', `has ${lines.length} lines (max ${FACE_LIMITS.lines})`, 'use fewer lines or another face');
     if (lines.some(l => l.length > FACE_LIMITS.lineChars)) add('text', `a line exceeds ${FACE_LIMITS.lineChars} characters`, 'break long lines with \\n');
     if (lines.some(l => /[\u0000-\u0008\u000b-\u001f\u007f]/.test(l))) add('text', 'contains control characters', 'use printable text; \\t splits a price column');
+    // Other kit fields take $params; face text is drawn as written ("$5" prices are fine, "$label" is not a lookup).
+    if (lines.some(l => l.split('\t').some(cell => /^\s*\$[A-Za-z_]/.test(cell)))) add('text', 'is drawn as written: faces do not take $params', 'write the words themselves; for text that changes, place a library sign (its text is state)');
   }
   if (typeof face.image === 'string' && !FACE_IMAGE.test(face.image)) add('image', 'must be this world\'s image asset /assets/<sha>.png or .jpg (no URLs, data: or other worlds)', 'upload the image with POST /v1/god/assets and use its /assets/<sha>.<ext> path');
   for (const key of ['font', 'ink', 'bg', 'align'] as const) if (face[key] !== undefined && face.text === undefined) add(key, 'has no effect without text', `remove ${key}`);

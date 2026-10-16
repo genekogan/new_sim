@@ -12,9 +12,10 @@
 //  F5 opens the world in Chrome; every request to a host other than 127.0.0.1/localhost is aborted (never contacted)
 //     and logged; checks the faces are drawn and the image came from this world's /assets/;
 //  F6 zero external image requests in the network log.
-// Writes .lane/e2e/faces-<stamp>/{report.json,network-log.json,*.png}.
+// Writes .lane/e2e/faces-<stamp>/{report.json,network-log.json,*.png}; the test world's data/ and assets/ are deleted
+// when the run ends (--keep leaves the server running and both folders in place).
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { deflateSync, crc32 } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
@@ -156,7 +157,13 @@ try {
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
   try { await browser?.close(); } catch { /* closed */ }
   releaseChrome?.();
-  if (!args.keep) server.kill();
+  if (!args.keep) {
+    // Stop our own world, then delete its DB and asset copies (contract: test worlds are deleted).
+    if (server.exitCode === null && server.signalCode === null) await new Promise((r) => { server.once('exit', r); server.kill(); setTimeout(r, 10_000); });
+    for (const dir of ['data', 'assets']) rmSync(resolve(out, dir), { recursive: true, force: true });
+    report.cleaned = ['data', 'assets'].every((dir) => !existsSync(resolve(out, dir)));
+    writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+  }
   log(`${report.ok ? 'PASS' : 'FAIL'} ${report.steps.filter((s) => s.ok).length}/${report.steps.length} — ${out}`);
   if (!report.ok && existsSync(out)) writeFileSync(resolve(out, 'server.log'), serverLog);
   process.exitCode = report.ok ? 0 : 1;

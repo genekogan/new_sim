@@ -57,6 +57,7 @@ test('decals on a shop: wall slots and this world\'s images only; refusals name 
   refused(w, [{ op: 'set', id: 'bakery', params: { decals: [{ slot: 'facade-f0-s-1', h: 1, text: 'X' }] } }], /^params\.decals\.0\.w$/, /slot, w, h/);
   refused(w, [{ op: 'set', id: 'bakery', params: { decals: [{ slot: 'facade-f0-s-1', w: 1, h: 1, text: 'X', pattern: 'mosaic' }] } }], /^params\.decals\.0\.pattern$/, /split it into two faces/);
   refused(w, [{ op: 'set', id: 'bakery', params: { decals: { slot: 'facade-f0-s-1' } } }], /^params\.decals$/, /JSON list/);
+  refused(w, [{ op: 'set', id: 'bakery', params: { decals: [{ slot: 'facade-f0-s-1', w: 1, h: 0.4, text: '$label' }] } }], /^params\.decals\.0\.text$/, /library sign/);
   refused(w, [{ op: 'set', id: 'bakery', params: { decals: Array.from({ length: 17 }, () => ({ slot: 'facade-f0-s-1', w: 1, h: 1, text: 'X' })) } }], /^params\.decals$/, /JSON list/);
 });
 

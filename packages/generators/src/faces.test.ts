@@ -66,6 +66,9 @@ test('faces refuse at their field with a fix: legacy contract, wrong primitive, 
   refusal(board([{ text: Array.from({ length: 13 }, (_, i) => `line ${i}`).join('\n') }]), ['shapes', 0, 'faces', 0, 'text'], /13 lines/);
   refusal(board([{ text: 'x'.repeat(65) }]), ['shapes', 0, 'faces', 0, 'text'], /exceeds 64/);
   refusal(board([{ text: 'bell\u0007' }]), ['shapes', 0, 'faces', 0, 'text'], /control characters/);
+  refusal(board([{ text: '$label' }]), ['shapes', 0, 'faces', 0, 'text'], /drawn as written: faces do not take \$params.*library sign/);
+  refusal(board([{ text: ['Tea\t$price'] }]), ['shapes', 0, 'faces', 0, 'text'], /do not take \$params/);
+  assert.equal(board([{ text: ['Tea\t$2', '$5 lunch', 'US$ 4'] }]).success, true, 'prices are text');
   assert.equal(board(Array.from({ length: 7 }, () => ({ text: 'x' }))).success, false, 'at most six faces per shape');
 });
 
