@@ -89,7 +89,7 @@ try {
         await page.mouse.click(640, 700);   // a real gesture: unlocks audio
         await page.keyboard.down('w'); await page.waitForTimeout(250); await page.keyboard.up('w');   // deliberate movement takes the camera over from Broadcast
         await page.waitForTimeout(1200);
-        await look([0, 2.0, 1.6], [0, 1.55, -5]);
+        await look([1.4, 1.75, -1.2], [0, 1.55, -5]);   // beside the bench, so the resident does not block the view
         await page.waitForTimeout(5000);
         const st = await step(`dpr ${dpr}: the north gallery shows 4 pieces; both videos play`, () => page.evaluate(() => window.__edenArt.state()), (s) => s.videos.filter((v) => v.playing).length >= 2 && s.faces.filter((f) => f.frame && f.url).length >= 4);
         if (dpr === 2) report.videos = st?.videos;

@@ -38,6 +38,31 @@ export function hoverText(a: Pick<ArtInfo, 'title' | 'maker' | 'kind'>): string 
   return m ? `${t} — ${m}` : t;
 }
 
+/** UVs (u0, v0, u1, v1) that show a `media`-shaped picture on a `face`-shaped plane without stretching: the middle
+ *  is kept and the overflow cropped (CSS object-fit: cover). */
+export function coverUv(media: number, face: number): [number, number, number, number] {
+  if (!(media > 0) || !(face > 0) || Math.abs(media - face) < 1e-3) return [0, 0, 1, 1];
+  if (media > face) { const w = face / media; return [(1 - w) / 2, 0, (1 + w) / 2, 1]; }
+  const h = media / face; return [0, (1 - h) / 2, 1, (1 + h) / 2];
+}
+/** Crop the plane's UVs to cover once the picture's size is known (an image's load, a video's metadata). Per face, so
+ *  one shared texture can fill faces of different shapes. */
+export function coverWhenReady(texture: THREE.Texture, geometry: THREE.PlaneGeometry, faceAspect: number) {
+  const apply = () => {
+    const src = texture.image as { videoWidth?: number; videoHeight?: number; naturalWidth?: number; naturalHeight?: number; width?: number; height?: number } | undefined;
+    const w = src?.videoWidth || src?.naturalWidth || src?.width || 0, h = src?.videoHeight || src?.naturalHeight || src?.height || 0;
+    if (!w || !h) return false;
+    const [u0, v0, u1, v1] = coverUv(w / h, faceAspect), uv = geometry.attributes.uv as THREE.BufferAttribute;
+    // PlaneGeometry order: (0,1) (1,1) (0,0) (1,0)
+    uv.setXY(0, u0, v1); uv.setXY(1, u1, v1); uv.setXY(2, u0, v0); uv.setXY(3, u1, v0); uv.needsUpdate = true;
+    return true;
+  };
+  if (apply()) return;
+  const el = texture.image as HTMLElement | undefined;
+  if (el && typeof (el as HTMLElement).addEventListener === 'function') { el.addEventListener('loadedmetadata', apply, { once: true }); el.addEventListener('load', apply, { once: true }); }
+  else { let tries = 0; const t = setInterval(() => { if (apply() || ++tries > 120) clearInterval(t); }, 250); }   // TextureLoader sets .image only on load
+}
+
 // ------------------------------------------------------------------ shared videos
 
 const PLAY_M = 30, MAX_PLAYING = 4, RELEASE_MS = 20_000;

@@ -7,7 +7,7 @@ import { kitArgs } from '@sim/generators';
 import { buildKit } from '../kit.mesh.ts';
 import { registerMesh } from '../registry.ts';
 import { bindMotionModel } from '../motion.ts';
-import { artOf, videoTexture } from '../art-media.ts';
+import { artOf, coverWhenReady, videoTexture } from '../art-media.ts';
 
 type Face = { at: [number, number, number]; w: number; h: number; yaw?: number; pitch?: number; bg?: string; ink?: string; font?: string; line?: number; media?: boolean; slot?: number };
 const texCache = new Map<string, THREE.Texture>();
@@ -60,7 +60,7 @@ registerMesh({
       // video and images glow a little so art reads in dim rooms; text keeps the matte board look
       plane.material = art ? new THREE.MeshBasicMaterial({ map, toneMapped: false }) : new THREE.MeshStandardMaterial({ map, roughness: 0.85, metalness: 0 });
       plane.position.set(...f.at); plane.rotation.set(f.pitch ?? 0, f.yaw ?? 0, 0, 'YXZ'); plane.name = 'sign-face';
-      if (art) plane.userData.art = art;
+      if (art) { plane.userData.art = art; coverWhenReady(map, plane.geometry as THREE.PlaneGeometry, f.w / f.h); }
       root.add(plane);
     }
     return root;

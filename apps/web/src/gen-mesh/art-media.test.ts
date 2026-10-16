@@ -2,7 +2,7 @@
 //   node --test apps/web/src/gen-mesh/art-media.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artOf, hoverText, makerText, mediaKind } from './art-media.ts';
+import { artOf, coverUv, hoverText, makerText, mediaKind } from './art-media.ts';
 
 test('media kinds: images, videos by extension, inline images; nothing scriptable', () => {
   assert.equal(mediaKind('https://x.org/a.jpg'), 'image');
@@ -25,4 +25,12 @@ test('hover text: title and maker in words', () => {
   assert.equal(makerText('creator:u:'), "by the world's creator");
   assert.equal(hoverText({ title: 'Tide', maker: 'soul:s1:Ana', kind: 'video' }), 'Tide — by Ana (a resident)');
   assert.equal(hoverText({ title: '', maker: '', kind: 'video' }), 'Untitled video');
+});
+
+test('cover fit: a landscape video in a portrait frame is cropped at the sides, never stretched', () => {
+  const [u0, v0, u1, v1] = coverUv(640 / 480, 0.74 / 0.94);
+  assert.equal(v0, 0); assert.equal(v1, 1);
+  assert.ok(Math.abs((u1 - u0) * (640 / 480) - 0.74 / 0.94) < 1e-9 && Math.abs(u0 + u1 - 1) < 1e-9);
+  assert.deepEqual(coverUv(1, 1), [0, 0, 1, 1]);
+  const t = coverUv(0.5, 2); assert.equal(t[0], 0); assert.ok(Math.abs(t[3] - t[1] - 0.25) < 1e-9);
 });
