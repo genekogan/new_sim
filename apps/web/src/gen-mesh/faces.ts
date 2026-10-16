@@ -37,15 +37,29 @@ const rgb = (hex: string): V3 => [parseInt(hex.slice(1, 3), 16), parseInt(hex.sl
 function mulberry(seed: number) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const hash3 = (i: number, j: number, seed: number) => mulberry(Math.imul(i + 7919, 73856093) ^ Math.imul(j + 104729, 19349663) ^ Math.imul(seed + 1, 83492791))();
 const clamp8 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-/** Distance from (x, y) to the closed outline (pixel units). */
-function outlineDistance(x: number, y: number, outline: [number, number][]): number {
-  let best = Infinity;
+/** Pixels (centres) closer than `r` to the closed outline, found by stroking each edge: each edge visits only the rows
+ *  and columns of its own band, so the cost follows perimeter × border rather than pixels × outline vertices. */
+function strokeMask(w: number, h: number, outline: [number, number][], r: number): Uint8Array {
+  const mask = new Uint8Array(w * h), r2 = r * r;
   for (let i = 0; i < outline.length; i++) {
-    const [ax, ay] = outline[i], [bx, by] = outline[(i + 1) % outline.length], dx = bx - ax, dy = by - ay;
-    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)));
-    best = Math.min(best, Math.hypot(x - ax - t * dx, y - ay - t * dy));
+    const [ax, ay] = outline[i], [bx, by] = outline[(i + 1) % outline.length], dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy || 1;
+    const y0 = Math.max(0, Math.floor(Math.min(ay, by) - r - 0.5)), y1 = Math.min(h - 1, Math.ceil(Math.max(ay, by) + r));
+    for (let y = y0; y <= y1; y++) {
+      const yc = y + 0.5;
+      // The part of the edge within r of this row, widened by r: no nearer pixel lies outside it.
+      let t0 = 0, t1 = 1;
+      if (dy !== 0) { const ta = (yc - r - ay) / dy, tb = (yc + r - ay) / dy; t0 = Math.max(0, Math.min(ta, tb)); t1 = Math.min(1, Math.max(ta, tb)); if (t0 > t1) continue; }
+      else if (Math.abs(ay - yc) >= r) continue;
+      const xa = ax + t0 * dx, xb = ax + t1 * dx;
+      const x0 = Math.max(0, Math.floor(Math.min(xa, xb) - r - 0.5)), x1 = Math.min(w - 1, Math.ceil(Math.max(xa, xb) + r));
+      for (let x = x0; x <= x1; x++) {
+        const k = y * w + x; if (mask[k]) continue;
+        const xc = x + 0.5, t = Math.max(0, Math.min(1, ((xc - ax) * dx + (yc - ay) * dy) / len2)), ex = xc - ax - t * dx, ey = yc - ay - t * dy;
+        if (ex * ex + ey * ey < r2) mask[k] = 1;
+      }
+    }
   }
-  return best;
+  return mask;
 }
 
 /** RGBA pixels (row 0 = bottom, v = 0) of a seeded pattern. `outline` (pixels) draws a lead border along a shaped face. */
@@ -58,17 +72,19 @@ export function patternPixels(kind: 'stained-glass' | 'mosaic', w: number, h: nu
     const gx = Math.ceil(w / 2 / s) + 2, gy = Math.ceil(h / s) + 2, sites: { x: number; y: number; c: V3; shade: number }[] = [];
     const rand = mulberry(seed * 2654435761);
     for (let j = 0; j < gy; j++) for (let i = 0; i < gx; i++) sites.push({ x: (i + 0.15 + 0.7 * rand()) * s, y: (j + 0.15 + 0.7 * rand()) * s, c: palette[Math.floor(rand() * palette.length)], shade: 0.82 + 0.3 * rand() });
+    const rim = opts.outline ? strokeMask(w, h, opts.outline, border) : null;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-      const fx = Math.min(x, w - 1 - x) + 0.5, fy = y + 0.5, ci = Math.floor(fx / s), cj = Math.floor(fy / s);
-      let d1 = Infinity, d2 = Infinity, near = sites[0];
+      const fx = Math.min(x, w - 1 - x) + 0.5, fy = y + 0.5, k = (y * w + x) * 4;
+      if (rim ? rim[y * w + x] : Math.min(x + 0.5, w - x - 0.5, fy, h - fy) < border) { put(k, lead); continue; }
+      const ci = Math.floor(fx / s), cj = Math.floor(fy / s);
+      let q1 = Infinity, q2 = Infinity, near = sites[0]; // squared distances; one root each for the two nearest
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
         const i = ci + di, j = cj + dj; if (i < 0 || j < 0 || i >= gx || j >= gy) continue;
-        const site = sites[j * gx + i], d = Math.hypot(fx - site.x, fy - site.y);
-        if (d < d1) { d2 = d1; d1 = d; near = site; } else if (d < d2) d2 = d;
+        const site = sites[j * gx + i], ex = fx - site.x, ey = fy - site.y, q = ex * ex + ey * ey;
+        if (q < q1) { q2 = q1; q1 = q; near = site; } else if (q < q2) q2 = q;
       }
-      const edge = opts.outline ? outlineDistance(x + 0.5, fy, opts.outline) : Math.min(x + 0.5, w - x - 0.5, fy, h - fy);
-      const k = (y * w + x) * 4;
-      if (d2 - d1 < leadW || edge < border) { put(k, lead); continue; }
+      const d1 = Math.sqrt(q1);
+      if (Math.sqrt(q2) - d1 < leadW) { put(k, lead); continue; }
       const glow = near.shade * (1.1 - 0.28 * Math.min(1, d1 / s)) + 0.04 * Math.sin(fy * 0.21 + near.x);
       put(k, [near.c[0] * glow, near.c[1] * glow, near.c[2] * glow]);
     }
@@ -95,8 +111,10 @@ export function patternPixels(kind: 'stained-glass' | 'mosaic', w: number, h: nu
   return px;
 }
 
+/** Long side of a pattern texture: 160 px per metre, 128 at least; glass pieces are large, so glass stops at 256. */
+export const patternSize = (pattern: FaceContent['pattern'], wM: number, hM: number) => Math.max(128, Math.min(pattern === 'stained-glass' ? 256 : 512, Math.round(Math.max(wM, hM) * 160)));
 function patternTexture(face: FaceContent, wM: number, hM: number, outline: [number, number][] | undefined): THREE.Texture {
-  const long = Math.max(128, Math.min(512, Math.round(Math.max(wM, hM) * 160))), w = wM >= hM ? long : Math.max(32, Math.round(long * wM / hM)), h = wM >= hM ? Math.max(32, Math.round(long * hM / wM)) : long;
+  const long = patternSize(face.pattern, wM, hM), w = wM >= hM ? long : Math.max(32, Math.round(long * wM / hM)), h = wM >= hM ? Math.max(32, Math.round(long * hM / wM)) : long;
   const pxOutline = outline?.map(([u, v]) => [u * w, v * h] as [number, number]);
   const key = JSON.stringify(['pattern', face.pattern, face.seed ?? 1, face.palette ?? null, face.cells ?? null, w, h, pxOutline?.map(p => p.map(Math.round)) ?? null]);
   const hit = textures.get(key); if (hit) return hit;

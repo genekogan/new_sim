@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { GENERATORS, type Value } from '@sim/generators';
 import { CORE_KIT, WorldModel, type Entity } from '@sim/world-compiler';
 import { buildKit } from './kit.mesh.ts';
-import { decalGroups, faceImagePath, patternPixels, shapeFaceMeshes } from './faces.ts';
+import { decalGroups, faceImagePath, patternPixels, patternSize, shapeFaceMeshes } from './faces.ts';
 import { MaterialLib } from './materials.ts';
 import { meshFor, type MeshCtx } from './registry.ts';
 import './building.mesh.ts';
@@ -71,6 +71,22 @@ test('seeded patterns are deterministic, use their palette, lead or grout their 
   for (let k = 0; k < mosaic.length; k += 4) colours.add(mosaic.subarray(k, k + 3).join(','));
   assert.ok(colours.has('204,196,180'), 'grout'); assert.ok(colours.size > 20, 'tesserae vary in shade');
   assert.equal(digest(mosaic), digest(patternPixels('mosaic', 128, 128, { seed: 3, cells: 16 })));
+});
+
+test('stained glass borders a shaped face by stroking its outline: same pixels as per-pixel distance, a fraction of the time', () => {
+  const ngon = (n: number, w: number, h: number) => Array.from({ length: n }, (_, i) => { const a = (i / n) * 2 * Math.PI; return [w / 2 + (w / 2 - 1) * Math.cos(a), h / 2 + (h / 2 - 1) * Math.sin(a)] as [number, number]; });
+  const digest = (a: Uint8Array) => createHash('sha256').update(a).digest('hex').slice(0, 16);
+  // Digests of the earlier per-pixel implementation (every pixel measured against every outline edge).
+  assert.equal(digest(patternPixels('stained-glass', 200, 300, { seed: 3, outline: ngon(64, 200, 300) })), 'be6340c38d9d7cb0');
+  assert.equal(digest(patternPixels('stained-glass', 159, 512, { seed: 7, outline: ngon(19, 159, 512) })), '8eea4f1e0e66a040');
+  assert.equal(digest(patternPixels('stained-glass', 128, 128, { seed: 2, outline: [[0, 0], [128, 0], [0, 128]] })), 'f594d27b35fe6908');
+  assert.equal(digest(patternPixels('stained-glass', 96, 160, { seed: 7 })), '5d3bd29a4a87b4bb');
+  // A rose window (512², 64-vertex outline) took about a second on the main thread; best of three now.
+  const rose = ngon(64, 512, 512); let best = Infinity;
+  for (let i = 0; i < 3; i++) { const t = performance.now(); patternPixels('stained-glass', 512, 512, { seed: 1, outline: rose }); best = Math.min(best, performance.now() - t); }
+  assert.ok(best < 100, `512² rose window took ${best.toFixed(1)} ms`);
+  // And the viewer draws glass at 256 px at most (pieces are large); mosaic keeps 512 for its small tesserae.
+  assert.equal(patternSize('stained-glass', 4, 4), 256); assert.equal(patternSize('mosaic', 4, 4), 512); assert.equal(patternSize('stained-glass', 0.5, 0.5), 128);
 });
 
 test('a menu board is one kit: header and priced lines drawn on the board front, a notice on the back', () => {
