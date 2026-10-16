@@ -31,6 +31,8 @@ import { cobuilderRoute } from './cobuilders.ts';
 import { mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
 import { mountDistrictRoutes, withDistrict } from './districts.ts'; // Y3 districts
+import { hashToken } from '../auth.ts';
+import { outcomeOf, TRACE_LIMITS, type TraceRow } from './trace.ts';
 
 export type GodDeps = {
   god: GodMode;
@@ -43,6 +45,8 @@ export type GodDeps = {
   limitIp: (c: Context, key: string, max: number, windowMs: number) => void;
   verifyUse?: VerifyUse;
   lookWorldUrl?: string; // W2: configured loopback URL, never derived from request headers
+  /** RL6 in-process replay only: false skips the per-token rate windows (authentication still runs). */
+  rateLimit?: boolean;
 };
 
 const codeSchema = z.object({ code: z.string().min(4).max(12) });
@@ -51,6 +55,24 @@ const answerSchema = z.object({ prayer: z.string(), text: z.string().min(1).max(
 const noStore = { 'cache-control': 'no-store' };
 
 export function mountGodRoutes(app: Hono, d: GodDeps) {
+  // RL7 trace (trace.ts): metadata of every god request, recorded after the route answered — never payload text.
+  const trace = d.god.trace, traced = new WeakMap<Context, { build?: string; step?: number }>();
+  app.use('/v1/god/*', async (c, next) => {
+    if (!trace.enabled) return next();
+    if (c.req.path === '/v1/god/stream' || c.req.path === '/v1/god/trace') { await next(); if (bearer(c)?.startsWith('god_')) trace.skip(); return; }
+    const t0 = performance.now(), json = c.json; let result: unknown;
+    c.json = ((o: unknown, ...rest: unknown[]) => { result = o; return (json as (...a: unknown[]) => Response)(o, ...rest); }) as typeof c.json;
+    await next();
+    const token = bearer(c), identity = identities.get(c) ?? (token?.startsWith('god_') ? d.god.godIdentity(token) : undefined);
+    if (identity === undefined) return;
+    const status = c.res.status, { code, field } = outcomeOf(result, c.error, status), via = traced.get(c);
+    const echo = (result as { build?: { id?: unknown; step?: { n?: unknown } } } | null | undefined)?.build;
+    const build = via?.build ?? (c.req.path.startsWith('/v1/god/builds/') ? c.req.param('id') : undefined) ?? (typeof echo?.id === 'string' ? echo.id : undefined);
+    const step = via?.step ?? (typeof echo?.step?.n === 'number' ? echo.step.n : undefined);
+    const row: TraceRow = { at: d.god.now(), method: c.req.method, route: c.req.routePath, status, ms: Math.round((performance.now() - t0) * 10) / 10, tok: (identity?.hash ?? hashToken(token!)).slice(0, 8), code };
+    if (build) row.build = build; if (step !== undefined) row.step = step; if (field) row.field = field;
+    trace.record(row);
+  });
   for (const path of ['/v1/god/builds', '/v1/god/builds/*']) app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   app.use('/v1/god/*', godBodyLimit(() => d.god.model.constants.limits.budget));
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -94,13 +116,14 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     identity.holder = parseHolder(c.req.header('x-eden-god-holder'));
     identities.set(c, identity); d.god.builds.touch(identity.hash, d.god.now()); return identity;
   };
-  const tokenLimit = godTokenLimiter(requireGod);
+  const tokenLimit: ReturnType<typeof godTokenLimiter> = d.rateLimit === false ? c => { requireGod(c); } : godTokenLimiter(requireGod);
   const limitGod: typeof tokenLimit = (c, bucket, max) => { try { tokenLimit(c, bucket, max); } catch (e) { if (e instanceof ApiError && e.status === 429) { e.extra = { ...e.extra, retryAfterMs: Number(e.extra?.retry_after ?? 1) * 1000 }; } throw e; } };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   const optionalBody = async (c: Context) => { const text = await c.req.text(); if (!text.trim()) return {}; try { return JSON.parse(text); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   const asGod = <T>(c: Context, b: { build?: unknown } | null, fn: () => T) => {
     const identity = requireGod(c), parsed = buildFieldSchema.optional().safeParse(b?.build);
     if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: `build.${i.path.join('.')}`, detail: i.message })) };
+    if (parsed.data) traced.set(c, { build: parsed.data.id, step: parsed.data.step });
     return d.god.as({ identity, build: parsed.data }, fn);
   };
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
@@ -173,8 +196,15 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/doctor', c => c.json(serverDoctor(d.god.builds, d.verifyUse, doctorIdentity(c)), 200, noStore));
   app.post('/v1/god/doctor', async c => { const who = doctorIdentity(c); const input = z.object({ fix: z.literal(true) }).strict().parse(await body(c)); return c.json(serverDoctor(d.god.builds, d.verifyUse, who, input.fix), 200, noStore); });
   app.post('/v1/god/builds', async (c) => { limitGod(c, 'build-start', BUILD_LIMITS.startPerMinute); const r = d.god.builds.start(await body(c), requireGod(c)); const district = r.ok ? d.god.districts.report(r.build) : undefined; return c.json(r.ok ? { ...r, report: { ...siteReport(d.god.model.fork(), { ...r.build, roots: r.build.roots.map(root => root.id) }, r.inventory, d.god.builds.inventoryContext?.()), ...(district ? { district } : {}) }, parts: d.god.parts.suggest(r.build), build: { ...r.build, reuse: d.god.parts.reuseOf(r.build.id) } } : r, 200, noStore); });
-  app.get('/v1/god/builds', (c) => { requireGod(c); return c.json(d.god.builds.list(), 200, noStore); });
-  app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); const reuse = d.god.parts.reuseOf(result.build.id); return c.json(withDistrict(d.god.districts, { ...result, reuse, build: { ...result.build, reuse } }), 200, noStore); });
+  // RL7: loop hints (the same refusal code + field 3+ times in 2 min) ride on build show
+  app.get('/v1/god/builds', (c) => { requireGod(c); const loops = trace.loops(); return c.json({ ...d.god.builds.list(), ...(loops.length ? { loops } : {}) }, 200, noStore); });
+  app.get('/v1/god/builds/:id', (c) => { requireGod(c); const result = d.god.builds.status(c.req.param('id')); if (!result) throw new ApiError(404, 'not-found', 'unknown build'); const reuse = d.god.parts.reuseOf(result.build.id), loops = trace.loops({ build: result.build.id }); return c.json(withDistrict(d.god.districts, { ...result, reuse, build: { ...result.build, reuse }, ...(loops.length ? { loops } : {}) }), 200, noStore); });
+  app.get('/v1/god/trace', (c) => {
+    const who = requireGod(c), build = c.req.query('build'), limit = Number(c.req.query('limit') ?? 50);
+    if (build !== undefined && !/^[a-z0-9][a-z0-9-]{0,39}$/.test(build)) throw new ApiError(400, 'invalid', 'build must be a build id');
+    if (!Number.isInteger(limit) || limit < 1 || limit > 1024) throw new ApiError(400, 'invalid', 'limit must be 1..1024');
+    return c.json({ now: d.god.now(), you: who.hash.slice(0, 8), enabled: trace.enabled, window: { loopMs: TRACE_LIMITS.loopWindowMs, loopMin: TRACE_LIMITS.loopMin }, stats: trace.summary(), loops: trace.loops({ build }), rows: trace.rows({ build, limit }) }, 200, noStore);
+  });
   app.post('/v1/god/builds/:id/check', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); requireGod(c); const r = d.god.checkBuild(c.req.param('id')); if (!r) throw new ApiError(404, 'not-found', 'unknown build'); return c.json(r, 200, noStore); });
   app.post('/v1/god/builds/:id/step', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.step(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/pause', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.pause(c.req.param('id'), await optionalBody(c), requireGod(c)), 200, noStore); });

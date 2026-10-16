@@ -1,0 +1,913 @@
+{
+ "run": "A3-plaza",
+ "genesis": "worlds/templates/eden-district.json",
+ "files": {
+  "defs/gazebo-green-roof.kit.json": "{\n \"name\": \"gazebo-green-roof\",\n \"description\": \"A planted (green) roof for a 5 m flat-roofed gazebo: sedum mat on a low mound, grasses, flowering cushions, two shrubs, trailing plants over the parapet, and LED strips along the fascia foot and the inner ceiling edge.\",\n \"tags\": [\n  \"roof\",\n  \"green-roof\",\n  \"planted\",\n  \"garden\",\n  \"led\",\n  \"decor\"\n ],\n \"components\": {\n  \"light\": {\n   \"color\": \"#eafaff\",\n   \"range\": 6,\n   \"on\": true\n  }\n },\n \"shapes\": [\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.05,\n    0\n   ],\n   \"size\": [\n    4.48,\n    0.4,\n    4.48\n   ],\n   \"color\": \"#5b4733\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"rbox\",\n   \"at\": [\n    0,\n    0.3,\n    0\n   ],\n   \"size\": [\n    4.44,\n    0.1,\n    4.44\n   ],\n   \"round\": 0.04,\n   \"color\": \"#7c9c46\",\n   \"material\": \"moss\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    0.3,\n    0\n   ],\n   \"r\": 2,\n   \"scale\": [\n    1.08,\n    0.13,\n    1.08\n   ],\n   \"segments\": 14,\n   \"color\": \"#6f9640\",\n   \"material\": \"moss\",\n   \"collide\": false\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.5,\n    0.62,\n    -1.5\n   ],\n   \"r\": 0.2,\n   \"h\": 0.62,\n   \"segments\": 6,\n   \"color\": \"#8fae4a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    1.4,\n    0.62,\n    -1.6\n   ],\n   \"r\": 0.23,\n   \"h\": 0.74,\n   \"segments\": 6,\n   \"color\": \"#a7b95c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.6,\n    0.62,\n    1.3\n   ],\n   \"r\": 0.26,\n   \"h\": 0.62,\n   \"segments\": 6,\n   \"color\": \"#8fae4a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    1.5,\n    0.62,\n    1.45\n   ],\n   \"r\": 0.2,\n   \"h\": 0.74,\n   \"segments\": 6,\n   \"color\": \"#a7b95c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    0.62,\n    -1.75\n   ],\n   \"r\": 0.23,\n   \"h\": 0.62,\n   \"segments\": 6,\n   \"color\": \"#8fae4a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    0.62,\n    1.7\n   ],\n   \"r\": 0.26,\n   \"h\": 0.74,\n   \"segments\": 6,\n   \"color\": \"#a7b95c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.8,\n    0.62,\n    0\n   ],\n   \"r\": 0.2,\n   \"h\": 0.62,\n   \"segments\": 6,\n   \"color\": \"#8fae4a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    1.8,\n    0.62,\n    0.1\n   ],\n   \"r\": 0.23,\n   \"h\": 0.74,\n   \"segments\": 6,\n   \"color\": \"#a7b95c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.9,\n    0.58,\n    -0.8\n   ],\n   \"r\": 0.24,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#c9b23c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.8,\n    0.58,\n    -0.9\n   ],\n   \"r\": 0.29,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#b65f92\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.8,\n    0.58,\n    0.9\n   ],\n   \"r\": 0.33999999999999997,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#e9e4cf\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.9,\n    0.58,\n    0.8\n   ],\n   \"r\": 0.24,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#d98b3a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    0.58,\n    0\n   ],\n   \"r\": 0.29,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#5f8f36\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.4,\n    0.58,\n    -1.2\n   ],\n   \"r\": 0.33999999999999997,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#7fa64a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.5,\n    0.58,\n    1.2\n   ],\n   \"r\": 0.24,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#c9b23c\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.2,\n    0.58,\n    0.1\n   ],\n   \"r\": 0.29,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#b65f92\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.2,\n    0.58,\n    0.2\n   ],\n   \"r\": 0.33999999999999997,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#7fa64a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.3,\n    0.58,\n    -0.4\n   ],\n   \"r\": 0.24,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#e9e4cf\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.3,\n    0.58,\n    0.45\n   ],\n   \"r\": 0.29,\n   \"scale\": [\n    1,\n    0.62,\n    1\n   ],\n   \"segments\": 7,\n   \"color\": \"#d98b3a\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.6,\n    0.78,\n    -1.6\n   ],\n   \"r\": 0.32,\n   \"segments\": 8,\n   \"color\": \"#4d7a32\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.6,\n    0.74,\n    1.6\n   ],\n   \"r\": 0.3,\n   \"segments\": 8,\n   \"color\": \"#557f35\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    1.6,\n    0.75,\n    -0.7\n   ],\n   \"r\": 0.1,\n   \"h\": 0.5,\n   \"segments\": 5,\n   \"color\": \"#8c6bb8\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    1.65,\n    0.75,\n    -0.95\n   ],\n   \"r\": 0.1,\n   \"h\": 0.5,\n   \"segments\": 5,\n   \"color\": \"#8c6bb8\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.6,\n    0.75,\n    0.75\n   ],\n   \"r\": 0.1,\n   \"h\": 0.5,\n   \"segments\": 5,\n   \"color\": \"#8c6bb8\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.65,\n    0.75,\n    1\n   ],\n   \"r\": 0.1,\n   \"h\": 0.5,\n   \"segments\": 5,\n   \"color\": \"#8c6bb8\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     2.1,\n     0.45,\n     -1.2\n    ],\n    [\n     2.45,\n     0.56,\n     -1.2\n    ],\n    [\n     2.58,\n     0.4,\n     -1.2\n    ],\n    [\n     2.6,\n     0.12,\n     -1.2\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.3,\n    0.56,\n    -1.2\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.56,\n    0.42,\n    -1.2\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.6,\n    0.26,\n    -1.2\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.61,\n    0.12,\n    -1.2\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     2.1,\n     0.45,\n     0.9\n    ],\n    [\n     2.45,\n     0.56,\n     0.9\n    ],\n    [\n     2.58,\n     0.4,\n     0.9\n    ],\n    [\n     2.6,\n     0.03,\n     0.9\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.3,\n    0.56,\n    0.9\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.56,\n    0.42,\n    0.9\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.6,\n    0.21500000000000002,\n    0.9\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.61,\n    0.03,\n    0.9\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     -2.1,\n     0.45,\n     -0.4\n    ],\n    [\n     -2.45,\n     0.56,\n     -0.4\n    ],\n    [\n     -2.58,\n     0.4,\n     -0.4\n    ],\n    [\n     -2.6,\n     -0.06,\n     -0.4\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.3,\n    0.56,\n    -0.4\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.56,\n    0.42,\n    -0.4\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.6,\n    0.17,\n    -0.4\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.61,\n    -0.06,\n    -0.4\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     -2.1,\n     0.45,\n     1.5\n    ],\n    [\n     -2.45,\n     0.56,\n     1.5\n    ],\n    [\n     -2.58,\n     0.4,\n     1.5\n    ],\n    [\n     -2.6,\n     0.12,\n     1.5\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.3,\n    0.56,\n    1.5\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.56,\n    0.42,\n    1.5\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.6,\n    0.26,\n    1.5\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.61,\n    0.12,\n    1.5\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     -0.6,\n     0.45,\n     2.1\n    ],\n    [\n     -0.6,\n     0.56,\n     2.45\n    ],\n    [\n     -0.6,\n     0.4,\n     2.58\n    ],\n    [\n     -0.6,\n     0.03,\n     2.6\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.6,\n    0.56,\n    2.3\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.6,\n    0.42,\n    2.56\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.6,\n    0.21500000000000002,\n    2.6\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.6,\n    0.03,\n    2.61\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     1.3,\n     0.45,\n     2.1\n    ],\n    [\n     1.3,\n     0.56,\n     2.45\n    ],\n    [\n     1.3,\n     0.4,\n     2.58\n    ],\n    [\n     1.3,\n     -0.06,\n     2.6\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.3,\n    0.56,\n    2.3\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.3,\n    0.42,\n    2.56\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.3,\n    0.17,\n    2.6\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.3,\n    -0.06,\n    2.61\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     0.2,\n     0.45,\n     -2.1\n    ],\n    [\n     0.2,\n     0.56,\n     -2.45\n    ],\n    [\n     0.2,\n     0.4,\n     -2.58\n    ],\n    [\n     0.2,\n     0.12,\n     -2.6\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.2,\n    0.56,\n    -2.3\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.2,\n    0.42,\n    -2.56\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.2,\n    0.26,\n    -2.6\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.2,\n    0.12,\n    -2.61\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"r\": 0.028,\n   \"path\": [\n    [\n     -1.6,\n     0.45,\n     -2.1\n    ],\n    [\n     -1.6,\n     0.56,\n     -2.45\n    ],\n    [\n     -1.6,\n     0.4,\n     -2.58\n    ],\n    [\n     -1.6,\n     0.03,\n     -2.6\n    ]\n   ],\n   \"segments\": 4,\n   \"color\": \"#4f7f31\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.6,\n    0.56,\n    -2.3\n   ],\n   \"r\": 0.11,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.6,\n    0.42,\n    -2.56\n   ],\n   \"r\": 0.1,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.6,\n    0.21500000000000002,\n    -2.6\n   ],\n   \"r\": 0.09,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#7aaa48\"\n  },\n  {\n   \"material\": \"leaf\",\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.6,\n    0.03,\n    -2.61\n   ],\n   \"r\": 0.08,\n   \"scale\": [\n    1,\n    0.8,\n    1\n   ],\n   \"segments\": 5,\n   \"color\": \"#6a9a3e\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    -0.13,\n    -2.53\n   ],\n   \"size\": [\n    5.06,\n    0.045,\n    0.045\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    -0.13,\n    2.53\n   ],\n   \"size\": [\n    5.06,\n    0.045,\n    0.045\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -2.53,\n    -0.13,\n    0\n   ],\n   \"size\": [\n    0.045,\n    0.045,\n    5.06\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    2.53,\n    -0.13,\n    0\n   ],\n   \"size\": [\n    0.045,\n    0.045,\n    5.06\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    -0.24,\n    -2.12\n   ],\n   \"size\": [\n    4.24,\n    0.035,\n    0.035\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    -0.24,\n    2.12\n   ],\n   \"size\": [\n    4.24,\n    0.035,\n    0.035\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -2.12,\n    -0.24,\n    0\n   ],\n   \"size\": [\n    0.035,\n    0.035,\n    4.24\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    2.12,\n    -0.24,\n    0\n   ],\n   \"size\": [\n    0.035,\n    0.035,\n    4.24\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  }\n ]\n}",
+  "defs/marble-shrine.kit.json": "{\n \"name\": \"marble-shrine\",\n \"description\": \"A little white-marble shrine: a two-step plinth, a niche between pilasters under a pyramid roof with a gilt finial, a pedestal with a softly glowing orb, an offering ledge with candles, and LED strips on the step nosings and around the niche.\",\n \"tags\": [\n  \"shrine\",\n  \"marble\",\n  \"civic\",\n  \"sacred\",\n  \"led\"\n ],\n \"components\": {\n  \"light\": {\n   \"color\": \"#fff1d6\",\n   \"range\": 4,\n   \"on\": true\n  },\n  \"surface\": {\n   \"height\": 0.36\n  }\n },\n \"slots\": [\n  {\n   \"id\": \"offerings\",\n   \"kind\": \"surface\",\n   \"p\": [\n    0,\n    0.36,\n    0.4\n   ],\n   \"yaw\": 0,\n   \"height\": 0.36,\n   \"accepts\": {\n    \"maxSize\": [\n     0.3,\n     0.3,\n     0.3\n    ],\n    \"maxMass\": 5\n   },\n   \"capacity\": 4\n  }\n ],\n \"shapes\": [\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.07,\n    0\n   ],\n   \"size\": [\n    1.9,\n    0.14,\n    1.5\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#eef3f8\",\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.21,\n    -0.05\n   ],\n   \"size\": [\n    1.6,\n    0.14,\n    1.2\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    1.03,\n    -0.43\n   ],\n   \"size\": [\n    1.24,\n    1.5,\n    0.16\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"box\",\n   \"at\": [\n    -0.54,\n    1.03,\n    -0.13\n   ],\n   \"size\": [\n    0.16,\n    1.5,\n    0.66\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"box\",\n   \"at\": [\n    0.54,\n    1.03,\n    -0.13\n   ],\n   \"size\": [\n    0.16,\n    1.5,\n    0.66\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    -0.54,\n    0.31,\n    0.24\n   ],\n   \"size\": [\n    0.24,\n    0.06,\n    0.24\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"cyl\",\n   \"at\": [\n    -0.54,\n    1.03,\n    0.24\n   ],\n   \"r\": 0.085,\n   \"h\": 1.38,\n   \"segments\": 10\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    -0.54,\n    1.75,\n    0.24\n   ],\n   \"size\": [\n    0.24,\n    0.07,\n    0.24\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    0.54,\n    0.31,\n    0.24\n   ],\n   \"size\": [\n    0.24,\n    0.06,\n    0.24\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"cyl\",\n   \"at\": [\n    0.54,\n    1.03,\n    0.24\n   ],\n   \"r\": 0.085,\n   \"h\": 1.38,\n   \"segments\": 10\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    0.54,\n    1.75,\n    0.24\n   ],\n   \"size\": [\n    0.24,\n    0.07,\n    0.24\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    1.86,\n    -0.08\n   ],\n   \"size\": [\n    1.46,\n    0.16,\n    0.9\n   ]\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#eef3f8\",\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    2.19,\n    -0.08\n   ],\n   \"r\": 0.98,\n   \"h\": 0.5,\n   \"segments\": 4,\n   \"yaw\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    2.5,\n    -0.08\n   ],\n   \"r\": 0.025,\n   \"h\": 0.16,\n   \"material\": \"metal\",\n   \"color\": \"#c9a646\"\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    2.6,\n    -0.08\n   ],\n   \"r\": 0.065,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#d4af37\"\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#f4f7fa\",\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    0.52,\n    -0.2\n   ],\n   \"r\": 0.13,\n   \"h\": 0.48,\n   \"r2\": 0.1,\n   \"segments\": 10\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"lathe\",\n   \"at\": [\n    0,\n    0.76,\n    -0.2\n   ],\n   \"profile\": [\n    [\n     0,\n     0\n    ],\n    [\n     0.16,\n     0.02\n    ],\n    [\n     0.2,\n     0.08\n    ],\n    [\n     0.17,\n     0.1\n    ]\n   ],\n   \"segments\": 10\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    0.98,\n    -0.2\n   ],\n   \"r\": 0.15,\n   \"segments\": 10,\n   \"material\": \"emissive\",\n   \"color\": \"#fff4d6\",\n   \"glow\": 0.75,\n   \"collide\": false\n  },\n  {\n   \"material\": \"stone\",\n   \"color\": \"#e8eef4\",\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.32,\n    0.4\n   ],\n   \"size\": [\n    0.9,\n    0.08,\n    0.26\n   ]\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    -0.3,\n    0.42,\n    0.42\n   ],\n   \"r\": 0.022,\n   \"h\": 0.12,\n   \"color\": \"#f6efe0\",\n   \"material\": \"plastic\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    -0.3,\n    0.5,\n    0.42\n   ],\n   \"r\": 0.018,\n   \"segments\": 4,\n   \"color\": \"#ffcf6b\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"role\": \"flame\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    0.42,\n    0.42\n   ],\n   \"r\": 0.022,\n   \"h\": 0.12,\n   \"color\": \"#f6efe0\",\n   \"material\": \"plastic\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    0.5,\n    0.42\n   ],\n   \"r\": 0.018,\n   \"segments\": 4,\n   \"color\": \"#ffcf6b\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"role\": \"flame\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    0.3,\n    0.42,\n    0.42\n   ],\n   \"r\": 0.022,\n   \"h\": 0.12,\n   \"color\": \"#f6efe0\",\n   \"material\": \"plastic\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0.3,\n    0.5,\n    0.42\n   ],\n   \"r\": 0.018,\n   \"segments\": 4,\n   \"color\": \"#ffcf6b\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"role\": \"flame\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.125,\n    0.74\n   ],\n   \"size\": [\n    1.86,\n    0.022,\n    0.022\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.265,\n    0.54\n   ],\n   \"size\": [\n    1.56,\n    0.022,\n    0.022\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -0.455,\n    1,\n    0.19\n   ],\n   \"size\": [\n    0.022,\n    1.3,\n    0.022\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0.455,\n    1,\n    0.19\n   ],\n   \"size\": [\n    0.022,\n    1.3,\n    0.022\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    1.765,\n    0.19\n   ],\n   \"size\": [\n    0.93,\n    0.022,\n    0.022\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  }\n ]\n}",
+  "defs/plaza-led-strips.kit.json": "{\n \"name\": \"plaza-led-strips\",\n \"description\": \"Cool-white LED strips set into a plaza: a frame 0.45 m inside an 18 x 14 m edge, a halo frame round the gazebo and a U framing the shrine; glows by day and night and lights the paving after dusk.\",\n \"tags\": [\n  \"led\",\n  \"light\",\n  \"strip\",\n  \"plaza\",\n  \"decor\"\n ],\n \"components\": {\n  \"light\": {\n   \"color\": \"#e6f7ff\",\n   \"range\": 9,\n   \"on\": true\n  }\n },\n \"shapes\": [\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.095,\n    -6.55\n   ],\n   \"size\": [\n    17.18,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.095,\n    6.55\n   ],\n   \"size\": [\n    17.18,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -8.55,\n    0.095,\n    0\n   ],\n   \"size\": [\n    0.08,\n    0.07,\n    13.02\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    8.55,\n    0.095,\n    0\n   ],\n   \"size\": [\n    0.08,\n    0.07,\n    13.02\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.5,\n    0.095,\n    -3.2\n   ],\n   \"size\": [\n    6.48,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.5,\n    0.095,\n    3.2\n   ],\n   \"size\": [\n    6.48,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -4.7,\n    0.095,\n    0\n   ],\n   \"size\": [\n    0.08,\n    0.07,\n    6.32\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.7000000000000002,\n    0.095,\n    0\n   ],\n   \"size\": [\n    0.08,\n    0.07,\n    6.32\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    5.35,\n    0.095,\n    0\n   ],\n   \"size\": [\n    0.08,\n    0.07,\n    2.98\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    6.75,\n    0.095,\n    -1.45\n   ],\n   \"size\": [\n    2.8000000000000007,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    6.75,\n    0.095,\n    1.45\n   ],\n   \"size\": [\n    2.8000000000000007,\n    0.07,\n    0.08\n   ],\n   \"color\": \"#eafaff\",\n   \"material\": \"emissive\",\n   \"glow\": 1,\n   \"collide\": false\n  }\n ]\n}",
+  "defs/gazebo-teal-braces.kit.json": "{\n \"name\": \"gazebo-teal-braces\",\n \"description\": \"Sixteen teal-painted knee braces linking the posts of a 5 m gazebo to its eaves beam.\",\n \"tags\": [\n  \"gazebo\",\n  \"trim\",\n  \"brace\",\n  \"decor\"\n ],\n \"shapes\": [\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.105,\n    -0.475,\n    -2.33\n   ],\n   \"roll\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.33,\n    -0.475,\n    -2.105\n   ],\n   \"pitch\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -0.225,\n    -0.475,\n    -2.33\n   ],\n   \"roll\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.33,\n    -0.475,\n    -0.225\n   ],\n   \"pitch\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    0.225,\n    -0.475,\n    -2.33\n   ],\n   \"roll\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.33,\n    -0.475,\n    0.225\n   ],\n   \"pitch\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.105,\n    -0.475,\n    -2.33\n   ],\n   \"roll\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.33,\n    -0.475,\n    2.105\n   ],\n   \"pitch\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -2.105,\n    -0.475,\n    2.33\n   ],\n   \"roll\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.33,\n    -0.475,\n    -2.105\n   ],\n   \"pitch\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    -0.225,\n    -0.475,\n    2.33\n   ],\n   \"roll\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.33,\n    -0.475,\n    -0.225\n   ],\n   \"pitch\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    0.225,\n    -0.475,\n    2.33\n   ],\n   \"roll\": -0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.33,\n    -0.475,\n    0.225\n   ],\n   \"pitch\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.105,\n    -0.475,\n    2.33\n   ],\n   \"roll\": 0.7853981633974483\n  },\n  {\n   \"kind\": \"box\",\n   \"size\": [\n    0.075,\n    0.6363961030678928,\n    0.075\n   ],\n   \"color\": \"#1d8f8a\",\n   \"material\": \"paint\",\n   \"collide\": false,\n   \"at\": [\n    2.33,\n    -0.475,\n    2.105\n   ],\n   \"pitch\": -0.7853981633974483\n  }\n ]\n}"
+ },
+ "rows": [
+  {
+   "at": "2026-10-15T12:56:46.507Z",
+   "cmd": "help",
+   "file": "transcript.jsonl",
+   "line": 1,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:56:51.369Z",
+   "cmd": "register http://127.0.0.1:5350/w/district-p dev:admin",
+   "file": "transcript.jsonl",
+   "line": 2,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:56:51.421Z",
+   "cmd": "mint",
+   "file": "transcript.jsonl",
+   "line": 3,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:56:51.471Z",
+   "cmd": "status",
+   "file": "transcript.jsonl",
+   "line": 4,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:56:54.093Z",
+   "cmd": "map",
+   "file": "transcript.jsonl",
+   "line": 5,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:57:05.873Z",
+   "cmd": "describe region-old-town.plaza",
+   "file": "transcript.jsonl",
+   "line": 6,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:57:05.955Z",
+   "cmd": "where 96,19",
+   "file": "transcript.jsonl",
+   "line": 7,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:57:06.057Z",
+   "cmd": "free 20x18 --near region-old-town.plaza",
+   "file": "transcript.jsonl",
+   "line": 8,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:57:33.485Z",
+   "cmd": "defs gazebo",
+   "file": "transcript.jsonl",
+   "line": 9,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:57:33.566Z",
+   "cmd": "defs plaza",
+   "file": "transcript.jsonl",
+   "line": 10,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:58:13.810Z",
+   "cmd": "schema --md",
+   "file": "transcript.jsonl",
+   "line": 11,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:58:33.528Z",
+   "cmd": "defs pavilion",
+   "file": "transcript.jsonl",
+   "line": 12,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:58:33.608Z",
+   "cmd": "defs roundhouse",
+   "file": "transcript.jsonl",
+   "line": 13,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:58:33.697Z",
+   "cmd": "describe commons-pavilion",
+   "file": "transcript.jsonl",
+   "line": 14,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:22.966Z",
+   "cmd": "defs bench",
+   "file": "transcript.jsonl",
+   "line": 15,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:23.051Z",
+   "cmd": "defs bench-seat",
+   "file": "transcript.jsonl",
+   "line": 16,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:23.142Z",
+   "cmd": "describe eden-house-3",
+   "file": "transcript.jsonl",
+   "line": 17,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.173Z",
+   "cmd": "free 18x14 --near 95,19",
+   "file": "transcript.jsonl",
+   "line": 18,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.256Z",
+   "cmd": "where 86,12",
+   "file": "transcript.jsonl",
+   "line": 19,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.338Z",
+   "cmd": "where 104,12",
+   "file": "transcript.jsonl",
+   "line": 20,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.418Z",
+   "cmd": "where 86,26",
+   "file": "transcript.jsonl",
+   "line": 21,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.499Z",
+   "cmd": "where 104,26",
+   "file": "transcript.jsonl",
+   "line": 22,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:29.579Z",
+   "cmd": "where 95,19",
+   "file": "transcript.jsonl",
+   "line": 23,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:33.467Z",
+   "cmd": "group marble-plaza",
+   "file": "transcript.jsonl",
+   "line": 24,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:33.583Z",
+   "cmd": "place plaza --rect 95,19,18,14 --name marble-plaza --param material=stone --param pattern=grid --param color=#eef0ef --param size=1.2 --param kerb=true",
+   "file": "transcript.jsonl",
+   "line": 25,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T12:59:51.411Z",
+   "cmd": "look --at marble-plaza --from sw --out shots/01-plaza-sw.png",
+   "file": "transcript.jsonl",
+   "line": 27,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:00:00.218Z",
+   "cmd": "set marble-plaza --param material=tile --param color=#f4f7f8",
+   "file": "transcript.jsonl",
+   "line": 28,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:00:05.274Z",
+   "cmd": "look --at marble-plaza --from sw --dist 22 --out shots/02-plaza-tile.png",
+   "file": "transcript.jsonl",
+   "line": 30,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:00:27.869Z",
+   "cmd": "set marble-plaza --param color=#e2eaf3",
+   "file": "transcript.jsonl",
+   "line": 31,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:00:49.647Z",
+   "cmd": "look --at marble-plaza --from sw --dist 22 --out shots/03-plaza-cool.png",
+   "file": "transcript.jsonl",
+   "line": 33,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:01:21.870Z",
+   "cmd": "place pavilion --at 93.5,19 --facing w --param w=5 --param d=5 --param roof=flat --param material=wood --param wall=#1d8f8a --param trim=#9a6b43 --param roofColor=#5f7f3c --param floorHeight=3 --name gazebo --dry",
+   "file": "transcript.jsonl",
+   "line": 34,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:01:26.205Z",
+   "cmd": "place pavilion --at 93.5,19 --facing w --param w=5 --param d=5 --param roof=flat --param material=wood --param wall=#1d8f8a --param trim=#9a6b43 --param roofColor=#5f7f3c --param floorHeight=3 --name gazebo",
+   "file": "transcript.jsonl",
+   "line": 35,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:01:26.354Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 36,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:01:37.873Z",
+   "cmd": "look --at gazebo --from sw --dist 12 --out shots/04-gazebo-shell.png",
+   "file": "transcript.jsonl",
+   "line": 38,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:04.526Z",
+   "cmd": "find green roof planted",
+   "file": "transcript.jsonl",
+   "line": 39,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:04.582Z",
+   "cmd": "find planter",
+   "file": "transcript.jsonl",
+   "line": 40,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:04.616Z",
+   "cmd": "place planter-box --in gazebo/roof --dry",
+   "file": "transcript.jsonl",
+   "line": 41,
+   "recorded": "cli",
+   "error": "REFUSED by the CLI: place has no option --in. Its options: --json --at --offset --near --around --dist --dir --count --facing --yaw --against --between --along --t --side --setback --inside --corner --wall --on --row --grid --gap --spacing --float --from --to --via --width --across --span --free --r"
+  },
+  {
+   "at": "2026-10-15T13:02:04.681Z",
+   "cmd": "where gazebo",
+   "file": "transcript.jsonl",
+   "line": 42,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:16.418Z",
+   "cmd": "place planter-box --on gazebo/roof --dry",
+   "file": "transcript.jsonl",
+   "line": 43,
+   "recorded": "error",
+   "error": "gazebo has no slot roof; its slots: pavilion (room), ground (floor), front (stand)"
+  },
+  {
+   "at": "2026-10-15T13:02:16.498Z",
+   "cmd": "place planter-box --inside gazebo/roof --dry",
+   "file": "transcript.jsonl",
+   "line": 44,
+   "recorded": "error",
+   "error": "gazebo has no room roof; rooms: pavilion"
+  },
+  {
+   "at": "2026-10-15T13:02:16.569Z",
+   "cmd": "defs gazebo --json",
+   "file": "transcript.jsonl",
+   "line": 45,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:40.945Z",
+   "cmd": "defs cottage",
+   "file": "transcript.jsonl",
+   "line": 46,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:02:41.022Z",
+   "cmd": "defs flat-roof",
+   "file": "transcript.jsonl",
+   "line": 47,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:03:06.743Z",
+   "cmd": "layers",
+   "file": "transcript.jsonl",
+   "line": 48,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:04:05.356Z",
+   "cmd": "defs gazebo --json",
+   "file": "transcript.jsonl",
+   "line": 49,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:04:05.410Z",
+   "cmd": "defs lamp-post --json",
+   "file": "transcript.jsonl",
+   "line": 50,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:27.721Z",
+   "cmd": "place bench --inside gazebo/pavilion --wall left --name gazebo-bench-s --param iron=#1d8f8a --param wood=#a8774a",
+   "file": "transcript.jsonl",
+   "line": 51,
+   "recorded": "error",
+   "error": "no room for a 1.6×0.55 m thing against the left wall in gazebo/pavilion (4.78×4.78 m): in the doorway open-e; in the doorway open-s; in the doorway open-n"
+  },
+  {
+   "at": "2026-10-15T13:05:27.798Z",
+   "cmd": "place bench --inside gazebo/pavilion --wall right --name gazebo-bench-n --param iron=#1d8f8a --param wood=#a8774a",
+   "file": "transcript.jsonl",
+   "line": 52,
+   "recorded": "error",
+   "error": "no room for a 1.6×0.55 m thing against the right wall in gazebo/pavilion (4.78×4.78 m): in the doorway open-w; in the doorway open-n; in the doorway open-s"
+  },
+  {
+   "at": "2026-10-15T13:05:43.720Z",
+   "cmd": "place bench --at 93.5,17.4 --facing s --name gazebo-bench-n --param iron=#1d8f8a --param wood=#a8774a",
+   "file": "transcript.jsonl",
+   "line": 53,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:43.920Z",
+   "cmd": "place bench --at 93.5,20.6 --facing n --name gazebo-bench-s --param iron=#1d8f8a --param wood=#a8774a",
+   "file": "transcript.jsonl",
+   "line": 54,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:48.703Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 55,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:48.781Z",
+   "cmd": "describe gazebo-bench-n",
+   "file": "transcript.jsonl",
+   "line": 56,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:58.584Z",
+   "cmd": "place bench --inside gazebo/pavilion --facing s --name test-bench --dry",
+   "file": "transcript.jsonl",
+   "line": 57,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:05:58.666Z",
+   "cmd": "move gazebo-bench-n --in gazebo/pavilion --dry",
+   "file": "transcript.jsonl",
+   "line": 58,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:18.903Z",
+   "cmd": "move gazebo-bench-n --in gazebo/pavilion",
+   "file": "transcript.jsonl",
+   "line": 59,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:19.075Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 60,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:23.019Z",
+   "cmd": "move gazebo/gazebo-bench-n --by 0,-1.6",
+   "file": "transcript.jsonl",
+   "line": 61,
+   "recorded": "refused:overlap.solid"
+  },
+  {
+   "at": "2026-10-15T13:06:23.156Z",
+   "cmd": "move gazebo/gazebo-bench-n --facing s",
+   "file": "transcript.jsonl",
+   "line": 62,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:23.289Z",
+   "cmd": "describe gazebo/gazebo-bench-n",
+   "file": "transcript.jsonl",
+   "line": 63,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:32.575Z",
+   "cmd": "move gazebo/gazebo-bench-n --by 0,-1.55",
+   "file": "transcript.jsonl",
+   "line": 64,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:32.746Z",
+   "cmd": "move gazebo-bench-s --in gazebo/pavilion",
+   "file": "transcript.jsonl",
+   "line": 65,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:37.056Z",
+   "cmd": "move gazebo/gazebo-bench-s --facing n",
+   "file": "transcript.jsonl",
+   "line": 66,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:37.275Z",
+   "cmd": "move gazebo/gazebo-bench-s --by 0,1.55",
+   "file": "transcript.jsonl",
+   "line": 67,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:37.560Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 68,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:06:43.125Z",
+   "cmd": "look --at gazebo --from sw --dist 10 --out shots/05-gazebo-benches.png",
+   "file": "transcript.jsonl",
+   "line": 70,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:07:51.443Z",
+   "cmd": "define-kit defs/gazebo-green-roof.kit.json",
+   "file": "transcript.jsonl",
+   "line": 71,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:00.224Z",
+   "cmd": "defs gazebo-green-roof@1",
+   "file": "transcript.jsonl",
+   "line": 72,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:00.290Z",
+   "cmd": "dryrun {\"ops\":[{\"op\":\"place\",\"def\":\"gazebo-green-roof@1\",\"name\":\"gazebo-roof-garden\",\"in\":{\"parent\":\"gazebo\"},\"p\":[0,3.05,0],\"r\":0}]}",
+   "file": "transcript.jsonl",
+   "line": 73,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:00.339Z",
+   "cmd": "dryrun {\"ops\":[{\"op\":\"place\",\"def\":\"gazebo-green-roof@1\",\"name\":\"gazebo-roof-garden\",\"in\":{\"parent\":\"gazebo\",\"slot\":\"pavilion\"},\"p\":[0,2.95,0],\"r\":0}]}",
+   "file": "transcript.jsonl",
+   "line": 74,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:00.397Z",
+   "cmd": "dryrun {\"ops\":[{\"op\":\"place\",\"def\":\"gazebo-green-roof@1\",\"name\":\"gazebo-roof-garden\",\"p\":[93.5,3.05,19],\"r\":-1.5708}]}",
+   "file": "transcript.jsonl",
+   "line": 75,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:08.954Z",
+   "cmd": "act {\"ops\":[{\"op\":\"place\",\"def\":\"gazebo-green-roof@1\",\"name\":\"roof-garden\",\"in\":{\"parent\":\"gazebo\"},\"p\":[0,3.05,0],\"r\":0}],\"group\":\"marble-plaza\"}",
+   "file": "transcript.jsonl",
+   "line": 76,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:09.150Z",
+   "cmd": "describe gazebo/roof-garden",
+   "file": "transcript.jsonl",
+   "line": 77,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:24.468Z",
+   "cmd": "look --at gazebo --from sw --dist 10 --out shots/06-green-roof.png",
+   "file": "transcript.jsonl",
+   "line": 79,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:08:47.615Z",
+   "cmd": "define-kit defs/gazebo-green-roof.kit.json",
+   "file": "transcript.jsonl",
+   "line": 80,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:09:21.056Z",
+   "cmd": "defs table --json",
+   "file": "transcript.jsonl",
+   "line": 81,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:09:52.325Z",
+   "cmd": "define-kit defs/marble-shrine.kit.json",
+   "file": "transcript.jsonl",
+   "line": 82,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:09:52.398Z",
+   "cmd": "define-kit defs/plaza-led-strips.kit.json",
+   "file": "transcript.jsonl",
+   "line": 83,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:10:03.009Z",
+   "cmd": "act {\"ops\":[{\"op\":\"place\",\"def\":\"plaza-led-strips@1\",\"name\":\"plaza-leds\",\"p\":[95,0,19],\"r\":0}],\"group\":\"marble-plaza\"}",
+   "file": "transcript.jsonl",
+   "line": 84,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:10:03.206Z",
+   "cmd": "describe plaza-leds",
+   "file": "transcript.jsonl",
+   "line": 85,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:10:03.320Z",
+   "cmd": "place marble-shrine@1 --at 101.9,19 --facing w --name shrine",
+   "file": "transcript.jsonl",
+   "line": 86,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:10:14.842Z",
+   "cmd": "look --at marble-plaza --from sw --dist 24 --out shots/07-wide-sw.png",
+   "file": "transcript.jsonl",
+   "line": 88,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:10:19.739Z",
+   "cmd": "look --at shrine --from w --dist 5 --out shots/08-shrine-w.png",
+   "file": "transcript.jsonl",
+   "line": 90,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:11:42.974Z",
+   "cmd": "set gazebo --param w=4.4 --param d=4.4",
+   "file": "transcript.jsonl",
+   "line": 91,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:11:43.214Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 92,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:05.862Z",
+   "cmd": "undo",
+   "file": "transcript.jsonl",
+   "line": 93,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:06.066Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 94,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:13.361Z",
+   "cmd": "define-kit defs/plaza-led-strips.kit.json",
+   "file": "transcript.jsonl",
+   "line": 95,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:19.221Z",
+   "cmd": "define-kit defs/plaza-led-strips.kit.json",
+   "file": "transcript.jsonl",
+   "line": 96,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:24.999Z",
+   "cmd": "look --at marble-plaza --from above --dist 26 --out shots/09-above.png",
+   "file": "transcript.jsonl",
+   "line": 98,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:38.492Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 99,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:38.567Z",
+   "cmd": "sky",
+   "file": "transcript.jsonl",
+   "line": 100,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:12:52.769Z",
+   "cmd": "look --at gazebo --from w --dist 8 --out shots/10-gazebo-w.png",
+   "file": "transcript.jsonl",
+   "line": 102,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:13:39.826Z",
+   "cmd": "define-kit defs/gazebo-teal-braces.kit.json",
+   "file": "transcript.jsonl",
+   "line": 103,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:13:39.886Z",
+   "cmd": "act {\"ops\":[{\"op\":\"place\",\"def\":\"gazebo-teal-braces@1\",\"name\":\"teal-braces\",\"in\":{\"parent\":\"gazebo\"},\"p\":[0,3.05,0],\"r\":0}],\"group\":\"marble-plaza\"}",
+   "file": "transcript.jsonl",
+   "line": 104,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:13:45.218Z",
+   "cmd": "look --at gazebo --from sw --dist 7 --out shots/11-braces.png",
+   "file": "transcript.jsonl",
+   "line": 106,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:13:56.470Z",
+   "cmd": "look --at gazebo --from s --dist 11 --out shots/12-braces-s.png",
+   "file": "transcript.jsonl",
+   "line": 108,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:14:54.990Z",
+   "cmd": "defs gazebo-teal-braces@1 --json",
+   "file": "transcript.jsonl",
+   "line": 109,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:14:55.061Z",
+   "cmd": "describe gazebo/teal-braces",
+   "file": "transcript.jsonl",
+   "line": 110,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:15:38.259Z",
+   "cmd": "describe shrine",
+   "file": "transcript.jsonl",
+   "line": 111,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:15:49.313Z",
+   "cmd": "time 21:00",
+   "file": "transcript.jsonl",
+   "line": 112,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:15:55.019Z",
+   "cmd": "look --at marble-plaza --from sw --dist 22 --out shots/13-night-wide.png",
+   "file": "transcript.jsonl",
+   "line": 114,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:15:59.999Z",
+   "cmd": "look --at gazebo --from sw --dist 9 --out shots/14-night-gazebo.png",
+   "file": "transcript.jsonl",
+   "line": 116,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:04.883Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 117,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:04.933Z",
+   "cmd": "history",
+   "file": "transcript.jsonl",
+   "line": 118,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:36.330Z",
+   "cmd": "undo",
+   "file": "transcript.jsonl",
+   "line": 119,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:36.379Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 120,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:40.602Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 121,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:40.653Z",
+   "cmd": "history",
+   "file": "transcript.jsonl",
+   "line": 122,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:52.490Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 123,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:52.542Z",
+   "cmd": "time 14:22",
+   "file": "transcript.jsonl",
+   "line": 124,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:52.592Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 125,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:58.198Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 126,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:16:58.247Z",
+   "cmd": "time --json",
+   "file": "transcript.jsonl",
+   "line": 127,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:04.763Z",
+   "cmd": "history --json",
+   "file": "transcript.jsonl",
+   "line": 128,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:08.653Z",
+   "cmd": "history --json",
+   "file": "transcript.jsonl",
+   "line": 129,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:18.685Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 130,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:28.249Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 131,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:28.303Z",
+   "cmd": "act {\"ops\":[{\"op\":\"world\",\"state\":{\"time\":{\"set\":{\"hour\":14.7,\"n\":2}}}}]}",
+   "file": "transcript.jsonl",
+   "line": 132,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:28.355Z",
+   "cmd": "time",
+   "file": "transcript.jsonl",
+   "line": 133,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:44.607Z",
+   "cmd": "group --off",
+   "file": "transcript.jsonl",
+   "line": 134,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:44.660Z",
+   "cmd": "resolve",
+   "file": "transcript.jsonl",
+   "line": 135,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:44.758Z",
+   "cmd": "describe gazebo",
+   "file": "transcript.jsonl",
+   "line": 136,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:44.823Z",
+   "cmd": "describe gazebo/gazebo-bench-n",
+   "file": "transcript.jsonl",
+   "line": 137,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:44.901Z",
+   "cmd": "describe gazebo/gazebo-bench-s",
+   "file": "transcript.jsonl",
+   "line": 138,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:17:50.747Z",
+   "cmd": "history",
+   "file": "transcript.jsonl",
+   "line": 139,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:18:06.481Z",
+   "cmd": "look --at gazebo --from sw --dist 10 --out shots/final-closeup.png",
+   "file": "transcript.jsonl",
+   "line": 141,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:18:11.424Z",
+   "cmd": "look --at 87,19 --from sw --dist 36 --out shots/final-wide.png",
+   "file": "transcript.jsonl",
+   "line": 143,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T13:18:58.815Z",
+   "cmd": "look --at shrine --from w --dist 6 --out shots/final-shrine.png",
+   "file": "transcript.jsonl",
+   "line": 145,
+   "recorded": "ok"
+  }
+ ]
+}

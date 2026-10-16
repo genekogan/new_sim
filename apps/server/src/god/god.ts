@@ -21,6 +21,7 @@ import { GodDistricts } from './districts.ts'; // Y3 districts
 import { buildReceipt } from './build-integrity.ts';
 import { definitionUseClosure } from './unused-defs.ts';
 import { rewindChanges, rewindDependents } from './rewind.ts';
+import { GodTrace } from './trace.ts';
 export type { WorldBuildMessage } from './builds.ts';
 const previewBatchSchema = batchSchema.extend({ build: buildFieldSchema.optional() });
 
@@ -77,6 +78,8 @@ export class GodMode {
   readonly districts: GodDistricts; // Y3 districts
   readonly parts: Parts;
   readonly helpers: HelperTokens;
+  /** RL7: bounded in-memory ring of god request metadata (routes.ts records; `trace` and `build show` read). */
+  readonly trace: GodTrace = new GodTrace({ now: () => this.now() });
   private caller: BuildCaller = {};
   /** Journal label for edits made without a token (genesis import); 'server' otherwise. */
   private system: string | null = null;

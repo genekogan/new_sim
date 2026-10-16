@@ -712,8 +712,10 @@ const rewindReport = (id, r, dry) => {
     ...(r.warnings ?? []).map(x => `WARNING: ${x}`), ...(dry ? [`apply: build rewind ${id} --to ${w.to}${w.to ? '' : ' (the start)'}`] : [])].join('\n');
 };
 const reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(', ') || 'none'}${r.recorded === false ? `; not fully recorded${r.code ? ' (' + r.code + ')' : ''}` : ''}` : '';
+// RL7: a refusal the server saw 3+ times in 2 min (same code + field), from build show and trace.
+export const loopLine = (l) => `LOOP ×${l.count} in ${Math.max(1, Math.round((l.lastAt - l.firstAt) / 1000))} s: ${l.code}${l.field ? ` (field ${l.field})` : ''} via ${l.routes.join(', ')}${l.builds?.length ? ` [build ${l.builds.join(', ')}]` : ''} — the same refusal keeps coming back; change the request${HINTS[l.code] ? ` (${HINTS[l.code]})` : ''} instead of resending it`;
 function buildReport(r) {
-  if (r.open) return [...r.open.flatMap(b => [...buildWords(b), buildListLine(b)]), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
+  if (r.open) return [...(r.loops ?? []).map(loopLine), ...r.open.flatMap(b => [...buildWords(b), buildListLine(b)]), ...r.recent.map((b) => `${b.id}: ${b.status}`), buildHeader()].filter(Boolean).join('\n') || 'no builds';
   const b = r.build, steps = b.plan.steps, current = r.current ?? b.current, open = ['active', 'paused'].includes(b.status);
   const lines = [...(r.district ? districtLines(r.district, b.id) : []), ...buildWords(b), ...buildOutline(b)];
   if (current) {
@@ -729,7 +731,21 @@ function buildReport(r) {
   if (load().build?.id === b.id) lines.push(`local: ${buildHeader()}`);
   const reuse = reuseReport(r.reuse ?? b.reuse); if (reuse) lines.push(reuse);
   const receipt = checkedReceipt(r.receipt ?? b.done?.receipt); if (receipt) lines.push(receipt);
+  for (const l of r.loops ?? []) lines.push(loopLine(l));
   return lines.join('\n');
+}
+const ago = (now, at) => { const s = Math.max(0, Math.round((now - at) / 1000)); return s < 120 ? `${s}s ago` : `${Math.round(s / 60)}m ago`; };
+/** trace [--build id] [--limit n]: this world's recent god requests — route, outcome code, field, ms; never payloads. */
+export async function trace(flags = {}) {
+  const q = new URLSearchParams();
+  if (flags.build !== undefined) { if (typeof flags.build !== 'string' || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(flags.build)) throw new Error('trace --build takes a build id'); q.set('build', flags.build); }
+  if (flags.limit !== undefined) { const n = Number(flags.limit); if (!Number.isInteger(n) || n < 1 || n > 1024) throw new Error('trace --limit takes 1..1024'); q.set('limit', String(n)); }
+  const r = ok(await call(`/v1/god/trace${q.size ? `?${q}` : ''}`), 'trace');
+  if (flags.json) return r;
+  const s = r.stats;
+  if (!r.enabled) return 'trace: off on this server (GOD_TRACE=0)';
+  return [`trace: ${s.kept} of ${s.traced} god requests kept (newest first, max ${s.rowsMax}); ${s.refused} refused, ${s.repeated} of them repeats inside a loop`, ...r.loops.map(loopLine),
+    ...r.rows.map(x => `  ${ago(r.now, x.at)} ${x.method} ${x.route} → ${x.code}${x.field ? ` (${x.field})` : ''} ${x.ms} ms${x.build ? ` [${x.build}${x.step !== undefined ? ` ${x.step}` : ''}]` : ''} ${x.tok ?? '-'}${x.tok === r.you ? ' (you)' : ''}`)].join('\n');
 }
 const waitTimeout = (value = '15m') => {
   const m = typeof value === 'string' && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
@@ -1231,8 +1247,9 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['once', 'follow', 'fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
-const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
+const BOOL = new Set(['fix', 'helper', 'local', 'remote' /* W2 remote looks */, 'no-build', 'done', 'force', 'undo', 'float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'site', 'unused', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS, ...LAYERS_BOOLS]);
+// listen --once/--follow are switches; `hours --follow field@open=…` takes a value, so they are listen-only.
+const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : cmd === 'listen' ? new Set([...BOOL, 'once', 'follow']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -1253,8 +1270,8 @@ export function parseFlags(argv, bools = BOOL) {
 // What each command accepts: anything else is refused, never silently ignored.
 const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
 const FLAGS = {
-  doctor: 'fix local',
-  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry',
+  doctor: 'fix local', trace: 'build limit',
+  build: 'title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry helper ttl',
   listen: 'after timeout once follow', ack: '',
   'verify-use': 'seat from uses',
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -1265,7 +1282,7 @@ const FLAGS = {
   ...LAYERS_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { listen: 0, ack: 2, doctor: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -1274,7 +1291,7 @@ export function checkArgs(cmd, f, rest) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}…": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => '--' + x).join(' ')}`);
     for (const x of [].concat(v)) {
-      if (x === true && !BOOL.has(k) && !(cmd === 'build' && (k === 'take' || k === 'delete' /* Y3 */)) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
+      if (x === true && !boolsFor(cmd).has(k) && !(cmd === 'build' && (k === 'take' || k === 'delete' /* Y3 */)) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && !(cmd === 'build' && k === 'steps') && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (cmd === 'look' && ['dist', 'span'].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === '' || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
@@ -1285,8 +1302,10 @@ export function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
 }
+/** RL6 replay/lint: the CLI's own reading tables (read-only). */
+export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
-export const COMMANDS = { doctor: (r, f) => doctor(f),
+export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
   listen: (r, f) => listen(f), ack: (r) => ack(r[0], r[1]),
   build: (r, f) => build(r[0], r.slice(1), f),
@@ -1310,6 +1329,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f),
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
+trace:  trace [--build id] [--limit n] (the world's recent god requests: route, outcome, ms, no payloads; LOOP = the same refusal 3+ times in 2 min, also in build show)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> ([bounds] containment / [collider] hit) · reach <from> <to> · clear <x,z|ref> --size WxD · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
 look:   --views \"sw;w --dist 30;inside\" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).\nlook:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. Sheets, frame strips and kit workbench require local Playwright and Google Chrome. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|…] changes only the picture, never the world clock.
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
@@ -1317,13 +1337,13 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force] · build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open). Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) · build start <id> --district <d> [--plots p1,p2] [--brief …] (a chapter: site and massing come from the plots) · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force] · build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open; global --no-build skips automatic metadata)
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [\"reply up to 140 characters\"]
-pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] · ack <message-id> [reply] (a reply of up to 140 characters)
+pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all] (answered too) · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
@@ -1338,7 +1358,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const t0 = Date.now();
   // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
   const tr = (() => { try { return load().transcript; } catch { return null; } })();
-  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  // RL6: argv keeps the exact words (a replay cannot recover quoting from the joined cmd).
+  const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, 'god_…');
+  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: redact([cmd, ...argv].join(' ')), argv: [cmd ?? 'help', ...argv].map(redact), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
   if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
   Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else { console.log(JSON.stringify(out, null, 2)); if (!f.json && out?.[OUTPUT_SUFFIX]) console.error(out[OUTPUT_SUFFIX]); } if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });

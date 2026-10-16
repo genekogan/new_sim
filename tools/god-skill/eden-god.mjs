@@ -2653,7 +2653,7 @@ async function layers(f) {
 var LAYERS_FLAGS = { hours: "open event follow clear note", event: "set piece shift label remove", own: "private public", access: "", price: "service", currency: "", give: "", pay: "", zone: "rect circle area", "zone-suggest": "", relate: "off", layers: "" };
 var LAYERS_BOOLS = ["clear", "private", "public", "off"];
 var LAYERS_POS = { hours: 1, event: 2, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
-var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) \xB7 event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] (adds one event; its set appears while it is on) \xB7 event <ref> <name> --remove \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
+var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00 (or 07:00-15:00@sat,sun) [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) \xB7 event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] (adds one event; its set appears while it is on) \xB7 event <ref> <name> --remove \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/version.mjs
 var SKILL_VERSION = "1.4";
@@ -3556,8 +3556,9 @@ var rewindReport = (id, r, dry) => {
   ].join("\n");
 };
 var reuseReport = (r) => r ? `reuse: ${r.newDefs} new defs, ${r.placedFromParts} placed from parts; kept as parts: ${r.kept.join(", ") || "none"}${r.recorded === false ? `; not fully recorded${r.code ? " (" + r.code + ")" : ""}` : ""}` : "";
+var loopLine = (l) => `LOOP \xD7${l.count} in ${Math.max(1, Math.round((l.lastAt - l.firstAt) / 1e3))} s: ${l.code}${l.field ? ` (field ${l.field})` : ""} via ${l.routes.join(", ")}${l.builds?.length ? ` [build ${l.builds.join(", ")}]` : ""} \u2014 the same refusal keeps coming back; change the request${HINTS[l.code] ? ` (${HINTS[l.code]})` : ""} instead of resending it`;
 function buildReport(r) {
-  if (r.open) return [...r.open.flatMap((b2) => [...buildWords(b2), buildListLine(b2)]), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
+  if (r.open) return [...(r.loops ?? []).map(loopLine), ...r.open.flatMap((b2) => [...buildWords(b2), buildListLine(b2)]), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
   const b = r.build, steps2 = b.plan.steps, current = r.current ?? b.current, open = ["active", "paused"].includes(b.status);
   const lines = [...r.district ? districtLines(r.district, b.id) : [], ...buildWords(b), ...buildOutline(b)];
   if (current) {
@@ -3576,7 +3577,33 @@ function buildReport(r) {
   if (reuse) lines.push(reuse);
   const receipt = checkedReceipt(r.receipt ?? b.done?.receipt);
   if (receipt) lines.push(receipt);
+  for (const l of r.loops ?? []) lines.push(loopLine(l));
   return lines.join("\n");
+}
+var ago = (now, at) => {
+  const s = Math.max(0, Math.round((now - at) / 1e3));
+  return s < 120 ? `${s}s ago` : `${Math.round(s / 60)}m ago`;
+};
+async function trace(flags2 = {}) {
+  const q = new URLSearchParams();
+  if (flags2.build !== void 0) {
+    if (typeof flags2.build !== "string" || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(flags2.build)) throw new Error("trace --build takes a build id");
+    q.set("build", flags2.build);
+  }
+  if (flags2.limit !== void 0) {
+    const n = Number(flags2.limit);
+    if (!Number.isInteger(n) || n < 1 || n > 1024) throw new Error("trace --limit takes 1..1024");
+    q.set("limit", String(n));
+  }
+  const r = ok(await call(`/v1/god/trace${q.size ? `?${q}` : ""}`), "trace");
+  if (flags2.json) return r;
+  const s = r.stats;
+  if (!r.enabled) return "trace: off on this server (GOD_TRACE=0)";
+  return [
+    `trace: ${s.kept} of ${s.traced} god requests kept (newest first, max ${s.rowsMax}); ${s.refused} refused, ${s.repeated} of them repeats inside a loop`,
+    ...r.loops.map(loopLine),
+    ...r.rows.map((x) => `  ${ago(r.now, x.at)} ${x.method} ${x.route} \u2192 ${x.code}${x.field ? ` (${x.field})` : ""} ${x.ms} ms${x.build ? ` [${x.build}${x.step !== void 0 ? ` ${x.step}` : ""}]` : ""} ${x.tok ?? "-"}${x.tok === r.you ? " (you)" : ""}`)
+  ].join("\n");
 }
 var waitTimeout = (value = "15m") => {
   const m = typeof value === "string" && /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(value);
@@ -4198,8 +4225,8 @@ async function status() {
   const v = st.versions;
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["once", "follow", "fix", "helper", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
-var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
+var BOOL = /* @__PURE__ */ new Set(["fix", "helper", "local", "remote", "no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "site", "unused", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : cmd === "listen" ? /* @__PURE__ */ new Set([...BOOL, "once", "follow"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -4222,7 +4249,8 @@ function parseFlags(argv, bools = BOOL) {
 var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
 var FLAGS = {
   doctor: "fix local",
-  build: "title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry",
+  trace: "build limit",
+  build: "title steps at offset size yaw mass brief root take done force undo say timeout asks include district plots file delete to dry helper ttl",
   listen: "after timeout once follow",
   ack: "",
   "verify-use": "seat from uses",
@@ -4262,7 +4290,7 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { listen: 0, ack: 2, doctor: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -4270,7 +4298,7 @@ function checkArgs(cmd, f, rest) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}\u2026": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => "--" + x).join(" ")}`);
     for (const x of [].concat(v)) {
-      if (x === true && !BOOL.has(k) && !(cmd === "build" && (k === "take" || k === "delete")) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
+      if (x === true && !boolsFor(cmd).has(k) && !(cmd === "build" && (k === "take" || k === "delete")) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && !(cmd === "build" && k === "steps") && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (cmd === "look" && ["dist", "span"].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === "" || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
@@ -4281,9 +4309,11 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
+var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 var readArg = (r) => r[0] !== void 0 ? existsSync6(r[0]) && !r[0].trim().startsWith("{") ? readFileSync6(r[0], "utf8") : r[0] : readFileSync6(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
+  trace: (r, f) => trace(f),
   kit: (r, f) => {
     if (r[0] !== "look" || !r[1]) throw Error("usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]");
     return kitLook(readArg(r.slice(1)), f);
@@ -4378,6 +4408,7 @@ var COMMANDS = {
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ["build", "group"].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 locks:  doctor [--fix] [--local] [--json] (holders, stale locks; --fix breaks only stale ownership)
+trace:  trace [--build id] [--limit n] (the world's recent god requests: route, outcome, ms, no payloads; LOOP = the same refusal 3+ times in 2 min, also in build show)
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> ([bounds] containment / [collider] hit) \xB7 reach <from> <to> \xB7 clear <x,z|ref> --size WxD \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
 look:   --views "sw;w --dist 30;inside" or --site makes a labelled sheet; --frames n --every ms makes a motion strip. kit look <kit.json> [--beside core/church@1] renders a world-free four-view bench. defs --unused [--remove] lists/retires never-placed trials (undoable).
 look:   --remote (or EDEN_GOD_LOOK=remote) uses the world host; automatic fallback if local Chrome cannot start. Sheets, frame strips and kit workbench require local Playwright and Google Chrome. --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane. --hour HH[:MM] [--weather rain|clear|\u2026] changes only the picture, never the world clock.
@@ -4386,13 +4417,13 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
-site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] \xB7 build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) \xB7 build start <id> --district <d> [--plots p1,p2] [--brief \u2026] (a chapter: site and massing come from the plots) \xB7 build continue <id> --brief "follow-up" \xB7 build check [id] \xB7 build step [label] [--asks "later ask"] [--include ref,ref] [--say "\u2026" [--mass nave,tower]] (announce before designing; without --say stays local) \xB7 build [show [id]] \xB7 build wait [--timeout 15m] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force] \xB7 build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open). Global --no-build skips automatic metadata.
+site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] \xB7 build district <id> [--file plan.json | --delete] (one plan: roads, plots with massing, terrain/water notes, chapters; no flag = show it; --delete frees the id, buildings stay) \xB7 build start <id> --district <d> [--plots p1,p2] [--brief \u2026] (a chapter: site and massing come from the plots) \xB7 build continue <id> --brief "follow-up" \xB7 build check [id] \xB7 build step [label] [--asks "later ask"] [--include ref,ref] [--say "\u2026" [--mass nave,tower]] (announce before designing; without --say stays local) \xB7 build [show [id]] \xB7 build wait [--timeout 15m] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] [--helper [--ttl min]] (--helper: a scoped token for a sub-agent, EDEN_GOD_HELPER=file) \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force] \xB7 build rewind [id] --to <step> [--dry] [--force] (undo every build edit after that step; stays open; global --no-build skips automatic metadata)
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["reply up to 140 characters"]
-pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
+inbox:  listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> [reply] (a reply of up to 140 characters)
+pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at \u2026 hints; also shown at build start)
@@ -4415,10 +4446,11 @@ ${HELP}`);
       return null;
     }
   })();
+  const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026");
   const record = (out, error) => {
     if (!tr || cmd === "look-shot" || cmd === "look-keeper") return;
     try {
-      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: [cmd, ...argv].join(" ").replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026"), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
+      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: redact([cmd, ...argv].join(" ")), argv: [cmd ?? "help", ...argv].map(redact), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
     } catch {
     }
   };
@@ -4449,6 +4481,7 @@ ${HELP}`);
 }
 export {
   BUILD_API,
+  CLI_SHAPE,
   COMMANDS,
   COMPASS,
   EXAMPLES,
@@ -4491,6 +4524,7 @@ export {
   lookFrame,
   lookOverrides,
   lookViews,
+  loopLine,
   map,
   mint,
   mirror,
@@ -4525,6 +4559,7 @@ export {
   status,
   stream,
   terrain,
+  trace,
   undo,
   verifyUse,
   view,

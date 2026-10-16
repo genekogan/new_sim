@@ -98,7 +98,7 @@ only after reading, and do not claim the requested work is complete before verif
    Group undo is atomic: a conflict reverts nothing. Start's site report rides on the same response.
    `build rewind [id] --to k [--dry]` atomically undoes every build edit after step k (lead and helpers) and keeps the
    build open at step k; `--dry` lists what it removes. A later outside edit that depends on that work refuses it
-   (undo that edit first). `undo --group <open build>` rewinds it to the start.
+   (undo that edit first). `undo --group <build>` on an open build rewinds it to the start.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
@@ -379,6 +379,8 @@ day is a Saturday.
   `resolve` — constraints that no longer hold.
 - `history` — the journal (seq, group, note, what each edit did). `schema --md` — the full
   vocabulary (every generator's params with ranges, kit primitives, ops, refusal codes) = SCHEMA.md.
+- `trace [--build id] [--limit n]` — this world's recent god requests (route, outcome code, field, ms; never payloads). A
+  `LOOP` line, here or in `build show`, means the same refusal came back 3+ times in 2 min: change the request.
 
 ## New kinds of things (bespoke kits and meshes)
 
