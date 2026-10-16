@@ -31,10 +31,10 @@ Contract 2
   `surfaces: true`, opaque unlit shapes of wood, bark, stone, rock, cobble, brick, plaster, tile, thatch, metal, fabric,
   sand, gravel, dirt, mud, leaf, moss and grass take the Eden realism shader by material class. A shape's `pattern`
   (`marble`, `ashlar`, `planks`, `shingles`, `stripes`; `none` = flat) replaces that surface and needs no kit flag.
-  A per-vertex `edenSurf` (shape-local metres, circumference, seed) keeps patterns on the shape; up-facing looks use
-  world up. Contract 1 refuses `pattern` and `surfaces` when defined and draws retained data flat; `?surfaces=0`
-  turns surfaces off. `gallery-surfaces-examples.json` is the v2 fixture: plain classes must not change; the
-  intended changes are listed in `gallery-surfaces-allow.json`.
+  A per-vertex `edenSurf` (shape-local metres, stripe count around round shapes, seed) keeps patterns on the shape;
+  class looks read the shape-local normal (a pitched slab is treated as level). Contract 1 refuses `pattern` and
+  `surfaces` when defined and draws retained data flat; `?surfaces=0` turns surfaces off. Retained v2 content has
+  neither field, so it draws exactly as before.
 * Unsupported shape fields refuse with a field path and fix. Segments that would be clamped refuse. Physics includes
   bevels and a conservative spline control hull; all new shapes retain boxes. Triangle estimates cover actual cap,
   bevel and subdivision counts and refuse above 80,000 before meshing.
