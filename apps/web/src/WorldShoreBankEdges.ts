@@ -1,4 +1,10 @@
 import type {NativeShoreTerrainInput} from '../../../mars/viewer/app/engine-view/content/environment/native-shore-terrain.ts';
+/** The closure mesh's name (WorldGeometry). */
+export const SHORE_BANK_EDGE_NAME='Captured shore north/south visual bank edge closure (no support)';
+/** The flat backdrop a cosmetic landscape replaces: the outside-ground planes and the bank closure that only joins the
+ * captured terrain to them. The Eden expansion's own ground rises from the captured edge heights, so a closure kept
+ * under it stood up to 3.5 m above that ground as a flat brown wall along the commons pond. */
+export const isFlatBackdrop=(o:{name:string})=>o.name==='outside-ground'||o.name===SHORE_BANK_EDGE_NAME;
 /** Close the vertical gap between captured terrain's north/south edges and the
  * existing flat visual backdrop. No top surface, west connector, nav or support.
  * Exact captured bed vertices remain unchanged; the water datum is never an input. */
