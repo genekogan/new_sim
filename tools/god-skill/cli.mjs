@@ -12,7 +12,7 @@ import { atomicWrite, buildHeader, call, claimFile, load, num, ok, OUTPUT_SUFFIX
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
-import { camera, shoot, keeper, stopKeeper, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
+import { camera, shoot, keeper, stopKeeper, drawableCount, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
 import { kitDefinition } from './lib/kit.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -1040,7 +1040,7 @@ async function lookInner(flags = {}, runtime = {}, signal) {
   const cam = views[0];
   signal.throwIfAborted();
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...overrides,
+  const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: drawableCount(m.snapshot) /* r2.1: bodies are never in layer.drawn */, cliPath: SELF, keep: !!flags.keep, ...overrides,
     ...(flags.views || flags.site ? { views } : {}), frames: count, every,
     ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;

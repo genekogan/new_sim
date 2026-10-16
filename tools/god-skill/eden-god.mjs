@@ -1929,6 +1929,24 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
+function drawableCount(snapshot3 = {}) {
+  const lib = /* @__PURE__ */ new Map();
+  for (const d of [...snapshot3.defs ?? [], ...snapshot3.library ?? []]) {
+    if (!d?.ref) continue;
+    lib.set("sha:" + d.hash, d);
+    lib.set(d.ref, d);
+    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
+  }
+  const drawable = (ref) => {
+    let make, body = false;
+    for (let d = lib.get(ref), i = 0; d && i < 16; d = d.extends ? lib.get(d.extends) : null, i++) {
+      make ??= d.make;
+      body ||= !!d.components?.body;
+    }
+    return !!make && !body && make.kind !== "none" && make.kind !== "parts";
+  };
+  return (snapshot3.entities ?? []).filter((e) => drawable(e.def)).length;
+}
 function waitForShot({ expect = 0, timeoutMs = 6e5 } = {}) {
   return new Promise((resolve6, reject) => {
     let raf, timer, stable = 0, last = -1;
@@ -1955,8 +1973,9 @@ function waitForShot({ expect = 0, timeoutMs = 6e5 } = {}) {
       } else raf = requestAnimationFrame(tick);
     };
     timer = setTimeout(() => {
+      const w = window.__simEntity, drawn = w?.layer?.drawn;
       cleanup();
-      reject(Error("look: viewer did not initialize and settle before timeout"));
+      reject(Error(`look: viewer did not initialize and settle before timeout (drawn ${drawn?.size ?? 0} of ${expect ? Math.floor(expect * 0.6) : 0} needed from ${expect} drawable, viewer ready ${!!window.__shotReady}, entity layer ${w?.layer?.active ? "active" : "inactive"})`));
     }, timeoutMs);
     window.addEventListener("sim-shot-ready", tick, { once: true });
     tick();
@@ -2067,7 +2086,8 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
       writeFileSync4(resolve4(out), Buffer.from(result.data.split(",")[1], "base64"));
       return { file: resolve4(out), ms: now() - t0, via: "studio", ...result, data: void 0 };
     }
-    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs }) : page.evaluate(waitForShot, { expect, timeoutMs }));
+    const waitMs = Math.max(1e3, timeoutMs - (now() - t0) - 2e3);
+    const state = await (runtime.waitReady ? runtime.waitReady(page, { expect, timeoutMs: waitMs }) : page.evaluate(waitForShot, { expect, timeoutMs: waitMs }));
     runtime.signal?.throwIfAborted();
     if (!state?.ready) throw Error(`look: ${state?.why === "no entity world on this page" ? "this world has no entity layer" : "viewer did not initialize and settle before timeout"}`);
     const cells = [], receipts = [];
@@ -3824,7 +3844,7 @@ async function lookInner(flags2 = {}, runtime = {}, signal) {
     worldUrl: load().world,
     ...cam,
     out,
-    expect: m.snapshot.entities.length,
+    expect: drawableCount(m.snapshot),
     cliPath: SELF,
     keep: !!flags2.keep,
     ...overrides,

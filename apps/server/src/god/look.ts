@@ -20,6 +20,16 @@ export const lookSchema = z.object({
 export type Look = z.infer<typeof lookSchema>;
 export type LookRenderer = (worldUrl: string, shot: Look, expect: number, signal: AbortSignal) => Promise<Uint8Array>;
 
+/** r2.1: the count a remote look waits for (60% of it in layer.drawn). Only what the viewer's entity layer draws:
+ *  resident bodies (`components.body`, make 'none') and prefab containers (make 'parts') are never drawn there, so
+ *  counting every entity made looks time out in body-heavy worlds. */
+type DrawableModel = { entities: Map<string, { def: string }>; resolvedDef(ref: string): { make: { kind: string }; components: { body?: unknown } } | null | undefined };
+export function drawableEntities(model: DrawableModel): number {
+  let n = 0;
+  for (const e of model.entities.values()) { const def = model.resolvedDef(e.def); if (def && !def.components?.body && def.make.kind !== 'none' && def.make.kind !== 'parts') n++; }
+  return n;
+}
+
 type Job = { run(signal: AbortSignal): Promise<Uint8Array>; resolve(png: Uint8Array): void; reject(e: unknown): void; controller: AbortController; timer: ReturnType<typeof setTimeout>; dispose(): void };
 
 /** One active render per mounted world. Queue wait counts against the same absolute deadline.

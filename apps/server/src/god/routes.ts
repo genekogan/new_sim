@@ -26,7 +26,7 @@ import { siteReport } from './build-integrity.ts';
 import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { serverDoctor } from './lock-doctor.ts';
 import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
-import { mountLookRoutes } from './look.ts'; // W2 remote looks
+import { drawableEntities, mountLookRoutes } from './look.ts'; // W2 remote looks
 import { mountWorkbenchRoutes } from './workbench.ts';
 
 export type GodDeps = {
@@ -73,7 +73,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   mountWorkbenchRoutes(app, { god: d.god, requireGod, limitGod, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets, asGod: (c, fn) => d.god.as({ identity: requireGod(c) }, fn) });
   mountLandRoutes(app, { god: d.god, requireGod });
-  mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => d.god.model.entities.size }); // W2 remote looks
+  mountLookRoutes(app, { requireGod, worldUrl: d.lookWorldUrl, entities: () => drawableEntities(d.god.model) }); // W2 remote looks; r2.1: bodies are never drawn
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });
   // LAYERS: GET /v1/world/layers, /v1/world/layers/me (Soul), /v1/god/layers, /v1/god/layers/zone-suggest?use=
   mountLayerRoutes(app, { god: d.god, layers: () => (d.god as unknown as { layers?: GodLayers }).layers, requireGod, soulFromBearer: d.soulFromBearer, categoryOf: (x) => vocab.categoryOf(x as never) });   // GOD-ENV: POST /v1/god/strike   // GOD-ENV: POST /v1/god/land (raise, mountain, valley, move, water, extend …)
