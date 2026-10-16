@@ -35,7 +35,9 @@ export class AutoPortraits{
   // every body assignment (owner, agent, god births, travel, the legacy-look migration) asks for a redraw once applied
   host.listeners.push({onApplied:e=>{if(e.kind==='body-assignment-v1'&&typeof (e.payload as {soulId?:unknown})?.soulId==='string'){const id=(e.payload as {soulId:string}).soulId;setTimeout(()=>this.nudge(id),0).unref?.();}}});
   const sweepMs=opts.sweepMs??30000;
-  if(sweepMs>0){setTimeout(()=>this.sweep(),Math.min(5000,sweepMs)).unref();this.timer=setInterval(()=>this.sweep(),sweepMs);this.timer.unref();}
+  // the first sweep waits 5-30 s at random, so the worlds of one host restarting together don't all render at once
+  // (a renderer holds ~300 MB while busy and exits 10 s after its last portrait)
+  if(sweepMs>0){setTimeout(()=>this.sweep(),Math.min(sweepMs,5000+Math.floor(Math.random()*55000))).unref();this.timer=setInterval(()=>this.sweep(),sweepMs);this.timer.unref();}
  }
  /** The look a Soul's current body draws with, or null (no body, a legacy unparameterised body, a creature, an upload). */
  private job(soulId:string):Job|null{
@@ -79,7 +81,7 @@ export class AutoPortraits{
    }
   }finally{this.busy=false;this.armIdle();}
  }
- private armIdle(){if(this.idle)clearTimeout(this.idle);this.idle=setTimeout(()=>this.stopWorker(),20000);this.idle.unref();}
+ private armIdle(){if(this.idle)clearTimeout(this.idle);this.idle=setTimeout(()=>this.stopWorker(),10000);this.idle.unref();}
  private stopWorker(){const c=this.child;this.child=null;this.ready=null;if(c){c.stdin.end();setTimeout(()=>{if(c.exitCode===null)c.kill();},5000).unref();}}
  private start(){
   if(this.crashes>=3)throw Error('portrait renderer disabled after repeated crashes');
