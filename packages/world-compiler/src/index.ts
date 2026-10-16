@@ -12,3 +12,4 @@ export { isOpen, eventsOn, isDark, followPatch, minutesOf, describeSchedule, sch
 export { aliasRef, type DefLibrary } from './model.ts';
 export { creationInputFailure } from './input.ts';
 export { buildLibrary, coreLibrary, libraryRef, pinnedOlder } from './library.ts';
+export { frameMediaKind, MEDIA_SLOTS_MAX } from './sign-media.ts';

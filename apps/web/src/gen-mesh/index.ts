@@ -4,3 +4,5 @@ export { meshFor, registerMesh, registeredMeshes, type MeshBuilder, type MeshCtx
 import.meta.glob('./**/*.mesh.ts', { eager: true });
 // VOCAB-W2: the sound layer (components.sound → procedural WebAudio; new worlds only, after a gesture)
 import './sound.ts';
+// W6: hover art (frames, screens, gallery walls) for its title and maker; videos are shared and played near the camera
+import './art-hover.ts';
