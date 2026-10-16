@@ -69,3 +69,12 @@ test('invalid discovery syntax refuses before reading world state',async t=>{
  }
  assert.deepEqual(seen,[],'malformed commands must not silently query a different capability view');
 });
+
+test('search terms separated by |, \\| , commas or spaces match any of them, best matches first (quality case 35)',async t=>{
+ const {read}=await mounted(t);
+ const grep=await read(['--search','gift\\|wave']);assert.deepEqual(grep.available.map(c=>c.id),['wave:s_peer'],'grep alternation is not a literal');assert.deepEqual(grep.searchTerms,['gift','wave']);
+ const either=await read(['--search','real-fire|willow']);assert.deepEqual(either.available.map(c=>c.id).sort(),['warm-by-fire:real-fire','wave:s_peer']);
+ const comma=await read(['--search','nothing-here, willow']);assert.deepEqual(comma.available.map(c=>c.id),['wave:s_peer']);
+ const ranked=await read(['--search','warm fire']);assert.equal(ranked.available[0].id,'warm-by-fire:real-fire','more terms matched ranks first');assert.ok(ranked.available.some(c=>c.id==='wave:s_peer'),'Warming matches warm');
+ assert.equal((await read(['--search','a book'])).matchingTotals.available,0,'tiny words alone match nothing extra');
+});

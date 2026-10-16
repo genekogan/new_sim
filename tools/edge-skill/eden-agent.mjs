@@ -232,14 +232,21 @@ export async function observe(){
   here:{nearby:(st.nearby??[]).slice(0,12).map(n=>({who:n.who,distance:n.distance,doing:n.doing||undefined})),untrusted:true},
   happening:st.happening,canDo:c.canDo};
 }
+// Quality case 35: agents write grep alternation ("gift\\|give"). `|`, `\\|`, commas and spaces separate terms that match
+// any of them (tiny words ignored); the whole phrase still counts most, and the best matches come first.
+const SEARCH_STOP=new Set(['the','and','with','for','into','from','some']);
+export function searchTerms(query){const whole=String(query).trim().toLowerCase(),terms=[...new Set(whole.split(/\\\||\||,|\s+/).map(x=>x.trim()).filter(x=>x.length>=3&&!SEARCH_STOP.has(x)))];return {whole,terms:terms.length?terms:[whole]};}
 function summarise(caps,filters={}){
  const avail=caps.filter(c=>c.available!==false),blocked=caps.filter(c=>c.available===false);
  // Search the full response first: an omitted compact-list entry is still an offered action.
- const matches=c=>(!filters.verb||c.verb===filters.verb)&&(!filters.search||[c.id,c.verb,c.label].some(v=>String(v??'').toLowerCase().includes(filters.search)));
- const matchingAvail=avail.filter(matches),matchingBlocked=blocked.filter(matches),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
+ const q=filters.search?searchTerms(filters.search):null;
+ const score=c=>{if(!q)return 1;const hay=[c.id,c.verb,c.label].map(v=>String(v??'').toLowerCase()).join('\n');return (hay.includes(q.whole)?100:0)+q.terms.filter(t=>hay.includes(t)).length;};
+ const pick=list=>list.map((c,i)=>({c,i,s:(!filters.verb||c.verb===filters.verb)?score(c):0})).filter(x=>x.s>0).sort((a,b)=>b.s-a.s||a.i-b.i).map(x=>x.c);
+ const matchingAvail=pick(avail),matchingBlocked=pick(blocked),truncated={available:matchingAvail.length>80,blocked:matchingBlocked.length>15};
  return {available:matchingAvail.slice(0,80).map(c=>({id:c.id,verb:c.verb,label:c.label,...(c.params?{params:Object.keys(c.params)}:{})})),
   blocked:matchingBlocked.slice(0,15).map(c=>({id:c.id,label:c.label,why:c.blocked?.code})),
   totals:{available:avail.length,blocked:blocked.length},matchingTotals:{available:matchingAvail.length,blocked:matchingBlocked.length},truncated,
+  ...(q&&q.terms.length>1?{searchTerms:q.terms,searchNote:'Any of these terms matches; best matches first.'}:{}),
   ...(truncated.available||truncated.blocked?{hint:'Some offered capabilities are omitted from this compact list; absence is not a refusal. Use capabilities --search "<ID, verb or label>" or capabilities --verb "<exact verb>" to filter all offers before the display limit.'}:{})};
 }
 function capabilityFilters(args){
