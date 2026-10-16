@@ -66,6 +66,8 @@ const wouldMove = (moved: ResidentMove[]) => moved.map(m => ({ name: m.name, sou
 /** G1: what the walk-out planner made of an accepted edit: who moves, warnings (no clear ground; a thing set down
  *  instead of put into a resident's hands) and the would-be world's entities it rewrote. */
 export type WalkoutPrep = { moved: ResidentMove[]; warnings: string[]; touched: string[] };
+/** R8: what the committed god request was, for the residents' map-change notice (map-notices.ts). */
+export type ApplyContext = { kind: 'edit' | 'undo' | 'redo'; note?: string; build?: string };
 const NO_WALKOUTS: WalkoutPrep = { moved: [], warnings: [], touched: [] };
 
 export class GodMode {
@@ -91,7 +93,7 @@ export class GodMode {
    *  G1 "god rules": `prepare` plans, on the would-be world, the residents an accepted edit/undo/redo walks out of its
    *  way (listed as `moved` in the durable receipt), and `apply` moves them after the SQL commit in the same request.
    *  Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[]) => string[] | void } | null = null;
+  bodies: { uses: UsesHook; lifted?: (ids: string[], after?: WorldModel) => string[]; refuse?: (after: WorldModel, diff: Diff, ops: Op[], o?: { undo?: boolean }) => Failure | null; prepare?: (before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], o?: { dry?: boolean }) => WalkoutPrep; apply?: (moved: ResidentMove[], o?: ApplyContext) => string[] | void } | null = null;
   /** Bridge admission/decoration must run before the accepted receipt is persisted, and never on replay. */
   actGuard: ((batch: unknown) => Result | null) | null = null;
   finalizeAct: ((result: Result, after: WorldModel) => Result) | null = null;
@@ -333,7 +335,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const concurrent = this.store.commit(next, this.owner, r.diff!, { seq: result.seq, by: 'god', at, note: journalNote, group, ops, inverse: r.inverse!, kind: 'edit', builds: updates.writes, origins: this.parts.origins(ops, next, this.caller.identity) }, clientRef === undefined ? undefined : { clientRef, requestHash, payloadHash, result });
     if (concurrent) return concurrent;
     // A resident the engine could not land where planned is named in the receipt too (best effort: never unsends it).
-    const late = this.bodies?.apply?.(moved) ?? [];
+    const late = this.bodies?.apply?.(moved, { kind: 'edit', note: journalNote ?? undefined, build: field?.id ?? group?.split('/')[0] }) ?? [];
     if (late.length) { result.warnings.push(...late); if (clientRef !== undefined) this.store.amendReceipt(clientRef, result); }
     if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     Object.assign(this.model, next); // preserve bridge/nav references and WeakMap keys
@@ -377,7 +379,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     if (updates.echo) (r.result as typeof r.result & { build: BuildEcho }).build = updates.echo;
     const refused = this.store.commit(next, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at, note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq, builds: updates.writes });
     if (refused) return refused;
-    r.result.warnings.push(...this.bodies?.apply?.(moved) ?? []);
+    r.result.warnings.push(...this.bodies?.apply?.(moved, { kind }) ?? []);
     Object.assign(this.model, next);
     if (updates.echo) updates.echo.rev = updates.writes.find(w => w.echo)!.rev!;
     const deltas = this.builds.accepted(updates.writes);
@@ -453,7 +455,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     }
     const refusal = this.store.commitSequence(this.owner, preflight.entries);
     if (refusal) return { accepted: false, reverted: [] as number[], notReverted, ...(!refusal.accepted ? { failures: refusal.failures } : {}) };
-    const late = this.bodies?.apply?.(moved) ?? [];
+    const late = this.bodies?.apply?.(moved, { kind: 'undo' }) ?? [];
     // Make the complete result visible before invoking observers; an observer cannot expose a half-reverted world.
     const frames = preflight.entries.map(entry => ({ entry, deltas: this.builds.accepted(entry.updates.writes) }));
     if (preflight.entries.length) Object.assign(this.model, preflight.model);

@@ -26,7 +26,9 @@ import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.t
 import { isVerificationProbe } from '../verification-probe.ts';
 import { planWalkouts, dropReleased, unhand, stuckWarning, type StuckResident } from './walkout.ts';
 import { GodNotices } from './notices.ts';
-import type { WalkoutPrep } from './god.ts';
+import { MapNotices, mapChanges, mapNoticeText, nearSite, planMapNotices, type MapChange, type MapPlan, type MapResident } from './map-notices.ts';
+import type { ApplyContext, WalkoutPrep } from './god.ts';
+import type { BuildNotice } from './builds.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -102,6 +104,8 @@ export class EngineBridge {
   readonly layers: GodLayers;
   /** G1/R8: what residents perceive about god edits (the walk-out reason; later "the god changed something near you"). */
   readonly notices: GodNotices;
+  /** R8: "the god changed something near you", one per request, rate-limited per resident (map-notices.ts). */
+  readonly mapNotices: MapNotices;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
@@ -122,7 +126,7 @@ export class EngineBridge {
     this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) { this.rescueTrapped(); this.evacuateSites(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) { this.rescueTrapped(); this.evacuateSites(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -141,8 +145,11 @@ export class EngineBridge {
       uses: id => this.usesOne(id),
       refuse: (after, diff, ops, o) => this.protectedBody(after, diff, ops, o?.undo === true),
       prepare: (before, after, diff, _ops, o) => this.prepareWalkouts(before, after, diff, o?.dry === true),
-      apply: moved => this.applyWalkouts(moved, this.stuckPlanned.splice(0)),
+      apply: (moved, o) => { const late = this.applyWalkouts(moved, this.stuckPlanned.splice(0)); this.stageMapNotices(o); return late; },
     };
+    // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
+    this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
+    this.god.onBuild(e => this.buildNotice(e));
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
     if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
@@ -395,17 +402,68 @@ export class EngineBridge {
    *  the engine's own step-clear of buried bodies still applies. `dry` (dry run, preview): plan only, nothing rewritten. */
   private prepareWalkouts(before: WorldModel, after: WorldModel, diff: Diff, dry = false): WalkoutPrep {
     try {
-      if (!dry) { this.flush(); this.host.drainInputs(); this.stuckPlanned = []; }
+      if (!dry) { this.flush(); this.host.drainInputs(); this.stuckPlanned = []; this.mapPlanned = null; }
       // Nothing goes into a resident's hands (an undo of a take): set down first, so the plan sees where it lands.
       const kept = dry ? { warnings: [], touched: [] } : unhand(this.engine, before, after, diff);
       const { moved, stuck } = planWalkouts(this.engine, before, after, diff, this.host.minds.values());
       const warnings = [...kept.warnings, ...stuck.map(stuckWarning)], touched = [...kept.touched];
-      if (!dry) { this.stuckPlanned = stuck; touched.push(...dropReleased(after, diff, moved)); }
+      if (!dry) { this.stuckPlanned = stuck; touched.push(...dropReleased(after, diff, moved)); this.mapPlanned = this.planMap(before, after, diff, new Set([...moved, ...stuck].map(x => x.soulId)), touched); }
       return { moved, warnings, touched };
     } catch (e) { this.log(`walk-out planning: ${(e as Error).message}`); return { moved: [], warnings: [], touched: [] }; }
   }
   /** Log and fold each planned move now (no tick, no animation wait), interrupt the resident's act, tell it why. A
    *  resident the engine could not land at its planned exit is told so and named in the returned warnings. */
+  // ---- R8 map-change notices (map-notices.ts)
+  /** The last prepared edit's map notice (who hears of it), delivered only once that edit has committed. */
+  private mapPlanned: MapPlan | null = null;
+  private residents(): MapResident[] {
+    const out: MapResident[] = [];
+    for (const m of this.host.minds.values()) { const p = this.engine.world.entities[m.entityId]?.pose?.p; if (p && !isVerificationProbe(m.soulId)) out.push({ soulId: m.soulId, name: m.name, p: [p[0], p[2]] }); }
+    return out;
+  }
+  /** Planned in the request (pure, bounded); a planning fault never refuses or delays the edit. */
+  private planMap(before: WorldModel, after: WorldModel, diff: Diff, told: Set<string>, touched: string[]): MapPlan | null {
+    try {
+      if (!this.host.minds.size) return null;
+      const changes = mapChanges(before, after, diff, touched); if (!changes.length) return null;
+      const relations = this.layers.relations().filter(r => r.rel === 'works-at' || r.rel === 'lives-at');
+      const mine = (r: MapResident, c: MapChange) => { const soul = { soulId: r.soulId, name: r.name }; return c.owners.some(o => this.layers.isOf(o, soul)) || relations.some(x => c.things.includes(x.b) && this.layers.isOf(x.a, soul)); };
+      return planMapNotices(changes, this.residents(), { exclude: told, mine });
+    } catch (e) { this.log(`map notices: ${(e as Error).message}`); return null; }
+  }
+  /** After the commit: stage the request's notice; it is delivered when the request has finished (a build done in the
+   *  same request tells its own sentence instead). A closing build's edits are covered by its start and done notices. */
+  private stageMapNotices(o?: ApplyContext) {
+    const plan = this.mapPlanned; this.mapPlanned = null; if (!plan) return;
+    try {
+      const build = o?.kind === 'edit' && o.build ? this.god.builds.body(o.build) : undefined;
+      if (build && this.god.builds.closingSites().some(s => s.id === o!.build)) return;
+      const label = o?.kind === 'edit' ? (build ? { title: build.title, say: build.say?.text } : { note: o.note }) : {};
+      const text = mapNoticeText(plan.changes, label, this.whereOf(plan.at, plan.changes[0].id));
+      this.mapNotices.stage(plan.souls, text, build?.title ?? (plan.changes.length === 1 ? plan.changes[0].name : undefined));
+      queueMicrotask(() => { try { this.mapNotices.deliverStaged(); } catch (e) { this.log(`map notices: ${(e as Error).message}`); } });
+    } catch (e) { this.log(`map notices: ${(e as Error).message}`); }
+  }
+  /** " at the harbour" (the place around it, not itself), " by the fountain" (a named thing near it), else " near you". */
+  private whereOf(at: Vec2, except: string): string {
+    const places = this.edge?.places, own = this.places.ofEntity(except)?.id;
+    const place = places?.containing(at[0], at[1], 0).find(p => p.parent !== null && !p.carrier && p.id !== own);
+    const say = (name: string) => /^[A-Z]/.test(name) || name.startsWith('the ') ? name : `the ${name}`;
+    if (place?.name) return ` at ${say(place.name)}`;
+    const by = this.nav.namesNear(at, except, 1, 12)[0];
+    return by ? ` by ${say(by.split('/').at(-1)!.replace(/[-_]+/g, ' '))}` : ' near you';
+  }
+  /** Construction: a build started near a resident (one inside a closing site is walked out and told by G1), and done. */
+  private buildNotice(e: BuildNotice) {
+    if (e.kind !== 'started' && e.kind !== 'done') return;
+    try {
+      const body = this.god.builds.body(e.id); if (!body || !this.host.minds.size) return;
+      const title = body.title, closing = this.god.builds.closingSites().find(s => s.id === e.id), residents = this.residents();
+      if (e.kind === 'started') this.mapNotices.construction(nearSite(body.site, residents, { skipInside: closing?.zones }), `The god started building ${title} nearby${closing ? '; it is closed until finished' : ''}.`, title);
+      else this.mapNotices.construction(nearSite(body.site, residents), `${title[0].toUpperCase()}${title.slice(1)} is finished and open.`, title);
+    } catch (err) { this.log(`map notices: ${(err as Error).message}`); }
+  }
+  private flushMapNotices() { try { this.mapNotices.flush(); } catch (e) { this.log(`map notices: ${(e as Error).message}`); } }
   /** Residents the last edit's plan found no clear ground for (told why when that edit applies). */
   private stuckPlanned: StuckResident[] = [];
   private applyWalkouts(moved: ResidentMove[], stuck: StuckResident[] = []): string[] {
