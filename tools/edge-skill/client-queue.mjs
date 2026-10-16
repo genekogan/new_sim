@@ -7,6 +7,12 @@ const fail=message=>{throw Error('client queue: '+message);};
 const stable=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9:._@-]{0,159}$/.test(value)?value:fail('invalid stable ID');
 const safeText=(value,max=300)=>typeof value==='string'&&value.trim()&&value.length<=max?value.trim():fail('invalid text');
 const plain=value=>value&&typeof value==='object'&&!Array.isArray(value);
+/** A queued public step that speaks: a say, or a conversation step carrying text. */
+export const spokenStep=step=>!!step?.publicStep&&(typeof step.publicStep.say==='string'||typeof step.publicStep.text==='string');
+/** A confirmed-refused step in an owner queue waits at most this long for a `fixes` repair (or until one
+ * continuation attempt is refused); then it is skipped and the queue goes on with its next step. */
+export const REFUSED_OWNER_STEP_MS=60_000;
+const STALL_HINT='; the refused step is skipped at the next queue check and the owner queue goes on with its next step';
 export function durationSeconds(value){
  if(typeof value==='number'&&Number.isFinite(value)&&value>0&&value<=86400)return value;
  const m=/^(\d+(?:\.\d+)?)(s|m|h)$/.exec(String(value));if(!m)fail('duration must be positive seconds or Ns/Nm/Nh');
@@ -62,6 +68,16 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
  const save=()=>{lease();safe(stateFile);const tmp=safe(stateFile+'.tmp');writeFileSync(tmp,JSON.stringify(state)+'\n',{mode:0o600});renameSync(tmp,stateFile);onChange(snapshot());};
  const notify=(reason,step)=>{state.notice={reason,step:step?.id,at:now()};save();onWake(reason,snapshot());};
  const current=()=>state.steps.find(s=>!['completed','cancelled','skipped','superseded'].includes(s.status));
+ // R2 queue rule: one refused owner step never freezes the steps behind it (Basil 03:18-03:40).
+ const refusedAttempts=new Map();
+ const stalled=step=>state.source==='owner'&&step?.status==='failed'&&step.refusalConfirmed===true&&!step.receiptId&&!step.publicStep;
+ const dropSpeechAfter=(index,act)=>{const dropped=[];for(const s of state.steps.slice(index+1))if(s.status==='pending'&&spokenStep(s)){s.status='skipped';s.redraft=true;s.reason=`drafted before ${String(act).slice(0,60)} was refused; not spoken`;dropped.push(s.id);}return dropped;};
+ function skipRefused(step,why){
+  const droppedSpeech=dropSpeechAfter(state.steps.indexOf(step),step.act);refusedAttempts.delete(step.id);
+  step.status='skipped';step.skippedAfterRefusal=true;step.reason=`${String(step.reason??step.code??'refused').slice(0,160)} (refused; skipped ${why}; the queue went on)`;
+  state.skips=[...(state.skips??[]),{stepId:step.id,act:step.act,code:step.code??null,why,at:now(),droppedSpeech}].slice(-24);
+  notify('refused-step-skipped',step);
+ }
  const condition=(step,context)=>{const u=step.until;if(!u)return true;if(u.event)return state.events?.some(e=>e.kind===u.event&&e.sequence>(step.untilAfterSequence??0));return Number.isFinite(context.worldMinutes)&&Number.isFinite(step.untilWorldMinutes)&&context.worldMinutes>=step.untilWorldMinutes;};
  const reference=(step,part)=>'queue-'+createHash('sha256').update(JSON.stringify([state.id,step.id,part,step.act,step.params])).digest('hex');
  async function send(step,body,part,pausedNow){
@@ -70,14 +86,17 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
   const ref=reference(step,part);if(part==='stop')step.stopRequested=true;else step.clientRef=ref;step.status=part==='stop'?'stopping':'dispatching';step.attempts=(step.attempts??0)+1;save();
   if(pausedNow()){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}
   let result;try{result=await adapter.send({...body,clientRef:ref});}catch(error){if(error.code==='local.attended'&&error.requestNotSent){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
-  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.refusalConfirmed=result?.accepted===false;step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
+  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.failedAt=now();step.refusalConfirmed=result?.accepted===false;step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
   return result.receipt;
  }
  async function drive(context={},paused=false){
   const pausedNow=()=>paused||isPaused();
   lease();
   for(const previous of state.previous??[]){if(previous.folded)continue;const r=await adapter.readReceipt(previous.receiptId).catch(()=>null);if(r&&TERMINAL.has(r.phase)){await onReceipt(r,previous);previous.folded=true;save();}}
-  let step=current();if(!step||['failed','interrupted','blocked'].includes(step.status))return snapshot();
+  let step=current();
+  if(stalled(step)&&!pausedNow()){const tries=refusedAttempts.get(step.id)??0,age=now()-(step.failedAt??state.notice?.at??state.at??0);
+   if(tries>0||age>=REFUSED_OWNER_STEP_MS){skipRefused(step,tries>0?'after a continuation without a valid fixes repair was refused':`after ${Math.round(age/1000)} s without a fixes repair`);return drive(context,paused);}}
+  if(!step||['failed','interrupted','blocked'].includes(step.status))return snapshot();
   if(step.receiptId){
    const receipt=await adapter.readReceipt(step.receiptId).catch(()=>null);lease();if(!receipt||receipt.id!==step.receiptId)return snapshot();step.receipt=receipt;step.lastReconciledAt=now();
    const reached=condition(step,context);if(step.stopRequested&&!step.stopReceiptId&&TERMINAL.has(receipt.phase)){const stop=await send(step,{capability:'stand:here',params:{}},'stop',pausedNow);if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
@@ -121,9 +140,7 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
   const result=await send(step,body,'hold-'+(step.renewal??0),pausedNow);if(!result)return snapshot();step.receiptId=result.id;step.receipt=result;step.status=result.phase==='waiting'?'waiting':'running';state.notice=null;state.replaceReceiptId=null;save();return snapshot();
  }
 
- return {
-  snapshot,
-  enqueue(steps,{id=randomUUID(),source='mind',replace=false,force=false}={}){
+ function enqueueNow(steps,{id=randomUUID(),source='mind',replace=false,force=false}={}){
    lease();stable(id);stable(source);const normalized=replySteps({do:steps});if(normalized.some(s=>!s.act&&(s.for||s.until||s.if)))fail('public steps cannot carry body conditions');
    if(normalized.some(s=>s.fixes!==undefined)){
     const active=current(),replacement=normalized[0];
@@ -132,17 +149,28 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
     if(state.source==='owner'&&source==='owner'&&id!==state.id)fail('a new owner request must explicitly replace the queue; fixes continues its original request');
     if(active.publicStep||active.status!=='failed'||active.refusalConfirmed!==true||active.receiptId)fail('repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed');
     const index=state.steps.indexOf(active),next={...replacement,...(active.protected?{protected:true}:{}),id:`step-repair-${randomUUID()}`,status:'pending',attempts:0};
-    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now()}].slice(-24);
+    // Truth rule: speech queued after the refused step was written before the refusal and may claim
+    // an outcome that never happened. A repair never carries it: every unrun speech step after the
+    // refused one in this plan is skipped (redraft:true) and the mind redrafts from actual results.
+    const droppedSpeech=dropSpeechAfter(index,active.act);
+    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now(),droppedSpeech}].slice(-24);
     state.steps[index]=next;state.notice=null;save();return snapshot();
    }
    if(state.id===id)return snapshot();
    const active=current();if(active&&!replace)fail('queue already has pending work');
    if(active&&state.source==='owner'&&source==='mind'&&replace)fail('an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement');
    if(['dispatching','stopping'].includes(active?.status)&&replace)fail('transport outcome uncertain; reconcile before replacement');
-   if(active?.protected&&replace&&!force)fail('local protected step requires explicit owner force/attended takeover');
+   // Protection the Soul set on its own autonomous step (mind, routine, commitment) guards against its own later
+   // whims, never against its owner (Cleo 03:58). Protection the owner set still needs the owner's --force.
+   const selfProtected=active?.protected&&state.source!=='owner';
+   if(active?.protected&&replace&&!force&&!(selfProtected&&source==='owner'))fail('local protected step requires explicit owner force/attended takeover');
    const previous=[...(state.previous??[])];if(active?.receiptId)previous.push({...active,status:'superseded'});
    state={version:1,scope,id,source,at:now(),notice:null,events:[],eventSequence:0,previous:previous.slice(-50),replaceReceiptId:active?.receiptId??null,steps:normalized.map((s,i)=>({...s,...(!s.act?{publicStep:structuredClone(s.publicStep??s),act:s.say?'say':s.converse?'converse':s.publicStep?.act??'public-step'}:{}),id:`step-${i}-${randomUUID()}`,status:'pending',attempts:0}))};save();return snapshot();
-  },
+ }
+
+ return {
+  snapshot,
+  enqueue(steps,options){try{return enqueueNow(steps,options);}catch(error){const active=current();if(stalled(active)){refusedAttempts.set(active.id,(refusedAttempts.get(active.id)??0)+1);if(error.message.startsWith('client queue: '))error.message+=STALL_HINT;}throw error;}},
   event(event){lease();if(typeof event?.kind==='string'){state.eventSequence=(state.eventSequence??0)+1;state.events=[...(state.events??[]),{kind:event.kind,sequence:state.eventSequence}].slice(-100);save();}},
   pump(context={},paused=false){if(!pumping)pumping=drive(context,paused).finally(()=>{pumping=null;});return pumping;},
   resume(){lease();const s=current();if(s&&s.status==='blocked'&&state.notice?.reason!=='public-step-outcome-uncertain'){s.status='pending';state.notice=null;save();}return snapshot();},

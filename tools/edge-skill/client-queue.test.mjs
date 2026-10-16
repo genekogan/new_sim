@@ -50,10 +50,10 @@ test('until uses qualified native renewals and observed owned release, never an 
  q.event({kind:'presentation.started'});await q.pump();assert.equal(sent[2].capability,'stand:here');assert.equal(physical,'standing');await q.pump();assert.equal(q.snapshot().steps[0].status,'completed');
 });
 
-test('client-protected read refuses owner replacement; nonprotected replan waits for native safe-stop',async t=>{
+test('owner-protected read refuses non-force owner replacement; nonprotected replan waits for native safe-stop',async t=>{
  const root=folder(t),receipts=new Map(),sent=[];let physical='reading',unsafe=true;
  const adapter={send:async body=>{sent.push(body);const r={id:'r'+sent.length,capability:body.capability,phase:sent.length===1?'started':'waiting'};receipts.set(r.id,r);return {accepted:true,receipt:r};},readReceipt:async id=>receipts.get(id)};
- const q=openClientQueue(root,{adapter});t.after(()=>q.close());q.enqueue([{act:'read:library',protected:true}],{id:'original'});await q.pump();
+ const q=openClientQueue(root,{adapter});t.after(()=>q.close());q.enqueue([{act:'read:library',protected:true}],{id:'original',source:'owner'});await q.pump();
  assert.throws(()=>q.enqueue([{act:'walk:tea'}],{id:'new',replace:true,source:'owner'}),/protected/);assert.equal(sent.length,1);assert.equal(physical,'reading');
  q.enqueue([{act:'walk:tea'}],{id:'new',replace:true,force:true,source:'owner'});await q.pump({busy:{id:'r1'}});assert.equal(sent.length,2);assert.equal(q.snapshot().steps[0].status,'waiting');assert.equal(physical,'reading','native unsafe phase has not yet stopped');
  unsafe=false;if(!unsafe){receipts.get('r1').phase='replaced';receipts.get('r2').phase='started';physical='walking';}await q.pump();assert.equal(q.snapshot().steps[0].status,'running');assert.equal(physical,'walking');
