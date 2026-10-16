@@ -10,7 +10,8 @@ export async function standby(warm: () => Promise<unknown> = async () => {}): Pr
   // best effort: whatever fails to load here fails the same way after the signal, where it is reported as before
   try { await warm(); } catch (e) { console.log(`[standby] warm-up incomplete: ${(e as Error).message}`); }
   await new Promise<void>((go) => {
-    const hold = setInterval(() => {}, 1 << 30);   // signal listeners alone do not keep a process alive
+    // signal listeners alone do not keep a process alive; a launcher that died meanwhile never sends the signal: go too
+    const parent = process.ppid, hold = setInterval(() => { if (process.ppid !== parent) process.exit(0); }, 1000);
     const quit = () => process.exit(0);
     process.once('SIGTERM', quit); process.once('SIGINT', quit);
     process.once('SIGUSR2', () => { clearInterval(hold); process.off('SIGTERM', quit); process.off('SIGINT', quit); go(); });
