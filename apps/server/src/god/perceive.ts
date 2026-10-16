@@ -15,7 +15,9 @@
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
-import { actuatedState, kindActions, wrapAct } from './actuators.ts';
+import { actionsOf, actuatedState, kindActions, wrapAct, type Thing } from './actuators.ts';
+import { heldGodThing } from './held.ts';
+import { waterRole, wordOf } from './water.ts';
 import { economyOn } from './layers.ts';
 import { supportY } from './nav.ts';
 
@@ -111,7 +113,7 @@ export class GodPerceive {
     const o = this.objs!; let k = short.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || BUILT_KIND;
     if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
     // VOCAB-MECH: a def with actions (actuators) gives its kind those actions (one kind per kind of thing)
-    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def?.actions.length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
+    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def && actionsOf(def).length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
     return k;
   }
   private actHost() {
@@ -120,6 +122,21 @@ export class GodPerceive {
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
       access: (id: string, soul: EdgeSoul) => this.h.layers?.refusal(id, soul) ?? null,
+      // W5 (water.ts): tank → can → planter
+      water: {
+        thing: (id: string) => this.thing(id),
+        held: (soul: EdgeSoul) => { const x = heldGodThing(this.h.engine.world.entities, soul.entityId); return x ? this.thing(x.id) : null; },
+        sourceNear: (id: string, r: number) => {
+          const e = this.h.model.entities.get(id); if (!e) return null;
+          const p = this.h.model.worldPose(e); let best: Thing | null = null, bd = r;
+          for (const o of this.h.model.entities.values()) {
+            if (o.id === id) continue; const d0 = this.h.model.resolvedDef(o.def); if (!d0 || waterRole(d0) !== 'source') continue;
+            const q = this.h.model.worldPose(o), d = Math.hypot(q.x - p.x, q.z - p.z); if (d <= bd) { bd = d; best = this.thing(o.id); }
+          }
+          return best;
+        },
+        commit: (set: { id: string; field: string; value: number }[], note: string) => this.h.commit!(set.map((x) => ({ op: 'set', id: x.id, state: { [x.field]: x.value } })), note),
+      },
       // SOULFIX: where to stand to operate it: a clear spot within reach (1.5 m) on its level that the body can walk to,
       // nearest its front first, else nearest the thing (bars across a cell work from either side); deterministic order
       approach: (id: string, soul: EdgeSoul, front: Vec2 | null) => {
@@ -140,6 +157,10 @@ export class GodPerceive {
       },
     };
   }
+  private thing(id: string): Thing | null {
+    const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); if (!e || !def) return null;
+    return { id, name: e.name ? this.h.model.pathOf(id) : `the ${wordOf(def)}`, def, state: actuatedState(e, def), params: (e.params ?? {}) as Record<string, unknown> };
+  }
   private rootPlace(): string | null {
     const places = (this.h.edge as any)?.places?.byId as Map<string, { id: string; parent: string | null }> | undefined;
     for (const p of places?.values() ?? []) if (p.parent === null) return p.id;
@@ -157,7 +178,7 @@ export class GodPerceive {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
       if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
-      const text = signText(e, def), acts = this.h.commit ? def.actions.length > 0 : false;
+      const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
       // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
       const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
       if (!e.name && text === null && !acts && !lay) continue;

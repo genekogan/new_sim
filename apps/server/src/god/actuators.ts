@@ -7,6 +7,7 @@
 import type { Entity, StoredDef } from '@sim/world-compiler';
 import type { EdgeSoul } from '../edge/contract.ts';
 import { afterCommit } from '../edge/comms/store.ts';
+import { SOURCE_NEAR_VESSEL, asPlant, asTank, drawWater, isWaterAction, waterActions, waterFields, waterPlant, waterRole, type Transfer } from './water.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -18,10 +19,13 @@ export const ACT_SIGHT = 30;
 /** Close enough to reach out and touch it without walking. */
 export const ACT_REACH = 1.6;
 
+/** W5 (water.ts): a def's own actions plus those its water role gives it (draw-water at a tank, water a planter). */
+export const actionsOf = (def: StoredDef): Action[] => { const w = waterActions(def); return w.length ? [...def.actions, ...w] : def.actions; };
+
 /** The fields of an entity's state the def's actions read or write, with defaults filled (public: Souls see them). */
 export function actuatedState(e: Entity, def: StoredDef): Record<string, unknown> {
-  const fields = new Set<string>();
-  for (const a of def.actions) { for (const w of a.when) fields.add(w.field); for (const t of a.then) if ('field' in t) fields.add(t.field); }
+  const fields = new Set<string>(waterFields(def));
+  for (const a of actionsOf(def)) { for (const w of a.when) fields.add(w.field); for (const t of a.then) if ('field' in t) fields.add(t.field); }
   const out: Record<string, unknown> = {};
   for (const f of fields) { const v = e.state?.[f] ?? (def.state as Record<string, { default?: unknown }>)[f]?.default; if (v !== undefined) out[f] = v; }
   return out;
@@ -43,6 +47,7 @@ function describeState(field: string, v: unknown) {
   if (field === 'lit') return v ? 'already lit' : 'not lit';
   if (field === 'playing') return v ? 'already playing' : 'not playing';
   if (field === 'level') return v === 1 ? 'full' : v === 0 ? 'empty' : `at ${v}`;
+  if (field === 'moisture') return v === 1 ? 'well watered' : v === 0 ? 'dry' : `at moisture ${v}`;
   return `${field} ${JSON.stringify(v)}`;
 }
 /** The state patch an action makes (`set` and `toggle`; attach/detach are left to the engine's own verbs). */
@@ -66,13 +71,42 @@ export type ActuatorHost = {
   access?(id: string, soul: EdgeSoul): Refusal | null;
   /** SOULFIX: a standing point within reach that the body can walk to (front, back, else any side), or null. */
   approach?(id: string, soul: EdgeSoul, front: Vec2 | null): { p: Vec2; level: number } | null;
+  /** W5 water (water.ts): the things involved in moving water, and an atomic commit of several state changes. */
+  water?: WaterHost;
 };
+export type Thing = { id: string; name: string; def: StoredDef; state: Record<string, unknown>; params: Record<string, unknown> };
+export type WaterHost = {
+  /** The god thing in this Soul's hand, or null. */
+  held(soul: EdgeSoul): Thing | null;
+  thing(id: string): Thing | null;
+  /** The nearest water source within `r` metres of a thing (a can standing under a tank's tap). */
+  sourceNear(id: string, r: number): Thing | null;
+  commit(set: Transfer['set'], note: string): { accepted: boolean };
+};
+
+/** W5: what a water action would do now (a refusal or the transfer); null when the action is not about water. */
+export function waterPlan(a: Action, id: string, soul: EdgeSoul, host: ActuatorHost): Transfer | Refusal | null {
+  const w = host.water; if (!w) return null;
+  const t = w.thing(id); if (!t) return null;
+  const role = waterRole(t.def);
+  if (!(isWaterAction(a) || (role === 'vessel' && a.name === 'fill'))) return null;
+  const vessel = (x: Thing | null) => (x && waterRole(x.def) === 'vessel' ? asTank(x.id, x.name, x.def, x.state, x.params) : null);
+  if (role === 'source') return drawWater(asTank(t.id, t.name, t.def, t.state, t.params), vessel(w.held(soul)));
+  if (role === 'plant') return waterPlant(asPlant(t.id, t.name, t.def, t.state, t.params), vessel(w.held(soul)));
+  if (role === 'vessel') {
+    const src = w.sourceNear(id, SOURCE_NEAR_VESSEL);
+    if (!src) return { code: 'water.no-source', reason: `There is no water by ${t.name}; carry it to a water tank or a rain barrel and fill it there.` };
+    return drawWater(asTank(src.id, src.name, src.def, src.state, src.params), vessel(t));
+  }
+  return null;
+}
+const isRefusal = (x: Transfer | Refusal | null): x is Refusal => !!x && 'code' in x;
 type BuiltLike = { at: Vec2 | null; state?: Record<string, unknown>; removed?: boolean; key?: string; front?: Vec2 | null };
 
 /** Object-kind actions for a def's actions (the `built` kind of things of that def). */
 export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: BuiltLike) => string) {
   const out: Record<string, any> = {};
-  for (const a of def.actions) {
+  for (const a of actionsOf(def)) {
     if (!/^[a-z][a-z0-9_-]{0,39}$/.test(a.name)) continue;
     const check = (s: BuiltLike, ctx: { soul: EdgeSoul }): Refusal | null => {
       if (s.removed || !s.at) return { code: 'object.gone', reason: 'It is not there any more.' };
@@ -80,6 +114,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const d = Math.hypot(s.at[0] - me[0], s.at[1] - me[1]);
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
       const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
+      const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null; if (water) return isRefusal(water) ? water : null;
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
     };
     out[a.name] = {
@@ -88,10 +123,11 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       validate: (s: BuiltLike, _p: unknown, ctx: any) => check(s, ctx),
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > ACT_REACH;
-        const patch = thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);
+        const water = s.key ? waterPlan(a, s.key, ctx.soul, host) : null;
+        const patch = water && !isRefusal(water) ? { litres: water.litres } : thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);
         const ap = far && s.key ? host.approach?.(s.key, ctx.soul, s.front ?? null) : null;
         const walk = !far ? [] : ap ? [ap.level === 0 ? { verb: 'walk_to', params: { to: ap.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: ap.p[0], z: ap.p[1], level: ap.level } }] : [{ verb: 'walk_to', params: { to, standoff: 0.5 } }];
-        return { state: s, result: { action: a.name, set: patch }, bodies: [{ label: `${a.label}`, steps: [...walk, { verb: 'wave', params: { at: s.key, seconds: 1 } }] }] };
+        return { state: s, result: { action: a.name, set: patch, ...(water && !isRefusal(water) ? { summary: water.summary } : {}) }, bodies: [{ label: `${a.label}`, steps: [...walk, { verb: 'wave', params: { at: s.key, seconds: 1 } }] }] };
       },
     };
   }
@@ -105,8 +141,17 @@ export function wrapAct(objects: { act(id: string, soul: EdgeSoul, input: Record
   objects.act = (id: string, soul: EdgeSoul, input: Record<string, unknown>) => {
     const out = orig(id, soul, input);
     if (!out?.accepted) return out;
-    const t = find(id), a = t?.def.actions.find((x) => x.name === input.action);
+    const t = find(id), a = t ? actionsOf(t.def).find((x) => x.name === input.action) : undefined;
     if (!t || !a) return out;
+    // W5: water moves between two things (tank → can, can → planter) in one commit, planned again at commit time
+    const water = waterPlan(a, id, soul, host);
+    if (water) {
+      if (isRefusal(water)) { log(`water ${a.name} on ${id}: ${water.reason}`); return out; }
+      const go = () => { try { const now = waterPlan(a, id, soul, host); if (!now || isRefusal(now)) { log(`water ${a.name} on ${id}: by commit time ${now ? now.reason : 'not water'}`); return; } const r = host.water!.commit(now.set, `${soul.soulId} ${a.name} ${t.name}: ${now.litres} L`); if (!r.accepted) log(`water ${a.name} on ${id}: the world refused ${JSON.stringify(now.set)}`); } catch (e) { log(`water ${a.name} on ${id}: ${(e as Error).message}`); } };
+      const db0 = (objects as unknown as { core?: { db?: unknown } }).core?.db;
+      try { if (db0) afterCommit(db0 as never, go); else setImmediate(go); } catch { setImmediate(go); }
+      return out;
+    }
     const patch = thenPatch(a, t.state, (input.params ?? {}) as Record<string, unknown>);
     if (!Object.keys(patch).length) return out;
     // the object act runs inside the ledger's transaction (and may still roll back with the body's admission): change the
