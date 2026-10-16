@@ -84,6 +84,9 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
    `build.outside`: preserve the named thing, or explicitly name it with start/step `--include ref,ref` and retry.
    `build check [id]` and done return a checked receipt; unverified asks and check warnings do not block done.
    Group undo is atomic: a conflict reverts nothing. Start's site report rides on the same response.
+   `build rewind [id] --to k [--dry]` atomically undoes every build edit after step k (lead and helpers) and keeps the
+   build open at step k; `--dry` lists what it removes. A later outside edit that depends on that work refuses it
+   (undo that edit first). `undo --group <open build>` rewinds it to the start.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.

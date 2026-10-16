@@ -226,6 +226,11 @@ export class WorldStore {
     const r = this.db.db.prepare('SELECT seq,by,at,note,grp,ops,inverse,undone,undo_of,kind,hash8,label,acct FROM world_edits_v1 WHERE world_id=? AND seq=?').get(this.worldId, seq) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string }) | undefined;
     return r ? { ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) } : null;
   }
+  /** Y5: every journal row whose effect is still live after `seq` (any group, any kind), oldest first. */
+  liveEditsAfter(seq: number): EditRow[] {
+    return (this.db.db.prepare('SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? AND seq>? AND undone=0 ORDER BY seq').all(this.worldId, seq) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
+      .map(r => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
+  }
   /** Snapshot the complete group stack before undo starts; newly journaled undos cannot hide older group edits. */
   groupEdits(group: string): EditRow[] {
     return (this.db.db.prepare("SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind, hash8, label, acct FROM world_edits_v1 WHERE world_id=? AND grp=? AND undone=0 AND kind IN ('edit','redo') ORDER BY seq DESC").all(this.worldId, group) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
