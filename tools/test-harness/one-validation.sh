@@ -53,7 +53,8 @@ step V4-web 900 bash tools/test-harness/web-suite.sh
 if [ "$BASELINE" != none ]; then
   step V4-web-baseline 900 bash "$BASELINE/tools/test-harness/web-suite.sh"
 fi
-# V5 the FULL server suite, on the laptop, safely: every Codex-era port remapped, overrides set, serial
+# V5 the FULL server suite, safely: every Codex-era port remapped, overrides set, serial.
+# Step cap 9000 s (main had 3600 s; the serial suite takes ~3100-3300 s on Modal CPU and a slower box hit 3600 at 1089/1094).
 server_tests() {
   local tree="$1"; shift
   cd "$tree/apps/server" || return 1
@@ -67,7 +68,7 @@ export -f server_tests
 export REMAP
 step V5-server-full 9000 bash -c 'server_tests "$1"' _ "$ROOT"
 if [ -n "${SERVER_TEST_FILES:-}" ] && [ "$BASELINE" != none ] && [ "$BASELINE" != "$ROOT" ]; then
-  step V5-server-baseline 3600 bash -c 'server_tests "$1"' _ "$BASELINE"
+  step V5-server-baseline 9000 bash -c 'server_tests "$1"' _ "$BASELINE"
 fi
 [ -z "$(busy)" ] || echo "WARNING: listeners left in 5400-5449 after V5" | tee -a "$OUT/V5-server-full.log"
 # V6 new worlds: god + Soul e2es (real servers, fake minds, $0), Clerk via synthetic issuer, under /worlds
