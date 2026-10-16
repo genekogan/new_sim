@@ -1,9 +1,9 @@
 {
-  "name": "@sim/catalog",
+  "name": "@sim/conformance",
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "description": "EF4 library conformance sweep only (measure + conformance). The registry catalogue itself is archived: docs/ARCHIVED.md.",
+  "description": "EF4 core-library conformance gate: every core def revision bakes, places, furnishes and builds gallery geometry within budgets at its parameter endpoints, or has an exact documented finding. (Moved out of the archived @sim/catalog, 2026-10-16.)",
   "exports": {
     ".": "./src/conformance.ts"
   },

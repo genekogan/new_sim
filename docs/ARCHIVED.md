@@ -50,5 +50,11 @@ After that, run `pnpm install`. To read a removed file without restoring it, run
 
 **Integration note (cloud/integration-20261016).** Release 2 added the EF4 library conformance sweep inside
 `packages/catalog` (`src/conformance.ts`, its test, `bin/conformance.mjs`, `conformance/`). It is Godmode gate work, not the
-registry, so `@sim/catalog` survives with only `src/measure.ts` and the conformance files (no registry, no `@sim/catalog`
-dependency from the server). `parts.test.ts` lost its two registry-branch cases.
+registry. `parts.test.ts` lost its two registry-branch cases.
+
+**Shim removed (2026-10-16, Gene: "Remove what's left").** The last `@sim/catalog` shim is gone: the EF4 conformance gate
+moved, unchanged, to `packages/conformance` (`@sim/conformance`; god-gate step `conformance`, package-suite entry
+`conformance`; the release gate reads older runs' `catalog` package output as `conformance`). It guards the core library:
+every core def revision must bake, place, furnish and build gallery geometry within budget at its parameter endpoints, or
+carry an exact documented finding pinned by def hash. No registry-world path was left in the tree (no world reads a
+registry; `CATALOG_*` settings were already gone). Nothing named `@sim/catalog` remains.

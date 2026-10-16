@@ -13,7 +13,9 @@ export const REQUIRED_STEPS = [
   'V6-join-clerk', 'V6-join-dev', 'V6-launcher', 'V6-mars-two', 'V6-lm-two',
 ];
 const TAP_STEPS = new Set(['V3-packages', 'V3-mars-engine', 'V3-client-cli', 'V3-launcher-unit', 'V3-harness', 'V4-web', 'V5-server-full']);
-const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'catalog'];
+const REQUIRED_PACKAGES = ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance'];
+/** Runs made before 2026-10-16 name the EF4 conformance package by its old directory, packages/catalog. */
+const PACKAGE_ALIASES = { catalog: 'conformance' };
 const STEP_EXCLUSIONS = new Set(['V6-launcher']); // Real Chrome/Metal proof belongs to V7.
 const CASE_STEPS = new Set(REQUIRED_STEPS.filter(step => step.startsWith('V6-') && step !== 'V6-launcher'));
 const EXPECTED_SKIP = ['V7', 'V8'];
@@ -189,6 +191,9 @@ export function readRun(dir, expected, manifest, requiredSteps = REQUIRED_STEPS)
       } else if (TAP_STEPS.has(step)) {
         const tap = parseTap(raw, step); item.tests = tap.tests; errors.push(...tap.errors);
         if (step === 'V3-packages') {
+          const alias = (p) => PACKAGE_ALIASES[p] ?? p;
+          tap.packages = tap.packages.map(alias); tap.packageExits = Object.fromEntries(Object.entries(tap.packageExits).map(([p, x]) => [alias(p), x]));
+          for (const t of tap.tests) { const [p, ...rest] = t.id.split(' > '); if (rest.length && PACKAGE_ALIASES[p]) t.id = [PACKAGE_ALIASES[p], ...rest].join(' > '); }
           if (JSON.stringify([...tap.packages].sort()) !== JSON.stringify([...REQUIRED_PACKAGES].sort())) errors.push(`${step}: missing/duplicate package test output`);
           for (const p of REQUIRED_PACKAGES) {
             if (!Number.isInteger(tap.packageExits[p])) errors.push(`${step}: missing package exit for ${p}`);

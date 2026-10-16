@@ -304,7 +304,7 @@ test('start parts are bounded to eight and 2KB, empty before a done build, parts
     const text = JSON.stringify((await f.req(path, undefined, null)).data); assert.equal(text.includes(f.identity.hash), false); assert.equal(text.includes(f.identity.hash.slice(0, 8)), false); assert.equal(text.includes('maker'), false);
   }
 });
-test('non-registry find miss is logged once at offset zero', async t => {
+test('a find miss is logged once at offset zero', async t => {
   const f = fixture(t); await f.req('/v1/god/defs?q=zqxwzqxw'); await f.req('/v1/god/defs?q=offset-only&offset=1');
   assert.equal(f.query('god_find_misses_v1').length, 1); assert.equal(f.query('god_find_misses_v1')[0].query, 'zqxwzqxw');
 });

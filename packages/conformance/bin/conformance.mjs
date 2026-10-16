@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// nice -n 10 node packages/catalog/bin/conformance.mjs --k 32 --out /tmp/conformance.json
+// nice -n 10 node packages/conformance/bin/conformance.mjs --k 32 --out /tmp/conformance.json
 // Geometry uses the gallery's complete mesh registry bundle; GPU screenshots are a separate qualification.
 import { createRequire } from 'node:module';
 import { mkdtempSync, readdirSync, statSync, writeFileSync, rmSync } from 'node:fs';
