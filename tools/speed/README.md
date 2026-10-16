@@ -12,6 +12,8 @@ python3 <team>/ops/with-heavy-slot.py --owner speed --purpose speed-phone --time
 node <worktrees>/lane-speed/tools/speed/character-transfer.mjs http://127.0.0.1:5890 <team>/scratch/speed/character-transfer.json
 ```
 
+Another lane can run the same tools on its own ports: `SPEED_PORTS=6342,6343 SPEED_SCRATCH=<dir>` (fixtures, matrix and probe all honour them; the live 4930–4990 are always refused). Phone-tier parts can be isolated with `?phoneOff=detail,lod,cards,bodies,worker`, and the desktop distance detail with `?desktopDetail=0`.
+
 Fixtures prints the two owned PIDs. Stop those exact processes with SIGTERM when finished. `fixtures.json` contains their public identities and data paths. The fixture starter refuses occupied ports before clearing its own disposable data. It creates one idle resident named Phone probe, slows the clock to 0.1, and never runs an LLM. Keep servers outside the heavy-slot wrapper; only build/probe work takes the slot.
 
 `matrix.mjs all|before|after|phone-before|phone [output-dir]` probes both worlds. `all` runs before, after and phone sequentially under one heavy slot. `before` uses `?loadqueue=0` (legacy deferred loading); `after` uses the nearest-first queue in the same bundle. `phone-before` is useful when investigating a mobile regression. Outputs default to the speed scratch directory.
