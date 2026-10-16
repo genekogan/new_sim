@@ -5670,7 +5670,8 @@
             "floors": 2,
             "floorHeight": 3.6,
             "material": "stone",
-            "roof": "flat",
+            "roof": "hip",
+            "roofPitch": 14,
             "plan": {
               "floors": [
                 {
@@ -55676,7 +55677,7 @@
           "name": "campus-library-dome",
           "p": [
             -12,
-            7.25,
+            7.7,
             -121
           ],
           "params": {
@@ -55800,15 +55801,6 @@
           "name": "north-avenue-tree-5",
           "p": [
             -26,
-            -78
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "north-avenue-tree-6",
-          "p": [
-            -10,
             -78
           ]
         },

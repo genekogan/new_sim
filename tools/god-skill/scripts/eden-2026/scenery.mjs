@@ -92,7 +92,7 @@ group('scenery: lighthouse stripes', put => {
 group('scenery: campus dome', put => {
   // old north.ts: the library annex has a domed central roof over its portico; the annex is a 2-storey 7.2 m hall
   const [x, z] = mid('region-campus.library-annex');
-  put('dome-roof', 'campus-library-dome', [x, 7.25, z], { params: { sx: 1.8, sy: 1.6, sz: 1.8, roof: '#8fa6a0', drum: '#efe4cf', trim: '#e8e2d2' } });
+  put('dome-roof', 'campus-library-dome', [x, 7.7, z], { params: { sx: 1.8, sy: 1.6, sz: 1.8, roof: '#8fa6a0', drum: '#efe4cf', trim: '#e8e2d2' } });
 });
 group('scenery: lawns', (put, ops) => {
   // old commons and south lawn are mown in broad stripes
@@ -100,7 +100,7 @@ group('scenery: lawns', (put, ops) => {
   ops.push({ op: 'place', def: 'core/lawn@1', name: 'south-mown-lawn', shape: { area: rect(box('eden-south-lawn')) }, params: { stripes: true, edge: 2 } });
 });
 group('scenery: avenue and commons trees', put => {
-  for (let i = 0; i < 12; i++) put('tree', `north-avenue-tree-${i + 1}`, [-90 + i * 16, -78], {});
+  for (let i = 0; i < 12; i++) if (i !== 5) put('tree', `north-avenue-tree-${i + 1}`, [-90 + i * 16, -78], {});   // i=5 (x -10) would stand in the campus view axis
   for (let i = 0; i < 8; i++) put('tree', `south-avenue-tree-${i + 1}`, [-28 + i * 8, 92.5], {});
   for (const [i, x, z] of [[1, -34, -26], [2, -34, -12], [3, -34, 14], [4, -34, 28], [5, -26, 34], [6, -12, 34], [7, 14, 34], [8, -20, -34], [9, -4, -34], [10, 22, -34]]) put('tree', `commons-edge-tree-${i}`, [x, z], {});
 });
