@@ -32,7 +32,7 @@ test('stroll: the longrun phrases about the Green field the Soul stands in wande
   // Ada ×2, Basil, the owner's tour stretch, and the everyday variants of the same request
   for (const phrase of ['stroll around the Green field', 'take a walk through the Green field', 'take a walk through the park',
     'walk around the Green field', 'explore the Green field', 'tour the Green field', 'take a tour of the Green field', 'go for a stroll in the field',
-    'wander around the Green field', 'stroll through the field', 'go touring'])
+    'wander around the Green field', 'stroll through the field'])
     assert.equal(to(phrase), 'wander:here', phrase);
   const r = resolveCapability('stroll around the Green field', ctx());
   assert.equal(r.kind, 'alias');

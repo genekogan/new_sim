@@ -853,10 +853,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** What each capability answers to, for PM-R057 natural names (built only when an id is not exact). */
   private vocabulary(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
+    // R2 stroll: where the Soul stands (its place path), so a stroll of that place can wander in place when its loop is closed
+    return Object.assign(this.vocabularyOf(soul, caps), {here: this.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id)});
+  }
+  private vocabularyOf(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
     const w = this.host.engine.world as NativeWorld, me = this.body(soul.entityId), all = [...this.places.byId.values()], root = all.find(p => p.parent === null);
     const objects = new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]));
     const around = (x: number, z: number) => {const p = this.places.containing(x, z, 0).find(q => q.parent !== null); return p ? [p.id, p.name] : [];};
-    return {caps, me: me ? [me.pose.p[0], me.pose.p[2]] : null, here: this.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier').map(p => p.id), root: root ? [...tokens(root.id), ...tokens(root.name)] : [],
+    return {caps, me: me ? [me.pose.p[0], me.pose.p[2]] : null, root: root ? [...tokens(root.id), ...tokens(root.name)] : [],
       places: all.filter(p => p.parent !== null).map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};

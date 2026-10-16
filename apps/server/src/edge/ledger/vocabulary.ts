@@ -116,7 +116,7 @@ export const NOT_YET: [RegExp, string, string[]][] = [
   [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance']],
 ];
 /** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
-const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', touring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
+const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
   dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
