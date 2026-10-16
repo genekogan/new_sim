@@ -24,18 +24,24 @@ Usage: node eden-agent.mjs <command> [args]
 
 Start: register <world URL> \xB7 create-soul "Name" ["Character"] \xB7 approval wait
 Reconnect an existing Soul: pair-soul <Soul ID> \xB7 select-soul <Soul ID>
-See: status \xB7 here \xB7 observe \xB7 capabilities \xB7 map \xB7 view --alt-only
+See: status \xB7 here \xB7 look around (explore) \xB7 observe \xB7 capabilities \xB7 map \xB7 view --alt-only
+Find: capabilities --search "<ID, verb or label>" \xB7 capabilities --verb "<exact verb>"
 Choose: resolve "<words or offered ID>" \xB7 act "<words or offered ID>" [params JSON]
+Activities: act "jog to the park" \xB7 act "go for a jog around the pond" \xB7 act "row a boat"
 Finish: wait 60 \xB7 receipt [receipt ID] (accepted is not completed)
 Talk: say "<text>" \xB7 converse start <Soul ID> [text]
       converse say <conversation ID> "<text>" \xB7 converse accept|decline|leave <ID>
 Objects: object <ID> \xB7 mark <note|sign|offering|proposal> "Title" "Text"
+Travel: travel \xB7 travel <world on this site> \xB7 travel home (this folder follows)
 Auto mode: dashboard [--engine codex] \xB7 live [--engine codex] \xB7 cost
 While live: tell "<human request>" --wait \xB7 report
 Owner inbox: listen [--after message-id] [--timeout 25] [--once|--follow] \xB7 ack <message-id> ["short reply"]
 Manual session: attend 90 \xB7 act/say/converse \xB7 attend --release
 Pause with the dashboard or its pause API; STOP ends the ordinary live loop.
 Guide: SKILL.md (Start or resume; Observe, resolve, finish).
+Resolve the complete owner request first; preserve its action, partner, place and duration.
+Compact capability lists can omit offers: read totals/truncated and search before declaring unsupported.
+Paired acts need their offered invitation and independent consent; a solo receipt is not shared completion.
 Copy offered IDs exactly; unknown or ambiguous targets must not become another action.`;
 }
 
@@ -3428,8 +3434,88 @@ function openClientMemory(directory, { scope, now: now2 = () => (/* @__PURE__ */
   return api;
 }
 
+// tools/edge-skill/client-travel.mjs
+var TRAVEL_PATH = "/v1/edge/travel";
+var USAGE = "usage: travel [<world slug or name> | home]";
+var ASK_HOME = /* @__PURE__ */ new Set(["travel.away", "travel.unavailable", "unreachable"]);
+function travelledState(prev, r) {
+  if (!r?.ok || typeof r.base !== "string" || !/^https?:\/\/.+\/w\/[a-z0-9-]+$/.test(r.base) || typeof r.soulId !== "string") throw Error("travel: the world answered without a destination");
+  const home = prev.travel?.home ?? (r.from === r.home ? { world: prev.world, soul: prev.soul, token: prev.token } : null);
+  const token = r.token ?? (r.base === prev.world ? prev.token : null);
+  if (!token) throw Error("travel: the world answered without a Soul token for the destination");
+  const grant = { world: r.base, soul: r.soulId, token };
+  const travel2 = { home: r.atHome ? { ...grant } : home, homeSlug: r.home ?? prev.travel?.homeSlug ?? null, at: r.to, lastAt: (/* @__PURE__ */ new Date()).toISOString() };
+  const next = { world: r.base, soul: r.soulId, token, travel: travel2, mode: void 0, lastReceipt: void 0 };
+  if (prev.accountAuth) next.delegations = { ...prev.delegations ?? {}, [r.soulId]: { world: r.base, token } };
+  return next;
+}
+function travelReport(r, state) {
+  const { token: _t, ...rest } = r;
+  return {
+    ...rest,
+    folder: { world: state.world, soul: state.soul, homeKept: !!state.travel?.home },
+    next: r.atHome ? "You are home. Run here or observe." : `You are in ${r.toName ?? r.to}. Run here or observe; "travel home" brings you back.`
+  };
+}
+async function callAt(base, token, path, { body: body2, fetchImpl = fetch, timeoutMs = 9e4 } = {}) {
+  let r;
+  try {
+    r = await fetchImpl(base + path, { method: body2 ? "POST" : "GET", headers: { "content-type": "application/json", ...token ? { authorization: `Bearer ${token}` } : {} }, body: body2 ? JSON.stringify(body2) : void 0, signal: AbortSignal.timeout(timeoutMs) });
+  } catch (e) {
+    return { status: 0, data: { code: "unreachable", message: String(e?.message ?? e) } };
+  }
+  const text3 = await r.text();
+  let data;
+  try {
+    data = JSON.parse(text3);
+  } catch {
+    data = { raw: text3.slice(0, 200) };
+  }
+  return { status: r.status, data };
+}
+var codeOf = (r) => r.status === 0 ? "unreachable" : r.data?.code ?? r.data?.error?.code ?? null;
+var fail3 = (r, what) => {
+  const e = Error(`${what}: ${codeOf(r) ?? "HTTP " + r.status}: ${r.data?.message ?? r.data?.error?.message ?? JSON.stringify(r.data).slice(0, 200)}`);
+  e.code = codeOf(r);
+  e.status = r.status;
+  return e;
+};
+async function travelCommand(args, { load: load2, save: save2, live: live2 = () => false, fetchImpl = fetch }) {
+  if (args.length > 1) throw Error(USAGE);
+  const s = load2();
+  if (!s.world) throw Error("No world yet. Run: node eden-agent.mjs register <world-url>");
+  if (!s.token) throw Error("No paired Soul yet. Run create-soul (or pair-soul) first.");
+  const to = args[0];
+  if (to === void 0) {
+    const r2 = await callAt(s.world, s.token, TRAVEL_PATH, { fetchImpl });
+    if (r2.status === 200) return { ...r2.data, folder: { world: s.world, soul: s.soul, homeKept: !!s.travel?.home } };
+    const h = s.travel?.home;
+    if (h && h.world !== s.world && ASK_HOME.has(codeOf(r2))) {
+      const x = await callAt(h.world, h.token, TRAVEL_PATH, { fetchImpl });
+      if (x.status === 200) return { ...x.data, folder: { world: s.world, soul: s.soul, homeKept: true }, note: `${s.world} answered ${codeOf(r2)}; this is home's view` };
+    }
+    throw fail3(r2, "travel");
+  }
+  if (typeof to !== "string" || !to.trim() || to.length > 80 || to.startsWith("-")) throw Error(USAGE);
+  if (live2()) throw Error("Stop this folder\u2019s mind before travelling (the mind keeps the world it started in).");
+  const home = to.trim().toLowerCase() === "home";
+  let r = await callAt(s.world, s.token, TRAVEL_PATH, { body: { to }, fetchImpl });
+  if (r.status !== 200 && home && s.travel?.home && s.travel.home.world !== s.world && ASK_HOME.has(codeOf(r))) {
+    const h = s.travel.home, first = codeOf(r);
+    r = await callAt(h.world, h.token, TRAVEL_PATH, { body: { to: "home" }, fetchImpl });
+    if (r.status === 200 && r.data?.ok) {
+      const d = { ...r.data, base: r.data.base ?? h.world, soulId: r.data.soulId ?? h.soul, token: r.data.token ?? h.token, atHome: true, viaHome: first };
+      const st2 = save2(travelledState(s, d));
+      return travelReport(d, st2);
+    }
+  }
+  if (r.status !== 200 || !r.data?.ok) throw fail3(r, "travel");
+  const st = save2(travelledState(s, r.data));
+  return travelReport(r.data, st);
+}
+
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9";
+var SKILL_VERSION = "1.9.2";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3681,7 +3767,13 @@ function finishApproval(dto2, pending, world, connection) {
 async function approval(action = "status") {
   if (liveRunning()) throw Error("Stop this folder\u2019s mind before selecting a newly approved Soul, or use a fresh folder.");
   if (!["status", "wait", "cancel"].includes(action)) throw Error("usage: approval [status|wait|cancel]");
-  const s = load(), pending = need(s, "pendingApproval", "Run create-soul or pair-soul first.");
+  const s = load();
+  if (!s.pendingApproval && action !== "cancel" && s.accountAuth && s.soul && s.token) {
+    const data = ok(await call("/v1/agent/me"), "check selected Soul grant");
+    if (data.soul?.id !== s.soul) throw Error("Selected Soul grant differs; no ready approval was reported.");
+    return { status: "ready", soul: { id: s.soul, name: data.soul.name }, paired: true, next: "Run status. The selected Soul is already ready and granted; no new approval was requested." };
+  }
+  const pending = need(s, "pendingApproval", "Run create-soul or pair-soul first.");
   if (pending.world !== s.world || pending.worldId !== s.worldId) throw Error("Approval belongs to another world.");
   if (!pending.approvalId) return startApproval(pending.input);
   const body2 = { approvalId: pending.approvalId, pollSecret: pending.input.pollSecret }, deadline = Date.now() + 15 * 6e4;
@@ -3813,20 +3905,50 @@ async function observe() {
     canDo: c.canDo
   };
 }
-function summarise(caps) {
-  const avail = caps.filter((c) => c.available !== false);
+var SEARCH_STOP = /* @__PURE__ */ new Set(["the", "and", "with", "for", "into", "from", "some"]);
+function searchTerms(query) {
+  const whole = String(query).trim().toLowerCase(), terms = [...new Set(whole.split(/\\\||\||,|\s+/).map((x) => x.trim()).filter((x) => x.length >= 3 && !SEARCH_STOP.has(x)))];
+  return { whole, terms: terms.length ? terms : [whole] };
+}
+function summarise(caps, filters = {}) {
+  const avail = caps.filter((c) => c.available !== false), blocked = caps.filter((c) => c.available === false);
+  const q = filters.search ? searchTerms(filters.search) : null;
+  const score = (c) => {
+    if (!q) return 1;
+    const hay = [c.id, c.verb, c.label].map((v) => String(v ?? "").toLowerCase()).join("\n");
+    return (hay.includes(q.whole) ? 100 : 0) + q.terms.filter((t) => hay.includes(t)).length;
+  };
+  const pick = (list2) => list2.map((c, i) => ({ c, i, s: !filters.verb || c.verb === filters.verb ? score(c) : 0 })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.c);
+  const matchingAvail = pick(avail), matchingBlocked = pick(blocked), truncated = { available: matchingAvail.length > 80, blocked: matchingBlocked.length > 15 };
   return {
-    available: avail.slice(0, 80).map((c) => ({ id: c.id, verb: c.verb, label: c.label, ...c.params ? { params: Object.keys(c.params) } : {} })),
-    blocked: caps.filter((c) => c.available === false).slice(0, 15).map((c) => ({ id: c.id, label: c.label, why: c.blocked?.code }))
+    available: matchingAvail.slice(0, 80).map((c) => ({ id: c.id, verb: c.verb, label: c.label, ...c.params ? { params: Object.keys(c.params) } : {} })),
+    blocked: matchingBlocked.slice(0, 15).map((c) => ({ id: c.id, label: c.label, why: c.blocked?.code })),
+    totals: { available: avail.length, blocked: blocked.length },
+    matchingTotals: { available: matchingAvail.length, blocked: matchingBlocked.length },
+    truncated,
+    ...q && q.terms.length > 1 ? { searchTerms: q.terms, searchNote: "Any of these terms matches; best matches first." } : {},
+    ...truncated.available || truncated.blocked ? { hint: 'Some offered capabilities are omitted from this compact list; absence is not a refusal. Use capabilities --search "<ID, verb or label>" or capabilities --verb "<exact verb>" to filter all offers before the display limit.' } : {}
   };
 }
-async function capabilities() {
+function capabilityFilters(args) {
+  const filters = {}, usage = 'usage: capabilities [--search "<ID, verb or label>"] [--verb "<exact verb>"]';
+  for (let i = 0; i < args.length; i++) {
+    const flag = args[i];
+    if (!["--search", "--verb"].includes(flag) || Object.hasOwn(filters, flag.slice(2))) throw Error(usage);
+    const value = args[++i];
+    if (typeof value !== "string" || !value.trim() || value.startsWith("--")) throw Error(usage);
+    filters[flag.slice(2)] = flag === "--search" ? value.trim().toLowerCase() : value.trim();
+  }
+  return filters;
+}
+async function capabilities(...args) {
+  const filters = capabilityFilters(args);
   const s = load(), soul = need(s, "soul", "Create one with create-soul.");
-  if (await mode() === "edge") return { canDo: summarise(ok(await call(EDGE.capabilities), "capabilities").capabilities ?? []) };
+  if (await mode() === "edge") return { canDo: summarise(ok(await call(EDGE.capabilities), "capabilities").capabilities ?? [], filters) };
   const goals = (await call(OWNER.caps(soul), { as: "owner" })).data?.goals ?? [];
   const caps = goals.flatMap((g) => (g.bindings ?? []).map((b) => ({ id: b.id, verb: g.id, label: b.aliases?.[0] ?? b.label, available: b.available, blocked: b.blockedCode ? { code: b.blockedCode } : void 0 })));
   if (goals.some((g) => g.id === "rest")) caps.push({ id: "rest:self", verb: "rest", label: "rest", available: true });
-  return { canDo: summarise(caps) };
+  return { canDo: summarise(caps, filters) };
 }
 async function map() {
   if (await mode() === "edge") return ok(await call(EDGE.map), "map");
@@ -3962,7 +4084,9 @@ async function act(first, ...rest) {
   if (d.accepted) {
     accepted();
     if (d.receipt?.channel !== "attention" && d.receipt?.channel !== "none") save({ lastReceipt: d.receipt?.id, lastActAt: now() });
-    return { accepted: true, receipt: d.receipt, ...d.resolved ? { resolved: d.resolved } : {}, ...rewritten ? { asked: rewritten.from } : {}, ...d.receipt?.object || d.object ? { object: d.receipt?.object ?? d.object } : {}, next: "wait", ...then };
+    const personKey = ["targetSoul", "target"].find((k) => params?.[k] !== void 0);
+    const solo = personKey && !/:s_[A-Za-z0-9]+/.test(capability) && !/^(?:hug|high-five|dance-with|handshake|wave|give|go-near|walk-with|invite)/.test(capability);
+    return { accepted: true, receipt: d.receipt, ...solo ? { warning: `"${personKey}" did not make this a shared act: ${capability} is a solo action. Resolve the complete request and use the offered partner capability (capabilities --verb <verb>); do not report it as done with the other person.` } : {}, ...d.resolved ? { resolved: d.resolved } : {}, ...rewritten ? { asked: rewritten.from } : {}, ...d.receipt?.object || d.object ? { object: d.receipt?.object ?? d.object } : {}, next: "wait", ...then };
   }
   return hinted({ accepted: false, code: d.code, reason: d.reason, ...d.did_you_mean ? { did_you_mean: d.did_you_mean } : {}, ...d.retry_after ? { retry_after: d.retry_after } : {}, next: "observe and choose something else" });
 }
@@ -4056,7 +4180,27 @@ async function project(title, ...text3) {
   if (!title || !text3.length) throw new Error('usage: project "<title>" "<what it is>"');
   return act("make:project", JSON.stringify({ title, text: text3.join(" ") }));
 }
-async function explore() {
+function compactAround(a) {
+  const clip2 = (s, n) => String(s ?? "").length > n ? String(s).slice(0, n - 1) + "\u2026" : String(s ?? "");
+  const places = (a.places ?? []).map((p, i) => `${p.name} \xB7 ${p.dir} ${p.m}m ${p.eta} \xB7 ${p.been === void 0 ? "new" : p.been === "found" ? "found" : "been " + p.been + "\xD7"}${i < 3 && p.what ? " \xB7 " + clip2(p.what, 80) : ""}${p.walk ? ` [${p.walk}]` : ""}`);
+  const go = a.unvisited?.[0] ?? null;
+  return {
+    ...a.found?.length ? { found: a.found.map((f) => `${f.name}${f.what ? " \xB7 " + clip2(f.what, 80) : ""}${f.walk ? ` [${f.walk}]` : ""}`) } : {},
+    places,
+    people: (a.people ?? []).slice(0, 6),
+    things: (a.things ?? []).slice(0, 6),
+    ...go ? { suggestion: go, next: `act ${go}, then leave a mark or meet someone there` } : {},
+    untrusted: true
+  };
+}
+async function explore(...args) {
+  if (await mode() === "edge") {
+    const r = await call("/v1/edge/around");
+    if (r.status === 200) {
+      const a = r.data.around ?? {};
+      return args.includes("--full") ? a : compactAround(a);
+    }
+  }
   const all = (await capabilities()).canDo.available.filter((c) => c.verb === "walk"), seen = new Set(load().visited ?? []);
   const fresh = all.filter((c) => !seen.has(c.id));
   const pick = (fresh.length ? fresh : all)[Math.floor(Math.random() * Math.max(1, (fresh.length ? fresh : all).length))];
@@ -4137,7 +4281,7 @@ async function wait(seconds = "45") {
     } catch (error) {
       receiptUnavailable = { id: s.lastReceipt, status: null, error: { code: "receipt.unavailable", message: String(error.message) }, canonicalState: "unknown" };
     }
-    const stalled = lr?.phase === "waiting" ? { hint: "Your movement is waiting (often the world's quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends." } : {};
+    const stalled = lr?.awaitingAnswer ? { hint: `${lr.awaitingAnswer.note} Do not tell the owner it is happening; keep waiting for their answer (invite.accepted) or report that it is still pending.` } : lr?.phase === "waiting" ? { hint: "Your movement is waiting (often the world's quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends." } : {};
     const invites = events2.filter((e) => e.kind === "invite" && e.invite).map((e) => ({ id: e.invite.id, from: e.invite.from?.name, what: e.invite.what, expiresInSeconds: e.invite.expiresInSeconds, accept: `act ${e.invite.accept}`, decline: `act ${e.invite.decline}` }));
     return {
       ...stalled,
@@ -5379,7 +5523,7 @@ async function live(...argv) {
     const bodies = steps.filter(bodyStep);
     let ownerAnswerSource = "model-unverified";
     if (typeof plan2.owner === "string") plan2.owner = perception.truthful(plan2.owner);
-    if (own && (bodies.length || execution.results.some((r) => r.accepted === false || r.accepted == null && r.readOnly !== true && r.queueRetained !== true))) {
+    if ((own || later) && (bodies.length || execution.results.some((r) => r.accepted === false || r.accepted == null && r.readOnly !== true && r.queueRetained !== true))) {
       plan2.owner = results.join("; ").slice(0, 600);
       ownerAnswerSource = "execution-verdict";
     }
@@ -5444,7 +5588,7 @@ async function live(...argv) {
       }
     }
     if (later && (steps.length || plan2.owner)) {
-      const r = { id: later.id, t: now(), text: later.text, continued: true, answer: typeof plan2.owner === "string" ? plan2.owner.slice(0, 600) : null, answerSource: "model-unverified", results, receipt: steps.some((x) => x.act) ? lastReceipt : null };
+      const r = { id: later.id, t: now(), text: later.text, continued: true, answer: typeof plan2.owner === "string" ? plan2.owner.slice(0, 600) : null, answerSource: ownerAnswerSource, results, receipt: steps.some((x) => x.act) ? lastReceipt : null };
       appendFileSync2(LIVE.replies, JSON.stringify(r) + "\n");
       logLive({ owner: { ...r, continued: true } });
     }
@@ -5978,34 +6122,34 @@ async function body(cmd, ...args) {
       const r2 = ok(await call("/v1/edge/body"), "body");
       return { look: r2.look, choices: r2.lookChoices };
     }
-    let look;
+    let look2;
     const flag = args.shift();
     if (flag === "--random") {
-      look = { random: true };
+      look2 = { random: true };
       if (args[0] === "--seed") {
         const seed = Number(args[1]);
         if (!Number.isInteger(seed) || seed < 0) throw new Error("--seed needs a whole number");
-        look.seed = seed;
+        look2.seed = seed;
         args.splice(0, 2);
       }
       if (args.length) throw new Error("usage: body look --random [--seed N]");
     } else if (flag === "--set") {
-      look = {};
+      look2 = {};
       for (const kv of args) {
         const i = kv.indexOf("=");
         if (i < 1) throw new Error("usage: body look --set key=value [key=value ...]");
         const k = kv.slice(0, i), v = kv.slice(i + 1);
-        look[k] = ["headSize", "height", "build", "walkSpeed"].includes(k) ? Number(v) : v;
+        look2[k] = ["headSize", "height", "build", "walkSpeed"].includes(k) ? Number(v) : v;
       }
-      if (!Object.keys(look).length) throw new Error("body look --set needs key=value pairs");
+      if (!Object.keys(look2).length) throw new Error("body look --set needs key=value pairs");
     } else if (flag === "--json") {
       try {
-        look = JSON.parse(args[0] ?? "");
+        look2 = JSON.parse(args[0] ?? "");
       } catch {
         throw new Error("body look --json needs a JSON object");
       }
     } else throw new Error("usage: body look [--random [--seed N] | --set key=value ... | --json {...}]");
-    const r = ok(await call("/v1/edge/body", { method: "PUT", body: { look } }), "body");
+    const r = ok(await call("/v1/edge/body", { method: "PUT", body: { look: look2 } }), "body");
     return { changed: r.changed, body: r.body };
   }
   if (cmd !== "upload") throw new Error("usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...]|upload path.glb --type ceramic --license owned --rights-confirmed]");
@@ -6034,6 +6178,9 @@ async function body(cmd, ...args) {
   noticeOwnerInbox(data);
   if (!response.ok) throw new Error((data.error?.code ?? "body.unavailable") + ": " + (data.error?.message ?? "Body upload refused"));
   return data.asset;
+}
+async function travel(...args) {
+  return travelCommand(args, { load, save, live: () => !!liveRunning() });
 }
 async function profile(...args) {
   return clientProfile(load().soul, args, { call });
@@ -6069,7 +6216,11 @@ async function listen(...args) {
 async function ack(...args) {
   return clientAck(args, { call });
 }
-var commands = { listen, ack, body, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
+async function look(what, ...rest) {
+  if (what !== "around") throw new Error("usage: look around [--full]   (a body action: act look <target>; your appearance: body look)");
+  return explore(...rest);
+}
+var commands = { look, listen, ack, body, travel, live, dashboard, profile, tell, report, view, cost, plan, events, attend, register, status, approval, "pair-soul": pairSoul, "select-soul": selectSoul, "create-soul": createSoul, here, observe, capabilities, map, digest, calendar, whatson, explore, act, resolve: resolveAct, say, converse, object, mark, project, wait, receipt, accept, decline, version: async () => ({ skillVersion: SKILL_VERSION, contract: CONTRACT, apiContract: API_CONTRACT }) };
 if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync2(process.argv[1])).href) {
   const [cmd, ...args] = process.argv.slice(2);
   if (!cmd || ["help", "--help", "-h"].includes(cmd)) {
@@ -6103,6 +6254,7 @@ export {
   body,
   calendar,
   capabilities,
+  compactAround,
   conversationStartBody,
   converse,
   cost,
@@ -6117,6 +6269,7 @@ export {
   listen,
   live,
   liveOptions,
+  look,
   map,
   mark,
   object,
@@ -6131,9 +6284,11 @@ export {
   resolveAct,
   rewrite,
   say,
+  searchTerms,
   selectSoul,
   status,
   tell,
+  travel,
   view,
   wait,
   whatson

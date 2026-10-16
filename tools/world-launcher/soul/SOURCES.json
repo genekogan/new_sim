@@ -3,22 +3,22 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "694f05d7b7ad5ac3689641545b8add3550337f579a2c96dd0a0dfc278954504b",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-fcb47049.manifest.json)",
-    "source": "fcb470499750d4efe4913bf2df8c82e625d523de",
-    "note": "lane inbox: 1.9 + owner-message listen (--once/--follow)/ack and authenticated JSON, image and event-stream receipts"
+    "sha256": "01ce60a796ee84fe47c1cc59e1fd80def2648e8b26e3b35842da0e4610d136cb",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-97580df6.manifest.json)",
+    "source": "97580df67bd33e00839fbe4c13f3b3265825f885",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel [<world>|home]"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "32d4514ee7dadaf13941205fcd35146742ca05d78c7281dd27bd6acc3e864f51",
-    "from": "git show fcb47049:tools/edge-skill/SKILL.md",
-    "note": "template; the world fills {{BASE}}. Includes owner inbox listening and acknowledgement guidance."
+    "sha256": "b1da3146a13cc6ee471cd82619d4be250a22ddf2372eca1167058e66c18e6d9a",
+    "from": "git show 97580df6:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales and travel guidance."
   },
   "instructions": {
     "file": "instructions.md",
     "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
     "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md",
-    "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36\u2026)"
+    "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36…)"
   },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
 }
