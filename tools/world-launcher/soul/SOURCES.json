@@ -3,21 +3,21 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "fb7ac1bc576f71c420632ec1d662b5e171fee073c497fd263415fe9df23cf19a",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-97479c1c.manifest.json)",
-    "source": "97479c1ca38096c33779d25237f118bdff608a36",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape)"
+    "sha256": "e75308716e007dde91a40d7bf21bc5076781dfcfbec208574270c12ebd4a4649",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-a936cfde.manifest.json)",
+    "source": "a936cfded079d77b33276b5db99bf62461f3f9f9",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed"
   },
   "skill": {
     "file": "skill.md",
     "sha256": "7802ca66760bea0afe49c43e92c4f30ee3b71c5cff24bb52d5090385fe0667b0",
-    "from": "git show 97479c1c:tools/edge-skill/SKILL.md",
+    "from": "git show a936cfde:tools/edge-skill/SKILL.md",
     "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits."
   },
   "instructions": {
     "file": "instructions.md",
     "sha256": "3bf0fbd7fa70f8831d8259d869ac3a1ce1750f8919b7fbfac45739203d311502",
-    "from": "git show 97479c1c:tools/edge-skill/INSTRUCTIONS.md",
+    "from": "git show a936cfde:tools/edge-skill/INSTRUCTIONS.md",
     "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001."
   },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."

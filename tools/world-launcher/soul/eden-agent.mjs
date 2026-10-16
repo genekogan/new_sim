@@ -6268,7 +6268,7 @@ async function body(cmd, ...args) {
         const i = kv.indexOf("=");
         if (i < 1) throw new Error("usage: body look --set key=value [key=value ...]");
         const k = kv.slice(0, i), v = kv.slice(i + 1);
-        look2[k] = ["headSize", "height", "build", "walkSpeed"].includes(k) ? Number(v) : v;
+        look2[k] = ["headSize", "height", "build", "walkSpeed", "shoulders", "chest", "hips", "weight"].includes(k) ? Number(v) : v;
       }
       if (!Object.keys(look2).length) throw new Error("body look --set needs key=value pairs");
     } else if (flag === "--json") {
