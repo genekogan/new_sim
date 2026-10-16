@@ -36,7 +36,7 @@ const god = async (w) => {
 const check = (k, ok, detail) => { report.checks[k] = { ok: !!ok, ...(detail !== undefined ? { detail } : {}) }; console.log(`  ${ok ? 'ok ' : 'FAIL'} ${k}${detail !== undefined ? ` — ${typeof detail === 'string' ? detail : JSON.stringify(detail)}` : ''}`); };
 
 const corner = (extra = []) => ({ schema: 'def/1', name: 'reading-corner', version: 1, description: 'A reading corner: a bench under a lamp post, with a little table. Sit and read in the evening.', tags: ['reading', 'corner', 'seat'], form: 'point',
-  make: { kind: 'parts', parts: [{ id: 'bench', def: 'core-bench@1', at: [0, 0, 0] }, { id: 'lamp', def: 'core-lamp-post@1', at: [1.8, 0, -0.6] }, { id: 'table', def: 'core-table@1', at: [-1.9, 0, 0.2] }, ...extra] },
+  make: { kind: 'parts', parts: [{ id: 'bench', def: 'core-bench@1', p: [0, 0] }, { id: 'lamp', def: 'core-lamp-post@1', p: [1.8, -0.6] }, { id: 'table', def: 'core-table@1', p: [-1.9, 0.2] }, ...extra] },
   size: { box: [6, 3, 3] }, layer: 'solid', anchor: 'base' });
 
 try {
@@ -57,7 +57,7 @@ try {
   check('publish.idempotent', c.code === 0 && /unchanged/.test(c.stdout));
   c = cli('publish', '--from', alpha.base, '--dev', '--ref', 'my-martian@1');
   step('publish a Little Martians model (refused)', c); check('publish.restricted-refused', c.code === 1 && /library\.restricted/.test(c.stdout));
-  r = await ga('/v1/god/act', { ops: [{ op: 'define', def: corner([{ id: 'bench2', def: 'core-bench@1', at: [0, 0, 1.6], r: 180 }]) }], note: 'e2e: a second bench' });
+  r = await ga('/v1/god/act', { ops: [{ op: 'define', def: corner([{ id: 'bench2', def: 'core-bench@1', p: [0, 1.6], r: 3.142 }]) }], note: 'e2e: a second bench' });
   check('alpha.redefine', r.data.accepted, r.data.failures);
   c = cli('publish', '--from', alpha.base, '--dev', '--ref', 'reading-corner@1', '--author-name', 'Ana (alpha owner)', '--title', 'Reading corner');
   step('publish v2 from alpha', c); check('publish.v2', c.code === 0 && /published alpha\/reading-corner@2/.test(c.stdout));
@@ -123,6 +123,12 @@ try {
           const f = join(shots, `beta-library-dpr${dpr}.png`); await page.screenshot({ path: f });
           step(`screenshot dpr ${dpr}`, { file: f, stats, errors });
           check(`shot.dpr${dpr}`, stats.entities >= 10 && !errors.length, { entities: stats.entities, errors: errors.slice(0, 2) });
+          // closer: the corners placed from the library (v1 left, v2 with its second bench right, v1 again behind,
+          // the route-placed v2 in front, the uploaded totem in the middle)
+          const frame = () => page.evaluate(() => { const s = window.__simEntity; s.controls.target.set(0, 0.6, -1); s.camera.position.set(2, 8.5, 15); s.controls.update?.(); });
+          await frame(); await page.waitForTimeout(1000); await frame(); await page.waitForTimeout(1500);   // twice: an arrival glide may still own the camera
+          const fc = join(shots, `beta-library-close-dpr${dpr}.png`); await page.screenshot({ path: fc });
+          step(`close-up dpr ${dpr}`, { file: fc });
           await ctx.close();
         }
       } finally { await browser.close(); }
