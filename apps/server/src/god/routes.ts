@@ -26,7 +26,7 @@ import { CREATION_LIMITS } from '@sim/generators';
 import { siteReport } from './build-integrity.ts';
 import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
 import { serverDoctor } from './lock-doctor.ts';
-import { BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
+import { ATTENTION, BUILD_LIMITS, buildFieldSchema, type Identity } from './builds.ts';
 import { HELPER_LIMITS, helperRoute } from './helpers.ts';
 import { cobuilderRoute } from './cobuilders.ts';
 import { mountLookRoutes } from './look.ts'; // W2 remote looks
@@ -216,6 +216,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/builds/:id/abandon', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await optionalBody(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.builds.abandon(id, b, () => d.god.undoGroupUnder(id, b.force === true))), 200, noStore); });
   // Y5: atomic rewind to after step k ({to, dry?, force?}); any god token, like done/abandon (the owner card).
   app.post('/v1/god/builds/:id/rewind', async (c) => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); const id = c.req.param('id'); const b = await body(c); return c.json(d.god.as({ identity: requireGod(c) }, () => d.god.rewind(id, b)), 200, noStore); });
+  // CE8: fire-and-forget look hint from the lead; memory only, published on the public site.
+  app.post('/v1/god/builds/:id/attention', async c => { limitGod(c, 'attention', ATTENTION.perMinute); return c.json(d.god.builds.attend(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
   app.post('/v1/god/builds/:id/claims', async c => { limitGod(c, 'builds', BUILD_LIMITS.editsPerMinute); return c.json(d.god.builds.claim(c.req.param('id'), await body(c), requireGod(c)), 200, noStore); });
   // WD7 slice 3: the claim's holder mints a scoped helper token; the response carries only the new token.
   app.post('/v1/god/builds/:id/claims/:cid/helper', async c => { limitGod(c, 'helper-mint', HELPER_LIMITS.mintPerMinute); return c.json(d.god.mintHelper(c.req.param('id'), c.req.param('cid'), await optionalBody(c), requireGod(c)), 200, noStore); });

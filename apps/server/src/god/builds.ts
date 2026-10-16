@@ -9,6 +9,9 @@ import { helperScopeFailure, type ClaimState, type HelperScope } from './helpers
 import { accountKey, cobuilderFailure, labelAccount, whose } from './cobuilders.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
+/** CE8: the lead's latest look target. Memory only (no SQL, no rev, no history); at most one publish per minMs per build. */
+export const ATTENTION = { minMs: 1000, ttlMs: 20_000, perMinute: 120 } as const;
+export type Attention = { at: [number, number, number]; eye?: [number, number, number]; t: number };
 export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside', 'build.rewind', 'build.depends'] as const;
 const fixes: Record<typeof buildCodes[number], string> = {
   'build.outside': 'Name the existing entity with build start --include <ref> or build step --include <ref>, then retry.',
@@ -58,6 +61,7 @@ export const buildActionSchemas = {
   claim: z.object({ part: z.string().regex(/^[a-z0-9][a-z0-9-]{0,18}$/), root: z.string().min(1).max(300).optional(), region: siteSchema.optional(), take: z.string().regex(/^c_[0-9a-f]{8}$/).optional() }).strict().refine(c => !!(c.root || c.region || c.take), 'Supply a root, region, or stale claim to take.'),
   release: z.object({ done: z.boolean().optional() }).strict(),
   rewind: z.object({ to: z.number().int().min(0).max(999), dry: z.boolean().optional(), force: z.boolean().optional() }).strict(),
+  attention: z.object({ lease: z.string().regex(/^l_[0-9a-f]{8}$/).optional(), at: z.tuple([z.number().finite(), z.number().finite().min(-2000).max(2000), z.number().finite()]), eye: z.tuple([z.number().finite().min(-1e5).max(1e5), z.number().finite().min(-1e5).max(1e5), z.number().finite().min(-1e5).max(1e5)]).optional() }).strict(),
 };
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
@@ -87,11 +91,12 @@ export type BuildBody = {
   rewinds?: { at: number; to: number; from: number; edits: number; removed: number; byLabel: string }[];
 };
 type Row = Omit<BuildRow, 'body'> & { body: BuildBody };
-export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[]; say?: Caption; designing?: string[]; note?: Caption; reopensAt?: number };
-export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt' | 'say' | 'designing' | 'note' | 'reopensAt'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
+export type PublicSite = { id: string; title: string; status: BuildRow['status']; rev: number; lastAt: number; pauseAfterMs: number; closed: boolean; step: { n: number; label: string; of: number }; site: Site; massing: Mass[]; roots: string[]; claims: { part: string; status: Claim['status'] | 'stale' }[]; say?: Caption; designing?: string[]; note?: Caption; reopensAt?: number; attention?: Attention };
+export type SiteDelta = Pick<PublicSite, 'id' | 'rev' | 'status' | 'lastAt' | 'say' | 'designing' | 'note' | 'reopensAt' | 'attention'> & { closed?: boolean; step?: PublicSite['step']; claim?: PublicSite['claims'][number]; rootsAdded?: string[]; rootsRemoved?: string[] };
 export type BuildEcho = { id: string; status: BuildRow['status']; rev: number; group?: string; step: { n: number; label: string }; claim?: string };
 export type BuildEventKind = 'started' | 'step' | 'alive' | 'paused' | 'resumed' | 'claimed' | 'released' | 'taken' | 'done' | 'abandoned' | 'closure-lifted' | 'rewound';
-export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind; site?: PublicSite; delta?: SiteDelta };
+/** `attention` carries the site's current rev without advancing it: viewers apply it outside the rev sequence. */
+export type WorldBuildMessage = { type: 'edge'; kind: 'world-build'; rev: number; now: number; event: BuildEventKind | 'attention'; site?: PublicSite; delta?: SiteDelta };
 export type BuildNotice = { kind: BuildEventKind; id: string; rev: number; now: number; delta: SiteDelta; view?: GodBuildView };
 export type GodBuildView = Omit<BuildBody, 'lead' | 'roots' | 'claims' | 'massing'> & {
   chapters?: { id: string; brief?: string; asks?: string[] }[];
@@ -333,7 +338,9 @@ export class GodBuilds {
   readonly rootIndex = new Map<string, string>();
   readonly pauseMs: number; readonly closureMs: number;
   readonly store: WorldStore;
-  private host: { model: () => WorldModel; now: () => number; pauseMs?: number; closureMs?: number; emit: (message: WorldBuildMessage) => void; notice: (event: BuildNotice) => void; receipt?: (id: string, body?: BuildBody) => BuildReceipt | undefined };
+  private host: { model: () => WorldModel; now: () => number; pauseMs?: number; closureMs?: number; emit: (message: WorldBuildMessage) => void; notice: (event: BuildNotice) => void; receipt?: (id: string, body?: BuildBody) => BuildReceipt | undefined; schedule?: (fn: () => void, ms: number) => void };
+  /** CE8: latest lead look per open build; never persisted. `pending` = one trailing publish is scheduled. */
+  private gaze = new Map<string, { latest: Attention; publishedAt: number; pending: boolean }>();
   constructor(store: WorldStore, host: GodBuilds['host']) {
     this.store = store; this.host = host;
     const positive = (v: number | undefined, fallback: number) => v !== undefined && Number.isFinite(v) && v > 0 ? v : fallback;
@@ -381,7 +388,36 @@ export class GodBuilds {
       ...(open(r) ? { reopensAt: this.reopensAt(r) } : {}),
     };
   }
-  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale ? 'stale' : c.status })), ...this.captions(r) }; }
+  private public(r: Row, now: number): PublicSite { const b = r.body; return { id: r.id, title: b.title, status: effective(r, now, this.pauseMs), rev: r.rev, lastAt: r.last_at, pauseAfterMs: this.pauseMs, closed: this.isClosing(r, now), step: { n: b.step.n, label: b.step.label, of: b.plan.steps.length }, site: structuredClone(b.site), massing: structuredClone(b.massing), roots: [...b.roots], claims: b.claims.map(c => ({ part: c.part, status: c.status === 'held' && lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale ? 'stale' : c.status })), ...this.captions(r), ...this.attentionOf(r.id, now) }; }
+  /** Snapshots carry the latest look while it is fresh (no older trail is kept). */
+  private attentionOf(id: string, now: number): { attention?: Attention } {
+    const a = this.gaze.get(id)?.latest;
+    return a && now - a.t <= ATTENTION.ttlMs ? { attention: structuredClone(a) } : {};
+  }
+  /** CE8 passive marker: the build lead says where it is looking. Fire-and-forget for the caller; never a SQL write. */
+  attend(id: string, raw: unknown, caller: Identity) {
+    const now = this.host.now(), p = buildActionSchemas.attention.safeParse(raw); if (!p.success) return schemaFailure(p.error);
+    const row = this.row(id); if (!row) return fail('build.unknown', id); if (!open(row)) return fail('build.closed', id);
+    if (caller.hash !== row.body.lead.tokenHash && p.data.lease !== row.body.lead.lease) return fail('build.lease', `${id} is led by ${row.body.lead.label}; only the lead's looks are shown.`);
+    const [x0, z0, x1, z1] = this.host.model().ground().extent, [x, , z] = p.data.at;
+    if (x < x0 || x > x1 || z < z0 || z > z1) return fail('build.site', 'Attention point is outside the ground extent.', 'at');
+    const round = (v: [number, number, number]) => v.map(n => Math.round(n * 100) / 100) as [number, number, number];
+    const latest: Attention = { at: round(p.data.at), ...(p.data.eye ? { eye: round(p.data.eye) } : {}), t: now };
+    const g = this.gaze.get(id) ?? { latest, publishedAt: -Infinity, pending: false }; g.latest = latest; this.gaze.set(id, g);
+    const wait = g.publishedAt + ATTENTION.minMs - now;
+    if (wait <= 0) { this.publishAttention(id); return { ok: true as const, t: now, published: true }; }
+    if (!g.pending) { g.pending = true; (this.host.schedule ?? ((fn, ms) => { setTimeout(fn, ms).unref?.(); }))(() => this.publishAttention(id), wait); }
+    return { ok: true as const, t: now, published: false };
+  }
+  private publishAttention(id: string) {
+    const g = this.gaze.get(id), row = this.rows.get(id); if (!g) return;
+    g.pending = false;
+    if (!row || !open(row)) { this.gaze.delete(id); return; }
+    const now = this.host.now(); if (now - g.latest.t > ATTENTION.ttlMs) return;
+    g.publishedAt = now;
+    const delta: SiteDelta = { id, rev: row.rev, status: effective(row, now, this.pauseMs), lastAt: row.last_at, attention: structuredClone(g.latest) };
+    this.host.emit({ type: 'edge', kind: 'world-build', event: 'attention', rev: row.rev, now, delta });
+  }
   private view(r: Row, now: number, recent?: { seq: number; note: string | null; at: number }[]): GodBuildView {
     const b = structuredClone(r.body), refused = this.store.buildRefusals(r.id), { lease: _lease, tokenHash: _tokenHash, ...lead } = b.lead;
     if (b.done && !b.done.receipt) b.done.receipt = this.store.buildReceipt(r.id);
@@ -483,7 +519,7 @@ export class GodBuilds {
       this.rows.set(row.id, row);
       if (roots) { for (const id of roots.removed) if (this.rootIndex.get(id) === row.id) this.rootIndex.delete(id); for (const id of roots.added) this.rootIndex.set(id, row.id); }
     } else {
-      const previous = this.rows.get(row.id); this.rows.delete(row.id);
+      const previous = this.rows.get(row.id); this.rows.delete(row.id); this.gaze.delete(row.id);
       for (const id of previous?.body.roots ?? []) if (this.rootIndex.get(id) === row.id) this.rootIndex.delete(id);
     }
   }

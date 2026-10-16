@@ -48,6 +48,8 @@ export type GodOptions = {
   now?: () => number;
   buildPauseMs?: number;
   buildClosureMs?: number;
+  /** CE8 trailing attention publish; default an unref'd setTimeout (tests and replays inject a fake clock). */
+  schedule?: (fn: () => void, ms: number) => void;
   constants?: Partial<WorldModel['constants']>;
   seed?: string;
   /** A genesis/1 template applied once when the world is first created (worlds/templates/*.json). */
@@ -134,7 +136,7 @@ export class GodMode {
     }
     this.builds = new GodBuilds(this.store, { model: () => this.model, now: () => this.now(), pauseMs: opts.buildPauseMs, closureMs: opts.buildClosureMs,
       emit: m => { try { this.opts.emit(m); } catch { /* viewers are best effort */ } },
-      receipt: (id, body) => this.checkBuild(id, body)?.receipt,
+      receipt: (id, body) => this.checkBuild(id, body)?.receipt, schedule: opts.schedule,
       notice: e => { this.push('build', e); for (const fn of this.buildListeners) { try { fn(e); } catch { /* listeners must not turn a committed edit into a refusal */ } } },
     });
     // Y3 districts: private plans built as chapter builds; a chapter start takes site and massing from its plots.
