@@ -3,16 +3,16 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "01ce60a796ee84fe47c1cc59e1fd80def2648e8b26e3b35842da0e4610d136cb",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-97580df6.manifest.json)",
-    "source": "97580df67bd33e00839fbe4c13f3b3265825f885",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel [<world>|home]"
+    "sha256": "c2bedf27e66af79b649df62cab97bf32967974c2e44f52cac3f1b9c119ca9f8f",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-976e838c.manifest.json)",
+    "source": "976e838cca1a54a3567e6a8112118e625ed3659e",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection and speech truth"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "b1da3146a13cc6ee471cd82619d4be250a22ddf2372eca1167058e66c18e6d9a",
-    "from": "git show 97580df6:tools/edge-skill/SKILL.md",
-    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales and travel guidance."
+    "sha256": "6ab3372aac9769e476254c484a2adb7bacc99824121d163c8d71759ecd6662d6",
+    "from": "git show 976e838c:tools/edge-skill/SKILL.md",
+    "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel and creature guidance."
   },
   "instructions": {
     "file": "instructions.md",

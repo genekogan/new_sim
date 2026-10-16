@@ -1,8 +1,27 @@
 #!/usr/bin/env node
 
 // tools/edge-skill/client-owner-reply.mjs
+var OWNER_ANSWER_MAX = 4e3;
+function ownerAnswerText(text3, max = OWNER_ANSWER_MAX) {
+  if (typeof text3 !== "string") return text3 ?? null;
+  const value = text3.trim();
+  if (value.length <= max) return value;
+  const head = value.slice(0, max - 2), ends = [...head.matchAll(/[.!?](?=\s|$)|;(?=\s)/g)], end = ends.at(-1)?.index;
+  return (end > max / 2 ? head.slice(0, end + 1) : head.replace(/\s+\S*$/, "")) + " \u2026";
+}
+function routeOwnerReport(steps, owner) {
+  if (typeof owner === "string" && owner.trim()) return { steps, owner, routed: 0 };
+  const report2 = steps.filter((s) => typeof s?.say === "string" && s.say.trim() && !s.act && !s.converse);
+  if (!report2.length) return { steps, owner, routed: 0 };
+  return {
+    steps: steps.filter((s) => !report2.includes(s)),
+    owner: report2.map((s) => s.say.trim()).join(" "),
+    routed: report2.length,
+    line: `Report sent to your owner privately, not said aloud (${report2.length} say step${report2.length === 1 ? "" : "s"}). Put owner reports in "owner".`
+  };
+}
 function ownerReplyWithLocalResults({ answer, source: source2, results = [], localResults = [] } = {}) {
-  const verdict = () => ({ answer: results.join("; ").slice(0, 600), source: "execution-verdict" });
+  const verdict = () => ({ answer: ownerAnswerText(results.join("; ")), source: "execution-verdict" });
   if (source2 === "execution-verdict" || typeof answer !== "string" || !answer.trim()) return verdict();
   const scheduled = localResults.some((r) => r.operation === "schedule" || r.operation === "compile");
   let report2 = answer.trim();
@@ -14,7 +33,7 @@ function ownerReplyWithLocalResults({ answer, source: source2, results = [], loc
   if (scheduled) warnings.push("Saving a local schedule or binding does not confirm execution.");
   if (!report2) return verdict();
   const prefix = warnings.length ? warnings.join("; ") + " Model report (unverified): " : "";
-  return { answer: (prefix + report2).slice(0, 600), source: "model-unverified" };
+  return { answer: ownerAnswerText(prefix + report2), source: "model-unverified" };
 }
 
 // tools/edge-skill/client-help.mjs
@@ -1161,7 +1180,10 @@ async function executeReplySteps(steps, { queue, id: id3, source: source2, repla
     } catch (error) {
       return refusal2("local.queue-refused", error.message);
     }
+    const repair = steps.some((s) => s.fixes !== void 0) ? retained.repairs?.at(-1) : null, dropped = repair?.droppedSpeech?.length ?? 0;
+    if (dropped) results.push({ operation: "speech-redraft", accepted: null, readOnly: true, code: "local.speech-redraft", line: `Dropped ${dropped} pre-written speech step${dropped === 1 ? "" : "s"} queued after the refused ${repair.failedStep.act}: written before the refusal, not said. Speak only after the replacement finishes, and only about what actually happened.` });
     const state = await pump();
+    for (const s of (state.skips ?? []).slice(retained.skips?.length ?? 0)) results.push({ operation: "refused-step-skipped", accepted: null, readOnly: true, code: "local.refused-step-skipped", line: `Skipped the refused ${s.act} (${s.code ?? "refused"}) ${s.why}; the queue went on with its next step.${s.droppedSpeech?.length ? ` Dropped ${s.droppedSpeech.length} pre-written speech step${s.droppedSpeech.length === 1 ? "" : "s"} after it, not said.` : ""}` });
     const failed = state.steps.find((s) => ["failed", "blocked", "interrupted"].includes(s.status));
     if (failed) {
       results.push({ operation: failed.act, accepted: false, code: failed.code ?? state.notice?.reason ?? failed.status, reason: failed.reason ?? state.notice?.reason ?? failed.status, queueRetained: true, line: `Queue ${state.id} retained, but ${failed.act} ${failed.status}: ${failed.code ?? state.notice?.reason ?? ""}. Dependent public steps have not run.` });
@@ -1201,18 +1223,36 @@ var literalSoulReference = (text3, reference2) => {
 };
 var GENERIC_IDENTITY_BASES = /* @__PURE__ */ new Set(["anyone", "anyone nearby", "someone", "someone nearby", "somebody", "somebody nearby", "people nearby", "everyone nearby", "everyone", "any nearby person"]);
 var literalGenericIdentityBases = (ownerText) => [...GENERIC_IDENTITY_BASES].filter((basis) => literalSoulReference(ownerText, basis));
-function bindLiveSoulReferences(refs2, { ownerText = "", identityBasis, resolve: resolve9 } = {}) {
+var NEARBY_SOCIAL_METRES = 5;
+var SOCIAL_ACT = /^(?:wave|greet|nod|bow|cheer|clap|smile)(?:$|[\s:-])/i;
+var socialIdentityStep = (step) => step?.converse === "start" || typeof step?.act === "string" && SOCIAL_ACT.test(step.act.trim());
+var NO_SOCIAL = /\b(?:do ?n[o']?t|never|no)\s+(?:talk|speak|chat|greet|wave|social[a-z]*|interact|convers[a-z]*|engage)|\b(?:talk|speak|chat)\s+(?:to|with)\s+(?:no ?one|nobody)|\b(?:avoid|ignore)\s+(?:everyone|everybody|people|others|anyone)\b|\bkeep to yourself\b|\b(?:stay|keep|be)\s+(?:quiet|silent)\b|\bin silence\b/i;
+var ownerForbidsSocial = (text3) => NO_SOCIAL.test(String(text3 ?? "").normalize("NFKC").replace(/[\u2018\u2019]/g, "'"));
+var nameWords = (name) => identityText(name).split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 2);
+function nearbySocialChoice(ownerText, chosen, nearby, selfName) {
+  const row = nearby.find((p) => p?.id === chosen?.id);
+  if (!row || !Number.isFinite(row.dist) || row.dist > NEARBY_SOCIAL_METRES || ownerForbidsSocial(ownerText)) return false;
+  let rest = identityText(ownerText);
+  for (const p of [...nearby, chosen, { name: selfName }]) if (p?.name && literalSoulReference(ownerText, p.name)) rest = rest.split(identityText(p.name)).join(" ");
+  return !nameWords(chosen.name ?? row.name).some((w) => literalSoulReference(rest, w));
+}
+function bindLiveSoulReferences(refs2, { ownerText = "", identityBasis, resolve: resolve9, social = false, nearby = [], selfName = null } = {}) {
   const list2 = Array.isArray(refs2) ? refs2 : [refs2], generic = GENERIC_IDENTITY_BASES.has(identityText(identityBasis)) && literalSoulReference(ownerText, identityBasis);
   const resolved = resolve9(list2);
   if (!resolved.ok) return resolved;
+  let nearbySocial = false;
   if (ownerText && !generic) {
     for (let i = 0; i < list2.length; i++) {
       const ref = list2[i], chosen = resolved.chosen[i], name = typeof ref === "string" && !ref.startsWith("s_") ? ref : ref?.name ?? chosen.name, id3 = typeof ref === "string" && ref.startsWith("s_") ? ref : ref?.id ?? chosen.id;
       if (chosen.nameAmbiguous && !literalSoulReference(ownerText, chosen.id)) return { ok: false, code: "identity.reassigned-name", reason: "The named label was reassigned. An explicit canonical ID must come from the trusted owner request, not a model-invented pair; clarify instead of substituting.", requested: resolved.requested, chosen: resolved.chosen };
+      if (!literalSoulReference(ownerText, name) && !literalSoulReference(ownerText, id3) && social && nearbySocialChoice(ownerText, chosen, nearby, selfName)) {
+        nearbySocial = true;
+        continue;
+      }
       if (!literalSoulReference(ownerText, name) && !literalSoulReference(ownerText, id3)) return { ok: false, code: "identity.owner-binding-required", reason: "Selected full name/ID is not a literal reference in the trusted owner request. " + (literalGenericIdentityBases(ownerText).length ? "For an intended generic choice, this request contains a literal selector: retry the step with top-level identityBasis:" + JSON.stringify(literalGenericIdentityBases(ownerText)[0]) + ", keeping the exact observed with/targetSoul reference. identityBasis belongs on this do step, not inside params. This is a repair hint, not acceptance or consent." : "Use the exact intended full name, wait for it, or ask for clarification; no similar-name substitution."), requested: resolved.requested, chosen: resolved.chosen };
     }
   }
-  return { ...resolved, basis: ownerText ? generic ? "literal-generic-choice" : "literal-owner-reference" : "observed-autonomous-choice" };
+  return { ...resolved, basis: ownerText ? generic ? "literal-generic-choice" : nearbySocial ? "nearby-social-choice" : "literal-owner-reference" : "observed-autonomous-choice" };
 }
 
 // tools/edge-skill/client-dispatch-authority.mjs
@@ -1281,6 +1321,9 @@ var fail = (message) => {
 var stable = (value) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9:._@-]{0,159}$/.test(value) ? value : fail("invalid stable ID");
 var safeText = (value, max = 300) => typeof value === "string" && value.trim() && value.length <= max ? value.trim() : fail("invalid text");
 var plain3 = (value) => value && typeof value === "object" && !Array.isArray(value);
+var spokenStep = (step) => !!step?.publicStep && (typeof step.publicStep.say === "string" || typeof step.publicStep.text === "string");
+var REFUSED_OWNER_STEP_MS = 6e4;
+var STALL_HINT = "; the refused step is skipped at the next queue check and the owner queue goes on with its next step";
 function durationSeconds(value) {
   if (typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 86400) return value;
   const m = /^(\d+(?:\.\d+)?)(s|m|h)$/.exec(String(value));
@@ -1405,6 +1448,27 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
     onWake(reason, snapshot());
   };
   const current = () => state.steps.find((s) => !["completed", "cancelled", "skipped", "superseded"].includes(s.status));
+  const refusedAttempts = /* @__PURE__ */ new Map();
+  const stalled = (step) => state.source === "owner" && step?.status === "failed" && step.refusalConfirmed === true && !step.receiptId && !step.publicStep;
+  const dropSpeechAfter = (index, act2) => {
+    const dropped = [];
+    for (const s of state.steps.slice(index + 1)) if (s.status === "pending" && spokenStep(s)) {
+      s.status = "skipped";
+      s.redraft = true;
+      s.reason = `drafted before ${String(act2).slice(0, 60)} was refused; not spoken`;
+      dropped.push(s.id);
+    }
+    return dropped;
+  };
+  function skipRefused(step, why) {
+    const droppedSpeech = dropSpeechAfter(state.steps.indexOf(step), step.act);
+    refusedAttempts.delete(step.id);
+    step.status = "skipped";
+    step.skippedAfterRefusal = true;
+    step.reason = `${String(step.reason ?? step.code ?? "refused").slice(0, 160)} (refused; skipped ${why}; the queue went on)`;
+    state.skips = [...state.skips ?? [], { stepId: step.id, act: step.act, code: step.code ?? null, why, at: now2(), droppedSpeech }].slice(-24);
+    notify("refused-step-skipped", step);
+  }
   const condition = (step, context) => {
     const u = step.until;
     if (!u) return true;
@@ -1444,6 +1508,7 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
     lease();
     if (!result?.accepted || !result.receipt?.id) {
       step.status = "failed";
+      step.failedAt = now2();
       step.refusalConfirmed = result?.accepted === false;
       step.code = result?.code ?? "transport.invalid-response";
       step.reason = result?.reason ?? "No accepted receipt";
@@ -1465,6 +1530,13 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
       }
     }
     let step = current();
+    if (stalled(step) && !pausedNow()) {
+      const tries = refusedAttempts.get(step.id) ?? 0, age = now2() - (step.failedAt ?? state.notice?.at ?? state.at ?? 0);
+      if (tries > 0 || age >= REFUSED_OWNER_STEP_MS) {
+        skipRefused(step, tries > 0 ? "after a continuation without a valid fixes repair was refused" : `after ${Math.round(age / 1e3)} s without a fixes repair`);
+        return drive(context, paused);
+      }
+    }
     if (!step || ["failed", "interrupted", "blocked"].includes(step.status)) return snapshot();
     if (step.receiptId) {
       const receipt2 = await adapter.readReceipt(step.receiptId).catch(() => null);
@@ -1646,38 +1718,52 @@ function openClientQueue(directory, { adapter, scope = null, now: now2 = Date.no
     save2();
     return snapshot();
   }
-  return {
-    snapshot,
-    enqueue(steps, { id: id3 = randomUUID3(), source: source2 = "mind", replace = false, force = false } = {}) {
-      lease();
-      stable(id3);
-      stable(source2);
-      const normalized = replySteps({ do: steps });
-      if (normalized.some((s) => !s.act && (s.for || s.until || s.if))) fail("public steps cannot carry body conditions");
-      if (normalized.some((s) => s.fixes !== void 0)) {
-        const active2 = current(), replacement = normalized[0];
-        if (normalized.length !== 1 || !replacement.act || replacement.publicStep || /^(look|turn|face|glance)\b/i.test(replacement.act)) fail("repair needs one replacement body step; original remaining steps are retained");
-        if (!active2 || replacement.fixes !== active2.id) fail("fixes must name the current failed body step, never a foreign, earlier or completed step");
-        if (state.source === "owner" && source2 === "owner" && id3 !== state.id) fail("a new owner request must explicitly replace the queue; fixes continues its original request");
-        if (active2.publicStep || active2.status !== "failed" || active2.refusalConfirmed !== true || active2.receiptId) fail("repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed");
-        const index = state.steps.indexOf(active2), next = { ...replacement, ...active2.protected ? { protected: true } : {}, id: `step-repair-${randomUUID3()}`, status: "pending", attempts: 0 };
-        state.repairs = [...state.repairs ?? [], { failedStep: structuredClone(active2), replacementStepId: next.id, requestedBy: id3, requestedSource: source2, at: now2() }].slice(-24);
-        state.steps[index] = next;
-        state.notice = null;
-        save2();
-        return snapshot();
-      }
-      if (state.id === id3) return snapshot();
-      const active = current();
-      if (active && !replace) fail("queue already has pending work");
-      if (active && state.source === "owner" && source2 === "mind" && replace) fail("an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement");
-      if (["dispatching", "stopping"].includes(active?.status) && replace) fail("transport outcome uncertain; reconcile before replacement");
-      if (active?.protected && replace && !force) fail("local protected step requires explicit owner force/attended takeover");
-      const previous = [...state.previous ?? []];
-      if (active?.receiptId) previous.push({ ...active, status: "superseded" });
-      state = { version: 1, scope, id: id3, source: source2, at: now2(), notice: null, events: [], eventSequence: 0, previous: previous.slice(-50), replaceReceiptId: active?.receiptId ?? null, steps: normalized.map((s, i) => ({ ...s, ...!s.act ? { publicStep: structuredClone(s.publicStep ?? s), act: s.say ? "say" : s.converse ? "converse" : s.publicStep?.act ?? "public-step" } : {}, id: `step-${i}-${randomUUID3()}`, status: "pending", attempts: 0 })) };
+  function enqueueNow(steps, { id: id3 = randomUUID3(), source: source2 = "mind", replace = false, force = false } = {}) {
+    lease();
+    stable(id3);
+    stable(source2);
+    const normalized = replySteps({ do: steps });
+    if (normalized.some((s) => !s.act && (s.for || s.until || s.if))) fail("public steps cannot carry body conditions");
+    if (normalized.some((s) => s.fixes !== void 0)) {
+      const active2 = current(), replacement = normalized[0];
+      if (normalized.length !== 1 || !replacement.act || replacement.publicStep || /^(look|turn|face|glance)\b/i.test(replacement.act)) fail("repair needs one replacement body step; original remaining steps are retained");
+      if (!active2 || replacement.fixes !== active2.id) fail("fixes must name the current failed body step, never a foreign, earlier or completed step");
+      if (state.source === "owner" && source2 === "owner" && id3 !== state.id) fail("a new owner request must explicitly replace the queue; fixes continues its original request");
+      if (active2.publicStep || active2.status !== "failed" || active2.refusalConfirmed !== true || active2.receiptId) fail("repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed");
+      const index = state.steps.indexOf(active2), next = { ...replacement, ...active2.protected ? { protected: true } : {}, id: `step-repair-${randomUUID3()}`, status: "pending", attempts: 0 };
+      const droppedSpeech = dropSpeechAfter(index, active2.act);
+      state.repairs = [...state.repairs ?? [], { failedStep: structuredClone(active2), replacementStepId: next.id, requestedBy: id3, requestedSource: source2, at: now2(), droppedSpeech }].slice(-24);
+      state.steps[index] = next;
+      state.notice = null;
       save2();
       return snapshot();
+    }
+    if (state.id === id3) return snapshot();
+    const active = current();
+    if (active && !replace) fail("queue already has pending work");
+    if (active && state.source === "owner" && source2 === "mind" && replace) fail("an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement");
+    if (["dispatching", "stopping"].includes(active?.status) && replace) fail("transport outcome uncertain; reconcile before replacement");
+    const selfProtected = active?.protected && state.source !== "owner";
+    if (active?.protected && replace && !force && !(selfProtected && source2 === "owner")) fail("local protected step requires explicit owner force/attended takeover");
+    const previous = [...state.previous ?? []];
+    if (active?.receiptId) previous.push({ ...active, status: "superseded" });
+    state = { version: 1, scope, id: id3, source: source2, at: now2(), notice: null, events: [], eventSequence: 0, previous: previous.slice(-50), replaceReceiptId: active?.receiptId ?? null, steps: normalized.map((s, i) => ({ ...s, ...!s.act ? { publicStep: structuredClone(s.publicStep ?? s), act: s.say ? "say" : s.converse ? "converse" : s.publicStep?.act ?? "public-step" } : {}, id: `step-${i}-${randomUUID3()}`, status: "pending", attempts: 0 })) };
+    save2();
+    return snapshot();
+  }
+  return {
+    snapshot,
+    enqueue(steps, options) {
+      try {
+        return enqueueNow(steps, options);
+      } catch (error) {
+        const active = current();
+        if (stalled(active)) {
+          refusedAttempts.set(active.id, (refusedAttempts.get(active.id) ?? 0) + 1);
+          if (error.message.startsWith("client queue: ")) error.message += STALL_HINT;
+        }
+        throw error;
+      }
     },
     event(event) {
       lease();
@@ -2284,6 +2370,28 @@ function nextReview(review, afterRealMs) {
 }
 
 // tools/edge-skill/client-living.mjs
+async function unresolvedBindingSteps(bindings, resolve9, limit = 8) {
+  const out = [];
+  for (const b of Array.isArray(bindings) ? bindings : []) {
+    let steps;
+    try {
+      steps = replySteps({ do: b.steps });
+    } catch {
+      continue;
+    }
+    for (const s of steps.filter((x) => bodyStep(x) && typeof x.act === "string" && !/:here$/.test(x.act))) {
+      if (out.length >= limit) return out;
+      let r;
+      try {
+        r = await resolve9(s.act);
+      } catch {
+        continue;
+      }
+      if (r?.ok === false && /^(?:capability\.unknown|place\.(?:unknown|unreachable)|target\.not-in-sight|not-found)$/.test(String(r.code))) out.push({ id: b.id, act: s.act, code: r.code, reason: String(r.reason ?? "").slice(0, 160) });
+    }
+  }
+  return out;
+}
 var hash = (value) => createHash4("sha256").update(JSON.stringify(value)).digest("hex");
 var done = (s) => ["completed", "cancelled", "skipped", "superseded"].includes(s.status);
 var safe2 = (path) => {
@@ -4575,7 +4683,7 @@ Steps:
 {"converse":"say","id":"<conversationId>","text":"<text>"}
 {"object":"<objectId>","action":"<action>","params":{...}} e.g. chess move {"from":"e2","to":"e4"}, project contribute {"text":"...","effort":5}, a calendar item "interest".
 {"mark":"note"|"sign"|"offering"|"proposal","title":"<at most 60 chars>","text":"<at most 300 chars>"} and {"project":"<title>","text":"<what it is>"} leave lasting things where you stand.
-{"act":"<id or words>","for":"3m","if":{"place":"<id>"}} = a local body step. Return several in "do" for "then" requests; code saves them and starts each only after the previous receipt is terminal, without another model call. "for" sets seconds. Use "until" instead of "for" only for an offered timed activity: code renews actual bounded native substeps, then requests owned stand and waits for terminal receipts when a NEW event or HH:MM world time is reached; unavailable clocks/refused guards wake you instead of guessing. This is a CLIENT queue, never send act:"plan" or call a server planner. Mixed steps retain order after the first body step. A standalone say/converse/look reply can happen during a body action without replacing it. For finish-uninterrupted reading use {"act":"read a book in the library","protected":true,"params":{"seconds":360}}: protected belongs on the step, not world params. The client also normalizes the params.protected alias; conflicting values refuse. protected:true is a LOCAL finish-uninterrupted policy; ordinary native replacement still follows native safe-stop. For a future queued step, copy an offered id from doHere/canDo/exits; a descriptive label is not an id. For an intentional repair send one body step with fixes equal to the CURRENT confirmed-refused body step ID. The queue keeps its original owner request, completed receipts and remaining steps; never resend completed work or uncertain public effects. A lesson is recorded only after that fix really completes. fixes must preserve the original owner intent and its requested duration/constraints, not merely make some body action succeed. Changing a capability label to a legitimate offered ID for the same requested action is a correction; changing the requested posture/activity is a different choice. If sitting is unavailable, find a legitimate offered seat, clarify or wait; do not substitute lying or another posture unless the owner explicitly approved it. Report the original refusal, actual replacement/result and what remains unmet. queueComplete proves execution of the repaired steps, not fulfillment of the original request. ownerGoal:"resolved" is a separate semantic judgment and must not hide an unmet request behind queue completion.
+{"act":"<id or words>","for":"3m","if":{"place":"<id>"}} = a local body step. Return several in "do" for "then" requests; code saves them and starts each only after the previous receipt is terminal, without another model call. "for" sets seconds. Use "until" instead of "for" only for an offered timed activity: code renews actual bounded native substeps, then requests owned stand and waits for terminal receipts when a NEW event or HH:MM world time is reached; unavailable clocks/refused guards wake you instead of guessing. This is a CLIENT queue, never send act:"plan" or call a server planner. Mixed steps retain order after the first body step. A standalone say/converse/look reply can happen during a body action without replacing it. For finish-uninterrupted reading use {"act":"read a book in the library","protected":true,"params":{"seconds":360}}: protected belongs on the step, not world params. The client also normalizes the params.protected alias; conflicting values refuse. protected:true is a LOCAL finish-uninterrupted policy against your own later steps, not your owner's requests; ordinary native replacement still follows native safe-stop. For a future queued step, copy an offered id from doHere/canDo/exits; a descriptive label is not an id. For an intentional repair send one body step with fixes equal to the CURRENT confirmed-refused body step ID. Without one within a minute, the refused owner step is skipped and the queue goes on (refused-step-skipped). The queue keeps its original owner request, completed receipts and remaining steps; never resend completed work or uncertain public effects. A lesson is recorded only after that fix really completes. fixes must preserve the original owner intent and its requested duration/constraints, not merely make some body action succeed. Changing a capability label to a legitimate offered ID for the same requested action is a correction; changing the requested posture/activity is a different choice. If sitting is unavailable, find a legitimate offered seat, clarify or wait; do not substitute lying or another posture unless the owner explicitly approved it. Report the original refusal, actual replacement/result and what remains unmet. queueComplete proves execution of the repaired steps, not fulfillment of the original request. ownerGoal:"resolved" is a separate semantic judgment and must not hide an unmet request behind queue completion.
 {"look":"whatson"|"explore"|"calendar"|"object:<id>"} = fetch information; you are woken again at once with the answer. Use sparingly.
 
 Habits and commitments: optional schedule is a full Markdown replacement with ## Routines (world time), ## Commitments, ## Reviews (real time). Routine example: - 07:30 daily \xB7 tea at commons-kitchen \xB7 20m. Commitment example: - 2026-10-09 18:00 America/New_York (real) \xB7 meet at eden-bandstand. Review example: - daily 23:30 America/New_York \xB7 review goals. Routines use WORLD minutes; action params.seconds use native-tick seconds. On a compilation review, return compile:[{id,steps,leadRealSeconds?}] for supplied stable entry IDs, do:[], and code reuses these bindings at their due times with no model call. A commitment may need an explicit real travel lead; do not claim it was kept merely because walking was accepted. Owner edits are preserved; schedule updates compare content before writing. Goals may use up to3 remember judgments per review with measurable metric/next/horizon.
@@ -4583,7 +4691,7 @@ Habits and commitments: optional schedule is a full Markdown replacement with ##
 Living well:
 - Choose meaningful offered activities when a priority, routine or event calls for them: walking somewhere, reading, sitting with someone, by the fire, exercising, eating at a shared meal. Do not manufacture chatter or acts to fill quiet time. For a timed activity, choose 3-10 minutes ({"seconds":180-600}; 600 is the most); when alone or at night prefer the full 600. You are woken when it ends or when someone talks to you, so long activities cost nothing.
 - Generic peer example: if the owner said "talk to someone", use {"converse":"start","with":"<actual nearby soulId>","identityBasis":"someone","text":"Would you like to talk?"}. For an approach use {"act":"go-near","targetSoul":{"id":"<actual observed soulId>"},"identityBasis":"someone"}. Put identityBasis on EACH person-directed do step, never only inside params. Do not invent an ID or infer agreement.
-- OWNER REQUEST lines come from your owner, the human whose Soul you are: the only trusted instructions you get. Carry them out right away (it replaces what you are doing): a compatible initial human-word act may use the owner's words ({"act":"read a book in the library"}, {"act":"sit on a bench"}), but unsupported wording may be refused. For queued future legs, copy offered capability IDs and their params, not descriptive labels. After a refusal use its exact offered ID or ask for clarification; never claim admission from the words alone. Say hello / talk to someone = walk near them and say or converse. Answer in "owner" truthfully, in the world's terms: what your body is actually doing (walking, not running; the ground, not a bench), and if it was refused, say so plainly and what you do instead. Pictures/screenshots cannot be sent yet: describe what you see in words instead.
+- OWNER REQUEST lines come from your owner, the human whose Soul you are: the only trusted instructions you get. Carry them out right away (it replaces what you are doing): a compatible initial human-word act may use the owner's words ({"act":"read a book in the library"}, {"act":"sit on a bench"}), but unsupported wording may be refused. For queued future legs, copy offered capability IDs and their params, not descriptive labels. After a refusal use its exact offered ID or ask for clarification; never claim admission from the words alone. Say hello / talk to someone = walk near them and say or converse. Answer in "owner" truthfully, in the world's terms: what your body is actually doing (walking, not running; the ground, not a bench), and if it was refused, say so plainly and what you do instead. "owner" is private to your owner, while a say is heard by everyone nearby: never say your report aloud, and never queue a say that reports an outcome before it happens; you are woken when queued steps finish, then report in "owner". Pictures/screenshots cannot be sent yet: describe what you see in words instead.
 - INVITES are someone asking you to do something together (a hug, a dance, a walk, a ride): answer at once with {"act":"accept:<inviteId>"} (or "decline:<inviteId>"); accept unless you have a good reason.
 - Respond once to genuinely new speech or invitations. Use the EXACT FULL requested Soul names. Never replace an unavailable named person with a similar first name, an older Soul, or a model memory judgment. If absent, wait or clarify; missing people have not agreed. The trusted owner request remains active independently of targets or an acknowledgement. A new owner request replaces its scope. Only after the logical request is truly concluded may you return ownerGoal:"resolved"; that is your semantic judgment, never physical success inferred by code. It cannot clear before this reply's identity checks or while the owned queue is unfinished/refused or its target conversation remains attached. For a named owner task return targets:["<FULL literal requested name>",...] even while waiting or only walking, so the named goal remains active after the acknowledgement. Person-directed body steps use targetSoul:{id/name} or params.with exact references; known person-bearing body forms require that structure, not guessed plain names. Use with:[{name:"<literal full intended name>"}] or {id,name}; code resolves exact observed identity. Bare IDs must be literal owner IDs or match a full actual name in the request. A generic owner choice needs identityBasis equal to an explicit supported literal selector in that request (anyone, anyone nearby, someone, someone nearby, somebody, somebody nearby, people nearby, everyone nearby, everyone, any nearby person). Autonomous observed-ID choices remain available. Existing conversation IDs, full members and pending invitations are actual facts: reply in that group, do not start a duplicate same-party group or repeatedly ask for already given agreement. Your current-turn do steps are requests, not accepted actions: never say you queued/started/arrived/completed them before their actual verdict. Warming/sitting/reading is an occupied body, not free space for another body queue. Body-dependent success speech goes after the body step in the durable ordered queue; public-only dialogue remains independent. Keep a coherent shared topic; continue while both people choose to, and leave naturally when it is resolved. Receipt/heartbeat-only wakes never require speech. Respect a decline; accepted facts do not need repeated apologies or double-checks.
 - Go where things happen (ON NOW lists scheduled happenings with their walk id). Explore somewhere new now and then.
@@ -5365,7 +5473,7 @@ async function live(...argv) {
         logLive({ identityGoalReceived: { ownerRequestId: q.id, replaced } });
       }
     }
-    const own = ownerActive, later = !own && ownerLater && Date.now() < ownerLater.until && ["done", "idle", "check"].includes(reason) ? ownerLater : null;
+    const own = ownerActive, later = !own && laterDue(reason) ? ownerLater : null;
     if (later) ownerLater = null;
     const b = useRoutine && !own ? routine : brain, newConv = b.isNew;
     const evText = evs.filter((e) => e.kind !== "receipt" || e.receipt?.id === lastReceipt).slice(-12).map(evLine);
@@ -5389,7 +5497,7 @@ async function live(...argv) {
       resume: "you were away; WHILE AWAY sums up what happened: pick up from there"
     }[reason] ?? reason;
     const ownLine = own ? reason === "owner" ? `OWNER REQUEST (trusted, from your owner; do it now): "${own.text}"` : `STILL ON YOUR OWNER'S REQUEST: "${own.text}" (if it is done, reply {"do":[],"owner":"<what happened>"})` : null;
-    const laterLine = later ? `EARLIER OWNER REQUEST: "${later.text}" (you did: ${clip(later.results.join("; ") || "nothing", 200)}). If a part of it is still to do (a next step), do it now and tell your owner in "owner"; if it is all done, don't repeat it: carry on with your own plans.` : null;
+    const laterLine = later ? `EARLIER OWNER REQUEST: "${later.text}" (you did: ${clip(later.results.join("; ") || "nothing", 200)}). If a part of it is still to do (a next step), do it now and tell your owner in "owner"; if it is all done, don't repeat it: carry on with your own plans. Any report to your owner goes in "owner" (private); a say with no "owner" is sent to your owner, not spoken.` : null;
     const text3 = [
       localOperations.context(cadences.status().uncompiled),
       `CURRENT OWN PROFILE ${JSON.stringify({ ...ownProfile, ...pendingOwnProfile ? { name: pendingOwnProfile.name, revision: pendingOwnProfile.revision, source: "fresh-here-name; full-profile refresh pending" } : {}, pending: pendingOwnProfile, identityIsImmutableSoulID: true })}`,
@@ -5500,6 +5608,15 @@ async function live(...argv) {
       S.identityGoal = { ...S.identityGoal, ownerRequestId: own.id, text: own.text, requestedNames: plan2.targets };
       saveS();
     }
+    if (later) {
+      const routed = routeOwnerReport(steps, plan2.owner);
+      if (routed.routed) {
+        steps = routed.steps;
+        plan2.owner = routed.owner;
+        results.push(routed.line);
+        logLive({ ownerReportRouted: { ownerRequestId: later.id, steps: routed.routed } });
+      }
+    }
     const identityOwner = own ?? later ?? S.identityGoal;
     const identity = await qualifyIdentitySteps(steps, identityOwner?.text ?? "", identityOwner?.id ?? identityOwner?.ownerRequestId ?? null);
     const execution = identity.ok ? await executeReplySteps(identity.steps, { queue: bodyQueue, id: own?.id ?? "wake-" + randomUUID4(), source: own ? "owner" : "mind", force: own?.force === true, replace: !!own || bodyQueue.snapshot().steps.some((s2) => ["failed", "interrupted", "blocked"].includes(s2.status)), pump: () => bodyQueue.pump(queueContext(), leaseHeld()), runPublic: runStep }) : { results: [{ operation: "identity-preflight", accepted: false, code: identity.code, reason: identity.reason, line: `refused ${identity.code}: ${identity.reason}` }], again: true, retained: false };
@@ -5524,7 +5641,7 @@ async function live(...argv) {
     let ownerAnswerSource = "model-unverified";
     if (typeof plan2.owner === "string") plan2.owner = perception.truthful(plan2.owner);
     if ((own || later) && (bodies.length || execution.results.some((r) => r.accepted === false || r.accepted == null && r.readOnly !== true && r.queueRetained !== true))) {
-      plan2.owner = results.join("; ").slice(0, 600);
+      plan2.owner = ownerAnswerText(results.join("; "));
       ownerAnswerSource = "execution-verdict";
     }
     logLive({ wakeEnd: { reason, loop, reviewKey: reviewTask?.key ?? null, sessionId: b.id, queueId: bodyQueue.snapshot().id, usage: { input: u.in, cached: u.read, cacheWrite: u.write, output: u.out, reasoning: u.reasoning ?? null }, actualModel: ans.model ?? null, usd: rec.usd } });
@@ -5560,8 +5677,10 @@ async function live(...argv) {
     }
     if (plan2.compile) try {
       cadences.compile(plan2.compile);
-      localResult("compile", true, "Bindings saved; they have not run.");
-      localOwnerResult("compile", true, "Schedule bindings saved; they have not run yet.");
+      const unbound = await unresolvedBindingSteps(plan2.compile, (capability) => call(EDGE.resolve, { body: { capability } }).then((r) => ok(r, "resolve").resolve)), warn = unbound.length ? ` Not resolvable in this world now: ${unbound.map((u2) => `${u2.id} "${clip(u2.act, 60)}" (${u2.code})`).join("; ")}; bind them to places on your map.` : "";
+      if (unbound.length) logLive({ compileUnresolved: unbound });
+      localResult("compile", true, "Bindings saved; they have not run." + warn);
+      localOwnerResult("compile", true, "Schedule bindings saved; they have not run yet." + warn);
     } catch (error) {
       localResult("compile", false, error.message);
       localOwnerResult("compile", false, "Schedule compilation not confirmed: " + clip(error.message, 240));
@@ -5583,12 +5702,12 @@ async function live(...argv) {
     if (own) {
       own.results.push(...results);
       if (typeof plan2.owner === "string" && plan2.owner.trim()) {
-        own.answer = plan2.owner.trim().slice(0, 600);
+        own.answer = ownerAnswerText(plan2.owner);
         own.answerSource = ownerAnswerSource;
       }
     }
     if (later && (steps.length || plan2.owner)) {
-      const r = { id: later.id, t: now(), text: later.text, continued: true, answer: typeof plan2.owner === "string" ? plan2.owner.slice(0, 600) : null, answerSource: ownerAnswerSource, results, receipt: steps.some((x) => x.act) ? lastReceipt : null };
+      const r = { id: later.id, t: now(), text: later.text, continued: true, answer: typeof plan2.owner === "string" ? ownerAnswerText(plan2.owner) : null, answerSource: ownerAnswerSource, results, receipt: steps.some((x) => x.act) ? lastReceipt : null };
       appendFileSync2(LIVE.replies, JSON.stringify(r) + "\n");
       logLive({ owner: { ...r, continued: true } });
     }
@@ -5610,9 +5729,15 @@ async function live(...argv) {
     appendFileSync2(LIVE.replies, JSON.stringify(r) + "\n");
     answered.add(own.id);
     if (ownerActive?.id === own.id) ownerActive = null;
-    if (!error && !bodyQueue.snapshot().steps.some((s2) => !["completed", "cancelled", "skipped"].includes(s2.status))) ownerLater = { id: own.id, text: own.text, results: own.results, until: Date.now() + 10 * 6e4 };
+    const qs = bodyQueue.snapshot(), open = qs.steps.some((s2) => !["completed", "cancelled", "skipped"].includes(s2.status));
+    if (!error && (!open || qs.id === own.id)) ownerLater = { id: own.id, text: own.text, results: own.results, until: Date.now() + (open ? 6 * 36e5 : 10 * 6e4), ...open ? { afterQueue: qs.id } : {} };
     logLive({ owner: { id: own.id, request: own.text, answer: r.answer, answerSource: r.answerSource, results: own.results, ...own.localResults ? { localResults: own.localResults } : {}, receipt: own.receipt, queue: bodyQueue.snapshot(), latencySeconds: r.latencySeconds } });
     console.log(`owner request "${clip(own.text, 60)}" \u2192 ${clip(own.results.join(" | ") || "(no action)", 160)}${r.answer ? ' \xB7 "' + clip(r.answer, 120) + '"' : ""}`);
+  }
+  function laterDue(reason) {
+    if (!ownerLater || Date.now() >= ownerLater.until || !["done", "idle", "check"].includes(reason)) return false;
+    const q = bodyQueue.snapshot();
+    return !(ownerLater.afterQueue === q.id && q.steps.some((s2) => !["completed", "cancelled", "skipped"].includes(s2.status)));
   }
   function normaliseStep(st) {
     if (!st || typeof st !== "object") return {};
@@ -5654,11 +5779,11 @@ async function live(...argv) {
         return { ok: false, code: "soul.scope-unavailable", reason: "Actual world identity is absent from legacy boot; new exact-name binding is unqualified. Wait/clarify or use an explicit canonical ID through the unchanged manual API." };
       }
       const resolveRefs = (values) => identityEvidence.resolve(values);
-      let result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs });
+      let result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
       if (!result.ok && /unavailable|not-found|unknown/.test(result.code ?? "") && identityEvidence.refreshDue()) {
         try {
           await identityEvidence.refresh();
-          result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs });
+          result = bindLiveSoulReferences(refs2, { ownerText, identityBasis: st.identityBasis, resolve: resolveRefs, social: socialIdentityStep(st), nearby: lastHere?.near ?? [], selfName: persona.name });
         } catch (error) {
           logLive({ identityRefresh: { error: clip(error.message, 160) } });
         }
@@ -5669,7 +5794,7 @@ async function live(...argv) {
       saveS();
       logLive({ identityVerdict: evidence });
       if (!result.ok) return result;
-      if (createdGoal && result.basis === "literal-generic-choice") {
+      if (createdGoal && ["literal-generic-choice", "nearby-social-choice"].includes(result.basis)) {
         S.identityGoal = null;
         saveS();
         createdGoal = false;
@@ -5875,7 +6000,7 @@ async function live(...argv) {
       }
       const reason = wakeReason();
       if (!reason) continue;
-      if (ownerLater && Date.now() < ownerLater.until && ["done", "idle", "check"].includes(reason)) {
+      if (laterDue(reason)) {
         await think(reason);
         continue;
       }
