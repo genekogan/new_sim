@@ -3947,7 +3947,7 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
-var CLI_SHAPE = { POS, FLAGS, BOOL, boolsFor };
+var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 var readArg = (r) => r[0] !== void 0 ? existsSync6(r[0]) && !r[0].trim().startsWith("{") ? readFileSync6(r[0], "utf8") : r[0] : readFileSync6(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
@@ -4050,12 +4050,12 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
-site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] \xB7 build continue <id> --brief "follow-up" \xB7 build check [id] \xB7 build step [label] [--asks "later ask"] [--include ref,ref] [--say "\u2026" [--mass nave,tower]] (announce before designing; without --say stays local) \xB7 build [show [id]] \xB7 build wait [--timeout 15m] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] \xB7 build continue <id> --brief "follow-up" \xB7 build check [id] \xB7 build step [label] [--asks "later ask"] [--include ref,ref] [--say "\u2026" [--mass nave,tower]] (announce before designing; without --say stays local) \xB7 build [show [id]] \xB7 build wait [--timeout 15m] \xB7 build resume [id] [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force] (global --no-build skips automatic metadata).
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
+pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all] (answered too) \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at \u2026 hints; also shown at build start)

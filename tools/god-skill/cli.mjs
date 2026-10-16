@@ -1182,7 +1182,7 @@ export function checkArgs(cmd, f, rest) {
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
 }
 /** RL6 replay/lint: the CLI's own reading tables (read-only). */
-export const CLI_SHAPE = { POS, FLAGS, BOOL, boolsFor };
+export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = { doctor: (r, f) => doctor(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
@@ -1214,12 +1214,12 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
-site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
+site:   build start <id> --title "…" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path|build] [--asks "item; item"] [--include ref,ref] · build continue <id> --brief "follow-up" · build check [id] · build step [label] [--asks "later ask"] [--include ref,ref] [--say "…" [--mass nave,tower]] (announce before designing; without --say stays local) · build [show [id]] · build wait [--timeout 15m] · build resume [id] [--take] · build claim <part> [--root path | --at ref --size w,d] [--take c_…] · build release [--done] · build pause [note] · build done [summary] [--force] · build abandon [--undo] [--force] (global --no-build skips automatic metadata).
 resume: omit id to resume the only paused build or active build with a dead lead; several open builds or an unknown id list the choices.
 mass:   site-local metres; h = wall/eave height, not total height. Gable/pyramid roofs add half the shorter side; flat adds none. Example: 26x12 h15 gable = 15 m walls + 6 m roof = 21 m total.
 batch:  plan '<batch>' · preview '<batch>' · commit <preview-id> · act '<batch>' · dryrun '<batch>' · request <clientRef>
 world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
+pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all] (answered too) · answer <id> <text> · status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) · find <words> [--category c] [--has …] · recommend <what you want> · taxonomy (categories, counts, param conventions, actuators)
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
