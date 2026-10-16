@@ -22,12 +22,14 @@ export const MATERIAL_LOOKS: Record<Material, Look> = {
   rubber: { color: '#2b2b2b', roughness: 0.9, metalness: 0 }, emissive: { color: '#ffe9c4', roughness: 0.5, metalness: 0, emissive: true },
 };
 
-/** A subclass keeps the shader on material clones made by lights/state/look overrides. */
+/** A subclass keeps the shader on material clones made by lights/state/look overrides. three ≥ r15x declares
+ *  `varying vec4 vColor`, so the vec3 radiance takes its `.rgb`: a bare `vColor` failed to compile and every kit glow
+ *  part (a lantern's lit body) silently drew nothing (r2.1 walk, walk-lantern@1). */
 class VertexGlowMaterial extends THREE.MeshStandardMaterial {
   override onBeforeCompile(shader: Parameters<THREE.Material['onBeforeCompile']>[0]) {
-    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n totalEmissiveRadiance *= vColor;\n#endif');
+    shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n#ifdef USE_COLOR\n totalEmissiveRadiance *= vColor.rgb;\n#endif');
   }
-  override customProgramCacheKey() { return 'kit-vertex-glow/2'; }
+  override customProgramCacheKey() { return 'kit-vertex-glow/3'; }
 }
 
 export class MaterialLib {

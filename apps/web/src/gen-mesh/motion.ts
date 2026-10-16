@@ -70,7 +70,8 @@ function distToPath(x: number, z: number, path: [number, number][]) {
 let clockNight: number | null = null;
 export function setClockNight(n: number | null) { clockNight = n === null || !Number.isFinite(n) ? null : Math.max(0, Math.min(1, n)); }
 export function nightOf(model: WorldModel | null): number {
-  if (!model) return 0;
+  // r2.1: a world of kits and buildings binds no motion model (only meshes and animals do); its lamps still follow the clock
+  if (!model) return clockNight ?? 0;
   if (clockNight !== null) return Math.max(clockNight, paletteNight(model));
   return paletteNight(model);
 }
