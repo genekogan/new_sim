@@ -18,6 +18,8 @@ export type MeshLodOptions={minTriangles:number;maxErrorPx:number;ratios:readonl
    * above the terrain and must stay above a simplified surface. */
   maxWorldError:number};
 export const PHONE_MESH_LOD:MeshLodOptions=Object.freeze({minTriangles:6000,maxErrorPx:1,ratios:[0.3,0.1,0.03],rescanFrames:120,budgetMs:6,maxWorldError:0.015});
+/** Desktop (release 3.1): the same levels, swapped in only when their error is under half a CSS pixel. */
+export const DESKTOP_MESH_LOD:MeshLodOptions=Object.freeze({...PHONE_MESH_LOD,maxErrorPx:0.5});
 /** Vertex colours carry painted ground (tyre tracks, paths, soil patches): a colour step of ~0.03 counts like a 1.5 cm
  * displacement, so painted detail survives simplification. Normals keep the shading of folds. */
 const COLOUR_WEIGHT=0.5,NORMAL_WEIGHT=0.05;
