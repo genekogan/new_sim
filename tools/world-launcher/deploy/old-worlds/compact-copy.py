@@ -45,7 +45,9 @@ def main():
     con.execute('PRAGMA main.journal_mode=DELETE')
     con.execute('BEGIN')  # one transaction: the read snapshot of s and the whole write of main
     objs = con.execute("SELECT type,name,tbl_name,sql FROM s.sqlite_master ORDER BY rowid").fetchall()
-    bad = [o for o in objs if o[0] in ('view', 'trigger') or (o[3] or '').upper().startswith('CREATE VIRTUAL')]
+    # Triggers are recreated after the data and indexes, so they never fire during the copy (Godmode release 1 adds
+    # world_edit_usage_insert_v1, an AFTER INSERT counter on world_edits_v1). Views and virtual tables stay unsupported.
+    bad = [o for o in objs if o[0] == 'view' or (o[3] or '').upper().startswith('CREATE VIRTUAL')]
     if bad: raise SystemExit(f'unsupported schema objects: {[o[1] for o in bad]}')
     tables = [o for o in objs if o[0] == 'table' and not o[1].startswith('sqlite_')]
     for _, name, _, sql in tables: con.execute(sql)
@@ -80,6 +82,8 @@ def main():
            con.execute('SELECT name,seq FROM s.sqlite_sequence ORDER BY name').fetchall(): raise SystemExit('sqlite_sequence differs')
     for typ, name, _, sql in objs:
         if typ == 'index' and sql: con.execute(sql)
+    for typ, name, _, sql in objs:
+        if typ == 'trigger' and sql: con.execute(sql)
     for p in ('user_version', 'application_id'):
         con.execute(f'PRAGMA main.{p}={int(con.execute(f"PRAGMA s.{p}").fetchone()[0])}')
     con.execute('COMMIT')
