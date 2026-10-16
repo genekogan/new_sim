@@ -17,7 +17,8 @@ import * as THREE from 'three';
 import {admittedBodyUrl} from './recorded-body.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { floaterBody, floaterModel, floaterPose, idPhase, type FloaterBody } from '../../engine/bodies/index.ts';
+import { creatureOf, floaterBody, floaterModel, floaterPose, idPhase, type FloaterBody } from '../../engine/bodies/index.ts';
+import { buildCreature, creatureMode, type CreatureRig } from './creatures.ts';
 import type { SampledEntity } from '../../engine/take/replay.ts';
 import type { Body } from '../../engine/world/types.ts';
 
@@ -32,7 +33,9 @@ export type FloaterViewOpts = {
   dt?: number;
 };
 
-type Floater = { id: string; body: FloaterBody; holder: THREE.Group; tilt: THREE.Group; orient: THREE.Group; stand: THREE.Mesh | null; model: THREE.Object3D | null };
+type Floater = { id: string; body: FloaterBody; holder: THREE.Group; tilt: THREE.Group; orient: THREE.Group; stand: THREE.Mesh | null; model: THREE.Object3D | null;
+  /** A creature body (duck, snail, dog): built and animated procedurally (creatures.ts) instead of a loaded head. */
+  creature?: { rig: CreatureRig; tick: number | null } };
 
 const TURN = Math.PI / 2;
 
@@ -107,6 +110,18 @@ export class FloaterView {
     holder.add(tilt);
     tilt.add(turn);
     turn.add(orient);
+    const species = creatureOf(fb);
+    if (species) {
+      // creatures stand on the ground with +X forward: no hover, no archive turn, nothing to load
+      const rig = buildCreature(species.id);
+      rig.root.traverse((o) => (o.userData.entity = id));
+      tilt.add(rig.root);
+      holder.userData.bodyModel = `creature:${species.id}`;
+      const f: Floater = { id, body: fb, holder, tilt, orient, stand: null, model: rig.root, creature: { rig, tick: null } };
+      this.floaters.set(id, f);
+      this.root.add(holder);
+      return;
+    }
     const stand = new THREE.Mesh(new THREE.SphereGeometry(fb.radius, 24, 16), this.standIn);
     tilt.add(stand);
     const f: Floater = { id, body: fb, holder, tilt, orient, stand, model: null };
@@ -140,6 +155,7 @@ export class FloaterView {
     if (!f) return;
     this.root.remove(f.holder);
     f.stand?.geometry.dispose();
+    f.creature?.rig.dispose();
     this.floaters.delete(id);this.byId.delete(id);
   }
 
@@ -171,6 +187,16 @@ export class FloaterView {
   }
 
   private pose(f: Floater, e: Pick<SampledEntity, 'p' | 'yaw' | 'pitch' | 'roll' | 'speed' | 'activity' | 'state'>, tick: number, dt: number) {
+    if (f.creature) {
+      // a creature: drawn on its ground pose (at the waterline while swimming), its gait from the sampled speed
+      const c = f.creature, mode = creatureMode(e.activity, e.speed), step = c.tick === null || tick < c.tick ? 0 : (tick - c.tick) * dt;
+      c.tick = tick;
+      f.holder.visible = true;
+      f.holder.position.set(e.p[0], e.p[1] + c.rig.lift(mode), e.p[2]);
+      f.holder.rotation.set(0, -e.yaw, 0);
+      c.rig.animate({ mode, speed: e.speed ?? 0, t: tick * dt, dt: step });
+      return;
+    }
     const body = settled(f.body, e);
     const q = floaterPose(f.id, e, body, tick, dt, e.speed ?? 0);
     f.holder.visible = true;

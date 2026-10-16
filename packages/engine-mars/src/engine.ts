@@ -263,6 +263,8 @@ export class MarsEngine implements Engine {
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
     for (const id of Object.keys(this.ents)) {
       const e = this.ents[id]; if (e.kind !== 'human') continue;
+      // creatures (bodies/creatures.ts) show a rest as 'settle' (the duck sits, the snail withdraws, the dog lies down)
+      if (e.body?.type === 'creature') { const resting = this.bodyResting(id); if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }
       const act: string = e.human.activity;
       if (this.acts.get(id) !== act) { this.acts.set(id, act); this.out.changes.push([tick, id, 'activity', act]); }
       const on: string | null = e.human.on ?? null;

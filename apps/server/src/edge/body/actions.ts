@@ -41,7 +41,7 @@ export function shapeRigidCapabilities(me:Entity|undefined,caps:EdgeCapability[]
   if(creature){
     const label=`Settle here (the ${creature.id} ${creature.settles})`;caps.unshift({id:'settle:here',verb:'settle',label,available:true,params:secondsParam});plans.set('settle:here',{label,steps:[{verb:'rest',params:{seconds:60}}],seconds:true});
     const Move=creature.moves[0]!.toUpperCase()+creature.moves.slice(1);
-    for(const c of caps)if(c.verb==='walk'||c.verb==='stroll'||c.verb==='go-near'){c.label=c.label.replace(/\b(?:walk|stroll|go near)\b/ig,Move);if(!c.label.includes(Move))c.label=`${Move} to ${c.label}`;}else if(c.verb==='swim')c.label=c.label.replace(/\bswim\b/i,`Swim (${creature.swims})`).replace(/walk to/i,`${creature.moves} to`);else if(c.id==='stand:here')c.label='Get up / stop what I am doing';
+    for(const c of caps)if(['walk','stroll','wander','go-near'].includes(c.verb)){c.label=c.label.replace(/\b(?:walk|stroll|wander|go near)\b/ig,Move);if(!c.label.includes(Move))c.label=`${Move} to ${c.label}`;}else if(c.verb==='swim')c.label=c.label.replace(/\bswim\b/i,`Swim (${creature.swims})`).replace(/walk to/i,`${creature.moves} to`);else if(c.id==='stand:here')c.label='Get up / stop what I am doing';
     return;
   }
   for(const verb of ['hover','settle']){const id=verb+':here',label=verb==='hover'?'Hover here':'Settle here (hold position while hovering)';caps.unshift({id,verb,label,available:true,params:secondsParam});plans.set(id,{label,steps:[{verb:'rest',params:{seconds:60}}],seconds:true});}
