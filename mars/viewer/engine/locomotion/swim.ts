@@ -13,6 +13,8 @@ import { SWIM_COST, rectOf } from '../spatial/tiled.ts';
 import { G_STEEP, G_OUTSIDE, G_SWIM, G_WADE, G_WALK, coarseMedium, swimRootY, type GroundField } from '../spatial/ground.ts';
 import { angleDelta, heading, hypot, wrapAngle, type Vec2 } from '../core/math.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { creatureOf } from '../bodies/creatures.ts';
+import type { Body } from '../world/types.ts';
 
 /** m/s while swimming (the shallows: wading pace). */
 export const SWIM_SPEED = 0.8;
@@ -23,6 +25,8 @@ const STEP_IN_M = 6;
 type Params = { actor: string; x: number; z: number; landing?: boolean };
 type Exec = { actor: string; id: string; points: Vec2[]; index: number };
 
+/** A body's swimming pace: SWIM_SPEED for humanoids, a creature's own (never faster than SWIM_SPEED). */
+export function swimSpeedOf(body: Body | undefined): number { const c = creatureOf(body)?.swimSpeed; return c ? Math.min(c, SWIM_SPEED) : SWIM_SPEED; }
 const fail = (code: string, message: string, subjects?: string[]): Diagnostic => ({ code: `swim.${code}`, message, subjects });
 const fmt = (p: Vec2) => `${p[0].toFixed(1)}, ${p[1].toFixed(1)}`;
 
@@ -41,7 +45,8 @@ function onDeck(rt: Runtime, actor: string): boolean {
 function bodyIssue(rt: Runtime, actor: string): Diagnostic | null {
   const e = rt.world.entities[actor];
   if (!e?.human || e.kind !== 'human') return fail('actor', `${actor} is not a person`, [actor]);
-  if (e.body && e.body.family !== 'humanoid') return fail('body-family', `${actor}'s body does not swim`, [actor]);
+  // humanoids swim; of the other bodies only creatures whose species swims (bodies/creatures.ts: duck, dog)
+  if (e.body && e.body.family !== 'humanoid' && !creatureOf(e.body)?.swimSpeed) return fail('body-family', creatureOf(e.body)?.cannot.swim ?? `${actor}'s body does not swim`, [actor]);
   if (e.human.grip || e.human.on || e.human.riding || e.human.carrier || e.human.sleepPose || e.human.hands?.left || e.human.hands?.right
     || Object.values(rt.world.entities).some((it) => it.support?.kind === 'in-hand' && it.support.by === actor))
     return fail('occupied-body', `${actor} must put things down and be on their feet before swimming`, [actor]);
@@ -147,7 +152,7 @@ export const swimTo: ActionDef<Params, Vec2[], Exec> = {
     const turn = angleDelta(e.pose.yaw, heading([target[0] - cur[0], target[1] - cur[1]]));
     e.pose.yaw = wrapAngle(e.pose.yaw + Math.max(-TURN_RATE * dt, Math.min(TURN_RATE * dt, turn)));
     if (Math.abs(turn) > 0.6) { const at = poseAt(f, cur, false); h.activity = at.activity; h.speed = 0; return { status: 'running', phase: 'turning' }; }
-    const speed = f.medium(cur[0], cur[1]) === G_SWIM ? SWIM_SPEED : WADE_SPEED, step = Math.min(d, speed * dt);
+    const speed = f.medium(cur[0], cur[1]) === G_SWIM ? swimSpeedOf(e.body) : WADE_SPEED, step = Math.min(d, speed * dt);
     const next: Vec2 = [cur[0] + ((target[0] - cur[0]) * step) / d, cur[1] + ((target[1] - cur[1]) * step) / d];
     const who = crowd(rt, ex.actor, next);
     if (who) { const at = poseAt(f, cur, false); h.activity = at.activity; h.speed = 0; return { status: 'blocked', diagnostic: fail('occupied', `${ex.actor} waits for ${who} in the water`, [ex.actor, who]) }; }

@@ -131,7 +131,7 @@ export type FoodPreparation = {
  * worlds, takes and hashes without the field are unchanged. A 'floater' is a static scanned head that
  * hovers at `hoverHeight` above its ground pose with radius `radius`; `model` names its GLB.
  */
-export type Body = { family: 'humanoid' | 'floater'; type?: 'humanoid' | 'ceramic' | 'floater'; model?: string; modelUrl?: string;
+export type Body = { family: 'humanoid' | 'floater'; type?: 'humanoid' | 'ceramic' | 'floater' | 'creature'; model?: string; modelUrl?: string;
   avatar?: {kind:'body'; modelUrl:string; bodyType:'humanoid'|'ceramic'|'floater'}; radius?: number; hoverHeight?: number;
   /** core/humanoid@2 look params (compact), with `model` = the look key `humanoid2-<sha16>`. Height, build and walkSpeed
    *  are physical (bodies/humanoid.ts: radius, eye height, seat fit, walking speed); the rest is paint. */

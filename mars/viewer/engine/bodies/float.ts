@@ -15,6 +15,7 @@ import { Spatial, type Contributor } from '../spatial/service.ts';
 import { HUMAN_PROFILE, type AgentProfile, type Link, type SpatialScene } from '../spatial/types.ts';
 import type { Body, WorldState } from '../world/types.ts';
 import { floaterBody, type FloaterBody } from './body.ts';
+import { creatureSpecies } from './creatures.ts';
 
 /** Cruising glide speed (m/s): a little slower than a walk, unhurried. */
 export const FLOAT_SPEED = 1.0;
@@ -23,6 +24,9 @@ export const linkReason = (kind: Link['kind']): string => `floater.${kind}-unsup
 
 /** Movement profile of a floater: a humanoid's, with the head's radius (route planning reads only radius). */
 export function floaterProfile(body: FloaterBody): AgentProfile {
+  // a creature moves at its species' own speed (bodies/creatures.ts); every other floater glides at FLOAT_SPEED
+  const creature = body.type === 'creature' ? creatureSpecies(body.model) : undefined;
+  if (creature) return { ...HUMAN_PROFILE, id: `creature-${creature.id}-r${body.radius}`, radius: body.radius, height: body.hoverHeight + body.radius, speed: creature.speed, turnRate: creature.id === 'snail' ? 1.2 : 3.0 };
   return { ...HUMAN_PROFILE, id: `floater-r${body.radius}`, radius: body.radius, height: body.hoverHeight + body.radius, speed: FLOAT_SPEED, turnRate: 3.0 };
 }
 

@@ -71,6 +71,7 @@ import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
 import {humanRadius} from '../../../mars/viewer/engine/bodies/humanoid.ts';
+import {creatureOf} from '../../../mars/viewer/engine/bodies/creatures.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
@@ -803,7 +804,9 @@ export class MarsEngine implements Engine {
   bodyProgramProblemV1(program:Program):Diag|null {
     const body=this.ents[program.actor]?.body;
     if(body?.family!=='floater'||body.type===undefined&&body.modelUrl===undefined)return null;
-    for(const s of program.steps)if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(s.verb))return {code:'body.unsupported',message:'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};
+    // creatures (bodies/creatures.ts) whose species swims may also swim and come ashore
+    const swims=!!creatureOf(body)?.swimSpeed;
+    for(const s of program.steps){const verb=s.verb.replace(/^mars:/,'');if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(verb)&&!(swims&&['swim_to','ground_travel'].includes(verb)))return {code:'body.unsupported',message:creatureOf(body)?(['swim_to','ground_travel'].includes(verb)&&creatureOf(body)!.cannot.swim||`A ${creatureOf(body)!.id} cannot do that; it can ${creatureOf(body)!.moves}, settle, turn and follow.`):'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};}
     return null;
   }
   /** BODY-v1: never interrupt holders, commitments or unsafe postures to swap a body. */
