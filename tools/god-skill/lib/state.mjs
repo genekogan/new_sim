@@ -11,13 +11,26 @@ export const claimFile = (id) => {
   if (!/^c_[0-9a-f]{8}$/.test(id)) throw new Error('EDEN_GOD_CLAIM must be c_ followed by eight hexadecimal digits');
   return `.eden-god.claim-${id}.json`;
 };
+/** WD7 slice 3: EDEN_GOD_HELPER names a helper file (world + the helper's own scoped token + its claim). */
+export const helperFile = (id) => `.eden-god.helper-${claimFile(id).slice('.eden-god.claim-'.length, -'.json'.length)}.json`;
+function helperState() {
+  const file = process.env.EDEN_GOD_HELPER; if (!file) return null;
+  if (!existsSync(file)) throw new Error(`EDEN_GOD_HELPER names a missing file: ${file}`);
+  const s = read(file), cid = s.helper?.claim;
+  if (!cid) throw new Error(`${file} is not a helper file (no helper.claim)`);
+  if (process.env.EDEN_GOD_CLAIM && process.env.EDEN_GOD_CLAIM !== cid) throw new Error(`EDEN_GOD_CLAIM=${process.env.EDEN_GOD_CLAIM} differs from the helper file's claim ${cid}`);
+  return s;
+}
+/** The claim this process works under: EDEN_GOD_CLAIM, or the helper file's claim. */
+export const activeClaim = () => process.env.EDEN_GOD_CLAIM || helperState()?.helper.claim;
 export function atomicWrite(file, text) {
   const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
   try { writeFileSync(temp, text, { mode: 0o600, flag: 'wx' }); renameSync(temp, file); }
   finally { try { unlinkSync(temp); } catch (e) { if (e.code !== 'ENOENT') throw e; } }
 }
 export function load() {
-  const s = read(STATE), cid = process.env.EDEN_GOD_CLAIM;
+  // A helper never reads the lead's credentials: its world and token come from the helper file.
+  const s = helperState() ?? read(STATE), cid = activeClaim();
   if (!cid) return s;
   // Credentials belong to the lead's file. A new claim starts at its own first
   // step; subsequent progress/group/warnings live only in the claim file.
@@ -27,18 +40,18 @@ export function load() {
   return merged;
 }
 export function withStateLock(run) {
-  const file = process.env.EDEN_GOD_CLAIM ? claimFile(process.env.EDEN_GOD_CLAIM) : STATE;
+  const cid = activeClaim(), file = cid ? claimFile(cid) : STATE;
   const release = acquireLock(`${file}.lock`, { label: 'claim/step state', reentrant: true });
   try { const out = run(); if (out?.then) return out.finally(release); release(); return out; }
   catch (e) { release(); throw e; }
 }
 export function save(patch) { return withStateLock(() => saveUnlocked(patch)); }
 function saveUnlocked(patch) {
-  const file = process.env.EDEN_GOD_CLAIM ? claimFile(process.env.EDEN_GOD_CLAIM) : STATE;
+  const cid = activeClaim(), file = cid ? claimFile(cid) : STATE;
   const s = { ...read(file), ...patch };
   for (const k of Object.keys(s)) if (s[k] === undefined) delete s[k];
   // A null build is a claim-file tombstone: do not inherit the lead again.
-  if (process.env.EDEN_GOD_CLAIM && Object.hasOwn(patch, 'build') && !patch.build) s.build = null;
+  if (cid && Object.hasOwn(patch, 'build') && !patch.build) s.build = null;
   atomicWrite(file, JSON.stringify(s, null, 2) + '\n');
   return load();
 }

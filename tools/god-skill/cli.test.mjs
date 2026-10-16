@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
 import { view, invalidate, mirror } from './lib/mirror.mjs';
 import { build, buildWait, EXAMPLES, examples, group, act, dryrun, importWorld, look, lookOverrides, parseFlags, parseMassing } from './cli.mjs';
-import { buildSuffix, call, claimFile, load, save } from './lib/state.mjs';
+import { buildSuffix, call, claimFile, helperFile, load, save } from './lib/state.mjs';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
 
@@ -155,7 +155,7 @@ async function buildFixture(t, handler = () => null) {
   const server = createServer(async (req, res) => {
     try {
       let raw = ''; for await (const part of req) raw += part;
-      const c = { method: req.method, path: req.url, raw, body: raw ? JSON.parse(raw) : undefined };
+      const c = { method: req.method, path: req.url, raw, body: raw ? JSON.parse(raw) : undefined, auth: req.headers.authorization };
       calls.push(c);
       let reply = await handler(c, calls);
       if (!reply) {
@@ -673,6 +673,40 @@ test('claim bootstrap, per-claim steps, local guards, group undo and release nev
   assert.equal(load().build, null);
   assert.equal(readFileSync('.eden-god.json', 'utf8'), original);
   assert.equal(JSON.parse(readFileSync(claimFile('c_1234abcd'), 'utf8')).build, null);
+});
+
+test('WD7 build claim --helper writes a 0600 helper file, prints only its env line, and the helper uses only its own token', async t => {
+  const secret = 'god_stub_helper-scoped-fixture', previous = process.env.EDEN_GOD_HELPER;
+  t.after(() => { if (previous === undefined) delete process.env.EDEN_GOD_HELPER; else process.env.EDEN_GOD_HELPER = previous; });
+  const helper = { label: 'lead/helper:east-aisle', hash8: 'abcd1234', build: 'church', claim: 'c_1234abcd', part: 'east-aisle', expiresAt: Date.UTC(2026, 9, 16, 2), verifyBudget: 3 };
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/builds/church/claims/c_1234abcd/helper' ? { ok: true, token: secret, helper } : null);
+  save({ build: localBuild() }); const lead = readFileSync('.eden-god.json', 'utf8');
+  await assert.rejects(build('claim', ['east-aisle'], { root: 'church/east-aisle', ttl: '30' }), /needs --helper/);
+  await assert.rejects(build('claim', ['east-aisle'], { root: 'church/east-aisle', helper: 'yes' }), /takes no value/);
+  assert.equal(calls.length, 0);
+  const text = await build('claim', ['east-aisle'], { root: 'church/east-aisle', helper: true, ttl: '30' });
+  const file = join(process.cwd(), helperFile('c_1234abcd'));
+  assert.ok(text.includes(`export EDEN_GOD_HELPER=${file}`), text);
+  for (const token of [secret, 'fixture-only']) assert.ok(!text.includes(token), 'no token is ever printed');
+  assert.deepEqual(calls.map(c => [c.path, c.body]), [['/v1/god/builds/church/claims', { part: 'east-aisle', root: 'church/east-aisle' }], ['/v1/god/builds/church/claims/c_1234abcd/helper', { ttlMs: 1_800_000 }]]);
+  assert.ok(calls.every(c => c.auth === 'Bearer fixture-only'), 'the lead mints with its own token');
+  const saved = JSON.parse(readFileSync(file, 'utf8')); assert.equal(saved.token, secret); assert.equal(saved.world, load().world); assert.equal(saved.helper.claim, 'c_1234abcd'); assert.equal(saved.build.claim, 'c_1234abcd');
+  assert.equal(statSync(file).mode & 0o777, 0o600); assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+  // The sub-agent: only EDEN_GOD_HELPER, never the lead's file credentials.
+  process.env.EDEN_GOD_HELPER = file;
+  assert.equal(load().token, secret); assert.equal(load().build.claim, 'c_1234abcd'); assert.equal(load().build.lease, undefined);
+  await act({ ops: [{ op: 'remove', id: 'pew' }] });
+  assert.equal(calls.at(-1).auth, `Bearer ${secret}`); assert.deepEqual(calls.at(-1).body.build, { id: 'church', claim: 'c_1234abcd', step: 1, label: 'shell' });
+  const count = calls.length;
+  await assert.rejects(build('start', ['chapel'], startFlags()), /claim holders cannot build start/);
+  await assert.rejects(build('done'), /claim holders cannot build done/);
+  await assert.rejects(undo(), /undo --group church\/east-aisle/);
+  assert.equal(calls.length, count);
+  await build('release', [], { done: true });
+  assert.equal(calls.at(-1).path, '/v1/god/builds/church/claims/c_1234abcd/release'); assert.equal(calls.at(-1).auth, `Bearer ${secret}`);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+  process.env.EDEN_GOD_CLAIM = 'c_99999999'; assert.throws(() => load(), /differs from the helper file/); delete process.env.EDEN_GOD_CLAIM;
+  process.env.EDEN_GOD_HELPER = join(process.cwd(), 'missing.json'); assert.throws(() => load(), /missing file/);
 });
 
 test('claim overrides a local claim and independent subprocesses keep all twenty step updates', async t => {
