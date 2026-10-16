@@ -172,6 +172,16 @@ test('all package TAP documents and explicit package exits are mandatory', t => 
   assert.match(r.errors.join('\n'), /missing\/duplicate package test output/);
   assert.match(r.errors.join('\n'), /missing package exit/);
 });
+test('package output: the EF4 package counts as conformance under its old name catalog (runs before 2026-10-16), never twice', t => {
+  const all = (last) => ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', last]
+    .map(p => tap([{ name: 'ok' }], { prefix: `## ${p}` }) + `## ${p} exit=0\n`).join('');
+  for (const last of ['conformance', 'catalog']) {
+    const r = readRun(fixture(t, { step: 'V3-packages', log: all(last) }), expected, manifest(), ['V3-packages']);
+    assert.doesNotMatch(r.errors.join('\n'), /package/, last);
+  }
+  const twice = readRun(fixture(t, { step: 'V3-packages', log: all('catalog') + tap([{ name: 'ok' }], { prefix: '## conformance' }) + '## conformance exit=0\n' }), expected, manifest(), ['V3-packages']);
+  assert.match(twice.errors.join('\n'), /missing\/duplicate package test output/);
+});
 test('a timeout cannot be waived by the same failing test identity', t => {
   const dir = fixture(t, { exit: '142', log: tap([{ name: 'known', status: 'fail' }]) });
   assert.match(readRun(dir, expected, manifest([entry('known')]), ['V4-web']).errors.join('\n'), /timeout/);

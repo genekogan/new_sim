@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 test('raw package results keep an earlier failure even when the last package passes', t => {
   const dir = mkdtempSync(join(tmpdir(), 'sim-package-harness-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  for (const p of ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'catalog']) {
+  for (const p of ['engine-mars', 'world-compiler', 'generators', 'ground', 'kernel', 'brain', 'engine-toy', 'engine-contract', 'protocol', 'engine-native', 'conformance']) {
     mkdirSync(join(dir, 'packages', p, 'src'), { recursive: true });
     writeFileSync(join(dir, 'packages', p, 'src', 'stub.test.ts'), `import test from 'node:test'; test('${p}', () => { ${p === 'engine-mars' ? "throw Error('retained failure')" : ''} });\n`);
   }
@@ -21,7 +21,7 @@ test('raw package results keep an earlier failure even when the last package pas
   assert.match(r.stdout, /not ok 1 - engine-mars/);
   assert.match(r.stdout, /retained failure/);
   assert.match(r.stdout, /## engine-mars exit=1/);
-  assert.match(r.stdout, /## catalog exit=0/);
+  assert.match(r.stdout, /## conformance exit=0/);
 });
 
 test('historical input transport resolves original SHAs in an independent Git database', t => {

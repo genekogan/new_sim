@@ -300,11 +300,16 @@ export class GodNav {
         if (reach(q.p)) { goal = q; break; }
       }
     }
-    this.rooms.set(key, goal); if (this.rooms.size > 200) this.rooms.clear();
+    // one entry per room per world version: drop an older version's entries, never clear mid-sweep (the Eden 2026 cafe
+    // offers 268 rooms within 80 m; the old 200-entry cap cleared during every sweep, so each sweep past the 50-tick goal
+    // cache re-routed every room: the cafe's ~10 s stalls)
+    if (this.roomsOf !== this.cache?.key) { this.rooms.clear(); this.roomsOf = this.cache?.key; }
+    this.rooms.set(key, goal); if (this.rooms.size > 20_000) this.rooms.clear();
     if (!goal) this.blocked.set(t.ref, `Nothing inside ${t.ref} can be reached from its front door right now: furniture closes the way in.`); else this.blocked.delete(t.ref);
     return goal;
   }
   private rooms = new Map<string, { p: Vec2; level: number } | null>();
+  private roomsOf: string | undefined;
   /** Why a thing has no goal (shown as the capability's blocked reason). */
   readonly blocked = new Map<string, string>();
 
@@ -372,11 +377,20 @@ export class GodNav {
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {
-    return this.things().filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o);
+    return this.byVersion(`l|${t.ref}|${n}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
   }
   /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
   namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
-    return this.things().filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref);
+    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
+  }
+  /** "by the X" answers depend only on the named things (index version): remembered until the world changes (each
+   *  label scanned every thing: ~0.25 s of every capabilities sweep in the Eden 2026 cafe). */
+  private nearMemo = new Map<string, unknown>();
+  private nearOf: string | undefined;
+  private byVersion<T>(key: string, f: () => T): T {
+    this.things(); if (this.nearOf !== this.cache?.key) { this.nearMemo.clear(); this.nearOf = this.cache?.key; }
+    if (this.nearMemo.has(key)) return this.nearMemo.get(key) as T;
+    const v = f(); if (this.nearMemo.size > 50_000) this.nearMemo.clear(); this.nearMemo.set(key, v); return v;
   }
 }
 

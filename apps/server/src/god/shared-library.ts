@@ -12,7 +12,7 @@
 // `deps.gate` takes the real gate when it merges. A model the gate changes (stripped metadata) is refused here: the
 // library stores gated bytes, so a clean file comes back byte-identical and keeps its content address.
 // The site's library lives in one directory (SIM_LIBRARY_DIR) shared by the worlds of a box; without it the routes say
-// so (503 library.unavailable). Built on packages/library only (no @sim/catalog: it is being archived).
+// so (503 library.unavailable). Built on packages/library only (the catalogue registry is archived: docs/ARCHIVED.md).
 import { readFileSync } from 'node:fs';
 import type { Context, Hono } from 'hono';
 import { z } from 'zod';

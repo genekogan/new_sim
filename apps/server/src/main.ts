@@ -123,7 +123,7 @@ const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env
 if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); await host.enableSpreadV2?.(); });
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
 const genesis = process.env.GENESIS_FILE ? JSON.parse(readFileSync(process.env.GENESIS_FILE, 'utf8')) : undefined;
-const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never), cobuilders: process.env.SIM_COBUILDERS === '1' /* off: one god per world (Gene 2026-10-16) */ }) : undefined;
 // Stage B (lane L8): the ground fact is queued before the entity bridge so boot installs the terrain first.
 const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown}).installGroundV1 ? new GroundHost(db, host, god) : undefined;
 if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);

@@ -150,7 +150,11 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
       if (!ge || !gx) continue;
       const far = linkApproach(link, !ascending).approach;
       const ca = cellOf(ge, approach), cx = snap(gx, far, r, 0.4);
-      if (!passable(ge, ca) || cx < 0 || segmentClearance(ge, approach, entry.p) < r * 0.9) {
+      // Leaving a level by a link: the approach-to-entry segment needs room for the body itself. Arriving by the same link
+      // only snaps to standing room near the far approach (cx), so a stricter departure test (0.9 x the planning radius)
+      // let wider bodies climb past furniture beside a stair top and then strand them up there (Eden 2026 tower: top-entry
+      // clearance 0.311 m, a 0.289 m body needed 0.314). Body radius on both sides keeps every link reversible.
+      if (!passable(ge, ca) || cx < 0 || segmentClearance(ge, approach, entry.p) < Math.min(r * 0.9, profile.radius)) {
         dropped?.push({ level: entry.level, at: [approach, entry.p], farLevel: exit.level, far });
         continue;
       }

@@ -1,4 +1,5 @@
-// node --test tools/world-launcher/worldops.test.mjs — world housekeeping (lane WORLDOPS ports: proxy 6060, children 6061–6069).
+// node --test tools/world-launcher/worldops.test.mjs — world housekeeping (lane WORLDOPS ports: proxy 6060, children 6061–6067;
+// a second launcher with co-builders off on 6068/6069). WORLDOPS_TEST_PORT moves the whole block (e.g. 6320 for lane r3b).
 // Stand-in worlds (fake-world.mjs) write their owner into sim.db the way GodMode does on first boot (WORLD_OWNER_ID).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +11,7 @@ import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
 import { defaultCommand } from './children.mjs';
 
-const PORT = 6060, RANGE = [6061, 6069];
+const PORT = Number(process.env.WORLDOPS_TEST_PORT ?? 6060), RANGE = [PORT + 1, PORT + 7], OFF_PORT = PORT + 8, OFF_RANGE = [PORT + 9, PORT + 9];
 const dir = mkdtempSync(join(tmpdir(), 'launcher-worldops-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'plain.json'), JSON.stringify({ schema: 'genesis/1', name: 'Plain', description: 'x', batches: [] }));
@@ -23,8 +24,11 @@ if (!db.prepare('SELECT 1 FROM world_meta_v1 WHERE world_id=?').get(process.env.
 db.close(); await import(${JSON.stringify(new URL('./fake-world.mjs', import.meta.url).pathname)});`);
 const command = (w, port) => { const c = defaultCommand(w, port, { publicOrigin: `http://127.0.0.1:${PORT}` }); return { cmd: process.execPath, args: [born], env: { ...c.env, DATA_DIR: w.dataDir } }; };
 let L;
-before(async () => { L = await openLauncher({ port: PORT, range: RANGE, dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {} }); });
-after(async () => { await L?.close(); });
+let OFF;
+// L keeps co-builders on (the kept-for-later feature, Gene 2026-10-16); OFF is the default site: one god per world.
+before(async () => { L = await openLauncher({ port: PORT, range: RANGE, dataDir: join(dir, 'data'), webDir, templatesDir, command, eager: 0, log: () => {}, cobuilders: true }); });
+before(async () => { OFF = await openLauncher({ port: OFF_PORT, range: OFF_RANGE, dataDir: join(dir, 'data-off'), webDir, templatesDir, command, eager: 0, log: () => {} }); });
+after(async () => { await L?.close(); await OFF?.close(); });
 const api = (p, o = {}) => fetch(`http://127.0.0.1:${PORT}${p}`, o);
 const post = (p, body, headers = {}) => api(p, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
 const list = async () => (await (await api('/__sim/worlds.json')).json()).worlds;
@@ -152,4 +156,28 @@ test('handoff: the world changes owner only when the receiving person accepts; e
   assert.equal((await post('/__sim/worlds/arium/offers/cancel', {}, V)).status, 200);
   const log = (await (await post('/__sim/op/audit', { slug: 'arium' })).json()).audit.map((x) => x.op);
   assert.deepEqual(log, ['cobuilder-invite', 'cobuilder-add', 'cobuilder-pair', 'cobuilder-remove', 'transfer-offer', 'transfer', 'cobuilder-invite', 'offers-cancel']);
+});
+
+test('co-builders are off by default (one god per world): invite, accept and pairing are refused with a reason; handover still works', async () => {
+  const offApi = (p, o = {}) => fetch(`http://127.0.0.1:${OFF_PORT}${p}`, o);
+  const offPost = (p, body, headers = {}) => offApi(p, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  let r = await offPost('/__sim/op/create-world', { name: 'Solo', template: 'plain', owner: 'dev:gene' }); assert.equal(r.status, 201);
+  for (const [path, body, headers] of [['cobuilders/invite', { to: 'dev:victor' }, G], ['cobuild/pair/start', { agent: 'victor-claude' }, {}], ['cobuild/pair/poll', { poll_token: 'x' }, {}], ['cobuild/pair/approve', { code: 'ABCDEFGH' }, V]]) {
+    r = await offPost(`/__sim/worlds/solo/${path}`, body, headers); const d = await r.json();
+    assert.equal(r.status, 403, path); assert.equal(d.code, 'cobuilders-off', path); assert.match(d.message, /one god/, path);
+  }
+  const offDir = join(dir, 'data-off');
+  const listed = await (await offApi('/__sim/worlds/solo/cobuilders', { headers: G })).json();
+  assert.equal(listed.enabled, false); assert.deepEqual(listed.cobuilders, []);
+  assert.equal((await offPost('/__sim/worlds/solo/cobuilders/invite', {}, M)).status, 403);
+  // handover to a new single owner is unchanged
+  r = await offPost('/__sim/worlds/solo/transfer', { to: 'dev:victor' }, G); const off = await r.json(); assert.equal(r.status, 200, JSON.stringify(off));
+  assert.equal((await (await offApi(`/__sim/worlds/solo/offer?code=${off.code}`)).json()).kind, 'transfer');
+  r = await offPost('/__sim/worlds/solo/offer/accept', { code: off.code }, V); const d = await r.json(); assert.equal(r.status, 200, JSON.stringify(d)); assert.equal(d.owner, 'dev:victor');
+  const db = new DatabaseSync(join(offDir, 'worlds/solo/sim.db'), { readOnly: true }); try { assert.equal(JSON.parse(db.prepare('SELECT body FROM world_meta_v1').get().body).owner, 'dev:victor'); } finally { db.close(); }
+});
+test('world servers get SIM_COBUILDERS only when the launcher turns co-builders on', () => {
+  const w = { slug: 'x', name: 'X', dataDir: '/tmp/x' };
+  assert.equal(defaultCommand(w, 6001, { publicOrigin: 'http://127.0.0.1:6000' }).env.SIM_COBUILDERS, undefined);
+  assert.equal(defaultCommand(w, 6001, { publicOrigin: 'http://127.0.0.1:6000', cobuilders: true }).env.SIM_COBUILDERS, '1');
 });

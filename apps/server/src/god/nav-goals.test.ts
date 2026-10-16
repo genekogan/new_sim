@@ -74,3 +74,23 @@ test('furnished-room fallback samples rotate with the room, preserving bounded r
     }
   }
 });
+
+test('freeze2/L3: room goals stay cached per world version past 200 rooms (no re-routing every room on each sweep)', () => {
+  // one long hall of 260 small rooms, each reachable at its centre from its own door: a Soul's capabilities sweep reads every
+  // room's goal; once the 50-tick goal cache lapses, the next sweep must reuse the per-version room goals, not route again
+  const n = 260, rooms = Array.from({ length: n }, (_, i) => ({ id: `r${i}`, polygon: [[i * 3, 0], [i * 3 + 2, 0], [i * 3 + 2, 2], [i * 3, 2]] }));
+  const baked = { rooms, slots: rooms.map((r, i) => ({ id: r.id, kind: 'room', p: [i * 3 + 1, 1, 0.5], yaw: 0 })),
+    openings: rooms.map((r, i) => ({ id: `door-${r.id}`, kind: 'door', at: [i * 3 + 1, 0], yaw: Math.PI, width: 1, state: 'open' })) };
+  const entity = { id: 'hall', name: 'hall', def: 'hall@1', in: { parent: 'world' } };
+  const def = { name: 'hall', form: 'point', components: {}, tags: ['building'], make: { kind: 'mesh' } };
+  let reaches = 0; const world = { tick: 0, entities: {} };
+  const nav = new GodNav({ model: { entities: new Map([['hall', entity]]), editSeq: 1, ground: () => ({ waters: [] }), resolvedDef: () => def, bake: () => baked,
+    worldPose: () => ({ x: 0, y: 0, z: 0, yaw: 0, s: 1 }), pathOf: () => 'hall', get: () => undefined },
+  engine: { world, standableNearV1: (at: Vec2) => at, reachV1: () => { reaches++; return { ok: true }; } }, levelAt: () => 0, engineOwned: () => false } as unknown as NavHost);
+  const roomThings = nav.things().filter(t => t.kind === 'room' && t.entry);
+  assert.ok(roomThings.length >= 250, `rooms in the index: ${roomThings.length}`);
+  const sweep = () => { for (const t of roomThings) assert.ok(nav.goal(t, [0, -5]), t.ref); };
+  sweep(); const first = reaches; assert.ok(first >= roomThings.length);
+  world.tick += 200; sweep();
+  assert.equal(reaches, first, 'the second sweep reuses every room goal of this world version');
+});

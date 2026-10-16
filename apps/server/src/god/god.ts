@@ -58,6 +58,9 @@ export type GodOptions = {
   assetDir?: string;
   /** The shared def library (default: the process's core library; null = none, for tests of a bare world). */
   library?: import('@sim/world-compiler').DefLibrary | null;
+  /** Y4b co-builder tokens (`cobuilder:<account>:…`). Gene 2026-10-16: one god per world; the code stays for later but is off
+   *  unless the world runs with SIM_COBUILDERS=1. Off: such tokens (and their helpers) are not god tokens at all. */
+  cobuilders?: boolean;
 };
 
 /** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
@@ -163,9 +166,18 @@ export class GodMode {
     if (!token?.startsWith('god_')) return null;
     // Y4b: a co-builder token (label `cobuilder:<account>:…`, set by the launcher) and its helpers carry their account.
     const scoped = (identity: Identity, rootLabel: string | null) => { const account = cobuilderOf(rootLabel); return account === null ? identity : { ...identity, cobuilder: account }; };
-    const hash = hashToken(token); if (this.store.hasToken(hash)) { const label = this.store.tokenLabel(hash); return scoped({ hash, label: label ?? 'an agent' }, label); }
-    const helper = this.helpers.scope(hash, this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent));
-    return helper ? scoped({ hash, label: helper.label, child: helper.scope }, helper.scope.parentLabel) : null;
+    const hash = hashToken(token); let identity: Identity | null = null;
+    if (this.store.hasToken(hash)) { const label = this.store.tokenLabel(hash); identity = scoped({ hash, label: label ?? 'an agent' }, label); }
+    else { const helper = this.helpers.scope(hash, this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent)); identity = helper ? scoped({ hash, label: helper.label, child: helper.scope }, helper.scope.parentLabel) : null; }
+    // Gene 2026-10-16: one god per world. With co-builders off, a co-builder token (or its helper) is no god token anywhere.
+    return identity?.cobuilder !== undefined && !this.opts.cobuilders ? null : identity;
+  }
+  /** Why a co-builder token is refused while co-builders are off (one god per world); null for any other token. */
+  cobuilderRefusal(token: string | undefined): string | null {
+    if (this.opts.cobuilders || !token?.startsWith('god_')) return null;
+    const hash = hashToken(token);
+    const label = this.store.hasToken(hash) ? this.store.tokenLabel(hash) : this.helpers.scope(hash, this.now(), (b, c) => this.builds.claimState(b, c), parent => this.store.hasTokenRow(parent))?.scope.parentLabel;
+    return cobuilderOf(label) === null ? null : 'Co-builders are turned off on this site: each world has one god, its owner. Ask the world owner to build this, or to hand the world over.';
   }
   /** Why a helper token is refused (expired, claim no longer held, lead token gone); null for any other token. */
   helperRefusal(token: string | undefined): string | null {

@@ -1,11 +1,16 @@
 # EF4 library conformance
 
+`@sim/conformance` (was the last piece of `@sim/catalog`; the catalogue registry is archived, see docs/ARCHIVED.md). What it
+guards: a change to a core def revision, a generator, the compiler, furnishing or gallery geometry that makes any core def
+fail to bake, place, furnish or stay inside its triangle/draw/material budget at a parameter endpoint, enum value, scale
+endpoint or seeded joint sample. Known failures are pinned by exact def hash, so a changed revision needs a reviewed record.
+
 The gate discovers `src/conformance.test.ts` automatically. It checks every library revision (777 at integration `3baa4c51`), defaults, every numeric min/max, every enum and boolean value, both scale endpoints, and two seeded joint samples per definition. Each point gets an isolated world with a valid water fixture when needed. It bakes and attempts placement, runs the real furnishing planner and applies its operations for room-bearing buildings, and bundles every gallery mesh registration to build geometry and check finite vertices plus triangle/draw/material budgets.
 
 Full sweep, Node 22.20, without any service or network:
 
 ```sh
-env -u NODE_USE_SYSTEM_CA nice -n 10 ~/.nvm/versions/node/v22.20.0/bin/node packages/catalog/bin/conformance.mjs --k 32 --out /tmp/ef4-full.json
+env -u NODE_USE_SYSTEM_CA nice -n 10 ~/.nvm/versions/node/v22.20.0/bin/node packages/conformance/bin/conformance.mjs --k 32 --out /tmp/ef4-full.json
 ```
 
 Use `--shard 1/4` through `--shard 4/4` sequentially, or `--filter lighthouse`, for bounded work on the shared laptop. `--seed NAME` is reproducible independently of sharding. Violations return exit 1; `--report-only` explicitly permits a report despite violations. No output artifact can turn a failing full sweep into a conformance certificate.

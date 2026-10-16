@@ -18,7 +18,7 @@ test('EF4 seeded points include all endpoints, enums, scales and K combinations 
 });
 
 test('EF4 small-K gate: every library def places, bakes, furnishes and builds gallery geometry, or has an exact documented finding', { timeout: 180_000 }, t => {
-  const dir = mkdtempSync(join(tmpdir(), 'catalog-conformance-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = mkdtempSync(join(tmpdir(), 'ef4-conformance-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const out = join(dir, 'report.json');
   const env = { ...process.env }; delete env.NODE_USE_SYSTEM_CA;
   const result = spawnSync(process.execPath, [new URL('../bin/conformance.mjs', import.meta.url).pathname, '--k', '2', '--out', out, '--report-only'], { encoding: 'utf8', timeout: 170_000, env });

@@ -20,11 +20,12 @@ async function send(sub: string, body: unknown) {
 }
 
 export function OfferCard({ link, signedIn, onDone }: { link: OfferLink; signedIn: boolean; onDone: () => void }) {
-  const [offer, setOffer] = useState<{ kind: 'cobuild' | 'transfer'; world: { name: string } } | 'gone' | null>(null);
+  const [offer, setOffer] = useState<{ kind: 'cobuild' | 'transfer'; world: { name: string } } | 'gone' | 'off' | null>(null);
   const [state, setState] = useState<{ busy?: boolean; done?: string; err?: string }>({});
   useEffect(() => {
     if (link.kind !== 'worldoffer') return;
-    void fetch(`${at('offer')}?code=${encodeURIComponent(link.code)}`).then((r) => (r.ok ? r.json() : 'gone')).then(setOffer, () => setOffer('gone'));
+    // a co-builder invitation while co-builders are off (one god per world): the launcher says so (code cobuilders-off)
+    void fetch(`${at('offer')}?code=${encodeURIComponent(link.code)}`).then(async (r) => (r.ok ? r.json() : (await r.json().catch(() => ({}))).code === 'cobuilders-off' ? 'off' : 'gone')).then(setOffer, () => setOffer('gone'));
   }, [link]);
   const act = async () => {
     setState({ busy: true });
@@ -35,15 +36,17 @@ export function OfferCard({ link, signedIn, onDone }: { link: OfferLink; signedI
   };
   const title = link.kind === 'cobuildpair' ? 'Your agent asks to co-build this world'
     : offer === 'gone' ? 'This invitation is no longer valid'
+      : offer === 'off' ? 'Co-builders are turned off'
       : offer?.kind === 'transfer' ? `You are offered ${offer.world.name}` : offer ? `You are invited to co-build ${offer.world.name}` : 'Invitation…';
   const what = link.kind === 'cobuildpair' ? 'It gets its own god token for this world, labelled with your name. The owner can revoke it.'
+    : offer === 'off' ? 'Each world has one god, its owner, so this co-builder invitation cannot be used.'
     : offer && offer !== 'gone' ? (offer.kind === 'transfer' ? 'Accept and you become its god: its owner hands it to you, and every agent that could edit it loses that access.' : 'Accept and your own agent can build here alongside the owner. You cannot hand the world on or archive it.') : null;
   return (
-    <div className="gp-pairs" data-offer={link.kind} data-offer-kind={offer && offer !== 'gone' ? offer.kind : ''}>
+    <div className="gp-pairs" data-offer={link.kind} data-offer-kind={offer && offer !== 'gone' && offer !== 'off' ? offer.kind : offer ?? ''}>
       <b>{title}</b>
       {what && <p className="gp-dim">{what}</p>}
-      {!signedIn && offer !== 'gone' && <p>Sign in first; accepting with your account is your consent.</p>}
-      {signedIn && !state.done && offer !== 'gone' && (link.kind === 'cobuildpair' || offer) && (
+      {!signedIn && offer !== 'gone' && offer !== 'off' && <p>Sign in first; accepting with your account is your consent.</p>}
+      {signedIn && !state.done && offer !== 'gone' && offer !== 'off' && (link.kind === 'cobuildpair' || offer) && (
         <div className="gp-row"><button className="gp-btn gp-primary" data-offer-accept="1" disabled={state.busy} onClick={() => void act()}>{link.kind === 'cobuildpair' ? 'Approve my agent' : 'Accept'}</button><button className="gp-btn" onClick={onDone}>Not now</button></div>
       )}
       {state.done && <p role="status" className="gp-ok">{state.done}</p>}

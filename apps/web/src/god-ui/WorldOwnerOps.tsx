@@ -1,6 +1,7 @@
 // The owner's world housekeeping, a small folded section of the god popover (GodBolt), backed by the launcher
-// (tools/world-launcher/handoff.mjs, worldops.mjs; docs/god/WORLD-OWNER-API.md): invite a co-builder, offer the world to
-// someone, archive it. Nothing here deletes a world: archiving moves it aside, and the site admin can restore it.
+// (tools/world-launcher/handoff.mjs, worldops.mjs; docs/god/WORLD-OWNER-API.md): offer the world to someone, archive it.
+// Co-builders (invite/remove) show only when the site turns them on (`enabled`); Gene 2026-10-16: one god per world, so
+// they are off by default and the rows stay hidden (an old co-builder still shows, so the owner can remove them). Nothing here deletes a world: archiving moves it aside, and the site admin can restore it.
 import { useCallback, useEffect, useState } from 'react';
 import { BASE } from '../base-path.ts';
 import { worldKey } from '../world-path.ts';
@@ -20,7 +21,7 @@ const short = (a: string) => a.replace(/^dev:/, '');
 
 export function WorldOwnerOps() {
   const [open, setOpen] = useState(false);
-  const [state, setState] = useState<{ cobuilders: Cobuilder[]; offers: Offer[] } | null>(null);
+  const [state, setState] = useState<{ enabled?: boolean; cobuilders: Cobuilder[]; offers: Offer[] } | null>(null);
   const [link, setLink] = useState<{ kind: 'cobuild' | 'transfer'; url: string } | null>(null);
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -39,16 +40,17 @@ export function WorldOwnerOps() {
   const remove = (account: string) => run(account, async () => { const d = await call<{ tokensRevoked: number }>('cobuilders/remove', { account }); await load(); setNote({ text: `${short(account)} removed; ${d.tokensRevoked} agent token${d.tokensRevoked === 1 ? '' : 's'} revoked.` }); });
   const archive = () => run('archive', async () => { await call('archive', { confirm }); location.assign(`${BASE}/`); });
   const pending = state?.offers.length ?? 0;
+  const cobuild = !!state?.enabled, oldCobuilders = state?.cobuilders.length ?? 0;
 
   return (
     <details className="gp-owner-ops" data-owner-ops="1" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary>This world: co-builders, hand on, archive{pending ? <span className="gp-count">{pending}</span> : null}</summary>
-      <div className="gp-ops-block" data-ops="cobuilders">
-        <div className="gp-row"><b>Co-builders</b><button className="gp-btn" data-ops-invite="1" disabled={!!busy} onClick={() => void invite('cobuild')}>Invite</button></div>
+      <summary>This world: {cobuild ? 'co-builders, ' : ''}hand on, archive{pending ? <span className="gp-count">{pending}</span> : null}</summary>
+      {(cobuild || oldCobuilders > 0) && <div className="gp-ops-block" data-ops="cobuilders">
+        <div className="gp-row"><b>Co-builders</b>{cobuild && <button className="gp-btn" data-ops-invite="1" disabled={!!busy} onClick={() => void invite('cobuild')}>Invite</button>}</div>
         {state && (state.cobuilders.length
           ? state.cobuilders.map((c) => <div key={c.account} className="gp-row"><span>{short(c.account)}</span><button className="gp-mini" data-ops-remove={c.account} disabled={!!busy} onClick={() => void remove(c.account)}>remove</button></div>)
           : <p className="gp-dim">None yet. Each co-builder pairs their own agent; you can remove them any time.</p>)}
-      </div>
+      </div>}
       <div className="gp-ops-block" data-ops="transfer">
         <div className="gp-row"><b>Hand it on</b><button className="gp-btn" data-ops-transfer="1" disabled={!!busy} onClick={() => void invite('transfer')}>Offer</button></div>
         <p className="gp-dim">Whoever opens the link and accepts becomes its god, and your agents lose access.</p>

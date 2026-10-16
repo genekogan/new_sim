@@ -17,7 +17,7 @@ const suites = [
   ['god', test(files('apps/server/src/god', '.test.ts'))],
   ['world-compiler', test([...files('packages/world-compiler/src', '.test.ts'), ...files('packages/world-compiler/src/core-kit', '.test.ts')])],
   // Catalog discovery includes EF4 conformance.test.ts (all defs, endpoints/enums/scales, seeded K=2).
-  ['catalog', test(files('packages/catalog/src', '.test.ts'))],
+  ['conformance', test(files('packages/conformance/src', '.test.ts'))],
   ['generators', test(files('packages/generators/src', '.test.ts'))],
   // K1 / NT5: offline kit semantics always run; recorded pixel captures can gate the same command.
   ['kit-mesh', test(['apps/web/src/gen-mesh/kit.mesh.test.ts', 'apps/web/src/gen-mesh/kit-surfaces.test.ts'])], // Y1: + surfaces

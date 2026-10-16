@@ -79,7 +79,9 @@ const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'wa
   'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball']);
 
 export type Invite = {id: string; what: string; host: {soulId: string; name: string}; guests: {soulId: string; name: string}[]; capability: string; label: string;
-  kind: 'paired' | 'give' | 'activity' | 'ride'; pairedPolicy?: 'ready-v1'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
+  kind: 'paired' | 'give' | 'activity' | 'ride'; pairedPolicy?: 'ready-v1';
+  /** E2 #2 (2026-10-16): activity invitations carry the group window policy their poses use (absent on older invitations). */
+  windowPolicy?: 'once-v1'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
   createdTick: number; expiresTick: number; state: 'pending' | 'closed'; responses: Record<string, 'accepted' | 'declined' | 'expired' | 'cancelled'>;
   hostReceipt: string | null; guestReceipts: Record<string, string>; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
@@ -381,13 +383,13 @@ export class Together {
       const w = this.withSouls(soul, params.with); if (!w.ok) return {code: w.code, reason: w.reason};
       const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps), last = [...out].reverse().find(s => s.verb === 'mars:pose_v1');
       // CN5: a game keeps its court's group (the guest takes a free place at the same court)
-      if (last && !last.params.game) {last.params.group = id; last.params.waitSeconds = 20; last.params.alone = 'start'; last.params.need = 1;}
+      if (last && !last.params.game) {last.params.group = id; last.params.waitSeconds = 20; last.params.alone = 'start'; last.params.need = 1; last.params.windowPolicy = 'once-v1';}  // E2 #2: one shared window
       const ride = cap.verb === 'object' ? out.find(s => s.verb === 'mars:carrier_ride') : undefined;
       if (ride) {ride.params.holdSeats = w.souls.length; ride.params.holdSeconds = 90;}
       const what = ride ? 'ride' : cap.verb, label = ride ? `invites you on ${cap.label.replace(/^.*\(/, '').replace(/\)$/, '') || 'the ride'}` : `invites you to join: ${cap.label}`;
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what, kind: ride ? 'ride' : 'activity', host: {soulId: soul.soulId, name: soul.name}, guests: w.souls.map(s => ({soulId: s.soulId, name: s.name})), capability: cap.id, label,
-          ...(last ? {activity: String(last.params.activity), seconds: Number(last.params.seconds), ...(last.params.prop ? {prop: String(last.params.prop)} : {}), ...(last.params.base ? {base: String(last.params.base)} : {})} : {}),
+          ...(last?.params.windowPolicy ? {windowPolicy: 'once-v1' as const} : {}), ...(last ? {activity: String(last.params.activity), seconds: Number(last.params.seconds), ...(last.params.prop ? {prop: String(last.params.prop)} : {}), ...(last.params.base ? {base: String(last.params.base)} : {})} : {}),
           ...(ride && cap.object ? {ride: {object: cap.object, carrier: String(ride.params.carrier)}} : {}), place: cap.target?.kind === 'place' ? cap.target.id : null,
           createdTick: this.tick, expiresTick: this.tick + (ride ? 90 : 90) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
         this.saveInvite(inv); this.announce(inv);
@@ -461,13 +463,13 @@ export class Together {
       const near = ownCaps.filter(c => c.verb === verb && c.available && c.target?.kind === 'spot' && ownPlans.has(c.id)).map(c => ({c, d: to(c.id)})).filter(x => x.d <= 12).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id))[0];
       if (near) {
         const steps = structuredClone(ownPlans.get(near.c.id)!.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
-        if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start';}
+        if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
         return {label: ownPlans.get(near.c.id)!.label, steps, capability: 'accept:' + inv.id, commit};
       }
     }
     if (!hostCap.endsWith(':here') && ownPlans.has(hostCap) && ownCaps.find(c => c.id === hostCap)?.available) {
       const own = ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
-      if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start';}
+      if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start'; if (inv.windowPolicy) last.params.windowPolicy = inv.windowPolicy;}
       return {label: own.label, steps, capability: 'accept:' + inv.id, commit};
     }
     if (verb === 'sit') {
@@ -480,7 +482,7 @@ export class Together {
     if (inv.activity) {
       const lying = ['lie', 'nap', 'yoga', 'pushups', 'situps'].includes(inv.activity);
       return {label: `${inv.activity} with ${inv.host.name}`, capability: 'accept:' + inv.id, commit,
-        steps: [...this.standFirst(soul.entityId), ...go(lying ? 1.8 : 1.4), pose(inv.activity, inv.seconds ?? 60, {group: inv.id, waitSeconds: 20, alone: 'start', ...(inv.prop ? {prop: inv.prop} : {})})]};
+        steps: [...this.standFirst(soul.entityId), ...go(lying ? 1.8 : 1.4), pose(inv.activity, inv.seconds ?? 60, {group: inv.id, waitSeconds: 20, alone: 'start', ...(inv.windowPolicy ? {windowPolicy: inv.windowPolicy} : {}), ...(inv.prop ? {prop: inv.prop} : {})})]};
     }
     return {label: `Join ${inv.host.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: host.entityId, standoff: 1.4}}], capability: 'accept:' + inv.id, commit};
   }

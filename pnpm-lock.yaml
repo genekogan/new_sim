@@ -238,7 +238,16 @@ importers:
         specifier: ^22.19.19
         version: 22.20.4
 
-  packages/catalog:
+  packages/client:
+    dependencies:
+      '@sim/engine-contract':
+        specifier: workspace:*
+        version: link:../engine-contract
+      '@sim/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/conformance:
     dependencies:
       '@sim/generators':
         specifier: workspace:*
@@ -250,15 +259,6 @@ importers:
       '@types/node':
         specifier: ^22.19.19
         version: 22.19.19
-
-  packages/client:
-    dependencies:
-      '@sim/engine-contract':
-        specifier: workspace:*
-        version: link:../engine-contract
-      '@sim/protocol':
-        specifier: workspace:*
-        version: link:../protocol
 
   packages/engine-contract:
     dependencies:

@@ -7,6 +7,10 @@
 // then all start together and end at one shared tick; with `gap` the two step in to face each other at that distance
 // (hug, handshake, high-five, dance together, give/take). `hold`/`release` set or clear the item carried in the hand
 // (`human.holding`, drawn as `human.prop` whenever no activity prop is shown) when the pose completes.
+// together/1 window policy `once-v1` (E2 #2, prospective; set by edge invitations from 2026-10-16, so older logs replay
+// unchanged): a group opens its shared window once. A body whose window has passed (still settling after a courtesy step,
+// its `until` stale) is no partner and never seeds a second "shared" window. A guest who arrives after the window visibly
+// closed does the pose alone at once (no wait), marked `late` in its body state and its outputs.
 import { z } from 'zod';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
@@ -63,7 +67,7 @@ const GAME_REACH = 30;
 export const LIE_CLEARANCE = 0.9;
 
 type Params = { actor: string; activity: string; seconds: number; prop?: string; base?: 'sit' | 'idle'; seatHeight?: number; face?: Vec2;
-  group?: string; pairedPolicy?: 'ready-v1'; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
+  group?: string; pairedPolicy?: 'ready-v1'; windowPolicy?: 'once-v1'; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
   /** hotfix: stepping in or back for a paired gesture never brings this body closer to anyone else than it already is
    *  (once within arm's reach of them); prospective, set by edge plans, so earlier logs replay unchanged. */
   clear?: boolean;
@@ -75,9 +79,11 @@ type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw:
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
   /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
-  lonely?: number; end?: number; wins?: number; since?: number };
+  lonely?: number; end?: number; wins?: number; since?: number;
+  /** once-v1: this body arrived after its group's window had closed and does the pose alone. */
+  late?: boolean };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
-export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean; pairedPolicy?: 'ready-v1'; readyAt?: number };
+export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean; pairedPolicy?: 'ready-v1'; readyAt?: number; windowPolicy?: 'once-v1'; late?: true };
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: 'pose.' + code, message, subjects });
 
 function admission(rt: Runtime, p: Params): Diagnostic | null {
@@ -127,12 +133,13 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   verb: 'pose_v1',
   description: 'activities/1: take a generic activity pose where you are (read, browse, write, play-piano, play-music, paint, eat, drink, cook, play-game, craft, post-letter, wave, use-computer, sing, listen, lift-weights over a seat or standing; sit-ground, lie, nap, pushups, situps, yoga on open ground, bench-press on a bench; dance, jump, stretch, jumping-jacks, pull-ups, dips standing; play-frisbee, play-petanque, play-volleyball as choreographed group games) for a number of seconds, optionally holding a prop and facing a point, then return to the base posture.',
   schema: z.object({ actor: z.string().min(1).max(80), activity: z.enum(POSE_ACTIVITIES as [string, ...string[]]), seconds: z.number().min(0.5).max(3600), prop: z.enum(POSE_PROPS).optional(), base: z.enum(['sit', 'idle']).optional(), seatHeight: z.number().min(0.2).max(1.2).optional(), face: z.tuple([z.number(), z.number()]).optional(),
-    group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), pairedPolicy: z.literal('ready-v1').optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
+    group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), pairedPolicy: z.literal('ready-v1').optional(), windowPolicy: z.literal('once-v1').optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
     gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
     instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(),
     game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
     .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
-    .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' }),
+    .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' })
+    .refine((p) => !p.windowPolicy || (!!p.group && !p.pairedPolicy && !p.game), { message: 'once-v1 is a group activity window (not a paired gesture or a game)' }),
   reservations: (_w, p) => [{ resource: 'hand:' + p.actor + ':left', mode: 'exclusive' }, { resource: 'hand:' + p.actor + ':right', mode: 'exclusive' }, { resource: 'pose:' + p.actor, mode: 'exclusive' }],
   plan(rt, p) { const d = admission(rt, p); return d ? { ok: false, diagnostic: d } : { ok: true, program: true }; },
   start(rt, p, _plan, id) {
@@ -170,31 +177,38 @@ function finish(rt: Runtime, ex: Exec) {
   if (h && ex.p.release) delete h.holding;
   if (h && ex.p.hold) h.holding = ex.p.hold;
   restore(rt, ex);
-  return { status: 'completed' as const, outputs: { seconds: ex.p.seconds, ...(ex.p.group ? { group: ex.p.group } : {}) } };
+  return { status: 'completed' as const, outputs: { seconds: ex.p.seconds, ...(ex.p.group ? { group: ex.p.group } : {}), ...(ex.late ? { late: true } : {}) } };
 }
 
 /** together/1: wait for the group, start together, step in to `gap` facing the partner, end at the shared tick. */
 function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entities'][string]>, h: NonNullable<typeof a.human>, dt: number) {
   if(ex.p.pairedPolicy)return pairedReadyV1(rt,ex,a,h,dt);
-  const tick = rt.tick, ticks = (s: number) => Math.round(s / dt);
-  const others = partnersOf(rt, ex), partner = others[0];
+  const tick = rt.tick, ticks = (s: number) => Math.round(s / dt), once = ex.p.windowPolicy === 'once-v1';
+  // once-v1: a body whose window has passed is no partner (it may still be settling with its stale `until`)
+  const near = partnersOf(rt, ex), others = once ? near.filter((o) => (o.human!.together!.until ?? Infinity) > tick) : near, partner = others[0];
+  const closed = once && !others.length && near.length > 0;
   const faceTo = (q: number[]) => { if (!held(rt, ex.p.actor) && hypot(q[0] - a.pose.p[0], q[2] - a.pose.p[2]) > 0.05) a.pose.yaw = heading([q[0] - a.pose.p[0], q[2] - a.pose.p[2]]); };
   if (h.prop === undefined || ex.p.prop) { if (ex.p.prop) h.prop = ex.p.prop; else if (h.holding) h.prop = h.holding; }
   if (ex.phase === 'waiting') {
     const going = others.find((o) => o.human!.together!.phase === 'active' && (o.human!.together!.until ?? 0) > tick);
     if (going) { ex.phase = 'active'; ex.until = going.human!.together!.until!; }
     else if (others.length >= (ex.p.need ?? 1)) { ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds); }
+    else if (closed) {
+      // once-v1: the group's window already closed before this body arrived: alone at once (or refused, alone:'fail')
+      if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('window-closed', 'They had already finished before you got there.', [ex.p.actor]) }; }
+      ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds); ex.late = true;
+    }
     else if ((ex.waited = (ex.waited ?? 0) + 1) > ticks(ex.p.waitSeconds ?? 30)) {
       if (ex.p.alone !== 'start') { restore(rt, ex); return { status: 'failed' as const, diagnostic: issue('partner-absent', 'Nobody came to do it with you in time.', [ex.p.actor]) }; }
       ex.phase = 'active'; ex.until = tick + ticks(ex.p.seconds);
     } else {
-      h.together = { group: ex.p.group!, phase: 'waiting', mobile: !!ex.mobile };
+      h.together = { group: ex.p.group!, phase: 'waiting', mobile: !!ex.mobile, ...(once ? { windowPolicy: 'once-v1' as const } : {}) };
       if (partner) faceTo(partner.pose.p); else if (ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;
       if (h.activity !== ex.base) h.activity = ex.base === 'sit' && !held(rt, ex.p.actor) ? 'idle' : ex.base;
       return { status: 'running' as const, phase: 'waiting-for-partner' };
     }
   }
-  h.together = { group: ex.p.group!, phase: 'active', until: ex.until, mobile: !!ex.mobile };
+  h.together = { group: ex.p.group!, phase: 'active', until: ex.until, mobile: !!ex.mobile, ...(once ? { windowPolicy: 'once-v1' as const } : {}), ...(ex.late ? { late: true as const } : {}) };
   if (ex.p.game) return playGame(rt, ex, a, h, others, dt);
   if (ex.p.gap) {
     // a paired gesture ends when its partner has gone (no hugging the air)

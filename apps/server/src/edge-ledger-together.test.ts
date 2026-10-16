@@ -100,14 +100,14 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   assert.equal(w.phase(a, dn).phase, 'completed'); assert.equal(w.phase(b, dy).phase, 'completed');
 
   // 6. group jumping jacks: shared window, late joins and safe settling
-  const groupBeginTick=w.f.host.engine.world.tick,intervals:unknown[]=[],frames:{tick:number;actors:{soulId:string;activity:string;until:number|undefined;holders:string[]}[]}[]=[],lastDiagnostic=new Map<string,string>();
+  const groupBeginTick=w.f.host.engine.world.tick,intervals:unknown[]=[],frames:{tick:number;actors:{soulId:string;activity:string;until:number|undefined;late?:true;holders:string[]}[]}[]=[],lastDiagnostic=new Map<string,string>();
   const capture=()=>{const rt=w.f.host.engine.runtime;for(const actor of[a,b,c]){const h=w.body(actor).human,holders=(w.f.host.engine as unknown as {rt:{holder(resource:string):string[]}}).rt.holder('actor:'+actor.entityId),row={tick:rt.tick,soulId:actor.soulId,entityId:actor.entityId,pose:structuredClone(w.body(actor).pose),activity:h.activity,together:structuredClone(h.together??null),holders:[...holders],program:w.f.host.engine.programOf(actor.entityId)};const key=JSON.stringify({...row,tick:0,pose:undefined});if(lastDiagnostic.get(actor.soulId)!==key){intervals.push(row);lastDiagnostic.set(actor.soulId,key);}}};
   capture();
   const jj = await w.act(a, `jumping jacks with ${b.name} and ${c.name}`, {seconds: 6}); assert.equal(jj.resolved?.to, 'jumping-jacks:here', JSON.stringify(jj));
   for (let i = 0; i < 10; i++) w.f.host.tickOnce();
   const [jb, jc] = [await w.act(b, 'accept'), await w.act(c, 'accept')];
   const started: Record<string, number> = {}, ended: Record<string, number> = {};
-  await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {capture();frames.push({tick,actors:[a,b,c].map(actor=>({soulId:actor.soulId,activity:w.body(actor).human.activity,until:w.body(actor).human.together?.until,holders:[...(w.f.host.engine as unknown as {rt:{holder(resource:string):string[]}}).rt.holder('actor:'+actor.entityId)]}))});for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
+  await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {capture();frames.push({tick,actors:[a,b,c].map(actor=>({soulId:actor.soulId,activity:w.body(actor).human.activity,until:w.body(actor).human.together?.until,late:w.body(actor).human.together?.late,holders:[...(w.f.host.engine as unknown as {rt:{holder(resource:string):string[]}}).rt.holder('actor:'+actor.entityId)]}))});for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
   capture();
   const records=[...w.f.host.engine.runtime.records.values()].filter(r=>{const p=r.params as {actor?:string};return [a,b,c].some(s=>s.entityId===p?.actor)&&((r.verb==='pose_v1'&&r.history.some(h=>h.tick>=groupBeginTick))||r.id.includes(':make-way:'));}).map(r=>({id:r.id,verb:r.verb,parent:r.parent,status:r.status,requestedTick:r.requestedTick,endedTick:r.endedTick,params:r.params,history:r.history,diagnostic:r.diagnostic,outputs:r.outputs}));
   const overlap={maxSimultaneous:Math.max(...frames.map(f=>f.actors.filter(a=>a.activity==='jumping-jacks').length)),threeParticipantTicks:frames.filter(f=>f.actors.every(a=>a.activity==='jumping-jacks')).length};
@@ -122,14 +122,19 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   // defer the truthful terminal receipt until the actor safely settles.
   // This is not a claim of uninterrupted three-person exercise or equal
   // receipt deadlines (pose.ts checks nudged() before the shared-until rule).
-  const sharedUntils=new Set(frames.flatMap(f=>f.actors.flatMap(x=>x.until===undefined?[]:[x.until])));
+  // E2 #2 (once-v1, 2026-10-16): a guest who arrives after the shared window closed does it alone at once, marked late;
+  // its own window is not the shared one, and it never borrows a settling body's stale deadline.
+  const lateActors=new Set(frames.flatMap(f=>f.actors.filter(x=>x.late).map(x=>x.soulId)));
+  assert.ok(lateActors.size<=1&&!lateActors.has(a.soulId),'only a guest can be late, never the host');
+  const sharedUntils=new Set(frames.flatMap(f=>f.actors.flatMap(x=>x.until===undefined||x.late?[]:[x.until])));
   assert.equal(sharedUntils.size,1,'one actual shared pose deadline');const commonUntil=[...sharedUntils][0];
   assert.ok(overlap.maxSimultaneous>=2,'actual overlapping participation, not invitation-only');
-  assert.ok(frames.every(f=>f.tick<commonUntil||f.actors.every(x=>x.activity!=='jumping-jacks')),'no jumping-jacks beyond the shared pose window');
+  assert.ok(frames.every(f=>f.tick<commonUntil||f.actors.every(x=>x.activity!=='jumping-jacks'||lateActors.has(x.soulId))),'no jumping-jacks beyond the shared pose window (except a late guest alone)');
   for(const [actor,receipt] of [[a,jj],[b,jb],[c,jc]] as const){
     const record=records.find(r=>r.verb==='pose_v1'&&(r.params as {actor?:string;activity?:string}).actor===actor.entityId&&(r.params as {activity?:string}).activity==='jumping-jacks');
     assert.ok(record,'actual grouped pose record');const terminal=w.phase(actor,receipt).endedTick!;
     assert.equal(terminal,record.endedTick,'terminal receipt reflects actual native completion');assert.ok(terminal>=commonUntil,'no fabricated early completion');
+    if(lateActors.has(actor.soulId)){const own=frames.find(f=>f.actors.find(x=>x.soulId===actor.soulId)!.late)!.actors.find(x=>x.soulId===actor.soulId)!.until!;assert.ok(own>commonUntil&&terminal>=own,'a late guest completes its own window');assert.equal((record.outputs as {late?:boolean}|undefined)?.late,true,'late is recorded');continue;}
     const release=frames.find(f=>f.tick>=commonUntil&&f.actors.find(x=>x.soulId===actor.soulId)!.holders.length===0);
     assert.ok(release,'owned actor settling actually releases');assert.ok(terminal>=release.tick&&terminal<=release.tick+1,'completion on holder-free tick or next fixed tick in submission order');
     assert.equal(frames.find(f=>f.tick===terminal)!.actors.find(x=>x.soulId===actor.soulId)!.holders.length,0,'completion cannot precede owned settling release');
