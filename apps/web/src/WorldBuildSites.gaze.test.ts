@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { WorldBuildSites, parseBuildFeed, GAZE, type PublicSite, type Attention, type SiteModel } from './WorldBuildSites.ts';
+import { WorldBuildSites, parseBuildFeed, GAZE, gazeSize, type PublicSite, type Attention, type SiteModel } from './WorldBuildSites.ts';
 
 const SERVER_NOW = 1_800_000_000_000;
 function site(overrides: Partial<PublicSite> = {}): PublicSite {
@@ -84,6 +84,20 @@ test('CE8: reduced motion keeps the reticle still; otherwise it breathes gently'
   assert.ok(new Set(moving.map(v => v.toFixed(6))).size > 1, `moving: ${moving}`); assert.ok(moving.every(v => Math.abs(v / still[0] - 1) <= GAZE.pulse + 1e-9));
 });
 
+test('CE8: a close look is a small mark; a wide look rings what it framed (clamped); where/free hints are small', () => {
+  assert.equal(gazeSize({ at: [0, 0, 0] }), GAZE.worldSize);
+  assert.equal(gazeSize({ at: [0, 0, 0], eye: [1, 1, 1] }), GAZE.worldSize, 'never smaller than the base mark');
+  const wide = gazeSize({ at: [-66, 0, 3], eye: [-43.7, 17.3, 25.3] }); // S1's 36 m look at the whole site
+  assert.ok(Math.abs(wide - 2 * Math.tan(Math.PI / 8) * 36) < 0.1, String(wide));
+  assert.equal(gazeSize({ at: [0, 0, 0], eye: [0, 400, 0] }), GAZE.maxSize);
+  const h = harness(); h.sites.apply(start());
+  h.sites.apply(look({ at: [-66, 0, 3], eye: [-43.7, 17.3, 25.3], t: SERVER_NOW }));
+  assert.equal(gazeOf(h)?.size, wide); assert.equal(sprite(h)!.scale.x, wide);
+  h.sites.apply(look({ at: [100, 0, 20], t: SERVER_NOW + 1 }));
+  assert.equal(gazeOf(h)?.size, GAZE.worldSize, 'a later where/free hint shrinks it again');
+  h.sites.dispose();
+});
+
 test('CE8: snapshots restore a fresh look; closing the site or style off removes it', () => {
   const h = harness();
   h.sites.reset([site({ rev: 4, attention: { at: [104, 0, 18], t: SERVER_NOW - 1000 } })], 4, SERVER_NOW);
@@ -96,4 +110,24 @@ test('CE8: snapshots restore a fresh look; closing the site or style off removes
   // A hint for a site the viewer does not know is ignored (the next snapshot carries it).
   h.sites.apply(look({ at: [1, 0, 1], t: SERVER_NOW + 1 }, 5)); assert.equal(h.sites.inspect().sites.length, 0);
   h.sites.dispose();
+});
+
+test('CE8 contract: the real server attention event and public site drive the real viewer reticle', async () => {
+  const { Db } = await import('../../server/src/db.ts');
+  const { GodMode } = await import('../../server/src/god/god.ts');
+  let now = SERVER_NOW; const messages: unknown[] = [];
+  const god = new GodMode(new Db(':memory:'), { worldId: 'gaze-contract', ownerId: 'owner', tick: () => 0, now: () => now, schedule: () => {}, emit: (m: unknown) => messages.push(m) });
+  try {
+    const identity = god.godIdentity(god.mintFor({ id: 'owner', role: 'user' }, 'lead'))!;
+    const started = god.builds.start({ id: 'church', title: 'Stone church', steps: ['shell'], site: { at: [0, 0], size: [40, 40] } }, identity);
+    assert.equal(started.ok, true);
+    const h = harness(); for (const m of messages) h.sites.apply(m);
+    now += 10; assert.equal(god.builds.attend('church', { at: [3, 0, -4], eye: [20, 12, 18] }, identity).ok, true);
+    h.sites.apply(messages.at(-1));
+    assert.deepEqual(gazeOf(h)?.at, [3, 0.05, -4]); assert.ok(gazeOf(h)!.size > GAZE.worldSize);
+    // A viewer that joins later gets the same look from the public snapshot.
+    const late = harness(); const list = god.builds.publicList(now); late.sites.reset(list.builds as PublicSite[], list.rev, list.now);
+    assert.deepEqual(gazeOf(late)?.at, [3, 0.05, -4]);
+    h.sites.dispose(); late.sites.dispose();
+  } finally { god.db.close(); }
 });

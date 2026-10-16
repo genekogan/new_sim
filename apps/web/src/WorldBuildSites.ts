@@ -77,15 +77,17 @@ type View = {
   sayUntil: number; noteUntil: number; reopenDeadline: number; designingActive: boolean;
   captionAlpha: { value: number }; captionTop: { value: number };
   /** CE8 reticle: one sprite, created on the first hint; gazeUntil is the local-clock end of the fade. */
-  gaze: THREE.Sprite | null; gazeT: number; gazeUntil: number; gazePulse: number;
+  gaze: THREE.Sprite | null; gazeT: number; gazeUntil: number; gazePulse: number; gazeSize: number;
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
 const MARKER_ALPHA = 0.95, FAINT_EDGE_ALPHA = 0.06, COVERAGE_GRID = 8; // 64 sampled columns per mass
 const MINUTE = 60_000, QUIET_MS = 3 * MINUTE, SAY_MS = 8 * MINUTE, NOTE_MS = 6000;
 const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
-/** CE8: full for 14 s, faded out by 20 s after the god looked; ≥ 2.4 m and ≥ 36 px across. */
-export const GAZE = { ttlMs: 20_000, fadeMs: 6000, alpha: 0.85, worldSize: 2.4, minPx: 36, pulse: 0.06 } as const;
+/** CE8: full for 14 s, faded out by 20 s after the god looked. The ring spans what the look framed at its target
+ * (half-height = distance × tan(45°/2), the look camera's vertical fov), clamped to 2.4–60 m and ≥ 36 px across. */
+export const GAZE = { ttlMs: 20_000, fadeMs: 6000, alpha: 0.85, worldSize: 2.4, maxSize: 60, viewTan: Math.tan(Math.PI / 8), minPx: 36, pulse: 0.06 } as const;
+export const gazeSize = (a: Pick<Attention, 'at' | 'eye'>) => a.eye ? Math.min(GAZE.maxSize, Math.max(GAZE.worldSize, 2 * GAZE.viewTan * Math.hypot(a.eye[0] - a.at[0], a.eye[1] - a.at[1], a.eye[2] - a.at[2]))) : GAZE.worldSize;
 const STYLES = ['ring', 'label', 'outline', 'sheen', 'wheel'] as const;
 type Style = typeof STYLES[number];
 
@@ -275,8 +277,10 @@ export class WorldBuildSites {
     v.gazeT = attention.t; v.data.attention = { at: [...attention.at], ...(attention.eye ? { eye: [...attention.eye] } : {}), t: attention.t };
     const receivedAt = this.clock(); v.gazeUntil = receivedAt + attention.t + GAZE.ttlMs - (now ?? Date.now());
     if (v.gazeUntil <= receivedAt) { if (v.gaze) v.gaze.visible = false; this.gazing.delete(v); return; }
+    // A close look is a small mark; a wide look rings the area it framed.
+    v.gazeSize = gazeSize(attention);
     const sprite = v.gaze ?? this.gazeSprite(v);
-    sprite.position.set(attention.at[0], attention.at[1] + 0.05, attention.at[2]);
+    sprite.position.set(attention.at[0], attention.at[1] + 0.05, attention.at[2]); sprite.scale.set(v.gazeSize, v.gazeSize, 1);
     this.gazing.add(v); this.gazeFrame(v, receivedAt, this.reducedMotion());
   }
   private gazeFrame(v: View, nowMs: number, still: boolean) {
@@ -299,13 +303,13 @@ export class WorldBuildSites {
       this.gazeTexture = new THREE.CanvasTexture(canvas); this.gazeTexture.colorSpace = THREE.SRGBColorSpace;
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.gazeTexture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, opacity: 0 }));
-    sprite.name = 'build-gaze'; sprite.renderOrder = 999; sprite.frustumCulled = false; sprite.visible = false; sprite.scale.set(GAZE.worldSize, GAZE.worldSize, 1);
+    sprite.name = 'build-gaze'; sprite.renderOrder = 999; sprite.frustumCulled = false; sprite.visible = false; sprite.scale.set(v.gazeSize, v.gazeSize, 1);
     sprite.onBeforeRender = (renderer, _scene, camera) => {
       const m = sprite.matrixWorld.elements, view = camera.matrixWorldInverse.elements;
       const depth = Math.max(0.01, -(view[2] * m[12] + view[6] * m[13] + view[10] * m[14] + view[14]));
       const height = renderer.getSize(this.viewport).y;
       const unitsPerPixel = 2 * (camera instanceof THREE.PerspectiveCamera ? depth : 1) / (Math.max(1, height) * camera.projectionMatrix.elements[5]);
-      const size = Math.max(GAZE.worldSize, GAZE.minPx * unitsPerPixel) * v.gazePulse;
+      const size = Math.max(v.gazeSize, GAZE.minPx * unitsPerPixel) * v.gazePulse;
       sprite.scale.set(size, size, 1); sprite.updateMatrixWorld();
     };
     v.gaze = sprite; v.group.add(sprite); this.tag(v);
@@ -333,7 +337,7 @@ export class WorldBuildSites {
   }
   inspect() {
     return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], coverage: [...v.coverage], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length,
-      gaze: v.gaze?.visible ? { at: v.gaze.position.toArray(), opacity: v.gaze.material.opacity, t: v.gazeT } : null })) };
+      gaze: v.gaze?.visible ? { at: v.gaze.position.toArray(), size: v.gazeSize, opacity: v.gaze.material.opacity, t: v.gazeT } : null })) };
   }
 
   private put(data: PublicSite, now?: number) {
@@ -353,7 +357,7 @@ export class WorldBuildSites {
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
     installDesignPulse(faces.material, this.pulse);
     faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 }, gaze: null, gazeT: -Infinity, gazeUntil: 0, gazePulse: 1 };
+    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 }, gaze: null, gazeT: -Infinity, gazeUntil: 0, gazePulse: 1, gazeSize: GAZE.worldSize };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
     if (data.attention) this.attend(v, data.attention, now);
