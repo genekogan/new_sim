@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Activate a world-launcher release ON THE BOX (release.sh runs it over ssh as root after the upload; also by hand):
-#   bash activate.sh <staging|production> <release dir> [--restart]
+#   bash activate.sh <staging|production> <release dir> [--restart|--reload]
 #
 # Without visible downtime (lane C4, backlog G9): when the running unit is the keeper (keeper.mjs) and this release
 # carries the same keeper, it switches the stage link and runs `systemctl reload`: the keeper hands the worlds over to
@@ -31,6 +31,9 @@ point() { node -e 'const fs=require("fs");const t=process.argv[2]+".next";try{fs
 
 MODE=restart
 if [ "$FORCE" != --restart ] && [ -f "$data/keeper.json" ] && [ "$(mainpid)" = "$(kj keeper.pid)" ] && [ "$(kj keeper.sha)" = "$(sha "$REL/tools/world-launcher/keeper.mjs")" ]; then MODE=reload; fi
+# --reload: hand over even though this release carries a different keeper. The running (older) keeper stays and runs the
+# new launcher: worlds are pre-warmed but there is no canary; the new keeper takes effect at the next restart.
+if [ "$FORCE" = --reload ] && [ -f "$data/keeper.json" ] && [ "$(mainpid)" = "$(kj keeper.pid)" ]; then MODE=reload; fi
 
 # reload: wait for the keeper's handover to finish (keeper.json handover.startedAt changes, then done|failed)
 activate() {

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Option B (production on eden2; NOT run unless Codex chooses it): ship this worktree's HEAD to eden2 as a
 # world-launcher release and (by default) switch a stage to it.
-#   tools/world-launcher/deploy/release.sh [staging|production] [--no-activate] [--restart]   (--restart: no handover)
+#   tools/world-launcher/deploy/release.sh [staging|production] [--no-activate] [--restart|--reload]   (--restart: no handover;
+#   --reload: hand over even when this release changes keeper.mjs; the running keeper stays until the next restart)
 #   tools/world-launcher/deploy/release.sh --local <dir>     assemble only (Option A: run it on the laptop)
 # Run from a clean worktree. The release: `git archive HEAD` (committed files only, so no .env, data or keys),
 # the web app built with --base /worlds/ (every URL under the launcher's prefix), the Mars web assets the worlds
@@ -12,8 +13,8 @@
 # Take it away entirely: remove the Caddy routes, then systemctl disable --now sim-worlds@<stage> (data stays in /srv/sim-worlds-data/<stage>).
 set -euo pipefail
 HOST="${SIM_WORLDS_HOST:-root@eden2}"
-STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
-while [ $# -gt 0 ]; do case "$1" in staging|production) STAGE="$1";; --no-activate) ACTIVATE=0;; --restart) RESTART=1;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production] [--no-activate] [--restart] | --local <dir>"; exit 2;; esac; shift; done
+STAGE=staging; ACTIVATE=1; LOCAL=""; RESTART=""; HOW=""; BASE="${SIM_WORLDS_BASE:-/worlds}"
+while [ $# -gt 0 ]; do case "$1" in staging|production) STAGE="$1";; --no-activate) ACTIVATE=0;; --restart) RESTART=1; HOW=--restart;; --reload) HOW=--reload;; --local) LOCAL="$2"; shift;; *) echo "usage: $0 [staging|production] [--no-activate] [--restart|--reload] | --local <dir>"; exit 2;; esac; shift; done
 ROOT="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 cd "$ROOT"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || { echo "commit first: the release is exactly HEAD"; exit 1; }
@@ -69,7 +70,7 @@ echo "== activate $STAGE -> $BUILD"
 ssh "$HOST" "set -e
   [ '$STAGE' != production ] || test -f /etc/sim-worlds/production-auth.env || { echo 'production needs /etc/sim-worlds/production-auth.env (the account provider settings) first'; exit 1; }
   systemctl enable sim-worlds@$STAGE >/dev/null 2>&1
-  bash $REL/tools/world-launcher/deploy/activate.sh $STAGE $REL ${RESTART:+--restart}
+  bash $REL/tools/world-launcher/deploy/activate.sh $STAGE $REL $HOW
   # retention: keep what a stage points at plus the three newest others
   keep=\$(for s in staging production staging.previous production.previous; do readlink -f /srv/sim-worlds/\$s 2>/dev/null; done)
   ls -1dt /srv/sim-worlds/releases/we-*/ | sed 's:/\$::' | tail -n +4 | while read -r d; do echo \"\$keep\" | grep -qx \"\$d\" || { rm -rf \"\$d\" \"\$d.deps.log\"; echo \"pruned \$d\"; }; done"
