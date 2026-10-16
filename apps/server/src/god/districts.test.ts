@@ -1,6 +1,7 @@
 // Y3 / NT10 slice 1: district plans recorded once, built as chapter builds that close only their own plots.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { coreRef } from '@sim/world-compiler';
 import { Db } from '../db.ts';
@@ -13,14 +14,8 @@ import { chapterShape, checkPlan, districtPlanSchema } from './districts.ts';
 import { godSchema } from './schema.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const plot = (id: string, x: number, z: number, title: string) => ({ id, title, at: [x, z], size: [16, 18], massing: [{ name: 'hall', at: [0, z < 0 ? -2 : 2], size: [10, 8], h: 6, roof: 'gable' }] });
-export const streetPlan = () => ({
-  id: 'high', title: 'High Street', brief: 'Owner words: a lively six-shop street by the river', steps: ['massing', 'shops', 'details'],
-  roads: [{ id: 'high', name: 'High Street', path: [[-60, 0], [60, 0]], width: 8 }],
-  plots: [plot('p1', -40, -14, 'Bakery'), plot('p2', -40, 14, 'Smithy'), plot('p3', 0, -14, 'Inn'), plot('p4', 0, 14, 'Chapel'), plot('p5', 40, -14, 'Market'), plot('p6', 40, 14, 'Mill')],
-  chapters: [['p1', 'p2'], ['p3', 'p4'], ['p5', 'p6']],
-  terrain: 'gentle fall to the south', water: 'river 40 m south of the street',
-});
+/** A six-plot street on both sides of one road, in three chapters of two plots (fixtures/district-street.json). */
+const streetPlan = () => JSON.parse(readFileSync(new URL('./fixtures/district-street.json', import.meta.url), 'utf8'));
 function fixture() {
   const db = new Db(':memory:'), emitted: (WorldDiffMessage | WorldBuildMessage)[] = [];
   let now = 2_000_000;
@@ -99,7 +94,7 @@ test('Y3: chapters take site and massing from plots, refuse taken plots, close o
   assert.equal(s.ok, true, JSON.stringify(s));
   assert.deepEqual(s.build.district, { id: 'high', plots: ['p1', 'p2'] }); assert.equal(s.build.title, 'High Street: Bakery, Smithy'); assert.deepEqual(s.build.plan.steps, ['massing', 'shops', 'details']);
   assert.deepEqual(s.build.site.at, [-40, 0]); assert.deepEqual(s.build.massing.map((m: any) => m.name), ['p1-hall', 'p2-hall']); assert.deepEqual(s.build.roots, [], 'a chapter never adopts earlier roots');
-  assert.deepEqual(s.report.district.plots.map((p: any) => p.id), ['p1', 'p2']); assert.deepEqual(s.report.district.frontage[0], { plot: 'p1', road: 'high', distance: 10, side: 'south', frontYaw: 0 });
+  assert.deepEqual(s.report.district.plots.map((p: any) => p.id), ['p1', 'p2']); assert.deepEqual(s.report.district.frontage[0], { plot: 'p1', road: 'high', gap: 1, side: 'south', frontYaw: 0 });
   assert.deepEqual(s.report.district.neighbours.map((n: any) => n.plot), ['p3', 'p4']);
   assert.equal(start(input).replayed, true, 'the expanded start replays');
   const busy = start({ id: 'other', district: { id: 'high', plots: ['p2'] } }); assert.equal(code(busy), 'district.plot'); assert.equal(busy.failures[0].fix, 'build resume high-1');

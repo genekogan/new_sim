@@ -244,8 +244,10 @@ export class GodDistricts {
     const frontage = mine.flatMap(id => {
       const plot = plan.plots.find(p => p.id === id); if (!plot || !plan.roads?.length) return [];
       const best = plan.roads.map(r => ({ road: r.id, ...nearestOn(r, plot.at), width: r.width })).sort((a, z) => a.d - z.d)[0];
-      const dx = best.at[0] - plot.at[0], dz = best.at[1] - plot.at[1];
-      return [{ plot: id, road: best.road, distance: r1(Math.max(0, best.d - best.width / 2)), side: Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'east' : 'west') : (dz > 0 ? 'south' : 'north'), frontYaw: Math.round(Math.atan2(dx, dz) * 1000) / 1000 }];
+      // gap: from the plot's edge to the road's edge along the line to the nearest road point.
+      const dx = best.at[0] - plot.at[0], dz = best.at[1] - plot.at[1], d = Math.hypot(dx, dz) || 1, y = plot.yaw ?? 0;
+      const reach = Math.abs((dx * Math.cos(y) - dz * Math.sin(y)) / d) * plot.size[0] / 2 + Math.abs((dx * Math.sin(y) + dz * Math.cos(y)) / d) * plot.size[1] / 2;
+      return [{ plot: id, road: best.road, gap: r1(Math.max(0, best.d - best.width / 2 - reach)), side: Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'east' : 'west') : (dz > 0 ? 'south' : 'north'), frontYaw: Math.round(Math.atan2(dx, dz) * 1000) / 1000 }];
     });
     const near = obb(b.site, 40), counts = { built: 0, building: 0, planned: 0 };
     for (const p of plan.plots) { const s = states.get(p.id)?.status ?? 'planned'; counts[s === 'undone' ? 'planned' : s]++; }
