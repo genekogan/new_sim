@@ -40,6 +40,8 @@ export type GodDeps = {
   limitIp: (c: Context, key: string, max: number, windowMs: number) => void;
   verifyUse?: VerifyUse;
   lookWorldUrl?: string; // W2: configured loopback URL, never derived from request headers
+  /** RL6 in-process replay only: false skips the per-token rate windows (authentication still runs). */
+  rateLimit?: boolean;
 };
 
 const codeSchema = z.object({ code: z.string().min(4).max(12) });
@@ -59,7 +61,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     identity.holder = parseHolder(c.req.header('x-eden-god-holder'));
     identities.set(c, identity); d.god.builds.touch(identity.hash, d.god.now()); return identity;
   };
-  const tokenLimit = godTokenLimiter(requireGod);
+  const tokenLimit: ReturnType<typeof godTokenLimiter> = d.rateLimit === false ? c => { requireGod(c); } : godTokenLimiter(requireGod);
   const limitGod: typeof tokenLimit = (c, bucket, max) => { try { tokenLimit(c, bucket, max); } catch (e) { if (e instanceof ApiError && e.status === 429) { e.extra = { ...e.extra, retryAfterMs: Number(e.extra?.retry_after ?? 1) * 1000 }; } throw e; } };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   const optionalBody = async (c: Context) => { const text = await c.req.text(); if (!text.trim()) return {}; try { return JSON.parse(text); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };

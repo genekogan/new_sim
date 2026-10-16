@@ -3947,6 +3947,7 @@ function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
+var CLI_SHAPE = { POS, FLAGS, BOOL, boolsFor };
 var readArg = (r) => r[0] !== void 0 ? existsSync6(r[0]) && !r[0].trim().startsWith("{") ? readFileSync6(r[0], "utf8") : r[0] : readFileSync6(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
@@ -4077,10 +4078,11 @@ ${HELP}`);
       return null;
     }
   })();
+  const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026");
   const record = (out, error) => {
     if (!tr || cmd === "look-shot" || cmd === "look-keeper") return;
     try {
-      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: [cmd, ...argv].join(" ").replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026"), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
+      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: redact([cmd, ...argv].join(" ")), argv: [cmd ?? "help", ...argv].map(redact), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
     } catch {
     }
   };
@@ -4111,6 +4113,7 @@ ${HELP}`);
 }
 export {
   BUILD_API,
+  CLI_SHAPE,
   COMMANDS,
   COMPASS,
   EXAMPLES,

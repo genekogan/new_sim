@@ -1181,6 +1181,8 @@ export function checkArgs(cmd, f, rest) {
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
 }
+/** RL6 replay/lint: the CLI's own reading tables (read-only). */
+export const CLI_SHAPE = { POS, FLAGS, BOOL, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = { doctor: (r, f) => doctor(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
@@ -1232,7 +1234,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const t0 = Date.now();
   // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
   const tr = (() => { try { return load().transcript; } catch { return null; } })();
-  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  // RL6: argv keeps the exact words (a replay cannot recover quoting from the joined cmd).
+  const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, 'god_…');
+  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: redact([cmd, ...argv].join(' ')), argv: [cmd ?? 'help', ...argv].map(redact), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
   if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
   Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else { console.log(JSON.stringify(out, null, 2)); if (!f.json && out?.[OUTPUT_SUFFIX]) console.error(out[OUTPUT_SUFFIX]); } if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });

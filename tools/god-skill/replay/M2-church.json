@@ -1,0 +1,435 @@
+{
+ "run": "M2-church",
+ "genesis": "worlds/templates/eden-district.json",
+ "files": {
+  "defs/gothic-spire-tower.kit.json": "{\n \"name\": \"gothic-spire-tower\",\n \"tags\": [\n  \"church\",\n  \"tower\",\n  \"gothic\",\n  \"landmark\"\n ],\n \"shapes\": [\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    0.4,\n    0\n   ],\n   \"size\": [\n    4.5,\n    0.8,\n    4.5\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#0f0f12\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    8,\n    0\n   ],\n   \"size\": [\n    3.8,\n    16,\n    3.8\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.9,\n    2.2,\n    -1.9\n   ],\n   \"size\": [\n    0.85,\n    4.4,\n    0.85\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#0f0f12\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.9,\n    8.6,\n    -1.9\n   ],\n   \"size\": [\n    0.65,\n    8.4,\n    0.65\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    -1.85,\n    17,\n    -1.85\n   ],\n   \"r\": 0.3,\n   \"h\": 1,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.85,\n    18.8,\n    -1.85\n   ],\n   \"r\": 0.34,\n   \"h\": 2.6,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.85,\n    20.15,\n    -1.85\n   ],\n   \"r\": 0.09,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.9,\n    2.2,\n    1.9\n   ],\n   \"size\": [\n    0.85,\n    4.4,\n    0.85\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#0f0f12\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.9,\n    8.6,\n    1.9\n   ],\n   \"size\": [\n    0.65,\n    8.4,\n    0.65\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    -1.85,\n    17,\n    1.85\n   ],\n   \"r\": 0.3,\n   \"h\": 1,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.85,\n    18.8,\n    1.85\n   ],\n   \"r\": 0.34,\n   \"h\": 2.6,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    -1.85,\n    20.15,\n    1.85\n   ],\n   \"r\": 0.09,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.9,\n    2.2,\n    -1.9\n   ],\n   \"size\": [\n    0.85,\n    4.4,\n    0.85\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#0f0f12\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.9,\n    8.6,\n    -1.9\n   ],\n   \"size\": [\n    0.65,\n    8.4,\n    0.65\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    1.85,\n    17,\n    -1.85\n   ],\n   \"r\": 0.3,\n   \"h\": 1,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    1.85,\n    18.8,\n    -1.85\n   ],\n   \"r\": 0.34,\n   \"h\": 2.6,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.85,\n    20.15,\n    -1.85\n   ],\n   \"r\": 0.09,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.9,\n    2.2,\n    1.9\n   ],\n   \"size\": [\n    0.85,\n    4.4,\n    0.85\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#0f0f12\"\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.9,\n    8.6,\n    1.9\n   ],\n   \"size\": [\n    0.65,\n    8.4,\n    0.65\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    1.85,\n    17,\n    1.85\n   ],\n   \"r\": 0.3,\n   \"h\": 1,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    1.85,\n    18.8,\n    1.85\n   ],\n   \"r\": 0.34,\n   \"h\": 2.6,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    1.85,\n    20.15,\n    1.85\n   ],\n   \"r\": 0.09,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    5.4,\n    0\n   ],\n   \"size\": [\n    4,\n    0.25,\n    4\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#26262d\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    10.2,\n    0\n   ],\n   \"size\": [\n    4,\n    0.25,\n    4\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#26262d\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    16.25,\n    0\n   ],\n   \"size\": [\n    4.3,\n    0.5,\n    4.3\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#26262d\"\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    0,\n    6.3,\n    1.93\n   ],\n   \"polygon\": [\n    [\n     -0.45,\n     0\n    ],\n    [\n     0.45,\n     0\n    ],\n    [\n     0.45,\n     2.221\n    ],\n    [\n     0.43,\n     2.408\n    ],\n    [\n     0.372,\n     2.587\n    ],\n    [\n     0.278,\n     2.75\n    ],\n    [\n     0.152,\n     2.889\n    ],\n    [\n     0,\n     3\n    ],\n    [\n     -0.152,\n     2.889\n    ],\n    [\n     -0.278,\n     2.75\n    ],\n    [\n     -0.372,\n     2.587\n    ],\n    [\n     -0.43,\n     2.408\n    ],\n    [\n     -0.45,\n     2.221\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#22305e\",\n   \"collide\": false,\n   \"glow\": 0.35,\n   \"material\": \"glass\"\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    -0.55,\n    11,\n    1.93\n   ],\n   \"polygon\": [\n    [\n     -0.35,\n     0\n    ],\n    [\n     0.35,\n     0\n    ],\n    [\n     0.35,\n     3.194\n    ],\n    [\n     0.335,\n     3.339\n    ],\n    [\n     0.289,\n     3.479\n    ],\n    [\n     0.216,\n     3.605\n    ],\n    [\n     0.118,\n     3.714\n    ],\n    [\n     0,\n     3.8\n    ],\n    [\n     -0.118,\n     3.714\n    ],\n    [\n     -0.216,\n     3.605\n    ],\n    [\n     -0.289,\n     3.479\n    ],\n    [\n     -0.335,\n     3.339\n    ],\n    [\n     -0.35,\n     3.194\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    0.55,\n    11,\n    1.93\n   ],\n   \"polygon\": [\n    [\n     -0.35,\n     0\n    ],\n    [\n     0.35,\n     0\n    ],\n    [\n     0.35,\n     3.194\n    ],\n    [\n     0.335,\n     3.339\n    ],\n    [\n     0.289,\n     3.479\n    ],\n    [\n     0.216,\n     3.605\n    ],\n    [\n     0.118,\n     3.714\n    ],\n    [\n     0,\n     3.8\n    ],\n    [\n     -0.118,\n     3.714\n    ],\n    [\n     -0.216,\n     3.605\n    ],\n    [\n     -0.289,\n     3.479\n    ],\n    [\n     -0.335,\n     3.339\n    ],\n    [\n     -0.35,\n     3.194\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    0,\n    6.3,\n    -1.87\n   ],\n   \"polygon\": [\n    [\n     -0.45,\n     0\n    ],\n    [\n     0.45,\n     0\n    ],\n    [\n     0.45,\n     2.221\n    ],\n    [\n     0.43,\n     2.408\n    ],\n    [\n     0.372,\n     2.587\n    ],\n    [\n     0.278,\n     2.75\n    ],\n    [\n     0.152,\n     2.889\n    ],\n    [\n     0,\n     3\n    ],\n    [\n     -0.152,\n     2.889\n    ],\n    [\n     -0.278,\n     2.75\n    ],\n    [\n     -0.372,\n     2.587\n    ],\n    [\n     -0.43,\n     2.408\n    ],\n    [\n     -0.45,\n     2.221\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#22305e\",\n   \"collide\": false,\n   \"glow\": 0.35,\n   \"material\": \"glass\"\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    -0.55,\n    11,\n    -1.87\n   ],\n   \"polygon\": [\n    [\n     -0.35,\n     0\n    ],\n    [\n     0.35,\n     0\n    ],\n    [\n     0.35,\n     3.194\n    ],\n    [\n     0.335,\n     3.339\n    ],\n    [\n     0.289,\n     3.479\n    ],\n    [\n     0.216,\n     3.605\n    ],\n    [\n     0.118,\n     3.714\n    ],\n    [\n     0,\n     3.8\n    ],\n    [\n     -0.118,\n     3.714\n    ],\n    [\n     -0.216,\n     3.605\n    ],\n    [\n     -0.289,\n     3.479\n    ],\n    [\n     -0.335,\n     3.339\n    ],\n    [\n     -0.35,\n     3.194\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    0.55,\n    11,\n    -1.87\n   ],\n   \"polygon\": [\n    [\n     -0.35,\n     0\n    ],\n    [\n     0.35,\n     0\n    ],\n    [\n     0.35,\n     3.194\n    ],\n    [\n     0.335,\n     3.339\n    ],\n    [\n     0.289,\n     3.479\n    ],\n    [\n     0.216,\n     3.605\n    ],\n    [\n     0.118,\n     3.714\n    ],\n    [\n     0,\n     3.8\n    ],\n    [\n     -0.118,\n     3.714\n    ],\n    [\n     -0.216,\n     3.605\n    ],\n    [\n     -0.289,\n     3.479\n    ],\n    [\n     -0.335,\n     3.339\n    ],\n    [\n     -0.35,\n     3.194\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    1.93,\n    6.3,\n    0\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.45\n    ],\n    [\n     0,\n     0.45\n    ],\n    [\n     2.221,\n     0.45\n    ],\n    [\n     2.408,\n     0.43\n    ],\n    [\n     2.587,\n     0.372\n    ],\n    [\n     2.75,\n     0.278\n    ],\n    [\n     2.889,\n     0.152\n    ],\n    [\n     3,\n     0\n    ],\n    [\n     2.889,\n     -0.152\n    ],\n    [\n     2.75,\n     -0.278\n    ],\n    [\n     2.587,\n     -0.372\n    ],\n    [\n     2.408,\n     -0.43\n    ],\n    [\n     2.221,\n     -0.45\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#22305e\",\n   \"collide\": false,\n   \"glow\": 0.35,\n   \"material\": \"glass\"\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    1.93,\n    11,\n    -0.55\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.35\n    ],\n    [\n     0,\n     0.35\n    ],\n    [\n     3.194,\n     0.35\n    ],\n    [\n     3.339,\n     0.335\n    ],\n    [\n     3.479,\n     0.289\n    ],\n    [\n     3.605,\n     0.216\n    ],\n    [\n     3.714,\n     0.118\n    ],\n    [\n     3.8,\n     0\n    ],\n    [\n     3.714,\n     -0.118\n    ],\n    [\n     3.605,\n     -0.216\n    ],\n    [\n     3.479,\n     -0.289\n    ],\n    [\n     3.339,\n     -0.335\n    ],\n    [\n     3.194,\n     -0.35\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    1.93,\n    11,\n    0.55\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.35\n    ],\n    [\n     0,\n     0.35\n    ],\n    [\n     3.194,\n     0.35\n    ],\n    [\n     3.339,\n     0.335\n    ],\n    [\n     3.479,\n     0.289\n    ],\n    [\n     3.605,\n     0.216\n    ],\n    [\n     3.714,\n     0.118\n    ],\n    [\n     3.8,\n     0\n    ],\n    [\n     3.714,\n     -0.118\n    ],\n    [\n     3.605,\n     -0.216\n    ],\n    [\n     3.479,\n     -0.289\n    ],\n    [\n     3.339,\n     -0.335\n    ],\n    [\n     3.194,\n     -0.35\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    -1.87,\n    6.3,\n    0\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.45\n    ],\n    [\n     0,\n     0.45\n    ],\n    [\n     2.221,\n     0.45\n    ],\n    [\n     2.408,\n     0.43\n    ],\n    [\n     2.587,\n     0.372\n    ],\n    [\n     2.75,\n     0.278\n    ],\n    [\n     2.889,\n     0.152\n    ],\n    [\n     3,\n     0\n    ],\n    [\n     2.889,\n     -0.152\n    ],\n    [\n     2.75,\n     -0.278\n    ],\n    [\n     2.587,\n     -0.372\n    ],\n    [\n     2.408,\n     -0.43\n    ],\n    [\n     2.221,\n     -0.45\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#22305e\",\n   \"collide\": false,\n   \"glow\": 0.35,\n   \"material\": \"glass\"\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    -1.87,\n    11,\n    -0.55\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.35\n    ],\n    [\n     0,\n     0.35\n    ],\n    [\n     3.194,\n     0.35\n    ],\n    [\n     3.339,\n     0.335\n    ],\n    [\n     3.479,\n     0.289\n    ],\n    [\n     3.605,\n     0.216\n    ],\n    [\n     3.714,\n     0.118\n    ],\n    [\n     3.8,\n     0\n    ],\n    [\n     3.714,\n     -0.118\n    ],\n    [\n     3.605,\n     -0.216\n    ],\n    [\n     3.479,\n     -0.289\n    ],\n    [\n     3.339,\n     -0.335\n    ],\n    [\n     3.194,\n     -0.35\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"extrude\",\n   \"at\": [\n    -1.87,\n    11,\n    0.55\n   ],\n   \"polygon\": [\n    [\n     0,\n     -0.35\n    ],\n    [\n     0,\n     0.35\n    ],\n    [\n     3.194,\n     0.35\n    ],\n    [\n     3.339,\n     0.335\n    ],\n    [\n     3.479,\n     0.289\n    ],\n    [\n     3.605,\n     0.216\n    ],\n    [\n     3.714,\n     0.118\n    ],\n    [\n     3.8,\n     0\n    ],\n    [\n     3.714,\n     -0.118\n    ],\n    [\n     3.605,\n     -0.216\n    ],\n    [\n     3.479,\n     -0.289\n    ],\n    [\n     3.339,\n     -0.335\n    ],\n    [\n     3.194,\n     -0.35\n    ]\n   ],\n   \"h\": 0.06,\n   \"roll\": 1.5708,\n   \"color\": \"#0f0f12\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    16.8,\n    0\n   ],\n   \"r\": 1.85,\n   \"r2\": 1.75,\n   \"h\": 0.6,\n   \"segments\": 8,\n   \"material\": \"metal\",\n   \"color\": \"#2c7b52\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    23.6,\n    0\n   ],\n   \"r\": 1.75,\n   \"h\": 13.6,\n   \"segments\": 8,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    18,\n    1.45\n   ],\n   \"size\": [\n    0.6,\n    1.1,\n    0.6\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#2c7b52\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    18.95,\n    1.45\n   ],\n   \"r\": 0.45,\n   \"h\": 0.8,\n   \"segments\": 4,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    18,\n    -1.45\n   ],\n   \"size\": [\n    0.6,\n    1.1,\n    0.6\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#2c7b52\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    18.95,\n    -1.45\n   ],\n   \"r\": 0.45,\n   \"h\": 0.8,\n   \"segments\": 4,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    1.45,\n    18,\n    0\n   ],\n   \"size\": [\n    0.6,\n    1.1,\n    0.6\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#2c7b52\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    1.45,\n    18.95,\n    0\n   ],\n   \"r\": 0.45,\n   \"h\": 0.8,\n   \"segments\": 4,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    -1.45,\n    18,\n    0\n   ],\n   \"size\": [\n    0.6,\n    1.1,\n    0.6\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#2c7b52\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    -1.45,\n    18.95,\n    0\n   ],\n   \"r\": 0.45,\n   \"h\": 0.8,\n   \"segments\": 4,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    30.5,\n    0\n   ],\n   \"r\": 0.22,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    31.2,\n    0\n   ],\n   \"size\": [\n    0.09,\n    1.2,\n    0.09\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    31.4,\n    0\n   ],\n   \"size\": [\n    0.6,\n    0.09,\n    0.09\n   ],\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  }\n ]\n}",
+  "defs/gothic-buttress.kit.json": "{\n \"name\": \"gothic-buttress\",\n \"tags\": [\n  \"church\",\n  \"gothic\",\n  \"buttress\"\n ],\n \"shapes\": [\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    1.8,\n    0\n   ],\n   \"size\": [\n    0.9,\n    3.6,\n    1.6\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"kind\": \"wedge\",\n   \"at\": [\n    0,\n    3.85,\n    0.45\n   ],\n   \"size\": [\n    0.9,\n    0.5,\n    0.7\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#26262d\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    4.4,\n    -0.35\n   ],\n   \"size\": [\n    0.75,\n    1.6,\n    0.9\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    4.05,\n    0.45\n   ],\n   \"r\": 0.24,\n   \"h\": 0.9,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    5.5,\n    0.45\n   ],\n   \"r\": 0.28,\n   \"h\": 2,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\",\n   \"collide\": false\n  },\n  {\n   \"kind\": \"sphere\",\n   \"at\": [\n    0,\n    6.55,\n    0.45\n   ],\n   \"r\": 0.07,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\",\n   \"collide\": false\n  }\n ]\n}",
+  "batch-buttresses.json": "{\"ops\":[{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-n1\",\"p\":[93.3,12.15],\"r\":3.141592653589793},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-s1\",\"p\":[93.3,25.85],\"r\":0},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-n2\",\"p\":[96.32,12.15],\"r\":3.141592653589793},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-s2\",\"p\":[96.32,25.85],\"r\":0},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-n3\",\"p\":[100.28,12.15],\"r\":3.141592653589793},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-s3\",\"p\":[100.28,25.85],\"r\":0},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-n4\",\"p\":[104.24,12.15],\"r\":3.141592653589793},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-s4\",\"p\":[104.24,25.85],\"r\":0},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-n5\",\"p\":[108.2,12.15],\"r\":3.141592653589793},{\"op\":\"place\",\"def\":\"gothic-buttress@1\",\"name\":\"buttress-s5\",\"p\":[108.2,25.85],\"r\":0}],\"group\":\"black-church\"}",
+  "defs/gothic-west-front.kit.json": "{\n \"name\": \"gothic-west-front\",\n \"tags\": [\n  \"church\",\n  \"gothic\",\n  \"portal\",\n  \"rose-window\"\n ],\n \"shapes\": [\n  {\n   \"collide\": false,\n   \"kind\": \"extrude\",\n   \"at\": [\n    0,\n    0,\n    0.08\n   ],\n   \"polygon\": [\n    [\n     -1.45,\n     2.15\n    ],\n    [\n     1.45,\n     2.15\n    ],\n    [\n     1.45,\n     2.6\n    ],\n    [\n     1.425,\n     2.979\n    ],\n    [\n     1.351,\n     3.351\n    ],\n    [\n     1.229,\n     3.71\n    ],\n    [\n     1.061,\n     4.05\n    ],\n    [\n     0.851,\n     4.365\n    ],\n    [\n     0.601,\n     4.651\n    ],\n    [\n     0.315,\n     4.901\n    ],\n    [\n     0,\n     5.111\n    ],\n    [\n     -0.315,\n     4.901\n    ],\n    [\n     -0.601,\n     4.651\n    ],\n    [\n     -0.851,\n     4.365\n    ],\n    [\n     -1.061,\n     4.05\n    ],\n    [\n     -1.229,\n     3.71\n    ],\n    [\n     -1.351,\n     3.351\n    ],\n    [\n     -1.425,\n     2.979\n    ],\n    [\n     -1.45,\n     2.6\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"material\": \"stone\",\n   \"color\": \"#0b0b0e\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    3.55,\n    0.1\n   ],\n   \"r\": 0.42,\n   \"h\": 0.04,\n   \"pitch\": 1.5708,\n   \"segments\": 12,\n   \"material\": \"glass\",\n   \"color\": \"#8c2232\",\n   \"glow\": 0.5\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"box\",\n   \"at\": [\n    0,\n    2.17,\n    0.12\n   ],\n   \"size\": [\n    2.9,\n    0.12,\n    0.12\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     1.55,\n     2.2,\n     0.18\n    ],\n    [\n     1.55,\n     2.7,\n     0.18\n    ],\n    [\n     1.523,\n     3.105,\n     0.18\n    ],\n    [\n     1.444,\n     3.502,\n     0.18\n    ],\n    [\n     1.314,\n     3.886,\n     0.18\n    ],\n    [\n     1.135,\n     4.25,\n     0.18\n    ],\n    [\n     0.909,\n     4.587,\n     0.18\n    ],\n    [\n     0.642,\n     4.892,\n     0.18\n    ],\n    [\n     0.337,\n     5.159,\n     0.18\n    ],\n    [\n     0,\n     5.385,\n     0.18\n    ],\n    [\n     -0.337,\n     5.159,\n     0.18\n    ],\n    [\n     -0.642,\n     4.892,\n     0.18\n    ],\n    [\n     -0.909,\n     4.587,\n     0.18\n    ],\n    [\n     -1.135,\n     4.25,\n     0.18\n    ],\n    [\n     -1.314,\n     3.886,\n     0.18\n    ],\n    [\n     -1.444,\n     3.502,\n     0.18\n    ],\n    [\n     -1.523,\n     3.105,\n     0.18\n    ],\n    [\n     -1.55,\n     2.7,\n     0.18\n    ],\n    [\n     -1.55,\n     2.2,\n     0.18\n    ]\n   ],\n   \"r\": 0.14,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    -1.55,\n    1.1,\n    0.18\n   ],\n   \"r\": 0.15400000000000003,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    1.55,\n    1.1,\n    0.18\n   ],\n   \"r\": 0.15400000000000003,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     1.8,\n     2.2,\n     0.32\n    ],\n    [\n     1.8,\n     2.7,\n     0.32\n    ],\n    [\n     1.769,\n     3.17,\n     0.32\n    ],\n    [\n     1.677,\n     3.632,\n     0.32\n    ],\n    [\n     1.526,\n     4.078,\n     0.32\n    ],\n    [\n     1.318,\n     4.5,\n     0.32\n    ],\n    [\n     1.056,\n     4.892,\n     0.32\n    ],\n    [\n     0.746,\n     5.246,\n     0.32\n    ],\n    [\n     0.392,\n     5.556,\n     0.32\n    ],\n    [\n     0,\n     5.818,\n     0.32\n    ],\n    [\n     -0.392,\n     5.556,\n     0.32\n    ],\n    [\n     -0.746,\n     5.246,\n     0.32\n    ],\n    [\n     -1.056,\n     4.892,\n     0.32\n    ],\n    [\n     -1.318,\n     4.5,\n     0.32\n    ],\n    [\n     -1.526,\n     4.078,\n     0.32\n    ],\n    [\n     -1.677,\n     3.632,\n     0.32\n    ],\n    [\n     -1.769,\n     3.17,\n     0.32\n    ],\n    [\n     -1.8,\n     2.7,\n     0.32\n    ],\n    [\n     -1.8,\n     2.2,\n     0.32\n    ]\n   ],\n   \"r\": 0.15,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    -1.8,\n    1.1,\n    0.32\n   ],\n   \"r\": 0.165,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    1.8,\n    1.1,\n    0.32\n   ],\n   \"r\": 0.165,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     2.05,\n     2.2,\n     0.46\n    ],\n    [\n     2.05,\n     2.7,\n     0.46\n    ],\n    [\n     2.015,\n     3.235,\n     0.46\n    ],\n    [\n     1.91,\n     3.761,\n     0.46\n    ],\n    [\n     1.738,\n     4.269,\n     0.46\n    ],\n    [\n     1.501,\n     4.75,\n     0.46\n    ],\n    [\n     1.203,\n     5.196,\n     0.46\n    ],\n    [\n     0.849,\n     5.599,\n     0.46\n    ],\n    [\n     0.446,\n     5.953,\n     0.46\n    ],\n    [\n     0,\n     6.251,\n     0.46\n    ],\n    [\n     -0.446,\n     5.953,\n     0.46\n    ],\n    [\n     -0.849,\n     5.599,\n     0.46\n    ],\n    [\n     -1.203,\n     5.196,\n     0.46\n    ],\n    [\n     -1.501,\n     4.75,\n     0.46\n    ],\n    [\n     -1.738,\n     4.269,\n     0.46\n    ],\n    [\n     -1.91,\n     3.761,\n     0.46\n    ],\n    [\n     -2.015,\n     3.235,\n     0.46\n    ],\n    [\n     -2.05,\n     2.7,\n     0.46\n    ],\n    [\n     -2.05,\n     2.2,\n     0.46\n    ]\n   ],\n   \"r\": 0.16,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    -2.05,\n    1.1,\n    0.46\n   ],\n   \"r\": 0.17600000000000002,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    2.05,\n    1.1,\n    0.46\n   ],\n   \"r\": 0.17600000000000002,\n   \"h\": 2.2,\n   \"segments\": 8,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"extrude\",\n   \"at\": [\n    0,\n    0,\n    0.04\n   ],\n   \"polygon\": [\n    [\n     -2.6,\n     5.4\n    ],\n    [\n     2.6,\n     5.4\n    ],\n    [\n     0,\n     7.9\n    ]\n   ],\n   \"h\": 0.06,\n   \"pitch\": -1.5708,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0.12\n   ],\n   \"path\": [\n    [\n     -2.7,\n     5.35,\n     0\n    ],\n    [\n     0,\n     8,\n     0\n    ],\n    [\n     2.7,\n     5.35,\n     0\n    ]\n   ],\n   \"r\": 0.1,\n   \"segments\": 5,\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    0,\n    8.6,\n    0.12\n   ],\n   \"r\": 0.24,\n   \"h\": 1.3,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"box\",\n   \"at\": [\n    -2.75,\n    2.9,\n    0.35\n   ],\n   \"size\": [\n    0.45,\n    5.8,\n    0.45\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    -2.75,\n    6.75,\n    0.35\n   ],\n   \"r\": 0.3,\n   \"h\": 1.9,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    -2.75,\n    7.75,\n    0.35\n   ],\n   \"r\": 0.08,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"box\",\n   \"at\": [\n    2.75,\n    2.9,\n    0.35\n   ],\n   \"size\": [\n    0.45,\n    5.8,\n    0.45\n   ],\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cone\",\n   \"at\": [\n    2.75,\n    6.75,\n    0.35\n   ],\n   \"r\": 0.3,\n   \"h\": 1.9,\n   \"segments\": 6,\n   \"material\": \"metal\",\n   \"color\": \"#3f9e6c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sphere\",\n   \"at\": [\n    2.75,\n    7.75,\n    0.35\n   ],\n   \"r\": 0.08,\n   \"material\": \"metal\",\n   \"color\": \"#c9a54a\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    11,\n    0.06\n   ],\n   \"r\": 1.7,\n   \"h\": 0.05,\n   \"pitch\": 1.5708,\n   \"segments\": 16,\n   \"material\": \"glass\",\n   \"color\": \"#24408f\",\n   \"glow\": 0.45\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"cyl\",\n   \"at\": [\n    0,\n    11,\n    0.08\n   ],\n   \"r\": 0.65,\n   \"h\": 0.05,\n   \"pitch\": 1.5708,\n   \"segments\": 12,\n   \"material\": \"glass\",\n   \"color\": \"#9a2335\",\n   \"glow\": 0.5\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     1.78,\n     11,\n     0.16\n    ],\n    [\n     1.645,\n     11.681,\n     0.16\n    ],\n    [\n     1.259,\n     12.259,\n     0.16\n    ],\n    [\n     0.681,\n     12.645,\n     0.16\n    ],\n    [\n     0,\n     12.78,\n     0.16\n    ],\n    [\n     -0.681,\n     12.645,\n     0.16\n    ],\n    [\n     -1.259,\n     12.259,\n     0.16\n    ],\n    [\n     -1.645,\n     11.681,\n     0.16\n    ],\n    [\n     -1.78,\n     11,\n     0.16\n    ],\n    [\n     -1.645,\n     10.319,\n     0.16\n    ],\n    [\n     -1.259,\n     9.741,\n     0.16\n    ],\n    [\n     -0.681,\n     9.355,\n     0.16\n    ],\n    [\n     0,\n     9.22,\n     0.16\n    ],\n    [\n     0.681,\n     9.355,\n     0.16\n    ],\n    [\n     1.259,\n     9.741,\n     0.16\n    ],\n    [\n     1.645,\n     10.319,\n     0.16\n    ],\n    [\n     1.78,\n     11,\n     0.16\n    ]\n   ],\n   \"r\": 0.16,\n   \"segments\": 6,\n   \"material\": \"stone\",\n   \"color\": \"#33333b\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0.68,\n     11,\n     0.14\n    ],\n    [\n     0.589,\n     11.34,\n     0.14\n    ],\n    [\n     0.34,\n     11.589,\n     0.14\n    ],\n    [\n     0,\n     11.68,\n     0.14\n    ],\n    [\n     -0.34,\n     11.589,\n     0.14\n    ],\n    [\n     -0.589,\n     11.34,\n     0.14\n    ],\n    [\n     -0.68,\n     11,\n     0.14\n    ],\n    [\n     -0.589,\n     10.66,\n     0.14\n    ],\n    [\n     -0.34,\n     10.411,\n     0.14\n    ],\n    [\n     0,\n     10.32,\n     0.14\n    ],\n    [\n     0.34,\n     10.411,\n     0.14\n    ],\n    [\n     0.589,\n     10.66,\n     0.14\n    ],\n    [\n     0.68,\n     11,\n     0.14\n    ]\n   ],\n   \"r\": 0.07,\n   \"segments\": 5,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0.7,\n     11,\n     0.14\n    ],\n    [\n     1.7,\n     11,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0.495,\n     11.495,\n     0.14\n    ],\n    [\n     1.202,\n     12.202,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0,\n     11.7,\n     0.14\n    ],\n    [\n     0,\n     12.7,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     -0.495,\n     11.495,\n     0.14\n    ],\n    [\n     -1.202,\n     12.202,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     -0.7,\n     11,\n     0.14\n    ],\n    [\n     -1.7,\n     11,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     -0.495,\n     10.505,\n     0.14\n    ],\n    [\n     -1.202,\n     9.798,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0,\n     10.3,\n     0.14\n    ],\n    [\n     0,\n     9.3,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  },\n  {\n   \"collide\": false,\n   \"kind\": \"sweep\",\n   \"at\": [\n    0,\n    0,\n    0\n   ],\n   \"path\": [\n    [\n     0.495,\n     10.505,\n     0.14\n    ],\n    [\n     1.202,\n     9.798,\n     0.14\n    ]\n   ],\n   \"r\": 0.06,\n   \"segments\": 4,\n   \"material\": \"stone\",\n   \"color\": \"#18181c\"\n  }\n ]\n}"
+ },
+ "rows": [
+  {
+   "at": "2026-10-15T18:16:15.959Z",
+   "cmd": "help",
+   "file": "transcript.jsonl",
+   "line": 1,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:20.356Z",
+   "cmd": "register http://127.0.0.1:5361/w/district-m2 dev:admin",
+   "file": "transcript.jsonl",
+   "line": 2,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:20.415Z",
+   "cmd": "mint",
+   "file": "transcript.jsonl",
+   "line": 3,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:20.470Z",
+   "cmd": "status",
+   "file": "transcript.jsonl",
+   "line": 4,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:23.349Z",
+   "cmd": "map",
+   "file": "transcript.jsonl",
+   "line": 5,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:27.742Z",
+   "cmd": "defs church",
+   "file": "transcript.jsonl",
+   "line": 6,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:16:27.828Z",
+   "cmd": "find church",
+   "file": "transcript.jsonl",
+   "line": 7,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:04.822Z",
+   "cmd": "examples church-massing",
+   "file": "transcript.jsonl",
+   "line": 8,
+   "recorded": "error",
+   "error": "the world did not serve church-massing.log (404)"
+  },
+  {
+   "at": "2026-10-15T18:17:04.981Z",
+   "cmd": "where 98,19",
+   "file": "transcript.jsonl",
+   "line": 9,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:05.104Z",
+   "cmd": "free 26x22 --near plaza-fountain",
+   "file": "transcript.jsonl",
+   "line": 10,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:27.167Z",
+   "cmd": "build start black-church --title Black Gothic church with green spires --steps shell,spire towers,gothic details,approach,check --at 100,19 --size 32,24 --mass nave 1,0 26x12 h15 gable; north-tower -11,-8 4x4 h28 pyramid; south-tower -11,8 4x4 h28 pyramid",
+   "file": "transcript.jsonl",
+   "line": 11,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:31.387Z",
+   "cmd": "place church --at 100,19 --facing w --name black-church --param w=12 --param d=24 --param porch=2 --param floorHeight=5 --param roofPitch=58 --param material=stone --param wall=#17171b --param trim=#2a2a30 --param roofColor=#1b1d1f --param windows=0.5 --dry",
+   "file": "transcript.jsonl",
+   "line": 12,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:40.123Z",
+   "cmd": "group black-church",
+   "file": "transcript.jsonl",
+   "line": 13,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:40.275Z",
+   "cmd": "place church --at 100,19 --facing w --name black-church --param w=12 --param d=24 --param porch=2 --param floorHeight=5 --param roofPitch=58 --param material=stone --param wall=#17171b --param trim=#2a2a30 --param roofColor=#1b1d1f --param windows=0.5 --param plan={\"floors\":[{\"rooms\":[{\"id\":\"nave\",\"rect\":[0,3.5,12,24]},{\"id\":\"vestry\",\"rect\":[0,0,12,3.5]}],\"doors\":[{\"between\":[\"nave\",\"vestry\"],\"at\":0.85}],\"exterior\":[{\"room\":\"nave\",\"wall\":\"s\",\"kind\":\"door\",\"at\":0.5,\"width\":2.4}]}],\"stairs\":[]}",
+   "file": "transcript.jsonl",
+   "line": 14,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:43.392Z",
+   "cmd": "describe black-church",
+   "file": "transcript.jsonl",
+   "line": 15,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:17:56.065Z",
+   "cmd": "look --at black-church --from sw --out shots/01-shell-sw.png",
+   "file": "transcript.jsonl",
+   "line": 17,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:18:54.212Z",
+   "cmd": "schema --md",
+   "file": "transcript.jsonl",
+   "line": 18,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:16.445Z",
+   "cmd": "build step",
+   "file": "transcript.jsonl",
+   "line": 19,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:16.527Z",
+   "cmd": "define-kit defs/gothic-spire-tower.kit.json",
+   "file": "transcript.jsonl",
+   "line": 20,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:16.606Z",
+   "cmd": "define-kit defs/gothic-buttress.kit.json",
+   "file": "transcript.jsonl",
+   "line": 21,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:20.655Z",
+   "cmd": "place gothic-spire-tower@1 --at 90.3,10.4 --facing w --name north-spire-tower",
+   "file": "transcript.jsonl",
+   "line": 22,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:20.889Z",
+   "cmd": "place gothic-spire-tower@1 --at 90.3,27.6 --facing w --name south-spire-tower",
+   "file": "transcript.jsonl",
+   "line": 23,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:30.839Z",
+   "cmd": "look --at 100,19 --from w --dist 55 --out shots/02-towers-w.png",
+   "file": "transcript.jsonl",
+   "line": 25,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:20:44.943Z",
+   "cmd": "look --at 96,19 --from sw --dist 60 --out shots/03-towers-sw.png",
+   "file": "transcript.jsonl",
+   "line": 27,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:00.644Z",
+   "cmd": "build step",
+   "file": "transcript.jsonl",
+   "line": 28,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:00.733Z",
+   "cmd": "dryrun batch-buttresses.json",
+   "file": "transcript.jsonl",
+   "line": 29,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:04.121Z",
+   "cmd": "act batch-buttresses.json",
+   "file": "transcript.jsonl",
+   "line": 30,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:15.513Z",
+   "cmd": "look --at 88,19 --from w --dist 22 --out shots/04-front-w.png",
+   "file": "transcript.jsonl",
+   "line": 32,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:26.041Z",
+   "cmd": "set black-church --param porch=0",
+   "file": "transcript.jsonl",
+   "line": 33,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:21:26.365Z",
+   "cmd": "describe black-church",
+   "file": "transcript.jsonl",
+   "line": 34,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:22:27.190Z",
+   "cmd": "define-kit defs/gothic-west-front.kit.json",
+   "file": "transcript.jsonl",
+   "line": 35,
+   "recorded": "refused:schema",
+   "expected": "ok",
+   "reason": "the file this command read changed later in the run; the corpus holds its final version"
+  },
+  {
+   "at": "2026-10-15T18:22:31.708Z",
+   "cmd": "define-kit defs/gothic-west-front.kit.json",
+   "file": "transcript.jsonl",
+   "line": 36,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:22:31.831Z",
+   "cmd": "place gothic-west-front@1 --at 88.0,19.01 --facing w --name west-front --dry",
+   "file": "transcript.jsonl",
+   "line": 37,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:22:37.712Z",
+   "cmd": "place gothic-west-front@1 --at 88.0,19.01 --facing w --name west-front",
+   "file": "transcript.jsonl",
+   "line": 38,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:22:44.411Z",
+   "cmd": "look --at 88,19 --from w --dist 30 --out shots/05-front-portal.png",
+   "file": "transcript.jsonl",
+   "line": 40,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:02.466Z",
+   "cmd": "define-kit defs/gothic-west-front.kit.json",
+   "file": "transcript.jsonl",
+   "line": 41,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:09.006Z",
+   "cmd": "build step",
+   "file": "transcript.jsonl",
+   "line": 42,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:09.112Z",
+   "cmd": "place footpath --from black-church --to region-old-town.plaza --width 2.6 --name church-walk --dry",
+   "file": "transcript.jsonl",
+   "line": 43,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:09.173Z",
+   "cmd": "defs footpath",
+   "file": "transcript.jsonl",
+   "line": 44,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:13.878Z",
+   "cmd": "place footpath --path [[87.9,19.01],[83.8,19.01]] --width 2.8 --param material=stone --param edging=true --name church-walk",
+   "file": "transcript.jsonl",
+   "line": 45,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:19.051Z",
+   "cmd": "build step",
+   "file": "transcript.jsonl",
+   "line": 46,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:19.124Z",
+   "cmd": "describe black-church/nave",
+   "file": "transcript.jsonl",
+   "line": 47,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:19.210Z",
+   "cmd": "describe black-church/nave-pew-1-1",
+   "file": "transcript.jsonl",
+   "line": 48,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.343Z",
+   "cmd": "describe black-church/nave-altar",
+   "file": "transcript.jsonl",
+   "line": 49,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.430Z",
+   "cmd": "describe black-church/nave-lectern",
+   "file": "transcript.jsonl",
+   "line": 50,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.518Z",
+   "cmd": "describe black-church/nave-piano",
+   "file": "transcript.jsonl",
+   "line": 51,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.606Z",
+   "cmd": "describe black-church/nave-pew-1-1",
+   "file": "transcript.jsonl",
+   "line": 52,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.693Z",
+   "cmd": "describe black-church/nave-pew-1-2",
+   "file": "transcript.jsonl",
+   "line": 53,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.779Z",
+   "cmd": "describe black-church/nave-pew-6-1",
+   "file": "transcript.jsonl",
+   "line": 54,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.862Z",
+   "cmd": "describe black-church/nave-pew-6-2",
+   "file": "transcript.jsonl",
+   "line": 55,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:27.946Z",
+   "cmd": "describe black-church/nave-lamp-l",
+   "file": "transcript.jsonl",
+   "line": 56,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:23:49.047Z",
+   "cmd": "verify-use black-church --from 80,19 --uses enter,sit",
+   "file": "transcript.jsonl",
+   "line": 57,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:16.133Z",
+   "cmd": "verify-use black-church --seat black-church/nave-pew-1-1 --from 80,19 --uses enter,sit",
+   "file": "transcript.jsonl",
+   "line": 58,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:20.660Z",
+   "cmd": "build done black stone church facing the plaza, two green-spired towers, ten buttresses with green pinnacles, Gothic portal and rose window, stone walk from the plaza; 12 pews (36 seats)",
+   "file": "transcript.jsonl",
+   "line": 59,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:20.695Z",
+   "cmd": "group --off",
+   "file": "transcript.jsonl",
+   "line": 60,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:35.895Z",
+   "cmd": "look --at 99,19 --from sw --span 50 --out shots/wide-sw.png",
+   "file": "transcript.jsonl",
+   "line": 62,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:41.965Z",
+   "cmd": "look --at 88,19 --from w --dist 24 --out shots/closeup-front.png",
+   "file": "transcript.jsonl",
+   "line": 64,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:24:58.798Z",
+   "cmd": "look --at 96,19 --from sw --dist 95 --out shots/wide-sw-full.png",
+   "file": "transcript.jsonl",
+   "line": 66,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:25:04.750Z",
+   "cmd": "look --at black-church --inside --floor 0 --from sw --out shots/interior-pews.png",
+   "file": "transcript.jsonl",
+   "line": 68,
+   "recorded": "ok"
+  },
+  {
+   "at": "2026-10-15T18:25:18.859Z",
+   "cmd": "look --at black-church --inside --floor 0 --from se --out shots/interior-pews.png",
+   "file": "transcript.jsonl",
+   "line": 70,
+   "recorded": "ok"
+  }
+ ]
+}
