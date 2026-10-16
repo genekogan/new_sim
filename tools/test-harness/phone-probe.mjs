@@ -118,8 +118,8 @@ const release = await chromeLease('phones-probe');
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-precise-memory-info', '--explicitly-allowed-ports=6000'] });
 const results = [];
 try {
-  for (const url of urls) {
-    const tag = `${new URL(url).pathname.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}-${label}`;
+  for (const [ui, url] of urls.entries()) {
+    const tag = `${new URL(url).pathname.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}-${label}-${new URL(url).searchParams.get('quality') ?? 'auto'}-${ui}`;
     const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: dpr, isMobile: true, hasTouch: true, userAgent: UA });
     await ctx.addInitScript((name) => { try { localStorage.setItem('sim.dev', name); } catch {} }, opt('name', 'admin'));
     await ctx.addInitScript(INIT);

@@ -67,7 +67,7 @@ import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, type Simplifier } from './WorldMeshLod.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -235,7 +235,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // Lane phones (V4): a phone draws fewer pixels, a smaller shadow map and less far detail (quality-tier.ts).
     const quality=browserQuality(),distanceDetail=quality.detail?new WorldDistanceDetail(quality.detail):null;
     const meshLod=quality.detail?new WorldMeshLod(PHONE_MESH_LOD,()=>import('meshoptimizer/simplifier').then(async m=>{await m.MeshoptSimplifier.ready;return m.MeshoptSimplifier.supported?m.MeshoptSimplifier as unknown as Simplifier:null;})):null;
-    (window as unknown as {__simQuality?:unknown}).__simQuality={tier:quality.tier,reason:quality.reason,maxPixelRatio:quality.maxPixelRatio,detail:()=>distanceDetail?{...distanceDetail.stats}:null,lod:()=>meshLod?{...meshLod.stats}:null};
+    (window as unknown as {__simQuality?:unknown}).__simQuality={tier:quality.tier,reason:quality.reason,maxPixelRatio:quality.maxPixelRatio,detail:()=>distanceDetail?{...distanceDetail.stats}:null,lod:()=>meshLod?{...meshLod.stats}:null,standIns:()=>farStandIns?{...farStandIns.stats}:null};
     renderer.setPixelRatio(Math.min(devicePixelRatio, quality.maxPixelRatio));
     const adaptive=newWorld?new AdaptiveResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio)):null;if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // lane PERF: new worlds step the pixel ratio down on a slow GPU
     renderer.shadowMap.enabled = true;
@@ -258,6 +258,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     host.appendChild(labels2d.domElement);
 
     const scene = new THREE.Scene();
+    const farStandIns=quality.detail?new WorldFarStandIns(PHONE_STAND_INS,rendererSnapshotter(renderer)):null;if(farStandIns)scene.add(farStandIns.group);  // lane phones: flat cards for far scattered things
     const staticBatches=new StaticBatchOwner(scene),batchEnabled=new URLSearchParams(location.search).get('staticBatches')!=='0';
     let batchGeometry:WorldGeometry|null=null,batchRevision=-1,batchGeneration=0;
     // Far plane covers the whole ±900 m terrain from anywhere in Eden: a nearer far plane slices the distant
@@ -846,7 +847,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       expansion?.wallFrames.update(camera,expansion.group.visible&&!past.current);
       // Initial required attachments are prepared together, never per GLB.
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
-      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render())renderer.render(scene,camera);}finally{meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render())renderer.render(scene,camera);}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
       if(batchEnabled)staticBatches.withRender(draw);else draw();
       shadowDetail?.restore();
       idleLife.restore();
@@ -956,7 +957,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();
-      initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();distanceDetail?.dispose();meshLod?.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
+      initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();distanceDetail?.dispose();meshLod?.dispose();farStandIns?.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();
       sceneRequest++;sceneHistory.dispose();
