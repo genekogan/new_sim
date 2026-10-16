@@ -13,7 +13,7 @@ import type { MeshCtx } from './registry.ts';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 const declared = (ctx: MeshCtx, k: string) => Object.hasOwn(ctx.def.params ?? {}, k);
-const STATE_LOOKS = ['open', 'lit', 'on', 'level'] as const;
+const STATE_LOOKS = ['open', 'lit', 'on', 'level', 'moisture'] as const;
 
 export type Look = { sx: number; sy: number; sz: number; taper: number; bend: number; skew: number; tint: string | null; vary: number; condition: string; state: Record<string, unknown> };
 export function lookOf(ctx: MeshCtx): Look | null {
@@ -29,7 +29,7 @@ export function lookOf(ctx: MeshCtx): Look | null {
 }
 /** State only changes the picture when it differs from what the plain build shows (doors closed, flames on, glow on, full). */
 function stateMatters(s: Record<string, unknown>, ctx: MeshCtx) {
-  return s.open === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1);
+  return s.open === true || s.lit === false || (s.on === false && !ctx.def.components.light) || (typeof s.level === 'number' && s.level < 1) || (typeof s.moisture === 'number' && s.moisture < 1);
 }
 
 const matCache = new Map<string, THREE.Material>();
