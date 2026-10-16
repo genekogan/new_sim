@@ -854,7 +854,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         fading.setStates(states);}
       balloonRide.pose(id=>people?.bodyObject(id)??null);
       fading.update(performance.now(),atmosphereSeconds,soulId=>{const id=s.conn.replica.souls.get(soulId)?.entityId,p=id?at.entities[id]?.p:null;return p?new THREE.Vector3(p[0],p[1],p[2]):null;},
-        soulId=>{const id=s.conn.replica.souls.get(soulId)?.entityId;return id?people?.bodyObject(id)??null:null;});
+        // travel keeps the departed Soul's entity (idle fades remove it), so every way a body is drawn must be hidden:
+        // a humanoid, a rigid floater (creatures) or the simple stand-in figure
+        soulId=>{const id=s.conn.replica.souls.get(soulId)?.entityId;return id?people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null:null;});
       // Idle life: breathing, weight shifts, head turns, speaking nods (render-time only).
       idleSouls.length=0;if(!past.current){const nowMs=Date.now();for(const soul of s.conn.replica.souls.values()){const e=at.entities[soul.entityId];if(!e)continue;
         idleSouls.push({id:soul.id,root:people?.bodyObject(soul.entityId)??null,p:e.p,yaw:e.yaw??0,activity:String(e.activity??'idle'),speaking:speeches.some(sp=>sp.speaker===soul.id&&nowMs-sp.at<4000),attention:attentionTargets.get(soul.id)});}}
