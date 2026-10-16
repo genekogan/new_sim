@@ -68,10 +68,40 @@ Before such publication, retain a reviewed per-file provenance record containing
   namespace; a matching slug or byte hash in another world does not inherit authorization. A legacy shared source URL
   such as `/browser/campus.glb?v=20260922b` needs a mapping restricted to its reviewed world page, not a global alias.
 
-That record enables a later bounded world-scoped publishing change. The current publisher/client support the shared
-CC0/own-work layout only; they do not implement these example scoped keys or permissions. This follow-up adds no approval,
-mapping, allowlist entry or upload for any excluded asset. The release owner must preserve scoped rights when implementing
-and verifying that path; it cannot silently fall through to the shared catalogue.
+### World-scoped publication (implemented, lane cdn2)
+
+`world-scoped.json` is that reviewed record for 17 objects / 128,764,392 bytes / 23 served paths: the Mars campus
+(`/browser/campus.glb?v=20260922b`, 675f4beb…, 70,772,556 B) and its BLOBS copy (`/blobs/assets/64/64b8838c….glb`,
+41,803,240 B) for `/w/mars`, and 13 Little Martians scans plus 2 ceramic buildings for `/w/littlemartians`. The Mars fork's
+corrected campus (909504a4…) is held. Keys are `assets<world>/<sha256>.<ext>` (e.g. `assets/w/mars/675f4beb….glb`), licence
+`world-scoped`, metadata `x-amz-meta-world`. The client maps them only from the manifest's `worlds['<world>']` section, by exact
+path and version query, on that world's own page; they never enter `assets` or the shared hash aliases.
+
+`world-scoped.mjs`: `plan` (dry run, no network or credentials) · `evidence` (read-only public GET of every served path) ·
+`apply` (re-fetches each served URL and uploads exactly those bytes; a path that no longer serves the recorded bytes is
+`not-served`, never uploaded or mapped; HEAD → `If-None-Match: *` PUT → authenticated readback, as above) · `manifest`
+(merges only receipt-verified paths into `worlds`). `verify.mjs` accepts the world-scoped keys.
+
+Local proof (no credentials, no R2): `world-scoped-proof.mjs serve` runs the Mars launcher on lane port 6140 (port-remap
+preload; never the live 4963), the real `publishScoped` into an on-disk stand-in bucket, and serves it as the CDN on 6141;
+`check` loads `/w/mars` in real Chrome at dpr 1 and 2 with the CDN up (campus from the CDN, origin campus never requested),
+unreachable and corrupt (origin fallback). See the file header for the exact commands.
+
+Release-owner commands (from a checkout with this branch merged; `T=<team>/scratch/cdn/world-scoped-<UTC stamp>`,
+a new directory per attempt; `apply`'s evidence GETs ~135 MB from https://sim.eden.art):
+
+```sh
+mkdir -p $T
+node tools/cdn/world-scoped.mjs plan --out $T/plan.json                                   # dry run; review it
+node tools/cdn/world-scoped.mjs evidence --plan $T/plan.json --out $T/evidence.json       # read-only; must say ok:true
+EDEN_ASSETS_CREDENTIALS=<private-secrets>/eden-assets-r2.env \
+  node tools/cdn/world-scoped.mjs apply --plan $T/plan.json --receipt $T/receipt.json      # the only credentialed step
+node tools/cdn/verify.mjs https://assets.eden.art $T/plan.json --sample 17 --out $T/cache-proof.json
+node tools/cdn/world-scoped.mjs manifest --receipt $T/receipt.json --base apps/web/src/cdn-manifest.json
+```
+
+Then commit the merged `apps/web/src/cdn-manifest.json` (it gains only a `worlds` section) and ship the web build through the
+normal release path. Rollback is the previous manifest; the uploaded objects are immutable and unreferenced without it.
 
 ## Upload and verification
 

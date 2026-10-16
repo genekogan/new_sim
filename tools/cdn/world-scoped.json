@@ -1,0 +1,406 @@
+{
+ "version": 1,
+ "schema": "cdn-world-scoped/1",
+ "note": "Reviewed per-file provenance for world-scoped CDN delivery (tools/cdn/README.md). Each object is published only for its own world page, under assets<world>/<sha>.<ext>, and only after apply re-fetches its exact bytes from the public served URL. Nothing here is CC0 or enters the shared catalogue.",
+ "origin": "https://sim.eden.art",
+ "liveRelease": {
+  "source": "1080cfa9ffc5965c15f22aa1228b0dfaadb5c86c",
+  "runtime": "<team>/runtime/convergence-1080cfa9",
+  "proof": "team/reviews/SIM-CONVERGENCE-RELEASE-1080CFA9.json"
+ },
+ "authorization": {
+  "ref": "team/lanes/t3-cdn2.md brief (release owner, 2026-10-16): Gene's default via the release owner",
+  "permits": "CDN delivery of files the live site already serves publicly to a world, for that same world only, under its own world-scoped key. Never the shared catalogue or shared /assets/<sha> aliases. Rights, audience and reuse terms are unchanged.",
+  "whyWithinAuthority": "Every object is a file the world page already requests and the public origin already serves to anyone; the CDN copy is byte-identical (SHA-256 checked at apply and in the browser), reachable only by its world page mapping, and its audience (anyone with the URL) is the same as the origin URL's.",
+  "preparedBy": "lane cdn2 (Claude worker)",
+  "preparedAt": "2026-10-16",
+  "reviewer": "release owner (L1) confirms by running apply; recorded in the receipt"
+ },
+ "worlds": {
+  "/w/mars": {
+   "slug": "mars",
+   "namespace": "root",
+   "worldId": "mars-2026-1",
+   "page": "https://sim.eden.art/w/mars",
+   "audience": "public: anyone who opens the world page",
+   "descriptor": "<team>/runtime/convergence-1080cfa9/successor-mars-descriptor.json"
+  },
+  "/w/littlemartians": {
+   "slug": "littlemartians",
+   "namespace": "root",
+   "worldId": "littlemartians-1",
+   "page": "https://sim.eden.art/w/littlemartians",
+   "audience": "public: anyone who opens the world page",
+   "descriptor": "<team>/runtime/convergence-1080cfa9/successor-littlemartians-descriptor.json"
+  }
+ },
+ "held": [
+  {
+   "world": "/worlds/w/mars",
+   "paths": [
+    "/blobs/assets/90/909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976.glb"
+   ],
+   "sha256": "909504a44dc358530fd5b426e6068100a65b6bad7686caefa2e73c77af844976",
+   "bytes": 41912564,
+   "reason": "The Mars fork corrected campus (apps/web/src/mars-fork.ts). Its /worlds world identity and live serving are not recorded locally; add it with its /worlds registry worldId once confirmed."
+  }
+ ],
+ "objects": [
+  {
+   "world": "/w/mars",
+   "paths": [
+    "/browser/campus.glb?v=20260922b"
+   ],
+   "sha256": "675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4",
+   "bytes": 70772556,
+   "localSource": "<team>/runtime/convergence-1080cfa9/mars-web/browser/campus.glb",
+   "derivation": "Mars College 2026 campus reconstruction (source <mars-campus-repo>/viewer/public/browser/campus.glb, per mars-web/campus-manifest.json); the live root Mars marsWebDir file (STATIC-MANIFEST.json browser/campus.glb)",
+   "referencedBy": [
+    "packages/engine-mars/src/mars-2026-map.ts MARS_2026_BACKDROP_URL (1080cfa9)",
+    "apps/web/src/WorldGeometry.ts addBackdrop fallback after BACKDROP_BLOBS (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Mars College (Gene Kogan)",
+    "status": "no open licence; Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
+    "terms": "Served publicly to visitors of the Mars world on sim.eden.art. No shared-catalogue, redistribution or reuse licence is granted; CDN delivery does not change that.",
+    "attribution": "Mars College 2026 campus reconstruction",
+    "record": "worlds/core-assets/index.json Mars records (licence string quoted in status); team/runtime/convergence-1080cfa9/mars-web/campus-manifest.json"
+   }
+  },
+  {
+   "world": "/w/mars",
+   "paths": [
+    "/blobs/assets/64/64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034.glb"
+   ],
+   "sha256": "64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034",
+   "bytes": 41803240,
+   "localSource": null,
+   "derivation": "tools/blobs/shrink-campus.mjs re-encoding of 675f4beb (quantized + WebP + meshopt; lane BLOBS 2026-10-11), staged on eden2 /srv/sim-blobs. No local copy: bytes come only from the public served URL at apply time.",
+   "referencedBy": [
+    "apps/web/src/WorldGeometry.ts BACKDROP_BLOBS (first campus candidate, 1080cfa9)",
+    "apps/web/src/initial-assets.json worlds.mars (41803240 bytes, measured 2026-10-11)"
+   ],
+   "rights": {
+    "holder": "Mars College (Gene Kogan)",
+    "status": "no open licence; Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
+    "terms": "Served publicly to visitors of the Mars world on sim.eden.art. No shared-catalogue, redistribution or reuse licence is granted; CDN delivery does not change that.",
+    "attribution": "Mars College 2026 campus reconstruction",
+    "record": "worlds/core-assets/index.json Mars records (licence string quoted in status); team/runtime/convergence-1080cfa9/mars-web/campus-manifest.json"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/verdelis.glb"
+   ],
+   "sha256": "881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa",
+   "bytes": 2076432,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/verdelis.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan verdelis--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kalama.glb"
+   ],
+   "sha256": "753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73",
+   "bytes": 1386044,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kalama.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan kalama--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kweku.glb"
+   ],
+   "sha256": "9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5",
+   "bytes": 1014384,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kweku.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan kweku--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/mycos.glb"
+   ],
+   "sha256": "411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf",
+   "bytes": 939644,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/mycos.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan mycos--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/ada.glb"
+   ],
+   "sha256": "d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c",
+   "bytes": 952780,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/ada.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan ada--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/shuijing.glb"
+   ],
+   "sha256": "b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c",
+   "bytes": 916388,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/shuijing.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan shuijing--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/nyx.glb"
+   ],
+   "sha256": "ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb",
+   "bytes": 1041840,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/nyx.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan nyx--characters (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/green-patterns-blue.glb",
+    "/world-assets/littlemartians/characters/green-patterns-blue.glb"
+   ],
+   "sha256": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+   "bytes": 927776,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/green-patterns-blue.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan green-patterns-blue--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/chebel.glb",
+    "/world-assets/littlemartians/characters/chebel.glb"
+   ],
+   "sha256": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+   "bytes": 759124,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/chebel.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan chebel--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/colors-lemuet.glb",
+    "/world-assets/littlemartians/characters/colors-lemuet.glb"
+   ],
+   "sha256": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+   "bytes": 1148980,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/colors-lemuet.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan colors-lemuet--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/crystal-freeman.glb",
+    "/world-assets/littlemartians/characters/crystal-freeman.glb"
+   ],
+   "sha256": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+   "bytes": 892012,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/crystal-freeman.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan crystal-freeman--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/dark-blue.glb",
+    "/world-assets/littlemartians/characters/dark-blue.glb"
+   ],
+   "sha256": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+   "bytes": 1101080,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/dark-blue.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan dark-blue--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/characters/kin/green-brains-out.glb",
+    "/world-assets/littlemartians/characters/green-brains-out.glb"
+   ],
+   "sha256": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+   "bytes": 1107956,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/characters/kin/green-brains-out.glb",
+   "derivation": "tools/floaters/build-assets.mjs rebuild of the archive ceramic scan green-brains-out--ceramic-heads (manifest.json models[].source)",
+   "referencedBy": [
+    "apps/web/src/LiveWorld.tsx FloaterView/KinScenery baseUrl /world-assets/littlemartians/characters/ (1080cfa9)",
+    "apps/server/src/edge/body/routes.ts body modelUrl strips kin/ (1080cfa9)"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+    "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+    "attribution": "Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/littlemartians/characters/manifest.json models[].license (identical for every model)"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/buildings/ceramic-tower.glb"
+   ],
+   "sha256": "658f17cb0d2fd323c194f30f1a1c7f0150d5a68f5401bdb03732516751517875",
+   "bytes": 1093356,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/buildings/ceramic-tower.glb",
+   "derivation": "tools/buildings/generate.py, after Vanessa Rosa's ceramics (core index source)",
+   "referencedBy": [
+    "worlds/littlemartians/scene.json buildings[] via apps/web/src/WorldGeometry.ts buildingUrl (1080cfa9)",
+    "apps/web/src/initial-assets.json worlds.littlemartians"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open licence; Vanessa Rosa (Little Martians); private to this project \u2014 not for redistribution outside it without the artist's permission",
+    "terms": "Procedural buildings after Vanessa Rosa's ceramics, served publicly to visitors of the Little Martians world. Not for redistribution outside this project without the artist's permission; CDN delivery does not change that.",
+    "attribution": "after Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/core-assets/index.json ceramic-tower/minaret-temple records"
+   }
+  },
+  {
+   "world": "/w/littlemartians",
+   "paths": [
+    "/world-assets/littlemartians/buildings/minaret-temple.glb"
+   ],
+   "sha256": "78446d149b6d4ef4156b9ee90c4fb046e9c0c7275ef4e88dc3154b9450d15ac7",
+   "bytes": 830800,
+   "localSource": "<team>/runtime/convergence-1080cfa9/source/worlds/littlemartians/buildings/minaret-temple.glb",
+   "derivation": "tools/buildings/generate.py, after Vanessa Rosa's ceramics (core index source)",
+   "referencedBy": [
+    "worlds/littlemartians/scene.json buildings[] via apps/web/src/WorldGeometry.ts buildingUrl (1080cfa9)",
+    "apps/web/src/initial-assets.json worlds.littlemartians"
+   ],
+   "rights": {
+    "holder": "Vanessa Rosa (Little Martians)",
+    "status": "no open licence; Vanessa Rosa (Little Martians); private to this project \u2014 not for redistribution outside it without the artist's permission",
+    "terms": "Procedural buildings after Vanessa Rosa's ceramics, served publicly to visitors of the Little Martians world. Not for redistribution outside this project without the artist's permission; CDN delivery does not change that.",
+    "attribution": "after Little Martians ceramics by Vanessa Rosa",
+    "record": "worlds/core-assets/index.json ceramic-tower/minaret-temple records"
+   }
+  }
+ ]
+}
