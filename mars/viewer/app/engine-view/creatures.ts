@@ -8,7 +8,7 @@
 //   settle — the species' rest (duck sits, snail withdraws into its shell, dog lies down), eased in and out
 // Model space: +X forward (the engine's yaw-0 direction), +Y up, ground at y = 0.
 import * as THREE from 'three';
-import type { CreatureId } from '../../engine/bodies/creatures.ts';
+import { CREATURES, type CreatureId } from '../../engine/bodies/creatures.ts';
 import { SWIM_ROOT_BELOW } from '../../engine/spatial/ground.ts';
 
 export type CreatureMode = 'idle' | 'walk' | 'swim' | 'settle';
@@ -52,6 +52,8 @@ const approach = (from: number, to: number, rate: number, dt: number) => from + 
 abstract class Rig implements CreatureRig {
   abstract readonly species: CreatureId;
   readonly root = new THREE.Group();
+  /** Drawn size (species table); the root is scaled by it, and waterline offsets scale with it. */
+  scale = 1;
   protected settle = 0;
   protected swim = 0;
   protected phase = 0;
@@ -98,7 +100,7 @@ class DuckRig extends Rig {
     });
     this.root.add(this.body, ...this.legs);
   }
-  lift(mode: CreatureMode) { return mode === 'swim' ? SWIM_ROOT_BELOW - 0.14 : 0; }
+  lift(mode: CreatureMode) { return mode === 'swim' ? SWIM_ROOT_BELOW - 0.14 * this.scale : 0; }
   protected pose(f: CreatureFrame, g: number, amp: number) {
     const s = this.settle, w = this.swim, t = f.t;
     const breathe = 1 + 0.015 * Math.sin(t * 2.4);
@@ -205,7 +207,7 @@ class DogRig extends Rig {
     });
     this.root.add(this.body);
   }
-  lift(mode: CreatureMode) { return mode === 'swim' ? SWIM_ROOT_BELOW - 0.42 : 0; }
+  lift(mode: CreatureMode) { return mode === 'swim' ? SWIM_ROOT_BELOW - 0.42 * this.scale : 0; }
   protected pose(f: CreatureFrame, g: number, amp: number) {
     const s = this.settle, w = this.swim, t = f.t;
     // trot: diagonal pairs (front-left with hind-right) swing together; the knee folds as the leg comes forward
@@ -232,5 +234,6 @@ class DogRig extends Rig {
 export function buildCreature(species: CreatureId): CreatureRig {
   const rig = species === 'duck' ? new DuckRig() : species === 'snail' ? new SnailRig() : new DogRig();
   rig.root.name = `creature:${species}`;
+  rig.scale = CREATURES[species].scale; rig.root.scale.setScalar(rig.scale);
   return rig;
 }

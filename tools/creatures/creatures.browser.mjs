@@ -137,6 +137,7 @@ try {
     assert.ok(r.value?.accepted, JSON.stringify(r.value)); await wait(4000); return 'settled';
   });
   for (const dpr of [1, 2]) await shoot('shelly-settled', 'Shelly', dpr, 14);
+  report.pipStatus = agent('status').slice(0, 1500); // what Pip's own agent reads while swimming
   report.finishedAt = new Date().toISOString();
   assert.deepEqual(report.pageErrors, [], 'no page errors');
 } finally {

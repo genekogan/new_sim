@@ -14,6 +14,9 @@ export type CreatureId = 'duck' | 'snail' | 'dog';
 export type CreatureSpecies = {
   id: CreatureId;
   name: string;
+  /** Drawn size relative to the rig's natural model (a resident must read at the camera's closest follow distance:
+   *  the duck is a big farmyard duck, the snail one of Gene's "large snails"). */
+  scale: number;
   /** Footprint radius (m) the route planner and clearance checks use. */
   radius: number;
   /** Eye height above the ground pose (m); stored as the body's hoverHeight (labels, eyes, portraits read it). */
@@ -34,7 +37,7 @@ const NO_HANDS = (who: string, what: string) => `${who} has no hands; ${what}`;
 
 export const CREATURES: Readonly<Record<CreatureId, CreatureSpecies>> = Object.freeze({
   duck: {
-    id: 'duck', name: 'Duck', radius: 0.22, eyeHeight: 0.36, speed: 0.6, swimSpeed: 0.8,
+    id: 'duck', name: 'Duck', scale: 1.5, radius: 0.33, eyeHeight: 0.54, speed: 0.6, swimSpeed: 0.8,
     moves: 'waddle', swims: 'paddle', settles: 'sits down on the ground',
     cannot: {
       hands: NO_HANDS('A duck', 'it can carry nothing and use no tools'),
@@ -45,7 +48,7 @@ export const CREATURES: Readonly<Record<CreatureId, CreatureSpecies>> = Object.f
     },
   },
   snail: {
-    id: 'snail', name: 'Snail', radius: 0.2, eyeHeight: 0.24, speed: 0.15, swimSpeed: null,
+    id: 'snail', name: 'Snail', scale: 2.2, radius: 0.44, eyeHeight: 0.53, speed: 0.15, swimSpeed: null,
     moves: 'slide', swims: null, settles: 'withdraws into its shell',
     cannot: {
       hands: NO_HANDS('A snail', 'it can carry nothing and use no tools'),
@@ -57,7 +60,7 @@ export const CREATURES: Readonly<Record<CreatureId, CreatureSpecies>> = Object.f
     },
   },
   dog: {
-    id: 'dog', name: 'Dog', radius: 0.3, eyeHeight: 0.55, speed: 1.4, swimSpeed: 0.6,
+    id: 'dog', name: 'Dog', scale: 1, radius: 0.3, eyeHeight: 0.55, speed: 1.4, swimSpeed: 0.6,
     moves: 'trot', swims: 'paddle', settles: 'lies down',
     cannot: {
       hands: NO_HANDS('A dog', 'it can carry nothing and use no tools'),
