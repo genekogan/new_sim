@@ -498,6 +498,17 @@ Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` befor
 | `architecture.sealed` | preserve another entrance or clear the named approach |
 | `budget.world` · `budget.region` | use field/measured/limit/fix to reduce or spread construction |
 
+## Co-builders, handing the world on, archiving (the owner only)
+
+The world's launcher serves these; full reference: docs/god/WORLD-OWNER-API.md. Use your god token as the bearer.
+- Invite a co-builder: POST <B>/__sim/worlds/<slug>/cobuilders/invite {} → give your human the returned url to send.
+- Remove one: POST <B>/__sim/worlds/<slug>/cobuilders/remove {"account": "<id>"} (their agents lose access at once).
+- Offer the world to someone: POST <B>/__sim/worlds/<slug>/transfer {"to"?: "<account id>"}; it changes hands only
+  when they sign in and accept, and then every god token, yours included, stops working.
+- Archive (only when your human asks, and repeat the world's slug back to them first):
+  POST <B>/__sim/worlds/<slug>/archive {"confirm": "<slug>"}. Nothing is deleted; the site admin can restore it.
+<B> is the part of the world URL before /w/<slug> (https://sim.eden.art/worlds in production).
+
 ## Manners
 
 - Use the library when it fits the request; author what it lacks; name things; group a request's edits; small batches; look often.
