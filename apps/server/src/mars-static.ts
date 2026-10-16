@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { serveStatic } from '@hono/node-server/serve-static';
 
 const PUBLIC_ORIGIN = 'https://sim.mars.college';
@@ -13,9 +14,12 @@ export function publicMarsAsset(path: string): boolean {
 }
 
 export function mountMarsStatic(app: Hono, root: string) {
-  app.get('/mars-assets/*', serveStatic({ root, rewriteRequestPath: p => p.replace(/^\/mars-assets/, '') }));
+  // Copied GLBs have no precompressed sidecars. Stream gzip for browsers that
+  // accept it, keeping range responses and already encoded bodies untouched.
+  const compressGlb = compress({ encoding: 'gzip', contentTypeFilter: /^model\/gltf-binary(?:;|$)/i });
+  app.get('/mars-assets/*', compressGlb, serveStatic({ root, rewriteRequestPath: p => p.replace(/^\/mars-assets/, '') }));
   for (const pattern of ['/engine/*', '/modular/*', '/models/*', '/history/*', '/2020/*', '/browser/*', '/data/manifest.json']) {
-    app.get(pattern, async (c, next) => {
+    app.get(pattern, compressGlb, async (c, next) => {
       if (!publicMarsAsset(c.req.path)) return c.notFound();
       if (existsSync(join(root, c.req.path))) return serveStatic({ root })(c, next);
       const headers = new Headers();
