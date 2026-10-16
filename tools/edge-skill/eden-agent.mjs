@@ -1139,7 +1139,14 @@ export async function body(cmd,...args){
   else throw new Error('usage: body look [--random [--seed N] | --set key=value ... | --json {...}]');
   const r=ok(await call('/v1/edge/body',{method:'PUT',body:{look}}),'body');return {changed:r.changed,body:r.body};
  }
- if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...]|upload path.glb --type ceramic --license owned --rights-confirmed]');
+ if(cmd==='photo'){ // the profile photo: an automatic straight-on portrait of the current look unless the owner uploaded one
+  const flag=args[0];
+  if(!flag&&!args.length){const r=await clientProfile(load().soul,[],{call});const p=r.profile;return p?{photo:p.photo,source:p.photoSource??(p.photo?'custom':null)}:r;}
+  if(flag==='--auto'&&args.length===1)return clientProfile(load().soul,['photo','auto'],{call});
+  if(flag==='--upload'&&args.length===2)return clientProfile(load().soul,['photo',args[1]],{call});
+  throw new Error('usage: body photo [--auto | --upload portrait.png]');
+ }
+ if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...|--set outfit=<preset>]|photo [--auto|--upload x.png]|upload path.glb --type ceramic --license owned --rights-confirmed]');
  const path=args.shift(),opts={};if(!path)throw new Error('body upload needs a GLB path');
  while(args.length){const flag=args.shift();if(flag==='--rights-confirmed')opts.rightsConfirmed=true;else if(flag==='--type'||flag==='--license'){const value=args.shift();if(!value||value.startsWith('--'))throw new Error(flag+' needs a value');opts[flag.slice(2)]=value;}else throw new Error('Unknown body upload argument: '+flag);}
  if(!['humanoid','ceramic','floater'].includes(opts.type)||!['CC0','owned'].includes(opts.license)||!opts.rightsConfirmed)throw new Error('Upload requires --type humanoid|ceramic|floater --license CC0|owned --rights-confirmed');

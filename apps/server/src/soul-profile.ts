@@ -18,7 +18,7 @@ export class SoulProfiles {
   if(!this.souls.owns(owner,row))throw new ApiError(403,'forbidden','not your soul');this.souls.requireControlReady(row);return row;
  }
  view(id:string){const row=this.host.db.soul(id);if(!row||row.retired_at!==null||row.world_id!==this.host.worldId)throw new ApiError(404,'not-found','no such soul');
-  return {contract:'soul-profile/1',soulId:id,name:row.name,description:row.description,revision:this.host.profileFact(id)?.revision??0,photo:this.host.profilePhoto(id)};
+  return {contract:'soul-profile/1',soulId:id,name:row.name,description:row.description,revision:this.host.profileFact(id)?.revision??0,photo:this.host.profilePhoto(id),photoSource:this.host.profilePhotoSource(id)};
  }
  async update(owner:string,id:string,input:unknown,authority?:AcceptanceGuard){if(authority)checkAcceptanceGuard(authority);const parsed=soulProfileUpdateSchema.safeParse(input);if(!parsed.success)throw new ApiError(400,'invalid','name or description and optional expectedRevision required');
   const row=this.owned(owner,id),old=this.host.profileFact(id),revision=old?.revision??0,p=parsed.data;
@@ -38,6 +38,14 @@ export class SoulProfiles {
    fromRevision:revision,revision:revision+1,fromName:row.name,birthName:old?.birthName??row.name,name:row.name,description:row.description,photo:png.photo});
   await this.commit(owner,fact,png.image,authority);if(authority)checkAcceptanceGuard(authority);return this.view(id);
  }
+ /** Back to the automatic portrait: the owner's uploaded photo is withdrawn (a new profile revision with no photo). */
+ async clearPhoto(owner:string,id:string,authority?:AcceptanceGuard){if(authority)checkAcceptanceGuard(authority);
+  const row=this.owned(owner,id),old=this.host.profileFact(id),revision=old?.revision??0;if(!old?.photo)return this.view(id);
+  const limit=this.souls.limits.allow(`profile-photo:${owner}`,12,3600000);if(!limit.ok)throw new ApiError(429,'rate-limited','too many portrait changes',{retry_after:limit.retryAfter});
+  const fact=soulProfileFactV1Schema.parse({contract:'soul-profile/1',worldId:this.host.worldId,soulId:id,entityId:row.entity_id,owner:row.owner,
+   fromRevision:revision,revision:revision+1,fromName:row.name,birthName:old.birthName??row.name,name:row.name,description:row.description,photo:null});
+  await this.commit(owner,fact,undefined,authority);if(authority)checkAcceptanceGuard(authority);return this.view(id);
+ }
  private async commit(owner:string,fact:SoulProfileFactV1,image?:Buffer,authority?:AcceptanceGuard){
   const guard=()=>{if(authority)checkAcceptanceGuard(authority);const row=this.owned(owner,fact.soulId),m=this.host.minds.get(row.id),body=this.host.engine.world.entities[row.entity_id],thing=this.host.kernel.things[row.id];
    if(row.entity_id!==fact.entityId||row.name!==fact.fromName||(this.host.profileFact(row.id)?.revision??0)!==fact.fromRevision)
@@ -53,7 +61,9 @@ export class SoulProfiles {
    return true;
   });
  }
+ /** Set by AutoPortraits: an automatic portrait's bytes by hash. */
+ autoBytes?:(id:string,hash:string)=>Uint8Array|null;
  photoBytes(id:string,hash:string){const row=this.host.db.soul(id);if(!row||row.world_id!==this.host.worldId||row.retired_at!==null||!/^[a-f0-9]{64}$/.test(hash))return null;
-  const bytes=(this.host.db.db.prepare('SELECT image FROM soul_profile_photos_v1 WHERE world_id=? AND soul_id=? AND hash=?').get(this.host.worldId,id,hash) as {image:Uint8Array}|undefined)?.image;return bytes&&createHash('sha256').update(bytes).digest('hex')===hash?bytes:null;
+  const bytes=(this.host.db.db.prepare('SELECT image FROM soul_profile_photos_v1 WHERE world_id=? AND soul_id=? AND hash=?').get(this.host.worldId,id,hash) as {image:Uint8Array}|undefined)?.image??this.autoBytes?.(id,hash)??undefined;return bytes&&createHash('sha256').update(bytes).digest('hex')===hash?bytes:null;
  }
 }
