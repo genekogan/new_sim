@@ -15,6 +15,7 @@ import { godVersions } from './versions.ts';
 import { mountLandRoutes } from './land.ts';
 import { mountLightningRoutes } from './lightning.ts';
 import { mountLayerRoutes, type GodLayers } from './layers.ts';
+import { mountGovernanceRoutes } from './governance.ts';
 import { vocab } from '@sim/world-compiler';
 import { schemaMarkdown } from '../../../../tools/god-skill/lib/schema-md.mjs';
 import { readFileSync } from 'node:fs';
@@ -136,6 +137,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });
   // LAYERS: GET /v1/world/layers, /v1/world/layers/me (Soul), /v1/god/layers, /v1/god/layers/zone-suggest?use=
   mountLayerRoutes(app, { god: d.god, layers: () => (d.god as unknown as { layers?: GodLayers }).layers, requireGod, soulFromBearer: d.soulFromBearer, categoryOf: (x) => vocab.categoryOf(x as never) });   // GOD-ENV: POST /v1/god/strike   // GOD-ENV: POST /v1/god/land (raise, mountain, valley, move, water, extend …)
+
+  mountGovernanceRoutes(app, { god: d.god, requireGod, soulFromBearer: d.soulFromBearer });   // GOVERN: constitution versions, amendments, prayer states
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
   app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));

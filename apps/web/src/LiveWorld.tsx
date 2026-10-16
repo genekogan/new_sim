@@ -71,6 +71,7 @@ import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
+import { ConstitutionCard } from './god-ui/Constitution.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
@@ -1091,6 +1092,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   return (
     <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, ...(entityWorld ? { position: 'relative' as const } : {}) } : (entityWorld ? { position: 'relative' } : undefined)}>
       {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} />}
+      {entityWorld && <ConstitutionCard />}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}

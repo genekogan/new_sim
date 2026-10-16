@@ -25,6 +25,7 @@ export { listen, ack };
 import { time as envTime, weather as envWeather, strike as envStrike, land as envLand, ENV_FLAGS, ENV_BOOLS, LAND_HELP } from './lib/env.mjs';
 import { secret, SECRET_HELP } from './lib/secret.mjs';
 import { hours, event, own, access, price, currency, give, pay, zone, zoneSuggest, relate, layers, LAYERS_FLAGS, LAYERS_BOOLS, LAYERS_POS, LAYERS_HELP } from './lib/layers.mjs';
+import { amendments, decide, governance, GOV_FLAGS, GOV_POS, GOV_HELP } from './lib/governance.mjs';
 export { schemaMarkdown };
 
 import { SKILL_VERSION } from './lib/version.mjs';
@@ -1280,10 +1281,10 @@ const FLAGS = {
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
   sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
   catalog: 'category has tag page per', find: 'category has tag all', parts: '', recommend: 'per', taxonomy: '',
-  ...LAYERS_FLAGS,
+  ...LAYERS_FLAGS, ...GOV_FLAGS,
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
@@ -1326,6 +1327,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   hours: (r, f) => hours(r[0], f), event: (r, f) => event(r[0], r[1], f), own: (r, f) => own(r[0], r[1], f), access: (r) => access(r[0], r[1]), price: (r, f) => price(r[0], r[1], f), currency: (r) => currency(r[0]),
   give: (r) => give(r[0], r[1]), pay: (r) => pay(r[0], r[1], r[2]), zone: (r, f) => zone(r[0], r[1], f), 'zone-suggest': (r) => zoneSuggest(r[0]), relate: (r, f) => relate(r[0], r[1], r[2], f), layers: (r, f) => layers(f),
   secret: (r) => secret(r[0], r[1]),
+  amendments: (r, f) => amendments(f), decide: (r, f) => decide(r[0], r[1], f), governance: (r, f) => governance(f),
   help: () => HELP,
 };
 for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => ['build', 'group'].includes(name) ? withStateLock(() => fn(r, f)) : fn(r, f));
@@ -1351,6 +1353,7 @@ find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page
 parts:  parts [words] [--json] (parts kept by finished builds, checks and pinned place sha:<hash> --at … hints; also shown at build start)
 ${LAYERS_HELP}
 ${SECRET_HELP}
+${GOV_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {
