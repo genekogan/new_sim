@@ -18,9 +18,9 @@ const place = (name: string, x = 0, z = 0, parent = 'world') => ({ op: 'place', 
 const code = (r: any) => r.failures?.[0]?.code;
 const site = (x: number) => ({ at: [x, 0], size: [60, 60] });
 
-function fixture() {
+function fixture(cobuilders = true) {
   const db = new Db(':memory:'); let now = 1_000_000;
-  const god = new GodMode(db, { worldId: 'cobuild', ownerId: 'owner', tick: () => 0, now: () => now, buildPauseMs: 120_000, assetDir: join(tmpdir(), 'y4b-assets'), emit: () => {} });
+  const god = new GodMode(db, { worldId: 'cobuild', ownerId: 'owner', tick: () => 0, now: () => now, buildPauseMs: 120_000, assetDir: join(tmpdir(), 'y4b-assets'), emit: () => {}, cobuilders });
   const owner = god.mintFor({ id: 'owner', role: 'user' }, 'owner-agent');
   // What the launcher's addGodToken writes for an accepted co-builder pairing.
   const cobuilder = (label: string) => { const token = `god_cobuild_${label.replace(/\W/g, '-')}`; god.store.addToken(hashToken(token), label); return token; };
@@ -213,4 +213,27 @@ test('Y4b × Y5: rewind is a build-wide undo; co-builders rewind only their own 
   const helper = (await f.post(`/v1/god/builds/church/claims/${claim.claim.id}/helper`, f.owner, {})).token as string;
   const routed = await f.call('POST', '/v1/god/builds/church/rewind', helper, { to: 0 }); assert.equal(routed.status, 403); assert.equal(routed.data.code, 'helper.scope');
   assert.equal(code(await f.post('/v1/god/undo?group=church', helper)), 'helper.scope'); assert.ok(f.god.model.get('roof'));
+});
+
+test('Gene 2026-10-16, one god per world: co-builders are off by default; their tokens are refused with a reason, owner and helper rules hold', async t => {
+  const f = fixture(false); t.after(() => f.db.close());
+  assert.equal(f.god.godIdentity(f.alice), null, 'a co-builder token is no god token while co-builders are off');
+  assert.equal(f.god.godFromToken(f.bob), false);
+  for (const [method, path, body] of [['POST', '/v1/god/act', { ops: [place('nope', 50, 50)] }], ['POST', '/v1/god/builds', { id: 'shed', title: 'shed', steps: ['shell'], site: site(300) }], ['GET', '/v1/god/edits?limit=1', undefined]] as const) {
+    const r = await f.call(method, path, f.alice, body); assert.equal(r.status, 403, `${path}: ${r.text}`); assert.equal(r.data.code, 'cobuilder.disabled');
+    assert.match(r.data.message, /one god/);
+  }
+  assert.equal(f.god.model.get('nope'), undefined);
+  assert.equal((await f.call('GET', '/v1/god/status', f.alice)).data.code, 'cobuilder.disabled', 'even status names the reason');
+  assert.equal(f.god.cobuilderRefusal(f.owner), null); assert.equal(f.god.cobuilderRefusal('god_unknown'), null); assert.equal(f.god.cobuilderRefusal(undefined), null);
+  // The owner works as before, and Y5 rewind still refuses helper tokens (by route and through undo --group).
+  const church = await f.start(f.owner, 'church', 0);
+  assert.equal(f.god.as({ identity: f.id(f.owner) }, () => f.god.act({ ops: [place('nave', 10)], build: { ...church, step: 1 } })).accepted, true);
+  const claim = await f.post('/v1/god/builds/church/claims', f.owner, { part: 'nave', root: 'nave' });
+  const helper = (await f.post(`/v1/god/builds/church/claims/${claim.claim.id}/helper`, f.owner, {})).token as string;
+  assert.equal(f.god.cobuilderRefusal(helper), null, "an owner's helper is not a co-builder");
+  const routed = await f.call('POST', '/v1/god/builds/church/rewind', helper, { to: 0 }); assert.equal(routed.status, 403); assert.equal(routed.data.code, 'helper.scope');
+  assert.equal(code(await f.post('/v1/god/undo?group=church', helper)), 'helper.scope'); assert.ok(f.god.model.get('nave'));
+  await f.post(`/v1/god/builds/church/claims/${claim.claim.id}/release`, f.owner, { done: true });
+  const rewound = await f.post('/v1/god/builds/church/rewind', f.owner, { to: 0 }); assert.equal(rewound.ok, true, JSON.stringify(rewound)); assert.equal(f.god.model.get('nave'), undefined);
 });

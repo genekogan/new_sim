@@ -6,6 +6,9 @@
 //  - the owner offers the world to another person (optionally a named account); it changes hands only when that
 //    person signs in and accepts. Then every god token (the old owner's agents, the co-builders') is revoked.
 // Every step is appended to <data>/audit.jsonl. Offer and pairing codes are kept only as hashes.
+// Gene 2026-10-16: one god per world. Co-builders stay in the code for later but are OFF unless the launcher runs with
+// --cobuilders (or SIM_COBUILDERS=1): inviting, accepting a co-builder invitation and co-builder pairing are refused with
+// code `cobuilders-off`; the owner can still list and remove old co-builders, and handover to a new owner works as before.
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { addGodToken, audit, dropGodTokens, hashToken, setWorldOwner } from './worldops.mjs';
@@ -14,7 +17,9 @@ const OFFER_TTL = 7 * 24 * 3600e3, PAIR_TTL = 10 * 60e3;
 const ACCOUNT_RE = /^[A-Za-z0-9_:.-]{3,48}$/;
 const code = (n = 18) => randomBytes(n).toString('base64url');
 
-export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log }) {
+export const COBUILDERS_OFF = { ok: false, code: 'cobuilders-off', message: 'Co-builders are turned off on this site: each world has one god, its owner. To give the world to someone else, the owner hands it over (transfer).' };
+
+export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log, cobuilders = false }) {
   const pairs = new Map(); // user_code → { slug, agent, poll, expires, token? }
   const db = (slug) => join(registry.worldDir(slug), 'sim.db');
   const live = (w) => (w.offers ?? []).filter((o) => o.expires > Date.now());
@@ -40,6 +45,7 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
     if (!a) return [401, { ok: false, code: 'signin-required', message: 'sign in to accept' }];
     if (o.to && o.to !== a.account) return [403, { ok: false, code: 'not-for-you', message: 'this invitation is for another account' }];
     const prev = registry.get(w.slug).offers ?? [];
+    if (o.kind === 'cobuild' && !cobuilders) return [403, COBUILDERS_OFF];
     if (o.kind === 'cobuild') {
       if (isOwner(w, a)) return [409, { ok: false, code: 'owner', message: 'you already own this world' }];
       const cobuilders = [...(w.cobuilders ?? []).filter((c) => c.account !== a.account), { account: a.account, at: Date.now(), by: o.by }];
@@ -67,9 +73,11 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
   return async function route(w, sub, method, body, authorization) {
     if (sub === 'offer' && method === 'GET') {
       const o = findOffer(w, body?.code);
+      if (o?.kind === 'cobuild' && !cobuilders) return [403, COBUILDERS_OFF];
       return o ? [200, { ok: true, kind: o.kind, world: { slug: w.slug, name: w.name }, ...(o.to ? { forAccount: true } : {}), expiresAt: new Date(o.expires).toISOString() }] : [404, { ok: false, code: 'no-offer' }];
     }
     if (sub === 'offer/accept' && method === 'POST') return accept(w, body, authorization);
+    if (sub.startsWith('cobuild/pair/') && !cobuilders) return [403, COBUILDERS_OFF];
     if (sub === 'cobuild/pair/start' && method === 'POST') {
       const userCode = code(6).replace(/[-_]/g, 'x').toUpperCase(), poll = code(24);
       const agent = (typeof body?.agent === 'string' ? body.agent : 'agent').replace(/[^\w .-]/g, '').slice(0, 24) || 'agent';
@@ -103,7 +111,8 @@ export function makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf
     if (ownerOnly[sub] !== method) return null;
     const a = await owner(w, authorization);
     if (!a) return [403, { ok: false, code: 'forbidden', message: "only this world's owner" }];
-    if (sub === 'cobuilders') return [200, { ok: true, cobuilders: w.cobuilders ?? [], offers: live(w).map(({ hash: _h, ...o }) => o) }];
+    if (sub === 'cobuilders') return [200, { ok: true, enabled: cobuilders, cobuilders: w.cobuilders ?? [], offers: live(w).map(({ hash: _h, ...o }) => o) }];
+    if (sub === 'cobuilders/invite' && !cobuilders) return [403, COBUILDERS_OFF];
     if (sub === 'cobuilders/invite') {
       const to = typeof body?.to === 'string' && body.to ? body.to : undefined;
       if (to && !ACCOUNT_RE.test(to)) return [400, { ok: false, code: 'invalid', message: 'to: an account id' }];

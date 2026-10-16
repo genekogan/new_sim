@@ -263,6 +263,8 @@ export function defaultCommand(world, port, o) {
     ...(o.site?.url && o.site?.key ? { SIM_SITE_URL: o.site.url, SIM_SITE_KEY: o.site.key } : {}),
     // M4 shared library: one directory per launcher, <data>/library (Gene 2026-10-16 default)
     ...(o.libraryDir ? { SIM_LIBRARY_DIR: o.libraryDir } : {}),
+    // Y4b co-builder tokens: off unless the launcher runs with --cobuilders (one god per world, Gene 2026-10-16)
+    ...(o.cobuilders ? { SIM_COBUILDERS: '1' } : {}),
   };
   return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }

@@ -24,7 +24,8 @@
 //                                unregister it (never deletes; worldops.mjs). restore-world {id} puts it back; list-archive;
 //                                audit {slug?} reads <data>/audit.jsonl
 //   POST /__sim/worlds/<slug>/archive  the world's owner (signed in, or their own agent's god token): {confirm: <slug>, reason?}
-//   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/: owner: GET cobuilders, POST cobuilders/invite {to?},
+//   co-builders and handoff (handoff.mjs), under /__sim/worlds/<slug>/ (co-builders OFF unless --cobuilders or
+//   SIM_COBUILDERS=1; one god per world, Gene 2026-10-16): owner: GET cobuilders, POST cobuilders/invite {to?},
 //   cobuilders/remove {account}, transfer {to?}, offers/cancel; anyone with the link: GET offer?code=, POST offer/accept
 //   {code} (signed in: that is the consent); a co-builder's agent: POST cobuild/pair/start|poll, approved by the co-builder
 //   (POST cobuild/pair/approve {code}).
@@ -133,7 +134,7 @@ export async function openLauncher(cfg = {}) {
   // with a key made fresh for this run and handed to the children in their environment.
   const siteKey = randomBytes(32).toString('hex');
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
-  const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
+  const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
     maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
@@ -202,7 +203,9 @@ export async function openLauncher(cfg = {}) {
     try { const r = await archiveWorld({ registry, pool, dataDir }, w.slug, by, reason); seen.delete(w.slug); stats.delete(w.slug); log(`archived ${w.slug} → ${r.archive} (by ${by})`); return [200, { ok: true, ...r }]; }
     finally { closing.delete(w.slug); }
   }
-  const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log });
+  // Gene 2026-10-16: one god per world; co-builders are off unless asked for (--cobuilders or SIM_COBUILDERS=1).
+  const cobuilders = cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1';
+  const handoff = makeHandoff({ registry, pool, dataDir, wp, publicOrigin, actorOf, isOwner, closing, log, cobuilders });
   async function ownerArchive(w, body, authorization) {
     const a = await actorOf(w, authorization);
     if (!isOwner(w, a)) return [403, { ok: false, code: 'forbidden', message: "only this world's owner (or the site admin) may archive it" }];
@@ -698,7 +701,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
       maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
-      marsWebDir: flag('mars-web'), webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
+      marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
       ...(underKeeper ? { listen: false, adopt: process.env.SIM_ADOPT ? JSON.parse(process.env.SIM_ADOPT) : null } : {}) });
     let stopping = false;
     const stop = (why) => { if (stopping) return; stopping = true; console.log(`[launcher] ${why}: stopping worlds…`); void l.close().then(() => process.exit(0)); };

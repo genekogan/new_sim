@@ -85,7 +85,10 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     if (token?.startsWith('god_')) {
       const identity = identityOf(c);
       if (identity?.child) { const denied = helperRoute(c.req.method, c.req.path, identity.child); if (denied) throw new ApiError(403, 'helper.scope', denied, { build: identity.child.build, claim: identity.child.claim }); }
-      else if (!identity) { const ended = d.god.helperRefusal(token); if (ended) throw new ApiError(401, 'helper.expired', ended); }
+      else if (!identity) {
+        const off = d.god.cobuilderRefusal(token); if (off) throw new ApiError(403, 'cobuilder.disabled', off);
+        const ended = d.god.helperRefusal(token); if (ended) throw new ApiError(401, 'helper.expired', ended);
+      }
       // Y4b: co-builder tokens (and their helpers) never reach env, weather or lightning, and never mint.
       if (identity?.cobuilder !== undefined) { const denied = cobuilderRoute(c.req.method, c.req.path); if (denied) throw new ApiError(403, 'cobuilder.scope', denied); }
     }

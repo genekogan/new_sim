@@ -1,4 +1,11 @@
-# World owner API: co-builders, handoff, archive
+# World owner API: handoff, archive (co-builders: kept, off)
+
+> **Co-builders are off (Gene, 2026-10-16: one god per world).** The co-builder calls below stay in the code for later
+> but the launcher refuses them with `403 {code: "cobuilders-off"}` unless it runs with `--cobuilders` (or
+> `SIM_COBUILDERS=1`, which it then passes to each world). While off, a `cobuilder:` god token is no god token at all
+> (`/v1/god/*` answers `403 cobuilder.disabled`), an old co-build invitation cannot be shown or accepted, the owner can
+> still list (`enabled: false`) and remove old co-builders, and handoff and archive work as before. The browser hides the
+> co-builder rows.
 
 These calls are served by the world launcher (`tools/world-launcher/handoff.mjs`, `worldops.mjs`), not by the world
 itself. `<B>` is the launcher's base: `https://sim.eden.art/worlds` in production, and empty on a local launcher.
@@ -10,7 +17,7 @@ are refused. The site admin runs `tools/world-launcher/op.mjs` on the launcher's
 through the reverse proxy. Every step is appended to `<data>/audit.jsonl`.
 
 In the browser, the owner finds all of this under the lightning-bolt popover, in the folded section
-"This world: co-builders, hand on, archive".
+"This world: hand on, archive" ("co-builders" joins it only when they are on).
 
 ## Owner
 

@@ -522,18 +522,17 @@ Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` befor
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
 | `build.claim` · `build.claimed` | stay in your scope; `build wait` for others |
 | `helper.scope` · `helper.expired` | a helper token: stay in its claim; when it ends, ask the lead |
-| `cobuilder.scope` | a co-builder token: no env, weather or strike; act only on your account's builds, claims and edits; ask the owner |
+| `cobuilder.disabled` | co-builders are off: each world has one god, its owner; use the owner's own token |
 | `build.lease` · `build.leased` | `build resume <id>`; `--take` only after the lead stops |
 | other `build.*` | follow `fix`; `build show <id>` for state |
 | `site.under-construction` | finish the build before residents use it |
 | `architecture.sealed` | preserve another entrance or clear the named approach |
 | `budget.world` · `budget.region` | use field/measured/limit/fix to reduce or spread construction |
 
-## Co-builders, handing the world on, archiving (the owner only)
+## Handing the world on, archiving (the owner only)
 
+Each world has one god: its owner (through their own agents and helpers). There are no co-builders on this site.
 The world's launcher serves these; full reference: docs/god/WORLD-OWNER-API.md. Use your god token as the bearer.
-- Invite a co-builder: POST <B>/__sim/worlds/<slug>/cobuilders/invite {} → give your human the returned url to send.
-- Remove one: POST <B>/__sim/worlds/<slug>/cobuilders/remove {"account": "<id>"} (their agents lose access at once).
 - Offer the world to someone: POST <B>/__sim/worlds/<slug>/transfer {"to"?: "<account id>"}; it changes hands only
   when they sign in and accept, and then every god token, yours included, stops working.
 - Archive (only when your human asks, and repeat the world's slug back to them first):
