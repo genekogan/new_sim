@@ -60,6 +60,31 @@ test('decals on a shop: wall slots and this world\'s images only; refusals name 
   refused(w, [{ op: 'set', id: 'bakery', params: { decals: Array.from({ length: 17 }, () => ({ slot: 'facade-f0-s-1', w: 1, h: 1, text: 'X' })) } }], /^params\.decals$/, /JSON list/);
 });
 
+test('decals stay on their wall: refused when they hang off its ends, float above the roof, sink below the ground or outgrow it', () => {
+  const w = world(), set = (decal: Record<string, unknown>) => [{ op: 'set', id: 'bakery', params: { decals: [{ text: 'X', ...decal }] } }];
+  assert.equal(act(w, [{ op: 'place', def: 'core/shop@1', name: 'bakery', at: [0, 0], params: { decals: fixtures.shopDecals } }]).result.accepted, true);
+  // The reviewer's probe: a 20 m panel 1000 km above the shop.
+  const float = refused(w, set({ slot: 'facade-f0-s-1', w: 20, h: 20, at: [0, 1e6], text: 'FLOAT' }), /^params\.decals\.0\.w$/, /Shrink w to at most 8\.26/);
+  assert.equal(float.measured, 20);
+  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 1, at: [0, 1e6] }), /^params\.decals\.0\.at$/, /Keep at\[1\] between -0\.9 and 6\.42/);
+  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 0.5, at: [3.5, 0] }), /^params\.decals\.0\.at$/, /Keep at\[0\] between -3\.13 and 3\.13/);
+  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 9 }), /^params\.decals\.0\.h$/, /Shrink h to at most 8\.32/);
+  refused(w, set({ slot: 'opening-front-door', w: 1, h: 0.4, at: [0, -0.5] }), /^params\.decals\.0\.at$/, /Keep at\[1\]/);
+  refused(w, set({ slot: 'gable-s', w: 0.9, h: 0.9, at: [0, 1.5] }), /^params\.decals\.0\.at$/, /Keep at\[1\]/);
+  // Whole facades are fair game: the shop front (8 m wall) edge to edge, and a gable sign up to the roof top.
+  for (const decal of [{ slot: 'facade-f0-s-1', w: 8.2, h: 0.5, at: [0, 1.1] }, { slot: 'facade-f1-s-1', w: 1, h: 0.5, at: [5.5, 0] }, { slot: 'gable-s', w: 1, h: 0.4, at: [0, 0] }, { slot: 'wall-w-1', w: 8.8, h: 0.4, at: [-0.57, 0] }])
+    assert.equal(act(w, set(decal)).result.accepted, true, JSON.stringify(decal));
+  // A turned shop measures along its own front.
+  const turned = world();
+  assert.equal(act(turned, [{ op: 'place', def: 'core/shop@1', name: 'bakery', at: [0, 0], params: { front: 'e', decals: [{ slot: 'opening-front-door', w: 2.2, h: 0.3, at: [0, 2.75], text: 'BAKERY' }] } }]).result.accepted, true);
+  refused(turned, set({ slot: 'opening-front-door', w: 2.2, h: 0.3, at: [4, 2.75] }), /^params\.decals\.0\.at$/, /Keep at\[0\]/);
+  // A round tower's walls are flat chords: a decal fits one chord, never wraps the curve.
+  const tower = world();
+  assert.equal(act(tower, [{ op: 'place', def: 'core/lighthouse@1', name: 'light', at: [0, 0], params: { decals: [{ slot: 'facade-f0-s-1', w: 1.2, h: 0.4, text: 'PIER' }] } }]).result.accepted, true);
+  const wrap = refused(tower, [{ op: 'set', id: 'light', params: { decals: [{ slot: 'facade-f0-s-1', w: 3, h: 0.4, text: 'HARBOUR LIGHT' }] } }], /^params\.decals\.0\.w$/, /Shrink w to at most 1\.59/);
+  assert.match(wrap.detail ?? '', /wider than the wall it sits on/);
+});
+
 test('decal edits undo; a building definition cannot smuggle an external decal default into instances', () => {
   const w = world();
   assert.equal(act(w, [{ op: 'place', def: 'core/shop@1', name: 'bakery', at: [0, 0], params: { decals: fixtures.shopDecals } }]).result.accepted, true);

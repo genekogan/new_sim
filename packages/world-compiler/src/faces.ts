@@ -1,6 +1,7 @@
 // XP8 admission: faces and decals may show only image assets registered to this world (the WD8 sign-media rule), and a
-// building's decals must name one of its own wall slots. Refusals are `params.invalid` with the field and a fix.
-import { FACE_IMAGE, FACE_LIMITS, decalSchema, faceContentIssues, type Slot } from '@sim/generators';
+// building's decals must name one of its own wall slots and stay on that wall. Refusals are `params.invalid` with the
+// field and a fix.
+import { FACE_IMAGE, FACE_LIMITS, GENERATORS, decalSchema, faceContentIssues, type Decal, type Slot } from '@sim/generators';
 import type { WorldModel } from './model.ts';
 import type { Failure, StoredDef } from './schemas.ts';
 
@@ -31,12 +32,49 @@ export function kitFaceFailure(w: WorldModel, def: StoredDef, op: number): Failu
   return null;
 }
 
-/** building/1 decals: a short list of faces, each on one of this building's wall slots, images from this world. */
-export function decalFailure(w: WorldModel, def: StoredDef, decals: unknown, slots: () => readonly Slot[], op: number, entity?: string): Failure | null {
+type Frame = { yaw: number; W: number; D: number; t: number; wallTop: number; roofRise: number; round?: unknown; walls: { a: [number, number]; b: [number, number]; out?: [number, number]; exterior: boolean; thick: number }[] };
+const metres = (v: number) => Math.round(v * 100) / 100;
+/** The building's canonical layout, from the params the bake sees (generator defaults under the instance's own). */
+function frameOf(def: StoredDef, params: Record<string, unknown>): Frame {
+  const g = GENERATORS['building/1'] as unknown as { params: Record<string, { default?: unknown }>; layout(p: Record<string, unknown>, a: Record<string, unknown>): Frame };
+  const defaults = Object.fromEntries(Object.entries(g.params).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
+  return g.layout({ ...defaults, ...params }, (def.make.kind === 'gen' ? def.make.args : undefined) ?? {});
+}
+/** A decal stays on its slot's wall: along the facade line it shares with that wall (a round tower's flat chord), and
+ *  between the ground and the eaves plus roof rise (which covers gables and parapets). */
+function decalFit(L: Frame, slot: Slot, d: Decal, at: string, fail: Fail): Failure | null {
+  const c = Math.cos(L.yaw), s = Math.sin(L.yaw), [px, py, pz] = slot.p, [ax, ay] = d.at ?? [0, 0];
+  const x = px * c - pz * s, z = px * s + pz * c, a = slot.yaw - L.yaw, n = [Math.sin(a), Math.cos(a)], right = [Math.cos(a), -Math.sin(a)];
+  let lo = Infinity, hi = -Infinity;
+  for (const wall of L.walls) {
+    if (!wall.exterior || !wall.out || wall.out[0] * n[0] + wall.out[1] * n[1] < 0.999) continue;
+    const off = (x - wall.a[0]) * wall.out[0] + (z - wall.a[1]) * wall.out[1]; // slots sit just outside the wall's face
+    if (off < -0.05 || off > wall.thick / 2 + 0.1) continue;
+    for (const p of [wall.a, wall.b]) { const t = (p[0] - x) * right[0] + (p[1] - z) * right[1]; lo = Math.min(lo, t); hi = Math.max(hi, t); }
+  }
+  // Rectangular walls end at the corner's centreline (half a wall short of the outer face); round chords already overlap.
+  const tol = L.round ? 0.02 : L.t / 2 + 0.02;
+  if (!Number.isFinite(lo)) { // no wall line found: at least keep the decal at the building's box
+    const qx = x + right[0] * ax, qz = z + right[1] * ax;
+    if (Math.abs(qx) > L.W / 2 + 0.5 || Math.abs(qz) > L.D / 2 + 0.5) return fail(`${at}.at`, d.at, `The decal on ${slot.id} sits ${metres(Math.hypot(qx, qz))} m from the building's centre, outside its walls.`, 'Keep at[0] near 0 so the decal stays on the wall.');
+  } else {
+    lo -= tol; hi += tol;
+    if (d.w > hi - lo + 1e-6) return fail(`${at}.w`, d.w, `A ${d.w} m decal is wider than the wall it sits on (${metres(hi - lo)} m at ${slot.id}).`, `Shrink w to at most ${metres(hi - lo)}, or use a wider wall.`);
+    if (ax - d.w / 2 < lo - 1e-6 || ax + d.w / 2 > hi + 1e-6) return fail(`${at}.at`, d.at, `The decal runs off its wall: it spans ${metres(ax - d.w / 2)}..${metres(ax + d.w / 2)} m along ${slot.id}, the wall ${metres(lo)}..${metres(hi)} m.`, `Keep at[0] between ${metres(lo + d.w / 2)} and ${metres(hi - d.w / 2)}.`);
+  }
+  const top = L.wallTop + L.roofRise, y0 = py + ay - d.h / 2, y1 = py + ay + d.h / 2;
+  if (d.h > top + 1e-6) return fail(`${at}.h`, d.h, `A ${d.h} m decal is taller than the building (${metres(top)} m to the roof top).`, `Shrink h to at most ${metres(top)}.`);
+  if (y0 < -1e-6 || y1 > top + 1e-6) return fail(`${at}.at`, d.at, `The decal floats off the building: it spans ${metres(y0)}..${metres(y1)} m high; walls and roof span 0..${metres(top)} m.`, `Keep at[1] between ${metres(d.h / 2 - py)} and ${metres(top - d.h / 2 - py)} (measured up from ${slot.id}, ${metres(py)} m above the base).`);
+  return null;
+}
+
+/** building/1 decals: a short list of faces, each on one of this building's wall slots and within that wall, images from
+ *  this world. `site.params` are the params the bake sees; `site.slots` its slots. */
+export function decalFailure(w: WorldModel, def: StoredDef, decals: unknown, site: { params: Record<string, unknown>; slots: () => readonly Slot[] }, op: number, entity?: string): Failure | null {
   if (def.make.kind !== 'gen' || def.make.gen !== 'building/1' || decals === undefined || decals === null) return null;
   const fail = failer(op, def, entity);
   if (!Array.isArray(decals) || decals.length > FACE_LIMITS.decals) return fail('params.decals', Array.isArray(decals) ? decals.length : typeof decals, `decals must be a list of at most ${FACE_LIMITS.decals} faces`, 'Pass decals as a JSON list: [{"slot":"facade-f0-s-1","w":2,"h":0.5,"text":"BAKERY"}].');
-  let walls: string[] | undefined;
+  let walls: Slot[] | undefined, frame: Frame | undefined;
   for (const [i, decal] of decals.entries()) {
     const at = `params.decals.${i}`;
     if (record(decal) && decal.image !== undefined) { const failure = imageFailure(w, decal.image, `${at}.image`, fail); if (failure) return failure; }
@@ -48,8 +86,11 @@ export function decalFailure(w: WorldModel, def: StoredDef, decals: unknown, slo
     const content = faceContentIssues(decal as Record<string, unknown>, true)[0];
     if (content) return fail([at, ...content.path].join('.'), (decal as Record<string, unknown>)[String(content.path[0])], content.message, content.fix);
     // Facade frames first (the usual homes for a sign), then opening sills and legacy hang points.
-    walls ??= slots().filter(s => s.kind === 'wall').map(s => s.id).sort((a, b) => rank(a) - rank(b));
-    if (!walls.includes(parsed.data.slot)) return fail(`${at}.slot`, parsed.data.slot, `${parsed.data.slot} is not a wall slot of this building`, `Use one of its wall slots (describe <building> lists them): ${walls.slice(0, 10).join(', ')}${walls.length > 10 ? ', …' : ''}.`);
+    walls ??= site.slots().filter(s => s.kind === 'wall').sort((a, b) => rank(a.id) - rank(b.id));
+    const slot = walls.find(s => s.id === parsed.data.slot);
+    if (!slot) return fail(`${at}.slot`, parsed.data.slot, `${parsed.data.slot} is not a wall slot of this building`, `Use one of its wall slots (describe <building> lists them): ${walls.slice(0, 10).map(s => s.id).join(', ')}${walls.length > 10 ? ', …' : ''}.`);
+    const misfit = decalFit(frame ??= frameOf(def, site.params), slot, parsed.data, at, fail);
+    if (misfit) return misfit;
   }
   return null;
 }

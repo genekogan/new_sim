@@ -557,7 +557,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   for (const e of diff.upserts) {
     const def = scratch.resolvedDef(e.def)!;
     const failure = signMediaFailure(scratch, def, e.state?.media ?? def.state.media?.default, touchedAt.get(e.id) ?? sourceOp(e), e.id)
-      ?? decalFailure(scratch, def, e.params?.decals ?? (def.params.decals as { default?: unknown } | undefined)?.default, () => scratch.slotsOf(e), touchedAt.get(e.id) ?? sourceOp(e), e.id); // XP8 hook
+      ?? decalFailure(scratch, def, e.params?.decals ?? (def.params.decals as { default?: unknown } | undefined)?.default, { params: e.params ?? {}, slots: () => scratch.slotsOf(e) }, touchedAt.get(e.id) ?? sourceOp(e), e.id); // XP8 hook
     if (failure) return { ok: false, failures: [failure] };
   }
   // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
@@ -683,7 +683,7 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
       const shape: Entity['shape'] = resolved.form === 'path' ? { path: [[0, 0], [1, 0]] }
         : resolved.form === 'area' ? { area: [[0, 0], [1, 0], [0, 1]] } : undefined;
       const baked = trial.bake(resolved, params.ok ? params.values : {}, 0, shape);
-      const decals = decalFailure(trial, resolved, params.ok ? params.values.decals : undefined, () => baked.slots, i); // XP8 hook
+      const decals = decalFailure(trial, resolved, params.ok ? params.values.decals : undefined, { params: params.ok ? params.values : {}, slots: () => baked.slots }, i); // XP8 hook
       if (decals) return decals;
       if (baked.tris > lim.budget.tris) return { ...fail(i, 'def.budget', `${baked.tris} tris > ${lim.budget.tris}`), field: 'make', measured: baked.tris, limit: lim.budget.tris, fix: 'Simplify the generated definition.' };
     }
