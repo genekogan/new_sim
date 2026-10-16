@@ -34,6 +34,8 @@ export function kitFaceFailure(w: WorldModel, def: StoredDef, op: number): Failu
 
 type Frame = { yaw: number; W: number; D: number; t: number; wallTop: number; roofRise: number; round?: unknown; walls: { a: [number, number]; b: [number, number]; out?: [number, number]; exterior: boolean; thick: number }[] };
 const metres = (v: number) => Math.round(v * 100) / 100;
+// Fix ranges round inward to the centimetre, so following the fix always passes.
+const down = (v: number) => Math.floor(v * 100 + 1e-6) / 100, up = (v: number) => Math.ceil(v * 100 - 1e-6) / 100;
 /** The building's canonical layout, from the params the bake sees (generator defaults under the instance's own). */
 function frameOf(def: StoredDef, params: Record<string, unknown>): Frame {
   const g = GENERATORS['building/1'] as unknown as { params: Record<string, { default?: unknown }>; layout(p: Record<string, unknown>, a: Record<string, unknown>): Frame };
@@ -59,12 +61,12 @@ function decalFit(L: Frame, slot: Slot, d: Decal, at: string, fail: Fail): Failu
     if (Math.abs(qx) > L.W / 2 + 0.5 || Math.abs(qz) > L.D / 2 + 0.5) return fail(`${at}.at`, d.at, `The decal on ${slot.id} sits ${metres(Math.hypot(qx, qz))} m from the building's centre, outside its walls.`, 'Keep at[0] near 0 so the decal stays on the wall.');
   } else {
     lo -= tol; hi += tol;
-    if (d.w > hi - lo + 1e-6) return fail(`${at}.w`, d.w, `A ${d.w} m decal is wider than the wall it sits on (${metres(hi - lo)} m at ${slot.id}).`, `Shrink w to at most ${metres(hi - lo)}, or use a wider wall.`);
-    if (ax - d.w / 2 < lo - 1e-6 || ax + d.w / 2 > hi + 1e-6) return fail(`${at}.at`, d.at, `The decal runs off its wall: it spans ${metres(ax - d.w / 2)}..${metres(ax + d.w / 2)} m along ${slot.id}, the wall ${metres(lo)}..${metres(hi)} m.`, `Keep at[0] between ${metres(lo + d.w / 2)} and ${metres(hi - d.w / 2)}.`);
+    if (d.w > hi - lo + 1e-6) return fail(`${at}.w`, d.w, `A ${d.w} m decal is wider than the wall it sits on (${metres(hi - lo)} m at ${slot.id}).`, `Shrink w to at most ${down(hi - lo)}, or use a wider wall.`);
+    if (ax - d.w / 2 < lo - 1e-6 || ax + d.w / 2 > hi + 1e-6) return fail(`${at}.at`, d.at, `The decal runs off its wall: it spans ${metres(ax - d.w / 2)}..${metres(ax + d.w / 2)} m along ${slot.id}, the wall ${metres(lo)}..${metres(hi)} m.`, `Keep at[0] between ${up(lo + d.w / 2)} and ${down(hi - d.w / 2)}.`);
   }
   const top = L.wallTop + L.roofRise, y0 = py + ay - d.h / 2, y1 = py + ay + d.h / 2;
-  if (d.h > top + 1e-6) return fail(`${at}.h`, d.h, `A ${d.h} m decal is taller than the building (${metres(top)} m to the roof top).`, `Shrink h to at most ${metres(top)}.`);
-  if (y0 < -1e-6 || y1 > top + 1e-6) return fail(`${at}.at`, d.at, `The decal floats off the building: it spans ${metres(y0)}..${metres(y1)} m high; walls and roof span 0..${metres(top)} m.`, `Keep at[1] between ${metres(d.h / 2 - py)} and ${metres(top - d.h / 2 - py)} (measured up from ${slot.id}, ${metres(py)} m above the base).`);
+  if (d.h > top + 1e-6) return fail(`${at}.h`, d.h, `A ${d.h} m decal is taller than the building (${metres(top)} m to the roof top).`, `Shrink h to at most ${down(top)}.`);
+  if (y0 < -1e-6 || y1 > top + 1e-6) return fail(`${at}.at`, d.at, `The decal floats off the building: it spans ${metres(y0)}..${metres(y1)} m high; walls and roof span 0..${metres(top)} m.`, `Keep at[1] between ${up(d.h / 2 - py)} and ${down(top - d.h / 2 - py)} (measured up from ${slot.id}, ${metres(py)} m above the base).`);
   return null;
 }
 

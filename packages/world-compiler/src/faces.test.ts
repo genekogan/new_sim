@@ -67,11 +67,14 @@ test('decals stay on their wall: refused when they hang off its ends, float abov
   // The reviewer's probe: a 20 m panel 1000 km above the shop.
   const float = refused(w, set({ slot: 'facade-f0-s-1', w: 20, h: 20, at: [0, 1e6], text: 'FLOAT' }), /^params\.decals\.0\.w$/, /Shrink w to at most 8\.26/);
   assert.equal(float.measured, 20);
-  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 1, at: [0, 1e6] }), /^params\.decals\.0\.at$/, /Keep at\[1\] between -0\.9 and 6\.42/);
+  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 1, at: [0, 1e6] }), /^params\.decals\.0\.at$/, /Keep at\[1\] between -0\.9 and 6\.41/);
   refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 0.5, at: [3.5, 0] }), /^params\.decals\.0\.at$/, /Keep at\[0\] between -3\.13 and 3\.13/);
-  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 9 }), /^params\.decals\.0\.h$/, /Shrink h to at most 8\.32/);
+  refused(w, set({ slot: 'facade-f0-s-1', w: 2, h: 9 }), /^params\.decals\.0\.h$/, /Shrink h to at most 8\.31/);
   refused(w, set({ slot: 'opening-front-door', w: 1, h: 0.4, at: [0, -0.5] }), /^params\.decals\.0\.at$/, /Keep at\[1\]/);
   refused(w, set({ slot: 'gable-s', w: 0.9, h: 0.9, at: [0, 1.5] }), /^params\.decals\.0\.at$/, /Keep at\[1\]/);
+  // Following a fix passes: the advised extremes are accepted.
+  for (const decal of [{ slot: 'facade-f0-s-1', w: 8.26, h: 0.5 }, { slot: 'facade-f0-s-1', w: 2, h: 1, at: [0, 6.41] }, { slot: 'facade-f0-s-1', w: 2, h: 0.5, at: [3.13, 0] }, { slot: 'facade-f0-s-1', w: 2, h: 8.31, at: [0, 2.755] }])
+    assert.equal(act(w, set(decal)).result.accepted, true, JSON.stringify(decal));
   // Whole facades are fair game: the shop front (8 m wall) edge to edge, and a gable sign up to the roof top.
   for (const decal of [{ slot: 'facade-f0-s-1', w: 8.2, h: 0.5, at: [0, 1.1] }, { slot: 'facade-f1-s-1', w: 1, h: 0.5, at: [5.5, 0] }, { slot: 'gable-s', w: 1, h: 0.4, at: [0, 0] }, { slot: 'wall-w-1', w: 8.8, h: 0.4, at: [-0.57, 0] }])
     assert.equal(act(w, set(decal)).result.accepted, true, JSON.stringify(decal));
