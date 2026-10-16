@@ -36,7 +36,10 @@ export function mountAgentInbox(app: Hono, d: Deps) {
     if (!before || c.req.raw.signal.aborted || c.res.status === 401 || c.res.status === 403) return;
     const current = agent(c);
     if (!current || current.kind !== before.kind || current.scope.owner !== before.scope.owner || current.scope.scope !== before.scope.scope) return;
-    if (!c.res.headers.get('content-type')?.includes('application/json')) {
+    // Versioned strict contracts (intent-v2 receipts, history pages, arrivals; the MCP tools that relay them) must keep their
+    // exact JSON shape: strict clients reject an extra key. They carry the inbox in the header, like binary/stream replies.
+    const contract = /\/intent-v2(\/|$)/.test(c.req.path);
+    if (contract || !c.res.headers.get('content-type')?.includes('application/json')) {
       if (c.res.status < 200 || c.res.status >= 300) return;
       inbox.touch(current.scope);
       const encoded = Buffer.from(JSON.stringify({inbox: inbox.deliver(current.scope)}), 'utf8').toString('base64url');
