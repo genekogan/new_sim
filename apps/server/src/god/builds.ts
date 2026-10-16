@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { hashOf, obbOverlap, type Batch, type Diff, type Failure, type WorldModel, type OBB, type Op } from '@sim/world-compiler';
 import type { BuildReceipt } from './build-integrity.ts';
 import { type BuildRow, type BuildWrite, type EditRow, WorldStore } from './store.ts';
+import { helperScopeFailure, type ClaimState, type HelperScope } from './helpers.ts';
 
 export const BUILD_LIMITS = { open: 8, roots: 256, closed: 200, claims: 8, retainedClaims: 32, made: 64, startPerMinute: 6, editsPerMinute: 120, bodyBytes: 65_536, transitionBytes: 256 } as const;
 export const buildCodes = ['build.unknown', 'build.closed', 'build.exists', 'build.limit', 'build.site', 'build.group', 'build.lease', 'build.leased', 'build.claim', 'build.claimed', 'build.claim-unknown', 'build.claims-open', 'build.undo-incomplete', 'build.outside'] as const;
@@ -55,7 +56,13 @@ export const buildActionSchemas = {
 export type BuildField = z.infer<typeof buildFieldSchema>;
 export type Mass = z.infer<typeof massSchema>;
 export type Site = z.infer<typeof siteSchema>;
-export type Identity = { hash: string; label: string; holder?: Holder };
+/** `child`: a helper token minted for one claim (WD7 slice 3); its rate limits and claim custody pool with `child.parent`. */
+export type Identity = { hash: string; label: string; holder?: Holder; child?: HelperScope };
+/** The token whose claim custody and rate limits a caller shares: the lead for a helper, otherwise itself. */
+export const poolOf = (caller: Identity) => caller.child?.parent ?? caller.hash;
+export const isIdentity = (v: unknown): v is Identity => !!v && typeof v === 'object' && typeof (v as Identity).hash === 'string';
+/** Attribution for routes whose requireGod returns the caller (WD7 slice 2: every journal row names its token). */
+export const callerOf = (v: unknown): BuildCaller => isIdentity(v) ? { identity: v } : {};
 export type BuildCaller = { identity?: Identity; build?: BuildField };
 export type Claim = { id: string; part: string; root?: string; region?: Site; made: string[]; step: { n: number; label: string }; status: 'held' | 'released' | 'done' | 'taken'; lastAt: number; holder: { label: string; hash8: string; process?: Holder }; user: { hash8: string; tokenHash: string }; takenBy?: { claim: string; label: string; at: number } };
 type Caption = { text: string; at: number };
@@ -194,6 +201,17 @@ function overlappingClaim(model: WorldModel, scope: Scope, others: readonly Live
   });
 }
 
+/** WD7 slice 3: explicit existing targets (move/set/remove ids, place parents) must already lie inside the claim. */
+function outsideClaim(model: WorldModel, mine: LiveClaim, ops: readonly Op[]): Failure | null {
+  for (const [i, op] of ops.entries()) {
+    const ref = op.op === 'move' || op.op === 'set' || op.op === 'remove' ? op.id : op.op === 'place' && op.in?.parent && op.in.parent !== 'world' ? op.in.parent : undefined;
+    if (!ref || ref.startsWith('$')) continue;
+    const e = model.get(ref); if (!e || inScope(model, e.id, mine.scope.roots)) continue;
+    return { op: i, code: 'helper.scope', field: op.op === 'place' ? 'in.parent' : 'id', entity: e.id, detail: `${model.pathOf(e.id) || e.id} is outside claim ${mine.id} (${mine.part}); a helper token edits only inside its claim.`, limit: { claim: mine.id, root: mine.root, region: mine.region }, fix: 'Edit only under the claim root or inside its region, or ask the lead.' };
+  }
+  return null;
+}
+
 /** Pure: scope is read from both worlds; speculative made ids never enter the cached claim. */
 export function claimCheck(before: WorldModel, after: WorldModel, diff: Diff, ops: Op[], mine: LiveClaim | undefined, others: readonly LiveClaim[]): { failure: Failure } | { made: string[] } {
   if (!mine && !others.length) return { made: [] };
@@ -271,7 +289,7 @@ export function advance(body: BuildBody, field: BuildField | undefined, made: st
   const claim = field.claim ? b.claims.find(c => c.id === field.claim)! : undefined;
   if (claim && caller?.holder) claim.holder.process = caller.holder;
   if (!claim && caller?.holder) b.lead.holder = caller.holder;
-  if (claim) { claim.made = [...new Set([...claim.made, ...made])]; claim.lastAt = at; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
+  if (claim) { claim.made = [...new Set([...claim.made, ...made])]; claim.lastAt = at; if (caller) claim.user = { hash8: poolOf(caller).slice(0, 8), tokenHash: poolOf(caller) }; }
   if (revert) return b;
   const current = claim?.step ?? b.step, n = Math.max(current.n, field.step ?? current.n);
   const label = field.step !== undefined && field.step < current.n ? current.label : field.label ?? (n > current.n ? b.plan.steps[n - 1] ?? `step ${n}` : current.label);
@@ -508,7 +526,7 @@ export class GodBuilds {
     const label = input.n !== undefined && input.n < current.n ? current.label : input.label ?? (n > current.n ? body.plan.steps[n - 1] ?? `step ${n}` : current.label);
     if (claim && caller?.holder) claim.holder.process = caller.holder;
     if (!claim && caller?.holder) body.lead.holder = caller.holder;
-    if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: caller.hash.slice(0, 8), tokenHash: caller.hash }; }
+    if (claim) { claim.step = { n, label }; claim.lastAt = now; if (caller) claim.user = { hash8: poolOf(caller).slice(0, 8), tokenHash: poolOf(caller) }; }
     else body.step = { n, label, at: now, seq: null };
     // Keep the last STEP_CALLS accepted tuples (16 hex each): a retry cannot replace a newer announcement, and a long,
     // chatty build can never grow its body to the 64 KiB guard (which would refuse every later batch).
@@ -608,14 +626,30 @@ export class GodBuilds {
     if (!lockStatus(row.body.lead.holder, row.last_at, this.pauseMs, this.host.now()).stale) return false;
     return this.pause(id, { lease: row.body.lead.lease, note: 'doctor: stale holder' }).ok;
   }
+  /** Custody of one claim, for helper-token validity: only `held` in an open build keeps a helper alive. */
+  claimState(id: string, cid: string): ClaimState {
+    const row = this.rows.get(id); if (!row) return this.store.build(id) ? 'closed' : 'unknown';
+    return row.body.claims.find(c => c.id === cid)?.status ?? 'unknown';
+  }
+  /** The claim a root token holds (directly or through its helpers), for minting. */
+  heldClaim(id: string, cid: string, caller: Identity): { claim: Claim } | { failure: Failure } {
+    const row = this.rows.get(id); if (!row) return { failure: buildFailure(this.store.build(id) ? 'build.closed' : 'build.unknown', id) };
+    const claim = row.body.claims.find(c => c.id === cid);
+    if (!claim || claim.status !== 'held') return { failure: buildFailure('build.claim-unknown', `${cid} is unknown or no longer held.`) };
+    if (claim.user.tokenHash !== poolOf(caller)) return { failure: buildFailure('build.claimed', `${cid} (${claim.part}) is held by ${claim.holder.label}; only its holder can mint a helper for it.`, 'build.claim') };
+    return { claim };
+  }
   private liveClaims(row: Row, now: number) { return row.body.claims.filter(c => c.status === 'held' && !lockStatus(c.holder.process, c.lastAt, this.pauseMs, now).stale); }
   private overlap(scope: Scope, now: number, except?: string) {
     const others: LiveClaim[] = [];
     for (const row of this.rows.values()) for (const c of this.liveClaims(row, now)) if (c.id !== except) others.push(scoped(c));
     return overlappingClaim(this.host.model(), scope, others);
   }
-  admit(field: BuildField | undefined, batch: Pick<Batch, 'group'>, _caller?: Identity): Admission {
-    const warnings: string[] = []; if (!field) { const owned = [...this.rows.values()].find(r => batch.group === r.id || batch.group?.startsWith(r.id + '/')); return { group: batch.group, warnings, ...(owned ? { failures: [buildFailure('build.group', `${batch.group} belongs to open build ${owned.id}.`)] } : {}) }; }
+  admit(field: BuildField | undefined, batch: Pick<Batch, 'group'> & { ops?: readonly Op[] }, caller?: Identity): Admission {
+    const warnings: string[] = [];
+    // WD7 slice 3: a helper token is authorised only through its own claim, before any planning.
+    if (caller?.child) { const refused = helperScopeFailure(caller.child, field, batch.ops); if (refused) return { warnings, failures: [refused] }; }
+    if (!field) { const owned = [...this.rows.values()].find(r => batch.group === r.id || batch.group?.startsWith(r.id + '/')); return { group: batch.group, warnings, ...(owned ? { failures: [buildFailure('build.group', `${batch.group} belongs to open build ${owned.id}.`)] } : {}) }; }
     const row = this.row(field.id); if (!row) return { warnings, failures: [buildFailure('build.unknown', field.id)] }; if (!open(row)) return { warnings, failures: [buildFailure('build.closed', field.id)] };
     if (field.claim) {
       const claim = row.body.claims.find(c => c.id === field.claim);
@@ -625,7 +659,10 @@ export class GodBuilds {
         if (overlap) return { warnings, failures: [buildFailure('build.claimed', `Claim ${claim.id} cannot resume: overlaps ${overlap.id} (${overlap.part}).`, 'build.claim', { limit: { claim: overlap.id, part: overlap.part } })] };
       }
       const group = `${row.id}/${claim.part}`; if (batch.group && batch.group !== group) warnings.push(`group ${batch.group} ignored; claim group is ${group}`);
-      return { row, field, mine: scoped(claim), group, warnings };
+      const mine = scoped(claim);
+      // A helper's named targets are checked before planning; claimCheck remains the geometric backstop.
+      if (caller?.child && batch.ops) { const outside = outsideClaim(this.host.model(), mine, batch.ops); if (outside) return { warnings, failures: [outside] }; }
+      return { row, field, mine, group, warnings };
     }
     if (field.lease !== row.body.lead.lease) return { warnings, failures: [buildFailure('build.lease', `${field.id} was resumed by ${row.body.lead.label} at ${row.body.lead.since}.`)] };
     let group = batch.group;

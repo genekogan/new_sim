@@ -25,7 +25,7 @@ import { recentStrikes } from './lightning.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { godTokenLimiter } from './rate-limit.ts';
 import { syncWorldClock } from './world-clock.ts';
-import type { BuildBody } from './builds.ts';
+import { callerOf, type BuildBody } from './builds.ts';
 
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 export type EnvInput = {
@@ -130,7 +130,7 @@ export function installWorldEnv(host: WorldHost, god: GodMode, edge?: EdgeLedger
   if (edge) edge.weatherNow = () => weatherNow(god.model.state, (host.engine.world as { env?: { datetime?: string } }).env?.datetime ?? null);
 }
 
-export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; requireGod: (c: Context) => void }) {
+export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; requireGod: (c: Context) => unknown }) {
   const limitGod = godTokenLimiter(d.requireGod);
   const noStore = { 'cache-control': 'no-store' };
   app.get('/v1/world/env', (c) => c.json(envView(d.host, d.god), 200, noStore));
@@ -138,7 +138,7 @@ export function mountEnvRoutes(app: Hono, d: { host: WorldHost; god: GodMode; re
     limitGod(c, 'env', CREATION_LIMITS.envEditsPerMinute);
     let b: EnvInput & { note?: string };
     try { b = await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); }
-    const r = setEnv(d.god, b, typeof b?.note === 'string' ? b.note : 'environment');
+    const r = d.god.as(callerOf(d.requireGod(c)), () => setEnv(d.god, b, typeof b?.note === 'string' ? b.note : 'environment'));
     const identity = d.god.godIdentity(c.req.header('authorization')?.replace(/^Bearer\s+/i, ''));
     const shared = r.accepted && identity && d.god.store.builds(true).some(row => (JSON.parse(row.body) as BuildBody).lead.tokenHash === identity.hash);
     // onCommit queues the logged engine rules. Read the clock only after those rules have applied.

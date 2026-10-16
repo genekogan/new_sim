@@ -26,6 +26,7 @@ import { CREATION_LIMITS } from '@sim/generators';
 import { godTokenLimiter } from './rate-limit.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
+import { callerOf } from './builds.ts';
 
 type V2 = [number, number];
 /** An op as a client writes it (the compiler fills defaults: in, mode). */
@@ -222,11 +223,11 @@ function describe(verb: string, cmp: ReturnType<typeof compare>, grew: LandRepor
   return parts.join('; ');
 }
 
-export function mountLandRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => void }) {
+export function mountLandRoutes(app: Hono, d: { god: GodMode; requireGod: (c: Context) => unknown }) {
   const limitGod = godTokenLimiter(d.requireGod);
   app.post('/v1/god/land', async (c) => {
     limitGod(c, 'land', CREATION_LIMITS.landEditsPerMinute);
     let b: LandInput; try { b = await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); }
-    return c.json(land(d.god, b), 200, { 'cache-control': 'no-store' });
+    return c.json(d.god.as(callerOf(d.requireGod(c)), () => land(d.god, b)), 200, { 'cache-control': 'no-store' });
   });
 }
