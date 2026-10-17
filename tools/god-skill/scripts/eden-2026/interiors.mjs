@@ -136,3 +136,24 @@ export const BARN = [
   ...[[88, 48.6], [88, 52], [85, 51.4], [91, 49.8]].map(([x, z], i) => B(`lantern-${i + 1}`, 'eden-pendant@1', [x, z], N)),
 ];
 export const BARN_TOPS = [on('eden-barn-1/barn-craft-table', 'barn-craft-pot', 'pot', [-0.6, 0]), on('eden-barn-1/barn-craft-table', 'barn-craft-crate', 'crate', [0.7, 0.05])];
+
+// Courtyard houses 1 and 2 (old eden-interiors house1/house2): a kitchen with sink, stove and a small table for two; a living
+// room with sofa, armchair, rug and lamp; a bedroom; a study with a desk. Wings 11 x 3.2 m (living, kitchen) and 3.2 x 3.2 m.
+export const SMALL_HOUSES = [['eden-house-1', 0], ['eden-house-2', 1]].flatMap(([h, v]) => {
+  const wood = v ? C.walnut : C.oak, fab = v ? C.sage : C.rust;
+  const k = (name, def, p, r, extra) => piece('kitchen', `${h}-kitchen`, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  const l = (name, def, p, r, extra) => piece('living', h, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  const b = (name, def, p, r, extra) => piece('bedroom', `${h}-bedroom`, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  const st = (name, def, p, r, extra) => piece('parlour', `${h}-study`, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  return [
+    k('sink', 'sink', [-4.4, -0.95], N), k('stove', 'stove', [-3.4, -0.95], N), k('counter', 'counter', [-2.3, -0.97], N, { params: { cab: v ? C.sage : '#a85a42', top: C.ash } }),
+    k('table', 'round-table', [3.2, 0.2], N, { params: { top: C.ash, legs: wood } }),
+    k('chair-1', 'chair', [2.55, 0.2], W, { params: { wood, cushion: fab } }), k('chair-2', 'chair', [3.85, 0.2], E, { params: { wood, cushion: fab } }),
+    k('pendant', 'eden-pendant@1', [3.2, 0.2], N), k('fridge', 'fridge', [4.9, -0.9], N),
+    l('sofa', 'sofa', [-3.8, -0.95], N, { params: { fabric: v ? C.teal : C.sage, pillow: C.ochre } }), l('armchair', 'armchair', [3.0, -0.9], N, { params: { fabric: v ? C.ochre : C.rose } }),
+    l('rug', 'rug', [-3.8, 0.3], N, { params: { border: v ? C.navy : C.ochre, field: C.cream } }), l('floor-lamp', 'floor-lamp', [-5.0, -1.0], N),
+    l('bookcase', 'bookcase', [4.6, -1.0], N, { params: { sx: 0.9 } }), l('plant', 'potted-plant', [2.0, 1.15], N), l('pendant', 'eden-pendant@1', [-3.8, 0.3], N),
+    b('bed', 'bed', [-0.45, 0.3], N, { params: { quilt: v ? C.teal : C.ochre } }), b('rug', 'rug', [0.8, -0.9], W, { params: { border: C.rust, field: C.cream } }),
+    st('desk', 'desk', [0, -1.0], N, { params: { top: wood } }), st('chair', 'chair', [0, -0.25], S, { params: { wood, cushion: fab } }),
+  ];
+});
