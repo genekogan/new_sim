@@ -1,0 +1,27 @@
+# Optional companion of sim-worlds@.service (lane W, 2026-10-17): systemd holds the launcher's port, so a restart of
+# sim-worlds@<stage> (a changed keeper, unit or settings file, `release.sh --restart`, a crash) queues new connections in
+# this socket's backlog instead of refusing them: no Caddy 502 page; requests wait until the next keeper answers.
+# keeper.mjs takes the socket when systemd passes it (LISTEN_FDS) and binds the port itself otherwise.
+# The port comes from a per-stage drop-in and must equal --port in /etc/sim-worlds/<stage>.conf (the keeper refuses another):
+#   /etc/systemd/system/sim-worlds@production.socket.d/10-port.conf
+#     [Socket]
+#     ListenStream=127.0.0.1:<port>
+# Not installed by install.sh (a template socket without its drop-in must not sit beside the running unit). Switch on, as
+# root, once (one last restart that blinks; the service must not hold the port when the socket starts):
+#   install -m 644 /srv/sim-worlds/production/tools/world-launcher/deploy/sim-worlds@.socket /etc/systemd/system/
+#   mkdir -p /etc/systemd/system/sim-worlds@production.socket.d
+#   printf '[Socket]\nListenStream=127.0.0.1:%s\n' "$(sed -n 's/.*--port \([0-9]*\).*/\1/p' /etc/sim-worlds/production.conf)" > /etc/systemd/system/sim-worlds@production.socket.d/10-port.conf
+#   systemctl daemon-reload && systemctl stop sim-worlds@production && systemctl enable --now sim-worlds@production.socket && systemctl start sim-worlds@production
+#   journalctl -u sim-worlds@production -n 20 | grep 'socket from systemd'
+# Switch off: systemctl disable --now sim-worlds@production.socket && systemctl restart sim-worlds@production
+# Take the stage away entirely: systemctl disable --now sim-worlds@<stage>.socket sim-worlds@<stage> (a connection to an
+# active socket would start the service again).
+[Unit]
+Description=Sim world launcher port (%i), held across restarts
+
+[Socket]
+Backlog=1024
+NoDelay=true
+
+[Install]
+WantedBy=sockets.target

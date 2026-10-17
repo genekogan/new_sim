@@ -37,6 +37,34 @@ export function memAvailableMb() {
   return Math.round(freemem() / 2 ** 20);
 }
 
+/** Memory a world's pre-warmed (standby) process needs beside its running one: measured 230-240 MB for a new world and
+ *  for the eden/mars forks (Node 22, code loaded, nothing opened), plus margin for the launcher's own overlap. */
+export const PREWARM_MB = 768;
+/** MB left under this process's cgroup v2 memory.high/memory.max (systemd MemoryHigh/MemoryMax of the unit), or null
+ *  when there is no such limit (not Linux, cgroup v1, unlimited). The world processes share the unit's cgroup. */
+export function cgroupHeadroomMb(read = (f) => readFileSync(f, 'utf8')) {
+  try {
+    const line = read('/proc/self/cgroup').split('\n').find((l) => l.startsWith('0::'));
+    if (!line) return null;
+    const dir = `/sys/fs/cgroup${line.slice(3).trim().replace(/\/$/, '')}`;
+    let limit = Infinity;
+    for (const f of ['memory.high', 'memory.max']) { const v = read(`${dir}/${f}`).trim(); if (v !== 'max' && Number(v) > 0) limit = Math.min(limit, Number(v)); }
+    if (limit === Infinity) return null;
+    return Math.round((limit - Number(read(`${dir}/memory.current`).trim())) / 2 ** 20);
+  } catch { return null; }
+}
+/** Why a release handover must not pre-warm a world now (null: it may). A second process of the world beside the first
+ *  must fit under the unit's memory limit (over MemoryHigh the unit is throttled, over MemoryMax a world is killed) and in
+ *  the host's available memory above the launcher's floor. Without room the world boots cold, as before pre-warm. */
+export function prewarmBlocked(minFreeMb = 0, { needMb = Number(process.env.SIM_PREWARM_NEED_MB ?? PREWARM_MB), read } = {}) {
+  const room = cgroupHeadroomMb(read);
+  if (room !== null && room < needMb) return `the unit is ${room} MB under its memory limit; pre-warm needs ${needMb}`;
+  let free = null;
+  try { const m = (read ?? ((f) => readFileSync(f, 'utf8')))('/proc/meminfo').match(/^MemAvailable:\s+(\d+)\s+kB/m); if (m) free = Math.round(Number(m[1]) / 1024); } catch { /* not Linux: no host check (macOS free memory excludes its cache) */ }
+  if (free !== null && free < minFreeMb + needMb) return `the server has ${free} MB available; pre-warm needs ${minFreeMb + needMb}`;
+  return null;
+}
+
 /**
  * Normalise and check the launcher's production settings. Throws with a reason a human can act on.
  * @param {{ devAuth?: boolean, publicOrigin?: string, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,

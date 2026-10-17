@@ -1,10 +1,11 @@
 // node --test tools/world-launcher/keeper.test.mjs
-// The keeper (keeper.mjs) and launcher handover, on lane C4's ports 6017–6019 only (keeper :6017, children 6018–6019).
+// The keeper (keeper.mjs) and launcher handover, on ports KEEPER_TEST_PORT (default 6017) to +2, and +3 to +5 for the socket-activation test.
 // Two throwaway "releases" in a temp dir: this launcher's own files plus fake-world.mjs as apps/server/src/main.ts, so the
 // real keeper forks the real launcher, which spawns fake worlds. Nothing outside the temp dir is read or written.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { connect } from 'node:net';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, symlinkSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -76,6 +77,29 @@ test('reload hands every world to the new release with no refused connection and
   assert.equal((await api('/__sim/worlds', { method: 'POST', body: JSON.stringify({ name: 'Three' }) })).status, 503, 'two child ports, both busy: the cap still holds');
   assert.deepEqual(JSON.parse(readFileSync(join(data, 'worlds.json'), 'utf8')).worlds.map((w) => w.slug).sort(), ['one', 'two']);
 });
+test('a keep-alive connection idle at the switch still answers its next request (a POST), then closes cleanly', async () => {
+  // Caddy keeps idle connections to the launcher and may send on one at any instant; a POST on a connection the old
+  // launcher closes under it cannot be replayed (Caddy answers 502). The old launcher answers it, with Connection: close.
+  const sock = connect(PORT, '127.0.0.1'); let buf = '', ended = false;
+  sock.setEncoding('utf8'); sock.on('data', (d) => { buf += d; }); sock.on('close', () => { ended = true; });
+  const until = async (ok, what) => { for (let i = 0; i < 200 && !ok(); i++) await sleep(25); assert.ok(ok(), typeof what === 'function' ? what() : what); };
+  sock.write('GET /worlds/w/one/healthz HTTP/1.1\r\nHost: x\r\nConnection: keep-alive\r\n\r\n');
+  await until(() => /\r\n0\r\n\r\n$/.test(buf) || /content-length: \d+[\s\S]*\r\n\r\n\{[\s\S]*\}$/i.test(buf), () => `first response (${JSON.stringify(buf)})`);
+  assert.match(buf, /^HTTP\/1\.1 200/); assert.doesNotMatch(buf, /connection: close/i, 'kept alive before the switch'); buf = '';
+  const before = status().handover?.startedAt;
+  point(release('b2', { loadMs: 800 })); keeper.kill('SIGHUP');
+  await until(() => { const h = status().handover; return h && h.startedAt !== before && h.state === 'taking-over'; }, 'handover reached take-over');
+  await sleep(100);   // the old launcher has its retire message by now
+  assert.equal(ended, false, 'the idle connection was not closed at the switch');
+  const body = '{"x":1}';
+  sock.write(`POST /worlds/w/two/v1/probe-post HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\n\r\n${body}`);
+  await until(() => ended, () => `the connection closes after its answer (${JSON.stringify(buf)})`);
+  const code = Number(/^HTTP\/1\.1 (\d+)/.exec(buf)?.[1]);
+  assert.ok(code > 0 && code < 500, `the POST was answered, not dropped (${buf.slice(0, 200)})`); assert.match(buf, /connection: close/i);
+  for (let i = 0; i < 300 && status().handover?.state === 'taking-over'; i++) await sleep(50);
+  assert.equal(status().handover.state, 'done', JSON.stringify(status().handover));
+  assert.equal((await handover(B)).state, 'done');   // back to B for the tests below
+});
 test('a new release whose launcher cannot start changes nothing: the running one serves on', async () => {
   const { out: h, bad } = await watch(['one', 'two'], () => handover(release('broken', { brokenLauncher: true })));
   assert.equal(h.state, 'failed'); assert.match(h.error, /exited/);
@@ -105,4 +129,37 @@ test('SIGTERM stops the keeper, its launcher and every world', async () => {
   assert.equal(code, 0);
   for (const pid of kids) assert.throws(() => process.kill(pid, 0), 'world process gone');
   assert.equal(status().active, null);
+});
+test('under socket activation (systemd holds the port, LISTEN_FDS=1) a keeper restart queues requests instead of refusing them', async (t) => {
+  // python3 stands in for systemd's sim-worlds@.socket: it binds the port, never accepts, and starts the keeper again
+  // with the socket as fd 3 whenever it exits (systemctl restart = stop + start)
+  const py = spawn('python3', ['-c', 'import sys; sys.exit(0)']); if (await new Promise((r) => { py.once('exit', (c) => r(c)); py.once('error', () => r(-1)); }) !== 0) { t.skip('no python3'); return; }
+  const P = PORT + 3, sdata = join(dir, 'data-socket'), pidFile = join(dir, 'socket-keeper.pid'), stopFile = join(dir, 'socket-stop'); mkdirSync(sdata, { recursive: true });
+  const holder = spawn('python3', ['-c', `
+import os, socket, subprocess, sys, time
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1', ${P})); s.listen(1024)
+if s.fileno() != 3: os.dup2(s.fileno(), 3)
+os.set_inheritable(3, True)
+while not os.path.exists(sys.argv[1]):
+    p = subprocess.Popen(sys.argv[3:], pass_fds=(3,), env={**os.environ, 'LISTEN_FDS': '1'})
+    open(sys.argv[2], 'w').write(str(p.pid)); p.wait(); time.sleep(0.05)
+`, stopFile, pidFile, process.execPath, join(A, 'tools/world-launcher/keeper.mjs'), '--link', A, '--port', String(P), '--range', `${P + 1}-${P + 2}`, '--data', sdata, '--base', '/worlds', '--eager', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let logs = ''; holder.stdout.on('data', (d) => { logs += d; }); holder.stderr.on('data', (d) => { logs += d; });
+  const get = (ms = 15_000) => fetch(`http://127.0.0.1:${P}/worlds/__sim/healthz`, { signal: AbortSignal.timeout(ms) });   // queued requests wait; startup polls do not
+  const keeperPid = () => { try { return Number(readFileSync(pidFile, 'utf8')); } catch { return 0; } };
+  try {
+    let up = false; for (let i = 0; i < 50 && !up; i++) { try { up = (await get(1000)).ok; } catch { await sleep(100); } }
+    assert.ok(up, `socket-activated keeper serves (${logs.slice(-800)})`); assert.match(logs, /socket from systemd/);
+    const first = keeperPid(); let stop = false; const bad = [];
+    const loop = (async () => { while (!stop) { try { const r = await get(); await r.arrayBuffer(); if (r.status >= 500) bad.push(r.status); } catch (e) { bad.push(e.cause?.code ?? e.message); } await sleep(20); } })();
+    await sleep(200); process.kill(first, 'SIGTERM');
+    for (let i = 0; i < 200 && (keeperPid() === first || !keeperPid()); i++) await sleep(50);
+    let back = false; for (let i = 0; i < 50 && !back; i++) { try { back = (await get(2000)).ok; } catch { /* restarting */ } if (!back) await sleep(100); }
+    await sleep(300); stop = true; await loop;
+    assert.ok(back && keeperPid() !== first, 'a new keeper took the same socket');
+    assert.deepEqual(bad, [], 'no request was refused while the keeper restarted');
+  } finally {
+    writeFileSync(stopFile, ''); const k = keeperPid(); try { if (k) process.kill(k, 'SIGTERM'); } catch { /* gone */ }
+    await new Promise((r) => (holder.exitCode !== null ? r() : holder.once('exit', r)));
+  }
 });

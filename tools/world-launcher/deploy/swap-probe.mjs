@@ -2,17 +2,20 @@
 // Measure what a visitor sees while the world launcher is swapped (lane C4 `downtime`, backlog G9).
 //
 //   node tools/world-launcher/deploy/swap-probe.mjs --origin http://127.0.0.1:6010 --base /worlds \
-//        --slugs a,b,c [--every 100] [--out probe.json] [--stop-file <path>]
+//        --slugs a,b,c [--every 100] [--posts] [--out probe.json] [--stop-file <path>]
 //
 // Every --every ms, for the homepage and for each world: GET <base>/ and <base>/w/<slug>/v1/config (what a page load and
 // the viewer's first request need). Per world one WebSocket <base>/w/<slug>/ws is held open; when it drops, it is
 // retried every --every ms (not the viewer's backoff) to find the moment the world takes viewers again.
+// --posts adds, per world, a POST with a small body to <base>/w/<slug>/v1/probe-post (unknown route: the world answers 404).
+// A proxy cannot replay a POST whose upstream connection was closed under it, so these catch what GETs cannot: any 5xx
+// (Caddy's 502) counts; a 4xx means the world answered and counts as fine.
 // It runs until SIGINT/SIGTERM or until --stop-file exists, then prints and writes a summary:
 //   errorMs      longest run of failed GETs (connection refused = what Caddy shows as a raw 502 page; 5xx; timeout)
 //   refused      how many GETs found nobody listening (would be Caddy's error page)
 //   slowestMs    the slowest successful GET (a request that waited for a world to boot instead of failing)
 //   wsDownMs     longest time the world's WebSocket could not be (re)opened; wsDrops how often it dropped
-// Read-only: it only sends GETs and opens viewer sockets; nothing is written to any world.
+// Read-only: it only sends GETs, POSTs to an unknown route (--posts) and opens viewer sockets; nothing is written to any world.
 import { existsSync, writeFileSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
@@ -23,13 +26,15 @@ const slugs = (flag('slugs', '') ?? '').split(',').filter(Boolean);
 const every = Number(flag('every', '100'));
 const out = flag('out');
 const stopFile = flag('stop-file');
+const posts = argv.includes('--posts');
 const port = Number(new URL(origin).port);
 if ([3999, ...range(4930, 4970), 4986, 4987].includes(port)) { console.error('refusing a live-world port'); process.exit(2); }
 function range(a, b) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
 
 const t0 = Date.now();
 const now = () => Date.now() - t0;
-const targets = [{ name: 'home', url: `${origin}${base}/` }, ...slugs.map((s) => ({ name: s, url: `${origin}${base}/w/${s}/v1/config` }))];
+const targets = [{ name: 'home', url: `${origin}${base}/` }, ...slugs.map((s) => ({ name: s, url: `${origin}${base}/w/${s}/v1/config` })),
+  ...(posts ? slugs.map((s) => ({ name: `${s}:post`, url: `${origin}${base}/w/${s}/v1/probe-post`, post: true })) : [])];
 const rec = Object.fromEntries(targets.map((t) => [t.name, { gets: 0, ok: 0, refused: 0, status5xx: 0, timeout: 0, other: 0, slowestMs: 0, slowestAt: null, runs: [], cur: null, statuses: {} }]));
 let stopping = false;
 
@@ -39,9 +44,9 @@ async function probe(t) {
     const at = now(), started = performance.now();
     let kind = 'ok', status = 0;
     try {
-      const res = await fetch(t.url, { signal: AbortSignal.timeout(15_000), headers: { accept: t.name === 'home' ? 'text/html' : 'application/json' } });
+      const res = await fetch(t.url, { signal: AbortSignal.timeout(15_000), headers: { accept: t.name === 'home' ? 'text/html' : 'application/json', ...(t.post ? { 'content-type': 'application/json' } : {}) }, ...(t.post ? { method: 'POST', body: JSON.stringify({ probe: at }) } : {}) });
       status = res.status; await res.arrayBuffer();
-      if (status >= 500) kind = 'status5xx'; else if (status >= 400) kind = 'other';
+      if (status >= 500) kind = 'status5xx'; else if (status >= 400 && !t.post) kind = 'other';
     } catch (e) {
       const code = e?.cause?.code ?? e?.name ?? 'error';
       kind = code === 'ECONNREFUSED' ? 'refused' : code === 'TimeoutError' ? 'timeout' : 'other';
