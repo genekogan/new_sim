@@ -4231,13 +4231,13 @@
           ],
           "params": {
             "wall": "#b08a5f",
-            "trim": "#6b4a2b",
-            "roofColor": "#6d735e",
+            "trim": "#5e412b",
+            "roofColor": "#4a4f4d",
             "w": 12,
             "d": 6,
-            "floorHeight": 3.5,
+            "floorHeight": 3.2,
             "material": "wood",
-            "roof": "gable"
+            "roof": "flat"
           }
         },
         {
@@ -62788,6 +62788,64 @@
             0,
             0,
             -8.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "scenery: market pergola stalls",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/market-stall@1",
+          "name": "market-pergola-stall-1",
+          "p": [
+            66.5,
+            29.5
+          ],
+          "params": {
+            "awning": "#d9473e"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/market-stall@1",
+          "name": "market-pergola-stall-2",
+          "p": [
+            71.5,
+            29.5
+          ],
+          "params": {
+            "awning": "#f2c14e"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "market-pergola-crate-1",
+          "p": [
+            69,
+            31.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "market-pergola-crate-2",
+          "p": [
+            69.8,
+            31.3
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "market-pergola-barrel",
+          "p": [
+            73.8,
+            31.4
           ]
         }
       ]

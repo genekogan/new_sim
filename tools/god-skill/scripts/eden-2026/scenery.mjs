@@ -153,6 +153,11 @@ group('scenery: greenhouse beds and harbour stall', put => {
 });
 // the open-air classroom court's big screen at its north end (old Eden: a lecture screen over a low stage)
 groups.push({ label: 'scenery: classroom screen', ops: [{ op: 'place', def: 'core/screen@1', name: 'classroom-court-screen', in: { parent: 'eden-classroom-1', slot: 'classroom' }, p: [0, 0, -8.6] }] });
+// stalls under the market pergola (old Eden: produce crates and a striped stall in the pergola)
+group('scenery: market pergola stalls', put => {
+  put('market-stall', 'market-pergola-stall-1', [66.5, 29.5], { params: { awning: '#d9473e' } }); put('market-stall', 'market-pergola-stall-2', [71.5, 29.5], { params: { awning: '#f2c14e' } });
+  put('crate', 'market-pergola-crate-1', [69, 31.2]); put('crate', 'market-pergola-crate-2', [69.8, 31.3], { r: 0.4 }); put('barrel', 'market-pergola-barrel', [73.8, 31.4]);
+});
 // V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
 {
   const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
