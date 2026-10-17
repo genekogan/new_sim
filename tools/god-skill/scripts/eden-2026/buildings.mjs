@@ -124,8 +124,8 @@ function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace =
 }
 courtyard('eden-house-1', [34, 15], 11, 10.4, { material: 'brick', wall: '#a85a42', roof: '#8a3b2a', trim: '#e9dfcc' });
 courtyard('eden-house-2', [52, 15], 11, 10.4, { material: 'plaster', wall: '#d5d5cd', roof: '#5d6567', trim: '#45616c' }, { floors: 2 });
-courtyard('eden-house-3', [34, 30], 12, 11, { material: 'wood', wall: '#d7ba91', roof: '#776d5b', trim: '#8a603e' }, { floors: 2, roofTerrace: true, furnished: null }); // furnished piece by piece (interiors.mjs)
-courtyard('eden-house-4', [54, 30], 12, 11, { material: 'stone', wall: '#d9d7c9', roof: '#696f68', trim: '#78725e' }, { floors: 2, roofTerrace: true, furnished: null });
+courtyard('eden-house-3', [34, 30], 12, 11, { material: 'wood', wall: '#8fa1ad', roof: '#5a5f66', trim: '#e9e2d0' }, { floors: 2, roofTerrace: true, furnished: null }); // furnished piece by piece (interiors.mjs)
+courtyard('eden-house-4', [54, 30], 12, 11, { material: 'brick', wall: '#9a4a36', roof: '#4b5258', trim: '#d8cfbd' }, { floors: 2, roofTerrace: true, furnished: null });
 for (const [i, x, z, w, r] of [[1, -116, 60, 16, 0], [2, -136, 60, 14, 0], [3, -116, 80, 16, Math.PI], [4, -138, 80, 18, Math.PI]]) {
   const rr = rng(5300 + (i - 1) * 17), floors = 1 + (rr() < 0.5 ? 1 : 0);
   courtyard(`region-courtyard-quarter.house-${i}`, [x, z], w, 13, { material: 'plaster', wall: pick(rr, ['#efe4cf', '#e6c86e', '#e9b07a', '#d49a8c', '#f0d9a8', '#c96f4a', '#efe9dc']), roof: pick(rr, ['#a8553a', '#b86a45', '#c27a52']), trim: '#3a5a4a' }, { floors, r });
