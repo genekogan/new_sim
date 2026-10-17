@@ -106,7 +106,8 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
       else { b.group = `slab-${lv.floor}`; b.slab(q.poly, lv.y - SLAB, SLAB, finish, 'floor'); b.slab(q.poly, lv.y - SLAB - 0.005, 0.006, '#f4efe6', 'wall'); b.group = at(lv.floor); }
     }
   }
-  if (!L.open && L.roof !== 'none') { b.group = `slab-${L.floors}`;   // roof none = open-topped walls (the Mars camp rooms)
+  // a glass house (greenhouse, palm house) has no ceiling slab under its glass roof: the beds inside show from outside
+  if (!L.open && L.roof !== 'none' && !glassWalls) { b.group = `slab-${L.floors}`;   // roof none = open-topped walls (the Mars camp rooms)
     b.slab(L.round ? ngon(L.round.R + L.t / 2, L.round.sides) : rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2), L.wallTop - 0.1, 0.12, '#f4efe6', 'wall'); }
 
   // ---- walls with openings

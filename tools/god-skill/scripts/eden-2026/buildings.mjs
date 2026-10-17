@@ -160,7 +160,7 @@ const NAMED = [
   ['eden-greenhouse', 'greenhouse', 10.4, 5, 1, 2.8, '#cfe6df', '#7a948b', 'gable', 'glass', 0, null],
   ['eden-a-frame', 'cottage', 5, 6, 1, 2.6, '#a4774f', '#5d4a3f', 'gable', 'wood', 0, 'cottage'],
   ['eden-yurt', 'roundhouse', 6, 6, 1, 2.5, '#e8d8b8', '#a97951', 'dome', 'plaster', 0, 'cottage'],
-  ['eden-tower-house', 'tower', 4, 4, 3, 2.8, '#d8c5a5', '#6b6154', 'hip', 'stone', 0, 'cottage'],
+  ['eden-tower-house', 'tower', 4, 4, 4, 2.8, '#3f7f86', '#c0392b', 'hip', 'plaster', 0, 'cottage'], // old Eden: a tall teal tower house with a red roof
   ['region-old-town.domed-hall', 'hall', 11, 13, 2, 4, '#efe9dc', '#5f8a7a', 'dome', 'plaster', -Math.PI / 2, 'hall'],
   ['region-old-town.bell-tower', 'tower', 4.4, 4.4, 5, 3, '#d9a85e', '#5a5f66', 'hip', 'stone', 0, 'hall'],
   ['region-sports-ground.clubhouse', 'hall', 10, 6, 1, 3, '#efe9dc', '#3f6a3c', 'gable', 'plaster', Math.PI / 2, 'hall'],

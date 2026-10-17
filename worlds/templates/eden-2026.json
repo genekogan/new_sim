@@ -4400,15 +4400,15 @@
             20
           ],
           "params": {
-            "wall": "#d8c5a5",
+            "wall": "#3f7f86",
             "trim": "#e9dfcc",
-            "roofColor": "#6b6154",
+            "roofColor": "#c0392b",
             "w": 5,
             "d": 5,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.8,
             "roof": "hip",
-            "material": "stone",
+            "material": "plaster",
             "windows": 0.6
           }
         },
@@ -14210,6 +14210,22 @@
         {
           "op": "place",
           "tmp": "$f2",
+          "def": "core/floor-lamp@1",
+          "name": "room-2-lamp",
+          "in": {
+            "parent": "eden-tower-house",
+            "slot": "room-2"
+          },
+          "p": [
+            -2.02,
+            0,
+            -2.02
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
           "def": "core/floor-lamp@1",
           "name": "top-lamp",
           "in": {
