@@ -90,8 +90,11 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
 
 /** Validated owner GLBs use the same canonical rig fitting and locomotion measurements. */
 export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppearance):Template{
- const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop'),run=measureWalk(gltf,'Run'),bodyScale=bodyScaleOf(gltf);
- return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(run.found?{runSpeed:run.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
+ // Phone arrival (lane L3): the four locomotion measurements share one fitted clone (a fit clones the whole skinned
+ // model; four of them per character were ~0.1 s of a 4x-throttled phone). Each measurement plays only its own clip
+ // and stops every action after, so a later one starts from the same pose a fresh clone would (people-template-golden).
+ const arms=fitArms(gltf),f=fit(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop',f),sprint=measureWalk(gltf,'Sprint_Loop',f),run=measureWalk(gltf,'Run',f),bodyScale=bodyScaleOf(gltf);
+ return {name,gltf,arms,...measureWalk(gltf,'Walk',f),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(run.found?{runSpeed:run.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
 }
 
 /** A composed body (humanoid@2 kit: one shared rig + parts) as a template: same fit/fitArms/measureWalk. */
@@ -223,8 +226,8 @@ function fitArms(gltf: GLTF) {
  * (the stance foot) and measure how fast it slides backwards relative to the
  * body. That velocity is the ground speed at which feet would not slide.
  */
-function measureWalk(gltf: GLTF, name = 'Walk'): { walkSpeed: number; forward: number; found?: boolean } {
-  const { model, mixer, idle, walk: base } = fit(gltf);
+function measureWalk(gltf: GLTF, name = 'Walk', fitted: ReturnType<typeof fit> = fit(gltf)): { walkSpeed: number; forward: number; found?: boolean } {
+  const { model, mixer, idle, walk: base } = fitted;
   const c = name === 'Walk' ? base.getClip() : THREE.AnimationClip.findByName(gltf.animations, name);
   if (!c) { mixer.stopAllAction(); return { walkSpeed: 1, forward: 1 }; }
   const walk = name === 'Walk' ? base : mixer.clipAction(c);
