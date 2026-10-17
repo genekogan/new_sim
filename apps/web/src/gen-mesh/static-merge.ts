@@ -12,7 +12,7 @@
 // The picture is the same: transforms are baked into positions and normals (mirrored nodes flip winding), and the
 // merged meshes keep shadows on. `?merge=0` turns this off for A/B measurement.
 import * as THREE from 'three';
-import { bakeColors, copyComponents, transformNormals, transformPoints } from './fast-geometry.ts';
+import { bakeColors, computeBounds, copyComponents, transformNormals, transformPoints } from './fast-geometry.ts';
 
 const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('merge') === '0';
 const MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'lightMap', 'displacementMap', 'envMap'] as const;
@@ -132,7 +132,7 @@ function build(bucket: Bucket): THREE.Mesh[] {
   const geo = new THREE.BufferGeometry();
   for (const nm of names) geo.setAttribute(nm, new THREE.BufferAttribute(arrays[nm], sizes[nm]));
   geo.setIndex(new THREE.BufferAttribute(index, 1));
-  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  if (!computeBounds(geo)) { geo.computeBoundingBox(); geo.computeBoundingSphere(); }
   let mat = bucket.mat;
   if (bucket.plain) {
     const s = bucket.mat as THREE.MeshStandardMaterial;

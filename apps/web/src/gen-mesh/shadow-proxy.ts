@@ -11,7 +11,7 @@
 // Measured on mars-two: 257 of 262 alpha-tested casters had fully opaque maps (the exporter marks everything MASK).
 // `?shadowproxy=0` for A/B.
 import * as THREE from 'three';
-import { transformPoints } from './fast-geometry.ts';
+import { computeBounds, transformPoints } from './fast-geometry.ts';
 
 const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('shadowproxy') === '0';
 const nullMats = new Map<number, THREE.ShaderMaterial>();
@@ -93,7 +93,7 @@ export function addShadowProxy(root: THREE.Object3D): number {
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeBoundingSphere(); geo.computeBoundingBox();
+    if (!computeBounds(geo)) { geo.computeBoundingSphere(); geo.computeBoundingBox(); }
     // (the CPU arrays stay: a cached asset is reused by the next renderer after a LiveWorld re-mount, which uploads again)
     const proxy = new THREE.Mesh(geo, nullMaterial(side));
     proxy.name = 'shadow-proxy'; proxy.castShadow = true; proxy.receiveShadow = false; proxy.userData.shadowProxy = true;

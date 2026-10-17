@@ -92,3 +92,18 @@ test('computeVertexNormals equals three for an indexed grid, shared and degenera
   const soup = new THREE.BufferGeometry(); soup.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
   assert.equal(computeVertexNormals(soup), false);   // non-indexed: three's own path
 });
+
+test('computeBounds equals computeBoundingBox + computeBoundingSphere (float, quantized interleaved, empty)', async () => {
+  const { computeBounds } = await import('./fast-geometry.ts');
+  for (const attr of attrs(77)) {
+    if (attr.itemSize < 3) continue;
+    const a = new THREE.BufferGeometry(), b = new THREE.BufferGeometry(); a.setAttribute('position', attr); b.setAttribute('position', attr);
+    assert.equal(computeBounds(a), true); b.computeBoundingBox(); b.computeBoundingSphere();
+    for (const k of ['min', 'max'] as const) for (const c of ['x', 'y', 'z'] as const) assert.ok(Object.is(a.boundingBox![k][c], b.boundingBox![k][c]));
+    for (const c of ['x', 'y', 'z'] as const) assert.ok(Object.is(a.boundingSphere!.center[c], b.boundingSphere!.center[c]));
+    assert.ok(Object.is(a.boundingSphere!.radius, b.boundingSphere!.radius));
+  }
+  const e = new THREE.BufferGeometry(), f = new THREE.BufferGeometry(); e.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3)); f.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
+  assert.equal(computeBounds(e), true); f.computeBoundingBox(); f.computeBoundingSphere();
+  assert.deepEqual([e.boundingBox!.min.toArray(), e.boundingBox!.max.toArray(), e.boundingSphere!.center.toArray(), e.boundingSphere!.radius], [f.boundingBox!.min.toArray(), f.boundingBox!.max.toArray(), f.boundingSphere!.center.toArray(), f.boundingSphere!.radius]);
+});

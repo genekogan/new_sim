@@ -137,3 +137,21 @@ export function computeVertexNormals(g: THREE.BufferGeometry): boolean {
   na.needsUpdate = true;
   return true;
 }
+
+/** computeBoundingBox() then computeBoundingSphere() for a geometry with a plain position and no morph targets: the same
+ *  box (expandByPoint over every vertex), centre ((min + max) * 0.5) and radius (sqrt of the largest squared distance).
+ *  Returns false (nothing set) otherwise, or when a coordinate is NaN (three's own calls then log it). */
+export function computeBounds(g: THREE.BufferGeometry): boolean {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute | undefined, p = plain(pos);
+  if (!p || p.s < 3 || !pos || g.morphAttributes.position || (pos as unknown as { isGLBufferAttribute?: boolean }).isGLBufferAttribute) return false;
+  const n = pos.count;
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (let i = 0; i < n; i++) { const x = comp(p, i, 0), y = comp(p, i, 1), z = comp(p, i, 2); x0 = Math.min(x0, x); y0 = Math.min(y0, y); z0 = Math.min(z0, z); x1 = Math.max(x1, x); y1 = Math.max(y1, y); z1 = Math.max(z1, z); }
+  if ([x0, y0, z0, x1, y1, z1].some(Number.isNaN)) return false;
+  const empty = x1 < x0 || y1 < y0 || z1 < z0, cx = empty ? 0 : (x0 + x1) * 0.5, cy = empty ? 0 : (y0 + y1) * 0.5, cz = empty ? 0 : (z0 + z1) * 0.5;
+  let r2 = 0;
+  for (let i = 0; i < n; i++) { const dx = cx - comp(p, i, 0), dy = cy - comp(p, i, 1), dz = cz - comp(p, i, 2); r2 = Math.max(r2, dx * dx + dy * dy + dz * dz); }
+  (g.boundingBox ??= new THREE.Box3()).min.set(x0, y0, z0); g.boundingBox.max.set(x1, y1, z1);
+  (g.boundingSphere ??= new THREE.Sphere()).center.set(cx, cy, cz); g.boundingSphere.radius = Math.sqrt(r2);
+  return true;
+}
