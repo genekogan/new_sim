@@ -229,6 +229,9 @@ export class MarsEngine implements Engine {
     // entity-physics/1 (world-edit, lane L9): a restored entity world re-registers its derived assets and re-bases its
     // Spatial on its own physics (absent in every authored world, so they are untouched).
     if(rt.world.entityPhysicsV1){registerAssets(rt.world.entityPhysicsV1.assets);(rt.services.spatial as Spatial).refreshForWorld(rt.world);}
+    // upper-floors/1: a restored world's services may come from its pre-fact base (snapshot restore); re-base on the
+    // installed floors so walkers reach them after a restart (a no-op when the planner already has them).
+    else if(rt.world.upperFloorsV1)(rt.services.spatial as Spatial).refreshForWorld(rt.world);
     this.cursor = rt.events.length;
     this.startRecorder();
     const self = this;
