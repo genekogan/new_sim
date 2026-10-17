@@ -3,7 +3,7 @@
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
 import { CREATION_LIMITS, GENERATORS, mergeKitSlots, type Baked, type LocalOBB } from '@sim/generators';
-import { hashOf } from './hash.ts';
+import { cacheKeyOf, hashOf } from './hash.ts';
 import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
@@ -199,7 +199,7 @@ export class WorldModel {
   bake(def: StoredDef, params: Record<string, Value>, seed: number, shape?: Entity['shape']): Baked {
     try {
     // Inherited make/slots/components can change while the child's own content hash stays fixed.
-    const key = hashOf([def.extends ? def : def.hash, params, seed, shape ?? null]);
+    const key = cacheKeyOf([def.extends ? def : def.hash, params, seed, shape ?? null]);
     const hit = this.bakes.get(key);
     if (hit) return hit;
     let baked: Baked;

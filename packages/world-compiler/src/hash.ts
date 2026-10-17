@@ -40,6 +40,16 @@ export function sha256Hex(input: string | Uint8Array): string {
   return Array.from(H, (x) => x.toString(16).padStart(8, '0')).join('');
 }
 export const hashOf = (v: unknown) => sha256Hex(stableStringify(v));
+/** In-memory cache key for content (bake keys): two independent 32-bit string hashes plus the length of the stable JSON.
+ *  Not for anything persisted or compared across processes (use hashOf); ~20x cheaper than the pure-JS SHA-256, which
+ *  dominated a big world's first frame (Eden 2026: ~1.1 s of bake keys while drawing). */
+export function cacheKeyOf(v: unknown): string {
+  const s = stableStringify(v);
+  let a = 0x811c9dc5 | 0, b = 0x9e3779b9 | 0;
+  for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 16777619); b = Math.imul(b ^ c, 0x5bd1e995); b ^= b >>> 15; }
+  a = Math.imul(a ^ (a >>> 16), 0x85ebca6b); b = Math.imul(b ^ (b >>> 13), 0xc2b2ae35);
+  return (a >>> 0).toString(16).padStart(8, '0') + (b >>> 0).toString(16).padStart(8, '0') + s.length.toString(36);
+}
 /** Short, URL-safe id from a counter and a world seed; ids are unique per world and never reused. */
 export function entityId(seq: number, worldSeed: string): string {
   return 'e_' + sha256Hex(`${worldSeed}:${seq}`).slice(0, 8);
