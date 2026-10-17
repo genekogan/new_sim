@@ -397,15 +397,23 @@ export class GodNav {
     plans.set(sid, { label: `Stroll through ${t.ref}`, steps: [...go.filter((s) => s.verb === 'stand'), ...route.flatMap((p, i) => [{ verb: 'walk_to', params: { to: p } }, ...(i < route.length - 1 ? [{ verb: 'rest', params: { seconds: 4 } }] : [])])] });
   }
   private strolls = new Map<string, { key: string; spots: Vec2[] }>();
+  /** The engine's navigation epoch, read once per tick and world version (each read syncs the planner, ~0.5 ms). */
+  private epochMemo: { at: string; ep: number | undefined } | null = null;
+  private navEpoch(): number | undefined {
+    const at = `${this.h.engine.world.tick}|${this.h.version?.() ?? this.h.model.editSeq}`;
+    if (this.epochMemo?.at !== at) this.epochMemo = { at, ep: this.h.engine.navEpochV1?.() };
+    return this.epochMemo.ep;
+  }
   private strollSpots(ref: string, poly: Vec2[]): Vec2[] {
     // L1: clear spots read only the static clearance (clearSpotsV1), so they are kept until a god edit (the area's outline)
     // or the navigation epoch (the static world) moves — not every engine writeback: after each walk a Soul's next listing
     // re-derived every area's spots (~200 nav tiles rebuilt, 6–10 s on Eden 2026)
-    const ep = this.h.engine.navEpochV1?.(), key = ep === undefined ? this.cache?.key ?? '' : `${this.h.staticVersion?.() ?? this.cache?.key}|${ep}`;
+    const ep = this.navEpoch(), key = ep === undefined ? this.cache?.key ?? '' : `${this.h.staticVersion?.() ?? this.cache?.key}|${ep}`;
     const hit = this.strolls.get(ref); if (hit?.key === key) return hit.spots;
     const f = (this.h.engine as unknown as { clearSpotsV1?: (p: Vec2[], n: number) => Vec2[] }).clearSpotsV1;
     const spots = (f ? f.call(this.h.engine, poly, 5) : []).map(([x, z]) => [r2(x), r2(z)] as Vec2);
-    this.strolls.set(ref, { key, spots }); if (this.strolls.size > 200) this.strolls.clear();
+    // (L1: was cleared past 200 areas; Eden 2026's listing reads more than that, so every listing recomputed them all)
+    this.strolls.set(ref, { key, spots }); if (this.strolls.size > 4096) this.strolls.delete(this.strolls.keys().next().value!);
     return spots;
   }
   private label(t: Thing, d: number): string {

@@ -462,9 +462,9 @@ export class GroundNav {
   }
 
   /**
-   * Paged: all levels over a tile rect, on the rect's own lattice — level 0 composed from tiles, each upper level (a deck,
-   * a floor) that has a surface reaching the rect built flat over it (so multi-level routes and walkers on upper floors
-   * see the same lattice as level 0).
+   * Paged: all levels over a tile rect, on the global lattice — level 0 composed from tiles over the rect, each upper
+   * level (a deck, a floor) that has a surface reaching the rect built over its own floors there (L1: a grid the size of
+   * those floors, not of the rect; cells beyond it read as no floor, as before).
    */
   gridsOver(r: TileRect, scene: SpatialScene): GridSet {
     const levels = new Map<number, LevelGrid>(), b = rectBounds(r);
