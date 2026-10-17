@@ -228,10 +228,11 @@ export class MarsEngine implements Engine {
     if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
     // entity-physics/1 (world-edit, lane L9): a restored entity world re-registers its derived assets and re-bases its
     // Spatial on its own physics (absent in every authored world, so they are untouched).
-    if(rt.world.entityPhysicsV1){registerAssets(rt.world.entityPhysicsV1.assets);(rt.services.spatial as Spatial).refreshForWorld(rt.world);}
-    // upper-floors/1: a restored world's services may come from its pre-fact base (snapshot restore); re-base on the
-    // installed floors so walkers reach them after a restart (a no-op when the planner already has them).
-    else if(rt.world.upperFloorsV1)(rt.services.spatial as Spatial).refreshForWorld(rt.world);
+    if(rt.world.entityPhysicsV1)registerAssets(rt.world.entityPhysicsV1.assets);
+    // A restored world's services come from its factory's genesis base (snapshot restore): re-base on the world's own
+    // logged static facts (nav/1, office guards, authored boundaries, upper floors, entity physics) so a restart equals
+    // the live world in every state, including after all upper floors are removed. A no-op when the base id already matches.
+    (rt.services.spatial as Spatial|undefined)?.refreshForWorld?.(rt.world);
     this.cursor = rt.events.length;
     this.startRecorder();
     const self = this;
