@@ -4,11 +4,11 @@
 // same rules sampled finer near water. Everything here reads the baked tiles
 // (Terrain.sample / slope), never the raw height function, so it agrees with
 // the picture and with the god's query to the bit.
-import { areaMask, pathMask } from './geom.ts';
+import { areaMask, clamp01, distPointSeg, distPolyEdge, distPolyline, pathMask, pointInPoly, sq } from './geom.ts';
 import { levelAlong } from './forms.ts';
 import { MEDIA_EPS, WADE_MAX_M, WALK_MAX_SLOPE } from './settle.ts';
 import type { Terrain } from './tiles.ts';
-import { TILE_M, type Ground, type Water } from './types.ts';
+import { TILE_M, type Ground, type Vec2, type Water } from './types.ts';
 
 /** Media codes in a media tile. `outside` = beyond the world extent (never walkable). */
 export const MEDIUM = { walk: 0, wade: 1, swim: 2, steep: 3, outside: 4 } as const;
@@ -55,6 +55,79 @@ export function levelAmong(waters: Water[], seaLevel: number | undefined, x: num
   let level: number | null = null;
   for (const w of waters) if ((w.area ? areaMask(x, z, w.area, 1e-9) : pathMask(x, z, w.path!, w.w!)) > 0) level = w.levels ? levelAlong(x, z, w.path!, w.levels).level : w.level;
   return level ?? (seaLevel ?? null);
+}
+
+/**
+ * L1 (speed): `levelAmong(waters, seaLevel, x, z)` for the points of one 1 m cell [cx, cx + 1) × [cz, cz + 1), compiled
+ * once. A nav tile asks the water level of each 0.1 m cell near water, and each answer measured the point against every
+ * edge of every near water (Eden 2026's canals and pond: most of a tile build). Per cell, a water whose outline or path
+ * lies farther than the cell's half-diagonal (plus 1e-6) from its centre is decided for all its points (inside or out,
+ * nearer than its width or not); a water decided "in" overrides every water before it (last wins); undecided waters keep
+ * only the edges and segments that can matter inside the cell (a segment nearest to some point of the cell lies within
+ * twice the half-diagonal of the centre's nearest; parity only counts edges spanning the point's z). Same arithmetic per
+ * edge and segment, so the same answers, bit for bit (media.test.ts).
+ */
+export function waterLevelCell(waters: Water[], seaLevel: number | undefined, cx: number, cz: number): (x: number, z: number) => number | null {
+  const H = Math.SQRT1_2 + 1e-6, X = cx + 0.5, Z = cz + 0.5, sea = seaLevel ?? null;
+  type Keep = { all: boolean; test: (x: number, z: number) => boolean; level: (x: number, z: number) => number };
+  const keep: Keep[] = [];
+  for (const w of waters) {
+    let all: boolean, test: Keep['test'] = () => true;
+    if (w.area) {
+      const poly = w.area, n = poly.length, dE = distPolyEdge(X, Z, poly);
+      if (dE > H) { if (!pointInPoly(X, Z, poly)) continue; all = true; }
+      else {
+        all = false;
+        const span: number[] = [], near: number[] = [];
+        for (let i = 0, j = n - 1; i < n; j = i++) {
+          const zi = poly[i][1], zj = poly[j][1];
+          if (Math.max(zi, zj) > cz - 1e-6 && Math.min(zi, zj) <= cz + 1 + 1e-6) span.push(i);
+          if (distPointSeg(X, Z, poly[j][0], poly[j][1], poly[i][0], poly[i][1]) <= dE + 2 * H) near.push(i);
+        }
+        test = (x, z) => {
+          let inside = false;
+          for (const i of span) { const j = i === 0 ? n - 1 : i - 1, xi = poly[i][0], zi = poly[i][1], xj = poly[j][0], zj = poly[j][1]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside; }
+          if (!inside) return false;
+          let best = Infinity;
+          for (const i of near) { const j = i === 0 ? n - 1 : i - 1, d = distPointSeg(x, z, poly[j][0], poly[j][1], poly[i][0], poly[i][1]); if (d < best) best = d; }
+          return best / 1e-9 > 0 && smoothPos(best / 1e-9);
+        };
+      }
+    } else {
+      const path = w.path!, ww = w.w!, d = distPolyline(X, Z, path);
+      if (d - H >= ww) continue;
+      all = d + H < ww;
+      const near: number[] = [];
+      for (let i = 1; i < path.length; i++) if (distPointSeg(X, Z, path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]) <= d + 2 * H) near.push(i);
+      if (!all) test = (x, z) => { let best = Infinity; for (const i of near) { const e = distPointSeg(x, z, path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]); if (e < best) best = e; } return 1 - smooth01(best / ww) > 0; };
+      if (w.levels) { const levels = w.levels; keep.push({ all, test, level: (x, z) => levelAlongSub(x, z, path, levels, near) }); continue; }
+    }
+    const lv = w.levels ? null : w.level;
+    keep.push({ all, test, level: lv === null ? (x, z) => levelAlong(x, z, w.path!, w.levels!).level : () => lv as number });
+  }
+  let from = 0;
+  for (let k = keep.length - 1; k >= 0; k--) if (keep[k].all) { from = k; break; }
+  const live = keep.slice(from);
+  if (!live.length) return () => sea;
+  if (live.length === 1 && live[0].all && live[0].level.length === 0) { const v = live[0].level(0, 0); return () => v; }
+  return (x, z) => { let level: number | null = null; for (const k of live) if (k.all || k.test(x, z)) level = k.level(x, z); return level ?? sea; };
+}
+/** geom.smooth(t) > 0 (the area mask's sign), as computed. */
+function smoothPos(t: number): boolean { const c = clamp01(t); return c * c * (3 - 2 * c) > 0; }
+function smooth01(t: number): number { const c = clamp01(t); return c * c * (3 - 2 * c); }
+/** forms.levelAlong over the segments `idx` (ascending; each i is the segment p[i-1]→p[i]), which hold the nearest. */
+function levelAlongSub(px: number, pz: number, p: Vec2[], levels: number[], idx: number[]): number {
+  let best = Infinity, bi = 0, bt = 0;
+  for (const i of idx) {
+    const ax = p[i - 1][0], az = p[i - 1][1], vx = p[i][0] - ax, vz = p[i][1] - az, wx = px - ax, wz = pz - az;
+    const n = vx * vx + vz * vz;
+    const raw = n === 0 ? 0 : (wx * vx + wz * vz) / n;
+    const t = clamp01(raw);
+    const d = Math.sqrt(sq(px - (ax + vx * t)) + sq(pz - (az + vz * t)));
+    if (d < best) { best = d; bi = i - 1; bt = t; }
+  }
+  const a = levels[bi], b = levels[bi + 1] ?? a;
+  return a + (b - a) * bt;
 }
 
 /** In the world extent (half-open on the far edges, as tiles are). */

@@ -84,7 +84,29 @@ export const CORRIDOR_HALO = 1.5;
 
 /** A link direction prepare() dropped for lack of room at its approach (recorded only with `nameObstacles`). */
 type Dropped = { level: number; at: Vec2[]; farLevel: number; far: Vec2 };
-type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; N: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]>; dropped?: Dropped[] };
+/**
+ * Search ids: level index k's cell c is B[k] + c (B = running sum of the level grids' cell counts). Levels of one GridSet
+ * may cover different extents of the global lattice (L1: a paged window's upper floors span their own floors, not the
+ * window), so a search's workspace is the levels' cells, not levels × the ground's. Equal-sized levels give B[k] = k·N,
+ * the ids as before. `fullTotal` = levels × the first level's cells (what the old layout spanned) keeps the size-gated
+ * choices (reverse flood, failed-search memo) exactly as they were.
+ */
+type Layout = { B: number[]; Ns: number[]; total: number; fullTotal: number };
+function layoutOf(grids: GridSet, lvIds: number[]): Layout {
+  const B: number[] = [], Ns: number[] = [];
+  let total = 0;
+  for (const id of lvIds) { const g = grids.levels.get(id)!, n = g.nx * g.nz; B.push(total); Ns.push(n); total += n; }
+  return { B, Ns, total, fullTotal: lvIds.length * (Ns[0] ?? 0) };
+}
+/** The level index of search id `id` (`hint`: a likely index, e.g. the last one). */
+function lvOf(L: Layout, id: number, hint = 0): number {
+  const { B, Ns } = L;
+  if (id >= B[hint] && id < B[hint] + Ns[hint]) return hint;
+  let lo = 0, hi = B.length - 1;
+  while (lo < hi) { const m = (lo + hi + 1) >> 1; if (B[m] <= id) lo = m; else hi = m - 1; }
+  return lo;
+}
+type Prep = Layout & { r: number; lvIds: number[]; idxOf: Map<number, number>; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]>; dropped?: Dropped[] };
 type Found = { goalId: number; chain: number[]; viaLink: Map<number, LinkEdge>; expanded: number };
 
 export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts = {}): RouteResult {
@@ -125,8 +147,7 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
   const r = profile.radius + PLAN_MARGIN;
   const lvIds = [...grids.levels.keys()].sort((a, b) => a - b);
   const idxOf = new Map(lvIds.map((l, i) => [l, i]));
-  const g0 = grids.levels.get(lvIds[0])!;
-  const N = g0.nx * g0.nz;
+  const L = layoutOf(grids, lvIds);
   const gs = grids.levels.get(start.level), gg = grids.levels.get(goal.level);
   if (!gs || !gg) return fail('route.unknown-level', `level ${!gs ? start.level : goal.level} does not exist`);
   const passable = (g: LevelGrid, c: number) => c >= 0 && g.clearance[c] >= r;
@@ -159,13 +180,13 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
         continue;
       }
       const len = dist2(approach, entry.p) + pathLen(link.path) + dist2(exit.p, centreOf(gx, cx));
-      const id = idxOf.get(entry.level)! * N + ca;
+      const id = L.B[idxOf.get(entry.level)!] + ca;
       const list = edges.get(id) ?? [];
       list.push({ link, ascending, toLevel: exit.level, toCell: cx, cost: len * 1.25, approach });
       edges.set(id, list);
     }
   }
-  return { r, lvIds, idxOf, N, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges, dropped };
+  return { ...L, r, lvIds, idxOf, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges, dropped };
 }
 
 /**
@@ -177,8 +198,7 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
  * Returns null when the goal is unreachable, a diagnostic when the expansion limit is hit.
  */
 function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint32Array; gen: number } | null): Found | RouteResult | null {
-  const { r, lvIds, idxOf, N, gg, s, gt, edges, sLv, gLv } = prep;
-  const total = lvIds.length * N;
+  const { r, lvIds, idxOf, B, gg, s, gt, edges, sLv, gLv, total } = prep;
   const S = scratchFor(total);
   const gen = S.gen;
   const { gScore, came, pos, stamp, shut } = S;
@@ -186,7 +206,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   const heap = S.heap;
   heap.reset(pos);
   const Ls = lvIds.map((id) => grids.levels.get(id)!);
-  const startId = sLv * N + s, goalId = gLv * N + gt;
+  const startId = B[sLv] + s, goalId = B[gLv] + gt;
   const goalC = centreOf(gg, gt);
   const gx0 = goalC[0], gz0 = goalC[1];
   // octile distance from a cell centre to the goal cell centre (same float ops as centreOf)
@@ -208,7 +228,8 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   heap.push(startId, h(sLv, s), false);
   let expanded = 0;
   const hasEdges = edges.size > 0;
-  let rev = opts.proveUnreachable && !mask && startId !== goalId && total <= maxExpand ? reverseFlood(S, prep, Ls, startId, goalId) : null;
+  let rev = opts.proveUnreachable && !mask && startId !== goalId && prep.fullTotal <= maxExpand ? reverseFlood(S, prep, Ls, startId, goalId) : null;
+  let lv = 0;
   while (heap.size) {
     if (rev) {
       const st = rev.step();
@@ -220,9 +241,10 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
     shut[cur] = gen;
     if (cur === goalId) break;
     if (++expanded > maxExpand) return fail('route.search-limit', `route search exceeded ${maxExpand} expansions`);
-    const lv = Math.floor(cur / N), c = cur - lv * N;
+    lv = lvOf(prep, cur, lv);
+    const base = B[lv], c = cur - base;
     const g = Ls[lv];
-    const nx = g.nx, nz = g.nz, cl = g.clearance, base = lv * N, gc = gScore[cur];
+    const nx = g.nx, nz = g.nz, cl = g.clearance, gc = gScore[cur];
     const straight = g.cell, diag = SQ2 * g.cell;
     const ci = c % nx, cj = (c - ci) / nx;
     for (let dj = -1; dj <= 1; dj++) {
@@ -253,7 +275,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
     if (!hasEdges) continue;
     for (const e of edges.get(cur) ?? []) {
       const tl = idxOf.get(e.toLevel)!;
-      const nid = tl * N + e.toCell;
+      const nid = B[tl] + e.toCell;
       if (ms && ms[nid] !== mg) continue;
       const t = gc + e.cost;
       const fresh = stamp[nid] !== gen;
@@ -266,7 +288,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
       }
     }
   }
-  if (shut[goalId] !== gen) { failRegion = { cells: shut, gen }; if (memo) remember(memo, shut, gen, total, expanded); return null; }
+  if (shut[goalId] !== gen) { failRegion = { cells: shut, gen }; if (memo) remember(memo, shut, gen, total, expanded, prep.fullTotal); return null; }
   const chain: number[] = [];
   for (let id = goalId; id !== -1; id = came[id]) chain.push(id);
   chain.reverse();
@@ -293,8 +315,8 @@ function strandedKey(grids: GridSet, prep: Prep): string {
   for (const [from, list] of prep.edges) for (const e of list) k += `${from}>${e.toLevel}:${e.toCell};`;
   return k;
 }
-function remember(key: string, shut: Uint32Array, gen: number, total: number, size: number) {
-  if (total > STRANDED_CELLS) return;
+function remember(key: string, shut: Uint32Array, gen: number, total: number, size: number, fullTotal = total) {
+  if (fullTotal > STRANDED_CELLS) return;
   const cells = new Uint8Array((total + 7) >> 3);
   for (let i = 0; i < total; i++) if (shut[i] === gen) cells[i >> 3] |= 1 << (i & 7);
   const old = stranded.get(key); if (old) { strandedBytes -= old.cells.byteLength; stranded.delete(key); }
@@ -327,7 +349,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
   const reg = failRegion;
   failRegion = null;
   if (!reg) return [];
-  const { lvIds, N, r } = prep;
+  const { lvIds, B, r } = prep;
   // (+ 0.5 m: a small pocket's passable cells can sit ~0.9 m from an obstacle that closes it, e.g. the
   // people level with a goal in a ring, whose diagonal neighbours are nearer)
   const grow = r + 0.5;
@@ -349,7 +371,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
       const g = grids.levels.get(lvIds[lv])!;
       if (!atHeight(o, g)) continue;
       cells(g, o.obb.c, ext, (q) => pointInObb(q, o.obb, grow), (n) => {
-        if (reg.cells[lv * N + n] === reg.gen) inR = true;
+        if (reg.cells[B[lv] + n] === reg.gen) inR = true;
         else if (g.clearance[n] >= r) outside = true;
         return inR && outside;
       });
@@ -358,7 +380,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
   }
   const touches = (level: number, p: Vec2) => {
     const lv = prep.idxOf.get(level), g = grids.levels.get(level);
-    return lv !== undefined && !!g && cells(g, p, r + 0.6, (q) => dist2(q, p) <= r + 0.6, (n) => reg.cells[lv * N + n] === reg.gen);
+    return lv !== undefined && !!g && cells(g, p, r + 0.6, (q) => dist2(q, p) <= r + 0.6, (n) => reg.cells[B[lv] + n] === reg.gen);
   };
   for (const d of prep.dropped ?? []) {
     if (touches(d.level, d.at[0]) === touches(d.farLevel, d.far)) continue;
@@ -376,7 +398,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
  * `step()` visits one cell: −1 exhausted without the start, 1 met the start, 0 not decided yet.
  */
 function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, goalId: number) {
-  const { r, N, idxOf, edges } = prep;
+  const { r, B, idxOf, edges } = prep;
   if (!S.rseen || S.rseen.length !== S.total) { S.rseen = new Uint32Array(S.total); S.rq = new Int32Array(S.total); }
   const seen = S.rseen, q = S.rq!, gen = S.gen;
   let into: Map<number, number[]> | null = null;
@@ -384,22 +406,22 @@ function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, 
     into = new Map();
     for (const [from, list] of edges)
       for (const e of list) {
-        const to = idxOf.get(e.toLevel)! * N + e.toCell;
+        const to = B[idxOf.get(e.toLevel)!] + e.toCell;
         const l = into.get(to);
         if (l) l.push(from);
         else into.set(to, [from]);
       }
   }
-  let head = 0, tail = 0;
+  let head = 0, tail = 0, lvHint = 0;
   seen[goalId] = gen;
   q[tail++] = goalId;
   return {
     step(): number {
       if (head === tail) return -1;
       const x = q[head++];
-      const lv = Math.floor(x / N), c = x - lv * N;
+      const lv = (lvHint = lvOf(prep, x, lvHint)), base = B[lv], c = x - base;
       const g = Ls[lv];
-      const nx = g.nx, nz = g.nz, cl = g.clearance, base = lv * N;
+      const nx = g.nx, nz = g.nz, cl = g.clearance;
       if (cl[c] >= r) {
         const xi = c % nx, xj = (c - xi) / nx;
         for (let dj = -1; dj <= 1; dj++) {
@@ -433,7 +455,7 @@ function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, 
 
 /** Cell chain → legs (string-pulled walk legs + link legs). */
 function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: Found, expanded: number): RouteResult {
-  const { r, lvIds, N, gg, gt } = prep;
+  const { r, lvIds, B, gg, gt } = prep;
   const { chain, viaLink } = found;
   const goalC = centreOf(gg, gt);
   const legs: Leg[] = [];
@@ -442,7 +464,7 @@ function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: 
   for (let k = 1; k < chain.length; k++) {
     const id = chain[k];
     const e = viaLink.get(id);
-    const g = grids.levels.get(lvIds[Math.floor(id / N)])!;
+    const lvk = lvOf(prep, id), g = grids.levels.get(lvIds[lvk])!;
     if (e) {
       // A running route owns its geometry; scene contributors may replace or edit links later.
       const link = structuredClone(e.link);
@@ -452,7 +474,7 @@ function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: 
       legs.push({ kind: 'link', link, ascending: e.ascending });
       pts = [exit.p];
       curLv = e.toLevel;
-    } else pts.push(centreOf(g, id % N));
+    } else pts.push(centreOf(g, id - B[lvk]));
   }
   // a snapped goal (its own cell has no standing room) ends at the snapped standable cell centre, never
   // at the raw goal (review H2); walk_to reports the snap distance
@@ -476,21 +498,20 @@ function corridorRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfil
   if ('ok' in cPrep) return null;
   const cFound = search(coarse, cPrep, opts, null);
   if (!cFound || 'ok' in cFound) return null;
-  const { N, lvIds } = prep;
-  const S = scratchFor(lvIds.length * N);
+  const { B, lvIds } = prep;
+  const S = scratchFor(prep.total);
   if (!S.mask) S.mask = new Uint32Array(S.total);
   if (S.maskGen >= 0xfffffffe) { S.maskGen = 0; S.mask.fill(0); }
   const mgen = ++S.maskGen;
   const k = Math.ceil(CORRIDOR_HALO / (f * grids.cell));
-  const Nc = cPrep.N;
   for (const id of cFound.chain) {
-    const lv = Math.floor(id / Nc), c = id - lv * Nc;
+    const lv = lvOf(cPrep, id), c = id - cPrep.B[lv];
     const cg = coarse.levels.get(lvIds[lv])!, g = grids.levels.get(lvIds[lv])!;
     // coarse lattice cell K covers fine lattice cells K·f … K·f + f − 1 (see coarseGrids)
     const ci = cg.ox + (c % cg.nx), cj = cg.oz + Math.floor(c / cg.nx);
     const i0 = Math.max(0, (ci - k) * f - g.ox), i1 = Math.min(g.nx, (ci + k + 1) * f - g.ox);
     const j0 = Math.max(0, (cj - k) * f - g.oz), j1 = Math.min(g.nz, (cj + k + 1) * f - g.oz);
-    for (let j = j0; j < j1; j++) for (let i = i0, row = lv * N + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
+    for (let j = j0; j < j1; j++) for (let i = i0, row = B[lv] + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
   }
   const found = search(grids, prep, opts, { stamp: S.mask, gen: mgen });
   if (!found || 'ok' in found) return null;
@@ -655,16 +676,31 @@ type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Ar
 const scratches = new Map<number, Scratch>();
 const SCRATCHES = 3;
 /** Numeric diagnostics: search workspaces kept and their bytes. */
-export function scratchMetrics() { let bytes = 0; for (const sc of scratches.values()) for (const v of Object.values(sc)) if (ArrayBuffer.isView(v)) bytes += v.byteLength; return { entries: scratches.size, bytes, totals: [...scratches.keys()] }; }
+export function scratchMetrics() { let bytes = 0; for (const sc of [...scratches.values(), ...(bigScratch ? [bigScratch] : [])]) for (const v of Object.values(sc)) if (ArrayBuffer.isView(v)) bytes += v.byteLength; return { entries: scratches.size + (bigScratch ? 1 : 0), bytes, totals: [...scratches.keys(), ...(bigScratch ? [bigScratch.total] : [])] }; }
 /** E-life (memory): a workspace costs ~28 bytes a cell; one for a 4×4-tile window (16.4 M cells) is ~450 MB. Only
  *  workspaces up to this many cells are kept for reuse; a bigger search gets a fresh one that is freed after it (Eden
  *  2026 kept 403 MB of workspaces after one resident's first capabilities). Search results are unchanged. */
 export const SCRATCH_KEEP_CELLS = 2_500_000;
+/** L1: one workspace bigger than SCRATCH_KEEP_CELLS is kept for the next big search (any size up to its own: ids and
+ *  generations do not care), and let go after BIG_IDLE small searches in a row. A Soul's first look inside a multi-storey
+ *  house runs ~30 room-reach searches over ~4 M cells each; each used to get (and free) a fresh ~110 MB workspace. */
+let bigScratch: Scratch | null = null, smallRun = 0;
+const BIG_IDLE = 400;
+/** Let the big workspace go now (a host calls this after a burst of reads, e.g. a Soul's capability listing). */
+export function releaseBigScratch() { bigScratch = null; smallRun = 0; }
+function newScratch(total: number): Scratch {
+  return { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
+}
 function scratchFor(total: number): Scratch {
   let sc = scratches.get(total);
-  if (!sc) {
-    sc = { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
-    if (total <= SCRATCH_KEEP_CELLS) {
+  if (total > SCRATCH_KEEP_CELLS) {
+    smallRun = 0;
+    if (!bigScratch || bigScratch.total < total) bigScratch = newScratch(total);
+    sc = bigScratch;
+  } else {
+    if (bigScratch && ++smallRun > BIG_IDLE) bigScratch = null;
+    if (!sc) {
+      sc = newScratch(total);
       if (scratches.size >= SCRATCHES) scratches.delete(scratches.keys().next().value!);
       scratches.set(total, sc);
     }

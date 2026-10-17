@@ -6,10 +6,11 @@ import { isStanding, isSupported, isUpright } from './rules.ts';
 import { HAND_REACH, handPoint, LIFT_APEX_MAX } from './liftcrew.ts';
 import { EDGE_REACH, ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, KNEEL_BACK, REACH_DOWN } from './handup.ts';
 import { hypot } from '../core/math.ts';
+import { entityList } from '../world/entity-list.ts';
 
 export const uprightsSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     if (!isUpright(e) || e.phase === 'carried') continue;
     if (isStanding(e) || e.phase === 'raising') {
       if (!isSupported(rt.world, e) && e.support?.kind !== 'held')
@@ -32,7 +33,7 @@ export const uprightsSupported: Invariant = (rt) => {
 export const liftHandsInReach: Invariant = (rt) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of Object.values(ents)) {
+  for (const e of entityList(rt.world)) {
     if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held') continue;
     for (const id of e.support.by) {
       const h = ents[id];
@@ -50,7 +51,7 @@ export const liftHandsInReach: Invariant = (rt) => {
         });
     }
   }
-  for (const h of Object.values(ents)) {
+  for (const h of entityList(rt.world)) {
     const slot = h.human?.grip?.slot;
     if (!slot?.startsWith(HANDUP_SLOT_PREFIX)) continue;
     const part = h.human!.grip!.entity;

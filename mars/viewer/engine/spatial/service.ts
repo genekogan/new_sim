@@ -6,7 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, hypot, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { buildStaticGrids, buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
+import { buildStaticGrids, buildGrids, clearanceAt, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
@@ -225,8 +225,32 @@ export class Spatial {
     return true;
   }
 
+  /** Inside readPass: the world whose sync is already done (and its entities object). */
+  private held: { world: WorldState; entities: WorldState['entities'] } | null = null;
+  /**
+   * Run `fn`, a read of `world` that changes nothing the planner sees (no entity, body or walk in progress moves), with
+   * one sync up front: every sync(world) inside it is answered "nothing changed" without walking the entities again
+   * (lane L1: a Soul's first listing inside an Eden 2026 house synced ~3,500 times, 0.9 s). A sync still runs whenever
+   * the scene is gone or the ground window grew (groundDirty), and for any other world.
+   */
+  readPass<T>(world: WorldState, fn: () => T): T {
+    this.sync(world);
+    const prev = this.held;
+    this.held = { world, entities: world.entities };
+    try {
+      return fn();
+    } finally {
+      this.held = prev;
+    }
+  }
+
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
   sync(world: WorldState): boolean {
+    const h = this.held;
+    if (h !== null) {
+      if (h.world === world && h.entities === world.entities && this.scene && !this.groundDirty) return false;
+      this.held = null;   // the planner now follows another world (or a changed one): real syncs until the pass ends
+    }
     const p = this.prof;
     if (!p) return this.syncNow(world);
     const t0 = p.now();
@@ -314,14 +338,14 @@ export class Spatial {
   private syncPaged(world: WorldState): boolean {
     const g = this.ground!, ext = g.extentTiles(), units: TileRect[] = [];
     const clip = (r: TileRect) => { const q: TileRect = [Math.max(r[0], ext[0]), Math.max(r[1], ext[1]), Math.min(r[2], ext[2]), Math.min(r[3], ext[3])]; if (q[0] <= q[2] && q[1] <= q[3]) units.push(q); };
-    for (const id in world.entities) { const e = world.entities[id]; if (e.kind === 'human' && e.human) clip(rectOf([[e.pose.p[0], e.pose.p[2]]])); }
-    for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
-    if (!units.length) clip(rectOf([[0, 0]]));
-    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    // (L1: the bodies are collected in navChanged's one pass over the entities; a capability listing syncs ~2000 times)
     // no scene = first sync or a re-base (refreshForWorld: new levels, wider raster). That changes the static world even
     // when no static entity did: an empty god world's only content is its world-edits, so `navChanged` alone would keep
     // the windows' old grids (no new floor, no new walls) until the next edit or a restart.
-    const changed = this.navChanged(world) || !this.scene;
+    const changed = this.navChanged(world, (e) => clip(rectOf([[e.pose.p[0], e.pose.p[2]]]))) || !this.scene;
+    for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
+    if (!units.length) clip(rectOf([[0, 0]]));
+    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
     if (!changed && this.pages && this.pages.key === key) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
@@ -408,6 +432,37 @@ export class Spatial {
   }
 
   /**
+   * L1 (memory): clearance reads at points round `at` on `level`, exactly as `clearanceAt(levelAt(level, at), q)` — the same
+   * values (0 off the grid) and the same window focus — but when no paged window holds `at` on level 0, the points are read
+   * from the fine tiles of the composite levelAt would build (GroundNav.clearanceReader) instead of copying it. Null when
+   * levelAt has no grid.
+   */
+  clearanceReader(level: number, at: Vec2): ((q: Vec2) => number) | null {
+    if (level === 0 && this.ground?.paged && this.pages) {
+      const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceReader(rectOf([at]), this.pages.all.obstacles);
+    }
+    const g = this.levelAt(level, at);
+    return g ? (q) => clearanceAt(g, q) : null;
+  }
+
+  /** L1: `Math.min(clearanceAt(levelAt(level, at), q), cap)` for points round `at`, the same answers and window focus; off
+   *  the paged windows on level 0 without building fine tiles (GroundNav.clearanceCapped). Null when levelAt has no grid. */
+  clearanceCapped(level: number, at: Vec2, cap: number): ((q: Vec2) => number) | null {
+    if (level === 0 && this.ground?.paged && this.pages) {
+      const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceCapped(rectOf([at]), this.pages.all.obstacles, cap);
+    }
+    const g = this.levelAt(level, at);
+    return g ? (q) => Math.min(clearanceAt(g, q), cap) : null;
+  }
+  /** L1: `clearanceAt(levelAt(level, at), q) >= t` (clearanceCapped at t). */
+  clearTester(level: number, at: Vec2, t: number): ((q: Vec2) => boolean) | null {
+    const read = this.clearanceCapped(level, at, t);
+    return read ? (q) => read(q) >= t : null;
+  }
+
+  /**
    * The grid of `id` over the tile holding `p`, which no paged window holds. Building an upper level costs ~0.1 s (raster
    * and EDT) and a Soul's capability listing, a ring search or a slot check asks for the same few tiles again and again,
    * so each is built once per navigation epoch (the epoch moves whenever the static world does). Level 0 is already
@@ -438,11 +493,12 @@ export class Spatial {
    * the last call; refreshes the snapshots. Allocation-free when nothing changed (~35k calls a run),
    * and changes exactly when the former sha256 key over the same fields would (planning.test.ts).
    */
-  private navChanged(world: WorldState): boolean {
+  private navChanged(world: WorldState, onBody?: (e: Entity) => void): boolean {
     const snaps = this.snaps;
     let n = 0, changed = false;
     for (const id in world.entities) {
       const e = world.entities[id];
+      if (onBody && e.kind === 'human' && e.human) { onBody(e); continue; }
       if (!isStatic(e)) continue;
       const s = snaps[n];
       if (!s) { snaps.push(navSnap(e)); changed = true; }

@@ -8,20 +8,28 @@ import { buildGrids, buildGridsOverFloors, type GridSet } from '../spatial/grid.
 import type { Level, Obstacle, SpatialScene, Surface } from '../spatial/types.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';
 
+/** L1: each level of `a` (buildGridsOverFloors) is a crop of `b`'s level (buildGrids) on the same global lattice: every
+ *  cell of `b` reads the same through `a` (free, clearance bits, first-cover blocker), and a cell outside the crop is
+ *  blocked with no floor in `b` (free 0, clearance 0, no blocker) — what cellOf −1 reads. */
 function assertSameGrids(a: GridSet, b: GridSet, what: string) {
   assert.equal(a.cell, b.cell, `${what}: cell`);
   assert.deepEqual([...a.levels.keys()], [...b.levels.keys()], `${what}: level order`);
   for (const [id, ga] of a.levels) {
     const gb = b.levels.get(id)!;
-    for (const k of ['level', 'y', 'cell', 'nx', 'nz', 'ox', 'oz', 'x0', 'z0'] as const) assert.equal(ga[k], gb[k], `${what}: level ${id} ${k}`);
-    const df = ga.free.findIndex((v, i) => v !== gb.free[i]);
-    assert.equal(df, -1, `${what}: level ${id} free differs at cell ${df}`);
-    const ca = new Uint32Array(ga.clearance.buffer, ga.clearance.byteOffset, ga.clearance.length);
-    const cb = new Uint32Array(gb.clearance.buffer, gb.clearance.byteOffset, gb.clearance.length);
-    const dc = ca.findIndex((v, i) => v !== cb[i]);
-    assert.equal(dc, -1, `${what}: level ${id} clearance differs at cell ${dc} (${ga.clearance[dc]} vs ${gb.clearance[dc]})`);
-    assert.equal(ga.blockers.size, gb.blockers.size, `${what}: level ${id} blocker count`);
-    assert.deepEqual([...ga.blockers], [...gb.blockers], `${what}: level ${id} blockers`);
+    for (const k of ['level', 'y', 'cell'] as const) assert.equal(ga[k], gb[k], `${what}: level ${id} ${k}`);
+    assert.ok(ga.nx * ga.nz <= Math.max(1, gb.nx * gb.nz), `${what}: level ${id} crop no bigger than the window`);
+    const bitsA = new Uint32Array(ga.clearance.buffer, ga.clearance.byteOffset, ga.clearance.length);
+    const bitsB = new Uint32Array(gb.clearance.buffer, gb.clearance.byteOffset, gb.clearance.length);
+    let inCrop = 0;
+    for (let j = 0; j < gb.nz; j++) for (let i = 0; i < gb.nx; i++) {
+      const kb = j * gb.nx + i, ia = gb.ox + i - ga.ox, ja = gb.oz + j - ga.oz, inside = ia >= 0 && ja >= 0 && ia < ga.nx && ja < ga.nz;
+      if (!inside) { assert.ok(gb.free[kb] === 0 && gb.clearance[kb] === 0 && !gb.blockers.has(kb), `${what}: level ${id} cell ${i},${j} outside the crop is open in buildGrids`); continue; }
+      const ka = ja * ga.nx + ia; inCrop++;
+      if (ga.free[ka] !== gb.free[kb] || bitsA[ka] !== bitsB[kb] || ga.blockers.get(ka) !== gb.blockers.get(kb)) assert.fail(`${what}: level ${id} cell ${i},${j} differs (free ${ga.free[ka]}/${gb.free[kb]}, clearance ${ga.clearance[ka]}/${gb.clearance[kb]}, blocker ${ga.blockers.get(ka)}/${gb.blockers.get(kb)})`);
+    }
+    // every crop cell lies in the window (a level with no floor here is one blocked cell)
+    if (ga.nx * ga.nz > 1) assert.equal(inCrop, ga.nx * ga.nz, `${what}: level ${id} crop inside the window`);
+    else assert.ok(ga.free[0] === 0 && ga.clearance[0] === 0, `${what}: level ${id} empty level is blocked`);
   }
 }
 

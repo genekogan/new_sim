@@ -351,12 +351,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** nav/1: an idle body standing inside a solid (e.g. it was mid-walk through a house when the footprints were admitted)
    *  steps out to the nearest clear spot, as a logged edge-relocate (deterministic in replay). At most once a minute each. */
   private unstick(tick: number) {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; nearestStandableV1?: (at: [number, number], except?: string) => [number, number] | null};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; nearestStandableV1?: (at: [number, number], except?: string) => [number, number] | null};
     if (!engine.clearanceAtV1 || !engine.nearestStandableV1 || !(this.host.engine.world as {navV1?: unknown}).navV1) return;
+    const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
     for (const m of this.host.minds.values()) {
       const b = this.body(m.entityId), h = b?.human; if (!b || !h || (h.level ?? 0) !== 0 || h.shore || h.carrier || h.sleepPose || h.activity === 'sit' || h.baseActivity === 'sit' || this.host.engine.programOf(m.entityId)) continue;
       // CN5: below the walk planner's body radius a body cannot start a walk (route.start-blocked), so it steps out
-      if ((this.unstuckAt.get(m.soulId) ?? -1e9) > tick - 1200 || engine.clearanceAtV1(b.pose.p[0], b.pose.p[2]) >= 0.27) continue;
+      if ((this.unstuckAt.get(m.soulId) ?? -1e9) > tick - 1200 || clear(b.pose.p[0], b.pose.p[2]) >= 0.27) continue;
       const to = engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], m.entityId); if (!to) continue;
       this.unstuckAt.set(m.soulId, tick);
       try {void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, {soulId: m.soulId, entityId: m.entityId, to, why: 'stepped out of a solid footprint'}).catch(() => {/* best effort */});} catch {/* clock not ready */}
@@ -527,13 +528,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** A pond loop must stay outside its entire outline and on admitted clear ground.
    * If a world has only one accessible bank, it gets no misleading "around" offer. */
   private bankLoop(poly: [number, number][], from: [number, number]): [number, number][] {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number};
     if (!engine.clearanceAtV1 || poly.length < 3) return [];
+    const clear = (x: number, z: number) => engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1!(x, z);
     const xs = poly.map(p => p[0]), zs = poly.map(p => p[1]);
     for (const margin of [2, 3.5, 5]) {
       const x0 = Math.min(...xs) - margin, x1 = Math.max(...xs) + margin, z0 = Math.min(...zs) - margin, z1 = Math.max(...zs) + margin;
       const route: [number, number][] = [[x0,z0],[(x0+x1)/2,z0],[x1,z0],[x1,(z0+z1)/2],[x1,z1],[(x0+x1)/2,z1],[x0,z1],[x0,(z0+z1)/2]];
-      if (route.some(p => engine.clearanceAtV1!(p[0], p[1]) < 0.7)) continue;
+      if (route.some(p => clear(p[0], p[1]) < 0.7)) continue;
       let near = 0; for (let i = 1; i < route.length; i++) if (Math.hypot(route[i][0]-from[0],route[i][1]-from[1]) < Math.hypot(route[near][0]-from[0],route[near][1]-from[1])) near=i;
       return [...route.slice(near), ...route.slice(0,near)];
     }
@@ -952,7 +954,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   /** activities/1: the world facts activity capabilities need, for one Soul. */
   private activityWorld(soul: EdgeSoul, me: NonNullable<ReturnType<EdgeLedger['body']>>, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean}>) {
-    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
+    const engine = this.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number; clearanceUpToV1?: (x: number, z: number, cap?: number) => number; nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null};
     const w = this.host.engine.world as NativeWorld, here: [number, number] = [me.pose.p[0], me.pose.p[2]];
     const others = Object.values(w.entities).filter(e => e.kind === 'human' && e.id !== soul.entityId).map(e => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     const claimed = new Set<string>();
@@ -961,7 +963,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const enclosingBuilding = (place: string | undefined) => {let out: string | null = null; for (let p = place ? this.places.byId.get(place) : undefined; p; p = p.parent ? this.places.byId.get(p.parent) : undefined) if (p.enclosed && (p.level ?? 0) === 0) out = p.id; return out;};
     const level = me.human?.level ?? 0, h = me.human;
     return {me: here, seated: !!h && (h.activity === 'sit' || h.baseActivity === 'sit'),
-      clearance: (x: number, z: number) => level === 0 && engine.clearanceAtV1 ? engine.clearanceAtV1(x, z) : 0,
+      // read only against standing-room thresholds (≤ 0.95 m): capped at 1 m, answered without building far nav tiles (L1)
+      clearance: (x: number, z: number) => level === 0 && engine.clearanceAtV1 ? (engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1(x, z)) : 0,
       open: (at: [number, number], min: number, rings: number) => level === 0 && engine.nearestStandableV1 ? engine.nearestStandableV1(at, soul.entityId, min, rings) : null,
       taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),
       // a spot inside a building is offered only when that building's interior was admitted (its walls are a shell, nav/1)

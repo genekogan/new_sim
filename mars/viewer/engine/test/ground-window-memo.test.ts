@@ -35,10 +35,22 @@ const scene = (): SpatialScene => ({
 
 function sameGrid(a: LevelGrid | undefined, b: LevelGrid | undefined, what: string) {
   if (!a || !b) { assert.equal(a, b, what); return; }
+  if (a.nx !== b.nx || a.nz !== b.nz || a.ox !== b.ox || a.oz !== b.oz) { sameCells(a, b, what); return; }
   for (const k of ['level', 'y', 'cell', 'nx', 'nz', 'ox', 'oz', 'x0', 'z0'] as const) assert.equal(a[k], b[k], `${what}: ${k}`);
   assert.ok(Buffer.from(a.free.buffer, a.free.byteOffset, a.free.byteLength).equals(Buffer.from(b.free.buffer, b.free.byteOffset, b.free.byteLength)), `${what}: free`);
   assert.ok(Buffer.from(a.clearance.buffer, a.clearance.byteOffset, a.clearance.byteLength).equals(Buffer.from(b.clearance.buffer, b.clearance.byteOffset, b.clearance.byteLength)), `${what}: clearance`);
   assert.deepEqual([...a.blockers], [...b.blockers], `${what}: blockers`);
+}
+/** L1: an upper floor is now a grid over its own floors (grid.ts buildGridsOverFloors): every cell of the full-window grid
+ *  `b` reads the same through `a` on the global lattice, and a cell outside `a` is blocked with no floor in `b`. */
+function sameCells(a: LevelGrid, b: LevelGrid, what: string) {
+  for (const k of ['level', 'y', 'cell'] as const) assert.equal(a[k], b[k], `${what}: ${k}`);
+  for (let j = 0; j < b.nz; j++) for (let i = 0; i < b.nx; i++) {
+    const kb = j * b.nx + i, ia = b.ox + i - a.ox, ja = b.oz + j - a.oz;
+    if (ia < 0 || ja < 0 || ia >= a.nx || ja >= a.nz) { if (b.free[kb] || b.clearance[kb] || b.blockers.has(kb)) assert.fail(`${what}: cell ${i},${j} outside the floor grid is open`); continue; }
+    const ka = ja * a.nx + ia;
+    if (a.free[ka] !== b.free[kb] || !Object.is(a.clearance[ka], b.clearance[kb]) || a.blockers.get(ka) !== b.blockers.get(kb)) assert.fail(`${what}: cell ${i},${j} differs`);
+  }
 }
 /** The window as gridsOver built it before the memo: level 0 composed, every touching upper floor by buildGrids. */
 function reference(nav: GroundNav, s: SpatialScene, r: [number, number, number, number]): GridSet {

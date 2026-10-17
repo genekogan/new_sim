@@ -12,6 +12,7 @@ import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
 import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP, JOG_SPEED_CAP, RUN_SPEED_CAP, CYCLE_SPEED_CAP } from '../locomotion/walk.ts';
 import { sleepSafetyIssue } from '../activities/sleep.ts';
+import { entityList } from '../world/entity-list.ts';
 
 const TOL = 0.03;
 /**
@@ -31,7 +32,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
     // activities/1 overlays on a seat (read, play-piano…) keep the seated exemption (baseActivity 'sit'; social/pose.ts)
     if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
@@ -52,7 +53,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
 export const humanStaticClearance:Invariant=humanStaticClearanceWithOverlay(()=>false);
 
 export const humanHumanSeparation: Invariant = (rt: Runtime) => {
-  const hs = Object.values(rt.world.entities).filter((e) => e.kind === 'human' && e.human);
+  const hs = entityList(rt.world).filter((e) => e.kind === 'human' && e.human);
   const out: Diagnostic[] = [];
   for (let i = 0; i < hs.length; i++)
     for (let j = i + 1; j < hs.length; j++) {
@@ -70,7 +71,7 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
 /** Full lie/rise footprint, ordinary-ground support and active actor/mat ownership. */
 export const supportedSleepSafety: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     if (!e.human?.sleepPose) continue;
     const issue = sleepSafetyIssue(rt, e);
     if (issue) out.push(issue);
@@ -79,7 +80,7 @@ export const supportedSleepSafety: Invariant = (rt: Runtime) => {
 };
 
 export const noUnsupported: Invariant = (rt: Runtime) =>
-  Object.values(rt.world.entities)
+  entityList(rt.world)
     .filter((e) => e.kind === 'component' && e.support?.kind === 'none')
     .map((e) => ({ code: 'support.unsupported', message: `${e.id} (${e.def}) has no support`, subjects: [e.id], at: e.pose.p }));
 
@@ -108,7 +109,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
   const valid = !!prev && prev.world === rt.world && prev.tick === rt.tick - 1;
   const poses = new Map<string, { p: Vec3; yaw: number; ext: number }>();
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     const human = e.kind === 'human' && !!e.human;
     if (!human && !isCarryLoad(e)) continue;
     const ext = human ? 0 : Math.max(...def(e.def).size) / 2;
@@ -156,7 +157,7 @@ const OVERSPEED_TOL = 1.05;
 /** No person's published speed exceeds its activity's cap + 5 % (MOVEMENT.md "No jumps"). */
 export const speedWithinCap: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     const sp = e.human?.speed;
     if (sp === undefined) continue;
     const cap = SPEED_CAPS[e.human!.activity];
@@ -189,7 +190,7 @@ const distToObb = (p: Vec2, o: OBB2) => {
 export const holdersPresent: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of Object.values(ents)) {
+  for (const e of entityList(rt.world)) {
     if (e.support?.kind !== 'held') continue;
     let obb: OBB2 | null = null;
     for (const id of e.support.by) {

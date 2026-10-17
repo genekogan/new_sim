@@ -305,4 +305,10 @@ export class GodPlaces {
     const places = this.h.edge?.places; if (!places) return null;
     return places.containing(at[0], at[1], level)[0]?.id ?? null;
   }
+  /** placeAt for many points over the places as they are now (one synchronous pass; PlaceIndex.locator). */
+  placeLocator(): (at: Vec2, level?: number) => string | null {
+    const places = this.h.edge?.places; if (!places) return () => null;
+    const find = places.locator();
+    return (at, level = 0) => find(at[0], at[1], level)?.id ?? null;
+  }
 }

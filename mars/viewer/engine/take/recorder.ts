@@ -8,7 +8,7 @@
 // (`thinChanges`): keyframes, linear in between, each recorded tick reproduced within the field's tolerance.
 // mars-take/4: tracks at TRACK_TOL (4 mm / 8 mrad, position holds exact at both ends), `entities0` + `removed`, and
 // `compactEvents` on finish.
-import { hashOf, sha256, stableStringify } from '../core/hash.ts';
+import { hashOf, hashStable, sha256, stableStringify } from '../core/hash.ts';
 import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL, type ChangeEvent, type PoseSample, type Take, type TakeEntity0, type TakeEvent, type TakeHands } from './types.ts';
@@ -104,7 +104,10 @@ export class TakeRecorder implements RuntimeObserver {
   private cursor: number;
   private finished = false;
 
-  constructor(rt: TakeSource, opts: RecorderOptions) {
+  /** `stateHashNow`: the caller's rt.stateHash() at this tick when it has it already — the final state hash of the take it
+   *  finished at this same tick, with nothing stepped or edited in between (lane L1: one world serialisation per take
+   *  boundary instead of two). Omitted: computed here, as before. */
+  constructor(rt: TakeSource, opts: RecorderOptions, stateHashNow?: string) {
     const ref=opts.renderSceneRef;
     if(ref && (ref.contract!=='render-scene-ref/1'||ref.rulesVersion!==opts.rulesVersion||!/^[a-f0-9]{64}$/.test(ref.hash)))
       throw new TypeError('invalid recorder render scene reference');
@@ -113,7 +116,7 @@ export class TakeRecorder implements RuntimeObserver {
     const tol = opts.tol ?? TRACK_TOL;
     this.tol = typeof tol === 'number' ? { pos: tol, ang: tol } : { pos: tol.pos, ang: tol.ang };
     this.startTick = rt.tick;
-    this.baselineStateHash = rt.stateHash();
+    this.baselineStateHash = stateHashNow ?? rt.stateHash();
     this.cursor = rt.events.length;
     this.sample();
     rt.observers.push(this);
@@ -267,7 +270,7 @@ export class TakeRecorder implements RuntimeObserver {
 /** The take's content address (every field except `id`). */
 export function takeIdOf(take: Omit<Take, 'id'> | Take, known?: ReadonlyMap<object, string>): string {
   const { id: _id, ...body } = take as Take;
-  return sha256(stableStringify(body, known)).slice(0, 24);
+  return hashStable(body, known).slice(0, 24);   // streamed: the final state's text is hashed in place, not joined into the body's
 }
 
 function withinTol(pred: PoseSample, actual: PoseSample, tol: { pos: number; ang: number }) {

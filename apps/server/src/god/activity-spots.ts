@@ -21,6 +21,8 @@ export type SpotsHost = {
   levelAt(x: number, z: number, y: number): number;
   /** Innermost place holding a point (a room, a building, an area), and its name. */
   placeAt(at: V2, level: number): string | null;
+  /** placeAt for many points while nothing changes (one derive): same answers, built once (places.ts locator). */
+  placeLocator?(): (at: V2, level: number) => string | null;
   placeName(id: string): string | null;
   /** Called before a derive (the god's places into the ledger's index). */
   prepare?(): void;
@@ -54,7 +56,10 @@ export class GodActivitySpots {
     const key = `${this.h.version()}:${this.h.model.entities.size}`;
     if (this.cache?.key === key) return this.cache.value;
     this.h.prepare?.();
-    const t0 = performance.now(), value = this.derive();
+    const t0 = performance.now();
+    let value: SpotsData;
+    this.locate = this.h.placeLocator?.() ?? null;
+    try { value = this.derive(); } finally { this.locate = null; }
     this.stats = { ms: Math.round(performance.now() - t0), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1 };
     this.cache = { key, value };
     return value;
@@ -84,7 +89,9 @@ export class GodActivitySpots {
     // activities step a spot that lies inside furniture back out at offer time, near the Soul, from warm tiles.
     return s ? this.world(t, s.local) : this.world(t, [0, t.size[2] / 2 + 0.45]);
   }
-  private place(at: V2, level: number) { return this.h.placeAt(at, level) ?? undefined; }
+  /** During a derive: the places as they were when it began (placeLocator), asked many times. */
+  private locate: ((at: V2, level: number) => string | null) | null = null;
+  private place(at: V2, level: number) { return (this.locate ? this.locate(at, level) : this.h.placeAt(at, level)) ?? undefined; }
   private label(t: Thing, place?: string) { const p = place ? this.h.placeName(place) : null; return `${t.name}${p && p.toLowerCase() !== t.name.toLowerCase() ? ` in ${p}` : ''}`.slice(0, 80); }
 
   private derive(): SpotsData {
