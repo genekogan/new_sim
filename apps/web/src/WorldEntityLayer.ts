@@ -498,6 +498,14 @@ function waterLevel(g: Ground, x: number, z: number): number | null {
   for (const w of g.waters) if (w.area && pointInPoly(x, z, w.area)) level = w.level; else if (w.path && w.w) { const lv = waterLevelAt(g, x, z); if (lv !== null) level = lv; }
   return level ?? g.seaLevel ?? null;
 }
-function pointInPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }
+// indexed reads, not array destructuring: the same arithmetic as @sim/ground's pointInPoly (L3e)
+function pointInPoly(px: number, pz: number, poly: [number, number][]) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j], zi = a[1], zj = b[1];
+    if ((zi > pz) !== (zj > pz)) { const xi = a[0]; if (px < ((b[0] - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; }
+  }
+  return inside;
+}
 export type { Def };
 export { TILE_N };
