@@ -7,33 +7,28 @@ import { centreLine, orchardPoints, paletteOf, queryOf, scatter2Points, type Sca
 import type { Entity, WorldModel } from '@sim/world-compiler';
 import * as THREE from 'three';
 import { meshFor, registerMesh, type MeshCtx } from './registry.ts';
-import { inPoly } from './soup.ts';
+import { blockTest, type BlockCells, type BlockShape } from './block-test.ts';
 import { speciesGeometry } from './species.ts';
 import { vertexMaterial } from './soup.ts';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-/** A spatial test for "something is already here": solid footprints and paved / road surfaces. */
-type BlockShape = ({ kind: 'obb'; c: [number, number]; h: [number, number]; yaw: number } | { kind: 'poly'; p: [number, number][] } | { kind: 'line'; c: [number, number][]; w: number }) & { id: string };
 /** The blocked-ground index is the same for every scatter in one world state: built once per model revision (Eden 2026's
  * ~240 woodlands each rebuilt it over all ~3,800 entities, ~18 s of first frame), keyed by the model's safety cache key. */
-const blockIndex = new WeakMap<object, { pad: number; cells: Map<string, BlockShape[]> }>();
-export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: number, z: number) => boolean {
-  const C = 16, key = model.safetyCacheKey(), hit = blockIndex.get(key);
-  const cells = hit && hit.pad === pad ? hit.cells : blockCells(model, pad, C);
+const blockIndex = new WeakMap<object, { pad: number; cells: BlockCells }>();
+export const BLOCK_CELL = 16;
+/** The blocked-ground cells of a model (solid footprints and paved / road surfaces), cached per model revision. */
+export function blockCellsOf(model: WorldModel, pad = 0.6): BlockCells {
+  const key = model.safetyCacheKey(), hit = blockIndex.get(key);
+  const cells = hit && hit.pad === pad ? hit.cells : blockCells(model, pad, BLOCK_CELL);
   if (!hit || hit.pad !== pad) blockIndex.set(key, { pad, cells });
-  return (x, z) => {
-    const l = cells.get(`${Math.floor(x / C)},${Math.floor(z / C)}`); if (!l) return false;
-    for (const s of l) {
-      if (s.id === self.id) continue;
-      if (s.kind === 'obb') { const dx = x - s.c[0], dz = z - s.c[1], co = Math.cos(s.yaw), si = Math.sin(s.yaw); const lx = dx * co - dz * si, lz = dx * si + dz * co; if (Math.abs(lx) <= s.h[0] && Math.abs(lz) <= s.h[1]) return true; }
-      else if (s.kind === 'poly') { if (inPoly(x, z, s.p)) return true; }
-      else { const [a, b] = s.c, vx = b[0] - a[0], vz = b[1] - a[1], n = vx * vx + vz * vz; let t = n ? ((x - a[0]) * vx + (z - a[1]) * vz) / n : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; if (Math.hypot(x - a[0] - vx * t, z - a[1] - vz * t) < s.w) return true; }
-    }
-    return false;
-  };
+  return cells;
 }
-function blockCells(model: WorldModel, pad: number, C: number): Map<string, BlockShape[]> {
+/** A spatial test for "something is already here": solid footprints and paved / road surfaces (block-test.ts). */
+export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: number, z: number) => boolean {
+  return blockTest(blockCellsOf(model, pad), BLOCK_CELL, self.id);
+}
+function blockCells(model: WorldModel, pad: number, C: number): BlockCells {
   const cells = new Map<string, BlockShape[]>();
   const put = (x0: number, z0: number, x1: number, z1: number, s: BlockShape) => { for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) { const k = `${gx},${gz}`; const l = cells.get(k); if (l) l.push(s); else cells.set(k, [s]); } };
   for (const e of model.entities.values()) {

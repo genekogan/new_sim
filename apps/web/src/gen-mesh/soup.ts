@@ -1,6 +1,7 @@
 // A small vertex-colour geometry builder for L3's mesh halves: everything an entity draws merges
 // into one or two BufferGeometries (few draw calls), low-poly with rounded silhouettes (blobs,
 // chamfered kerbs and caps, many-sided posts) — the Eden look, never voxel. Owner: L3.
+import { inPoly } from './block-test.ts';
 import * as THREE from 'three';
 
 export type V3 = [number, number, number];
@@ -163,7 +164,6 @@ export function soupMesh(s: Soup, name: string, opts: { shadow?: boolean; receiv
 // ---------- draping ----------
 
 type Sample = (x: number, z: number) => number;
-function inPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }
 function distEdge(px: number, pz: number, poly: [number, number][]) { let b = Infinity; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[j], c = poly[i], vx = c[0] - a[0], vz = c[1] - a[1], n = vx * vx + vz * vz; let t = n ? ((px - a[0]) * vx + (pz - a[1]) * vz) / n : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; b = Math.min(b, Math.hypot(px - a[0] - vx * t, pz - a[1] - vz * t)); } return b; }
 /** Clip a polygon to an axis-aligned rectangle (Sutherland–Hodgman). */
 function clipRect(poly: [number, number][], x0: number, z0: number, x1: number, z1: number): [number, number][] {
