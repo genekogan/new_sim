@@ -37,6 +37,12 @@
 // (their API, WebSocket, skill and CLI URLs carry the prefix) and the web build must be made with
 // `vite build --base <base>/` plus apps/web/src/base-path.ts (tools/world-launcher/deploy/release.sh does both).
 //
+// --old-worlds-root (stage `legacy`, deploy/old-worlds/README.md): the three original worlds at the site root, moved off
+// the laptop. No --base; only the forks eden/mars/littlemartians (op register-fork), served at /w/<key> exactly where the
+// laptop served them, and the root web build's "Sim" world list at /. Nothing new is created here (new worlds live under
+// /worlds). Root paths a world page asks for go where the laptop proxy sent them (tools/core/multiworld/proxy.mjs
+// worldForPath). The old->new redirect switch is <data>/redirects.json (redirects.mjs), read per request, off by default.
+//
 // Production (lane P3; tools/world-launcher/deploy/): --base /worlds --public-origin https://sim.eden.art
 // --auth-env <path> --max-worlds N --max-running N --min-free-mb N --world-heap-mb N --create-limit N. Children run edge
 // minds; dev auth only on an http origin.
@@ -67,6 +73,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
+import { legacyWorldFor, redirectSwitch } from './redirects.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
@@ -120,6 +127,10 @@ export async function openLauncher(cfg = {}) {
   const MAX_WORLDS = prod.maxWorlds;
   const behindProxy = publicOrigin !== origin;
   const B = prod.base, wp = (slug) => `${B}/w/${slug}`;
+  const oldRoot = cfg.oldWorldsRoot === true;
+  if (oldRoot && B) throw new Error('launcher: --old-worlds-root serves the original worlds at the site root; drop --base');
+  if (oldRoot && !authEnvFile) throw new Error('launcher: --old-worlds-root needs --auth-env (the original worlds sign in with Clerk)');
+  const redirects = oldRoot ? redirectSwitch(join(dataDir, 'redirects.json'), log) : null;
   const registry = new Registry(dataDir);
   const accountPolicy = creationPolicy(cfg);
   /** Handover state (keeper.mjs): 'active' → 'preparing' → 'retired' (or back to 'active' when the next one fails). */
@@ -142,7 +153,7 @@ export async function openLauncher(cfg = {}) {
   const siteKey = randomBytes(32).toString('hex');
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
   const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
-    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) { d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; if (oldRoot) d.env.SIM_FORK_ROOT = '1'; } return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -376,6 +387,11 @@ export async function openLauncher(cfg = {}) {
   // Shared static files (/modular, /engine, …) come from a running world on this release's server. An old-world fork
   // (fork-world.mjs, the old engine) doesn't serve this release's /modular/humanoid kit, so it answers only when no
   // release world runs (release 3 walk: with the eden fork first awake, every page's humanoid kit.json was a 404).
+  const oldWorldPort = async (path) => {
+    const slug = legacyWorldFor(path), w = slug && registry.get(slug);
+    if (!w) return anyRunning();
+    try { return await pool.ensure(worldEnv(w)); } catch { return anyRunning(); }
+  };
   const anyRunning = () => { const up = registry.worlds.filter((w) => pool.status(w.slug).status === 'running'); const w = up.find((x) => !x.fork) ?? up[0]; return w ? pool.status(w.slug).port ?? null : null; };
   function observe(slug, req, url) {
     const s = seenOf(slug), rest = url.pathname.slice(wp(slug).length) || '/';
@@ -454,6 +470,9 @@ export async function openLauncher(cfg = {}) {
       }
       if (path === '/__sim/worlds.json' && req.method === 'GET') { json(res, 200, await worldsJson()); return; }
       if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t) }); return; }
+      if (oldRoot && req.method === 'POST' && (path === '/__sim/worlds' || path === '/__sim/op/create-world')) {
+        json(res, 403, { ok: false, code: 'creation.elsewhere', message: 'This server keeps the original worlds. Make new worlds at /worlds/.', url: '/worlds/' }); return;
+      }
       if (path === '/__sim/worlds' && req.method === 'POST') {
         const chunks = []; let n = 0;
         for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
@@ -542,6 +561,8 @@ export async function openLauncher(cfg = {}) {
         const host = hostHealth(dataDir); // deploy/host-health.mjs (timer): `hostOk` public, the numbers loopback-only
         json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(host ? { hostOk: host.ok } : {}), ...(direct(req) ? { memAvailableMb: memAvailableMb(), ...(host ? { host } : {}) } : {}) }); return;
       }
+      const to = redirects?.target(req, path, url);
+      if (to) { res.writeHead(302, { location: to, 'cache-control': 'no-store' }).end(); return; }
       const world = path.match(/^\/w\/([^/]+)(?:\/|$)/)?.[1];
       if (world) {
         if (!SLUG_RE.test(world)) { json(res, 404, { ok: false, code: 'world.not-served' }); return; }
@@ -559,7 +580,8 @@ export async function openLauncher(cfg = {}) {
         if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
       }
       // Anything else a world page asks for (Mars assets, engine files, …): any running world serves it (base stripped).
-      const p = anyRunning();
+      // Original worlds at the root: the world the laptop proxy sent that path to (woken if asleep), as before the move.
+      const p = oldRoot ? await oldWorldPort(path) : anyRunning();
       if (p) { proxyHttp(req, res, p, { path: B ? path + url.search : undefined }); return; }
       json(res, 404, { ok: false, code: 'not-found' });
     } catch (e) {
@@ -765,7 +787,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
       maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
       maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
-      marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
+      marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), oldWorldsRoot: argv.includes('--old-worlds-root') ? true : undefined, soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
       ...(underKeeper ? { listen: false, adopt: process.env.SIM_ADOPT ? JSON.parse(process.env.SIM_ADOPT) : null } : {}) });
     let stopping = false;
     const stop = (why, gentle) => { if (stopping) return; stopping = true; console.log(`[launcher] ${why}: stopping worlds…`); void l.close(gentle ? { gentle } : {}).then(() => process.exit(0)); };

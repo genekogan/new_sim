@@ -29,14 +29,16 @@ export function forkOptions(d, env, root = ROOT) {
   check(typeof d.worldId === 'string' && d.worldId, 'descriptor: worldId required');
   const wp = env.WORLD_PATH ?? '', m = wp.match(/^(\/[a-z][a-z0-9-]{0,31})?\/w\/([a-z][a-z0-9-]{0,31})$/);
   check(m && m[2] === key, `WORLD_PATH ${wp} is not <base>/w/${key}`);
-  check(m[1], 'a fork runs under a launcher base (e.g. /worlds), never at the root the old release serves');
+  // At the root only on the launcher that took the original worlds over (--old-worlds-root sets SIM_FORK_ROOT=1): the
+  // laptop no longer serves them there. Any other launcher keeps its forks under its base.
+  check(m[1] || env.SIM_FORK_ROOT === '1', 'a fork runs under a launcher base (e.g. /worlds), never at the root the old release serves');
   const at = (p) => (typeof p === 'string' && p ? (isAbsolute(p) ? p : join(root, p)) : undefined);
   for (const f of ['input', 'dataDir', 'port', 'build', 'webDir', 'publicOrigin', 'inputManifestSHA256', 'accountRegistryPath']) check(!(f in d), `descriptor field ${f} comes from the launcher; remove it`);
   const publicOrigin = (env.PUBLIC_URL ?? '').replace(/\/+$/, '');
   check(/^https?:\/\/[^/]+$/.test(publicOrigin), 'PUBLIC_URL (origin) required');
   return {
     ...d, worldKey: key, input: root, dataDir: resolve(env.DATA_DIR ?? ''), port: Number(env.PORT), build: env.BUILD_ID || 'dev',
-    webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : undefined, publicOrigin, basePath: m[1],
+    webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : undefined, publicOrigin, basePath: m[1] ?? '', launcherChild: true,
     marsWebDir: at(d.marsWebDir) ?? (env.MARS_WEB_DIR ? resolve(env.MARS_WEB_DIR) : undefined),
     placeData: at(d.placeData), authoredBoundariesFile: at(d.authoredBoundariesFile), activitySpots: at(d.activitySpots),
     skillFile: at(d.skillFile), instructionsFile: at(d.instructionsFile),

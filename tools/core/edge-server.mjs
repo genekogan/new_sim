@@ -10,11 +10,13 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,instructionsFile,accountAuth=false,publicOrigin,ambient=true,
-  officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots,basePath=''}) {
+  officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots,basePath='',launcherChild=false}) {
   // basePath (world launcher fork, e.g. '/worlds'): served at <basePath>/w/eden on a launcher child port with the launcher's build id.
+  // launcherChild: the same on a launcher that serves the original worlds at the root (basePath '', --old-worlds-root).
+  const child=!!basePath||launcherChild===true;
   if(basePath!==''&&!/^\/[a-z][a-z0-9-]{0,31}$/.test(basePath))throw Error('basePath must be one path segment like /worlds');
-  if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(basePath?port>=1024&&port<=65535:port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
-  if(!basePath&&!build.startsWith('local-'))throw Error('local build identity required');
+  if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(child?port>=1024&&port<=65535:port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
+  if(!child&&!build.startsWith('local-'))throw Error('local build identity required');
   const origin=new URL(publicOrigin??`http://127.0.0.1:${port}`);if(origin.origin!==origin.href.replace(/\/$/,'')||origin.username||origin.password||!['http:','https:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))throw Error('explicit canonical public origin required');
   input=resolve(input);dataDir=resolve(dataDir);
   let authoredBoundaryDeclaration;
