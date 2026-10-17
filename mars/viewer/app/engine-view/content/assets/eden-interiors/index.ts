@@ -10,6 +10,7 @@ export const INTERIOR_EXPLORE:readonly {id:string;label:string;camera:[number,nu
  {id:'int-barn-workshop',label:'Barn workshop and crafts',camera:[83,2.6,54.5],target:[91.5,.6,48]},
  {id:'int-office-post-room',label:'Post room and reception',camera:[92,1.6,18.5],target:[93,.9,12]},
  {id:'int-office-studio',label:'Artists’ studio (office, first floor)',camera:[97.5,4.7,18.5],target:[91,3.6,12]},
+ {id:'int-office-upper-lounge',label:'Upper lounge (office, second floor)',camera:[92.2,7.7,13],target:[96.4,6.7,17.9]},
  {id:'int-house-3-kitchen',label:'House 3 kitchen and dining room',camera:[34,1.6,27.6],target:[29,.9,26]},
  {id:'int-house-3-living',label:'House 3 living room with piano',camera:[33.6,1.6,34.6],target:[37.5,.9,33]},
  {id:'int-house-2',label:'House 2 home interior',camera:[52,1.7,12.4],target:[53,.7,16]},
