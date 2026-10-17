@@ -33,6 +33,7 @@ const NEAREST = 4;
 const SHELF_READ_RADIUS = 8, TABLE_SEAT_GAP = 1.0, AUDIENCE_RADIUS = 30;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const inPolygon = (p: V2, poly: V2[]) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < ((xj - xi) * (p[1] - zi)) / (zj - zi) + xi) c = !c; } return c; };
 const centroidOf = (p: V2[]): V2 => [p.reduce((s, q) => s + q[0], 0) / p.length, p.reduce((s, q) => s + q[1], 0) / p.length];
 
 type Thing = { on?: string; id: string; e: Entity; def: StoredDef; name: string; tags: Set<string>; c: Record<string, any>; at: V2; y: number; yaw: number; level: number; size: [number, number, number]; slots: { id: string; kind: string; local: V2; yaw: number }[] };
@@ -276,6 +277,17 @@ export class GodActivitySpots {
         const at: V2 = [r2(b[0] - dir[0] * 0.8), r2(b[1] - dir[1] * 0.8)], face: V2 = [r2(b[0] + dir[0] * 3), r2(b[1] + dir[1] * 3)], place = this.place(at, 0);
         const feed = creatures.some(q => d2(q, at) <= 40);
         add({ id: `fish.${e.id}`.toLowerCase(), activity: 'fish', base: 'idle', at, faceTo: face, ...(feed ? { also: ['feed'] } : {}), label: `the end of ${name}`, ...(place ? { place } : {}) });
+      }
+      // a pond or lake with ducks, swans or koi in it: feed them (and fish) from the bank nearest them
+      if (sh.area?.length && (['pond', 'lake'].includes(kind) || def.tags.includes('pond'))) {
+        const poly = sh.area, inside = creatures.filter(q => inPolygon(q, poly) || poly.some(v => d2(v, q) < 4));
+        if (inside.length) {
+          const cc = centroidOf(inside), pc = centroidOf(poly);
+          let best: V2 = poly[0], bd = Infinity;
+          for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((cc[0] - a[0]) * dx + (cc[1] - a[1]) * dz) / L)), q: V2 = [a[0] + dx * t, a[1] + dz * t]; if (d2(q, cc) < bd) { bd = d2(q, cc); best = q; } }
+          const out: V2 = [best[0] - pc[0], best[1] - pc[1]], n = Math.hypot(out[0], out[1]) || 1, at: V2 = [r2(best[0] + out[0] / n * 1.6), r2(best[1] + out[1] / n * 1.6)], place = this.place(at, 0);
+          add({ id: `feed.${e.id}`.toLowerCase(), activity: 'feed', base: 'idle', at, faceTo: [r2(cc[0]), r2(cc[1])], also: ['fish'], label: `the bank of ${name}, by the ${inside.length > 1 ? 'birds and fish' : 'creature'} in it`, ...(place ? { place } : {}) });
+        }
       }
       if ((kind === 'football-pitch' || kind === 'pitch') && sh.area?.length) {
         const c = centroidOf(sh.area), xs = sh.area.map(p => p[0]), zs = sh.area.map(p => p[1]), alongX = Math.max(...xs) - Math.min(...xs) >= Math.max(...zs) - Math.min(...zs);
