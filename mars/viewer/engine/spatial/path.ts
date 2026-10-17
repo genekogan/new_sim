@@ -686,6 +686,8 @@ export const SCRATCH_KEEP_CELLS = 2_500_000;
  *  house runs ~30 room-reach searches over ~4 M cells each; each used to get (and free) a fresh ~110 MB workspace. */
 let bigScratch: Scratch | null = null, smallRun = 0;
 const BIG_IDLE = 400;
+/** Let the big workspace go now (a host calls this after a burst of reads, e.g. a Soul's capability listing). */
+export function releaseBigScratch() { bigScratch = null; smallRun = 0; }
 function newScratch(total: number): Scratch {
   return { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
 }

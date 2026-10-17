@@ -21,6 +21,7 @@ import { GodLayers } from './layers.ts';
 import { GodActivitySpots } from './activity-spots.ts';
 import { GodMeals } from './meals.ts';
 import { installGodRides } from './rides.ts';
+import { releaseBigScratch } from '../../../../mars/viewer/engine/spatial/path.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -816,6 +817,7 @@ export class EngineBridge {
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
     try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
     try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
     const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
