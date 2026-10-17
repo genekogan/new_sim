@@ -22,6 +22,7 @@ import { VEHICLE_PROFILES, type VehicleProfile } from './profiles.ts';
 import { blockersNear, planCurve, vehicleGrids, type Curve } from './curve.ts';
 import { rideTo } from './actions.ts';
 import { boxGap, describe, FOOTPRINT_PARTS, footprintOf, othersOnLevel, pathConflict, place, vehicleAround } from './traffic.ts';
+import { entityList } from '../world/entity-list.ts';
 
 /** Geometry and limits (catalog def 'forklift' carries the box; these are the working limits). */
 export const FORKLIFT = {
@@ -684,7 +685,7 @@ export const forkliftDeliver: ActionDef<{ operator: string; to: To }, ForkProgra
 export const forkliftLoad: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   let sp: Spatial | undefined;
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     if (e.support?.kind !== 'forks') continue;
     const v = rt.world.entities[e.support.vehicle];
     if (!v || v.def !== 'forklift') { out.push({ code: 'forklift.load-unsupported', message: `${e.id} is on the forks of ${e.support.vehicle}, which is not a forklift`, subjects: [e.id, e.support.vehicle], at: e.pose.p }); continue; }

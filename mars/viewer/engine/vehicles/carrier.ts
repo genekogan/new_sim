@@ -21,6 +21,7 @@ import type { Runtime, Invariant } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { angleDelta, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
 import { CATALOG } from '../world/catalog.ts';
+import { entityList } from '../world/entity-list.ts';
 
 export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 };
 export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number };
@@ -340,7 +341,7 @@ export function stepCarriers(rt: Runtime): void {
 /** Seats, riders and bodies agree; a seated rider sits exactly in its seat frame. */
 export const carrierInvariant: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     const b = carried(e);
     if (b) { const v = rt.world.entities[b.id]; if (state(v)?.seats[b.slot] !== e.id) out.push(diag('rider-mismatch', `${e.id} rides ${b.id}#${b.slot}, which does not hold it`, [e.id, b.id])); }
     const c = state(e); if (!c) continue;

@@ -11,6 +11,7 @@ import type { Link } from '../spatial/types.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
 import type { Entity, Pose } from '../world/types.ts';
 import { def } from '../world/catalog.ts';
+import { entityList } from '../world/entity-list.ts';
 
 const DEG = 180 / Math.PI;
 export const maxTiltOf = (defId: string): number | null => def(defId).handling?.fragile?.maxTilt ?? null;
@@ -55,7 +56,7 @@ export function fragileFlightCheck(rt: Runtime, item: Entity, carrier: Entity, l
 
 export const fragileLoadsOk: Invariant = (rt) => {
   const out: Diagnostic[] = [];
-  for (const e of Object.values(rt.world.entities)) {
+  for (const e of entityList(rt.world)) {
     if (e.kind !== 'component') continue;
     const max = maxTiltOf(e.def);
     if (max === null) continue;

@@ -19,8 +19,10 @@ import { levelFor } from './access.ts';
 import { flatObb, isJoist, isPlywood, memberTop, supportProblems } from './deck.ts';
 import { isStairFlight, stairLink } from './stairs.ts';
 import { frameLinks } from './frame.ts';
+import { entitiesById } from '../world/entity-list.ts';
 
-const sorted = (w: WorldState) => Object.values(w.entities).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+// (shared and read-only during an invariant pass: world/entity-list.ts)
+const sorted = (w: WorldState) => entitiesById(w);
 
 export function deckSurfaces(w: WorldState): Surface[] {
   const out: Surface[] = [];

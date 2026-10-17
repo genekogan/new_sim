@@ -68,6 +68,7 @@ export function groundFact(g: Ground, editSeq: number, opts: { paged?: boolean }
 
 import { swimTo, shoreToward, groundTravel, inDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
 import { acknowledgeRelocation, humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
+import { entityList } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { WALK_SPEED_CAP, setWalkReach } from '../../../mars/viewer/engine/locomotion/walk.ts';
 import { G_SWIM, swimRootY } from '../../../mars/viewer/engine/spatial/ground.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
@@ -89,7 +90,7 @@ const GROUND_SPEED_CAPS: Readonly<Record<string, number>> = { ...SPEED_CAPS, wad
 /** Published speed within the activity's cap, with the ground activities (wade, swim, tread) capped too. */
 const groundSpeedWithinCap = (rt: any) => {
   const out: any[] = [];
-  for (const e of Object.values(rt.world.entities) as any[]) {
+  for (const e of entityList(rt.world) as any[]) {
     const sp = e.human?.speed; if (sp === undefined) continue;
     const cap = GROUND_SPEED_CAPS[e.human.activity];
     if (cap !== undefined && sp <= cap * 1.05) continue;

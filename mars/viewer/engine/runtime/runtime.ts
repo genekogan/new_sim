@@ -5,6 +5,7 @@ import {admitFloaters} from '../bodies/policy.ts';
 import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
+import { withEntityList } from '../world/entity-list.ts';
 import { Profiler } from './profile.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
 import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
@@ -326,11 +327,14 @@ export class Runtime {
     if (this.waiting.size) this.admitWaiting();
     this.admitSocialReturns();
     const ti = this.prof ? this.prof.now() : 0;
-    for (const inv of this.invariants)
-      for (const d of inv(this)) {
-        this.violations.push({ ...d, tick: this.tick });
-        this.events.push({ tick: this.tick, type: 'violation', code: d.code, message: d.message, subjects: d.subjects });
-      }
+    // one entity list for the whole pass (world/entity-list.ts: ~24 Object.values over every entity were most of a tick)
+    withEntityList(this.world, () => {
+      for (const inv of this.invariants)
+        for (const d of inv(this)) {
+          this.violations.push({ ...d, tick: this.tick });
+          this.events.push({ tick: this.tick, type: 'violation', code: d.code, message: d.message, subjects: d.subjects });
+        }
+    });
     if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
     for (const o of this.observers) o.onTick?.(this);
   }
