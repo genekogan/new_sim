@@ -34,7 +34,8 @@ group('scenery: seaside resort and marina', (put, ops) => {
   put('carousel', 'resort-carousel', [164, 134], { params: { canopy: '#d9473e', trim: '#f4efe4' } });
   for (const [i, x] of [[1, 124], [2, 136], [3, 148]]) ops.push({ op: 'place', def: 'core/pier@1', name: `marina-pontoon-${i}`, shape: { path: [[x, 140], [x, 167]] }, params: { width: 2, rails: false } });
   const sails = ['#f2c14e', '#e26d5a', '#4f8fc0', '#fbf8f0', '#7bb37a', '#e98fb2'];
-  let n = 0; for (const x of [124, 136, 148]) for (const z of [157, 164]) for (const side of [-3, 3]) if ((n++ % 2) === 0) put('sailboat', `marina-sailboat-${n}`, [x + side, z], { params: { sail: sails[n % sails.length] } });
+  // old Eden's marina was full: a boat in every berth either side of the three pontoons
+  let n = 0; for (const x of [124, 136, 148]) for (const z of [145, 151, 157, 163]) for (const side of [-2.6, 2.6]) { n++; put('sailboat', `marina-sailboat-${n}`, [x + side, z], { params: { sail: sails[n % sails.length] } }); }
 });
 group('scenery: boats at sea and harbour', put => {
   for (const [i, x, z, c] of [[1, 20, 205, '#fbf8f0'], [2, 70, 232, '#f2c14e'], [3, -45, 222, '#e26d5a'], [4, 110, 196, '#fbf8f0'], [5, -100, 250, '#4f8fc0'], [6, 160, 245, '#fbf8f0']]) put('sailboat', `sea-sailboat-${i}`, [x, z], { params: { sail: c } });

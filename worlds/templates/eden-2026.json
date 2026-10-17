@@ -60829,25 +60829,25 @@
         {
           "op": "place",
           "def": "core/sailboat@1",
-          "name": "marina-sailboat-1",
+          "name": "marina-sailboat-3",
           "p": [
-            121,
-            157
+            121.4,
+            151
           ],
           "params": {
-            "sail": "#e26d5a"
+            "sail": "#fbf8f0"
           }
         },
         {
           "op": "place",
           "def": "core/sailboat@1",
-          "name": "marina-sailboat-3",
+          "name": "marina-sailboat-4",
           "p": [
-            121,
-            164
+            126.6,
+            151
           ],
           "params": {
-            "sail": "#fbf8f0"
+            "sail": "#7bb37a"
           }
         },
         {
@@ -60855,7 +60855,7 @@
           "def": "core/sailboat@1",
           "name": "marina-sailboat-5",
           "p": [
-            133,
+            121.4,
             157
           ],
           "params": {
@@ -60865,10 +60865,22 @@
         {
           "op": "place",
           "def": "core/sailboat@1",
+          "name": "marina-sailboat-6",
+          "p": [
+            126.6,
+            157
+          ],
+          "params": {
+            "sail": "#f2c14e"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
           "name": "marina-sailboat-7",
           "p": [
-            133,
-            164
+            121.4,
+            163
           ],
           "params": {
             "sail": "#e26d5a"
@@ -60877,9 +60889,69 @@
         {
           "op": "place",
           "def": "core/sailboat@1",
-          "name": "marina-sailboat-9",
+          "name": "marina-sailboat-8",
           "p": [
-            145,
+            126.6,
+            163
+          ],
+          "params": {
+            "sail": "#4f8fc0"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-13",
+          "p": [
+            133.4,
+            157
+          ],
+          "params": {
+            "sail": "#e26d5a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-14",
+          "p": [
+            138.6,
+            157
+          ],
+          "params": {
+            "sail": "#4f8fc0"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-15",
+          "p": [
+            133.4,
+            163
+          ],
+          "params": {
+            "sail": "#fbf8f0"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-16",
+          "p": [
+            138.6,
+            163
+          ],
+          "params": {
+            "sail": "#7bb37a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-21",
+          "p": [
+            145.4,
             157
           ],
           "params": {
@@ -60889,13 +60961,37 @@
         {
           "op": "place",
           "def": "core/sailboat@1",
-          "name": "marina-sailboat-11",
+          "name": "marina-sailboat-22",
           "p": [
-            145,
-            164
+            150.6,
+            157
+          ],
+          "params": {
+            "sail": "#7bb37a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-23",
+          "p": [
+            145.4,
+            163
           ],
           "params": {
             "sail": "#e98fb2"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sailboat@1",
+          "name": "marina-sailboat-24",
+          "p": [
+            150.6,
+            163
+          ],
+          "params": {
+            "sail": "#f2c14e"
           }
         }
       ]
