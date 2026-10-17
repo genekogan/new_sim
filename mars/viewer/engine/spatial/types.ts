@@ -46,6 +46,11 @@ export type Link = {
   carry?: 'none' | 'small';
   /** Entities that form it (the upright; the beam and its partner beam). */
   members?: string[];
+  /**
+   * upper-floors/1: a flight that turns (a dog-leg stair with a landing): the body faces along its own step path while
+   * climbing, instead of keeping `heading` throughout. Absent: unchanged (straight flights face `heading`).
+   */
+  faceAlong?: boolean;
 };
 
 export type Level = {

@@ -1507,7 +1507,8 @@ function encounter(rt: Runtime, ex: Exec, a: Entity, track: () => Track): Encoun
 
 function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'link' }>, dt: number): StepResult {
   const link = leg.link;
-  const face = leg.ascending ? link.heading : wrapAngle(link.heading + Math.PI);
+  // a turning flight (Link.faceAlong, upper-floors/1) is entered and climbed facing along its steps
+  const face = link.faceAlong ? alongYaw(linkGeometry(leg), ex.phase === 'align' ? 0 : ex.climbT, a.pose.yaw) : leg.ascending ? link.heading : wrapAngle(link.heading + Math.PI);
   if (ex.phase === 'align') {
     // a walk leg ends within 5 cm of the flight's standing entry point (its settle tolerance): step onto
     // it at walking pace first, so the climb starts from where the body is (no jump onto the first step)
@@ -1558,7 +1559,7 @@ function stepLink(rt: Runtime, ex: Exec, a: Entity, leg: Extract<Leg, { kind: 'l
     return blockedWait(rt, ex.id, ex.actor, [blocker], { code: 'traffic.person', message: `${ex.actor} waits on ${link.id} for ${blocker} to move`, subjects: [ex.actor, blocker, link.id] });
   }
   a.pose.p = next;
-  a.pose.yaw = face;
+  a.pose.yaw = link.faceAlong ? wrapAngle(a.pose.yaw + clamp(angleDelta(a.pose.yaw, alongYaw(geo, ex.climbT, a.pose.yaw)), -ex.profile.turnRate * 2 * dt, ex.profile.turnRate * 2 * dt)) : face;
   a.human!.activity = leg.ascending ? 'climb-up' : 'climb-down';
   if (ex.climbT >= total - 1e-9) {
     const exit = leg.ascending ? link.to : link.from;
@@ -1586,6 +1587,17 @@ function linkGeometry(leg: LinkLeg): LinkGeometry {
   const path: [number, number, number][] = [[entry.p[0], entry.y, entry.p[1]], ...steps, [exit.p[0], exit.y, exit.p[1]]];
   const lens = path.slice(1).map((q, i) => hypot(q[0] - path[i][0], q[1] - path[i][1], q[2] - path[i][2]));
   return { entry, exit, path, lens, total: lens.reduce((s, x) => s + x, 0) };
+}
+
+/** Horizontal heading of the link path at distance `at` (the next segment that moves sideways), or `fallback`. */
+function alongYaw(g: LinkGeometry, at: number, fallback: number): number {
+  let d = at, i = 0;
+  while (i < g.lens.length - 1 && d > g.lens[i]) { d -= g.lens[i]; i++; }
+  for (; i < g.lens.length; i++) {
+    const P = g.path[i], Q = g.path[i + 1];
+    if (Q && hypot(Q[0] - P[0], Q[2] - P[2]) > 1e-3) return heading([Q[0] - P[0], Q[2] - P[2]]);
+  }
+  return fallback;
 }
 
 function pointOnLink(g: LinkGeometry, at: number): [number, number, number] {

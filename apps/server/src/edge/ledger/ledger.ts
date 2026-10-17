@@ -1065,19 +1065,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
   placePathOf(soulId: string): PlaceRef[] {
     const m = this.host.minds.get(soulId); if (!m) return [];
     const b = this.body(m.entityId); if (!b) return [];
-    const path = this.places.containing(b.pose.p[0], b.pose.p[2], b.human?.level ?? 0).map(p => this.places.ref(p));
+    const path = this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level)).map(p => this.places.ref(p));
     const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
     if (basket) {const occ = this.places.occupierOf.get(ride!.id + '#' + ride!.slot); return [...(occ ? [{id: occ.occ.id, name: `${basket.name} (${ride!.slot})`, kind: 'occupier'}] : []), this.places.ref(basket), ...path];}
     const seat = this.seatOf(m.entityId), occ = seat ? this.places.occupierOf.get(seat) : undefined;
     return occ ? [{id: occ.occ.id, name: `${occ.place.name} seat`, kind: 'occupier'}, ...path] : path;
   }
-  private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], b.human?.level ?? 0)[0]?.id ?? null;}
+  private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level))[0]?.id ?? null;}
   enclosureOf(soulId: string): string | null {
     const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined; if (!b) return null;
     const ride = this.aboard(m!.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
     if (basket?.enclosed) return basket.id;
-    return this.enclosureAtPoint(b.pose.p[0],b.pose.p[2],b.human?.level??0);
+    return this.enclosureAtPoint(b.pose.p[0],b.pose.p[2],this.placeLevel(b.human?.level));
   }
+  /** The place-data floor number of an engine level (upper-floors/1: a building's upper floor reports its authored floor). */
+  placeLevel(level: number | undefined): number {const l = level ?? 0; return l < 2 ? l : (this.host.engine as unknown as {placeLevelV1?: (l: number) => number}).placeLevelV1?.(l) ?? l;}
   /** Logical property polygons can include balconies; privacy follows the validated actual room shell. */
   enclosureAtPoint(x:number,z:number,level=0):string|null{return this.places.containing(x,z,level).find(p=>p.enclosed&&inPoly(x,z,this.enclosurePolygon(p)))?.id??null;}
   private enclosurePolygon(p:Place){const interior=this.spots.interiors.find(i=>i.place===p.id);return interior?interiorShellPolygon(p,interior)??p.polygon:p.polygon;}
@@ -1143,7 +1145,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const here = new Set(this.placePathOf(soul.soulId).map(p => p.id)), souls = new Map<string, number>();
     for (const m of this.host.minds.values()) {
       if (m.soulId === soul.soulId || this.faded.has(m.soulId)) continue; const ob = this.body(m.entityId); if (!ob) continue;
-      for (const p of this.places.containing(ob.pose.p[0], ob.pose.p[2], ob.human?.level ?? 0)) souls.set(p.id, (souls.get(p.id) ?? 0) + 1);
+      for (const p of this.places.containing(ob.pose.p[0], ob.pose.p[2], this.placeLevel(ob.human?.level))) souls.set(p.id, (souls.get(p.id) ?? 0) + 1);
     }
     const marks = new Map<string, number>(), projects = new Map<string, string[]>();
     for (const o of this.comms?.objects.all() ?? []) {

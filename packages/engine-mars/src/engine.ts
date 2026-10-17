@@ -22,6 +22,7 @@ import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
 import {applyWorldEdit,type WorldEditV1} from './entity-physics.ts';
+import {applyUpperFloorsV1,placeLevelOf,previewUpperFloorsV1,type UpperFloorsFactV1,type UpperFloorsV1} from './upper-floors.ts';
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
 import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standHeight,groundArrival,inDeepWater} from './ground-bridge.ts';
@@ -1605,6 +1606,32 @@ export class MarsEngine implements Engine {
     if(this.renderPlatformMetadata){this.renderBaseKey='';this.startRecorder();}
     return {installed:true,relocated,trapped};
   }
+  /** upper-floors/1 (logged rules fact `upperFloorsV1`, upper-floors.ts): why this building's upper floors (or their removal)
+   *  cannot be applied here (pure), or null. */
+  previewUpperFloorsV1(fact:unknown):Diag|null{
+    const spatial=this.rt.services.spatial as Spatial,w=this.rt.world,source=spatial.source?.scene.levels??spatial.base.levels;
+    return previewUpperFloorsV1(fact,{world:w,sceneLevels:source.map(l=>l.id),groundWorld:!!w.groundV1,
+      bodiesOn:(levels)=>Object.keys(this.ents).sort().filter(id=>{const e=this.ents[id],h=e.human;if(e.kind!=='human'||!h)return false;if(levels.has(h.level??0))return true;
+        const b=Object.values((w.upperFloorsV1 as UpperFloorsV1|undefined)?.buildings??{}).find(b=>b.levels.some(l=>levels.has(l.id)));
+        return !!b&&/^climb/.test(String(h.activity??''))&&e.pose.p[0]>=b.crop[0]-2&&e.pose.p[0]<=b.crop[2]+2&&e.pose.p[2]>=b.crop[1]-2&&e.pose.p[2]<=b.crop[3]+2;})});
+  }
+  /** upper-floors/1: install a building's upper floors (cropped levels, floors, solids, stairs, rooms) or remove them; a fact
+   *  that does not preview cleanly is a no-op (replay agrees). The planner re-bases once; walkers replan. */
+  installUpperFloorsV1(fact:UpperFloorsFactV1):{installed:boolean;added:string[];removed:string[];relocated:string[]}{
+    const none={installed:false,added:[] as string[],removed:[] as string[],relocated:[] as string[]};
+    if(this.previewUpperFloorsV1(fact))return none;
+    if('building' in fact&&this.rt.world.upperFloorsV1?.buildings[fact.building.id])return none;
+    if(this.renderPlatformMetadata)this.finishRecorder();
+    const out=applyUpperFloorsV1(this.rt.world,fact),spatial=this.rt.services.spatial as Spatial;
+    if(!spatial.refreshForWorld(this.rt.world))throw Error('upper-floors.spatial-not-rebasable');
+    const relocated:string[]=[];
+    if('remove' in fact)for(const id of Object.keys(this.ents).sort()){const e=this.ents[id];if(e.kind!=='human'||!e.human||!out.levels.includes(e.human.level??0))continue;
+      const to=this.nearestStandableV1([e.pose.p[0],e.pose.p[2]],id);if(to&&this.relocateHumanV1(id,to))relocated.push(id);}
+    if(this.renderPlatformMetadata){this.renderBaseKey='';this.startRecorder();}
+    return {installed:true,added:out.added,removed:out.removed,relocated};
+  }
+  /** upper-floors/1 read: the authored floor number of an engine level (an upper floor's placeLevel; else the level). */
+  placeLevelV1(level:number):number{return placeLevelOf(this.rt.world,level);}
   /** world-edit/1 (logged event `world-edit`, lane L9): the entity world's derived physics for the changed entities —
    *  floors on levels, wall solids, stairs, closed doors — and its god-placed fixtures/items (same ids) join this world's
    *  static scene (world.entityPhysicsV1, like nav/1) and entities. The planner re-bases once; idle bodies a new solid
