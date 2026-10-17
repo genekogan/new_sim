@@ -75,8 +75,10 @@ async function benchWorld(name: string, boxIn: boolean) {
   const wall = (k: string, x: number, z: number, hx: number, hz: number) => ({ id: k, obb: { c: [c[0] + x, c[1] + z], half: [hx, hz], yaw: 0 }, y0: 0, y1: 2, kind: 'fixture' });
   const edit: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: { [id]: assetFromDef(id, bench) }, set: {
     bench: { fixture: { def: id, kind: 'fixture', label: 'bench', p: [c[0], 0, c[1]], yaw: 0 } },
-    // the left seat boxed in on three sides (the bench is the fourth): no clear slide onto it from anywhere
-    ...(boxIn ? { pen: { solids: [wall('pen-front', -0.75, 0.55, 0.65, 0.05), wall('pen-back', -0.75, -0.55, 0.65, 0.05), wall('pen-side', -1.45, 0, 0.05, 0.6)] } } : {}),
+    // the left seat walled in on all four sides (the bench itself is the seat's own obstacle and blocks nothing): every
+    // slide onto it from outside the pen crosses a wall, and no point inside the pen is reachable
+    ...(boxIn ? { pen: { solids: [wall('pen-front', -0.75, 0.55, 0.65, 0.05), wall('pen-back', -0.75, -0.55, 0.65, 0.05),
+      wall('pen-left', -1.45, 0, 0.05, 0.6), wall('pen-right', -0.05, 0, 0.05, 0.6)] } } : {}),
   } } as unknown as WorldEditV1;
   edit.hash = nextEntityPhysics(undefined, edit).hash;
   e.applyWorldEditV1(edit);
