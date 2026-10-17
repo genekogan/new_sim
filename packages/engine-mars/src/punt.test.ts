@@ -68,3 +68,22 @@ test('an early rear-rower stop steps around the occupied front thwart and leaves
   assert.equal(world.entities.a.human!.carrier,undefined);assert.equal(world.entities.a.human!.shore?.depthMetres,0);
   assert.ok(world.entities.b.human!.carrier);assert.deepEqual(rt.violations,[]);
 });
+
+test('a pond with a wide shallow shelf boards its punt where a stretch of bank drops steeply (L1, Eden 2026 commons pond)',async()=>{
+  const factory=await marsFactory({...GREEN_FIELD_WORLD,safeCrewRemoval:true,walkBlockV1:true}),e=factory.create(factory.genesis('shelf')) as MarsEngine;
+  const pond:[number,number][]=[[-15,-15],[15,-15],[15,15],[-15,15]];
+  const shelf:Ground={schema:'ground/1',base:0,extent:[-50,-50,50,50],waters:[{id:'pond',area:pond,level:-.2}],landforms:[{id:'bed',kind:'carve',area:pond,bed:-1.4,edge:8}]};
+  e.installGroundV1(groundFact(shelf,0));
+  assert.deepEqual(e.puntCandidatesV1(),[],'8 m of shallows on every side: no plank reaches floating water');
+  // the same pond, its east bank dropping steeply off the middle of the side (a quay-like stretch at z 6..10)
+  const quay:Ground={...shelf,landforms:[...shelf.landforms,{id:'quay',kind:'carve',area:[[10,5],[15,5],[15,11],[10,11]],bed:-1.4,edge:.5}]};
+  e.installGroundV1(groundFact(quay,1));
+  const spec=e.puntCandidatesV1()[0];
+  assert.ok(spec,'a punt boards at the steep stretch');
+  assert.equal(e.previewCarrierV1(spec),null);
+  assert.ok(spec.at[0]>9&&spec.at[1]>4&&spec.at[1]<12,`home by the quay ${JSON.stringify(spec.at)}`);
+  assert.ok(spec.bank!.door[0]>=15,`boarding on the dry bank ${JSON.stringify(spec.bank!.door)}`);
+  assert.deepEqual(e.puntCandidatesV1(),[spec],'the same candidate again (memoised per static world)');
+  assert.equal(e.installCarrierV1(spec),true);
+  assert.deepEqual(e.puntCandidatesV1().filter(s=>s.id!==spec.id),[],'installed: no second punt for that water');
+});

@@ -75,13 +75,56 @@ export function puntCandidates(rt:Runtime,render?:RenderScene):CarrierInstallSpe
       const point=(inward:number,along=0):V3|null=>{const x=round(mid[0]+normal[0]*inward+tangent[0]*along),z=round(mid[1]+normal[1]*inward+tangent[1]*along),y=surface.bank(x,z);return y===null?null:[x,round(y),z];};
       const door=point(-.9),ea=point(-1.45,-.85),eb=point(-1.45,.85);if(!door||!ea||!eb)continue;
       for(const radius of [5,4,3,2]){
-        const id=surface.id==='eden-pond'?'eden-punt':`punt-${surface.id.replace(/[^a-z0-9._-]+/gi,'-').toLowerCase().slice(0,50)}-${hashOf(surface.id).slice(0,6)}`;
+        const id=idOf(surface);
         const keys=Array.from({length:17},(_,i)=>{const angle=i/16*2*Math.PI,n=radius*(1-Math.cos(angle)),t=radius*.65*Math.sin(angle);return {t:i/16*150,p:[round(home[0]+normal[0]*n+tangent[0]*t),home[1],round(home[2]+normal[1]*n+tangent[1]*t)] as V3};});
         const spec:CarrierInstallSpec={id,def:'rowing-punt',label:surface.id==='eden-pond'?'Pond rowing punt':`${surface.id} rowing punt`,at:[home[0],home[2]],y:home[1],yaw:Math.atan2(-normal[1],-normal[0]),route:`${id}-loop`,routeKeys:keys,bank:{door,exits:{'rider-a':ea,'rider-b':eb}},waitSeconds:30};
         if(!previewPunt(rt,spec,render)){found=spec;break;}
       }
     }
+    if(!found&&!rt.world.entities[idOf(surface)]){
+      // memoised per water and static world (the navigation epoch): the host asks every minute
+      const sp=rt.services.spatial as Spatial;sp.sync(rt.world);
+      const key=`${surface.id}|${surface.level}|${sp.epoch}`;let memo=shelfMemo.get(rt);if(!memo)shelfMemo.set(rt,memo=new Map());
+      if(!memo.has(key)){if(memo.size>64)memo.clear();memo.set(key,shelfCandidate(rt,surface,render)??null);}
+      const hit=memo.get(key);found=hit?structuredClone(hit):undefined;
+    }
     if(found)out.push(found);
   }
   return out;
+}
+
+const shelfMemo=new WeakMap<Runtime,Map<string,CarrierInstallSpec|null>>();
+const idOf=(surface:Surface)=>surface.id==='eden-pond'?'eden-punt':`punt-${surface.id.replace(/[^a-z0-9._-]+/gi,'-').toLowerCase().slice(0,50)}-${hashOf(surface.id).slice(0,6)}`;
+
+/** L1: a water whose long shore sides all have shallows wider than a plank (Eden 2026's commons pond: ~6 m of shelf) can
+ * still board a punt where the hull floats within a short plank of dry bank — a jetty or deck over the water, a quay, a
+ * steeper stretch of bank. Tried on a 0.5 m lattice (waters up to 200 × 200 m; not the sea): every home where the hull
+ * floats, nearest the water's middle first, with its dry boarding point in any of 32 directions; the punt rule
+ * (previewPunt) still decides. Prospective: only a water with no punt yet gets one. */
+function shelfCandidate(rt:Runtime,surface:Surface,render?:RenderScene):CarrierInstallSpec|undefined{
+  const p=surface.polygon,xs=p.map(q=>q[0]),zs=p.map(q=>q[1]),x0=Math.min(...xs),z0=Math.min(...zs),x1=Math.max(...xs),z1=Math.max(...zs);
+  if((x1-x0)*(z1-z0)>40000)return undefined;
+  const S=0.5,nx=Math.ceil((x1-x0)/S)+1,nz=Math.ceil((z1-z0)/S)+1,cx=xs.reduce((a,b)=>a+b,0)/xs.length,cz=zs.reduce((a,b)=>a+b,0)/zs.length;
+  const disc=(x:number,z:number)=>surface.bank(x,z)!==null&&Array.from({length:8},(_,i)=>{const a=i*Math.PI/4;return surface.bank(x+Math.cos(a)*.3,z+Math.sin(a)*.3)!==null;}).every(Boolean);
+  const homes:V3[]=[];
+  for(let j=0;j<nz;j++)for(let i=0;i<nx;i++){const h:V3=[round(x0+i*S),surface.level,round(z0+j*S)];if(inPoly(h[0],h[2],p)&&hullWet(surface,h))homes.push(h);}
+  homes.sort((a,b)=>Math.hypot(a[0]-cx,a[2]-cz)-Math.hypot(b[0]-cx,b[2]-cz)||a[0]-b[0]||a[2]-b[2]);
+  const id=idOf(surface),label=surface.id==='eden-pond'?'Pond rowing punt':`${surface.id} rowing punt`;
+  let tried=0;
+  for(const home of homes)for(let k=0;k<32;k++){
+    const a=k*Math.PI/16,d:V2=[Math.cos(a),Math.sin(a)],tangent:V2=[-d[1],d[0]],normal:V2=[-d[0],-d[1]];
+    for(const r of [3.1,2.8,2.5,2.2]){
+      const at=(out:number,along:number):V3|null=>{const x=round(home[0]+d[0]*out+tangent[0]*along),z=round(home[2]+d[1]*out+tangent[1]*along),y=surface.bank(x,z);return y===null?null:[x,round(y),z];};
+      const door=at(r,0);if(!door||!disc(door[0],door[2]))continue;
+      const ea=at(r+.55,-.85),eb=at(r+.55,.85);if(!ea||!eb)continue;
+      for(const radius of [5,4,3,2]){
+        const keys=Array.from({length:17},(_,i)=>{const angle=i/16*2*Math.PI,n=radius*(1-Math.cos(angle)),t=radius*.65*Math.sin(angle);return {t:i/16*150,p:[round(home[0]+normal[0]*n+tangent[0]*t),home[1],round(home[2]+normal[1]*n+tangent[1]*t)] as V3};});
+        const spec:CarrierInstallSpec={id,def:'rowing-punt',label,at:[home[0],home[2]],y:home[1],yaw:Math.atan2(-normal[1],-normal[0]),route:`${id}-loop`,routeKeys:keys,bank:{door,exits:{'rider-a':ea,'rider-b':eb}},waitSeconds:30};
+        if(!previewPunt(rt,spec,render))return spec;
+        if(++tried>400)return undefined;   // bounded: a water this shallow everywhere is an honest "no punt"
+      }
+      break;
+    }
+  }
+  return undefined;
 }
