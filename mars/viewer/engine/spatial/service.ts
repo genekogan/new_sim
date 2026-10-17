@@ -225,8 +225,32 @@ export class Spatial {
     return true;
   }
 
+  /** Inside readPass: the world whose sync is already done (and its entities object). */
+  private held: { world: WorldState; entities: WorldState['entities'] } | null = null;
+  /**
+   * Run `fn`, a read of `world` that changes nothing the planner sees (no entity, body or walk in progress moves), with
+   * one sync up front: every sync(world) inside it is answered "nothing changed" without walking the entities again
+   * (lane L1: a Soul's first listing inside an Eden 2026 house synced ~3,500 times, 0.9 s). A sync still runs whenever
+   * the scene is gone or the ground window grew (groundDirty), and for any other world.
+   */
+  readPass<T>(world: WorldState, fn: () => T): T {
+    this.sync(world);
+    const prev = this.held;
+    this.held = { world, entities: world.entities };
+    try {
+      return fn();
+    } finally {
+      this.held = prev;
+    }
+  }
+
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
   sync(world: WorldState): boolean {
+    const h = this.held;
+    if (h !== null) {
+      if (h.world === world && h.entities === world.entities && this.scene && !this.groundDirty) return false;
+      this.held = null;   // the planner now follows another world (or a changed one): real syncs until the pass ends
+    }
     const p = this.prof;
     if (!p) return this.syncNow(world);
     const t0 = p.now();

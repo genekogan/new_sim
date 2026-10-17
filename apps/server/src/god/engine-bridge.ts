@@ -816,7 +816,8 @@ export class EngineBridge {
 
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
-    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    // L1: the walk listing only reads the world; the engine's planner syncs once for all of it (readPassV1)
+    try { const nav = () => this.nav.capabilities(soul, caps, plans), eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(nav); else nav(); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     releaseBigScratch();   // L1: room-reach searches inside a multi-storey house share one ~110 MB workspace; not kept after
     try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });

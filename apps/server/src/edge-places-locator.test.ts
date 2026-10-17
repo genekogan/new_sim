@@ -54,7 +54,7 @@ test('locator == containing()[0]: nesting, area ties in index order, levels, roo
 });
 
 const TEMPLATE = new URL('../../../worlds/templates/eden-2026.json', import.meta.url);
-test('Eden 2026: locator == containing()[0] round every place; activity spots the same with and without it', {skip: !existsSync(TEMPLATE) && 'no Eden 2026 template'}, async () => {
+test('Eden 2026: locator == containing()[0] round every place; activity spots and the walk listing the same with and without the locator / read pass', {skip: !existsSync(TEMPLATE) && 'no Eden 2026 template'}, async () => {
   const w = await bootEden();
   try {
     const ix = w.edge.places, all = [...ix.byId.values()];
@@ -65,6 +65,12 @@ test('Eden 2026: locator == containing()[0] round every place; activity spots th
       for (const l of [p.level ?? 0, 0, 1]) pts.push([ax, az, l], [(ax + bx) / 2, (az + bz) / 2, l], [ax + 1e-9, az - 1e-9, l], [(ax * 3 + bx) / 4 + 0.05, (az * 3 + bz) / 4 - 0.05, l]);
     }
     assert.equal(same(ix, pts), 0);
+    // L1 readPassV1: the walk listing with one planner sync is the listing with a sync per read
+    const eng = w.host.engine as unknown as {readPassV1?: unknown};
+    assert.equal(typeof eng.readPassV1, 'function');
+    const withPass = JSON.stringify(w.edge.capabilities(w.soul)), keepPass = eng.readPassV1;
+    try { eng.readPassV1 = undefined; assert.equal(JSON.stringify(w.edge.capabilities(w.soul)), withPass); }
+    finally { eng.readPassV1 = keepPass; }
     const spots = (w.bridge as unknown as {activitySpots: {data(): unknown; cache: unknown; h: {placeLocator?: unknown}}}).activitySpots;
     const fast = JSON.stringify(spots.data());
     const h = spots.h, keep = h.placeLocator;
