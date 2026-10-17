@@ -35,7 +35,7 @@ export function carrierFraming(c: CarrierPose): [number, number, number][] {
  * balloon drifted out of a frozen frame. A ridden carrier gets its own side-on shot instead: the eye a little above the
  * basket floor (under the envelope mouth), RIDER_DISTANCE out, looking at the basket and lower envelope. It holds for
  * any carrier (Eden 2026's native ride and god balloons alike) because it uses only the carrier's pose. */
-export const RIDER_EYE_MAX = 4, RIDER_EYE = 3, RIDER_DISTANCE = 20, RIDER_AIM = 4;
+export const RIDER_EYE_MAX = 4, RIDER_EYE = 3.6, RIDER_DISTANCE = 14, RIDER_AIM = 3;
 export function riderPose(c: CarrierPose, azimuth: number): CameraPose {
   const [x, y, z] = c.p;
   return { position: [x + Math.cos(azimuth) * RIDER_DISTANCE, y + RIDER_EYE, z + Math.sin(azimuth) * RIDER_DISTANCE], target: [x, y + RIDER_AIM, z], fov: 45 };
