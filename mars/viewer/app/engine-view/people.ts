@@ -238,15 +238,15 @@ function measureWalk(gltf: GLTF, name = 'Walk', fitted: ReturnType<typeof fit> =
   const dur = walk.getClip().duration, N = 120, dt = dur / N;
   const v: number[] = [];
   let prev: { foot: number; z: number } | null = null;
-  const p = new THREE.Vector3();
+  const p = new THREE.Vector3(), q = new THREE.Vector3();
   for (let i = 0; i <= N; i++) {
     walk.time = i * dt;
     mixer.update(0);
     // getWorldPosition updates the foot's own ancestor chain (updateWorldMatrix(true, false)): the same matrices
     // a whole-model updateMatrixWorld(true) computes for it, without every other bone and mesh
-    const ys = feet.map((f) => f!.getWorldPosition(p).y);
-    const foot = ys[0] < ys[1] ? 0 : 1;
-    const z = feet[foot]!.getWorldPosition(p).z;
+    const a = feet[0]!.getWorldPosition(p), b = feet[1]!.getWorldPosition(q);   // (each foot's chain once per sample)
+    const foot = a.y < b.y ? 0 : 1;
+    const z = foot === 0 ? a.z : b.z;
     if (prev && prev.foot === foot) v.push((z - prev.z) / dt);
     prev = { foot, z };
   }
