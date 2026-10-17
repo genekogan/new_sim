@@ -1,7 +1,7 @@
 // node --test apps/web/src/entity-arrival.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ARRIVAL_MAX, ARRIVAL_MIN, entityArrivalPose } from './entity-arrival.ts';
+import { ARRIVAL_AT, ARRIVAL_MAX, ARRIVAL_MIN, entityArrivalPose } from './entity-arrival.ts';
 const flat = () => 0;
 const d = (p: { eye: number[]; target: number[] }) => Math.hypot(p.eye[0] - p.target[0], p.eye[1] - p.target[1], p.eye[2] - p.target[2]);
 test('an empty plain: the middle of the world at the near distance, low enough to keep the horizon (not 320 m away)', () => {
@@ -42,4 +42,14 @@ test('portrait phone: a large built world is framed nearer than on a landscape s
   const wide = entityArrivalPose(big, 50, g, 45, 16 / 9), tall = entityArrivalPose(big, 50, g, 45, 390 / 844);
   assert.equal(wide.distance, 110);
   assert.ok(tall.distance < 60 && tall.distance >= 22, `portrait distance ${tall.distance}`);
+});
+test('a world with its own arrival spot (Little Martians: the flag named arrival at the Ceramic Commons) is framed there, near', () => {
+  const big: [number, number, number, number] = [-135, -135, 135, 135];
+  const p = entityArrivalPose(big, 435, () => 1, 45, 1.5, 1, [0, 18]);
+  assert.deepEqual([p.target[0], p.target[2]], [0, 18]); assert.equal(p.target[1], 1);
+  assert.equal(p.distance, ARRIVAL_AT); assert.ok(Math.abs(d(p) - ARRIVAL_AT) < 1e-6);
+  const phone = entityArrivalPose(big, 435, flat, 45, 390 / 844, 1, [0, 18]);
+  assert.ok(phone.distance <= ARRIVAL_AT && phone.distance >= ARRIVAL_MIN, String(phone.distance));
+  const none = entityArrivalPose(big, 435, flat, 45, 1.5, 1, null), bad = entityArrivalPose(big, 435, flat, 45, 1.5, 1, [NaN, 3]);
+  assert.deepEqual(none, bad); assert.equal(none.distance, ARRIVAL_MAX);
 });

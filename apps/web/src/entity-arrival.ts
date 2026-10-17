@@ -8,6 +8,9 @@ export type ArrivalPose = { target: [number, number, number]; eye: [number, numb
 /** Eye distance range (m): an empty plain starts near (WASD/zoom/double-click read at once); a built world is fitted
  * into the uncovered view up to ARRIVAL_MAX (the old framing went to OrbitControls' 320 m limit). */
 export const ARRIVAL_MIN = 22, ARRIVAL_MAX = 110;
+/** A world that names a thing `arrival` (Little Martians' arrival flag at the Ceramic Commons, as its source world arrived
+ * there) is framed on that spot at this distance, instead of fitting everything that was built. */
+export const ARRIVAL_AT = 45;
 const ELEVATION = (16 * Math.PI) / 180; // 16° above the ground: the horizon stays in view (45° fov), so an empty plain still shows where you are
 const AZIMUTH: [number, number] = [-0.9 / Math.hypot(0.9, 1.1), 1.1 / Math.hypot(0.9, 1.1)]; // from the south-west, as before (x −, z +)
 
@@ -18,11 +21,13 @@ const AZIMUTH: [number, number] = [-0.9 / Math.hypot(0.9, 1.1), 1.1 / Math.hypot
  * @param fovDeg   vertical field of view; aspect = width / height
  * @param visible  the fraction of the width left of the god panel (1: nothing covers the view); what was built is
  *                 framed in that part, so the panel does not hide it
+ * @param arrival  [x, z] of the world's own arrival spot (a thing named `arrival`), or null: frame what was built
  */
-export function entityArrivalPose(bounds: readonly [number, number, number, number], built: number, groundAt: (x: number, z: number) => number | null, fovDeg = 45, aspect = 16 / 9, visible = 1): ArrivalPose {
+export function entityArrivalPose(bounds: readonly [number, number, number, number], built: number, groundAt: (x: number, z: number) => number | null, fovDeg = 45, aspect = 16 / 9, visible = 1, arrival: readonly [number, number] | null = null): ArrivalPose {
   const [x0, z0, x1, z1] = bounds.every(Number.isFinite) ? bounds : [-20, -20, 20, 20];
-  const cx = built > 0 ? (x0 + x1) / 2 : 0, cz = built > 0 ? (z0 + z1) / 2 : 0;
-  const span = built > 0 ? Math.max(x1 - x0, z1 - z0) : 0;
+  const spot = arrival && arrival.every(Number.isFinite) ? arrival : null;
+  const cx = spot ? spot[0] : built > 0 ? (x0 + x1) / 2 : 0, cz = spot ? spot[1] : built > 0 ? (z0 + z1) / 2 : 0;
+  const span = spot ? 0 : built > 0 ? Math.max(x1 - x0, z1 - z0) : 0;
   const f = Number.isFinite(visible) ? Math.min(1, Math.max(0.3, visible)) : 1;
   const vfov = (fovDeg * Math.PI) / 180, tanH = Math.tan(vfov / 2) * (aspect > 0 ? aspect : 1), hfov = 2 * Math.atan(tanH * f);
   const half = Math.max(0.1, Math.min(vfov, hfov) / 2);
@@ -30,7 +35,7 @@ export function entityArrivalPose(bounds: readonly [number, number, number, numb
   // Portrait: the narrow width would push a built world out to the 110 m cap, which on a phone reads as a speck. Cap the
   // distance in proportion to the aspect (390x844 -> ~51 m) so the middle of what was built is framed large; the rest is a drag away.
   const cap = aspect >= 1 ? ARRIVAL_MAX : Math.max(ARRIVAL_MIN, ARRIVAL_MAX * Math.max(0.1, aspect));
-  const distance = Math.min(cap, Math.max(ARRIVAL_MIN, fit));
+  const distance = Math.min(cap, spot ? ARRIVAL_AT : Math.max(ARRIVAL_MIN, fit));
   const gy = groundAt(cx, cz) ?? 0;
   const h = Math.cos(ELEVATION) * distance;
   // Screen centre = the target. Put the built centre at the middle of the uncovered part: move the target right (the

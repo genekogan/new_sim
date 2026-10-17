@@ -78,7 +78,8 @@ only after reading, and do not claim the requested work is complete before verif
   takes the whole market back out.
 - **Flags** are labelled reference points (no collider): `flag "camp" --at 40,10`, then
   `--near flag:camp`. The owner can drop flags from the website too. (A `flagpole` is an ordinary
-  8 m civic thing, not a flag.)
+  8 m civic thing, not a flag.) A top-level thing named `arrival` (e.g. `flag "arrival" --at 0,18`) is where a
+  visitor's first view looks, from 45 m; without one the first view fits everything built.
 
 ## The loop
 

@@ -100,7 +100,7 @@ export class WorldEntityLayer {
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
     // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
     const m0 = this.model, q = new URLSearchParams(location.search), at = q.get('at')?.split(',').map(Number), eyeQ = q.get('eye')?.split(',').map(Number);
-    const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1);
+    const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1, this.arrivalAt());
     const eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
     this.seq = snap.seq;
@@ -251,6 +251,13 @@ export class WorldEntityLayer {
     }
     if (!Number.isFinite(x0)) { const h = Math.min(120, this.model.constants.extent / 4); return [-h, -h, h, h]; }
     return [x0, z0, x1, z1];
+  }
+
+  /** The world's own arrival spot: a top-level thing named `arrival` (Little Martians' flag at the Ceramic Commons), or null. */
+  arrivalAt(): [number, number] | null {
+    if (!this.model) return null;
+    for (const e of this.model.entities.values()) if (e.name === 'arrival' && e.in.parent === 'world') { const wp = this.model.worldPose(e); return [wp.x, wp.z]; }
+    return null;
   }
 
   /** Terrain meshes, for picking a ground point with a ray (flags). */
