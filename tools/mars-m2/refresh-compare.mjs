@@ -38,6 +38,9 @@ import sys, json
 from PIL import Image, ImageDraw, ImageFont
 images, tag, views, oldh, newh = sys.argv[1], sys.argv[2], json.loads(sys.argv[3]), sys.argv[4], sys.argv[5]
 import os
+for d in (1, 2):
+  ph = Image.new('RGB', (960 * d, 640 * d), (16, 18, 23)); gg = ImageDraw.Draw(ph); ff = ImageFont.truetype('/System/Library/Fonts/Helvetica.ttc', 20 * d)
+  gg.text((40 * d, 300 * d), 'No counterpart in the old world: a view of something new.', fill=(168, 179, 180), font=ff); ph.save(f'{images}/no-old-counterpart-dpr{d}.png')
 for name in views:
   for d in (1, 2):
     new = Image.open(f'{images}/{name}-dpr{d}-candidate-{tag}.png').convert('RGB')
@@ -56,6 +59,8 @@ const data = JSON.parse(m[1]);
 for (const v of views) {
   let row = data.find((x) => x.name === v.name);
   if (!row) { row = { name: v.name, label: v.label ?? v.name, note: v.note ?? '', hour: Number(v.hour.slice(0, 2)), kind: 'new', shots: {} }; data.push(row); }
+  else if (v.note) Object.assign(row, { label: v.label ?? row.label, note: v.note });
+  if (row.kind === 'new') for (const d of ['1', '2']) row.shots[d] = { ...(row.shots[d] ?? {}), old: `images/${world}/no-old-counterpart-dpr${d}.png` };
   for (const d of ['1', '2']) { row.shots[d] = { ...(row.shots[d] ?? {}), candidate: `images/${world}/${v.name}-dpr${d}-candidate-${tag}.png`, pair: `images/${world}/${v.name}-dpr${d}-pair-${tag}.png` }; delete row.shots[d].error; }
 }
 html = html.replace(m[1], JSON.stringify(data).replace(/<\/script/g, '<\\/script'));
