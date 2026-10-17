@@ -54,3 +54,27 @@ test('levelAmong agrees with waterLevelAt, rivers with sloping levels included',
   g.waters.push({ id: 'river', path: [[0, -200], [0, -100], [0, -40]], w: 6, level: -1, levels: [2, 0.5, -1] } as never);
   for (const [x, z] of [[0, -150], [1, -60], [-35, -5], [-80, -20], [200, 200]] as [number, number][]) assert.equal(levelAmong(g.waters, g.seaLevel, x, z), waterLevelAt(g, x, z));
 });
+
+test('waterLevelCell (L1): the same level as levelAmong at every 0.1 m lattice point, overlapping waters, rivers, edges', async () => {
+  const { levelAmong, waterLevelCell } = await import('./media.ts');
+  let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  // a wiggly pond (many vertices), a concave lake, a canal path with sloping levels, a narrow ditch, a sea level
+  const pond: [number, number][] = []; for (let k = 0; k < 90; k++) { const a = (k / 90) * Math.PI * 2, r = 9 + 3 * Math.sin(5 * a) + rnd(); pond.push([20 + r * Math.cos(a), 10 + r * Math.sin(a)]); }
+  const waters = [
+    { id: 'lake', area: [[-20, -20], [10, -20], [10, -5], [0, -5], [0, 5], [-20, 5]] as [number, number][], level: 0.2 },
+    { id: 'pond', area: pond, level: 0.5 },
+    { id: 'canal', path: [[-25, 0], [-5, 3.3], [15, 4.1], [35, 12.7], [40, 30]] as [number, number][], w: 2.5, levels: [0, 0.1, 0.25, 0.3, 0.6] },
+    { id: 'ditch', path: [[-10, -12], [30, -12.05]] as [number, number][], w: 0.6, level: 0.05 },
+  ] as never[];
+  let n = 0, differ = 0;
+  for (const sea of [undefined, -1]) for (let cz = -22; cz < 32; cz++) for (let cx = -27; cx < 42; cx++) {
+    const f = waterLevelCell(waters, sea, cx, cz);
+    for (let j = 0; j < 10; j++) for (let i = 0; i < 10; i++) {
+      const x = (Math.floor(cx / 0.1) + i + 0.5) * 0.1, z = (Math.floor(cz / 0.1) + j + 0.5) * 0.1;
+      if (Math.floor(x) !== cx || Math.floor(z) !== cz) continue;
+      n++; if (!Object.is(f(x, z), levelAmong(waters, sea, x, z))) differ++;
+    }
+  }
+  assert.ok(n > 600_000, `points ${n}`);
+  assert.equal(differ, 0, `${differ} of ${n} points differ`);
+});

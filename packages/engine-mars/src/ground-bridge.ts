@@ -6,7 +6,7 @@
 // bakes, and enters ground mode: Souls stand on the tiles, route over slope
 // and water media, swim deep water. Replay re-derives every height from the
 // journal of facts. Worlds without the fact are untouched.
-import { HUMANOID_MEDIA, TILE_M, Terrain, TileSampler, groundRecipeHash, groundSchema, levelAmong, mediaTile, mediumOf, watersNear, type Ground } from '../../ground/src/index.ts';
+import { HUMANOID_MEDIA, TILE_M, Terrain, TileSampler, groundRecipeHash, groundSchema, mediaTile, mediumOf, waterLevelCell, watersNear, type Ground } from '../../ground/src/index.ts';
 import type { GroundField, GroundV1 } from '../../../mars/viewer/engine/spatial/ground.ts';
 
 /** Content-addressed recipes this process can resolve (filled by the host from its table, and on every commit). */
@@ -33,16 +33,28 @@ export function groundField(hash: string): GroundField {
 }
 
 function fieldOf(g: Ground, id: string): GroundField {
-  const t = new TileSampler(new Terrain(g)), media = new Map<string, Uint8Array>(), wcache = new Map<string, ReturnType<typeof watersNear>>();
+  const t = new TileSampler(new Terrain(g)), media = new Map<string, Uint8Array>(), wcache = new Map<number, ReturnType<typeof watersNear>>();
+  // L1 (speed): the waters near each 8 m cell (was: each 64 m tile). A fine nav tile asks the water level of every 0.1 m
+  // cell near water; with Eden 2026's canals that dominated a tile build. levelAmong only ever takes a water whose mask
+  // is > 0 at the point (inside its area, or nearer its path than its width), and watersNear keeps every such water for
+  // any point of the box, in order, so the answer is identical.
+  const NONE: ReturnType<typeof watersNear> = [];
+  const wcell = new Map<number, (x: number, z: number) => number | null>();
   const watersAt = (x: number, z: number) => {
-    const tx = Math.floor(x / TILE_M), tz = Math.floor(z / TILE_M), k = `${tx},${tz}`;
-    let w = wcache.get(k); if (!w) { w = watersNear(g, tx * TILE_M - 1, tz * TILE_M - 1, (tx + 1) * TILE_M + 1, (tz + 1) * TILE_M + 1); wcache.set(k, w); }
+    const cx = Math.floor(x / 8), cz = Math.floor(z / 8), k = (cx + 1048576) * 2097152 + (cz + 1048576);
+    let w = wcache.get(k); if (!w) { w = watersNear(g, cx * 8 - 1, cz * 8 - 1, (cx + 1) * 8 + 1, (cz + 1) * 8 + 1); if (!w.length) w = NONE; wcache.set(k, w); }
     return w;
   };
   return {
     id, extent: g.extent, wadeMax: HUMANOID_MEDIA.wadeMax, maxSlope: HUMANOID_MEDIA.maxSlope,
     height: (x, z) => t.sample(x, z),
-    waterLevel: (x, z) => levelAmong(watersAt(x, z), g.seaLevel, x, z),
+    waterLevel: (x, z) => {
+      // L1 (speed): per 1 m cell, levelAmong compiled once (waterLevelCell: the same answers); a nav tile asks every 0.1 m cell
+      const cx = Math.floor(x), cz = Math.floor(z), k = (cx + 1048576) * 2097152 + (cz + 1048576);
+      let f = wcell.get(k);
+      if (!f) { if (wcell.size >= 16384) wcell.clear(); f = waterLevelCell(watersAt(x, z), g.seaLevel, cx, cz); wcell.set(k, f); }
+      return f(x, z);
+    },
     medium: (x, z) => mediumOf(t, x, z, HUMANOID_MEDIA, watersAt(x, z)),
     mediaTile: (tx, tz) => { const k = `${tx},${tz}`; let m = media.get(k); if (!m) { m = mediaTile(t, tx, tz, HUMANOID_MEDIA); media.set(k, m); } return m; },
   };

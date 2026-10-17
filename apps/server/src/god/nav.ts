@@ -21,6 +21,8 @@ type Engine = {
   world: { tick: number; entities: Record<string, any> };
   standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
   reachV1?(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: boolean };
+  /** The navigation epoch: moves exactly when the static world the planner sees does (spatial navChanged). */
+  navEpochV1?(): number;
 };
 export type NavHost = {
   model: WorldModel;
@@ -396,7 +398,11 @@ export class GodNav {
   }
   private strolls = new Map<string, { key: string; spots: Vec2[] }>();
   private strollSpots(ref: string, poly: Vec2[]): Vec2[] {
-    const key = this.cache?.key ?? ''; const hit = this.strolls.get(ref); if (hit?.key === key) return hit.spots;
+    // L1: clear spots read only the static clearance (clearSpotsV1), so they are kept until a god edit (the area's outline)
+    // or the navigation epoch (the static world) moves — not every engine writeback: after each walk a Soul's next listing
+    // re-derived every area's spots (~200 nav tiles rebuilt, 6–10 s on Eden 2026)
+    const ep = this.h.engine.navEpochV1?.(), key = ep === undefined ? this.cache?.key ?? '' : `${this.h.staticVersion?.() ?? this.cache?.key}|${ep}`;
+    const hit = this.strolls.get(ref); if (hit?.key === key) return hit.spots;
     const f = (this.h.engine as unknown as { clearSpotsV1?: (p: Vec2[], n: number) => Vec2[] }).clearSpotsV1;
     const spots = (f ? f.call(this.h.engine, poly, 5) : []).map(([x, z]) => [r2(x), r2(z)] as Vec2);
     this.strolls.set(ref, { key, spots }); if (this.strolls.size > 200) this.strolls.clear();

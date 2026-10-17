@@ -6,7 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, hypot, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { buildStaticGrids, buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
+import { buildStaticGrids, buildGrids, clearanceAt, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
@@ -405,6 +405,32 @@ export class Spatial {
       this.focusPage(i);
     }
     return this.grids.levels.get(id);
+  }
+
+  /**
+   * L1 (memory): clearance reads at points round `at` on `level`, exactly as `clearanceAt(levelAt(level, at), q)` — the same
+   * values (0 off the grid) and the same window focus — but when no paged window holds `at` on level 0, the points are read
+   * from the fine tiles of the composite levelAt would build (GroundNav.clearanceReader) instead of copying it. Null when
+   * levelAt has no grid.
+   */
+  clearanceReader(level: number, at: Vec2): ((q: Vec2) => number) | null {
+    if (level === 0 && this.ground?.paged && this.pages) {
+      const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceReader(rectOf([at]), this.pages.all.obstacles);
+    }
+    const g = this.levelAt(level, at);
+    return g ? (q) => clearanceAt(g, q) : null;
+  }
+
+  /** L1: `clearanceAt(levelAt(level, at), q) >= t` for points round `at`, the same answers and window focus; off the
+   *  paged windows on level 0 without building fine tiles (GroundNav.clearTester). Null when levelAt has no grid. */
+  clearTester(level: number, at: Vec2, t: number): ((q: Vec2) => boolean) | null {
+    if (level === 0 && this.ground?.paged && this.pages) {
+      const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearTester(rectOf([at]), this.pages.all.obstacles, t);
+    }
+    const g = this.levelAt(level, at);
+    return g ? (q) => clearanceAt(g, q) >= t : null;
   }
 
   /**

@@ -14,7 +14,7 @@
 //    Each hop is planned with the existing planner (findRoute) on a composite of
 //    just that hop's tiles, so a route never depends on how far the window has grown.
 import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
-import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, gridContentKeys, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
+import { BODY_HEIGHT, STEP, buildGrids, buildGridsOverFloors, edt, gridContentKeys, latticeCentre, latticeIndex, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
 import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES, coarseMedium, type GroundField } from './ground.ts';
@@ -86,16 +86,18 @@ class ComposedBlockers extends Map<number, string> {
  * as from any neighbouring cell — the generators put rails on the open sides of bridges and piers.
  */
 export function deckedField(base: GroundField, decks: Surface[], key: string): GroundField {
-  const buckets = new Map<string, Surface[]>();
+  // numeric 8 m cell keys (L1: deckY runs for every fine cell of a nav tile; string keys were a third of its cost)
+  const bk = (i: number, j: number) => (i + 1048576) * 2097152 + (j + 1048576);
+  const buckets = new Map<number, Surface[]>(), cellsOf: [number, number][] = [];
   for (const s of decks) {
     let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
     for (const [x, z] of obbCorners(s.obb)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
     for (let j = Math.floor(az / 8); j <= Math.floor(bz / 8); j++) for (let i = Math.floor(ax / 8); i <= Math.floor(bx / 8); i++) {
-      const k = `${i},${j}`, l = buckets.get(k); if (l) l.push(s); else buckets.set(k, [s]);
+      const k = bk(i, j), l = buckets.get(k); if (l) l.push(s); else { buckets.set(k, [s]); cellsOf.push([i, j]); }
     }
   }
   const deckY = (x: number, z: number): number | null => {
-    const l = buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`); if (!l) return null;
+    const l = buckets.get(bk(Math.floor(x / 8), Math.floor(z / 8))); if (!l) return null;
     let y = -Infinity, g = NaN;
     for (const s of l) if (s.y > y && pointInObb([x, z], s.obb)) { if (g !== g) g = base.height(x, z); if (s.y >= g - 0.05) y = s.y; }
     return y === -Infinity ? null : y;
@@ -110,7 +112,7 @@ export function deckedField(base: GroundField, decks: Surface[], key: string): G
       const k = `${tx},${tz}`; let m = tiles.get(k); if (m) return m;
       m = base.mediaTile(tx, tz);
       const x0 = tx * GROUND_TILE_M, z0 = tz * GROUND_TILE_M;
-      if (buckets.size && [...buckets.keys()].some((b) => { const [i, j] = b.split(',').map(Number); return i * 8 < x0 + GROUND_TILE_M && i * 8 + 8 > x0 && j * 8 < z0 + GROUND_TILE_M && j * 8 + 8 > z0; })) {
+      if (buckets.size && cellsOf.some(([i, j]) => i * 8 < x0 + GROUND_TILE_M && i * 8 + 8 > x0 && j * 8 < z0 + GROUND_TILE_M && j * 8 + 8 > z0)) {
         m = m.slice();
         for (let j = 0; j < GROUND_TILE_M; j++) for (let i = 0; i < GROUND_TILE_M; i++) if (deckY(x0 + i + 0.5, z0 + j + 0.5) !== null) m[j * GROUND_TILE_M + i] = G_WALK;
       }
@@ -247,51 +249,71 @@ export class GroundNav {
     return `${tx},${tz}:${h.toString(16)}${h2.toString(16)}`;
   }
 
-  /** One tile's fine level-0 raster: ground media, then obstacles in the body band above the ground there, then the exact EDT. */
-  fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel)): FineTile {
-    const hit = this.fine.get(key);
-    if (hit) { this.fine.delete(key); this.fine.set(key, hit); this.stats.fineHits++; return hit; }
-    this.stats.fineBuilds++;
-    const { per, apron: A, cell, field } = this;
-    const M = per + 2 * A, ox = tx * per - A, oz = tz * per - A;
-    const free = new Uint8Array(M * M), blk = new Int16Array(M * M).fill(-1), ids: string[] = ['ground:outside', 'ground:steep', 'ground:water'];
-    // coarse media around the apron'd tile (1 m cells), and which cells touch water
+  /**
+   * The walk raster (1 = free) of the cells [i0, i0 + ni) × [j0, j0 + nj) of a tile's apron'd raster (origin ox, oz; M × M
+   * cells): ground media, then obstacles in the body band above the ground there. fineTile classifies its whole raster
+   * with it; a point test (clearTester) only the cells round a point, with the same coarse window and clipping, so the
+   * cells are identical. `blk` / `ids` (whole raster only) name what blocks each cell.
+   */
+  private classify(ox: number, oz: number, M: number, rel: Obstacle[], i0: number, j0: number, ni: number, nj: number, blk?: Int16Array, ids?: string[]): Uint8Array {
+    const { cell, field } = this;
+    const free = new Uint8Array(ni * nj);
+    // coarse media around the apron'd tile (1 m cells), and which cells touch water — evaluated as first needed
     const c0x = Math.floor(latticeCentre(ox, cell)) - 1, c0z = Math.floor(latticeCentre(oz, cell)) - 1;
     const cw = Math.floor(latticeCentre(ox + M - 1, cell)) + 2 - c0x;
-    const coarse = new Uint8Array(cw * cw), wet = new Uint8Array(cw * cw);
-    for (let j = 0; j < cw; j++) for (let i = 0; i < cw; i++) coarse[j * cw + i] = coarseMedium(field, c0x + i + 0.5, c0z + j + 0.5);
-    for (let j = 0; j < cw; j++) for (let i = 0; i < cw; i++) {
-      let w = 0;
+    const coarse = new Uint8Array(cw * cw).fill(255), wet = new Uint8Array(cw * cw).fill(255);
+    const cm = (k: number) => { let c = coarse[k]; if (c === 255) c = coarse[k] = coarseMedium(field, c0x + (k % cw) + 0.5, c0z + Math.floor(k / cw) + 0.5); return c; };
+    const wetAt = (k: number) => {
+      let w = wet[k]; if (w !== 255) return w;
+      const i = k % cw, j = Math.floor(k / cw); w = 0;
       for (let dj = -1; dj <= 1 && !w; dj++) for (let di = -1; di <= 1; di++) {
         const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= cw || b >= cw) continue;
-        const c = coarse[b * cw + a]; if (c === G_WADE || c === G_SWIM) { w = 1; break; }
+        const c = cm(b * cw + a); if (c === G_WADE || c === G_SWIM) { w = 1; break; }
       }
-      wet[j * cw + i] = w;
-    }
-    for (let j = 0; j < M; j++) {
-      const z = latticeCentre(oz + j, cell), cj = Math.floor(z) - c0z;
-      for (let i = 0; i < M; i++) {
-        const x = latticeCentre(ox + i, cell), ci = Math.floor(x) - c0x, k = j * M + i, c = coarse[cj * cw + ci];
-        if (c === G_OUTSIDE) { blk[k] = 0; continue; }
-        if (c === G_STEEP) { blk[k] = 1; continue; }
-        if (wet[cj * cw + ci]) {
+      return (wet[k] = w);
+    };
+    for (let j = 0; j < nj; j++) {
+      const z = latticeCentre(oz + j0 + j, cell), cj = Math.floor(z) - c0z;
+      for (let i = 0; i < ni; i++) {
+        const x = latticeCentre(ox + i0 + i, cell), ci = Math.floor(x) - c0x, k = j * ni + i, ck = cj * cw + ci, c = cm(ck);
+        if (c === G_OUTSIDE) { if (blk) blk[k] = 0; continue; }
+        if (c === G_STEEP) { if (blk) blk[k] = 1; continue; }
+        if (wetAt(ck)) {
           const lvl = field.waterLevel(x, z);
-          if (lvl !== null && lvl - field.height(x, z) > field.wadeMax + 1e-4) { blk[k] = 2; continue; }
+          if (lvl !== null && lvl - field.height(x, z) > field.wadeMax + 1e-4) { if (blk) blk[k] = 2; continue; }
         }
         free[k] = 1;
       }
     }
     // obstacles in the body band above the ground at each cell (first listed names the cell, as stampLevel)
-    for (const o of rel) {
+    const whole = i0 === 0 && j0 === 0 && ni === M && nj === M, boxes = whole ? null : boxesOf(rel);
+    const bx0 = latticeCentre(ox + i0, cell) - cell, bz0 = latticeCentre(oz + j0, cell) - cell, bx1 = latticeCentre(ox + i0 + ni - 1, cell) + cell, bz1 = latticeCentre(oz + j0 + nj - 1, cell) + cell;
+    const clip: [number, number, number, number] | undefined = whole ? undefined : [i0, i0 + ni - 1, j0, j0 + nj - 1];
+    for (let n = 0; n < rel.length; n++) {
+      if (boxes && (boxes[4 * n + 2] < bx0 || boxes[4 * n] > bx1 || boxes[4 * n + 3] < bz0 || boxes[4 * n + 1] > bz1)) continue;
+      const o = rel[n];
       let idx = -1;
-      rasterObb(o.obb, ox, oz, cell, M, M, (k) => {
+      rasterObb(o.obb, ox, oz, cell, M, M, (g) => {
+        const k = (Math.floor(g / M) - j0) * ni + (g % M) - i0;
         if (!free[k]) return;
-        const x = latticeCentre(ox + (k % M), cell), z = latticeCentre(oz + Math.floor(k / M), cell), h = field.height(x, z);
+        const x = latticeCentre(ox + (g % M), cell), z = latticeCentre(oz + Math.floor(g / M), cell), h = field.height(x, z);
         if (o.y1 <= h + STEP || o.y0 >= h + BODY_HEIGHT) return;
-        if (idx < 0) { idx = ids.length; ids.push(o.id); if (idx > 32000) throw new Error('ground: too many obstacles in one tile'); }
-        free[k] = 0; blk[k] = idx;
-      }, true);
+        if (blk && ids) { if (idx < 0) { idx = ids.length; ids.push(o.id); if (idx > 32000) throw new Error('ground: too many obstacles in one tile'); } blk[k] = idx; }
+        free[k] = 0;
+      }, true, clip);
     }
+    return free;
+  }
+
+  /** One tile's fine level-0 raster: ground media, then obstacles in the body band above the ground there, then the exact EDT. */
+  fineTile(tx: number, tz: number, rel: Obstacle[], key = this.keyOf(tx, tz, rel)): FineTile {
+    const hit = this.fine.get(key);
+    if (hit) { this.fine.delete(key); this.fine.set(key, hit); this.stats.fineHits++; return hit; }
+    this.stats.fineBuilds++;
+    const { per, apron: A, cell } = this;
+    const M = per + 2 * A, ox = tx * per - A, oz = tz * per - A;
+    const blk = new Int16Array(M * M).fill(-1), ids: string[] = ['ground:outside', 'ground:steep', 'ground:water'];
+    const free = this.classify(ox, oz, M, rel, 0, 0, M, M, blk, ids);
     const clear = edt(free, M, M, cell);
     // crop to the tile
     const t: FineTile = { key, free: new Uint8Array(per * per), clearance: new Float32Array(per * per), blk: new Int16Array(per * per), ids };
@@ -306,18 +328,64 @@ export class GroundNav {
     return t;
   }
 
-  /** Level-0 grid over a tile rect: the fine tiles side by side on the global lattice (the last few are memoised). */
-  compose(r: TileRect, obstacles: Obstacle[]): LevelGrid {
-    const boxes = boxesOf(obstacles);
-    const tiles: { tx: number; tz: number; rel: Obstacle[]; key: string }[] = [];
+  /** A tile's relevant obstacles and content key for an (never mutated) obstacle list, memoised per list. */
+  private tileEntry(tx: number, tz: number, obstacles: Obstacle[]): { rel: Obstacle[]; key: string } {
     let known = this.tileKeys.get(obstacles);
     if (!known) this.tileKeys.set(obstacles, (known = new Map()));
-    for (let tz = r[1]; tz <= r[3]; tz++) for (let tx = r[0]; tx <= r[2]; tx++) {
-      const k = `${this.field.id}|${obstacles.length}|${tx},${tz}`;
-      let t = known.get(k);
-      if (!t) { const rel = this.relevant(obstacles, tx, tz, boxes); known.set(k, (t = { rel, key: this.keyOf(tx, tz, rel) })); }
-      tiles.push({ tx, tz, rel: t.rel, key: t.key });
-    }
+    const k = `${this.field.id}|${obstacles.length}|${tx},${tz}`;
+    let t = known.get(k);
+    if (!t) { const rel = this.relevant(obstacles, tx, tz, boxesOf(obstacles)); known.set(k, (t = { rel, key: this.keyOf(tx, tz, rel) })); }
+    return t;
+  }
+
+  /**
+   * L1 (memory): level-0 clearance at points, as `clearanceAt(compose(r, obstacles), q)` reads them — the same cells (a
+   * composite is its tiles' cells side by side), 0 outside `r` — but read from the fine tiles themselves: no composite is
+   * copied. A Soul's capability listing reads single points round hundreds of far places; each used to compose (copy) the
+   * 1–4 tiles round the point (Eden 2026: ~730 composites, gigabytes copied per listing).
+   */
+  clearanceReader(r: TileRect, obstacles: Obstacle[]): (q: Vec2) => number {
+    const { per, cell } = this;
+    let last: FineTile | null = null, ltx = NaN, ltz = NaN;
+    return (q) => {
+      const I = latticeIndex(q[0], cell), J = latticeIndex(q[1], cell), tx = Math.floor(I / per), tz = Math.floor(J / per);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return 0;
+      if (tx !== ltx || tz !== ltz) { const t = this.tileEntry(tx, tz, obstacles); last = this.fineTile(tx, tz, t.rel, t.key); ltx = tx; ltz = tz; }
+      return last!.clearance[(J - tz * per) * per + (I - tx * per)];
+    };
+  }
+
+  /**
+   * L1 (speed/memory): whether level-0 clearance at points is at least `t`, exactly as `clearanceAt(compose(r, obstacles), q)
+   * >= t` (0 outside `r`), without building fine tiles: a cached tile is read; otherwise only the cells within reach of q
+   * are classified (classify, as q's tile would) and the nearest blocked centre gives the very value edt stores
+   * (squared distances are exact integers; edtRows' formula, rounded to float32). Tile edges and the raster's border
+   * pads lie farther than the reach (the apron), so they never decide. A Soul's capability listing tests clear stroll stops
+   * over whole areas; it used to build ~150 fine tiles (~45 ms each) for that.
+   */
+  clearTester(r: TileRect, obstacles: Obstacle[], t: number): (q: Vec2) => boolean {
+    const { per, apron: A, cell } = this, R = Math.ceil(t / cell) + 2;
+    if (!(t > 0) || R + 1 > A) { const read = this.clearanceReader(r, obstacles); return (q) => read(q) >= t; }
+    const M = per + 2 * A, n = 2 * R + 1;
+    return (q) => {
+      const I = latticeIndex(q[0], cell), J = latticeIndex(q[1], cell), tx = Math.floor(I / per), tz = Math.floor(J / per);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return false;
+      const te = this.tileEntry(tx, tz, obstacles), hit = this.fine.get(te.key);
+      if (hit) return hit.clearance[(J - tz * per) * per + (I - tx * per)] >= t;
+      const ox = tx * per - A, oz = tz * per - A;
+      const free = this.classify(ox, oz, M, te.rel, I - ox - R, J - oz - R, n, n);
+      if (!free[R * n + R]) return false;
+      let best = Infinity;
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (!free[j * n + i]) { const d2 = (i - R) * (i - R) + (j - R) * (j - R); if (d2 < best) best = d2; }
+      if (best > R * R) return true;
+      return Math.fround(Math.max(0, Math.sqrt(best) * cell - cell / 2)) >= t;
+    };
+  }
+
+  /** Level-0 grid over a tile rect: the fine tiles side by side on the global lattice (the last few are memoised). */
+  compose(r: TileRect, obstacles: Obstacle[]): LevelGrid {
+    const tiles: { tx: number; tz: number; rel: Obstacle[]; key: string }[] = [];
+    for (let tz = r[1]; tz <= r[3]; tz++) for (let tx = r[0]; tx <= r[2]; tx++) { const t = this.tileEntry(tx, tz, obstacles); tiles.push({ tx, tz, rel: t.rel, key: t.key }); }
     const ckey = r.join(',') + '|' + tiles.map((t) => t.key).join(';');
     const memo = this.composed.get(ckey);
     if (memo) { this.composed.delete(ckey); this.composed.set(ckey, memo); return memo; }

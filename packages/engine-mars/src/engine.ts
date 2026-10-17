@@ -160,9 +160,11 @@ export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderSce
 export type NavSpecV1={version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[]};
 /** E2 #1: the level-0 grid for each point of a polygon read. Paged ground answers per 64 m tile (a place over ~100 m
  *  spans several nav windows, and the centre's window reads its far parts as blocked); other worlds keep their one grid. */
-function levelGridsFor(spatial:Spatial,centre:ReturnType<Spatial['levelAt']>){
-  const paged=(spatial as unknown as {ground?:{paged?:boolean}}).ground?.paged===true,tiles=new Map<string,ReturnType<Spatial['levelAt']>>();
-  return (x:number,z:number)=>{if(!paged)return centre;const k=Math.floor(x/64)+','+Math.floor(z/64);if(!tiles.has(k))tiles.set(k,spatial.levelAt(0,[x,z]));return tiles.get(k);};
+function levelGridsFor(spatial:Spatial,centre:(q:[number,number])=>boolean,t:number){
+  const paged=(spatial as unknown as {ground?:{paged?:boolean}}).ground?.paged===true,tiles=new Map<string,((q:[number,number])=>boolean)|null>();
+  // L1 (memory/speed): each tile's test answers as levelAt's grid would (clearance ≥ t), without copying a composite or
+  // building fine tiles off the windows (Spatial.clearTester)
+  return (x:number,z:number):boolean=>{if(!paged)return centre([x,z]);const k=Math.floor(x/64)+','+Math.floor(z/64);if(!tiles.has(k))tiles.set(k,spatial.clearTester(0,[x,z],t));const r=tiles.get(k);return r?r([x,z]):false;};
 }
 
 export class MarsEngine implements Engine {
@@ -1556,9 +1558,9 @@ export class MarsEngine implements Engine {
     if(this.rt.world.regions[r.id]||this.ents[r.id])return {code:'region.exists',message:`${r.id} already names a region or entity`};
     if(typeof r.label!=='string'||!r.label||r.label.length>100)return {code:'region.bad-label',message:'label 1..100 characters'};
     if(!Array.isArray(r.polygon)||r.polygon.length<3||r.polygon.length>64||!r.polygon.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)))return {code:'region.bad-polygon',message:'3..64 [x,z] points'};
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[r.polygon.reduce((s,v)=>s+v[0],0)/r.polygon.length,r.polygon.reduce((s,v)=>s+v[1],0)/r.polygon.length]);if(!grid)return {code:'region.no-ground',message:'no level-0 ground'};
-    const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]),gridOf=levelGridsFor(spatial,grid);let clear=0;
-    for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;const g=gridOf(x,z);if(g&&clearanceAt(g,[x,z])>=HUMAN_RADIUS+.07)clear++;}
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const centre=spatial.clearTester(0,[r.polygon.reduce((s,v)=>s+v[0],0)/r.polygon.length,r.polygon.reduce((s,v)=>s+v[1],0)/r.polygon.length],HUMAN_RADIUS+.07);if(!centre)return {code:'region.no-ground',message:'no level-0 ground'};
+    const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]),clearOf=levelGridsFor(spatial,centre,HUMAN_RADIUS+.07);let clear=0;
+    for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1){if(!inPoly(x,z,r.polygon))continue;if(clearOf(x,z))clear++;}
     return clear>=3?null:{code:'region.unsupported',message:`${r.id} has ${clear} clear standing spots on admitted native ground (needs 3)`};
   }
   /** placeRegionsV1 (logged rules fact `placeRegionsV1`): W1 places become native destination regions (walk/hang-out/gather offers);
@@ -1635,11 +1637,11 @@ export class MarsEngine implements Engine {
   /** world-edit/1 read: the nearest clear standing point to `at` on a level (rings of 0.25 m out to `maxRing`), away from
    *  other bodies; null when none. Used to plan a Soul's approach to a god-placed thing on another floor. */
   standableNearV1(at:[number,number],level=0,except?:string,minClear=HUMAN_RADIUS+.12,maxRing=24):[number,number]|null{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(level,at);if(!grid)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(level,at,minClear);if(!clear)return null;
     const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===level).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.25),z=r3(at[1]+dsin(ang)*ring*.25);
-      if(clearanceAt(grid,[x,z])<minClear||people.some(([px,pz])=>hypot(px-x,pz-z)<.7))continue;return [x,z];}}
+      if(!clear([x,z])||people.some(([px,pz])=>hypot(px-x,pz-z)<.7))continue;return [x,z];}}
     return null;
   }
   /** world-edit/1 read: engine level ids and heights (ground 0 first). */
@@ -1692,21 +1694,23 @@ export class MarsEngine implements Engine {
   nativeGroundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;const bounds=spatial.source?.scene.bounds;if(!bounds)throw Error('nav.source-ground-unavailable');return [...bounds] as [number,number,number,number];}
   /** nav/1 read: current raster bounds, widened by installed navigation overlays. */
   groundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return [...spatial.scene.bounds] as [number,number,number,number];}
+  /** nav read: the navigation epoch after syncing (moves exactly when the static world the planner sees changes). */
+  navEpochV1():number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return spatial.epoch;}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
-  clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.levelAt(level,[x,z]);return g?clearanceAt(g,[x,z]):0;}
+  clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearanceReader(level,[x,z]);return clear?clear([x,z]):0;}
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,at);if(!grid)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;
     const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.5),z=r3(at[1]+dsin(ang)*ring*.5);
-      if(clearanceAt(grid,[x,z])<minClear||people.some(([px,pz])=>hypot(px-x,pz-z)<.8))continue;return [x,z];}}
+      if(!clear([x,z])||people.some(([px,pz])=>hypot(px-x,pz-z)<.8))continue;return [x,z];}}
     return null;
   }
   /** nav/1 read: up to `n` clear standing points spread over a polygon (2 m lattice, farthest-point order from its centre), for strolls. */
   clearSpotsV1(polygon:[number,number][],n:number):[number,number][]{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(!Array.isArray(polygon)||polygon.length<3)return [];const grid=spatial.levelAt(0,[polygon.reduce((s,v)=>s+v[0],0)/polygon.length,polygon.reduce((s,v)=>s+v[1],0)/polygon.length]);if(!grid)return [];
-    const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[],gridOf=levelGridsFor(spatial,grid);
-    for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2){if(!inPoly(x,z,polygon))continue;const g=gridOf(x,z);if(g&&clearanceAt(g,[x,z])>=HUMAN_RADIUS+.4)cand.push([x,z]);}
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(!Array.isArray(polygon)||polygon.length<3)return [];const centre=spatial.clearTester(0,[polygon.reduce((s,v)=>s+v[0],0)/polygon.length,polygon.reduce((s,v)=>s+v[1],0)/polygon.length],HUMAN_RADIUS+.4);if(!centre)return [];
+    const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[],clearOf=levelGridsFor(spatial,centre,HUMAN_RADIUS+.4);
+    for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2){if(!inPoly(x,z,polygon))continue;if(clearOf(x,z))cand.push([x,z]);}
     if(!cand.length)return [];
     const cx=xs.reduce((a,b)=>a+b,0)/xs.length,cz=zs.reduce((a,b)=>a+b,0)/zs.length;
     const out:[number,number][]=[cand.reduce((b,p)=>hypot(p[0]-cx,p[1]-cz)<hypot(b[0]-cx,b[1]-cz)?p:b)];
