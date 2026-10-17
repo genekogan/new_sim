@@ -60,3 +60,37 @@ test('an upstairs seat checks its transition on the target floor, above ground-f
   assert.equal(e.world.entities.h_policy001.human?.level, 1);
   assert.deepEqual(e.runtime.violations, []);
 });
+
+// L3 (V6-party S8 knock-on): "sit in the canoe" chose the nearest free seat and refused when that seat's slide was
+// blocked (slot.transition-blocked), though the other seat was free and reachable. A reachable/1 asset's other free
+// seats are now tried nearest first; the nearest seat is still the one taken whenever it works.
+const bench: DefFacts = { ref: 'policy-bench@1', hash: 'b'.repeat(64), name: 'policy-bench', tags: [], layer: 'solid',
+  components: { seat: { height: 0.45 } }, box: [2.4, 0.45, 0.45],
+  slots: [{ id: 'left', kind: 'seat', p: [-0.6, 0.45, 0], yaw: 0 }, { id: 'right', kind: 'seat', p: [0.6, 0.45, 0], yaw: 0 }] };
+async function benchWorld(name: string, boxIn: boolean) {
+  const f = await marsFactory(GREEN_FIELD_WORLD), e = f.create(f.genesis(name)) as unknown as MarsEngine;
+  e.spawnHuman({ id: 'h_bench0001', label: 'Sitter', soul: 's_bench0001' });
+  const at = e.world.entities.h_bench0001.pose.p, c: [number, number] = [at[0] + 3, at[2] - 2];   // her left seat is nearer
+  const id = assetIdFor(bench, '{}');
+  const wall = (k: string, x: number, z: number, hx: number, hz: number) => ({ id: k, obb: { c: [c[0] + x, c[1] + z], half: [hx, hz], yaw: 0 }, y0: 0, y1: 2, kind: 'fixture' });
+  const edit: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: { [id]: assetFromDef(id, bench) }, set: {
+    bench: { fixture: { def: id, kind: 'fixture', label: 'bench', p: [c[0], 0, c[1]], yaw: 0 } },
+    // the left seat boxed in on three sides (the bench is the fourth): no clear slide onto it from anywhere
+    ...(boxIn ? { pen: { solids: [wall('pen-front', -0.75, 0.55, 0.65, 0.05), wall('pen-back', -0.75, -0.55, 0.65, 0.05), wall('pen-side', -1.45, 0, 0.05, 0.6)] } } : {}),
+  } } as unknown as WorldEditV1;
+  edit.hash = nextEntityPhysics(undefined, edit).hash;
+  e.applyWorldEditV1(edit);
+  return { e, c };
+}
+for (const boxIn of [false, true]) test(`sit on a two-seat bench: ${boxIn ? 'the nearer seat boxed in, she takes the other' : 'both clear, she takes the nearer'}`, async () => {
+  const { e, c } = await benchWorld(`bench-${boxIn}`, boxIn);
+  const program = { actor: 'h_bench0001', label: 'sit on the bench', steps: [{ verb: 'sit', params: { on: 'bench', seconds: 1 } }] };
+  assert.equal(e.canPerform(program), null);
+  assert.equal(e.perform(program).ok, true);
+  for (let i = 0; i < 3000 && e.world.entities.h_bench0001.human?.activity !== 'sit'; i++) e.step();
+  const h = e.world.entities.h_bench0001;
+  assert.equal(h.human?.activity, 'sit');
+  const x = h.pose.p[0] - c[0];
+  assert.ok(boxIn ? x > 0.3 : x < -0.3, `she sits on the ${boxIn ? 'right' : 'left'} seat (x ${x.toFixed(2)} from the bench centre)`);
+  assert.deepEqual(e.runtime.violations, []);
+});

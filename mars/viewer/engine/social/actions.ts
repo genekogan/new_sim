@@ -152,7 +152,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
     plan(rt, p) {
       const a = readyActor(rt, p.actor);
       if ('code' in a) return { ok: false, diagnostic: a };
-      let slot: Slot;
+      let slot: Slot, others: Slot[] = [];
       if (p.slot) {
         // an explicit slot is not checked for claims here: the runtime's reservation step names the holder
         const s = slotById(rt, p.slot);
@@ -169,48 +169,67 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
         }
         const me = pos2(a);
         slot = free.reduce((b, s) => (dist2(me, s.p) < dist2(me, b.p) - 1e-9 ? s : b));
+        // L3: the other free slots, nearest first, for when the nearest one's sit/stand approach is blocked (below)
+        others = free.filter((s) => s !== slot).map((s, i) => ({ s, i, d: dist2(me, s.p) })).sort((x, y) => x.d - y.d || x.i - y.i).map((x) => x.s);
       }
       if (kinds && !kinds.includes(slot.kind))
         return { ok: false, diagnostic: { code: 'slot.wrong-kind', message: `${slot.id} is a ${slot.kind} slot; ${verb} needs ${kinds.join('/')}`, subjects: [p.actor, slot.id] } };
-      const onSeat = dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level;
-      let approach: Vec2 | undefined, routeChecked = false, routeIssue: Diagnostic | undefined;
-      if (needsApproach(rt.world, slot)) {
-        // Entity-world assets explicitly opt into the new policy in their logged definition. A historical asset or
-        // active SlotProgram without it keeps the original selection. Test alternatives with the actual walker's
-        // profile: the first clear point can be a raster pocket that the planner cannot enter at this rotation.
-        const profile = bodyProfile(a);
-        const q = seatApproach(rt, slot, slot.approachPolicy === 'reachable/1' && !onSeat ? {
-          minClearance: profile.radius + PLAN_MARGIN, anyAngle: true,
-          accept: (point) => {
-            // Sit/stand moves directly between this point and the seat. Ignore only the seat's own obstacle;
-            // an alternative on the other side of a wall or table must never turn into a shortcut through it.
-            const sp = rt.services.spatial as Spatial, n = Math.max(1, Math.ceil(dist2(point, slot.p) / 0.025));
-            const pad = dist2(point, slot.p) / n / 2, floor = sp.levelAt(slot.level, point);
-            if (!floor) return false;
-            for (let i = 0; i <= n; i++) {
-              const k = i / n, p: Vec2 = [point[0] + (slot.p[0] - point[0]) * k, point[1] + (slot.p[1] - point[1]) * k];
-              // The actor may still be downstairs. The transition happens after the walk, on the seat's floor.
-              const y = slot.level === 0 && sp.ground ? sp.ground.standY(p[0], p[1]) : floor.y;
-              for (const o of sp.scene.obstacles) {
-                if (o.id === slot.owner || o.y1 <= y + STEP || o.y0 >= y + profile.height) continue;
-                // A seat tucked under a table (a bus seat 5 cm inside its table's footprint): that table is the seat's own
-                // workspace, so the slide may end inside it. Thin walls never qualify.
-                if (Math.min(...o.obb.half) >= 0.2) { const sl = rot2(sub2(slot.p, o.obb.c), -o.obb.yaw); if (Math.abs(sl[0]) <= o.obb.half[0] + 0.1 && Math.abs(sl[1]) <= o.obb.half[1] + 0.1) continue; }
-                const l = rot2(sub2(p, o.obb.c), -o.obb.yaw);
-                if (hypot(Math.max(0, Math.abs(l[0]) - o.obb.half[0]), Math.max(0, Math.abs(l[1]) - o.obb.half[1])) < profile.radius * TRANSITION_BODY + pad) {
-                  routeIssue ??= { code: 'slot.transition-blocked', message: `${slot.id} sit/stand approach crosses ${o.id}`, subjects: [slot.id, o.id] };
-                  return false;
+      const approachFor = (slot: Slot): { approach?: Vec2; routeChecked: boolean } | Diagnostic => {
+        const onSeat = dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level;
+        let approach: Vec2 | undefined, routeChecked = false, routeIssue: Diagnostic | undefined;
+        if (needsApproach(rt.world, slot)) {
+          // Entity-world assets explicitly opt into the new policy in their logged definition. A historical asset or
+          // active SlotProgram without it keeps the original selection. Test alternatives with the actual walker's
+          // profile: the first clear point can be a raster pocket that the planner cannot enter at this rotation.
+          const profile = bodyProfile(a);
+          const q = seatApproach(rt, slot, slot.approachPolicy === 'reachable/1' && !onSeat ? {
+            minClearance: profile.radius + PLAN_MARGIN, anyAngle: true,
+            accept: (point) => {
+              // Sit/stand moves directly between this point and the seat. Ignore only the seat's own obstacle;
+              // an alternative on the other side of a wall or table must never turn into a shortcut through it.
+              const sp = rt.services.spatial as Spatial, n = Math.max(1, Math.ceil(dist2(point, slot.p) / 0.025));
+              const pad = dist2(point, slot.p) / n / 2, floor = sp.levelAt(slot.level, point);
+              if (!floor) return false;
+              for (let i = 0; i <= n; i++) {
+                const k = i / n, p: Vec2 = [point[0] + (slot.p[0] - point[0]) * k, point[1] + (slot.p[1] - point[1]) * k];
+                // The actor may still be downstairs. The transition happens after the walk, on the seat's floor.
+                const y = slot.level === 0 && sp.ground ? sp.ground.standY(p[0], p[1]) : floor.y;
+                for (const o of sp.scene.obstacles) {
+                  if (o.id === slot.owner || o.y1 <= y + STEP || o.y0 >= y + profile.height) continue;
+                  // A seat tucked under a table (a bus seat 5 cm inside its table's footprint): that table is the seat's own
+                  // workspace, so the slide may end inside it. Thin walls never qualify.
+                  if (Math.min(...o.obb.half) >= 0.2) { const sl = rot2(sub2(slot.p, o.obb.c), -o.obb.yaw); if (Math.abs(sl[0]) <= o.obb.half[0] + 0.1 && Math.abs(sl[1]) <= o.obb.half[1] + 0.1) continue; }
+                  const l = rot2(sub2(p, o.obb.c), -o.obb.yaw);
+                  if (hypot(Math.max(0, Math.abs(l[0]) - o.obb.half[0]), Math.max(0, Math.abs(l[1]) - o.obb.half[1])) < profile.radius * TRANSITION_BODY + pad) {
+                    routeIssue ??= { code: 'slot.transition-blocked', message: `${slot.id} sit/stand approach crosses ${o.id}`, subjects: [slot.id, o.id] };
+                    return false;
+                  }
                 }
               }
-            }
-            const route = planWalk(rt, a, { level: slot.level, p: point });
-            if (!route.ok) { routeIssue ??= route.diagnostic; return false; }
-            routeChecked = true; return true;
-          },
-        } : undefined);
-        if (!Array.isArray(q)) { const issue = routeIssue ?? q; return { ok: false, diagnostic: { ...issue, subjects: [p.actor, ...(issue.subjects ?? [])] } }; }
-        approach = q;
+              const route = planWalk(rt, a, { level: slot.level, p: point });
+              if (!route.ok) { routeIssue ??= route.diagnostic; return false; }
+              routeChecked = true; return true;
+            },
+          } : undefined);
+          if (!Array.isArray(q)) { const issue = routeIssue ?? q; return { ...issue, subjects: [p.actor, ...(issue.subjects ?? [])] }; }
+          approach = q;
+        }
+        return { approach, routeChecked };
+      };
+      // "sit in the canoe": the nearest free seat is chosen first, exactly as before. When its approach is blocked or
+      // unreachable from here, a reachable/1 asset's other free seats are tried nearest first (the canoe's back seat when
+      // the front one's slide from the jetty crosses the jetty); the first seat's refusal stands if none works.
+      let found = approachFor(slot);
+      if ('code' in found && slot.approachPolicy === 'reachable/1') {
+        for (const s of others) {
+          if (s.approachPolicy !== 'reachable/1') continue;
+          const f = approachFor(s);
+          if (!('code' in f)) { slot = s; found = f; break; }
+        }
       }
+      if ('code' in found) return { ok: false, diagnostic: found };
+      const { approach, routeChecked } = found;
+      const onSeat = dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level;
       if (!onSeat && !routeChecked) {
         const d = checkStations(rt, [{ actor: p.actor, p: approach ?? slot.p, level: slot.level }]);
         if (d) return { ok: false, diagnostic: d };
