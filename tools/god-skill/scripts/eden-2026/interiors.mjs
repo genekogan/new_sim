@@ -8,7 +8,7 @@ const C = { walnut: '#5e3d27', oak: '#8a5a36', rust: '#b0573a', ochre: '#d19c3c'
 export const INTERIOR_DEFS = [
   // A ceiling pendant (old F.pendant): cord from the ceiling, a dark conical shade with a warm bulb; glows at night.
   { op: 'define', def: { schema: 'def/1', name: 'eden-pendant', version: 1, description: 'A ceiling pendant lamp: a dark conical shade on a cord, warm light (old Eden library and café).', tags: ['furniture', 'light', 'lamp', 'eden'], form: 'point',
-    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffd99a', range: 5, on: true } }, size: { box: [0.6, 2.92, 0.6] },
+    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffc983', range: 2.6, on: true } }, size: { box: [0.6, 2.92, 0.6] },
     make: { kind: 'gen', gen: 'kit/2', args: { shapes: [
       { kind: 'cyl', at: [0, 2.62, 0], r: 0.008, h: 0.6, segments: 4, color: '#2b2623', collide: false },
       { kind: 'cone', at: [0, 2.19, 0], r: 0.3, h: 0.26, segments: 14, color: '#2f3332', collide: false },

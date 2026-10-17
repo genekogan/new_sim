@@ -1589,8 +1589,8 @@
             },
             "components": {
               "light": {
-                "color": "#ffd99a",
-                "range": 5,
+                "color": "#ffc983",
+                "range": 2.6,
                 "on": true
               }
             },
