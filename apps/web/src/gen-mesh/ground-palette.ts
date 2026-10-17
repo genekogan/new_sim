@@ -3,7 +3,7 @@
 // colour is a pure function of height above base, slope and a little positional noise, so every
 // viewer paints the same ground. Owner: L3.
 import * as THREE from 'three';
-import { fbm, playaPatch, playaVein } from '@sim/generators';
+import { col, playaMottle } from './playa-mottle.ts';
 
 export const GROUND_PALETTES = ['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden', 'playa', 'meadow'] as const;
 export type GroundPalette = (typeof GROUND_PALETTES)[number];
@@ -26,30 +26,32 @@ const PAL: Record<GroundPalette, P> = {
 export const groundRealismFor = (palette: string | undefined) => palette === 'meadow';
 /** The level-ground colour of a palette (what a lawn's soft edge fades into). */
 export const groundBaseFor = (palette: string | undefined) => (PAL[(palette as GroundPalette) ?? 'grass'] ?? PAL.grass).base;
-const PLAYA = { crust: '#c5c6c6', dust: '#aaa392', vein: '#a69c87', grass: '#a89d78' };
-/** Playa mottling: soft crust/dust patches (40–200 m), thin tan veins with dry grass along them, fine speckle. */
-function playaMottle(c: THREE.Color, x: number, z: number) {
-  const p = playaPatch(x, z);
-  if (p > 0) c.lerp(col(PLAYA.crust), Math.min(1, p * 1.3) * 0.45); else c.lerp(col(PLAYA.dust), Math.min(1, -p * 1.3) * 0.2);
-  const v = playaVein(x, z);
-  if (v > 0.02) { c.lerp(col(PLAYA.vein), v * 0.7); c.lerp(col(PLAYA.grass), v * v * 0.25 * fbm(x, z, 18, 1, 3)); }
-  const k = 1 + (fbm(x, z, 7, 2, 61) - 0.5) * 0.09; c.r = Math.min(1, c.r * k); c.g = Math.min(1, c.g * k); c.b = Math.min(1, c.b * k);
-}
-const C = new Map<string, THREE.Color>(); const col = (h: string) => { let c = C.get(h); if (!c) { c = new THREE.Color(h); C.set(h, c); } return c; };
 function n2(x: number, z: number) { const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return s - Math.floor(s); }
 
+/** The palette's colour before the playa mottling (height, slope, rock, snow); returns whether the playa mottles it. */
+function paint(p: P, c: THREE.Color, y: number, slope: number, base: number): boolean {
+  const h = y - base;
+  c.copy(h < -0.2 ? col(p.shore) : col(p.base));
+  if (h < -0.2) c.lerp(col(p.low), Math.min(1, (-0.2 - h) / 1.5) * 0.6); // wet ground below the plain: shore → bed
+  if (h > 40) c.lerp(col(p.high), Math.min(1, (h - 40) / 60));
+  const rocky = Math.min(1, Math.max(0, (slope - p.rockFrom) / 0.9));
+  c.lerp(col(p.rock), rocky);
+  if (p.snow !== undefined && h > p.snow) c.lerp(col(p.snowC ?? '#f2f4f6'), Math.min(1, (h - p.snow) / 50));
+  return p === PAL.playa && h > -0.2;
+}
 /** Terrain vertex colour for a palette (the grass palette reproduces today's colouring plus a little noise). */
 export function terrainColorFor(palette: string | undefined): (c: THREE.Color, y: number, slope: number, base: number, x?: number, z?: number) => void {
   const p = PAL[(palette as GroundPalette) ?? 'grass'] ?? PAL.grass;
   return (c, y, slope, base, x = 0, z = 0) => {
-    const h = y - base;
-    c.copy(h < -0.2 ? col(p.shore) : col(p.base));
-    if (h < -0.2) c.lerp(col(p.low), Math.min(1, (-0.2 - h) / 1.5) * 0.6); // wet ground below the plain: shore → bed
-    if (h > 40) c.lerp(col(p.high), Math.min(1, (h - 40) / 60));
-    const rocky = Math.min(1, Math.max(0, (slope - p.rockFrom) / 0.9));
-    c.lerp(col(p.rock), rocky);
-    if (p.snow !== undefined && h > p.snow) c.lerp(col(p.snowC ?? '#f2f4f6'), Math.min(1, (h - p.snow) / 50));
-    if (p === PAL.playa && h > -0.2) playaMottle(c, x, z);
+    if (paint(p, c, y, slope, base)) playaMottle(c, x, z);
     if (p.noise > 0) { const k = 1 + (n2(Math.floor(x / 4), Math.floor(z / 4)) - 0.5) * 2 * p.noise; c.r = Math.min(1, c.r * k); c.g = Math.min(1, c.g * k); c.b = Math.min(1, c.b * k); }
   };
+}
+/** Phone arrival (lane L3): for the playa palette (no positional noise), the colour before the mottling and whether the
+ *  vertex is mottled, so the mottling can run in a worker (playa-mottle.ts mottleColors); null for every other palette.
+ *  `paint` then `playaMottle` where it returns true is exactly terrainColorFor. */
+export function terrainColorDeferred(palette: string | undefined): ((c: THREE.Color, y: number, slope: number, base: number) => boolean) | null {
+  const p = PAL[(palette as GroundPalette) ?? 'grass'] ?? PAL.grass;
+  if (p !== PAL.playa || p.noise > 0) return null;
+  return (c, y, slope, base) => paint(p, c, y, slope, base);
 }

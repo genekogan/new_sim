@@ -12,12 +12,14 @@ import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
-import { terrainColorFor, groundRealismFor } from './gen-mesh/ground-palette.ts';
+import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
+import { mottleSector } from './gen-mesh/terrain-mottle.ts';
 import { applyWorldRealism } from './WorldEdenRealism.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
-import { assetUrl } from './gen-mesh/gltf-assets.ts';
+import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
-import { planEager } from './gen-mesh/lazy-assets.ts';
+import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
+import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 
@@ -103,10 +105,14 @@ export class WorldEntityLayer {
     const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1);
     const eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
+    // Phone arrival (lane d3): start the eager GLBs now, nearest first, so they download while the terrain and every
+    // thing's holder are built (~2 s of main thread on a 4x phone) instead of after; each thing's own loadAsset(sha)
+    // then joins the same cached promise. The arrival card still waits for them to be drawn.
+    for (const sha of eagerShas()) void loadAsset(sha).catch(() => {});
     this.seq = snap.seq;
     this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
     this.active = true;
-    this.rebuildTerrain();
+    this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
     this.rebuildWater();
     this.buildHorizon();
     for (const e of snap.entities) this.draw(e, false);
@@ -282,7 +288,7 @@ export class WorldEntityLayer {
 
   // ---------- terrain ----------
 
-  private rebuildTerrain(onlyTiles?: Set<string>) {
+  private rebuildTerrain(onlyTiles?: Set<string>, deferMottle = false) {
     const m = this.model!; const [bx0, bz0, bx1, bz1] = m.ground().extent;   // GOD-ENV: bounds, a rectangle once extended
     const tx0 = Math.floor(bx0 / TILE_M), tx1 = Math.ceil(bx1 / TILE_M) - 1, tz0 = Math.floor(bz0 / TILE_M), tz1 = Math.ceil(bz1 / TILE_M) - 1;
     const sx0 = Math.floor(tx0 / SECTOR_TILES), sx1 = Math.floor(tx1 / SECTOR_TILES), sz0 = Math.floor(tz0 / SECTOR_TILES), sz1 = Math.floor(tz1 / SECTOR_TILES);
@@ -295,7 +301,7 @@ export class WorldEntityLayer {
         if (!touched) continue;
       }
       const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); }
-      const mesh = this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1]);
+      const mesh = this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle);
       this.sectors.set(key, mesh); this.terrainGroup.add(mesh);
     }
     for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); }
@@ -304,7 +310,7 @@ export class WorldEntityLayer {
     // re-baked tile; a hill raised in one corner no longer rebuilds every forest and road in the world
     if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') { const world = !!this.drawn.get(e.id)?.world; this.draw(e, false, world && reachesTiles(e, onlyTiles)); }
   }
-  private sectorMesh(sx: number, sz: number, t: [number, number, number, number]): THREE.Mesh {
+  private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false): THREE.Mesh {
     const m = this.model!;
     const tx0 = Math.max(t[0], sx * SECTOR_TILES), tz0 = Math.max(t[1], sz * SECTOR_TILES);
     const tx1 = Math.min(t[2], sx * SECTOR_TILES + SECTOR_TILES - 1), tz1 = Math.min(t[3], sz * SECTOR_TILES + SECTOR_TILES - 1);
@@ -312,24 +318,37 @@ export class WorldEntityLayer {
     const nx = w / TERRAIN_STEP, nz = d / TERRAIN_STEP;
     const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array((nx + 1) * (nz + 1) * 3);
     const c = new THREE.Color();
-    const terrainColor = terrainColorFor((m.state as { ground?: { palette?: string } }).ground?.palette);
+    const palette = (m.state as { ground?: { palette?: string } }).ground?.palette;
+    const terrainColor = terrainColorFor(palette), deferred = deferMottle ? terrainColorDeferred(palette) : null;
+    const nv = (nx + 1) * (nz + 1), rgb = deferred ? new Float64Array(nv * 3) : null, xz = deferred ? new Float64Array(nv * 2) : null, mottled: number[] = [];
     for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
       const x = x0 + i * TERRAIN_STEP, z = z0 + j * TERRAIN_STEP;
       const y = m.terrain.sample(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
       const k = (j * (nx + 1) + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       const slope = m.terrain.slope(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
-      terrainColor(c, y, slope, m.constants.base, x, z);
+      if (deferred) {   // the colour before the mottling now; the mottling (playa-mottle.ts) after, in a worker
+        if (deferred(c, y, slope, m.constants.base)) mottled.push(k / 3);
+        rgb![k] = c.r; rgb![k + 1] = c.g; rgb![k + 2] = c.b; xz![k / 3 * 2] = x; xz![k / 3 * 2 + 1] = z;
+      } else terrainColor(c, y, slope, m.constants.base, x, z);
       col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
     }
     const idx: number[] = [];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, cc = a + nx + 1, dd = cc + 1; idx.push(a, cc, b, b, cc, dd); }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); if (!computeVertexNormals(g)) g.computeVertexNormals();   // fast-geometry: same normals
     // Eden's meadow turf also takes the Eden realism ground shader (its own material, so a palette change never leaves it patched)
     const realism = groundRealismFor((m.state as { ground?: { palette?: string } }).ground?.palette);
     const mesh = new THREE.Mesh(g, this.material(realism ? 'terrain-meadow' : 'terrain', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: realism ? 1 : 0.95, metalness: 0 })));
     mesh.name = `entity-terrain ${sx},${sz}`; mesh.receiveShadow = true;
+    if (deferred && mottled.length) {
+      const key = `${sx},${sz}`, colour = g.attributes.color as THREE.BufferAttribute;
+      mottleSector(rgb!, xz!, Uint32Array.from(mottled), col, (out) => {
+        if (this.sectors.get(key) !== mesh && this.sectors.has(key)) return;   // replaced meanwhile: the new sector has its own
+        if (out !== colour.array) (colour.array as Float32Array).set(out);
+        colour.needsUpdate = true;
+      });
+    }
     if (realism) applyWorldRealism(mesh, { classify: () => 'ground' });
     return mesh;
   }

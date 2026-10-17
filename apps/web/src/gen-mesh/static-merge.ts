@@ -12,6 +12,7 @@
 // The picture is the same: transforms are baked into positions and normals (mirrored nodes flip winding), and the
 // merged meshes keep shadows on. `?merge=0` turns this off for A/B measurement.
 import * as THREE from 'three';
+import { bakeColors, computeBounds, copyComponents, transformNormals, transformPoints } from './fast-geometry.ts';
 
 const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('merge') === '0';
 const MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'lightMap', 'displacementMap', 'envMap'] as const;
@@ -102,13 +103,12 @@ function build(bucket: Bucket): THREE.Mesh[] {
     nrm.getNormalMatrix(it.matrix);
     const flip = it.matrix.determinant() < 0;
     const pos = g.attributes.position;
-    for (let i = 0; i < n; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(it.matrix); arrays.position.set([v.x, v.y, v.z], (vo + i) * 3);
-      v.fromBufferAttribute(normal, i).applyMatrix3(nrm).normalize(); arrays.normal.set([v.x, v.y, v.z], (vo + i) * 3);
-    }
+    // fast-geometry.ts: the same arithmetic on the typed arrays (bit-identical); three's per-vertex path otherwise
+    if (!transformPoints(pos, it.matrix, arrays.position, vo * 3)) for (let i = 0; i < n; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(it.matrix); arrays.position.set([v.x, v.y, v.z], (vo + i) * 3); }
+    if (!transformNormals(normal, nrm, arrays.normal, vo * 3)) for (let i = 0; i < n; i++) { v.fromBufferAttribute(normal, i).applyMatrix3(nrm).normalize(); arrays.normal.set([v.x, v.y, v.z], (vo + i) * 3); }
     if (bucket.plain) {
       const base = (it.mat as THREE.MeshStandardMaterial).color, vc = (it.mat as THREE.MeshStandardMaterial).vertexColors ? g.attributes.color : undefined;
-      for (let i = 0; i < n; i++) {
+      if (!bakeColors(base, vc, n, arrays.color, vo)) for (let i = 0; i < n; i++) {
         col.copy(base); if (vc) { col.r *= vc.getX(i); col.g *= vc.getY(i); col.b *= vc.getZ(i); }
         arrays.color.set([col.r, col.g, col.b], (vo + i) * 3);
       }
@@ -116,11 +116,14 @@ function build(bucket: Bucket): THREE.Mesh[] {
       for (const nm of names) {
         if (nm === 'position' || nm === 'normal') continue;
         const a = g.attributes[nm], s = sizes[nm], dst = arrays[nm];
-        for (let i = 0; i < n; i++) { const o = (vo + i) * s; dst[o] = a.getX(i); if (s > 1) dst[o + 1] = a.getY(i); if (s > 2) dst[o + 2] = a.getZ(i); if (s > 3) dst[o + 3] = a.getW(i); }
+        if (!copyComponents(a, s, dst, vo)) for (let i = 0; i < n; i++) { const o = (vo + i) * s; dst[o] = a.getX(i); if (s > 1) dst[o + 1] = a.getY(i); if (s > 2) dst[o + 2] = a.getZ(i); if (s > 3) dst[o + 3] = a.getW(i); }
       }
     }
-    const { start, count } = tris[k], idx = g.index;
-    for (let t = 0; t < count; t += 3) {
+    const { start, count } = tris[k], idx = g.index, ia = idx && !(idx as unknown as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute && !idx.normalized ? idx.array : null;
+    if (ia) for (let t = 0; t < count; t += 3) {
+      const a = ia[start + t], b = ia[start + t + 1], c = ia[start + t + 2];
+      index[io++] = vo + a; index[io++] = vo + (flip ? c : b); index[io++] = vo + (flip ? b : c);
+    } else for (let t = 0; t < count; t += 3) {
       const a = idx ? idx.getX(start + t) : start + t, b = idx ? idx.getX(start + t + 1) : start + t + 1, c = idx ? idx.getX(start + t + 2) : start + t + 2;
       index[io++] = vo + a; index[io++] = vo + (flip ? c : b); index[io++] = vo + (flip ? b : c);
     }
@@ -129,7 +132,7 @@ function build(bucket: Bucket): THREE.Mesh[] {
   const geo = new THREE.BufferGeometry();
   for (const nm of names) geo.setAttribute(nm, new THREE.BufferAttribute(arrays[nm], sizes[nm]));
   geo.setIndex(new THREE.BufferAttribute(index, 1));
-  geo.computeBoundingBox(); geo.computeBoundingSphere();
+  if (!computeBounds(geo)) { geo.computeBoundingBox(); geo.computeBoundingSphere(); }
   let mat = bucket.mat;
   if (bucket.plain) {
     const s = bucket.mat as THREE.MeshStandardMaterial;

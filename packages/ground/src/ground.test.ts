@@ -110,3 +110,12 @@ test('a 1 km world bakes in budget', () => {
   assert.equal(t.cachedTiles, 256);
   assert.ok(ms < 4000, `256 tiles took ${ms.toFixed(0)} ms`);
 });
+
+test('the last-tile cache answers like the map and forgets a tile an edit invalidates', () => {
+  const g = world(), t = new Terrain(g), fresh = (x: number, z: number) => new Terrain(g).sample(x, z);
+  for (const [x, z] of [[1, 2], [3, 4], [1, 2], [-200, 10], [5, 5]] as [number, number][]) { assert.equal(t.sample(x, z), fresh(x, z)); assert.equal(t.slope(x, z), new Terrain(g).slope(x, z)); }
+  const before = t.sample(2, 3);
+  const g2 = groundSchema.parse({ ...g, landforms: [...g.landforms, { id: 'pile', kind: 'bump', c: [2, 3], r: 8, h: 4, peak: 1 }] });
+  t.update(g2, [g2.landforms.at(-1)!]);
+  assert.notEqual(t.sample(2, 3), before); assert.equal(t.sample(2, 3), new Terrain(g2).sample(2, 3));
+});

@@ -11,6 +11,7 @@
 // Measured on mars-two: 257 of 262 alpha-tested casters had fully opaque maps (the exporter marks everything MASK).
 // `?shadowproxy=0` for A/B.
 import * as THREE from 'three';
+import { computeBounds, transformPoints } from './fast-geometry.ts';
 
 const OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).get('shadowproxy') === '0';
 const nullMats = new Map<number, THREE.ShaderMaterial>();
@@ -85,13 +86,14 @@ export function addShadowProxy(root: THREE.Object3D): number {
     let vo = 0, io = 0;
     list.forEach(({ mesh, rel }, k) => {
       const g = mesh.geometry, sp = g.attributes.position as THREE.BufferAttribute, flip = rel.determinant() < 0, { start, count } = ranges[k];
-      for (let i = 0; i < sp.count; i++) { v.fromBufferAttribute(sp, i).applyMatrix4(rel); pos[(vo + i) * 3] = v.x; pos[(vo + i) * 3 + 1] = v.y; pos[(vo + i) * 3 + 2] = v.z; }
-      for (let i = 0; i < count; i++) { const j = flip ? (i % 3 === 1 ? i + 1 : i % 3 === 2 ? i - 1 : i) : i; idx[io + i] = vo + (g.index ? g.index.getX(start + j) : start + j); }
+      if (!transformPoints(sp, rel, pos, vo * 3)) for (let i = 0; i < sp.count; i++) { v.fromBufferAttribute(sp, i).applyMatrix4(rel); pos[(vo + i) * 3] = v.x; pos[(vo + i) * 3 + 1] = v.y; pos[(vo + i) * 3 + 2] = v.z; }
+      const gi = g.index, ia = gi && !gi.normalized && !(gi as unknown as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute ? gi.array : null;
+      for (let i = 0; i < count; i++) { const j = flip ? (i % 3 === 1 ? i + 1 : i % 3 === 2 ? i - 1 : i) : i; idx[io + i] = vo + (ia ? ia[start + j] : gi ? gi.getX(start + j) : start + j); }
       vo += sp.count; io += count;
     });
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    geo.computeBoundingSphere(); geo.computeBoundingBox();
+    if (!computeBounds(geo)) { geo.computeBoundingSphere(); geo.computeBoundingBox(); }
     // (the CPU arrays stay: a cached asset is reused by the next renderer after a LiveWorld re-mount, which uploads again)
     const proxy = new THREE.Mesh(geo, nullMaterial(side));
     proxy.name = 'shadow-proxy'; proxy.castShadow = true; proxy.receiveShadow = false; proxy.userData.shadowProxy = true;

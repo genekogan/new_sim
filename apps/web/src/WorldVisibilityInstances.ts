@@ -57,12 +57,25 @@ export class WorldVisibilityInstances {
   const v=(i:number)=>index?index.getX(i):i,a=new THREE.Vector3(),b=new THREE.Vector3(),c=new THREE.Vector3(),centre=new THREE.Vector3(),box=new THREE.Box3().setFromBufferAttribute(position as THREE.BufferAttribute),size=box.getSize(new THREE.Vector3());
   const per=Math.max(1,Math.cbrt(count/3/CELL_TRIANGLES)),n=[0,1,2].map(k=>Math.max(1,Math.min(32,Math.round(per*size.getComponent(k)/Math.max(size.x,size.y,size.z,1e-9)*3))));
   const buckets=new Map<number,number[]>();
-  for(let t=start;t+2<end;t+=3){a.fromBufferAttribute(position,v(t));b.fromBufferAttribute(position,v(t+1));c.fromBufferAttribute(position,v(t+2));centre.copy(a).add(b).add(c).multiplyScalar(1/3);
+  // Phone arrival (lane L3): plain float positions read straight from the array (the same numbers fromBufferAttribute
+  // returns, the same arithmetic order), no per-triangle arrays; ~0.15 s of a 4x-throttled phone's first tour shot.
+  const plain=position instanceof THREE.BufferAttribute&&!(position as THREE.BufferAttribute).normalized&&position.itemSize===3&&(!index||index instanceof THREE.BufferAttribute)?(position as THREE.BufferAttribute).array as ArrayLike<number>:null;
+  if(plain){
+   const ix=index?index.array as ArrayLike<number>:null,mx=box.min.x,my=box.min.y,mz=box.min.z,dx=Math.max(size.x,1e-9),dy=Math.max(size.y,1e-9),dz=Math.max(size.z,1e-9),[n0,n1,n2]=n,third=1/3;
+   for(let t=start;t+2<end;t+=3){
+    const i0=ix?ix[t]:t,i1=ix?ix[t+1]:t+1,i2=ix?ix[t+2]:t+2,p0=i0*3,p1=i1*3,p2=i2*3;
+    const cx=(plain[p0]+plain[p1]+plain[p2])*third,cy=(plain[p0+1]+plain[p1+1]+plain[p2+1])*third,cz=(plain[p0+2]+plain[p1+2]+plain[p2+2])*third;
+    const k0=Math.min(n0-1,Math.max(0,Math.floor((cx-mx)/dx*n0))),k1=Math.min(n1-1,Math.max(0,Math.floor((cy-my)/dy*n1))),k2=Math.min(n2-1,Math.max(0,Math.floor((cz-mz)/dz*n2))),key=(k0*n1+k1)*n2+k2;
+    let list=buckets.get(key);if(!list)buckets.set(key,list=[]);list.push(i0,i1,i2);}
+  }else for(let t=start;t+2<end;t+=3){a.fromBufferAttribute(position,v(t));b.fromBufferAttribute(position,v(t+1));c.fromBufferAttribute(position,v(t+2));centre.copy(a).add(b).add(c).multiplyScalar(1/3);
    const k=[0,1,2].map(d=>Math.min(n[d]-1,Math.max(0,Math.floor((centre.getComponent(d)-box.min.getComponent(d))/Math.max(size.getComponent(d),1e-9)*n[d])))),key=(k[0]*n[1]+k[1])*n[2]+k[2];
    let list=buckets.get(key);if(!list)buckets.set(key,list=[]);list.push(v(t),v(t+1),v(t+2));}
   const cells:Cell[]=[];
   for(const list of buckets.values()){
-   const cellBox=new THREE.Box3();for(const i of list)cellBox.expandByPoint(a.fromBufferAttribute(position,i));cellBox.expandByScalar(1e-6);
+   const cellBox=new THREE.Box3();
+   if(plain){let x0=Infinity,y0=Infinity,z0=Infinity,x1=-Infinity,y1=-Infinity,z1=-Infinity;for(const i of list){const q=i*3,x=plain[q],y=plain[q+1],z=plain[q+2];x0=Math.min(x0,x);y0=Math.min(y0,y);z0=Math.min(z0,z);x1=Math.max(x1,x);y1=Math.max(y1,y);z1=Math.max(z1,z);}cellBox.min.set(x0,y0,z0);cellBox.max.set(x1,y1,z1);}
+   else for(const i of list)cellBox.expandByPoint(a.fromBufferAttribute(position,i));
+   cellBox.expandByScalar(1e-6);
    const g=new THREE.BufferGeometry();for(const [name,attr] of Object.entries(geometry.attributes))g.setAttribute(name,attr);
    g.setIndex(new THREE.BufferAttribute(position.count>65535?new Uint32Array(list):new Uint16Array(list),1));g.boundingSphere=geometry.boundingSphere;g.boundingBox=geometry.boundingBox;// shared bounds: stock tests stay whole-mesh
    cells.push({box:cellBox,geometry:g});

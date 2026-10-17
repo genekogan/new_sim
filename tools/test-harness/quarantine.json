@@ -9,12 +9,6 @@
       "owner": "release-owner (L1)"
     },
     {
-      "step": "V4-web",
-      "id": "the route data file and the renderer agree byte for byte on vehicles and routes",
-      "reason": "Tracked main lacks worlds/eden/rides/balloon-ride.v1.json. Preserve full route/vehicle conformance assertion pending published data; other balloon assertions still run.",
-      "owner": "World / Core ride-data owners"
-    },
-    {
       "step": "V3-mars-engine",
       "id": "full re-extraction reproduces the committed contentHash (CAMPUS_FULL=1)",
       "status": "skip",
@@ -32,8 +26,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: passes on the W51 re-seeded scene; lane L3 dropped its todo. Remove this entry once the gate baseline contains that change.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -81,8 +75,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -95,8 +89,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -116,8 +110,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -142,24 +136,10 @@
     },
     {
       "step": "V5-server-full",
-      "id": "Eden 2026: a new Soul's capabilities stay within budget, first and after a walk",
-      "status": "skip",
-      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
-      "owner": "Core / engine content owners"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "Eden 2026: /here in the cafe gives the same frame and capabilities, reads the place path a few times, within budget",
-      "status": "skip",
-      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
-      "owner": "Core / engine content owners"
-    },
-    {
-      "step": "V5-server-full",
       "id": "elevated-floor exit uses its admitted height and a composed humanoid profile",
       "status": "skip",
-      "reason": "Upstairs seat route unreachable before seating; owned by godmode/stairs-reach (skip reason in the test).",
-      "owner": "Godmode stairs-reach owner"
+      "reason": "Baseline-only skip: fixed in lane L3 (the test's own build 1.08 body, radius 0.311, plans at 0.371 m and building/1's 0.9 m interior doors give 0.35 m of raster clearance; it now uses build 1, radius 0.288, and runs). Remove this entry once the gate baseline contains the fix.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V5-server-full",

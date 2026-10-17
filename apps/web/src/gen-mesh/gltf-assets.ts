@@ -19,12 +19,14 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
 import { BASE } from '../base-path.ts';
 import { mergeStatic } from './static-merge.ts';
+import { preciseBounds } from './fast-geometry.ts';
 import { addShadowProxy } from './shadow-proxy.ts';
 import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
+import { decodedImagesOf, fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
-export function setAssetLoader(loader: GLTFLoader) { shared = loader; }
+export function setAssetLoader(loader: GLTFLoader) { shared = loader; warmAssetWorker(); }
 function loader(): GLTFLoader {
   return (shared ??= new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder));
 }
@@ -41,7 +43,10 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const hit = cache.get(sha);
   if (hit && (hit.settled || hit.by === l)) return hit.p;
   // lane PERF (texture-budget.ts): oversized textures are fitted before upload, and uploads are paced across frames
-  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { const st = ((globalThis as unknown as { __assetStages?: Record<string, string> }).__assetStages ??= {}); st[sha] = 'fit'; await fitTextures(g); st[sha] = 'prepare'; prepare(g); st[sha] = 'compile'; await compileModel(g); st[sha] = 'upload'; await uploadTextures(g); st[sha] = 'done'; return g; }), by: l, settled: false };
+  const G = globalThis as unknown as { __assetStages?: Record<string, string>; __assetTimes?: Record<string, Record<string, number>> };
+  const st = (G.__assetStages ??= {}), times: Record<string, number> = ((G.__assetTimes ??= {})[sha] = { start: performance.now() });   // probes (tools/speed)
+  const stage = (s: string) => { st[sha] = s; times[s] = performance.now(); };
+  const entry = { p: download(l, assetUrl(sha)).then(async (g) => { stage('fit'); await fitTextures(g); stage('prepare'); prepare(g); stage('compile'); await compileModel(g); stage('upload'); await uploadTextures(g); stage('done'); return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
@@ -49,6 +54,53 @@ export function loadAsset(sha: string): Promise<GLTF> {
     entry.settled = true; failed.add(sha); setTimeout(() => { if (cache.get(sha) === entry) cache.delete(sha); failed.delete(sha); }, 30_000);
   });
   return entry.p;
+}
+/** loadAsync, with the bytes downloaded in a worker when one is available (asset-fetch.ts); the loader's manager sees
+ *  the same itemStart / itemEnd (and itemError) as FileLoader gives it. */
+function download(l: GLTFLoader, url: string): Promise<GLTF> {
+  const bytes = fetchInWorker(url);
+  if (!bytes) return l.loadAsync(url);
+  l.manager.itemStart(url);
+  return bytes.then(
+    (buffer) => parseWithImages(l, buffer, THREE.LoaderUtils.extractUrlBase(url)).then((g) => { l.manager.itemEnd(url); return g; }, (e: unknown) => { l.manager.itemError(url); l.manager.itemEnd(url); throw e; }),
+    (e: { unavailable?: boolean }) => { l.manager.itemEnd(url); if (e?.unavailable) return l.loadAsync(url); l.manager.itemError(url); throw e; });
+}
+// Phone arrival round 2 (lane L3): images the download worker already decoded (asset-fetch.ts) become the parser's image
+// sources, as GLTFLoader's own ImageBitmapLoader path would make them (Texture(bitmap), needsUpdate, the source's extras
+// and mimeType; one source shared as clones). Anything else, or a non-ImageBitmap loader, takes three's path.
+type Parser = { json: { images?: { mimeType?: string; extras?: unknown }[] }; sourceCache: Record<number, Promise<THREE.Texture>>; loadImageSource(i: number, loader: { isImageBitmapLoader?: boolean }): Promise<THREE.Texture> };
+let pendingImages: Map<number, ImageBitmap> | null = null;
+const withImagePlugin = new WeakSet<GLTFLoader>();
+function parseWithImages(l: GLTFLoader, buffer: ArrayBuffer, path: string): Promise<GLTF> {
+  const images = decodedImagesOf(buffer);
+  if (!images) return l.parseAsync(buffer, path);
+  if (!withImagePlugin.has(l)) {
+    withImagePlugin.add(l);
+    l.register((parser) => {
+      const pre = pendingImages, p = parser as unknown as Parser;
+      if (pre) {
+        const own = p.loadImageSource.bind(p);
+        p.loadImageSource = (i, loader) => {
+          const bmp = pre.get(i);
+          if (!bmp || loader.isImageBitmapLoader !== true) return own(i, loader);
+          if (p.sourceCache[i] !== undefined) return p.sourceCache[i].then((t) => t.clone());
+          pre.delete(i);
+          const def = p.json.images![i];
+          const t = new THREE.Texture(bmp); t.needsUpdate = true;
+          if (def.extras !== undefined && typeof def.extras === 'object') Object.assign(t.userData, def.extras);
+          t.userData.mimeType = def.mimeType;
+          return (p.sourceCache[i] = Promise.resolve(t));
+        };
+      }
+      return { name: 'EDEN_worker_images' } as never;
+    });
+  }
+  pendingImages = images;
+  let parsed: Promise<GLTF>;
+  try { parsed = l.parseAsync(buffer, path); } finally { pendingImages = null; }
+  // bitmaps the parse did not take (an unused image, a texture through another loader) are released
+  const release = () => { for (const b of images.values()) b.close(); images.clear(); };
+  return parsed.then((g) => { release(); return g; }, (e: unknown) => { release(); throw e; });
 }
 export function assetFailed(sha: string) { return failed.has(sha); }
 /** W1: shot readiness includes parsing, texture upload and attached GLBs, without a fixed delay. */
@@ -73,7 +125,7 @@ function prepare(g: GLTF) {
   });
   // lane PERF: a static model's many nodes/materials become a few merged meshes (static-merge.ts)
   try { const r = mergeStatic(g.scene, g.animations.length > 0); if (r) g.userData.merged = r; } catch (e) { console.warn('static merge skipped', e); }
-  const box = new THREE.Box3().setFromObject(g.scene, true);
+  const box = preciseBounds(g.scene) ?? new THREE.Box3().setFromObject(g.scene, true);   // same box, typed-array loop (fast-geometry.ts)
   g.userData.bounds = box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(0.5, 1, 0.5)) : box;
   // lane PERF2: and its opaque casters become one shadow-only proxy (shadow-proxy.ts); after the bounds, which fit the model
   if (!g.animations.length) try { g.userData.shadowCasters = addShadowProxy(g.scene); } catch (e) { console.warn('shadow proxy skipped', e); }

@@ -65,7 +65,7 @@ test('year build 2022 east-house A+B: plan — material rules, bill of materials
   console.log(`[year-build B 2022 east-house] steps ${b.template.steps.length} (A ${b.phaseAStepCount}); verbs B ${JSON.stringify(kinds(b.template.steps.slice(b.phaseAStepCount).map((x) => ({ kind: x.verb }))))}; sequenced ${JSON.stringify(kinds(b.sequenced))}; unplaced ${JSON.stringify(kinds(b.unplaced))}`);
 });
 
-test('year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)', { todo: W51_TODO }, () => {
+test('year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)', () => {
   const h = new WorldHistory('x');
   const { base } = publishCampusYear(h, 2022, loadCampusFile(2022));
   const g = assemblyGraph(2022, base);

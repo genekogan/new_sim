@@ -92,6 +92,11 @@ const SNAPSHOT_FORMAT = 'sim-mars-snapshot/1';
 
 type Diag = { code: string; message: string; subjects?: string[] };
 const SHARED_WATER_WAIT_POLICY = 'shared-water-wait/1';
+/** shared-water-wait/2 (prospective): /1 plus a mutual-wait courtesy. When two swimmers each wait on the other's
+ * body, the one with the larger entity id steps aside (native make-way) so the other can go first. /1 programmes
+ * in old snapshots keep the plain wait, so recorded histories replay unchanged. */
+const SHARED_WATER_WAIT_POLICY_V2 = 'shared-water-wait/2';
+const SHARED_WATER_WAIT_POLICIES = new Set([SHARED_WATER_WAIT_POLICY, SHARED_WATER_WAIT_POLICY_V2]);
 type Op = { verb: string; params: Record<string, unknown>; settle: 'done' | 'held'; soft?: boolean; raw?: boolean } | { wait: number };
 type Prog = {
   id: string; actor: string; label: string; steps: Program['steps'];
@@ -510,7 +515,7 @@ export class MarsEngine implements Engine {
       return {code:'route.region-full',message:`${region} is full and nobody can stand beside it right now`};}
     return crowded??last;
   }
-  private sharedWaterStep(step:Program['steps'][number]|undefined):boolean{return step?.verb==='walk_to'&&step.params?.spreadWaitPolicy===SHARED_WATER_WAIT_POLICY&&['pond/1','pond-lap/1'].includes(String(step.params?.spread));}
+  private sharedWaterStep(step:Program['steps'][number]|undefined):boolean{return step?.verb==='walk_to'&&SHARED_WATER_WAIT_POLICIES.has(String(step.params?.spreadWaitPolicy))&&['pond/1','pond-lap/1'].includes(String(step.params?.spread));}
   /** Prospective plan-only policy: finite waits for actual human obstructions.
    * Static geometry and unknown envelopes never become waiting/success. */
   private waterBodyObstruction(d:Diag,actor:string):boolean{return d.code==='shore.occupied-route'&&!!d.subjects?.includes(actor)&&!!d.subjects?.some(id=>id!==actor&&!!this.ents[id]?.human);}
@@ -526,7 +531,17 @@ export class MarsEngine implements Engine {
     if(!this.sharedWaterStep(p.steps[p.index])||!this.waterBodyObstruction(d,p.actor))return false;
     const tick=this.rt.tick,wait=p.waterWait?.step===p.index?p.waterWait:{step:p.index,since:tick,attempts:0};
     p.waterWait=wait;if(++wait.attempts>60)return false;
-    p.index--;p.ops=[{wait:TPS}];return true;
+    const yielded=p.steps[p.index]?.params?.spreadWaitPolicy===SHARED_WATER_WAIT_POLICY_V2&&this.sharedWaterYieldV2(p,d);
+    p.index--;p.ops=[{wait:yielded?3*TPS:TPS}];return true;
+  }
+  /** shared-water-wait/2: two swimmers standing in each other's shore route (each programme waiting on the other)
+   * would both wait a minute and fail together. The larger entity id steps aside with a native courtesy walk. */
+  private sharedWaterYieldV2(p:Prog,d:Diag):boolean{
+    const other=d.subjects?.find(id=>id!==p.actor&&!!this.ents[id]?.human);if(!other||p.actor<other)return false;
+    const qid=this.byActor.get(other),q=qid?this.programs.get(qid):undefined,w=q?.waterWait;
+    if(!q||!w||(w.step!==q.index&&w.step!==q.index+1)||!this.sharedWaterStep(q.steps[w.step]))return false;
+    const at=this.pos(other);if(!at)return false;
+    this.m.makeWay(this.rt,p.actor,at);return true;
   }
   /** Edge reflex floor (yieldTimeoutV1): a shared-space spread step whose movement failed only because another body
    * was in the way waits 1 s and re-chooses its spot (at most a minute) instead of failing the programme. */
@@ -709,7 +724,7 @@ export class MarsEngine implements Engine {
   }
   canPerform(program: Program): Diag | null {
     for(const step of program.steps)if(step.verb==='mars:carrier_ride'){const issue=this.puntBoardingIssue(String(step.params.carrier??''));if(issue)return issue;}
-    for(const step of program.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))return {code:'action.invalid-spread-wait-policy',message:'Only shared-water-wait/1 on a pond/1 or pond-lap/1 walk is supported.'};
+    for(const step of program.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))return {code:'action.invalid-spread-wait-policy',message:'Only shared-water-wait/1 or /2 on a pond/1 or pond-lap/1 walk is supported.'};
     const bodyIssue=this.bodyProgramProblemV1(program); if(bodyIssue)return bodyIssue;
     for(const step of program.steps)if(step.verb==='walk_to'){const issue=this.gaitIssue(program.actor,step.params);if(issue)return issue;}
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}

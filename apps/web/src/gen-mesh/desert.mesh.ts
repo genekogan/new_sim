@@ -3,10 +3,10 @@
 // squarish-section torus with tread blocks (216 tris), a creosote is a few lumpy leaf clusters on
 // thin stems (≈ 120 tris), a tuft is a fan of thin blades (≤ 30 tris). Lines, rings and scrub are one
 // InstancedMesh per kind (a 500 m tyre ring = 1 draw call, a 1.2 km scrub field = 5).
-import { offsetAlong, scrubPoints, tireLine, tireRingPath, trackLines, type TirePose } from '@sim/generators';
+import { installScrubVerdicts, offsetAlong, scrubPoints, tireLine, tireRingPath, trackLines, type TirePose } from '@sim/generators';
 import type { Entity } from '@sim/world-compiler';
 import * as THREE from 'three';
-import { blockedBy } from './ecology.mesh.ts';
+import { BLOCK_CELL, blockCellsOf, blockedBy } from './ecology.mesh.ts';
 import { terrainColorFor } from './ground-palette.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { Soup, h01, mix, rgb, scale, vertexMaterial, type RGB, type V3 } from './soup.ts';
@@ -135,31 +135,76 @@ registerMesh({
   instanceKey(ctx) { return `${ctx.params.height}|${ctx.params.variant}|${ctx.params.color}`; },
 });
 
+// Phone arrival (lane L3): desert scrub comes from a worker (scrub.worker.ts) and fills in when it answers (well before the
+// arrival card lifts). Where no water can reach the area, the worker scatters it whole with the same blocked-ground cells
+// (block-test.ts); otherwise it sends the noise verdicts and this thread replays them with `blocked` and the water test.
+// Same points either way. No Worker (tests, old browsers) or `?scrubWorker=0`: computed in place, as before.
+type Verdicts = { key: string; marks: Uint8Array[] };
+type Answer = { v?: Verdicts | null; pts?: Float64Array | null } | null;
+type ScrubPt = { x: number; z: number; k: number; s: number; yaw: number; tone: number };
+let scrubWorker: Worker | null | undefined;
+const scrubWaits = new Map<number, (a: Answer) => void>();
+let scrubId = 0;
+function inWorker(msg: Record<string, unknown>): Promise<Answer> | null {
+  if (scrubWorker === undefined) {
+    try {
+      const off = typeof location !== 'undefined' && new URLSearchParams(location.search).get('scrubWorker') === '0';
+      scrubWorker = off || typeof Worker === 'undefined' ? null : new Worker(new URL('./scrub.worker.ts', import.meta.url), { type: 'module' });
+    } catch { scrubWorker = null; }
+    if (scrubWorker) {
+      scrubWorker.onmessage = (ev: MessageEvent<{ id: number } & NonNullable<Answer>>) => { const f = scrubWaits.get(ev.data.id); scrubWaits.delete(ev.data.id); f?.(ev.data); };
+      scrubWorker.onerror = () => { for (const f of scrubWaits.values()) f(null); scrubWaits.clear(); scrubWorker?.terminate(); scrubWorker = null; };
+    }
+  }
+  const w = scrubWorker; if (!w) return null;
+  return new Promise((resolve) => {
+    const id = ++scrubId; scrubWaits.set(id, resolve);
+    try { w.postMessage({ id, ...msg }); } catch { scrubWaits.delete(id); resolve(null); }
+  });
+}
+const bbox = (p: [number, number][]) => { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; };
+
 registerMesh({
   gen: 'desert-scrub/1', world: true,
   build(ctx) {
     const e = ctx.entity; if (!e.shape || !('area' in e.shape)) return null;
-    const water = (x: number, z: number) => { const g = ctx.model.ground(); for (const w of g.waters) if (w.area && w.level > ctx.model.terrain.sample(x, z) && inside(x, z, w.area as [number, number][])) return true; return false; };
-    const blocked = blockedBy(ctx.model, e), pts = scrubPoints(e.shape.area as [number, number][], ctx.params as never, seedOf(e), (x, z) => blocked(x, z) || water(x, z));
+    const area = e.shape.area as [number, number][], seed = seedOf(e);
     const group = new THREE.Group(); group.name = `desert-scrub ${e.name ?? e.id}`;
-    const byK: (typeof pts)[] = [[], [], [], [], []];
-    for (const p of pts) byK[p.k].push(p);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
-    byK.forEach((list, k) => {
-      if (!list.length) return;
-      const im = new THREE.InstancedMesh(scrubGeometry(k), vertexMaterial(), list.length);
-      list.forEach((p, i) => {
-        q.setFromAxisAngle(up, p.yaw); const wide = 0.9 + p.tone * 0.35;
-        pos.set(p.x, ctx.model.terrain.sample(p.x, p.z) - 0.03 * p.s, p.z); sc.set(p.s * wide, p.s, p.s * wide);
-        m.compose(pos, q, sc); im.setMatrixAt(i, m);
-        const t = 0.82 + p.tone * 0.3; tint.setRGB(t, t * (0.98 + p.tone * 0.04), t * 0.94); im.setColorAt(i, tint);
+    const water = (x: number, z: number) => { const g = ctx.model.ground(); for (const w of g.waters) if (w.area && w.level > ctx.model.terrain.sample(x, z) && inside(x, z, w.area as [number, number][])) return true; return false; };
+    const scatter = () => { const blocked = blockedBy(ctx.model, e); return scrubPoints(area, ctx.params as never, seed, (x, z) => blocked(x, z) || water(x, z)); };
+    const fill = (pts: ScrubPt[]) => {
+      const byK: ScrubPt[][] = [[], [], [], [], []];
+      for (const p of pts) byK[p.k].push(p);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
+      byK.forEach((list, k) => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(scrubGeometry(k), vertexMaterial(), list.length);
+        list.forEach((p, i) => {
+          q.setFromAxisAngle(up, p.yaw); const wide = 0.9 + p.tone * 0.35;
+          pos.set(p.x, ctx.model.terrain.sample(p.x, p.z) - 0.03 * p.s, p.z); sc.set(p.s * wide, p.s, p.s * wide);
+          m.compose(pos, q, sc); im.setMatrixAt(i, m);
+          const t = 0.82 + p.tone * 0.3; tint.setRGB(t, t * (0.98 + p.tone * 0.04), t * 0.94); im.setColorAt(i, tint);
+        });
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = k <= 2; im.receiveShadow = true; im.name = `scrub:${k}`; im.computeBoundingSphere(); im.userData.cameraTransparent = true;
+        group.add(im);
       });
-      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.castShadow = k <= 2; im.receiveShadow = true; im.name = `scrub:${k}`; im.computeBoundingSphere(); im.userData.cameraTransparent = true;
-      group.add(im);
+      group.userData.points = pts.length;
+    };
+    // no water's bounds touch the area: water() is false for every candidate, so the worker's scatter is the whole answer
+    const [ax0, az0, ax1, az1] = bbox(area);
+    const dry = ctx.model.ground().waters.every((w) => { if (!w.area) return true; const [x0, z0, x1, z1] = bbox(w.area as [number, number][]); return x1 < ax0 || x0 > ax1 || z1 < az0 || z0 > az1; });
+    const job = inWorker(dry ? { kind: 'points', area, params: ctx.params, seed, cells: blockCellsOf(ctx.model), C: BLOCK_CELL, selfId: e.id } : { area, params: ctx.params, seed });
+    if (!job) { fill(scatter()); return group.children.length ? group : null; }
+    let gone = false;
+    group.addEventListener('removed', () => { gone = true; });
+    void job.then((a) => {
+      if (gone) return;
+      if (a?.pts) { const f = a.pts, pts: ScrubPt[] = []; for (let i = 0; i < f.length; i += 6) pts.push({ x: f[i], z: f[i + 1], k: f[i + 2], s: f[i + 3], yaw: f[i + 4], tone: f[i + 5] }); fill(pts); return; }
+      if (a?.v) installScrubVerdicts(a.v);
+      fill(scatter());
     });
-    group.userData.points = pts.length;
-    return group.children.length ? group : null;
+    return group;
   },
 });
 function inside(px: number, pz: number, poly: [number, number][]) { let r = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) r = !r; } return r; }

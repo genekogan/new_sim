@@ -90,8 +90,11 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
 
 /** Validated owner GLBs use the same canonical rig fitting and locomotion measurements. */
 export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppearance):Template{
- const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop'),run=measureWalk(gltf,'Run'),bodyScale=bodyScaleOf(gltf);
- return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(run.found?{runSpeed:run.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
+ // Phone arrival (lane L3): the four locomotion measurements share one fitted clone (a fit clones the whole skinned
+ // model; four of them per character were ~0.1 s of a 4x-throttled phone). Each measurement plays only its own clip
+ // and stops every action after, so a later one starts from the same pose a fresh clone would (people-template-golden).
+ const arms=fitArms(gltf),f=fit(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop',f),sprint=measureWalk(gltf,'Sprint_Loop',f),run=measureWalk(gltf,'Run',f),bodyScale=bodyScaleOf(gltf);
+ return {name,gltf,arms,...measureWalk(gltf,'Walk',f),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(run.found?{runSpeed:run.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
 }
 
 /** A composed body (humanoid@2 kit: one shared rig + parts) as a template: same fit/fitArms/measureWalk. */
@@ -112,6 +115,7 @@ function clip(gltf: GLTF, name: string) {
  * fitted by shoulders, the crowns are at ≈ 1.75 (woman), 1.77 (casual) and 1.88 m (punk, hair tips).
  * A composed look with a `height` stands bodyScaleOf × that tall (shoulders and everything else scale with it).
  */
+const standingBoxes = new WeakMap<GLTF, Map<TemplateAppearance | undefined, THREE.Box3>>();
 function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   const model = clone(gltf.scene);
   const actorAppearance=transferActorAppearance(gltf.scene,model,appearance);
@@ -122,7 +126,11 @@ function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   for(const [k,name] of Object.entries(EXTRA_CLIPS) as [ExtraClip,string][]){const c=THREE.AnimationClip.findByName(gltf.animations,name);if(c)extra[k]=mixer.clipAction(c);}
   idle.play();
   mixer.update(0.01);
-  const b = new THREE.Box3().setFromObject(model);
+  // The standing box of a fresh clone in the Idle pose depends only on the source and the look: skinned bounds walk
+  // every vertex through its bones, ~40 ms a call on a 4x-throttled phone, and every template asks five times.
+  const looks = standingBoxes.get(gltf) ?? standingBoxes.set(gltf, new Map()).get(gltf)!;
+  let b = looks.get(appearance)?.clone();
+  if (!b) { b = new THREE.Box3().setFromObject(model); looks.set(appearance, b.clone()); }
   if(b.isEmpty()||![...b.min.toArray(),...b.max.toArray()].every(Number.isFinite)||b.max.y-b.min.y<1e-5)throw Error('Body model has no finite standing height');
   let scale = PERSON_HEIGHT / (b.max.y - b.min.y);
   const place = () => {
@@ -179,6 +187,7 @@ function fitArms(gltf: GLTF) {
   }
   mixer.stopAllAction();
   mixer.uncacheRoot(model);
+  standingBoxes.delete(gltf);   // the arms are about to change: later fits measure the fitted body afresh
   // bone rest offsets (and the skin stretch axis: the child joint, in the parent bone's frame)
   const axis = new Map<string, [THREE.Vector3, number]>();
   gltf.scene.traverse((o) => {
@@ -217,8 +226,8 @@ function fitArms(gltf: GLTF) {
  * (the stance foot) and measure how fast it slides backwards relative to the
  * body. That velocity is the ground speed at which feet would not slide.
  */
-function measureWalk(gltf: GLTF, name = 'Walk'): { walkSpeed: number; forward: number; found?: boolean } {
-  const { model, mixer, idle, walk: base } = fit(gltf);
+function measureWalk(gltf: GLTF, name = 'Walk', fitted: ReturnType<typeof fit> = fit(gltf)): { walkSpeed: number; forward: number; found?: boolean } {
+  const { model, mixer, idle, walk: base } = fitted;
   const c = name === 'Walk' ? base.getClip() : THREE.AnimationClip.findByName(gltf.animations, name);
   if (!c) { mixer.stopAllAction(); return { walkSpeed: 1, forward: 1 }; }
   const walk = name === 'Walk' ? base : mixer.clipAction(c);
@@ -229,14 +238,15 @@ function measureWalk(gltf: GLTF, name = 'Walk'): { walkSpeed: number; forward: n
   const dur = walk.getClip().duration, N = 120, dt = dur / N;
   const v: number[] = [];
   let prev: { foot: number; z: number } | null = null;
-  const p = new THREE.Vector3();
+  const p = new THREE.Vector3(), q = new THREE.Vector3();
   for (let i = 0; i <= N; i++) {
     walk.time = i * dt;
     mixer.update(0);
-    model.updateMatrixWorld(true);
-    const ys = feet.map((f) => f!.getWorldPosition(p).y);
-    const foot = ys[0] < ys[1] ? 0 : 1;
-    const z = feet[foot]!.getWorldPosition(p).z;
+    // getWorldPosition updates the foot's own ancestor chain (updateWorldMatrix(true, false)): the same matrices
+    // a whole-model updateMatrixWorld(true) computes for it, without every other bone and mesh
+    const a = feet[0]!.getWorldPosition(p), b = feet[1]!.getWorldPosition(q);   // (each foot's chain once per sample)
+    const foot = a.y < b.y ? 0 : 1;
+    const z = foot === 0 ? a.z : b.z;
     if (prev && prev.foot === foot) v.push((z - prev.z) / dt);
     prev = { foot, z };
   }

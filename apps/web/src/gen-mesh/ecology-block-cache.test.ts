@@ -28,3 +28,18 @@ test('scatters share one blocked-ground index per world state; an edit rebuilds 
   add([{ op: 'place', def: 'core/bench@1', name: 'bench-2', p: [30, 30] }]);
   assert.equal(blockedBy(w, w.get('wood-a')!)(29.3, 30), true, 'a new solid is seen after the edit');
 });
+
+test('the desert-scrub worker scatter (cloned block cells + blockTest) equals the viewer-thread scatter', async () => {
+  const { scrubPoints } = await import('@sim/generators');
+  const { blockCellsOf, BLOCK_CELL } = await import('./ecology.mesh.ts');
+  const { blockTest } = await import('./block-test.ts');
+  const w = world();
+  const ops = [{ op: 'place', def: 'core/bench@1', name: 'bench', p: [10, 10] }, { op: 'place', def: 'core/bench@1', name: 'bench-2', p: [-40, 25] },
+    { op: 'place', def: 'core/woodland@1', name: 'wood', shape: { area: [[-60, -60], [60, -60], [60, 60], [-60, 60]] } }];
+  const r = applyBatch(w, { ops } as never, 'god', 0) as { result: { accepted: boolean } }; assert.equal(r.result.accepted, true);
+  const e = w.get('wood')!, area: [number, number][] = [[-80, -70], [90, -60], [70, 80], [-75, 60]], params = { density: 0.02, grass: 3 } as never;
+  const here = scrubPoints(area, params, 4, blockedBy(w, e));
+  const there = scrubPoints(area, params, 4, blockTest(structuredClone(blockCellsOf(w)), BLOCK_CELL, e.id));   // what postMessage delivers
+  assert.ok(here.length > 50, `${here.length}`);
+  assert.deepEqual(there, here);
+});
