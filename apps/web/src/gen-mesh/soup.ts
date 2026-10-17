@@ -15,8 +15,8 @@ export const hf = (x: number, z: number, k = 0) => h01(Math.floor(x * 97.3), Mat
 
 let ico1: Float32Array | null = null, ico0: Float32Array | null = null;
 function icoPositions(detail: 0 | 1): Float32Array {
-  if (detail === 1) return (ico1 ??= (new THREE.IcosahedronGeometry(1, 1).toNonIndexed().attributes.position.array as Float32Array));
-  return (ico0 ??= (new THREE.IcosahedronGeometry(1, 0).toNonIndexed().attributes.position.array as Float32Array));
+  if (detail === 1) return (ico1 ??= (new THREE.IcosahedronGeometry(1, 1).attributes.position.array as Float32Array));
+  return (ico0 ??= (new THREE.IcosahedronGeometry(1, 0).attributes.position.array as Float32Array));
 }
 
 export class Soup {
