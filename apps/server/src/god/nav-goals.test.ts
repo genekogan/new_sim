@@ -4,7 +4,7 @@ import { GodNav, type NavHost } from './nav.ts';
 
 type Vec2 = [number, number];
 /** Target-selection unit fixture: exact local standing space and reachability, independent of raster resolution. */
-function house(degrees: number, offCentre = false, pocket?: Vec2) {
+function house(degrees: number, offCentre = false, pocket?: Vec2, aside?: Vec2) {
   const yaw = degrees * Math.PI / 180, c = Math.cos(yaw), s = Math.sin(yaw), origin: Vec2 = [13.17, -7.23];
   const world = ([x, z]: Vec2): Vec2 => [origin[0] + x * c + z * s, origin[1] - x * s + z * c];
   const local = ([x, z]: Vec2): Vec2 => [(x - origin[0]) * c - (z - origin[1]) * s, (x - origin[0]) * s + (z - origin[1]) * c];
@@ -21,7 +21,9 @@ function house(degrees: number, offCentre = false, pocket?: Vec2) {
     worldPose: () => ({ x: origin[0], y: 0, z: origin[1], yaw, s: 1 }),
     pathOf: () => 'house', get: () => undefined,
   }, engine: { world: { tick: 0, entities: {} },
-    standableNearV1: (at: Vec2) => {
+    standableNearV1: (at: Vec2, _level: number, _except: unknown, _r: number, ring?: number) => {
+      // `aside`: someone already stands on the room's goal, so the people-aware 6-ring refinement moves to this local spot
+      if (aside && ring === 6) return world(aside);
       const [x, z] = local(at);
       // A narrow entrance wing offset from the building centre. There is standing room only along its actual
       // opening normal; a radial approach is in the side wall. Outside the front wall is ordinary open ground.
@@ -56,6 +58,19 @@ test('a reachable furnished-room pocket stays offered after the building turns',
     assert.ok(goal, `${degrees}: the reachable pocket is found`);
     const p = local(goal.p);
     assert.ok(Math.hypot(p[0] - pocket[0], p[1] - pocket[1]) < 0.04, `${degrees}: goal stays in the reachable pocket`);
+  }
+});
+
+test('a room goal moved aside round someone standing on it stays where the front door reaches (else the reachable goal)', () => {
+  // V6-party S6 (moss-cottage living, two extra chairs and a hearth): the spot beside the occupied goal was inside the room
+  // but in a pocket the furniture closes off, and the act was refused route.unreachable
+  for (const degrees of [0, 37]) {
+    const centre: Vec2 = [0, 0.5], pocket: Vec2 = [-3.4, -2.6];
+    const { nav, world, local } = house(degrees, false, centre, pocket);
+    const goal = nav.goal(nav.thing('house/living')!, world([0, 8]));
+    assert.ok(goal, `${degrees}: a goal exists`);
+    const p = local(goal.p);
+    assert.ok(Math.hypot(p[0] - centre[0], p[1] - centre[1]) < 0.04, `${degrees}: not the closed-off spot beside it, got ${p}`);
   }
 });
 
