@@ -207,7 +207,7 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
   // The same area is scattered twice in a viewer (the bake's physics() counts it, the mesh places it with `blocked`):
   // the random stream and each trial's noise test depend only on the stream position, so both are memoised per
   // (area, params, seed) and a second call replays them; only `blocked` and spacing are evaluated again.
-  const memo = scrubMemo(area, params, seed, cap);
+  const memo = scrubMemo([area, seed, cap, density, grass, g, veins, cluster, String(params.toward ?? 'none'), clears]);   // what the verdicts read
   for (const [pi, ps] of passes.entries()) {
     if (ps.dens <= 0) continue;
     const maxMult = (1 + (dir ? g : 0)) * (1 - ps.vein + ps.vein / VEIN_MEAN) * (1 + cluster);
@@ -234,12 +234,12 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
   return out;
 }
 
-// A few recent scatters (key = area, params, seed, cap): each trial's noise verdict by its position in the pass's
+// A few recent scatters (key = everything the verdicts read): each trial's noise verdict by its position in the pass's
 // random stream (the stream itself is a cheap xorshift and is regenerated). One byte per stream position.
 type ScrubMemo = { get(pass: number, at: number): boolean | undefined; set(pass: number, at: number, ok: boolean): void };
 const scrubMemos = new Map<string, ScrubMemo>();
-function scrubMemo(area: Vec2[], params: Record<string, Value>, seed: number, cap: number): ScrubMemo {
-  const key = JSON.stringify([area, params, seed, cap]);
+function scrubMemo(inputs: unknown[]): ScrubMemo {
+  const key = JSON.stringify(inputs);
   let m = scrubMemos.get(key);
   if (m) { scrubMemos.delete(key); scrubMemos.set(key, m); return m; }
   const marks: Uint8Array[] = [];   // 0 unknown, 1 pass, 2 fail
@@ -274,9 +274,15 @@ export const desertScrubGen: Generator = {
   },
   physics({ params, shape, seed }) {
     const area = shape?.area ?? ([[-20, -20], [20, -20], [20, 20], [-20, 20]] as Vec2[]);
-    const pts = scrubPoints(area, params, seed);
-    const per = [0, 0, 0, 0, 0]; let tris = 0; for (const p of pts) { per[p.k]++; tris += SCRUB_TRIS[p.k]; }
-    return { box: boxOfBounds(bounds2(area), n(params.maxHeight, 1.6)), colliders: [], slots: [], tris, notes: [`${per[0] + per[1] + per[2]} creosote bushes, ${per[3] + per[4]} grass tufts (before exclusions; 5 instanced meshes, decor)`] };
+    // The scatter is only counted here (tris, notes): it runs when something reads them (budgets, god plans, a skill),
+    // not on every viewer's bake before the arrival card (~400 ms of playa noise on a 4x-throttled phone for mars-two).
+    let counted: { tris: number; notes: string[] } | undefined;
+    const count = () => counted ??= (() => {
+      const pts = scrubPoints(area, params, seed);
+      const per = [0, 0, 0, 0, 0]; let tris = 0; for (const p of pts) { per[p.k]++; tris += SCRUB_TRIS[p.k]; }
+      return { tris, notes: [`${per[0] + per[1] + per[2]} creosote bushes, ${per[3] + per[4]} grass tufts (before exclusions; 5 instanced meshes, decor)`] };
+    })();
+    return { box: boxOfBounds(bounds2(area), n(params.maxHeight, 1.6)), colliders: [], slots: [], get tris() { return count().tris; }, get notes() { return count().notes; } };
   },
 };
 export const creosoteGen: Generator = {

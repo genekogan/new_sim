@@ -66,3 +66,15 @@ test('scrub points: cached replays equal the original algorithm for any blocked,
   // a small cap still stops at the same point
   assert.deepEqual(scrubPoints(area, { density: 0.004 }, 5, blockA, 40), reference(area, { density: 0.004 }, 5, blockA, 40));
 });
+
+test('desert-scrub physics counts lazily and reports the same tris and notes as the eager count', async () => {
+  const { desertScrubGen } = await import('./desert.ts');
+  const params = { density: 0.004, grass: 3, toward: 'se', gradient: 0.6, veins: 0.6, cluster: 0.35, minHeight: 0.4, maxHeight: 1.6, minSpacing: 2.5, clear: [[0, 0, 30]] } as Record<string, Value>;
+  const b = desertScrubGen.physics({ params, args: {}, seed: 0, shape: { area } as never });
+  const pts = reference(area, params, 0); let tris = 0; const per = [0, 0, 0, 0, 0]; const T = [208, 208, 182, 14, 14];
+  for (const p of pts) { per[p.k]++; tris += T[p.k]; }
+  assert.equal(b.tris, tris);
+  assert.deepEqual(b.notes, [`${per[0] + per[1] + per[2]} creosote bushes, ${per[3] + per[4]} grass tufts (before exclusions; 5 instanced meshes, decor)`]);
+  assert.deepEqual(JSON.parse(JSON.stringify(b)), { box: b.box, colliders: [], slots: [], tris, notes: b.notes });
+  assert.deepEqual({ ...b }, { box: b.box, colliders: [], slots: [], tris, notes: b.notes });
+});
