@@ -190,7 +190,7 @@ const NAMED = [
   ['region-east-crossroads.petrol-station', 'shop', 7, 5, 1, 3, '#f3eee2', '#c43a2a', 'flat', 'plaster', 0, 'shop'],
   ['region-east-crossroads.pub', 'hall', 12, 8, 2, 2.9, '#b9ae96', '#3f4a3a', 'gable', 'stone', Math.PI / 2, 'bar'],
   ['region-golf-course.clubhouse', 'hall', 12, 7, 1, 3.4, '#efe9dc', '#3f5a4a', 'hip', 'plaster', Math.PI / 2, 'hall'],
-  ['region-festival-meadow.big-top', 'hall', 22, 22, 1, 5, '#efe9dc', '#c44a45', 'hip', 'plaster', 0, 'hall'],
+  ['region-festival-meadow.big-top', 'hall', 22, 22, 1, 5, '#f4efe4', '#c44a45', 'flat', 'plaster', 0, 'hall'], // striped tent canopy on its roof terrace (scenery.mjs)
   ['region-alpine.valley-station', 'hall', 7, 6, 1, 4, '#8a5a36', '#5a5f66', 'flat', 'wood', 0, 'hall'],
   ['region-alpine.mountain-station', 'hall', 8, 7, 1, 4, '#6e4a30', '#5a5f66', 'flat', 'wood', 0, 'hall'],
   ['region-alpine.mountain-restaurant', 'cottage', 12, 8, 2, 2.8, '#7a4a2a', '#4a4440', 'gable', 'wood', Math.PI, 'cafe'],

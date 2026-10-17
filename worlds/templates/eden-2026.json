@@ -5503,14 +5503,14 @@
             52
           ],
           "params": {
-            "wall": "#efe9dc",
+            "wall": "#f4efe4",
             "trim": "#e9dfcc",
             "roofColor": "#c44a45",
             "w": 22,
             "d": 22,
             "floors": 1,
             "floorHeight": 5,
-            "roof": "hip",
+            "roof": "flat",
             "material": "plaster",
             "windows": 0.6,
             "plan": {
@@ -55934,6 +55934,469 @@
       "note": "scenery: festival meadow",
       "group": "eden-2026",
       "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-big-top-canopy",
+            "version": 1,
+            "description": "The striped canvas canopy of a circus big top (24 m, red with white seams, a pennant on the king pole); sits on an enterable hall.",
+            "tags": [
+              "eden",
+              "scenery"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                24.8,
+                9.8,
+                24.8
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cone",
+                    "at": [
+                      0,
+                      3.6,
+                      0
+                    ],
+                    "r": 12.4,
+                    "h": 7.2,
+                    "color": "#c9342d",
+                    "segments": 24,
+                    "material": "fabric",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0.4,
+                        7,
+                        0
+                      ],
+                      [
+                        6.3,
+                        3.6,
+                        0
+                      ],
+                      [
+                        12.45,
+                        0.05,
+                        0
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0.346,
+                        7,
+                        0.2
+                      ],
+                      [
+                        5.456,
+                        3.6,
+                        3.15
+                      ],
+                      [
+                        10.782,
+                        0.05,
+                        6.225
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0.2,
+                        7,
+                        0.346
+                      ],
+                      [
+                        3.15,
+                        3.6,
+                        5.456
+                      ],
+                      [
+                        6.225,
+                        0.05,
+                        10.782
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0,
+                        7,
+                        0.4
+                      ],
+                      [
+                        0,
+                        3.6,
+                        6.3
+                      ],
+                      [
+                        0,
+                        0.05,
+                        12.45
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -0.2,
+                        7,
+                        0.346
+                      ],
+                      [
+                        -3.15,
+                        3.6,
+                        5.456
+                      ],
+                      [
+                        -6.225,
+                        0.05,
+                        10.782
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -0.346,
+                        7,
+                        0.2
+                      ],
+                      [
+                        -5.456,
+                        3.6,
+                        3.15
+                      ],
+                      [
+                        -10.782,
+                        0.05,
+                        6.225
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -0.4,
+                        7,
+                        0
+                      ],
+                      [
+                        -6.3,
+                        3.6,
+                        0
+                      ],
+                      [
+                        -12.45,
+                        0.05,
+                        0
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -0.346,
+                        7,
+                        -0.2
+                      ],
+                      [
+                        -5.456,
+                        3.6,
+                        -3.15
+                      ],
+                      [
+                        -10.782,
+                        0.05,
+                        -6.225
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -0.2,
+                        7,
+                        -0.346
+                      ],
+                      [
+                        -3.15,
+                        3.6,
+                        -5.456
+                      ],
+                      [
+                        -6.225,
+                        0.05,
+                        -10.782
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0,
+                        7,
+                        -0.4
+                      ],
+                      [
+                        0,
+                        3.6,
+                        -6.3
+                      ],
+                      [
+                        0,
+                        0.05,
+                        -12.45
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0.2,
+                        7,
+                        -0.346
+                      ],
+                      [
+                        3.15,
+                        3.6,
+                        -5.456
+                      ],
+                      [
+                        6.225,
+                        0.05,
+                        -10.782
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        0.346,
+                        7,
+                        -0.2
+                      ],
+                      [
+                        5.456,
+                        3.6,
+                        -3.15
+                      ],
+                      [
+                        10.782,
+                        0.05,
+                        -6.225
+                      ]
+                    ],
+                    "r": 0.16,
+                    "color": "#f4efe4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      8.2,
+                      0
+                    ],
+                    "r": 0.08,
+                    "h": 3,
+                    "color": "#5a4632",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.6,
+                      9.3,
+                      0
+                    ],
+                    "size": [
+                      1.2,
+                      0.7,
+                      0.05
+                    ],
+                    "color": "#f0c040",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-big-top-canopy@1",
+          "name": "festival-big-top-canopy",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/round-carpet-pack@1",
+          "name": "big-top-ring",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-1",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            0,
+            0,
+            -6.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-2",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            0,
+            0,
+            6.5
+          ],
+          "r": 3.142
+        },
         {
           "op": "place",
           "def": "eden-helter-skelter@1",

@@ -49,6 +49,12 @@ function blockCells(model: WorldModel, pad: number, C: number): Map<string, Bloc
       const p = e.shape.area as [number, number][]; let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
       put(x0 - pad, z0 - pad, x1 + pad, z1 + pad, { kind: 'poly', p, id: e.id }); continue;
     }
+    // a building's whole floor plan is blocked, not only its walls: no flowers or saplings growing indoors
+    if (gen === 'building/1') { const fp = model.footprint(e, d), yaw = model.worldPose(e).yaw, co = Math.cos(yaw), si = Math.sin(yaw); let a0 = Infinity, b0 = Infinity, a1 = -Infinity, b1 = -Infinity, cx = 0, cz = 0;
+      for (const o of fp) { cx += o.c[0] / fp.length; cz += o.c[1] / fp.length; }
+      for (const o of fp) { const oc = Math.cos(o.yaw), os = Math.sin(o.yaw); for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const x = o.c[0] + i * o.half[0] * oc + j * o.half[1] * os - cx, z = o.c[1] - i * o.half[0] * os + j * o.half[1] * oc - cz, a = x * co - z * si, b = x * si + z * co; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); } }
+      if (fp.length) { const ma = (a0 + a1) / 2, mb = (b0 + b1) / 2, c: [number, number] = [cx + ma * co + mb * si, cz - ma * si + mb * co], h: [number, number] = [(a1 - a0) / 2 + pad, (b1 - b0) / 2 + pad], r = Math.hypot(h[0], h[1]); put(c[0] - r, c[1] - r, c[0] + r, c[1] + r, { kind: 'obb', c, h, yaw, id: e.id }); }
+    }
     for (const o of model.footprint(e, d)) { const r = Math.hypot(o.half[0], o.half[1]) + pad; put(o.c[0] - r, o.c[1] - r, o.c[0] + r, o.c[1] + r, { kind: 'obb', c: o.c, h: [o.half[0] + pad, o.half[1] + pad], yaw: o.yaw, id: e.id }); }
   }
   return cells;

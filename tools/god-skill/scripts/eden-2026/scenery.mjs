@@ -59,8 +59,17 @@ group('scenery: railway and train', put => {
   put('locomotive', 'railway-locomotive', [160, -49], { r: Math.PI / 2, params: { paint: '#2f6b4f' } });
   for (let i = 0; i < 4; i++) put('rail-wagon', `railway-carriage-${i + 1}`, [151.5 - i * 4.6, -49], { r: Math.PI / 2, params: { body: '#a8352d' } });
 });
-group('scenery: festival meadow', put => {
+group('scenery: festival meadow', (put, ops) => {
   // big top: a striped canvas tent at circus scale; helter-skelter yellow tower; balloons; food stalls and lights
+  ops.push(kit('eden-big-top-canopy', 'The striped canvas canopy of a circus big top (24 m, red with white seams, a pennant on the king pole); sits on an enterable hall.', [24.8, 9.8, 24.8], [
+    { kind: 'cone', at: [0, 3.6, 0], r: 12.4, h: 7.2, color: RED, segments: 24, material: 'fabric', collide: false },
+    ...Array.from({ length: 12 }, (_, i) => { const a = i * Math.PI / 6, c = Math.cos(a), sn = Math.sin(a); return { kind: 'sweep', at: [0, 0, 0], path: [[r3(c * 0.4), 7.0, r3(sn * 0.4)], [r3(c * 6.3), 3.6, r3(sn * 6.3)], [r3(c * 12.45), 0.05, r3(sn * 12.45)]], r: 0.16, color: WHITE, collide: false }; }),
+    { kind: 'cyl', at: [0, 8.2, 0], r: 0.08, h: 3, color: '#5a4632', collide: false },
+    { kind: 'box', at: [0.6, 9.3, 0], size: [1.2, 0.7, 0.05], color: YELLOW, collide: false }]));
+  ops.push({ op: 'place', def: 'eden-big-top-canopy@1', name: 'festival-big-top-canopy', in: { parent: 'region-festival-meadow-big-top', slot: 'roof' }, p: [0, 0, 0] });
+  // inside the tent: a sawdust ring and tiered seats facing it on four sides
+  ops.push({ op: 'place', def: 'core/round-carpet-pack@1', name: 'big-top-ring', in: { parent: 'region-festival-meadow-big-top', slot: 'hall' }, p: [0, 0, 0] });
+  for (const [i, x, z, r] of [[1, 0, -6.5, 0], [2, 0, 6.5, Math.PI], [3, -6.5, 0, Math.PI / 2], [4, 6.5, 0, -Math.PI / 2]]) ops.push({ op: 'place', def: 'core/theatre-seats@1', name: `big-top-seats-${i}`, in: { parent: 'region-festival-meadow-big-top', slot: 'hall' }, p: [x, 0, z], ...(r ? { r: r3(r) } : {}) });
   put('eden-helter-skelter@1', 'festival-helter-skelter', mid('region-festival-meadow.helter-skelter'));
   put('balloon', 'festival-balloon-2', [262, 70], { params: { env: '#d9473e', stripe: '#f4efe4' } });
   put('balloon', 'festival-balloon-3', [300, 48], { params: { env: '#3f7fb5', stripe: '#f2c14e' } });
