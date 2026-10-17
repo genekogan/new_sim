@@ -37,7 +37,9 @@ export type VocabResult =
   | {kind: 'alias'; cap: EdgeCapability; note: string; params?: Record<string, unknown>}
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[];
     /** Refusal code when it is not capability.unknown (place.unreachable: a named place exists but cannot be reached). */
-    code?: string};
+    code?: string;
+    /** place.unreachable: the named place (a host may offer a walk to it on demand and resolve again). */
+    place?: string};
 
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some', 'through', 'thru', 'around', 'across', 'over', 'back', 'please', 'little', 'bit', 'for', 'while', 'and', 'then', 'there']);
 const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', move: 'walk', head: 'walk', travel: 'walk', 'come-back': 'walk', return: 'walk', 'go-back': 'walk', 'head-back': 'walk', 'walk-back': 'walk', running: 'run', sprint: 'run', sprinting: 'run', hurry: 'run', jogging: 'jog', 'go-over': 'walk',
@@ -391,7 +393,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
       const reachable = pool.filter(c => c.available && info.get(c.id)!.t.at), wholes = reachable.filter(c => c.target?.kind === 'place');
       const ranked = (wholes.length ? wholes : reachable).map(c => ({c, d: dist(info.get(c.id)!.t.at, place.center)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
       const why = verb === 'read' ? `there is nowhere to read in ${place.name}` : `${place.name} is not walkable ground yet`;
-      return {kind: 'unknown', code: 'place.unreachable', reason: `${input}: ${why}${ranked.length ? ` (the nearest place you can ${verb} to is ${ranked[0].c.id}, ${Math.round(ranked[0].d)} m from it)` : ''}; nothing else was chosen in its place.`,
+      return {kind: 'unknown', code: 'place.unreachable', place: place.id, reason: `${input}: ${why}${ranked.length ? ` (the nearest place you can ${verb} to is ${ranked[0].c.id}, ${Math.round(ranked[0].d)} m from it)` : ''}; nothing else was chosen in its place.`,
         didYouMean: ranked.slice(0, 3).map(r => ({id: r.c.id, label: r.c.label}))};
     }
   }

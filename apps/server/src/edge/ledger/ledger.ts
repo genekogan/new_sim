@@ -67,6 +67,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
+  /** World-engine worlds only (god/nav.ts): a walk to a named place beyond the listing's radius (a far big top), added to
+   *  this act's capabilities on demand; true when one was added. Unset elsewhere. */
+  walkOnDemand?: (soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => boolean;
   /** World-engine worlds only: called before the map is read, so a god's edit shows on the next `map`. Unset elsewhere. */
   beforeMap?: () => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
@@ -621,7 +624,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: this.startingPoint(soul.soulId), why: 'reclaimed after fading'});
       this.capCache.delete(soul.soulId);
     }
-    const {caps, plans} = this.binds(soul);
+    let {caps, plans} = this.binds(soul);
     let params = (input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? {...input.params as Record<string, unknown>} : {}) as Record<string, unknown>;
     if(['read','write','use-computer','listen','paint','craft','post-letter'].includes(askedVerb)){try{outcomeParams(params);}catch{return refuse('capability.params','Content parameters must be bounded strings (book100, query200, title100, text2000).');}if(params.book!==undefined&&!EDEN_LIBRARY_CATALOGUE.some(b=>b.id===params.book))return refuse('content.book-unknown','Choose a book id from the published catalogue.');}
     // intents/1: plain words for the attention channel ("look at the fire", "turn to Bill") and face:<soul> never touch the body
@@ -640,7 +643,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // PM-R057: exact ids first; an unambiguous natural name is accepted and reported back as `resolved`;
     // anything else is refused with the closest offered capabilities.
-    const v = caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, this.vocabulary(soul, caps));
+    let v = caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, this.vocabulary(soul, caps));
+    // a named place the listing leaves out for distance only (residents could not "go to the big top" across town while
+    // visitors reach it): offer that one walk for this act (copies; the listing cache is untouched) and resolve again
+    if (v.kind === 'unknown' && v.code === 'place.unreachable' && v.place && this.walkOnDemand) {
+      const more = [...caps], morePlans = new Map(plans);
+      if (this.walkOnDemand(soul, v.place, more, morePlans)) {caps = more; plans = morePlans; v = resolveCapability(text, this.vocabulary(soul, caps));}
+    }
     if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;
     const bodyIssue=bodyCapabilityProblem(this.body(soul.entityId),cap,plans.get(capability)?.steps);if(bodyIssue)return refuse(bodyIssue.code,bodyIssue.reason);

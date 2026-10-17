@@ -361,23 +361,41 @@ export class GodNav {
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
       for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
-    for (const { t, d } of pick) {
-      const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
-      const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
-      const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
-        ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
-      caps.push(cap);
-      if (!goal) continue;
-      const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
-      // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
-      const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
-      // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
-      // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
-      const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
-      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
-      if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
-    }
+    for (const { t, d } of pick) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
   }
+
+  /** A walk to one named place the listing leaves out for distance (the far big top, asked for by name): the same
+   *  capability the listing would give it from here. Ground-floor things and rooms only (an upper floor's rooms need a
+   *  multi-floor reach check; walk to the building first). True when a capability was added. */
+  walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
+    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId && (t.kind !== 'room' || t.level === 0));
+    const t = mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
+    const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
+    const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit', n = caps.length;
+    this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
+    return caps.length > n;
+  }
+
+  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans) {
+    const { here, myLevel, seated, exit } = at;
+    const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
+    const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
+      ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
+    caps.push(cap);
+    if (!goal) return;
+    const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
+    // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
+    const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
+    // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
+    // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
+    const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
+    plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
+    if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
+  }
+
   /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend
    *  a while), and for an open area big enough, a stroll through it (a loop of clear stops inside it). */
   private placeCapabilities(t: Thing, place: string, here: Vec2, d: number, go: Step[], myLevel: number, caps: EdgeCapability[], plans: Plans) {
