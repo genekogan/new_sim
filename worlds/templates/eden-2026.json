@@ -1018,6 +1018,94 @@
       ]
     },
     {
+      "note": "interior defs",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-pendant",
+            "version": 1,
+            "description": "A ceiling pendant lamp: a dark conical shade on a cord, warm light (old Eden library and café).",
+            "tags": [
+              "furniture",
+              "light",
+              "lamp",
+              "eden"
+            ],
+            "form": "point",
+            "state": {
+              "on": {
+                "type": "bool",
+                "default": true
+              }
+            },
+            "components": {
+              "light": {
+                "color": "#ffd99a",
+                "range": 5,
+                "on": true
+              }
+            },
+            "size": {
+              "box": [
+                0.6,
+                3.1,
+                0.6
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      2.78,
+                      0
+                    ],
+                    "r": 0.008,
+                    "h": 0.64,
+                    "segments": 4,
+                    "color": "#2b2623",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cone",
+                    "at": [
+                      0,
+                      2.33,
+                      0
+                    ],
+                    "r": 0.3,
+                    "h": 0.26,
+                    "segments": 14,
+                    "color": "#2f3332",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sphere",
+                    "at": [
+                      0,
+                      2.2,
+                      0
+                    ],
+                    "r": 0.07,
+                    "color": "#ffe2a8",
+                    "glow": 1,
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
       "note": "Eden architecture 1",
       "group": "eden-2026",
       "ops": [
@@ -3450,30 +3538,10 @@
                       "name": "Reading",
                       "rect": [
                         0,
-                        3.024,
+                        0,
                         10.4,
                         8.4
                       ]
-                    },
-                    {
-                      "id": "stacks",
-                      "name": "Stacks",
-                      "rect": [
-                        0,
-                        0,
-                        10.4,
-                        3.024
-                      ]
-                    }
-                  ],
-                  "doors": [
-                    {
-                      "between": [
-                        "reading",
-                        "stacks"
-                      ],
-                      "at": 0.7,
-                      "width": 1.2
                     }
                   ],
                   "exterior": [
@@ -3483,13 +3551,6 @@
                       "kind": "door",
                       "at": 0.5,
                       "width": 1.5
-                    },
-                    {
-                      "room": "stacks",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.2
                     }
                   ]
                 }
@@ -3711,30 +3772,10 @@
                       "name": "Cafe",
                       "rect": [
                         0,
-                        2.16,
+                        0,
                         8,
                         6
                       ]
-                    },
-                    {
-                      "id": "kitchen",
-                      "name": "Kitchen",
-                      "rect": [
-                        0,
-                        0,
-                        8,
-                        2.16
-                      ]
-                    }
-                  ],
-                  "doors": [
-                    {
-                      "between": [
-                        "cafe",
-                        "kitchen"
-                      ],
-                      "at": 0.7,
-                      "width": 1.2
                     }
                   ],
                   "exterior": [
@@ -3744,13 +3785,6 @@
                       "kind": "door",
                       "at": 0.5,
                       "width": 1.5
-                    },
-                    {
-                      "room": "kitchen",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.2
                     }
                   ]
                 }
@@ -13702,271 +13736,6 @@
       ]
     },
     {
-      "note": "furnish eden-library-1",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/shop-counter@1",
-          "name": "reading-desk",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            2.73,
-            0,
-            0.739
-          ],
-          "r": -1.571,
-          "params": {
-            "variant": "reception"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/long-table@1",
-          "name": "reading-table-1",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -2.488,
-            0,
-            -0.622
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/chair@1",
-          "name": "reading-chair-1a",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -3.776,
-            0,
-            -1.609
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/chair@1",
-          "name": "reading-chair-1b",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -2.832,
-            0,
-            0.23
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/chair@1",
-          "name": "reading-chair-2a",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -0.944,
-            0,
-            -1.609
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/chair@1",
-          "name": "reading-chair-2b",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            0,
-            0,
-            0.23
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/armchair@1",
-          "name": "reading-armchair-1",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -4.54,
-            0,
-            1.235
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/armchair@1",
-          "name": "reading-armchair-2",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -2.694,
-            0,
-            2.108
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f8",
-          "def": "core/floor-lamp@1",
-          "name": "reading-lamp",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "p": [
-            -4.72,
-            0,
-            2.288
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/bookcase@1",
-          "name": "stacks-shelf-1",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            -2.16,
-            0,
-            -1.142
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/bookcase@1",
-          "name": "stacks-shelf-4",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            1.728,
-            0,
-            -1.142
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f11",
-          "def": "core/bookcase@1",
-          "name": "stacks-shelf-5",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            3.024,
-            0,
-            -1.142
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f12",
-          "def": "core/bookcase@1",
-          "name": "stacks-shelf-6",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            4.32,
-            0,
-            -1.142
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
-          "def": "core/bookcase@1",
-          "name": "stacks-stack-1",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            -1.728,
-            0,
-            0.571
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f14",
-          "def": "core/bookcase@1",
-          "name": "stacks-stack-2",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            0.288,
-            0,
-            0.571
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f15",
-          "def": "core/bookcase@1",
-          "name": "stacks-stack-4",
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "stacks"
-          },
-          "p": [
-            4.32,
-            0,
-            0.571
-          ],
-          "r": 3.142
-        }
-      ]
-    },
-    {
       "note": "furnish eden-office-1",
       "group": "eden-2026",
       "ops": [
@@ -14688,191 +14457,6 @@
             7.028
           ],
           "r": 1.571
-        }
-      ]
-    },
-    {
-      "note": "furnish int-cafe",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/shop-counter@1",
-          "name": "cafe-counter",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            -1.084,
-            0,
-            -1.36
-          ],
-          "r": 0,
-          "params": {
-            "variant": "cafe"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/round-table@1",
-          "name": "cafe-table-1",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            -2.303,
-            0,
-            0.645
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/chair@1",
-          "name": "cafe-chair-1a",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            -3.249,
-            0,
-            0.76
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/chair@1",
-          "name": "cafe-chair-1b",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            -1.483,
-            0,
-            0.76
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/chair@1",
-          "name": "cafe-chair-2a",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            -0.071,
-            0,
-            0.76
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/chair@1",
-          "name": "cafe-chair-2b",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            1.483,
-            0,
-            0.76
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/sofa@1",
-          "name": "cafe-sofa",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            3.3,
-            0,
-            0.207
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/floor-lamp@1",
-          "name": "cafe-lamp",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "p": [
-            3.52,
-            0,
-            -1.064
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f8",
-          "def": "core/stove@1",
-          "name": "kitchen-stove",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "kitchen"
-          },
-          "p": [
-            -2.335,
-            0,
-            -0.581
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/fridge@1",
-          "name": "kitchen-fridge",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "kitchen"
-          },
-          "p": [
-            1.703,
-            0,
-            -0.553
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/counter@1",
-          "name": "kitchen-counter",
-          "in": {
-            "parent": "int-cafe",
-            "slot": "kitchen"
-          },
-          "p": [
-            3.423,
-            0,
-            0.059
-          ],
-          "r": -1.571
         }
       ]
     },
@@ -50045,6 +49629,1152 @@
       ]
     },
     {
+      "note": "interiors: library 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-north-shelf-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -3.7,
+            0,
+            -3.6
+          ],
+          "params": {
+            "sx": 1.6,
+            "sy": 1.15
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-north-shelf-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            3.7,
+            0,
+            -3.6
+          ],
+          "params": {
+            "sx": 1.6,
+            "sy": 1.15
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-window-shelf-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -1.15,
+            0,
+            -3.6
+          ],
+          "params": {
+            "sx": 1.85,
+            "sy": 0.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-window-shelf-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            1.15,
+            0,
+            -3.6
+          ],
+          "params": {
+            "sx": 1.85,
+            "sy": 0.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-east-shelf",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            4.6,
+            0,
+            0
+          ],
+          "r": -1.571,
+          "params": {
+            "sx": 1.2,
+            "sy": 1.15
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-east-low-north",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            4.6,
+            0,
+            -1.8
+          ],
+          "r": -1.571,
+          "params": {
+            "sx": 1.45,
+            "sy": 0.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-east-low-south",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            4.6,
+            0,
+            1.8
+          ],
+          "r": -1.571,
+          "params": {
+            "sx": 1.45,
+            "sy": 0.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-west-shelf",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -4.6,
+            0,
+            0.1
+          ],
+          "r": 1.571,
+          "params": {
+            "sx": 1.1,
+            "sy": 1.15
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "library-west-low-south",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -4.6,
+            0,
+            1.8
+          ],
+          "r": 1.571,
+          "params": {
+            "sx": 1.45,
+            "sy": 0.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "library-rug-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.5,
+            0,
+            0.7
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "library-rug-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.5,
+            0,
+            0.7
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/table@1",
+          "name": "library-reading-table-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.5,
+            0,
+            0.6
+          ],
+          "params": {
+            "top": "#8a5a36",
+            "legs": "#5e3d27"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/table@1",
+          "name": "library-reading-table-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.5,
+            0,
+            0.6
+          ],
+          "params": {
+            "top": "#8a5a36",
+            "legs": "#5e3d27"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "library-reading-chair-west-1",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.8,
+            0,
+            1.4
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: library 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "library-reading-chair-west-2",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.2,
+            0,
+            -0.2
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "library-reading-chair-east-1",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.2,
+            0,
+            1.4
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "library-reading-chair-east-2",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.8,
+            0,
+            -0.2
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "library-armchair-sage",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            1.9,
+            0,
+            3.1
+          ],
+          "r": 3.142,
+          "params": {
+            "fabric": "#8ea47f",
+            "wood": "#5e3d27"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "library-armchair-rose",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            3.95,
+            0,
+            3.1
+          ],
+          "r": 3.142,
+          "params": {
+            "fabric": "#c98a8a",
+            "wood": "#5e3d27"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "library-floor-lamp",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -4.3,
+            0,
+            3.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "library-tall-plant",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.4,
+            0,
+            3.3
+          ],
+          "params": {
+            "sy": 1.6
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "library-desk-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.5,
+            0,
+            -2.3
+          ],
+          "params": {
+            "top": "#5e3d27"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/office-desk@1",
+          "name": "library-desk-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.5,
+            0,
+            -2.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "library-desk-chair-west",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.5,
+            0,
+            -1.4
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/office-chair@1",
+          "name": "library-desk-chair-east",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.5,
+            0,
+            -1.4
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "library-pendant-1",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.5,
+            0,
+            0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "library-pendant-2",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.5,
+            0,
+            0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "library-pendant-3",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            -2.7,
+            0,
+            -2
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: library 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "library-pendant-4",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            2.3,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "library-pendant-5",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            0,
+            0,
+            2
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: library tops 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "library-books-west",
+          "in": {
+            "parent": "eden-library-1/library-reading-table-west",
+            "slot": "top"
+          },
+          "p": [
+            -0.2,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "library-books-east",
+          "in": {
+            "parent": "eden-library-1/library-reading-table-east",
+            "slot": "top"
+          },
+          "p": [
+            -0.2,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/desk-lamp@1",
+          "name": "library-desk-lamp-west",
+          "in": {
+            "parent": "eden-library-1/library-desk-west",
+            "slot": "top"
+          },
+          "p": [
+            -0.45,
+            0,
+            -0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "library-desk-books",
+          "in": {
+            "parent": "eden-library-1/library-desk-west",
+            "slot": "top"
+          },
+          "p": [
+            0.3,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "library-corner-lamp",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "reading"
+          },
+          "p": [
+            3.1,
+            0,
+            3.25
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: cafe 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "cafe-counter-1",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.6,
+            0,
+            -1.75
+          ],
+          "params": {
+            "cab": "#3f5f57",
+            "top": "#c9b48f",
+            "door": "#4f7068"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "cafe-counter-2",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -1.4,
+            0,
+            -1.75
+          ],
+          "params": {
+            "cab": "#3f5f57",
+            "top": "#c9b48f",
+            "door": "#4f7068"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "cafe-counter-3",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -0.2,
+            0,
+            -1.75
+          ],
+          "params": {
+            "cab": "#3f5f57",
+            "top": "#c9b48f",
+            "door": "#4f7068"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/shop-shelving@1",
+          "name": "cafe-back-shelves",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.2,
+            0,
+            -2.5
+          ],
+          "params": {
+            "g0": "#c46a43",
+            "g1": "#e8e2d6",
+            "g2": "#2f6b6b",
+            "g3": "#d9a63a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "cafe-menu-board",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            0.9,
+            0,
+            -2.45
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "cafe-stool-1",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.6,
+            0,
+            -0.85
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "cafe-stool-2",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -1.6,
+            0,
+            -0.85
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "core/round-table@1",
+          "name": "cafe-table-1",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.7,
+            0,
+            1.3
+          ],
+          "params": {
+            "top": "#f2ead8",
+            "legs": "#3b3d40"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "cafe-table-1-chair-w",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -3.38,
+            0,
+            1.3
+          ],
+          "r": 1.571,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "cafe-table-1-chair-e",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.02,
+            0,
+            1.3
+          ],
+          "r": -1.571,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/round-table@1",
+          "name": "cafe-table-2",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            2.5,
+            0,
+            1.35
+          ],
+          "params": {
+            "top": "#f2ead8",
+            "legs": "#3b3d40"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "cafe-table-2-chair-w",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            1.82,
+            0,
+            1.35
+          ],
+          "r": 1.571,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "cafe-table-2-chair-e",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            3.18,
+            0,
+            1.35
+          ],
+          "r": -1.571,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "cafe-sofa",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            3.25,
+            0,
+            -1.55
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#2f6b6b",
+            "pillow": "#d19c3c"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: cafe 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "cafe-nook-shelf",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            2.2,
+            0,
+            -2.6
+          ],
+          "params": {
+            "sx": 0.75,
+            "sy": 0.8
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "cafe-nook-rug",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            2.8,
+            0,
+            -1.55
+          ],
+          "r": 1.571,
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "cafe-plant",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -3.4,
+            0,
+            2.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "cafe-tall-plant",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            3.35,
+            0,
+            2.35
+          ],
+          "params": {
+            "sy": 1.5
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/picture-frame@1",
+          "name": "cafe-picture",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -3.75,
+            0,
+            -1.2
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "cafe-pendant-1",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -2.7,
+            0,
+            1.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "cafe-pendant-2",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            2.5,
+            0,
+            1.35
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "cafe-pendant-3",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            -1.6,
+            0,
+            -1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "cafe-pendant-4",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            0.2,
+            0,
+            -1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "cafe-pendant-5",
+          "in": {
+            "parent": "int-cafe",
+            "slot": "cafe"
+          },
+          "p": [
+            2.8,
+            0,
+            -1.5
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: cafe tops 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/cup-of-coffee-pack@1",
+          "name": "cafe-cup-1",
+          "in": {
+            "parent": "int-cafe/cafe-table-1",
+            "slot": "top"
+          },
+          "p": [
+            -0.1,
+            0,
+            -0.15
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/croissant-pack@1",
+          "name": "cafe-plate-1",
+          "in": {
+            "parent": "int-cafe/cafe-table-1",
+            "slot": "top"
+          },
+          "p": [
+            0.15,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/cup-of-coffee-pack@1",
+          "name": "cafe-cup-2",
+          "in": {
+            "parent": "int-cafe/cafe-table-2",
+            "slot": "top"
+          },
+          "p": [
+            0.1,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/candle@1",
+          "name": "cafe-candle-2",
+          "in": {
+            "parent": "int-cafe/cafe-table-2",
+            "slot": "top"
+          },
+          "p": [
+            -0.1,
+            0,
+            -0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/kettle@1",
+          "name": "cafe-kettle",
+          "in": {
+            "parent": "int-cafe/cafe-counter-1",
+            "slot": "top"
+          },
+          "p": [
+            -0.2,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/pie-pack@1",
+          "name": "cafe-pie-1",
+          "in": {
+            "parent": "int-cafe/cafe-counter-2",
+            "slot": "top"
+          },
+          "p": [
+            0.1,
+            0,
+            0.05
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/pie-pack@1",
+          "name": "cafe-pie-2",
+          "in": {
+            "parent": "int-cafe/cafe-counter-3",
+            "slot": "top"
+          },
+          "p": [
+            -0.15,
+            0,
+            0.05
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bread-loaf-pack@1",
+          "name": "cafe-bread",
+          "in": {
+            "parent": "int-cafe/cafe-counter-3",
+            "slot": "top"
+          },
+          "p": [
+            0.35,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
       "note": "courtyard planting 1",
       "group": "eden-2026",
       "ops": [
@@ -55825,158 +56555,6 @@
             22,
             -34
           ]
-        }
-      ]
-    },
-    {
-      "note": "scenery: library and cafe interiors",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "def": "core/rug@1",
-          "name": "library-reading-rug",
-          "p": [
-            -2.5,
-            0,
-            -0.6
-          ],
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "params": {
-            "border": "#7a2e24",
-            "field": "#b8503c"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/rug@1",
-          "name": "library-reading-rug-2",
-          "p": [
-            -3.4,
-            0,
-            1.8
-          ],
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "params": {
-            "border": "#7a2e24",
-            "field": "#b8503c"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/office-desk@1",
-          "name": "library-computer-desk",
-          "p": [
-            1.2,
-            0,
-            1.9
-          ],
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "r": 3.141592653589793
-        },
-        {
-          "op": "place",
-          "def": "core/bookcase@1",
-          "name": "library-reading-shelf-1",
-          "p": [
-            -4.6,
-            0,
-            -1.6
-          ],
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          },
-          "r": 1.5707963267948966
-        },
-        {
-          "op": "place",
-          "def": "core/potted-plant@1",
-          "name": "library-reading-plant",
-          "p": [
-            2.4,
-            0,
-            -1.8
-          ],
-          "in": {
-            "parent": "eden-library-1",
-            "slot": "reading"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/display-case@1",
-          "name": "cafe-cake-case",
-          "p": [
-            1.3,
-            0,
-            -1.2
-          ],
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "params": {
-            "g0": "#f3d9e4",
-            "g1": "#e9c46a",
-            "g2": "#c8553d"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/chalkboard@1",
-          "name": "cafe-menu-board",
-          "p": [
-            3.3,
-            0,
-            1.1
-          ],
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "r": -1.5707963267948966
-        },
-        {
-          "op": "place",
-          "def": "core/rug@1",
-          "name": "cafe-rug",
-          "p": [
-            -1.2,
-            0,
-            0.7
-          ],
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          },
-          "params": {
-            "border": "#2f4f4a",
-            "field": "#c79a5b"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/potted-plant@1",
-          "name": "cafe-plant",
-          "p": [
-            -3.6,
-            0,
-            1.55
-          ],
-          "in": {
-            "parent": "int-cafe",
-            "slot": "cafe"
-          }
         }
       ]
     },

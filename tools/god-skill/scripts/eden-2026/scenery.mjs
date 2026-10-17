@@ -103,16 +103,5 @@ group('scenery: avenue and commons trees', put => {
   for (let i = 0; i < 8; i++) put('tree', `south-avenue-tree-${i + 1}`, [-28 + i * 8, 92.5], {});
   for (const [i, x, z] of [[1, -34, -26], [2, -34, -12], [3, -34, 14], [4, -34, 28], [5, -26, 34], [6, -12, 34], [7, 14, 34], [8, -20, -34], [9, -4, -34], [10, 22, -34]]) put('tree', `commons-edge-tree-${i}`, [x, z], {});
 });
-group('scenery: library and cafe interiors', put => {
-  for (const [name, p] of [['library-reading-rug', [-2.5, 0, -0.6]], ['library-reading-rug-2', [-3.4, 0, 1.8]]]) put('rug', name, p, { in: { parent: 'eden-library-1', slot: 'reading' }, params: { border: '#7a2e24', field: '#b8503c' } });
-  put('office-desk', 'library-computer-desk', [1.2, 0, 1.9], { in: { parent: 'eden-library-1', slot: 'reading' }, r: Math.PI });
-  put('bookcase', 'library-reading-shelf-1', [-4.6, 0, -1.6], { in: { parent: 'eden-library-1', slot: 'reading' }, r: Math.PI / 2 });
-  put('potted-plant', 'library-reading-plant', [2.4, 0, -1.8], { in: { parent: 'eden-library-1', slot: 'reading' } });
-  // cafe (int-cafe, room 8 x 3.8 m): cakes under glass, a menu board, a rug under the tables, a plant
-  const cafe = { in: { parent: 'int-cafe', slot: 'cafe' } };
-  put('display-case', 'cafe-cake-case', [1.3, 0, -1.2], { ...cafe, params: { g0: '#f3d9e4', g1: '#e9c46a', g2: '#c8553d' } });
-  put('chalkboard', 'cafe-menu-board', [3.3, 0, 1.1], { ...cafe, r: -Math.PI / 2 });
-  put('rug', 'cafe-rug', [-1.2, 0, 0.7], { ...cafe, params: { border: '#2f4f4a', field: '#c79a5b' } });
-  put('potted-plant', 'cafe-plant', [-3.6, 0, 1.55], cafe);
-});
+// (library and café interiors: interiors.mjs)
 export const SCENERY_BATCHES = groups;

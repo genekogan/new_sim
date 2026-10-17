@@ -4,6 +4,7 @@
 // hill-village,suburb,cliff-village,resort-lake,abbey-yard,alpine}.ts and
 // eden-interiors/buildings.ts. Import only; the template owner applies/furnishes.
 import { readFileSync } from 'node:fs';
+import { oneRoom } from './interiors.mjs';
 
 const source = (path) => JSON.parse(readFileSync(new URL(`../../../../${path}`, import.meta.url), 'utf8'));
 const places = source('worlds/eden/places.v1.json').places;
@@ -132,7 +133,7 @@ for (const [i, x, z, w, r] of [[1, -116, 60, 16, 0], [2, -136, 60, 14, 0], [3, -
 courtyard('region-abbey.cloister', center('region-abbey.cloister'), 18, 16, { material: 'stone', wall: '#d8c9a8', roof: '#a8553a', trim: '#efe9dc' }, { floors: 2 });
 
 // Close-up east-side public quarter, with room ids matching furnish recipes.
-named('eden-library-1', 'hall', { w: 10.4, d: 8.4, floorHeight: 3.3, material: 'brick', wall: '#dfc9a3', roof: 'gable', roofColor: '#63716c', plan: twoRooms(10.4, 8.4, 'reading', 'stacks') }, { furnishStyle: 'library' });
+named('eden-library-1', 'hall', { w: 10.4, d: 8.4, floorHeight: 3.3, material: 'brick', wall: '#dfc9a3', roof: 'gable', roofColor: '#63716c', plan: oneRoom(10.4, 8.4, 'reading') }, { furnishStyle: null }); // furnished piece by piece like old Eden (interiors.mjs)
 named('eden-office-1', 'hall', { w: 12, d: 8, floors: 3, floorHeight: 3, material: 'plaster', wall: '#d6d9d8', roof: 'flat', trim: '#52636a', plan: { floors: [
   { rooms: [room('reception', [0, 0, 12, 8])], exterior: [{ room: 'reception', wall: 's', kind: 'door', width: 1.6 }] },
   { rooms: [room('office', [0, 0, 12, 8])] }, { rooms: [room('meeting', [0, 0, 12, 8])] },
@@ -149,7 +150,7 @@ for (const [id, x, z, w, d, r, wall, roof, trim, front, back, style] of [
   ['int-clinic', 64.5, -8.5, 4.4, 5.4, 0, '#e8eef0', '#5d6b73', '#3f8a6a', 'ward', null, 'hospital'],
   ['int-bathhouse', 83.5, -10.5, 4.4, 5.4, 0, '#cfe3e6', '#6e7c86', '#2f6f8a', 'bath', null, 'cottage'],
   ['int-potting-shed', 44, 82.5, 4.4, 4.4, Math.PI, '#7f8f5a', '#8a5a3c', '#e9e2cf', 'workshop', null, 'garage'],
-]) add(id, 'hall', [x, z], { w, d, floorHeight: 3, wall, roofColor: roof, trim, roof: 'gable', plan: back ? twoRooms(w, d, front, back) : openPlan(w, d, front) }, { r, furnishStyle: style });
+]) add(id, 'hall', [x, z], { w, d, floorHeight: 3, wall, roofColor: roof, trim, roof: 'gable', plan: id === 'int-cafe' ? oneRoom(w, d, 'cafe') : back ? twoRooms(w, d, front, back) : openPlan(w, d, front) }, { r, furnishStyle: id === 'int-cafe' ? null : style }); // café furnished piece by piece (interiors.mjs)
 
 // Named buildings and major skyline landmarks. Enterable counterparts use
 // building/1; windmills retain the existing animated sail kit as in old Eden.

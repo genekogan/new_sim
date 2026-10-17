@@ -33,8 +33,8 @@ const FLOWERS = ['#d9485f', '#f1c84b', '#e86aa8', '#f4f1e8', '#9b6fd1', '#ff8a3d
 const LEAVES = ['#3f6e33', '#4c7f3c', '#355f2b', '#5a8a3f', '#2f5428'];
 /** Interior wall paints (from eden-window-interiors' room shader) by room kind, seeded otherwise. */
 const PAINTS = ['#eddbb8', '#f2c7a8', '#bdd1ad', '#b3c7e0', '#f5eddb'];
-const ROOM_PAINT: Record<string, string> = { kitchen: '#f3e6c4', bath: '#dfe9ea', bedroom: '#c9d6e6', living: '#efdcc0', hall: '#efe6d4', landing: '#ece4d2', shop: '#f2ead8', nave: '#ece7dc', barn: '#c9a982', loft: '#c9a982', greenhouse: '#eef4ee' };
-const FLOOR_FINISH: Record<string, string> = { kitchen: '#c79e7a', bath: '#d9dcd6', shop: '#b88d60', barn: '#a08060', loft: '#b08b5a', greenhouse: '#9e968a', entrance: '#b9b3a6', nave: '#c8bfae', pavilion: '#a77c52' };
+const ROOM_PAINT: Record<string, string> = { kitchen: '#f3e6c4', bath: '#dfe9ea', bedroom: '#c9d6e6', living: '#efdcc0', hall: '#efe6d4', landing: '#ece4d2', shop: '#f2ead8', nave: '#ece7dc', barn: '#c9a982', loft: '#c9a982', greenhouse: '#eef4ee', reading: '#e4d6b8', stacks: '#e4d6b8', cafe: '#f3ead9' };
+const FLOOR_FINISH: Record<string, string> = { kitchen: '#c79e7a', bath: '#d9dcd6', shop: '#b88d60', barn: '#a08060', loft: '#b08b5a', greenhouse: '#9e968a', entrance: '#b9b3a6', nave: '#c8bfae', pavilion: '#a77c52', reading: '#c4a37c', stacks: '#c4a37c', cafe: '#b98d62' };
 
 const templates = new Map<string, THREE.Group>();
 const ORNAMENTS = new Set(['chimney', 'shutters', 'flowerBoxes', 'quoins', 'hood', 'doorLamp']);
