@@ -227,7 +227,7 @@ for (const [side, x, r] of [['west', 121, Math.PI / 2], ['east', 152, -Math.PI /
   let i = 0;
   for (const [a, b] of [[-30, 0], [4, 27], [31, 53]]) for (let z = a; z + 5.3 <= b; z += 5.7) {
     const rr = rng(9101 + ++i * 37 + (side === 'east' ? 700 : 0));
-    add(`canal-${side}-home-${i}`, 'townhouse', [x, z + 2.65], { w: 5.2, d: 8.2, floors: 2 + Math.floor(rr() * 2), floorHeight: 2.9, wall: pick(rr, PLASTER), roof: pick(rr, ['gable', 'hip', 'flat']), roofColor: pick(rr, ROOFS), trim: '#e9dfcc', windows: 0.65 }, { r, district: 'region-canal-quarter', originalPlaceId: `region-canal-quarter.${side}-row`, furnishStyle: 'shop', avoidOverlap: true });
+    add(`canal-${side}-home-${i}`, 'townhouse', [x, z + 2.65], { w: 5.2, d: 8.2, floors: 3 + Math.floor(rr() * 2), floorHeight: 2.9, wall: pick(rr, PLASTER), roof: pick(rr, ['gable', 'hip', 'flat']), roofColor: pick(rr, ROOFS), trim: '#e9dfcc', windows: 0.65 }, { r, district: 'region-canal-quarter', originalPlaceId: `region-canal-quarter.${side}-row`, furnishStyle: 'shop', avoidOverlap: true });
   }
 }
 for (let i = 0; i < 9; i++) add(`market-street-shop-${i + 1}`, 'shop', [113.1 + i * 6.3, 105.5], { w: 5.7, d: 8, floors: 2 + (i % 3 === 0 ? 1 : 0), material: 'plaster', wall: PLASTER[(i * 3) % PLASTER.length], roof: ['gable', 'hip', 'flat'][i % 3], roofColor: ROOFS[i % ROOFS.length], trim: ['#2f4f5f', '#7a2f2a', '#355e3b'][i % 3] }, { r: Math.PI, district: 'region-old-town', originalPlaceId: 'region-old-town.shops', furnishStyle: 'shop', avoidOverlap: true });

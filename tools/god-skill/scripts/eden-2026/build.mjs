@@ -50,6 +50,14 @@ for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
 for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
 for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
+// V3: old Eden's town roofs were gardens too: planters (and on bigger roofs a bench or a parasol table) on the flat roofs
+// of the canal, old-town, seaside and cliff houses; deterministic by name, optional (droppable)
+{const roofOps=[];let k=0;for(const b of BUILDING_BATCHES)for(const op of b.ops){const pr=op.params??{};if(op.op!=='place'||pr.roof!=='flat'||!/^(canal-|market-street-|old-town-|seafront-hotel-|cliff-house-)/.test(op.name??''))continue;
+  const w=Number(pr.w??6),d=Number(pr.d??6),h=[...op.name].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);if(h%3===2)continue;
+  roofOps.push({op:'place',def:'core/planter-box@1',name:`${op.name}-roof-planter`.slice(0,48),in:{parent:op.name,slot:'roof'},p:[+(-w/2+1.1).toFixed(2),0,+(d/2-0.8).toFixed(2)]});
+  if(w>=5&&d>=6)roofOps.push({op:'place',def:h%2?'core/bench@1':'core/flower-pot@1',name:`${op.name}-roof-${h%2?'bench':'pot'}`.slice(0,48),in:{parent:op.name,slot:'roof'},p:[+(w/2-1.2).toFixed(2),0,+(-d/2+0.9).toFixed(2)]});
+  if(w>=10&&d>=8)roofOps.push({op:'place',def:'core/parasol-table@1',name:`${op.name}-roof-parasol`.slice(0,48),in:{parent:op.name,slot:'roof'},p:[0,0,0]});k++;}
+ for(let i=0;i<roofOps.length;i+=14)apply(`town roof gardens ${i/14+1}`,roofOps.slice(i,i+14),'any');}
 const courtOps=[];for(const c of COURTYARDS){courtOps.push({op:'place',def:'core/flower-pot@1',name:`${c.name}-court-pot`.slice(0,48),p:[c.coords[0]+.7,c.coords[1]-.7]});if(c.court.w>=4) courtOps.push({op:'place',def:'core/round-table@1',name:`${c.name}-court-table`.slice(0,48),p:c.coords});}
 for(let i=0;i<courtOps.length;i+=10)apply(`courtyard planting ${i/10+1}`,courtOps.slice(i,i+10));
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='detail'))apply(b.name,b.ops);

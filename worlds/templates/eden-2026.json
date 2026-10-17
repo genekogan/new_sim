@@ -6067,7 +6067,7 @@
             "roofColor": "#6f7f5a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6088,7 +6088,7 @@
             "roofColor": "#5d4a3f",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6109,7 +6109,7 @@
             "roofColor": "#a8553a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6130,7 +6130,7 @@
             "roofColor": "#4f5d6b",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6151,7 +6151,7 @@
             "roofColor": "#3f4448",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6172,7 +6172,7 @@
             "roofColor": "#4f5d6b",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6193,7 +6193,7 @@
             "roofColor": "#8a3a2a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6214,7 +6214,7 @@
             "roofColor": "#b86a45",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6241,7 +6241,7 @@
             "roofColor": "#8a3a2a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6262,7 +6262,7 @@
             "roofColor": "#8a3a2a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6283,7 +6283,7 @@
             "roofColor": "#3f4448",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6304,7 +6304,7 @@
             "roofColor": "#3f4448",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6325,7 +6325,7 @@
             "roofColor": "#4f5d6b",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6346,7 +6346,7 @@
             "roofColor": "#3f4448",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6367,7 +6367,7 @@
             "roofColor": "#a8553a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6388,7 +6388,7 @@
             "roofColor": "#8a3a2a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6415,7 +6415,7 @@
             "roofColor": "#a8553a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6436,7 +6436,7 @@
             "roofColor": "#4f5d6b",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "flat",
             "windows": 0.65
@@ -6457,7 +6457,7 @@
             "roofColor": "#5d4a3f",
             "w": 5.2,
             "d": 8.2,
-            "floors": 3,
+            "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6478,7 +6478,7 @@
             "roofColor": "#a8553a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6499,7 +6499,7 @@
             "roofColor": "#9c6b4a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6520,7 +6520,7 @@
             "roofColor": "#9c6b4a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -6541,7 +6541,7 @@
             "roofColor": "#3f4448",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
             "windows": 0.65
@@ -6562,7 +6562,7 @@
             "roofColor": "#6f7f5a",
             "w": 5.2,
             "d": 8.2,
-            "floors": 2,
+            "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
             "windows": 0.65
@@ -22432,7 +22432,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -22448,7 +22448,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -22480,7 +22480,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -22489,22 +22489,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-west-home-1",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -22520,7 +22504,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -22528,24 +22512,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -22561,7 +22545,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -22569,15 +22553,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -22585,15 +22569,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -22601,7 +22585,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -22609,23 +22593,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-west-home-1",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -22641,6 +22609,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -22649,7 +22649,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -22681,11 +22681,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-west-home-1",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -23085,6 +23213,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-2",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -23484,6 +23756,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-3",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -23883,6 +24299,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-4",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -24282,6 +24842,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-5",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -24681,6 +25385,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -25080,6 +25928,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -25097,7 +26089,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -25113,7 +26105,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -25145,7 +26137,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -25154,22 +26146,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-west-home-8",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -25185,7 +26161,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -25193,24 +26169,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -25226,7 +26202,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -25234,15 +26210,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -25250,15 +26226,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -25266,7 +26242,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -25274,23 +26250,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-west-home-8",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -25306,6 +26266,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -25314,7 +26306,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -25346,11 +26338,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-west-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -25750,6 +26870,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-west-home-9",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -25767,7 +27031,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -25783,7 +27047,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -25815,7 +27079,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -25824,22 +27088,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-west-home-10",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -25855,7 +27103,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -25863,24 +27111,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -25896,7 +27144,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -25904,15 +27152,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -25920,15 +27168,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -25936,7 +27184,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -25944,23 +27192,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-west-home-10",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -25976,6 +27208,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -25984,7 +27248,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -26016,11 +27280,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-west-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -26038,7 +27430,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -26054,7 +27446,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -26086,7 +27478,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -26095,22 +27487,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-west-home-11",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -26126,7 +27502,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -26134,24 +27510,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -26167,7 +27543,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -26175,15 +27551,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -26191,15 +27567,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -26207,7 +27583,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -26215,23 +27591,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-west-home-11",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -26247,6 +27607,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -26255,7 +27647,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -26287,11 +27679,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-west-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -26309,7 +27829,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -26325,7 +27845,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -26357,7 +27877,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -26366,22 +27886,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-west-home-12",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -26397,7 +27901,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -26405,24 +27909,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -26438,7 +27942,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -26446,15 +27950,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -26462,15 +27966,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -26478,7 +27982,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -26486,23 +27990,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-west-home-12",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -26518,6 +28006,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -26526,7 +28046,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -26558,11 +28078,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-west-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -26962,6 +28610,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-east-home-1",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -26979,7 +28771,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -26995,7 +28787,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -27027,7 +28819,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -27036,22 +28828,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-2",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -27067,7 +28843,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -27075,24 +28851,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -27108,7 +28884,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -27116,15 +28892,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -27132,15 +28908,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -27148,7 +28924,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -27156,23 +28932,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-2",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -27188,6 +28948,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -27196,7 +28988,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -27228,11 +29020,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -27250,7 +29170,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -27266,7 +29186,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -27298,7 +29218,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -27307,22 +29227,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-3",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -27338,7 +29242,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -27346,24 +29250,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -27379,7 +29283,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -27387,15 +29291,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -27403,15 +29307,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -27419,7 +29323,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -27427,23 +29331,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-3",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -27459,6 +29347,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -27467,7 +29387,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -27499,11 +29419,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-3",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -27521,7 +29569,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -27537,7 +29585,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -27569,7 +29617,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -27578,22 +29626,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-4",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -27609,7 +29641,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -27617,24 +29649,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -27650,7 +29682,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -27658,15 +29690,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -27674,15 +29706,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -27690,7 +29722,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -27698,23 +29730,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-4",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -27730,6 +29746,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -27738,7 +29786,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -27770,11 +29818,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-4",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -27792,7 +29968,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -27808,7 +29984,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -27840,7 +30016,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -27849,22 +30025,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-5",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -27880,7 +30040,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -27888,24 +30048,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -27921,7 +30081,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -27929,15 +30089,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -27945,15 +30105,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -27961,7 +30121,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -27969,23 +30129,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-5",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -28001,6 +30145,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -28009,7 +30185,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -28041,11 +30217,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-5",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -28445,6 +30749,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -28844,6 +31292,150 @@
             -1.036
           ],
           "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f25",
+          "def": "core/floor-lamp@1",
+          "name": "landing-3-lamp",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "landing-3"
+          },
+          "p": [
+            0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f26",
+          "def": "core/rug@1",
+          "name": "bedroom-4-rug",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f27",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-4-wardrobe",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f28",
+          "def": "core/dresser@1",
+          "name": "bedroom-4-dresser",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f29",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-4-lamp",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-4"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f30",
+          "def": "core/rug@1",
+          "name": "bedroom-5-rug",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f31",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-5-wardrobe",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f32",
+          "def": "core/dresser@1",
+          "name": "bedroom-5-dresser",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.97
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f33",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-5-lamp",
+          "in": {
+            "parent": "canal-east-home-7",
+            "slot": "bedroom-5"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
         }
       ]
     },
@@ -28861,7 +31453,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -28877,7 +31469,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -28909,7 +31501,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -28918,22 +31510,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-8",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -28949,7 +31525,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -28957,24 +31533,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -28990,7 +31566,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -28998,15 +31574,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -29014,15 +31590,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -29030,7 +31606,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -29038,23 +31614,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-8",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -29070,6 +31630,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -29078,7 +31670,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -29110,11 +31702,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-8",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -29132,7 +31852,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -29148,7 +31868,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -29180,7 +31900,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -29189,22 +31909,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-9",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -29220,7 +31924,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -29228,24 +31932,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -29261,7 +31965,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -29269,15 +31973,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -29285,15 +31989,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -29301,7 +32005,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -29309,23 +32013,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-9",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -29341,6 +32029,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -29349,7 +32069,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -29381,11 +32101,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-9",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -29403,7 +32251,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -29419,7 +32267,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -29451,7 +32299,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -29460,22 +32308,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-10",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -29491,7 +32323,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -29499,24 +32331,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -29532,7 +32364,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -29540,15 +32372,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -29556,15 +32388,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -29572,7 +32404,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -29580,23 +32412,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-10",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -29612,6 +32428,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -29620,7 +32468,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -29652,11 +32500,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-10",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -29674,7 +32650,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -29690,7 +32666,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -29722,7 +32698,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -29731,22 +32707,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-11",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -29762,7 +32722,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -29770,24 +32730,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -29803,7 +32763,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -29811,15 +32771,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -29827,15 +32787,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -29843,7 +32803,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -29851,23 +32811,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-11",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -29883,6 +32827,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -29891,7 +32867,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -29923,11 +32899,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-11",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -29945,7 +33049,7 @@
             "slot": "hall"
           },
           "p": [
-            0.695,
+            1.01,
             0,
             0
           ],
@@ -29961,7 +33065,7 @@
             "slot": "hall"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             -3.62
           ],
@@ -29993,7 +33097,7 @@
             "slot": "parlour"
           },
           "p": [
-            0.95,
+            0.635,
             0,
             0
           ],
@@ -30002,22 +33106,6 @@
         {
           "op": "place",
           "tmp": "$f4",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "canal-east-home-12",
-            "slot": "parlour"
-          },
-          "p": [
-            -0.094,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
           "def": "core/workbench@1",
           "name": "kitchen-counter",
           "in": {
@@ -30033,7 +33121,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f6",
+          "tmp": "$f5",
           "def": "core/table@1",
           "name": "kitchen-table",
           "in": {
@@ -30041,24 +33129,24 @@
             "slot": "kitchen"
           },
           "p": [
+            0.138,
             0,
-            0,
-            0.297
+            0
           ],
-          "r": 0
+          "r": 1.571
         },
         {
           "op": "place",
           "def": "core/bowl@1",
           "name": "kitchen-bowl",
           "in": {
-            "parent": "$f6",
+            "parent": "$f5",
             "slot": "top"
           }
         },
         {
           "op": "place",
-          "tmp": "$f8",
+          "tmp": "$f7",
           "def": "core/chair@1",
           "name": "kitchen-chair-1",
           "in": {
@@ -30074,7 +33162,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f9",
+          "tmp": "$f8",
           "def": "core/chair@1",
           "name": "kitchen-chair-2",
           "in": {
@@ -30082,15 +33170,15 @@
             "slot": "kitchen"
           },
           "p": [
-            0.898,
             0,
-            0.33
+            0,
+            -0.831
           ],
-          "r": -1.571
+          "r": 0
         },
         {
           "op": "place",
-          "tmp": "$f10",
+          "tmp": "$f9",
           "def": "core/stool@1",
           "name": "kitchen-stool",
           "in": {
@@ -30098,15 +33186,15 @@
             "slot": "kitchen"
           },
           "p": [
-            -1.21,
+            -0.895,
             0,
-            -1.69
+            1.69
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
-          "tmp": "$f11",
+          "tmp": "$f10",
           "def": "core/floor-lamp@1",
           "name": "landing-lamp",
           "in": {
@@ -30114,7 +33202,7 @@
             "slot": "landing"
           },
           "p": [
-            -0.63,
+            -0.945,
             0,
             3.62
           ],
@@ -30122,23 +33210,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f12",
-          "def": "core/bed@1",
-          "name": "bedroom-bed",
-          "in": {
-            "parent": "canal-east-home-12",
-            "slot": "bedroom"
-          },
-          "p": [
-            0.36,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
+          "tmp": "$f11",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -30154,6 +33226,38 @@
         },
         {
           "op": "place",
+          "tmp": "$f12",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f13",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
           "tmp": "$f14",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
@@ -30162,7 +33266,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.17,
+            -0.855,
             0,
             -1.65
           ],
@@ -30194,11 +33298,139 @@
             "slot": "bath"
           },
           "p": [
-            -1.21,
+            0.895,
             0,
             -1.69
           ],
           "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f17",
+          "def": "core/floor-lamp@1",
+          "name": "landing-2-lamp",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "landing-2"
+          },
+          "p": [
+            -0.945,
+            0,
+            -3.62
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f18",
+          "def": "core/rug@1",
+          "name": "bedroom-2-rug",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f19",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-2-wardrobe",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.756,
+            0,
+            1.036
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f20",
+          "def": "core/dresser@1",
+          "name": "bedroom-2-dresser",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            0.823,
+            0,
+            -0.969
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f21",
+          "def": "core/floor-lamp@1",
+          "name": "bedroom-2-lamp",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-2"
+          },
+          "p": [
+            -0.855,
+            0,
+            -1.65
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f22",
+          "def": "core/bed@1",
+          "name": "bedroom-3-bed",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0.84
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
+          "def": "core/rug@1",
+          "name": "bedroom-3-rug",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f24",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-3-wardrobe",
+          "in": {
+            "parent": "canal-east-home-12",
+            "slot": "bedroom-3"
+          },
+          "p": [
+            0.756,
+            0,
+            -1.036
+          ],
+          "r": -1.571
         }
       ]
     },
@@ -51302,6 +54534,514 @@
       ]
     },
     {
+      "note": "town roof gardens 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "canal-west-home-6-roof-planter",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "roof"
+          },
+          "p": [
+            -1.5,
+            0,
+            3.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "canal-west-home-6-roof-bench",
+          "in": {
+            "parent": "canal-west-home-6",
+            "slot": "roof"
+          },
+          "p": [
+            1.4,
+            0,
+            -3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "canal-east-home-2-roof-planter",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "roof"
+          },
+          "p": [
+            -1.5,
+            0,
+            3.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "canal-east-home-2-roof-bench",
+          "in": {
+            "parent": "canal-east-home-2",
+            "slot": "roof"
+          },
+          "p": [
+            1.4,
+            0,
+            -3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "canal-east-home-6-roof-planter",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "roof"
+          },
+          "p": [
+            -1.5,
+            0,
+            3.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "canal-east-home-6-roof-bench",
+          "in": {
+            "parent": "canal-east-home-6",
+            "slot": "roof"
+          },
+          "p": [
+            1.4,
+            0,
+            -3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "market-street-shop-3-roof-planter",
+          "in": {
+            "parent": "market-street-shop-3",
+            "slot": "roof"
+          },
+          "p": [
+            -1.75,
+            0,
+            3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "market-street-shop-3-roof-pot",
+          "in": {
+            "parent": "market-street-shop-3",
+            "slot": "roof"
+          },
+          "p": [
+            1.65,
+            0,
+            -3.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "market-street-shop-6-roof-planter",
+          "in": {
+            "parent": "market-street-shop-6",
+            "slot": "roof"
+          },
+          "p": [
+            -1.75,
+            0,
+            3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "market-street-shop-6-roof-bench",
+          "in": {
+            "parent": "market-street-shop-6",
+            "slot": "roof"
+          },
+          "p": [
+            1.65,
+            0,
+            -3.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "market-street-shop-9-roof-planter",
+          "in": {
+            "parent": "market-street-shop-9",
+            "slot": "roof"
+          },
+          "p": [
+            -1.75,
+            0,
+            3.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "market-street-shop-9-roof-pot",
+          "in": {
+            "parent": "market-street-shop-9",
+            "slot": "roof"
+          },
+          "p": [
+            1.65,
+            0,
+            -3.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "seafront-hotel-1-roof-planter",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "roof"
+          },
+          "p": [
+            -5.15,
+            0,
+            4.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "seafront-hotel-1-roof-pot",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "roof"
+          },
+          "p": [
+            5.05,
+            0,
+            -4.1
+          ]
+        }
+      ]
+    },
+    {
+      "note": "town roof gardens 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "seafront-hotel-1-roof-parasol",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "seafront-hotel-2-roof-planter",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "roof"
+          },
+          "p": [
+            -5.15,
+            0,
+            4.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "seafront-hotel-2-roof-bench",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "roof"
+          },
+          "p": [
+            5.05,
+            0,
+            -4.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "seafront-hotel-2-roof-parasol",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "seafront-hotel-4-roof-planter",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "roof"
+          },
+          "p": [
+            -5.15,
+            0,
+            4.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "seafront-hotel-4-roof-bench",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "roof"
+          },
+          "p": [
+            5.05,
+            0,
+            -4.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "seafront-hotel-4-roof-parasol",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-2-roof-planter",
+          "in": {
+            "parent": "cliff-house-2",
+            "slot": "roof"
+          },
+          "p": [
+            -2.11,
+            0,
+            1.42
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-4-roof-planter",
+          "in": {
+            "parent": "cliff-house-4",
+            "slot": "roof"
+          },
+          "p": [
+            -1.2,
+            0,
+            1.78
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-5-roof-planter",
+          "in": {
+            "parent": "cliff-house-5",
+            "slot": "roof"
+          },
+          "p": [
+            -1.47,
+            0,
+            1.42
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-7-roof-planter",
+          "in": {
+            "parent": "cliff-house-7",
+            "slot": "roof"
+          },
+          "p": [
+            -1.16,
+            0,
+            1.21
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-8-roof-planter",
+          "in": {
+            "parent": "cliff-house-8",
+            "slot": "roof"
+          },
+          "p": [
+            -1.43,
+            0,
+            1.58
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-12-roof-planter",
+          "in": {
+            "parent": "cliff-house-12",
+            "slot": "roof"
+          },
+          "p": [
+            -1.54,
+            0,
+            1.49
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-13-roof-planter",
+          "in": {
+            "parent": "cliff-house-13",
+            "slot": "roof"
+          },
+          "p": [
+            -1.84,
+            0,
+            1.78
+          ]
+        }
+      ]
+    },
+    {
+      "note": "town roof gardens 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-15-roof-planter",
+          "in": {
+            "parent": "cliff-house-15",
+            "slot": "roof"
+          },
+          "p": [
+            -2.11,
+            0,
+            1.26
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-18-roof-planter",
+          "in": {
+            "parent": "cliff-house-18",
+            "slot": "roof"
+          },
+          "p": [
+            -1.73,
+            0,
+            1.32
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-19-roof-planter",
+          "in": {
+            "parent": "cliff-house-19",
+            "slot": "roof"
+          },
+          "p": [
+            -1.39,
+            0,
+            1.75
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-21-roof-planter",
+          "in": {
+            "parent": "cliff-house-21",
+            "slot": "roof"
+          },
+          "p": [
+            -1.71,
+            0,
+            1.73
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-24-roof-planter",
+          "in": {
+            "parent": "cliff-house-24",
+            "slot": "roof"
+          },
+          "p": [
+            -1.89,
+            0,
+            1.72
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-25-roof-planter",
+          "in": {
+            "parent": "cliff-house-25",
+            "slot": "roof"
+          },
+          "p": [
+            -1.73,
+            0,
+            1.55
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "cliff-house-27-roof-planter",
+          "in": {
+            "parent": "cliff-house-27",
+            "slot": "roof"
+          },
+          "p": [
+            -1.85,
+            0,
+            1.22
+          ]
+        }
+      ]
+    },
+    {
       "note": "courtyard planting 1",
       "group": "eden-2026",
       "ops": [
@@ -60826,8 +64566,7 @@
             145.7,
             43.2
           ],
-          "s": 0.53,
-          "r": 3.142
+          "s": 0.53
         },
         {
           "op": "place",
@@ -60848,16 +64587,6 @@
             12.5
           ],
           "s": 0.55
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-131",
-          "p": [
-            117.79,
-            17.41
-          ],
-          "s": 0.66
         },
         {
           "op": "place",
