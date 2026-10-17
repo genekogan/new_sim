@@ -33,7 +33,7 @@ ENV=${RB_ENV:-<team>/pm-integration/auth-account-20261009/clerk-publication-type
 E2=${RB_E2:-root@eden2}; RDATA=${RB_RDATA:-/srv/sim-worlds-data/legacy}; RBIN=${RB_RBIN:-/srv/sim-worlds/legacy/tools/world-launcher/deploy/old-worlds}
 CADDY=${RB_CADDY:-/etc/caddy/sites/sim.caddy}
 CVALIDATE=${RB_CADDY_VALIDATE:-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile}; CRELOAD=${RB_CADDY_RELOAD:-systemctl reload caddy}
-UNITS=${RB_UNITS-sim-worlds@legacy}
+UNITS=${RB_UNITS-sim-worlds@legacy sim-worlds-backup@legacy.timer}
 ACC=${RB_ACC:-<team>/runtime/production-accounts/accounts.sqlite}; PROD_DESC=$H/rollback/descriptors-1080cfa9; DESC=${RB_DESC:-$PROD_DESC}
 LPORTS=${RB_LPORTS:-eden:4950,mars:4963,littlemartians:4964}; HUNG_WAIT=${RB_HUNG_WAIT:-120}; PUBLIC=${RB_PUBLIC:-1}
 LOGD=${RB_LOG_DIR:-$H/logs}; LOG=$LOGD/rollback-$NOW.log; TEST=${RB_LAPTOP_ROOT:-}

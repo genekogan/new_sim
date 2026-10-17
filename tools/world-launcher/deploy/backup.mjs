@@ -25,6 +25,8 @@ async function copyDb(src, dest) {
 }
 
 await copyDb(join(dataDir, 'accounts.sqlite'), join(out, 'accounts.sqlite'));
+// the old worlds' own account registry (forks: /worlds/w/<key>, and the legacy stage's original worlds)
+await copyDb(join(dataDir, 'forks', 'accounts.sqlite'), join(out, 'forks-accounts.sqlite'));
 if (existsSync(join(dataDir, 'worlds.json'))) { copyFileSync(join(dataDir, 'worlds.json'), join(out, 'worlds.json')); ok++; }
 const worldsDir = join(dataDir, 'worlds');
 for (const slug of existsSync(worldsDir) ? readdirSync(worldsDir) : []) await copyDb(join(worldsDir, slug, 'sim.db'), join(out, 'worlds', `${slug}.db`));

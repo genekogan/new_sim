@@ -111,5 +111,5 @@ CLI_SHA=$(ssh $E2 "sha256sum $REL/tools/world-launcher/soul/eden-agent.mjs" | cu
 [ "$(curl -s https://sim.eden.art/eden-agent.mjs | shasum -a 256 | cut -d' ' -f1)" = "$CLI_SHA" ] && say "public CLI ${CLI_SHA:0:8} ok (this release's)" || say "WARN: public CLI sha differs from $BUILD's"
 
 # 7. persist across reboots
-ssh $E2 "systemctl enable $LUNIT 2>&1 | tail -1"
+ssh $E2 "systemctl enable $LUNIT 2>&1 | tail -1; systemctl enable --now sim-worlds-backup@legacy.timer 2>&1 | tail -1"   # nightly 03:30 UTC copies
 say "CUTOVER DONE ($BUILD). Laptop writers stopped (data intact), laptop proxy + tunnel untouched. Walk each world dpr 1/2 now. Rollback: bash $H/bin/rollback.sh $TS"
