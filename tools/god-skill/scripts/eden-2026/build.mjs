@@ -52,7 +52,19 @@ apply('world state',[{op:'world',state:genesis.state}]);
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='terrain'))apply(b.name,b.ops);
 apply('commons sleeping mat definition',COMMONS_DEFS);
 apply('interior defs',INTERIOR_DEFS);
-for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:op));
+// L4a (L1's door survey, team/scratch/d1-eden/door-survey2.mjs: 36 of 238 buildings could not be walked into): ~25 houses on
+// the hill, cliff and alpine slopes faced their door into the cut of their own foundation terrace (3-5 m of bank right
+// outside). They turn by quarter turns so the door looks along the slope; each turn below was chosen by re-running the
+// survey (a turn that broke a reachable house was taken back). DOOR_TURNS_JSON overrides the table for experiments.
+const DOOR_TURNS=process.env.DOOR_TURNS_JSON?JSON.parse(process.env.DOOR_TURNS_JSON):{'region-observatory-dome':1,
+ 'alpine-chalet-1':1,'alpine-chalet-2':1,'alpine-chalet-3':1,'alpine-chalet-4':1,'alpine-chalet-5':1,'alpine-chalet-6':1,'alpine-chalet-7':1,
+ 'cliff-house-7':1,'cliff-house-11':-1,'cliff-house-12':1,'cliff-house-14':1,'cliff-house-18':-1,'cliff-house-19':1,'cliff-house-20':1,
+ 'hillside-home-4':1,'hillside-home-5':1,'hillside-home-7':1,'hillside-home-9':1,'hillside-home-10':1,'hillside-home-11':-1,'hillside-home-12':1,
+ 'hillside-home-13':2,'hillside-home-14':-1,'hillside-home-15':1,'hillside-home-16':1};
+const doorTurn=op=>{const q=op.op==='place'?DOOR_TURNS[op.name]:0;if(!q)return op;const r=+((op.r??0)+q*Math.PI/2).toFixed(3);doorTurns.push({name:op.name,from:op.r??0,to:r});return{...op,r};};
+const doorTurns=[];
+for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:doorTurn(op)));
+console.log('door turns',doorTurns.length,JSON.stringify(doorTurns));
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
 for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}

@@ -1807,20 +1807,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -1869,20 +1855,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2072,20 +2044,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2134,20 +2092,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2343,20 +2287,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2405,20 +2335,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2624,20 +2540,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2692,20 +2594,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2888,20 +2776,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2950,20 +2824,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3109,7 +2969,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3157,20 +3017,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3221,20 +3067,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3382,7 +3214,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3425,20 +3257,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3490,20 +3308,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3651,7 +3455,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3700,20 +3504,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3765,20 +3555,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3924,7 +3700,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3966,20 +3742,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -4030,20 +3792,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -5682,7 +5430,8 @@
             "roof": "dome",
             "material": "stone",
             "windows": 0.6
-          }
+          },
+          "r": 1.571
         }
       ]
     },
@@ -6288,7 +6037,7 @@
                   "to": 1,
                   "room": "classroom",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -6367,7 +6116,7 @@
                   "to": 1,
                   "room": "classroom",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -8839,7 +8588,7 @@
             -40,
             -236
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -8862,7 +8611,7 @@
             -28,
             -246
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#8a5a36",
             "trim": "#f3eee2",
@@ -8885,7 +8634,7 @@
             -46,
             -252
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#6e4a30",
             "trim": "#f3eee2",
@@ -8908,7 +8657,7 @@
             -20,
             -232
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -8931,7 +8680,7 @@
             -34,
             -262
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#8a5a36",
             "trim": "#f3eee2",
@@ -8954,7 +8703,7 @@
             20,
             -238
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#6e4a30",
             "trim": "#f3eee2",
@@ -8977,7 +8726,7 @@
             30,
             -250
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -9276,7 +9025,8 @@
             "roof": "flat",
             "windows": 0.5,
             "balcony": true
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9298,7 +9048,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9341,7 +9091,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": -1.571
         },
         {
           "op": "place",
@@ -9362,7 +9112,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         }
       ]
     },
@@ -9410,7 +9161,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9473,7 +9225,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": -1.571
         },
         {
           "op": "place",
@@ -9495,7 +9248,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9516,7 +9269,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9707,7 +9461,7 @@
             200.693,
             0.683
           ],
-          "r": 2.246,
+          "r": 3.817,
           "params": {
             "wall": "#f0d9a8",
             "trim": "#efe9dc",
@@ -9727,7 +9481,7 @@
             200.51,
             18.609
           ],
-          "r": 2.744,
+          "r": 4.315,
           "params": {
             "wall": "#efe9dc",
             "trim": "#2f4f5f",
@@ -9747,7 +9501,7 @@
             219.41,
             9.89
           ],
-          "r": 2.976,
+          "r": 4.547,
           "params": {
             "wall": "#cf8b6a",
             "trim": "#7a2f2a",
@@ -9788,7 +9542,7 @@
             231.049,
             9.115
           ],
-          "r": -2.678,
+          "r": -1.107,
           "params": {
             "wall": "#e8d8b8",
             "trim": "#efe9dc",
@@ -9808,7 +9562,7 @@
             231.411,
             21.566
           ],
-          "r": -2.762,
+          "r": -1.191,
           "params": {
             "wall": "#e6c86e",
             "trim": "#355e3b",
@@ -9828,7 +9582,7 @@
             240.212,
             -58.882
           ],
-          "r": -1.003,
+          "r": -2.574,
           "params": {
             "wall": "#b9cf8c",
             "trim": "#3d5a80",
@@ -9848,7 +9602,7 @@
             249.907,
             -49.157
           ],
-          "r": -0.702,
+          "r": 0.869,
           "params": {
             "wall": "#b9cf8c",
             "trim": "#2f4f5f",
@@ -9874,7 +9628,7 @@
             251.872,
             -38.08
           ],
-          "r": -0.927,
+          "r": 2.215,
           "params": {
             "wall": "#c7b6d6",
             "trim": "#7a2f2a",
@@ -9894,7 +9648,7 @@
             248.232,
             -19.634
           ],
-          "r": -1.607,
+          "r": -3.178,
           "params": {
             "wall": "#efe9dc",
             "trim": "#3d5a80",
@@ -9914,7 +9668,7 @@
             251.929,
             -1.584
           ],
-          "r": -1.914,
+          "r": -0.343,
           "params": {
             "wall": "#e8d8b8",
             "trim": "#efe9dc",
@@ -9935,7 +9689,7 @@
             248.984,
             11.077
           ],
-          "r": -2.476,
+          "r": -0.905,
           "params": {
             "wall": "#9db8c9",
             "trim": "#7a2f2a",
@@ -11536,6 +11290,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -11551,7 +11321,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -11559,7 +11361,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -11616,6 +11418,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -11746,11 +11564,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -6.342,
+            6.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -11819,7 +11637,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -6.56,
+            6.56,
             0,
             -1.16
           ],
@@ -11923,6 +11741,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -11938,7 +11772,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -11946,7 +11812,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -12003,6 +11869,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -12133,11 +12015,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -7.342,
+            7.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -12206,7 +12088,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -7.56,
+            7.56,
             0,
             -1.16
           ],
@@ -12310,6 +12192,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -12325,7 +12223,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -12333,7 +12263,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -12390,6 +12320,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -12520,11 +12466,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.342,
+            8.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -12593,7 +12539,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.56,
+            8.56,
             0,
             -1.16
           ],
@@ -12697,6 +12643,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -12712,7 +12674,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -12720,7 +12714,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -12777,6 +12771,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -12907,11 +12917,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.342,
+            8.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -12980,7 +12990,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.56,
+            8.56,
             0,
             -1.16
           ],
@@ -13084,6 +13094,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-abbey-cloister-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            0,
+            0,
+            -3.11
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -13099,7 +13125,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
           "def": "core/wardrobe@1",
           "name": "bedroom-wardrobe",
           "in": {
@@ -13115,7 +13141,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/dresser@1",
           "name": "bedroom-dresser",
           "in": {
@@ -13131,7 +13157,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -13212,6 +13238,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-abbey-cloister-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -3.59
           ],
           "r": 0
         }
@@ -19972,7 +20014,7 @@
             "slot": "classroom"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -19981,6 +20023,22 @@
         {
           "op": "place",
           "tmp": "$f1",
+          "def": "core/school-desk@1",
+          "name": "classroom-desk-1-1",
+          "in": {
+            "parent": "region-campus-east-hall",
+            "slot": "classroom"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f2",
           "def": "core/chair@1",
           "name": "classroom-chair-1-1",
           "in": {
@@ -19996,7 +20054,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/school-desk@1",
           "name": "classroom-desk-1-2",
           "in": {
@@ -20012,7 +20070,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/chair@1",
           "name": "classroom-chair-1-2",
           "in": {
@@ -20023,22 +20081,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/school-desk@1",
-          "name": "classroom-desk-1-3",
-          "in": {
-            "parent": "region-campus-east-hall",
-            "slot": "classroom"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -20311,7 +20353,7 @@
             "slot": "classroom-1"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -20320,6 +20362,22 @@
         {
           "op": "place",
           "tmp": "$f22",
+          "def": "core/school-desk@1",
+          "name": "classroom-1-desk-1-1",
+          "in": {
+            "parent": "region-campus-east-hall",
+            "slot": "classroom-1"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-1",
           "in": {
@@ -20335,7 +20393,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f23",
+          "tmp": "$f24",
           "def": "core/school-desk@1",
           "name": "classroom-1-desk-1-2",
           "in": {
@@ -20351,7 +20409,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f24",
+          "tmp": "$f25",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-2",
           "in": {
@@ -20362,22 +20420,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f25",
-          "def": "core/school-desk@1",
-          "name": "classroom-1-desk-1-3",
-          "in": {
-            "parent": "region-campus-east-hall",
-            "slot": "classroom-1"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -20637,7 +20679,7 @@
             "slot": "classroom"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -20646,6 +20688,22 @@
         {
           "op": "place",
           "tmp": "$f1",
+          "def": "core/school-desk@1",
+          "name": "classroom-desk-1-1",
+          "in": {
+            "parent": "region-campus-west-hall",
+            "slot": "classroom"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f2",
           "def": "core/chair@1",
           "name": "classroom-chair-1-1",
           "in": {
@@ -20661,7 +20719,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/school-desk@1",
           "name": "classroom-desk-1-2",
           "in": {
@@ -20677,7 +20735,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/chair@1",
           "name": "classroom-chair-1-2",
           "in": {
@@ -20688,22 +20746,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/school-desk@1",
-          "name": "classroom-desk-1-3",
-          "in": {
-            "parent": "region-campus-west-hall",
-            "slot": "classroom"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -20976,7 +21018,7 @@
             "slot": "classroom-1"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -20985,6 +21027,22 @@
         {
           "op": "place",
           "tmp": "$f22",
+          "def": "core/school-desk@1",
+          "name": "classroom-1-desk-1-1",
+          "in": {
+            "parent": "region-campus-west-hall",
+            "slot": "classroom-1"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-1",
           "in": {
@@ -21000,7 +21058,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f23",
+          "tmp": "$f24",
           "def": "core/school-desk@1",
           "name": "classroom-1-desk-1-2",
           "in": {
@@ -21016,7 +21074,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f24",
+          "tmp": "$f25",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-2",
           "in": {
@@ -21027,22 +21085,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f25",
-          "def": "core/school-desk@1",
-          "name": "classroom-1-desk-1-3",
-          "in": {
-            "parent": "region-campus-west-hall",
-            "slot": "classroom-1"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },

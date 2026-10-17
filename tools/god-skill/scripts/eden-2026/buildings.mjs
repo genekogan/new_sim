@@ -40,6 +40,10 @@ function openPlan(w, d, kind = 'hall', floors = 1) {
     stairs: Array.from({ length: floors - 1 }, (_, k) => ({ from: k, to: k + 1, room: k ? `${kind}-${k}` : kind, wall: w >= d ? 'n' : 'w', at: 0.5 })),
   };
 }
+// L4a: at 0.5 a flight along the n wall stands in the n doorway (L1's door survey: the courtyard-quarter kitchens and the
+// campus east hall could not be entered from the north); this one starts at the wall's west end. Not used where interiors
+// were placed by hand around the old stair (eden-house kitchens).
+const clearNorthDoor = (plan) => { for (const st of plan.stairs) if (st.wall === 'n') st.at = 0; return plan; };
 function twoRooms(w, d, frontKind, backKind, floors = 1) {
   const cut = r3(d * 0.36);
   const plan = openPlan(w, d, frontKind, floors);
@@ -106,8 +110,10 @@ function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace =
   ]) {
     const levels = side === 'kitchen' ? floors : 1;
     const p = { w: ww, d: dd, floors: levels, floorHeight: 2.8, material: palette.material, wall: palette.wall, trim: palette.trim, roofColor: palette.roof,
-      roof: roofTerrace || side === 'study' ? 'flat' : 'shed', roofPitch: 20, windows: 0.45, plan: openPlan(ww, dd, kind, levels) };
-    if (side === 'bedroom' || side === 'study') p.plan.floors[0].exterior.push({ room: kind, wall: side === 'bedroom' ? 'e' : 'w', kind: 'door', at: 0.5, width: 1.3 });
+      roof: roofTerrace || side === 'study' ? 'flat' : 'shed', roofPitch: 20, windows: 0.45, plan: furnished ? clearNorthDoor(openPlan(ww, dd, kind, levels)) : openPlan(ww, dd, kind, levels) };
+    // the side wings open onto the court only: their end walls face the next wing across a 0.4 m gap (a door there led nowhere,
+    // and residents were sent to it: L1's door survey)
+    if (side === 'bedroom' || side === 'study') p.plan.floors[0].exterior = [{ room: kind, wall: side === 'bedroom' ? 'e' : 'w', kind: 'door', at: 0.5, width: 1.3 }];
     const b = add(id, 'hall', turn(x, z), p, { name: side === 'entry' ? group.name : `${group.name}-${side}`.slice(0, 48), displayName: `${label} — ${side === 'entry' ? 'entry and living room' : side} wing`, originalPlaceId: id, r, furnishStyle: furnished,
       metadata: { courtyardGroup: group.name, courtyardCenter: coords, courtyard: group.court, entry: side === 'entry', roomPurpose: kind, ...(roofTerrace && side === 'bedroom' ? { roofTerrace: true, terraceHeight: 2.82 } : {}) } });
     group.wings.push(b.name);
@@ -207,7 +213,7 @@ for (const [id, def, w, d, floors, floorHeight, wall, roofColor, roof, material,
 // Campus quad: the annex and two long lecture halls retain their distinctive
 // enclosing proportions and outward street entrances as well as quad entries.
 named('region-campus.library-annex', 'hall', { w: 24, d: 11, floors: 2, floorHeight: 3.6, material: 'stone', wall: '#efe4cf', trim: '#e8e2d2', roof: 'flat', roofColor: '#7a8a8f', plan: twoRooms(24, 11, 'reading', 'stacks', 2) }, { furnishStyle: 'library' });
-for (const [side, x, r] of [['east', 13, -Math.PI / 2], ['west', -37, Math.PI / 2]]) named(`region-campus.${side}-hall`, 'hall', { w: 24, d: 10, floors: 2, floorHeight: 3.6, material: 'brick', wall: side === 'east' ? '#b9785a' : '#a0563f', trim: '#efe9dc', roof: 'gable', roofColor: '#5a5f66', plan: openPlan(24, 10, 'classroom', 2) }, { coords: [x, -97], r, furnishStyle: 'school' });
+for (const [side, x, r] of [['east', 13, -Math.PI / 2], ['west', -37, Math.PI / 2]]) named(`region-campus.${side}-hall`, 'hall', { w: 24, d: 10, floors: 2, floorHeight: 3.6, material: 'brick', wall: side === 'east' ? '#b9785a' : '#a0563f', trim: '#efe9dc', roof: 'gable', roofColor: '#5a5f66', plan: clearNorthDoor(openPlan(24, 10, 'classroom', 2)) }, { coords: [x, -97], r, furnishStyle: 'school' });
 named('region-campus.clock-tower', 'tower', { w: 4, d: 4, floors: 5, floorHeight: 3, material: 'stone', wall: '#b9785a', trim: '#efe9dc', roof: 'hip', roofColor: '#5a5f66' }, { furnishStyle: 'hall', metadata: { clockFacePreferred: true } });
 for (const [x, i] of [[-36, 1], [12, 2]]) add(`campus-residence-${i}`, 'cottage', [x, -119], { w: 9, d: 7, floors: 3, roof: 'flat', wall: i === 1 ? '#efe4cf' : '#a9c3b0', trim: '#3a5a4a', balcony: true }, { r: Math.PI / 2, district: 'region-campus', originalPlaceId: 'region-campus', furnishStyle: 'cottage' });
 
