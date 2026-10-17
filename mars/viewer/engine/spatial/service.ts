@@ -314,14 +314,14 @@ export class Spatial {
   private syncPaged(world: WorldState): boolean {
     const g = this.ground!, ext = g.extentTiles(), units: TileRect[] = [];
     const clip = (r: TileRect) => { const q: TileRect = [Math.max(r[0], ext[0]), Math.max(r[1], ext[1]), Math.min(r[2], ext[2]), Math.min(r[3], ext[3])]; if (q[0] <= q[2] && q[1] <= q[3]) units.push(q); };
-    for (const id in world.entities) { const e = world.entities[id]; if (e.kind === 'human' && e.human) clip(rectOf([[e.pose.p[0], e.pose.p[2]]])); }
-    for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
-    if (!units.length) clip(rectOf([[0, 0]]));
-    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    // (L1: the bodies are collected in navChanged's one pass over the entities; a capability listing syncs ~2000 times)
     // no scene = first sync or a re-base (refreshForWorld: new levels, wider raster). That changes the static world even
     // when no static entity did: an empty god world's only content is its world-edits, so `navChanged` alone would keep
     // the windows' old grids (no new floor, no new walls) until the next edit or a restart.
-    const changed = this.navChanged(world) || !this.scene;
+    const changed = this.navChanged(world, (e) => clip(rectOf([[e.pose.p[0], e.pose.p[2]]]))) || !this.scene;
+    for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
+    if (!units.length) clip(rectOf([[0, 0]]));
+    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
     if (!changed && this.pages && this.pages.key === key) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
@@ -469,11 +469,12 @@ export class Spatial {
    * the last call; refreshes the snapshots. Allocation-free when nothing changed (~35k calls a run),
    * and changes exactly when the former sha256 key over the same fields would (planning.test.ts).
    */
-  private navChanged(world: WorldState): boolean {
+  private navChanged(world: WorldState, onBody?: (e: Entity) => void): boolean {
     const snaps = this.snaps;
     let n = 0, changed = false;
     for (const id in world.entities) {
       const e = world.entities[id];
+      if (onBody && e.kind === 'human' && e.human) { onBody(e); continue; }
       if (!isStatic(e)) continue;
       const s = snaps[n];
       if (!s) { snaps.push(navSnap(e)); changed = true; }
