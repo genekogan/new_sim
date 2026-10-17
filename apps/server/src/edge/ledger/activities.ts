@@ -93,7 +93,7 @@ export function loadSpots(raw: unknown): {data: SpotsData; refused: string[]} {
 
 export type ActivityWorld = {
   me: V2; seated: boolean;
-  /** Clear standing ground at a point (m), 0 inside solids / off ground. */
+  /** Clear standing ground at a point (m), 0 inside solids / off ground; may be capped at 1 m (only read against standing-room thresholds ≤ 0.95 m). */
   clearance(x: number, z: number): number;
   /** Nearest open spot with at least `min` m clearance within `rings`×0.5 m. */
   open(at: V2, min: number, rings: number): V2 | null;

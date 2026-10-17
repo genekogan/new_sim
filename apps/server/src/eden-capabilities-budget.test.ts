@@ -37,7 +37,9 @@ test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after 
   // (E-life: upper-storey rooms are now checked only from inside their building, so a first sweep from outside may make
   // no failed upstairs search at all; the stranded-search memo stays covered by its own path tests)
   void strandedMetrics; void h0;
-  assert.ok(nav.fineMax >= 40, 'paged worlds keep enough fine tiles for a capabilities sweep');
+  // L1: point reads off the windows (stroll stops, standing room round far things) build no fine tiles any more, so a
+  // sweep builds a few dozen at most (was ~230 on Eden 2026, which needed a 48-tile cache); the cache is 24 + the windows
+  assert.ok(sweep1.size <= 30, `a sweep builds few fine tiles (${sweep1.size})`);
 
   // walk somewhere, past the per-thing goal cache (50 ticks): the next call recomputes every goal from warm tiles
   const walk = (first.value as { id: string; verb: string; available?: boolean; target?: { kind?: string } }[]).find((c) => c.verb === 'walk' && c.available && c.target?.kind === 'place')!;

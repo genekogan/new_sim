@@ -422,15 +422,20 @@ export class Spatial {
     return g ? (q) => clearanceAt(g, q) : null;
   }
 
-  /** L1: `clearanceAt(levelAt(level, at), q) >= t` for points round `at`, the same answers and window focus; off the
-   *  paged windows on level 0 without building fine tiles (GroundNav.clearTester). Null when levelAt has no grid. */
-  clearTester(level: number, at: Vec2, t: number): ((q: Vec2) => boolean) | null {
+  /** L1: `Math.min(clearanceAt(levelAt(level, at), q), cap)` for points round `at`, the same answers and window focus; off
+   *  the paged windows on level 0 without building fine tiles (GroundNav.clearanceCapped). Null when levelAt has no grid. */
+  clearanceCapped(level: number, at: Vec2, cap: number): ((q: Vec2) => number) | null {
     if (level === 0 && this.ground?.paged && this.pages) {
       const r = this.pages.rects[this.pageAt(at)], tx = Math.floor(at[0] / 64), tz = Math.floor(at[1] / 64);
-      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearTester(rectOf([at]), this.pages.all.obstacles, t);
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.clearanceCapped(rectOf([at]), this.pages.all.obstacles, cap);
     }
     const g = this.levelAt(level, at);
-    return g ? (q) => clearanceAt(g, q) >= t : null;
+    return g ? (q) => Math.min(clearanceAt(g, q), cap) : null;
+  }
+  /** L1: `clearanceAt(levelAt(level, at), q) >= t` (clearanceCapped at t). */
+  clearTester(level: number, at: Vec2, t: number): ((q: Vec2) => boolean) | null {
+    const read = this.clearanceCapped(level, at, t);
+    return read ? (q) => read(q) >= t : null;
   }
 
   /**

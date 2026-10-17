@@ -10,11 +10,11 @@ const run = (env: Record<string, string>) => new Promise<string>((resolve) => {
 });
 const MATRIX: Record<string, Record<string, string>> = {
   default: {},
-  arena2: { MALLOC_ARENA_MAX: '2' },
-  mmap256k: { MALLOC_MMAP_THRESHOLD_: '262144', MALLOC_TRIM_THRESHOLD_: '1048576' },
   both: { MALLOC_ARENA_MAX: '2', MALLOC_MMAP_THRESHOLD_: '262144', MALLOC_TRIM_THRESHOLD_: '1048576' },
+  mmap1m: { MALLOC_ARENA_MAX: '2', MALLOC_MMAP_THRESHOLD_: '1048576', MALLOC_TRIM_THRESHOLD_: '2097152' },
 };
 test('Eden 2026 memory under malloc settings (diagnostic)', { timeout: 1_800_000, skip: process.platform !== 'linux' && 'Linux only' }, async (t) => {
-  const outs = await Promise.all(Object.entries(MATRIX).map(async ([k, env]) => [k, await run(env)] as const));
+  const outs: (readonly [string, string])[] = [];
+  for (const [k, env] of Object.entries(MATRIX)) outs.push([k, await run(env)] as const);   // serially: timings comparable
   for (const [k, out] of outs) for (const line of out.trim().split('\n')) t.diagnostic(`${k} ${line}`);
 });

@@ -1,6 +1,6 @@
 // L1 (Eden 2026 memory/speed): point reads off the paged windows no longer copy composites or build fine tiles. They must
 // give the very answers the composite gives: GroundNav.clearanceReader(r) = clearanceAt(compose(r), q) to the bit, and
-// GroundNav.clearTester(r, t) = (that ≥ t), whether q's fine tile is cached or classified round q, at tile seams, near
+// GroundNav.clearanceCapped(r, cap) = min(that, cap) and clearTester(r, t) = (that ≥ t), whether q's fine tile is cached or classified round q, at tile seams, near
 // water (wade/swim edges), steep ground and obstacles straddling seams, and 0 / false outside r.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,9 +42,11 @@ test('clearanceReader / clearTester give the composite\'s answers, tiles cached 
     const cold = new GroundNav(field, 0.1, { paged: true });   // nothing cached: classified round each point
     const testers = T.map((t) => [t, cold.clearTester(r, obstacles, t), ref.clearTester(r, obstacles, t)] as const);
     const read = ref.clearanceReader(r, obstacles), coldRead = new GroundNav(field, 0.1, { paged: true }).clearanceReader(r, obstacles);
+    const capped = [0.5, 1, 1.4].map((cap) => [cap, cold.clearanceCapped(r, obstacles, cap)] as const);
     for (const q of points(r)) {
       const want = clearanceAt(comp, q);
       assert.ok(Object.is(read(q), want) && Object.is(coldRead(q), want), `reader at ${q} in ${r}: ${read(q)} / ${coldRead(q)} vs ${want}`);
+      for (const [cap, f] of capped) assert.ok(Object.is(f(q), Math.min(want, cap)), `capped ${cap} at ${q}: ${f(q)} vs ${want}`);
       for (const [t, a, b] of testers) { assert.equal(a(q), want >= t, `cold tester t=${t} at ${q} in ${r} (clearance ${want})`); assert.equal(b(q), want >= t, `warm tester t=${t} at ${q}`); n++; }
     }
     assert.equal(cold.stats.fineBuilds, 0, 'the cold testers built no fine tile');

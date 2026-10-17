@@ -94,6 +94,15 @@ export function productionSettings(cfg, origin) {
 }
 
 /**
+ * glibc malloc settings for every world process (lane L1, measured on Linux, node 22). glibc raises its mmap threshold to
+ * the size of each big block freed, so the nav engine's multi-MB typed arrays (tiles, grids, search workspaces) are later
+ * carved out of the heap, which then never shrinks: a world's RSS stays a few hundred MB above what it holds. Eden 2026
+ * with one resident: 1011 MB default, 717 MB with a fixed 256 kB threshold (big blocks go back to the OS when freed), a
+ * 1 MB trim threshold and two arenas. A value the world's environment already sets wins.
+ */
+export const WORLD_MALLOC_ENV = Object.freeze({ MALLOC_ARENA_MAX: '2', MALLOC_MMAP_THRESHOLD_: '262144', MALLOC_TRIM_THRESHOLD_: '1048576' });
+
+/**
  * Wrap a child command with the production settings. The env is the child's whole environment
  * (children never inherit the launcher's), so what is set here is final; the --auth-env file
  * (passed by defaultCommand as `node --env-file`) only fills names this env leaves unset.
@@ -108,6 +117,7 @@ export function decorateCommand({ cmd, args, env }, s) {
   // this release's identity, not a BUILD_ID that a shared settings file may carry for another release
   if (s.build && s.build !== 'dev') out.BUILD_ID = s.build;
   if (s.worldHeapMb) out.NODE_OPTIONS = `--max-old-space-size=${s.worldHeapMb}`;
+  for (const [k, v] of Object.entries(WORLD_MALLOC_ENV)) if (out[k] === undefined) out[k] = v;
   return { cmd, args, env: out };
 }
 

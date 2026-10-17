@@ -25,9 +25,14 @@ export const FINE_APRON_M = 2;
 export const FINE_LRU = 24;
 /** Paged: fine tiles kept at least (Spatial.syncPaged); a Soul's capabilities read ~30 tiles round it in one sweep, which
  *  a smaller LRU misses on every pass (engine P4). */
-export const FINE_LRU_PAGED = 48;   // E-life: 40 + the walk windows; a nearby sweep reads ~37 tiles on Eden 2026 (2.9 MB each)
+export const FINE_LRU_PAGED = 24;   // L1: was 48 (E-life: a nearby sweep read ~37 tiles); point reads off the windows no longer
+                                    // build tiles (clearTester), so a listing builds ~20; 24 keeps them (2.9 MB each, -69 MB)
 /** Paged: bytes of upper-floor grids kept over windows (GroundNav.floorsOver); a 2-tile window's floor is ~7 MB. */
 export const FLOORS_OVER_BYTES = 64 * 1024 * 1024;   // E-life (memory): was 192 MB; Eden 2026 used 105 MB after one resident
+/** L1: point reads off the windows classify cells in blocks of this many cells a side (680-cell apron'd tile rasters = 10 × 10
+ *  blocks of 4.6 kB), and keep this many blocks (~7 MB). */
+export const FREE_BLOCK = 68;
+export const FREE_BLOCKS = 1536;
 /** Largest window (tiles per side): 6 × 64 m = 384 m. Routes needing more are refused ('ground.too-far'). */
 export const MAX_WINDOW_TILES = 6;
 /** Longest hop (m along the coarse path) planned by the fine planner at once. */
@@ -356,30 +361,57 @@ export class GroundNav {
   }
 
   /**
-   * L1 (speed/memory): whether level-0 clearance at points is at least `t`, exactly as `clearanceAt(compose(r, obstacles), q)
-   * >= t` (0 outside `r`), without building fine tiles: a cached tile is read; otherwise only the cells within reach of q
-   * are classified (classify, as q's tile would) and the nearest blocked centre gives the very value edt stores
-   * (squared distances are exact integers; edtRows' formula, rounded to float32). Tile edges and the raster's border
-   * pads lie farther than the reach (the apron), so they never decide. A Soul's capability listing tests clear stroll stops
-   * over whole areas; it used to build ~150 fine tiles (~45 ms each) for that.
+   * L1 (speed/memory): level-0 clearance at points capped at `cap` — exactly `Math.min(clearanceAt(compose(r, obstacles), q),
+   * cap)` (0 outside `r`) — without building fine tiles: a cached tile is read; otherwise only the cells within reach of q
+   * are looked at. Dry walkable ground with no obstacle near q is clear past the reach; else those cells are classified
+   * (classify, as q's tile would) and the nearest blocked centre gives the very value edt stores (squared distances are
+   * exact integers; edtRows' formula, rounded to float32). Tile edges and the raster's border pads lie farther than the
+   * reach (the apron), so they never decide. A Soul's capability listing tests standing room at hundreds of far points (whole
+   * areas for stroll stops); it used to build ~150 fine tiles (~45 ms each) for that.
    */
-  clearTester(r: TileRect, obstacles: Obstacle[], t: number): (q: Vec2) => boolean {
-    const { per, apron: A, cell } = this, R = Math.ceil(t / cell) + 2;
-    if (!(t > 0) || R + 1 > A) { const read = this.clearanceReader(r, obstacles); return (q) => read(q) >= t; }
-    const M = per + 2 * A, n = 2 * R + 1;
+  clearanceCapped(r: TileRect, obstacles: Obstacle[], cap: number): (q: Vec2) => number {
+    const { per, apron: A, cell, field } = this, R = Math.floor(cap / cell + 0.5) + 1;
+    if (!(cap > 0) || R + 1 > A) { const read = this.clearanceReader(r, obstacles); return (q) => Math.min(read(q), cap); }
+    const M = per + 2 * A;
     return (q) => {
       const I = latticeIndex(q[0], cell), J = latticeIndex(q[1], cell), tx = Math.floor(I / per), tz = Math.floor(J / per);
-      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return false;
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return 0;
       const te = this.tileEntry(tx, tz, obstacles), hit = this.fine.get(te.key);
-      if (hit) return hit.clearance[(J - tz * per) * per + (I - tx * per)] >= t;
-      const ox = tx * per - A, oz = tz * per - A;
-      const free = this.classify(ox, oz, M, te.rel, I - ox - R, J - oz - R, n, n);
-      if (!free[R * n + R]) return false;
+      if (hit) return Math.min(hit.clearance[(J - tz * per) * per + (I - tx * per)], cap);
+      // dry, gentle ground and no obstacle near: every cell within the reach is free (no medium or obstacle blocks one)
+      const x0 = latticeCentre(I - R, cell), z0 = latticeCentre(J - R, cell), x1 = latticeCentre(I + R, cell), z1 = latticeCentre(J + R, cell);
+      let dry = true;
+      for (let cz = Math.floor(z0) - 1; cz <= Math.floor(z1) + 1 && dry; cz++) for (let cx = Math.floor(x0) - 1; cx <= Math.floor(x1) + 1; cx++) if (coarseMedium(field, cx + 0.5, cz + 0.5) !== G_WALK) { dry = false; break; }
+      if (dry) {
+        const boxes = boxesOf(te.rel), bx0 = x0 - cell, bz0 = z0 - cell, bx1 = x1 + cell, bz1 = z1 + cell;
+        let near = false;
+        for (let k = 0; k < te.rel.length; k++) if (!(boxes[4 * k + 2] < bx0 || boxes[4 * k] > bx1 || boxes[4 * k + 3] < bz0 || boxes[4 * k + 1] > bz1)) { near = true; break; }
+        if (!near) return cap;
+      }
+      // the cells round q, classified in blocks of q's tile raster (kept: neighbouring reads share them)
+      const ox = tx * per - A, oz = tz * per - A, ci = I - ox, cj = J - oz;
+      const freeAt = (i: number, j: number) => { const b = this.freeBlock(te.key, ox, oz, M, te.rel, Math.floor(i / FREE_BLOCK), Math.floor(j / FREE_BLOCK)); return b[(j % FREE_BLOCK) * FREE_BLOCK + (i % FREE_BLOCK)]; };
+      if (!freeAt(ci, cj)) return 0;
       let best = Infinity;
-      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) if (!free[j * n + i]) { const d2 = (i - R) * (i - R) + (j - R) * (j - R); if (d2 < best) best = d2; }
-      if (best > R * R) return true;
-      return Math.fround(Math.max(0, Math.sqrt(best) * cell - cell / 2)) >= t;
+      for (let j = -R; j <= R; j++) for (let i = -R; i <= R; i++) if (!freeAt(ci + i, cj + j)) { const d2 = i * i + j * j; if (d2 < best) best = d2; }
+      if (best > R * R) return cap;
+      return Math.min(Math.fround(Math.max(0, Math.sqrt(best) * cell - cell / 2)), cap);
     };
+  }
+  /** Free-cell blocks of tiles' apron'd rasters (FREE_BLOCK² cells each, as classify gives them), least recently used out. */
+  private freeBlocks = new Map<string, Uint8Array>();
+  private freeBlock(key: string, ox: number, oz: number, M: number, rel: Obstacle[], bi: number, bj: number): Uint8Array {
+    const k = `${key}|${bi},${bj}`, hit = this.freeBlocks.get(k);
+    if (hit) return hit;
+    const b = this.classify(ox, oz, M, rel, bi * FREE_BLOCK, bj * FREE_BLOCK, FREE_BLOCK, FREE_BLOCK);
+    this.freeBlocks.set(k, b);
+    if (this.freeBlocks.size > FREE_BLOCKS) for (const old of this.freeBlocks.keys()) { this.freeBlocks.delete(old); if (this.freeBlocks.size <= FREE_BLOCKS * 0.75) break; }
+    return b;
+  }
+  /** `clearanceAt(compose(r, obstacles), q) >= t` (clearanceCapped at t). */
+  clearTester(r: TileRect, obstacles: Obstacle[], t: number): (q: Vec2) => boolean {
+    const read = this.clearanceCapped(r, obstacles, t);
+    return (q) => read(q) >= t;
   }
 
   /** Level-0 grid over a tile rect: the fine tiles side by side on the global lattice (the last few are memoised). */

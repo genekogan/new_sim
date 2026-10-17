@@ -1698,6 +1698,9 @@ export class MarsEngine implements Engine {
   navEpochV1():number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return spatial.epoch;}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
   clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearanceReader(level,[x,z]);return clear?clear([x,z]):0;}
+  /** nav read (L1): clearanceAtV1 capped at `cap` — the same value below it, `cap` at or above it — answered off the paged
+   *  windows without building fine nav tiles. For the many "is there standing room here (≥ t ≤ cap)?" reads. */
+  clearanceUpToV1(x:number,z:number,cap=1,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const read=spatial.clearanceCapped(level,[x,z],cap);return read?read([x,z]):0;}
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(0,at,minClear);if(!clear)return null;
     const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
