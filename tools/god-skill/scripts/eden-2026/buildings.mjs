@@ -170,7 +170,7 @@ const NAMED = [
   ['region-harbour.fish-market', 'hall', 14, 6, 1, 4, '#5f7f8f', '#3f4448', 'gable', 'wood', 0, 'shop'],
   ['region-vineyard.villa', 'cottage', 16, 10, 2, 3, '#e6c86e', '#b86a45', 'hip', 'plaster', 0, 'cottage'],
   ['region-vineyard.villa-tower', 'tower', 4.8, 4.8, 4, 3, '#e6c86e', '#b86a45', 'hip', 'stone', 0, 'hall'],
-  ['region-vineyard.wine-cellar', 'barn', 9, 7, 1, 3.6, '#c4b9a2', '#a8553a', 'gable', 'stone', Math.PI / 2, 'barn'],
+  ['region-vineyard.wine-cellar', 'barn', 9, 7, 1, 3.6, '#c4b9a2', '#a8553a', 'gable', 'stone', -Math.PI / 2, 'barn'],
   ['region-artists-village.warehouse-studio', 'hall', 20, 12, 1, 5, '#9a4a36', '#3f4448', 'shed', 'brick', 0, 'hall'],
   ['region-west-lake.inn', 'cottage', 16, 9, 2, 2.9, '#efe4cf', '#3f4448', 'gable', 'wood', Math.atan2(-8, 54), 'cottage'],
   ['region-campsite.lodge', 'cottage', 14, 9, 2, 3, '#8a5a36', '#3f4a3a', 'gable', 'wood', Math.PI * 0.85, 'cottage'],
