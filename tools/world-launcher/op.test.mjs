@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openLauncher } from './launcher.mjs';
 import { defaultCommand } from './children.mjs';
 
-const PORT = 6230, RANGE = [6231, 6235];
+const PORT = Number(process.env.OP_TEST_PORT ?? 6230), RANGE = [PORT + 1, PORT + 5];
 const dir = mkdtempSync(join(tmpdir(), 'launcher-op-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'arium.json'), JSON.stringify({ schema: 'genesis/1', name: 'Arium', description: 'x', batches: [] }));
@@ -47,4 +47,12 @@ test('operator create is refused through a reverse proxy and on bad input', asyn
   r = await op({ name: 'X', template: 'arium', ownerOf: 'nope' }); assert.equal(r.status, 404);
   r = await op({ name: 'X', template: 'nope', owner: 'acct_gene123' }); assert.equal(r.status, 400);
   r = await op({ name: 'X', template: 'arium', owner: 'bad owner!' }); assert.equal(r.status, 400);
+});
+test('operator create may choose the slug (eden-2026, not my-eden-2026); reserved, old-world and taken slugs are refused', async () => {
+  let r = await op({ name: 'Eden 2026', template: 'arium', owner: 'acct_gene123', slug: 'eden-2026' }); let d = await r.json();
+  assert.equal(r.status, 201, JSON.stringify(d)); assert.equal(d.slug, 'eden-2026'); assert.equal(d.owner, 'acct_gene123');
+  for (const slug of ['eden', 'mars', 'api', 'Bad Slug', '2026']) { r = await op({ name: 'Y', template: 'arium', owner: 'acct_gene123', slug }); assert.equal(r.status, 400, slug); }
+  r = await op({ name: 'Y', template: 'arium', owner: 'acct_gene123', slug: 'eden-2026' }); assert.equal(r.status, 409);
+  r = await fetch(`http://127.0.0.1:${PORT}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Eden 2026', template: 'arium', slug: 'eden-2026b' }) });
+  d = await r.json(); assert.equal(r.status, 201); assert.notEqual(d.slug, 'eden-2026b');
 });

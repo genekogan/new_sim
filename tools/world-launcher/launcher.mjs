@@ -14,7 +14,7 @@
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
 //   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz)
 //   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
-//                                {name, template, owner | ownerOf, godName?} → a world born owned by an existing account
+//                                {name, template, owner | ownerOf, godName?, slug?} → a world born owned by an existing account
 //                                (`owner` = account id, or `ownerOf` = the slug of a world whose god it is). CLI: op.mjs
 //   POST /__sim/op/register-fork operator only: {slug: eden|mars|littlemartians, descriptor, accounts?} → serve a copy of an
 //                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
@@ -65,11 +65,11 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
+import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
-import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
+import { EXISTING_WORLDS, decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 import { makeHandoff } from './handoff.mjs';
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
@@ -254,7 +254,15 @@ export async function openLauncher(cfg = {}) {
         return [409, { ok: false, code: 'god-name-taken', message: `"${godName}" is already shown as the god of someone else's world; choose another name to show.` }];
     }
     if (registry.worlds.length >= MAX_WORLDS) return [409, { ok: false, code: 'full', message: `this launcher holds at most ${MAX_WORLDS} worlds` }];
-    const slug = slugFor(name, new Set([...registry.slugs(), ...archivedSlugs(dataDir)]));
+    const taken = new Set([...registry.slugs(), ...archivedSlugs(dataDir)]);
+    // An operator may choose the slug (e.g. eden-2026 under /worlds/w/); the public path always derives one from the name.
+    // Never a reserved or old-world key, never one in use or archived, never over an existing world directory.
+    const chosen = op && typeof body?.slug === 'string' && body.slug ? body.slug : null;
+    if (chosen && (!SLUG_RE.test(chosen) || RESERVED.has(chosen) || EXISTING_WORLDS.includes(chosen) || FORK_SLUGS.includes(chosen)))
+      return [400, { ok: false, code: 'invalid', message: `slug ${JSON.stringify(chosen)}: lowercase a-z0-9-, starting with a letter, not a reserved name` }];
+    if (chosen && (taken.has(chosen) || existsSync(registry.worldDir(chosen))))
+      return [409, { ok: false, code: 'exists', message: `slug ${chosen} is in use, archived, or has data on disk` }];
+    const slug = chosen ?? slugFor(name, taken);
     const entry = { slug, name, template: t.id, port: null, createdAt: Date.now(), ...(typeof body?.creator === 'string' && body.creator ? { createdBy: body.creator.slice(0, 40) } : {}) };
     rmSync(registry.worldDir(slug), { recursive: true, force: true });
     mkdirSync(registry.worldDir(slug), { recursive: true });
