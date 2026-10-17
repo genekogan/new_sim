@@ -211,6 +211,8 @@ try {
   writeFileSync(resolve(out, 'server.log'), serverLog);
   const md = [`# god-mode e2e — ${slug} — ${report.startedAt}`, '', `boot ${report.summary.bootMs} ms · ${report.summary.steps} steps · ${report.summary.failed} failed · step p50 ${report.summary.p50} ms · p95 ${report.summary.p95} ms · max ${report.summary.max} ms`, '', '| step | ms | ok |', '|---|---:|:-:|', ...report.steps.map((s) => `| ${s.name} | ${s.ms} | ${s.ok ? '✔' : '✖ ' + (s.error ?? JSON.stringify(s.result)).slice(0, 160)} |`), '', '## shots', ...report.shots.map((s) => `- ${s.name}: \`${s.file}\` ${JSON.stringify(s.state)}`)].join('\n');
   writeFileSync(resolve(out, 'REPORT.md'), md);
+  // a remote run (Modal) keeps only stdout: on a failure, the server's last lines say why (S7's restart refused its snapshot)
+  if (report.summary.failed) log(`--- server log (last 30 lines) ---\n${serverLog.split('\n').slice(-30).join('\n')}\n---`);
   log(`\n${report.summary.failed ? '✖' : '✔'} ${report.summary.steps} steps, ${report.summary.failed} failed; p50 ${report.summary.p50} ms, p95 ${report.summary.p95} ms. Report: ${resolve(out, 'REPORT.md')}`);
   if (!args.keep) stop();
   process.exit(report.summary.failed ? 1 : 0);
