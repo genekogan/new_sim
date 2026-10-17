@@ -56,6 +56,8 @@ export type Thing = {
   /** Reference point (for distances and "by the X") and its level. */
   at: Vec2;
   level: number;
+  /** A room's floor height above its building's base (m): a low raised floor (a deck reached by a few risers) is not an upper storey. */
+  rise?: number;
   /** Area things: their outline; path things: their centre line + width. */
   area?: Vec2[];
   path?: Vec2[];
@@ -84,9 +86,12 @@ const SHOW = 120;            // walk capabilities offered: the nearest this many
 const ROOMS_WITHIN = 80;
 /** Upper-storey rooms are offered inside (or at the door of) their building, or to a Soul already upstairs (m). */
 const UPPER_ROOMS_WITHIN = 1;
+/** ... but a raised floor lower than this (Mars: Mimos main at .53 m, the kitchen's diner up its steps) is offered like the ground floor. */
+const LOW_RISE_M = 1.5;
 const BUILDINGS_WITHIN = 150;
 const DOWN_FIRST_M = 60;     // from a raised floor, a ground goal farther than this is walked to via the building's front (the engine pages long walks on the ground only, from 72 m)
 const PLACE_M2 = 300;       // ... at least this big (a court or a garden, not a paving tile or an exhibit's pad)
+const PLACES_MAX = 6;          // ... the nearest this many of them
 const PLACES_WITHIN = 400;   // an open area that is one of the world's places (a court, a garden) stays offered within this many metres
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
@@ -208,7 +213,7 @@ export class GodNav {
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
         out.push({ id: e.id, room: r.id, ref: rref, name: `${e.name}/${r.id}`, kind: 'room', what: `${rname} of ${e.name}${floor ? `, floor ${floor}` : ''}`,
-          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
+          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), rise: r3((r.y ?? 0) * wp.s), poly, roomFrame, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
       }
       // the room the front door opens into goes first (the entrance)
       if (front) { const fa = toWorld(front.at[0], front.at[1]); roomRefs.sort((a, b) => { const A = out.find((t) => t.ref === a)!, B = out.find((t) => t.ref === b)!; return (A.level - B.level) || (polyDist(A.poly!, fa) - polyDist(B.poly!, fa)); }); }
@@ -339,14 +344,20 @@ export class GodNav {
     // (and big stand-alone structures, so a Soul in a furnished room can still head for Freeside across the camp)
     // ... and the world's open-area places (courts, gardens) within PLACES_WITHIN (Little Martians: from Madmaraca's court 236 painted
     // courts and 96 exhibits are nearer than the Minarete court, so `walk:minarete-court` was refused while jog-around was offered)
-    for (const x of ranked.slice(SHOW)) if (((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) || (x.d <= PLACES_WITHIN && !!x.t.area && polyArea(x.t.area) >= PLACE_M2 && !!this.h.placeOf?.(x.t.ref))) pick.push(x);
+    // (at most PLACES_MAX of them, nearest first: Eden 2026 has dozens of gardens and courts within 400 m, and each offered walk
+    // costs a reach check: uncapped, a capabilities sweep built 160 fine tiles and a warm /here in the café took 21 s)
+    let places = 0;
+    for (const x of ranked.slice(SHOW)) {
+      if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
+      else if (places < PLACES_MAX && x.d <= PLACES_WITHIN && !!x.t.area && polyArea(x.t.area) >= PLACE_M2 && !!this.h.placeOf?.(x.t.ref)) { pick.push(x); places++; }
+    }
     // E-life: an upper storey's rooms are offered from close by (or from inside the building) only: each needs a multi-floor
     // reach check from the front door, and near Eden 2026's 3-4 storey canal row ~100 of them made one capabilities call
     // take 44 s (1600 floor windows built). Ground-floor rooms stay offered within ROOMS_WITHIN; walk to the building first.
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) {
       const rooms = (t.rooms ?? []).map((r) => this.thing(r)).filter((r): r is Thing => !!r);
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
-      for (const rt of rooms) if (rt.level === 0 || inside) pick.push({ t: rt, d: this.distance(rt, here) });
+      for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
