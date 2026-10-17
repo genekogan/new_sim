@@ -462,6 +462,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const bikesOut = () => outMemo ??= [...this.host.minds.values()].filter(m => m.soulId !== soul.soulId && this.openReceipts(m.soulId).some(r => /^cycle(?:-around)?:/.test(r.capability))).length;
       for (const c of [...caps]) {
         if (c.verb !== 'walk' || !c.target || this.places.byId.get(c.target.id)?.kind === 'water') continue;
+        // world-engine worlds: jog/run to outdoor places only (Eden 2026 offered 480 gait variants, one per room, chair and
+        // lamp it can walk to: a third of a 400 kB list); old worlds unchanged
+        if (this.placeWalkable) {const pl = c.target.kind === 'place' ? this.places.byId.get(c.target.id) : undefined; if (!pl || pl.enclosed || ['room', 'building'].includes(pl.kind)) continue;}
         const base = plans.get(c.id); if (!base || !base.steps.some(s => s.verb === 'walk_to')) continue;
         for (const gait of ['jog', 'run'] as const) {
           const id = `${gait}:${c.target.id}`, label = `${gait === 'jog' ? 'Jog' : 'Run'} to ${this.places.byId.get(c.target.id)?.name ?? c.label.replace(/^walk to /i, '')} (${gait === 'jog' ? '2.5' : '4'} m/s on dry ground)`;
