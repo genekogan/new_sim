@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { marsFactory, GREEN_FIELD_WORLD } from './index.ts';
-import type { Take } from '@sim/engine-contract';
+import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 
 test('a clock origin change keeps the render scene; a day-length change recaptures it', async () => {
   const f = await marsFactory(GREEN_FIELD_WORLD), e = f.create(f.genesis('clock-key'));
