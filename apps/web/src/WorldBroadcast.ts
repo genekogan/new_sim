@@ -30,6 +30,21 @@ export function carrierFraming(c: CarrierPose): [number, number, number][] {
   for (const [f, r] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) out.push(at(f * radius, r * radius, belly));
   return out;
 }
+/** Highest a rider's camera may stand above the basket floor: below the envelope's mouth line, so the envelope never sits
+ * between the eye and the basket (V1 3.2 walk: at dpr 2 the orbit pulled out along a steep ray, ~19 m above the basket,
+ * and the envelope hid the rider). Holds for any carrier: Eden 2026's native ride and god balloons alike. */
+export const RIDER_EYE_MAX = 4;
+/** Keep a rider's shot under the envelope: an eye above floor + RIDER_EYE_MAX comes down to it, keeping its distance to
+ * the target and its bearing (or, straight overhead, the carrier's side); the target is not above the eye. */
+export function riderView(pose: CameraPose, c: CarrierPose): CameraPose {
+  const top = c.p[1] + RIDER_EYE_MAX, [ex, ey, ez] = pose.position, target: [number, number, number] = [pose.target[0], Math.min(pose.target[1], top), pose.target[2]];
+  if (ey <= top) return target[1] === pose.target[1] ? pose : { ...pose, target };
+  const d = Math.hypot(ex - target[0], ey - target[1], ez - target[2]), rise = top - target[1];
+  let hx = ex - target[0], hz = ez - target[2], h = Math.hypot(hx, hz);
+  if (h < 1e-3) { hx = -Math.sin(c.yaw); hz = Math.cos(c.yaw); h = 1; }
+  const out = Math.max(Math.sqrt(Math.max(0, d * d - rise * rise)), BALLOON.envelope.radius * 3);
+  return { ...pose, position: [target[0] + hx / h * out, top, target[2] + hz / h * out], target };
+}
 /** Rendered rays a frame may spend on a pending shot decision (beyond the
  * held shot's own tracking); one search step may finish past it. */
 const DECISION_RAYS = 100;
@@ -136,7 +151,7 @@ export class WorldBroadcast {
     const changed = signature !== this.signature;
     if (changed) { this.semanticVersion++; this.signature = signature; }
     const subjects: Observation['subjects'] = {};
-    const carriers = this.hints?.().carriers ?? [];
+    const carriers = this.hints?.().carriers ?? [], riding: Record<string, CarrierPose> = {};
     let carrier: CarrierPose | null;
     for (const id of people) {
       const e = frame[id], body = records[id].body;
@@ -145,6 +160,7 @@ export class WorldBroadcast {
         subjects[id] = { p: [...e.p], yaw: e.yaw, height: b.hoverHeight + b.radius * 2,
           points: [[e.p[0], y, e.p[2]], [e.p[0], y + b.radius, e.p[2]]] };
       } else if (carrier = ridingCarrier(e.p, carriers)) {
+        riding[id] = carrier;
         // V1 (3.2 walk): a rider framed like a pedestrian put the camera ~4 m off and the basket filled the frame.
         // Frame the carrier (basket and envelope) instead; the rider's head and torso stay the visibility probes.
         subjects[id] = { p: [...e.p], yaw: e.yaw, height: 1.75, kind: 'human',
@@ -182,7 +198,7 @@ export class WorldBroadcast {
       if (!small) this.emptySince = null;
       else if ((this.emptySince ??= wallSeconds) <= wallSeconds - EMPTY_SECONDS) { this.picker.reject(choice.key, wallSeconds); this.lastPick = -Infinity; this.emptySince = null; }
     }
-    return result ? { ...result, shot: `${choice.label}:${result.shot ?? ''}` } : result;
+    return result ? { ...result, ...(result.pose && riding[focus] ? { pose: riderView(result.pose, riding[focus]) } : {}), shot: `${choice.label}:${result.shot ?? ''}` } : result;
   }
   /** A tour pose; a new move is checked once against the drawn scenery (clear path, target in sight). */
   private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[], tour: WorldTour = this.tour) {
