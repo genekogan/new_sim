@@ -4640,137 +4640,13 @@
             "wall": "#efe9dc",
             "trim": "#e9dfcc",
             "roofColor": "#c43a2a",
-            "w": 5,
-            "d": 5,
+            "w": 6,
+            "d": 6,
             "floors": 5,
             "floorHeight": 2.6,
             "roof": "dome",
             "material": "plaster",
-            "windows": 0.6,
-            "plan": {
-              "floors": [
-                {
-                  "rooms": [
-                    {
-                      "id": "living",
-                      "name": "Living",
-                      "rect": [
-                        0,
-                        0,
-                        5,
-                        5
-                      ]
-                    }
-                  ],
-                  "exterior": [
-                    {
-                      "room": "living",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "living",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    }
-                  ]
-                },
-                {
-                  "rooms": [
-                    {
-                      "id": "living-1",
-                      "name": "Living upstairs 1",
-                      "rect": [
-                        0,
-                        0,
-                        5,
-                        5
-                      ]
-                    }
-                  ],
-                  "exterior": []
-                },
-                {
-                  "rooms": [
-                    {
-                      "id": "living-2",
-                      "name": "Living upstairs 2",
-                      "rect": [
-                        0,
-                        0,
-                        5,
-                        5
-                      ]
-                    }
-                  ],
-                  "exterior": []
-                },
-                {
-                  "rooms": [
-                    {
-                      "id": "living-3",
-                      "name": "Living upstairs 3",
-                      "rect": [
-                        0,
-                        0,
-                        5,
-                        5
-                      ]
-                    }
-                  ],
-                  "exterior": []
-                },
-                {
-                  "rooms": [
-                    {
-                      "id": "living-4",
-                      "name": "Living upstairs 4",
-                      "rect": [
-                        0,
-                        0,
-                        5,
-                        5
-                      ]
-                    }
-                  ],
-                  "exterior": []
-                }
-              ],
-              "stairs": [
-                {
-                  "from": 0,
-                  "to": 1,
-                  "room": "living",
-                  "wall": "n",
-                  "at": 0.5
-                },
-                {
-                  "from": 1,
-                  "to": 2,
-                  "room": "living-1",
-                  "wall": "n",
-                  "at": 0.5
-                },
-                {
-                  "from": 2,
-                  "to": 3,
-                  "room": "living-2",
-                  "wall": "n",
-                  "at": 0.5
-                },
-                {
-                  "from": 3,
-                  "to": 4,
-                  "room": "living-3",
-                  "wall": "n",
-                  "at": 0.5
-                }
-              ]
-            }
+            "windows": 0.6
           }
         }
       ]
@@ -55328,9 +55204,9 @@
             "form": "point",
             "size": {
               "box": [
-                5.3,
+                6.3,
                 11,
-                5.3
+                6.3
               ]
             },
             "make": {
@@ -55345,10 +55221,10 @@
                       2.2,
                       0
                     ],
-                    "r": 2.62,
+                    "r": 3.1,
                     "h": 1.3,
                     "color": "#c9342d",
-                    "segments": 24,
+                    "segments": 32,
                     "collide": false
                   },
                   {
@@ -55358,10 +55234,10 @@
                       5.4,
                       0
                     ],
-                    "r": 2.62,
+                    "r": 3.1,
                     "h": 1.3,
                     "color": "#c9342d",
-                    "segments": 24,
+                    "segments": 32,
                     "collide": false
                   },
                   {
@@ -55371,10 +55247,10 @@
                       8.6,
                       0
                     ],
-                    "r": 2.62,
+                    "r": 3.1,
                     "h": 1.3,
                     "color": "#c9342d",
-                    "segments": 24,
+                    "segments": 32,
                     "collide": false
                   }
                 ]

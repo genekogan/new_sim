@@ -69,7 +69,7 @@ function add(id, defName, coords, params = {}, options = {}) {
   if (defName === 'tower') { p.w = Math.max(5, p.w ?? defaults.w); p.d = Math.max(5, p.d ?? defaults.d); }
   const w = Number(p.w ?? defaults.w ?? d.size?.box?.[0] ?? 6), depth = Number(p.d ?? defaults.d ?? d.size?.box?.[2] ?? 6);
   // Explicit room/door plans preserve entry on the smallest domed landmarks.
-  if (['roundhouse', 'lighthouse'].includes(defName) && !p.plan) p.plan = openPlan(w, depth, 'living', p.floors ?? 1);
+  if (defName === 'roundhouse' && !p.plan) p.plan = openPlan(w, depth, 'living', p.floors ?? 1); // the lighthouse keeps its round plan (helix, lantern, gallery; needs w >= 6 for its door)
   const metadata = {
     name, displayName: options.displayName ?? byPlace.get(id)?.name ?? title(id), def, originalPlaceId: options.originalPlaceId ?? id,
     coords: coords.map(r3), furnishStyle: Object.hasOwn(options, 'furnishStyle') ? options.furnishStyle : d.make?.args?.furnish ?? d.make?.args?.style ?? null,
@@ -167,7 +167,7 @@ const NAMED = [
   ['region-farm-hamlet.barn', 'barn', 12, 9, 2, 3.2, '#8e3326', '#4a4440', 'gable', 'wood', 0, 'barn'],
   ['region-farm-hamlet.farmhouse', 'cottage', 8, 7, 2, 2.9, '#efe4cf', '#5a5f66', 'hip', 'plaster', -Math.PI / 2, 'cottage'],
   ['region-farm-hamlet.windmill', 'windmill'],
-  ['region-harbour.lighthouse', 'lighthouse', 5, 5, 5, 2.6, '#efe9dc', '#c43a2a', 'dome', 'plaster', 0, null],
+  ['region-harbour.lighthouse', 'lighthouse', 6, 6, 5, 2.6, '#efe9dc', '#c43a2a', 'dome', 'plaster', 0, null],
   ['region-harbour.fish-market', 'hall', 14, 6, 1, 4, '#5f7f8f', '#3f4448', 'gable', 'wood', 0, 'shop'],
   ['region-vineyard.villa', 'cottage', 16, 10, 2, 3, '#e6c86e', '#b86a45', 'hip', 'plaster', 0, 'cottage'],
   ['region-vineyard.villa-tower', 'tower', 4.8, 4.8, 4, 3, '#e6c86e', '#b86a45', 'hip', 'stone', 0, 'hall'],

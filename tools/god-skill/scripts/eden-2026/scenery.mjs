@@ -23,8 +23,8 @@ const helter = [{ kind: 'cyl', at: [0, 4.5, 0], r: 1.6, h: 9, color: YELLOW, seg
   { kind: 'sweep', at: [0, 0, 0], path: spiral, r: 0.32, color: RED, collide: false }];
 const golfFlag = [{ kind: 'cyl', at: [0, 1.1, 0], r: 0.03, h: 2.2, color: WHITE }, { kind: 'box', at: [0.26, 1.95, 0], size: [0.5, 0.32, 0.02], color: '#d9473e', collide: false }];
 groups.push({ label: 'scenery: Eden fairground and golf defs', ops: [
-  kit('eden-lighthouse-bands', 'Three red paint bands round the harbour lighthouse tower (old Eden: a red-and-white banded lighthouse).', [5.3, 11, 5.3],
-    [2.2, 5.4, 8.6].map(y => ({ kind: 'cyl', at: [0, y, 0], r: 2.62, h: 1.3, color: RED, segments: 24, collide: false }))),
+  kit('eden-lighthouse-bands', 'Three red paint bands round the harbour lighthouse tower (old Eden: a red-and-white banded lighthouse).', [6.3, 11, 6.3],
+    [2.2, 5.4, 8.6].map(y => ({ kind: 'cyl', at: [0, y, 0], r: 3.1, h: 1.3, color: RED, segments: 32, collide: false }))),
   kit('eden-big-top', 'A red-and-white striped circus big top (23 m) with a pennant on its peak (old Eden festival meadow).', [23.6, 14, 23.6], bigTop),
   kit('eden-helter-skelter', 'A yellow helter-skelter tower with a red spiral slide (old Eden festival meadow).', [5.5, 11.4, 5.5], helter),
   kit('eden-golf-flag', 'A golf green pin: a white pole with a red flag.', [0.6, 2.2, 0.1], golfFlag)] });
