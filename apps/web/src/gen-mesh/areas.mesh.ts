@@ -83,7 +83,8 @@ registerMesh({
     drapeArea(soup, poly, 1.5, G(ctx), 0.02, (x, z, d) => {
       let c = scale(base, 0.92 + hf(x, z) * 0.14);
       if (mat === 'rock') c = scale(c, 0.85 + h01(Math.floor(x / 1.5), Math.floor(z / 1.5), 3) * 0.3);
-      if (stripes) { const a = (x - fr.c[0]) * fr.u[0] + (z - fr.c[1]) * fr.u[1]; if (Math.floor(a / 4) % 2 === 0) c = scale(c, 1.12); }
+      // mown stripes read from a height like old Eden's commons: 3.5 m bands, light 1.2x / dark 0.9x
+      if (stripes) { const a = (x - fr.c[0]) * fr.u[0] + (z - fr.c[1]) * fr.u[1]; c = scale(c, Math.floor(a / 3.5) % 2 === 0 ? 1.2 : 0.9); }
       if (edge > 0 && d < edge) c = mix(ground, c, Math.min(1, d / edge * (0.7 + hf(x, z, 2) * 0.6)));
       return c;
     });
