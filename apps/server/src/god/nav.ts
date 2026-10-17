@@ -425,12 +425,38 @@ export class GodNav {
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {
-    return this.byVersion(`l|${t.ref}|${n}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
+    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
   }
   /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
   namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
-    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
+    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
   }
+  /** L1: the things (rooms included) that can lie within `r` m of a point by `distance`, in things() order — a superset
+   *  (callers filter by distance as before), so "by the X" answers are unchanged. A grid of each thing's box (a path's
+   *  grown by half its width), rebuilt with the things list; was a scan of all ~3,000 Eden 2026 things per label
+   *  (~1.2 s of a new Soul's first listing). */
+  private within(at: Vec2, r: number): Thing[] {
+    const all = this.things();
+    if (this.grid?.of !== all) {
+      const cells = new Map<number, number[]>(), always: number[] = [];
+      all.forEach((t, i) => {
+        const pts = t.area ?? t.path ?? t.poly ?? [t.at], pad = !t.area && t.path ? Math.max(0, (t.width ?? 3) / 2) : 0;
+        let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+        for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+        if (!(x0 <= x1 && z0 <= z1) || !Number.isFinite(x0 + x1 + z0 + z1 + pad)) return;  // no outline: never within r
+        const i0 = Math.floor((x0 - pad) / NEAR_CELL), i1 = Math.floor((x1 + pad) / NEAR_CELL), j0 = Math.floor((z0 - pad) / NEAR_CELL), j1 = Math.floor((z1 + pad) / NEAR_CELL);
+        if ((i1 - i0 + 1) * (j1 - j0 + 1) > 4096) { always.push(i); return; }
+        for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) { const k = cellKey(ci, cj), l = cells.get(k); if (l) l.push(i); else cells.set(k, [i]); }
+      });
+      this.grid = { of: all, cells, always };
+    }
+    const g = this.grid, m = r + 1, seen = new Set<number>(g.always);   // (+1 m: float slack; the caller's distance test decides)
+    const i0 = Math.floor((at[0] - m) / NEAR_CELL), i1 = Math.floor((at[0] + m) / NEAR_CELL), j0 = Math.floor((at[1] - m) / NEAR_CELL), j1 = Math.floor((at[1] + m) / NEAR_CELL);
+    if (!((i1 - i0 + 1) * (j1 - j0 + 1) <= 4096)) return all;
+    for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) for (const i of g.cells.get(cellKey(ci, cj)) ?? []) seen.add(i);
+    return [...seen].sort((a, b) => a - b).map((i) => all[i]);
+  }
+  private grid: { of: Thing[]; cells: Map<number, number[]>; always: number[] } | null = null;
   /** "by the X" answers depend only on the named things (index version): remembered until the world changes (each
    *  label scanned every thing: ~0.25 s of every capabilities sweep in the Eden 2026 cafe). */
   private nearMemo = new Map<string, unknown>();
@@ -442,6 +468,8 @@ export class GodNav {
   }
 }
 
+const NEAR_CELL = 16;
+const cellKey = (i: number, j: number) => (i + 0x8000) * 0x10000 + (j + 0x8000);
 function polyDist(poly: Vec2[], p: Vec2) { return inPoly(p[0], p[1], poly) ? 0 : nearestOn(poly, p, true).d; }
 
 function roomSamples(poly: Vec2[], at: Vec2, step = 0.6): Vec2[] {
