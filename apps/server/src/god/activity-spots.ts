@@ -296,11 +296,19 @@ export class GodActivitySpots {
         const poly = sh.area, inside = creatures.filter(q => inPolygon(q, poly) || poly.some(v => d2(v, q) < 4));
         if (inside.length) {
           const cc = centroidOf(inside), pc = centroidOf(poly);
-          let best: V2 = poly[0], bd = Infinity;
-          for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((cc[0] - a[0]) * dx + (cc[1] - a[1]) * dz) / L)), q: V2 = [a[0] + dx * t, a[1] + dz * t]; if (d2(q, cc) < bd) { bd = d2(q, cc); best = q; } }
-          const out: V2 = [best[0] - pc[0], best[1] - pc[1]], n = Math.hypot(out[0], out[1]) || 1, at: V2 = [r2(best[0] + out[0] / n * 1.6), r2(best[1] + out[1] / n * 1.6)], place = this.place(at, 0);
+          // perimeter position of the bank point nearest the creatures (arc length from poly[0])
+          const seg = poly.map((a, i) => d2(a, poly[(i + 1) % poly.length])), per = seg.reduce((x, y) => x + y, 0);
+          let best: V2 = poly[0], bd = Infinity, bs = 0;
+          for (let i = 0, s0 = 0; i < poly.length; s0 += seg[i], i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((cc[0] - a[0]) * dx + (cc[1] - a[1]) * dz) / L)), q: V2 = [a[0] + dx * t, a[1] + dz * t]; if (d2(q, cc) < bd) { bd = d2(q, cc); best = q; bs = s0 + t * seg[i]; } }
+          const pointAt = (s: number): V2 => { s = ((s % per) + per) % per; for (let i = 0; i < poly.length; i++) { if (s <= seg[i] || i === poly.length - 1) { const a = poly[i], b = poly[(i + 1) % poly.length], t = seg[i] ? Math.min(1, s / seg[i]) : 0; return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; } s -= seg[i]; } return poly[0]; };
           const what = [...new Set(inside.map(kindAt))].map(k => (k === 'goose' ? 'geese' : k === 'koi' || k === 'fish' ? k : `${k}s`)).join(' and ');
-          add({ id: `feed.${e.id}`.toLowerCase(), activity: 'feed', base: 'idle', at, faceTo: [r2(cc[0]), r2(cc[1])], also: ['fish'], title: `Feed the ${what}`, label: `the bank of ${name}`, ...(place ? { place } : {}) });
+          // old Eden fed its ducks from several places on a bank (2 at the shore pond, 3 at the park pond): one spot per creature,
+          // up to 3, FEED_GAP metres apart along the bank on either side of the nearest point, so residents can feed together
+          const n = Math.min(3, inside.length, Math.max(1, Math.floor(per / (FEED_GAP * 2))));
+          [0, FEED_GAP, -FEED_GAP].slice(0, n).forEach((off, k) => {
+            const q = off ? pointAt(bs + off) : best, out: V2 = [q[0] - pc[0], q[1] - pc[1]], m = Math.hypot(out[0], out[1]) || 1, at: V2 = [r2(q[0] + out[0] / m * 1.6), r2(q[1] + out[1] / m * 1.6)], place = this.place(at, 0);
+            add({ id: `feed.${e.id}${k ? `.${k}` : ''}`.toLowerCase(), activity: 'feed', base: 'idle', at, faceTo: [r2(cc[0]), r2(cc[1])], also: ['fish'], title: `Feed the ${what}`, label: `the bank of ${name}`, ...(place ? { place } : {}) });
+          });
         }
       }
       if ((kind === 'football-pitch' || kind === 'pitch') && sh.area?.length) {
@@ -313,6 +321,8 @@ export class GodActivitySpots {
   }
 }
 
+/** Metres along a pond bank between the feeding places. */
+const FEED_GAP = 4;
 /** Def tags that name a playable instrument (the body pose draws it). */
 const INSTRUMENT_TAGS: [string, string][] = [['drum-kit', 'drums'], ['drums', 'drums'], ['guitar', 'guitar'], ['bass-guitar', 'bass'], ['violin', 'violin'], ['cello', 'cello'], ['keyboard-stand', 'keyboard'], ['flute', 'flute'], ['ukulele', 'ukulele']];
 /** Def tags of gym apparatus and the activity done at it (lying ones on its top). */

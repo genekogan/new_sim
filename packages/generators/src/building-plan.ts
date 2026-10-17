@@ -259,6 +259,8 @@ export function autoPlan(params: { W: number; D: number; t: number; fh: number; 
 type JPlan = {
   floors?: { rooms?: { id?: string; name?: string; rect?: number[]; kind?: string }[]; doors?: { between?: string[]; at?: number; width?: number }[]; exterior?: { room?: string; wall?: string; at?: number; kind?: string; width?: number; sill?: number; height?: number }[] }[];
   stairs?: { from?: number; to?: number; room?: string; wall?: string; at?: number }[];
+  /** One balcony on the front (south) wall of a room above the ground floor, reached by a door at `at` along that wall. */
+  balcony?: { floor?: number; room?: string; at?: number; width?: number; depth?: number };
 };
 
 /**
@@ -300,6 +302,16 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
   });
   if (!p.rooms.length) { p.rooms.push({ id: 'room', name: 'Room', floor: 0, kind: 'room', rect: [X0, Z0, X1, Z1] }); p.warnings.push('plan: no rooms; one room fills the footprint'); }
   if (p.ext.some((e) => e.kind === 'window')) p.autoWindows = false;
+  if (j.balcony && typeof j.balcony === 'object') {
+    const b = j.balcony, floor = typeof b.floor === 'number' ? Math.round(b.floor) : 1;
+    const room = p.rooms.find((r) => r.floor === floor && r.id === slug(b.room ?? '')) ?? p.rooms.find((r) => r.floor === floor);
+    if (!room || floor < 1) p.warnings.push(`plan: balcony skipped (it needs a room on an upper floor, floor ${floor})`);
+    else {
+      const span = room.rect ? room.rect[2] - room.rect[0] : c.W;
+      p.balcony = { floor, room: room.id, width: Math.min(typeof b.width === 'number' ? b.width : 3.2, span - 0.4), depth: Math.min(2, Math.max(0.8, typeof b.depth === 'number' ? b.depth : 1.2)) };
+      p.ext.push({ floor, room: room.id, side: 's', kind: 'door', to: 'balcony', ...(typeof b.at === 'number' ? { at: Math.min(1, Math.max(0, b.at)) } : {}) });
+    }
+  }
   const { risers, run } = stairGeometry(c.fh);
   for (const s of (j.stairs ?? []).slice(0, 8)) {
     const from = typeof s.from === 'number' ? Math.round(s.from) : 0, to = typeof s.to === 'number' ? Math.round(s.to) : from + 1;

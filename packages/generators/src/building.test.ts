@@ -151,3 +151,19 @@ test('layout is shared with the mesh half and cached by value', () => {
   const a = buildingLayout({ style: 'cottage', floors: 2 }), b = buildingLayout({ style: 'cottage', floors: 2 });
   assert.equal(a, b); assert.ok(a.walls.length > 8 && a.checks.ok);
 });
+
+test('explicit plan: an upper-floor balcony opens off the named room through its south wall, at `at`', () => {
+  const room = (id: string, rect: number[]) => ({ id, rect });
+  const plan = { floors: [{ rooms: [room('lobby', [0, 0, 12, 8])], exterior: [{ room: 'lobby', wall: 's', kind: 'door' }] },
+    { rooms: [room('west', [0, 0, 6, 8]), room('east', [6, 0, 12, 8])] }], stairs: [{ from: 0, to: 1, room: 'lobby', wall: 'n' }],
+    balcony: { floor: 1, room: 'east', at: 0.8 } };
+  const L = buildingLayout({ w: 12, d: 8, floors: 2, plan }) as unknown as { balcony?: { floor: number; rect: number[] }; openings: { id: string; floor: number; at: number[]; from?: string; to?: string }[] };
+  const door = L.openings.find((o) => o.id === 'balcony-door');
+  assert.ok(door && door.floor === 1 && door.from === 'east' && door.to === 'balcony');
+  assert.ok(door.at[0] > 3, 'at 0.8 puts the door in the east part of the east room');
+  assert.equal(L.balcony?.floor, 1);
+  assert.ok(L.balcony!.rect[1] >= 3.9 && L.balcony!.rect[0] < door.at[0] && L.balcony!.rect[2] > door.at[0], 'the balcony sits outside the south wall in front of its door');
+  const none = buildingLayout({ w: 12, d: 8, floors: 2, plan: { ...plan, balcony: { floor: 0, room: 'lobby' } } }) as unknown as { balcony?: unknown };
+  assert.equal(none.balcony, undefined, 'no ground-floor balcony');
+  assert.equal(buildingPhysics({ w: 12, d: 8, plan }).notes?.filter((n) => n.startsWith('violation: ')).length ?? 0, 0);
+});

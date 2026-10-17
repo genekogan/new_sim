@@ -78,7 +78,8 @@ only after reading, and do not claim the requested work is complete before verif
   takes the whole market back out.
 - **Flags** are labelled reference points (no collider): `flag "camp" --at 40,10`, then
   `--near flag:camp`. The owner can drop flags from the website too. (A `flagpole` is an ordinary
-  8 m civic thing, not a flag.)
+  8 m civic thing, not a flag.) A top-level thing named `arrival` (e.g. `flag "arrival" --at 0,18`) is where a
+  visitor's first view looks, from 45 m; without one the first view fits everything built.
 
 ## The loop
 
@@ -275,7 +276,8 @@ building's **north-west outer corner**, `0≤x≤w` east, `0≤z≤d` south (the
 you put the door elsewhere); per floor `rooms:[{id, rect:[x0,z0,x1,z1]}]` (corners, not centre+size; a
 room ≥ 0.8 m), `doors:[{between:[a,b], at?:0…1}]` (the two rects must share an edge ≥ door width + 0.3;
 omit `doors` to connect every touching pair), `exterior:[{room, wall:'s'|'n'|'e'|'w', kind:'door'|'window',
-at?:0…1}]` (the first exterior door is `front-door`); top level `stairs:[{from:0, to:1, room, wall}]`. E.g. w=8 d=5:
+at?:0…1}]` (the first exterior door is `front-door`); top level `stairs:[{from:0, to:1, room, wall}]` and an optional
+`balcony:{floor:1, room, at?:0…1}` (on that room's s wall). E.g. w=8 d=5:
 `{"floors":[{"rooms":[{"id":"kitchen","rect":[0,0,3,5]},{"id":"living","rect":[3,0,8,5]}],"doors":[{"between":["kitchen","living"]}],"exterior":[{"room":"living","wall":"s","kind":"door"}]}]}`
 `furnish <house>` fills every room from the building's recipe, `furnish <house>/<room>` one room
 (`--style shop`, `--dry` to see first); by hand: `--inside <house>/<room> --wall n | --corner se`.

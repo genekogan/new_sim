@@ -1807,20 +1807,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -1869,20 +1855,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2072,20 +2044,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2134,20 +2092,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2343,20 +2287,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2405,20 +2335,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2624,20 +2540,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2692,20 +2594,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -2888,20 +2776,6 @@
                   "exterior": [
                     {
                       "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
                       "wall": "e",
                       "kind": "door",
                       "at": 0.5,
@@ -2950,20 +2824,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3109,7 +2969,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3157,20 +3017,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3221,20 +3067,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3382,7 +3214,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3425,20 +3257,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3490,20 +3308,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3651,7 +3455,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3700,20 +3504,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -3765,20 +3555,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -3924,7 +3700,7 @@
                   "to": 1,
                   "room": "kitchen",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -3966,20 +3742,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "bedroom",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "bedroom",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "bedroom",
                       "wall": "e",
@@ -4030,20 +3792,6 @@
                     }
                   ],
                   "exterior": [
-                    {
-                      "room": "parlour",
-                      "wall": "s",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
-                    {
-                      "room": "parlour",
-                      "wall": "n",
-                      "kind": "door",
-                      "at": 0.5,
-                      "width": 1.5
-                    },
                     {
                       "room": "parlour",
                       "wall": "w",
@@ -5682,7 +5430,8 @@
             "roof": "dome",
             "material": "stone",
             "windows": 0.6
-          }
+          },
+          "r": 1.571
         }
       ]
     },
@@ -6288,7 +6037,7 @@
                   "to": 1,
                   "room": "classroom",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -6367,7 +6116,7 @@
                   "to": 1,
                   "room": "classroom",
                   "wall": "n",
-                  "at": 0.5
+                  "at": 0
                 }
               ]
             }
@@ -7512,7 +7261,123 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
+            }
           }
         },
         {
@@ -7532,7 +7397,123 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
+            }
           }
         },
         {
@@ -7552,7 +7533,123 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
+            }
           }
         },
         {
@@ -7572,7 +7669,123 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
+            }
           }
         },
         {
@@ -8375,7 +8588,7 @@
             -40,
             -236
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -8398,7 +8611,7 @@
             -28,
             -246
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#8a5a36",
             "trim": "#f3eee2",
@@ -8421,7 +8634,7 @@
             -46,
             -252
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#6e4a30",
             "trim": "#f3eee2",
@@ -8444,7 +8657,7 @@
             -20,
             -232
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -8467,7 +8680,7 @@
             -34,
             -262
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#8a5a36",
             "trim": "#f3eee2",
@@ -8490,7 +8703,7 @@
             20,
             -238
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#6e4a30",
             "trim": "#f3eee2",
@@ -8513,7 +8726,7 @@
             30,
             -250
           ],
-          "r": 3.142,
+          "r": 4.713,
           "params": {
             "wall": "#7a4a2a",
             "trim": "#f3eee2",
@@ -8812,7 +9025,8 @@
             "roof": "flat",
             "windows": 0.5,
             "balcony": true
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -8834,7 +9048,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -8877,7 +9091,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": -1.571
         },
         {
           "op": "place",
@@ -8898,7 +9112,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         }
       ]
     },
@@ -8946,7 +9161,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9009,7 +9225,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": -1.571
         },
         {
           "op": "place",
@@ -9031,7 +9248,7 @@
             "roof": "flat",
             "windows": 0.5
           },
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9052,7 +9269,8 @@
             "material": "plaster",
             "roof": "flat",
             "windows": 0.5
-          }
+          },
+          "r": 1.571
         },
         {
           "op": "place",
@@ -9243,7 +9461,7 @@
             200.693,
             0.683
           ],
-          "r": 2.246,
+          "r": 3.817,
           "params": {
             "wall": "#f0d9a8",
             "trim": "#efe9dc",
@@ -9263,7 +9481,7 @@
             200.51,
             18.609
           ],
-          "r": 2.744,
+          "r": 4.315,
           "params": {
             "wall": "#efe9dc",
             "trim": "#2f4f5f",
@@ -9283,7 +9501,7 @@
             219.41,
             9.89
           ],
-          "r": 2.976,
+          "r": 4.547,
           "params": {
             "wall": "#cf8b6a",
             "trim": "#7a2f2a",
@@ -9324,7 +9542,7 @@
             231.049,
             9.115
           ],
-          "r": -2.678,
+          "r": -1.107,
           "params": {
             "wall": "#e8d8b8",
             "trim": "#efe9dc",
@@ -9344,7 +9562,7 @@
             231.411,
             21.566
           ],
-          "r": -2.762,
+          "r": -1.191,
           "params": {
             "wall": "#e6c86e",
             "trim": "#355e3b",
@@ -9364,7 +9582,7 @@
             240.212,
             -58.882
           ],
-          "r": -1.003,
+          "r": -2.574,
           "params": {
             "wall": "#b9cf8c",
             "trim": "#3d5a80",
@@ -9384,7 +9602,7 @@
             249.907,
             -49.157
           ],
-          "r": -0.702,
+          "r": 0.869,
           "params": {
             "wall": "#b9cf8c",
             "trim": "#2f4f5f",
@@ -9410,7 +9628,7 @@
             251.872,
             -38.08
           ],
-          "r": -0.927,
+          "r": 2.215,
           "params": {
             "wall": "#c7b6d6",
             "trim": "#7a2f2a",
@@ -9430,7 +9648,7 @@
             248.232,
             -19.634
           ],
-          "r": -1.607,
+          "r": -3.178,
           "params": {
             "wall": "#efe9dc",
             "trim": "#3d5a80",
@@ -9450,7 +9668,7 @@
             251.929,
             -1.584
           ],
-          "r": -1.914,
+          "r": -0.343,
           "params": {
             "wall": "#e8d8b8",
             "trim": "#efe9dc",
@@ -9471,7 +9689,7 @@
             248.984,
             11.077
           ],
-          "r": -2.476,
+          "r": -0.905,
           "params": {
             "wall": "#9db8c9",
             "trim": "#7a2f2a",
@@ -11072,6 +11290,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -11087,7 +11321,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -11095,7 +11361,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -11152,6 +11418,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-1-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -11282,11 +11564,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -6.342,
+            6.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -11355,7 +11637,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -6.56,
+            6.56,
             0,
             -1.16
           ],
@@ -11459,6 +11741,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -11474,7 +11772,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -11482,7 +11812,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -11539,6 +11869,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-2-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -11669,11 +12015,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -7.342,
+            7.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -11742,7 +12088,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -7.56,
+            7.56,
             0,
             -1.16
           ],
@@ -11846,6 +12192,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -11861,7 +12223,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -11869,7 +12263,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -11926,6 +12320,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-3-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -12056,11 +12466,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.342,
+            8.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -12129,7 +12539,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.56,
+            8.56,
             0,
             -1.16
           ],
@@ -12233,6 +12643,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.242,
+            0,
+            -1.61
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -12248,7 +12674,39 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
+          "def": "core/wardrobe@1",
+          "name": "bedroom-wardrobe",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -1.021,
+            0,
+            1.652
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/dresser@1",
+          "name": "bedroom-dresser",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            1.088,
+            0,
+            1.509
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -12256,7 +12714,7 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.12,
+            1.12,
             0,
             -2.42
           ],
@@ -12313,6 +12771,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f3",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-courtyard-quarter-house-4-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -2.09
           ],
           "r": 0
         }
@@ -12443,11 +12917,11 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.342,
+            8.343,
             0,
             0
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -12516,7 +12990,7 @@
             "slot": "kitchen"
           },
           "p": [
-            -8.56,
+            8.56,
             0,
             -1.16
           ],
@@ -12620,6 +13094,22 @@
         {
           "op": "place",
           "tmp": "$f0",
+          "def": "core/bed@1",
+          "name": "bedroom-bed",
+          "in": {
+            "parent": "region-abbey-cloister-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            0,
+            0,
+            -3.11
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f1",
           "def": "core/rug@1",
           "name": "bedroom-rug",
           "in": {
@@ -12635,7 +13125,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f1",
+          "tmp": "$f2",
           "def": "core/wardrobe@1",
           "name": "bedroom-wardrobe",
           "in": {
@@ -12651,7 +13141,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/dresser@1",
           "name": "bedroom-dresser",
           "in": {
@@ -12667,7 +13157,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/floor-lamp@1",
           "name": "bedroom-lamp",
           "in": {
@@ -12748,6 +13238,22 @@
             -0.089,
             0,
             0
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "tmp": "$f4",
+          "def": "core/piano@1",
+          "name": "parlour-piano",
+          "in": {
+            "parent": "region-abbey-cloister-study",
+            "slot": "parlour"
+          },
+          "p": [
+            0,
+            0,
+            -3.59
           ],
           "r": 0
         }
@@ -19508,7 +20014,7 @@
             "slot": "classroom"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -19517,6 +20023,22 @@
         {
           "op": "place",
           "tmp": "$f1",
+          "def": "core/school-desk@1",
+          "name": "classroom-desk-1-1",
+          "in": {
+            "parent": "region-campus-east-hall",
+            "slot": "classroom"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f2",
           "def": "core/chair@1",
           "name": "classroom-chair-1-1",
           "in": {
@@ -19532,7 +20054,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/school-desk@1",
           "name": "classroom-desk-1-2",
           "in": {
@@ -19548,7 +20070,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/chair@1",
           "name": "classroom-chair-1-2",
           "in": {
@@ -19559,22 +20081,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/school-desk@1",
-          "name": "classroom-desk-1-3",
-          "in": {
-            "parent": "region-campus-east-hall",
-            "slot": "classroom"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -19847,7 +20353,7 @@
             "slot": "classroom-1"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -19856,6 +20362,22 @@
         {
           "op": "place",
           "tmp": "$f22",
+          "def": "core/school-desk@1",
+          "name": "classroom-1-desk-1-1",
+          "in": {
+            "parent": "region-campus-east-hall",
+            "slot": "classroom-1"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-1",
           "in": {
@@ -19871,7 +20393,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f23",
+          "tmp": "$f24",
           "def": "core/school-desk@1",
           "name": "classroom-1-desk-1-2",
           "in": {
@@ -19887,7 +20409,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f24",
+          "tmp": "$f25",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-2",
           "in": {
@@ -19898,22 +20420,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f25",
-          "def": "core/school-desk@1",
-          "name": "classroom-1-desk-1-3",
-          "in": {
-            "parent": "region-campus-east-hall",
-            "slot": "classroom-1"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -20173,7 +20679,7 @@
             "slot": "classroom"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -20182,6 +20688,22 @@
         {
           "op": "place",
           "tmp": "$f1",
+          "def": "core/school-desk@1",
+          "name": "classroom-desk-1-1",
+          "in": {
+            "parent": "region-campus-west-hall",
+            "slot": "classroom"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f2",
           "def": "core/chair@1",
           "name": "classroom-chair-1-1",
           "in": {
@@ -20197,7 +20719,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f2",
+          "tmp": "$f3",
           "def": "core/school-desk@1",
           "name": "classroom-desk-1-2",
           "in": {
@@ -20213,7 +20735,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f3",
+          "tmp": "$f4",
           "def": "core/chair@1",
           "name": "classroom-chair-1-2",
           "in": {
@@ -20224,22 +20746,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/school-desk@1",
-          "name": "classroom-desk-1-3",
-          "in": {
-            "parent": "region-campus-west-hall",
-            "slot": "classroom"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -20512,7 +21018,7 @@
             "slot": "classroom-1"
           },
           "p": [
-            -6.624,
+            6.624,
             0,
             -3.126
           ],
@@ -20521,6 +21027,22 @@
         {
           "op": "place",
           "tmp": "$f22",
+          "def": "core/school-desk@1",
+          "name": "classroom-1-desk-1-1",
+          "in": {
+            "parent": "region-campus-west-hall",
+            "slot": "classroom-1"
+          },
+          "p": [
+            -6.834,
+            0,
+            -2.514
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "tmp": "$f23",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-1",
           "in": {
@@ -20536,7 +21058,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f23",
+          "tmp": "$f24",
           "def": "core/school-desk@1",
           "name": "classroom-1-desk-1-2",
           "in": {
@@ -20552,7 +21074,7 @@
         },
         {
           "op": "place",
-          "tmp": "$f24",
+          "tmp": "$f25",
           "def": "core/chair@1",
           "name": "classroom-1-chair-1-2",
           "in": {
@@ -20563,22 +21085,6 @@
             0,
             0,
             -1.631
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f25",
-          "def": "core/school-desk@1",
-          "name": "classroom-1-desk-1-3",
-          "in": {
-            "parent": "region-campus-west-hall",
-            "slot": "classroom-1"
-          },
-          "p": [
-            6.834,
-            0,
-            -2.514
           ],
           "r": 3.142
         },
@@ -38142,286 +38648,6 @@
       ]
     },
     {
-      "note": "furnish seafront-hotel-1",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-2",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-3",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-4",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
       "note": "furnish castle-keep",
       "group": "eden-2026",
       "ops": [
@@ -55278,6 +55504,2470 @@
       ]
     },
     {
+      "note": "interiors: hotels 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel1-reception",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#2f6b6b",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel1-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel1-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#2f6b6b",
+            "pillow": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel1-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel1-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel1-plant-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel1-plant-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel1-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-101-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-101-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-101-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-102-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-102-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-102-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-201-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-201-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-201-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-202-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-202-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-202-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel2-reception",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#34476b",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel2-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel2-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#34476b",
+            "pillow": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel2-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel2-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel2-plant-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel2-plant-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel2-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-101-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-101-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-101-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-102-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-102-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 5",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-102-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-201-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-201-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-201-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-202-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-202-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-202-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 6",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel3-reception",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#b0573a",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel3-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel3-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#b0573a",
+            "pillow": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel3-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel3-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel3-plant-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel3-plant-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel3-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-101-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-101-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 7",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-101-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-102-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-102-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-102-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-201-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-201-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-201-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 8",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-202-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-202-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-202-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel4-reception",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#8ea47f",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel4-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel4-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#8ea47f",
+            "pillow": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel4-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel4-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel4-plant-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 9",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel4-plant-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel4-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-101-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-101-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-101-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-102-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-102-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 10",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-102-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-201-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-201-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-201-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-202-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-202-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-202-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
       "note": "town roof gardens 1",
       "group": "eden-2026",
       "ops": [
@@ -61608,6 +64298,172 @@
           "params": {
             "body": "#a8352d"
           }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-8",
+          "p": [
+            173,
+            -49.5
+          ],
+          "r": 1.736,
+          "params": {
+            "sz": 0.76
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-9",
+          "p": [
+            180,
+            -51
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-10",
+          "p": [
+            188,
+            -53
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-11",
+          "p": [
+            196,
+            -55
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-12",
+          "p": [
+            203.25,
+            -58.25
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-13",
+          "p": [
+            209.75,
+            -62.75
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-14",
+          "p": [
+            216.25,
+            -67.25
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-15",
+          "p": [
+            222.75,
+            -71.75
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-16",
+          "p": [
+            228.308,
+            -76.77
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-17",
+          "p": [
+            232.923,
+            -82.31
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-18",
+          "p": [
+            237.538,
+            -87.85
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-19",
+          "p": [
+            242.153,
+            -93.39
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/buffer-stop@1",
+          "name": "railway-buffer-stop",
+          "p": [
+            245.228,
+            -97.082
+          ],
+          "r": -0.695
         }
       ]
     },
@@ -64721,6 +67577,46 @@
       "ops": [
         {
           "op": "place",
+          "def": "core/footpath@1",
+          "name": "railway-bed",
+          "shape": {
+            "path": [
+              [
+                114,
+                -49
+              ],
+              [
+                150,
+                -49
+              ],
+              [
+                176,
+                -50
+              ],
+              [
+                200,
+                -56
+              ],
+              [
+                226,
+                -74
+              ],
+              [
+                246,
+                -98
+              ]
+            ]
+          },
+          "params": {
+            "width": 3.2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
           "def": "core/woodland@1",
           "name": "trees-meadow-tufts-1",
           "shape": {
@@ -65258,7 +68154,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -65306,13 +68208,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65422,7 +68318,13 @@
             97.3
           ],
           "s": 0.65
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 4",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65432,13 +68334,7 @@
             100.45
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 4",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65548,7 +68444,13 @@
             114
           ],
           "s": 0.64
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 5",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65558,13 +68460,7 @@
             114.1
           ],
           "s": 0.69
-        }
-      ]
-    },
-    {
-      "note": "trees 5",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65644,7 +68540,13 @@
             91
           ],
           "s": 0.47
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 6",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65654,13 +68556,7 @@
             91
           ],
           "s": 0.47
-        }
-      ]
-    },
-    {
-      "note": "trees 6",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65770,7 +68666,13 @@
             -66.6
           ],
           "s": 0.63
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 7",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65780,13 +68682,7 @@
             -66.6
           ],
           "s": 0.66
-        }
-      ]
-    },
-    {
-      "note": "trees 7",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65896,7 +68792,13 @@
             -66.6
           ],
           "s": 0.61
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 8",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65906,13 +68808,7 @@
             -66.6
           ],
           "s": 0.66
-        }
-      ]
-    },
-    {
-      "note": "trees 8",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66022,7 +68918,13 @@
             -67.2
           ],
           "s": 0.48
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 9",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66032,13 +68934,7 @@
             -67.2
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 9",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66148,7 +69044,13 @@
             -88.7
           ],
           "s": 0.5
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 10",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66158,13 +69060,7 @@
             -88.7
           ],
           "s": 0.48
-        }
-      ]
-    },
-    {
-      "note": "trees 10",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66274,7 +69170,13 @@
             -72
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 11",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/pine@1",
@@ -66284,13 +69186,7 @@
             -77
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 11",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/pine@1",
@@ -66400,7 +69296,13 @@
             -102
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 12",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66410,13 +69312,7 @@
             87.4
           ],
           "s": 0.64
-        }
-      ]
-    },
-    {
-      "note": "trees 12",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66526,7 +69422,13 @@
             96.7
           ],
           "s": 0.86
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 13",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66536,13 +69438,7 @@
             -24.3
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 13",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66728,7 +69624,13 @@
             -31.9
           ],
           "s": 0.66
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 15",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66738,13 +69640,7 @@
             -24.3
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 15",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66834,7 +69730,13 @@
             80
           ],
           "s": 0.37
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 16",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66844,13 +69746,7 @@
             70.8
           ],
           "s": 0.56
-        }
-      ]
-    },
-    {
-      "note": "trees 16",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/pine@1",
@@ -67090,7 +69986,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 17",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67130,13 +70032,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 17",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67584,7 +70480,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 18",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67632,13 +70534,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 18",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68102,7 +70998,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 19",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68142,13 +71044,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 19",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68596,7 +71492,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 20",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68644,13 +71546,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 20",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69114,7 +72010,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 21",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69154,13 +72056,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 21",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69640,7 +72536,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 22",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69680,13 +72582,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 22",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70158,7 +73054,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 23",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70206,13 +73108,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 23",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70700,7 +73596,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 24",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70740,13 +73642,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 24",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71218,7 +74114,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 25",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71258,13 +74160,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 25",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71720,7 +74616,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 26",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71760,13 +74662,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 26",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72214,7 +75110,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 27",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72254,13 +75156,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 27",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -76653,7 +79549,56 @@
                     "r": 0.28,
                     "h": 0.4,
                     "color": "#8a2a2a",
-                    "roll": 1.5708,
+                    "collide": false,
+                    "pitch": 1.5708
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.3,
+                      -0.205
+                    ],
+                    "r": 0.24,
+                    "h": 0.01,
+                    "color": "#efe9dc",
+                    "collide": false,
+                    "pitch": 1.5708
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.2,
+                      0.66,
+                      -0.02
+                    ],
+                    "r": 0.12,
+                    "h": 0.14,
+                    "color": "#8a2a2a",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.2,
+                      0.66,
+                      -0.02
+                    ],
+                    "r": 0.12,
+                    "h": 0.14,
+                    "color": "#8a2a2a",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.45,
+                      0.3,
+                      -0.15
+                    ],
+                    "r": 0.012,
+                    "h": 0.55,
+                    "color": "#222222",
                     "collide": false
                   },
                   {
@@ -76661,7 +79606,7 @@
                     "at": [
                       -0.45,
                       0.6,
-                      0.15
+                      -0.15
                     ],
                     "r": 0.18,
                     "h": 0.15,
@@ -76671,13 +79616,73 @@
                   {
                     "kind": "cyl",
                     "at": [
-                      0.45,
+                      0.5,
+                      0.5,
+                      0
+                    ],
+                    "r": 0.012,
+                    "h": 1,
+                    "color": "#222222",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.5,
                       1,
                       0
                     ],
                     "r": 0.22,
                     "h": 0.01,
                     "color": "#c9a227",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.6,
+                      0.45,
+                      0.1
+                    ],
+                    "r": 0.012,
+                    "h": 0.9,
+                    "color": "#222222",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.6,
+                      0.9,
+                      0.1
+                    ],
+                    "r": 0.17,
+                    "h": 0.01,
+                    "color": "#c9a227",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.24,
+                      0.6
+                    ],
+                    "r": 0.17,
+                    "h": 0.06,
+                    "color": "#2a2a2a",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.11,
+                      0.6
+                    ],
+                    "r": 0.025,
+                    "h": 0.22,
+                    "color": "#222222",
                     "collide": false
                   }
                 ]
@@ -79736,6 +82741,1079 @@
             130
           ],
           "r": 1.5708
+        }
+      ]
+    },
+    {
+      "note": "eden music defs",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-guitar-stand",
+            "version": 1,
+            "description": "An acoustic guitar on a floor stand; play the guitar.",
+            "tags": [
+              "eden",
+              "music",
+              "guitar"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.45,
+                1.4,
+                0.35
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.03,
+                      0
+                    ],
+                    "r": 0.16,
+                    "h": 0.04,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.3,
+                      -0.06
+                    ],
+                    "r": 0.012,
+                    "h": 0.55,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.32,
+                      0
+                    ],
+                    "r": 0.19,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#c08a4a"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.56,
+                      0
+                    ],
+                    "r": 0.145,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#c08a4a"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.4,
+                      0.047
+                    ],
+                    "r": 0.05,
+                    "h": 0.01,
+                    "pitch": 1.5707963267948966,
+                    "color": "#1a1a1a"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.94,
+                      0
+                    ],
+                    "size": [
+                      0.055,
+                      0.48,
+                      0.03
+                    ],
+                    "color": "#5a3a22"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.22,
+                      0
+                    ],
+                    "size": [
+                      0.085,
+                      0.16,
+                      0.03
+                    ],
+                    "color": "#2a1d14"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-bass-stand",
+            "version": 1,
+            "description": "A bass guitar on a floor stand, long neck and dark body; play the bass.",
+            "tags": [
+              "eden",
+              "music",
+              "bass-guitar"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.45,
+                1.6,
+                0.35
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.03,
+                      0
+                    ],
+                    "r": 0.16,
+                    "h": 0.04,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.3,
+                      -0.06
+                    ],
+                    "r": 0.012,
+                    "h": 0.55,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.32,
+                      0
+                    ],
+                    "r": 0.19,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#2c3e57"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.56,
+                      0
+                    ],
+                    "r": 0.145,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#2c3e57"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.4,
+                      0.047
+                    ],
+                    "r": 0.05,
+                    "h": 0.01,
+                    "pitch": 1.5707963267948966,
+                    "color": "#1a1a1a"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.03,
+                      0
+                    ],
+                    "size": [
+                      0.055,
+                      0.66,
+                      0.03
+                    ],
+                    "color": "#3a2616"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.4,
+                      0
+                    ],
+                    "size": [
+                      0.085,
+                      0.16,
+                      0.03
+                    ],
+                    "color": "#2a1d14"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-keyboard-stand",
+            "version": 1,
+            "description": "A stage keyboard on an X stand; play the keys.",
+            "tags": [
+              "eden",
+              "music",
+              "keyboard-stand"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                1.1,
+                1,
+                0.45
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      -0.25,
+                      0.42,
+                      0
+                    ],
+                    "size": [
+                      0.04,
+                      0.9,
+                      0.04
+                    ],
+                    "roll": 0.62,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      -0.25,
+                      0.42,
+                      0
+                    ],
+                    "size": [
+                      0.04,
+                      0.9,
+                      0.04
+                    ],
+                    "roll": -0.62,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0.25,
+                      0.42,
+                      0
+                    ],
+                    "size": [
+                      0.04,
+                      0.9,
+                      0.04
+                    ],
+                    "roll": 0.62,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0.25,
+                      0.42,
+                      0
+                    ],
+                    "size": [
+                      0.04,
+                      0.9,
+                      0.04
+                    ],
+                    "roll": -0.62,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.82,
+                      0
+                    ],
+                    "size": [
+                      1.02,
+                      0.08,
+                      0.32
+                    ],
+                    "color": "#1d1d1f"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.865,
+                      0.06
+                    ],
+                    "size": [
+                      0.9,
+                      0.012,
+                      0.15
+                    ],
+                    "color": "#f2efe6"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.875,
+                      0.03
+                    ],
+                    "size": [
+                      0.86,
+                      0.012,
+                      0.08
+                    ],
+                    "color": "#262626"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-music-stand-viola",
+            "version": 1,
+            "description": "A music stand with a viola case open beside it; play the viola (a violin pose).",
+            "tags": [
+              "eden",
+              "music",
+              "violin"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.5,
+                1.2,
+                0.4
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.55,
+                      0
+                    ],
+                    "r": 0.01,
+                    "h": 1.1,
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.12,
+                      0
+                    ],
+                    "size": [
+                      0.45,
+                      0.3,
+                      0.02
+                    ],
+                    "color": "#222222"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0.32,
+                      0.06,
+                      0.05
+                    ],
+                    "size": [
+                      0.22,
+                      0.1,
+                      0.62
+                    ],
+                    "color": "#6b2f2a"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-guitar-stool",
+            "version": 1,
+            "description": "A tall stool with a guitar leaning on it, on the amphitheatre stage; sit and play.",
+            "tags": [
+              "eden",
+              "music",
+              "guitar"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.6,
+                1.1,
+                0.45
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.62,
+                      0
+                    ],
+                    "r": 0.18,
+                    "h": 0.05,
+                    "color": "#7a5230"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0.1,
+                      0.3,
+                      0.1
+                    ],
+                    "r": 0.02,
+                    "h": 0.6,
+                    "color": "#4a3220"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      -0.1,
+                      0.3,
+                      0.1
+                    ],
+                    "r": 0.02,
+                    "h": 0.6,
+                    "color": "#4a3220"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0.1,
+                      0.3,
+                      -0.1
+                    ],
+                    "r": 0.02,
+                    "h": 0.6,
+                    "color": "#4a3220"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      -0.1,
+                      0.3,
+                      -0.1
+                    ],
+                    "r": 0.02,
+                    "h": 0.6,
+                    "color": "#4a3220"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0.33,
+                      0.32,
+                      0.05
+                    ],
+                    "r": 0.19,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#b9773c"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0.33,
+                      0.56,
+                      0.05
+                    ],
+                    "r": 0.145,
+                    "h": 0.09,
+                    "pitch": 1.5707963267948966,
+                    "color": "#b9773c"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "cyl",
+                    "at": [
+                      0.33,
+                      0.4,
+                      0.097
+                    ],
+                    "r": 0.05,
+                    "h": 0.01,
+                    "pitch": 1.5707963267948966,
+                    "color": "#1a1a1a"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0.33,
+                      0.94,
+                      0.05
+                    ],
+                    "size": [
+                      0.055,
+                      0.48,
+                      0.03
+                    ],
+                    "color": "#5a3a22"
+                  },
+                  {
+                    "collide": false,
+                    "kind": "box",
+                    "at": [
+                      0.33,
+                      1.22,
+                      0.05
+                    ],
+                    "size": [
+                      0.085,
+                      0.16,
+                      0.03
+                    ],
+                    "color": "#2a1d14"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-amphitheatre-steps",
+            "version": 1,
+            "description": "Two curved rows of stone steps facing the amphitheatre stage; sit and watch.",
+            "tags": [
+              "eden",
+              "amphitheatre",
+              "seating",
+              "stone"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                7,
+                0.5,
+                7
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.431,
+                      0.16,
+                      2.29
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": -0.5585,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.744,
+                      0.16,
+                      2.595
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": -0.2793,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.16,
+                      2.7
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.744,
+                      0.16,
+                      2.595
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0.2793,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.431,
+                      0.16,
+                      2.29
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0.5585,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.696,
+                      0.24,
+                      2.714
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": -0.5585,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.882,
+                      0.24,
+                      3.076
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": -0.2793,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.24,
+                      3.2
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.882,
+                      0.24,
+                      3.076
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0.2793,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.696,
+                      0.24,
+                      2.714
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0.5585,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  }
+                ]
+              }
+            },
+            "slots": [
+              {
+                "id": "step-2-seat-1",
+                "kind": "seat",
+                "p": [
+                  -1.029,
+                  0.32,
+                  2.496
+                ],
+                "yaw": 2.7506,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-2",
+                "kind": "seat",
+                "p": [
+                  -0.524,
+                  0.32,
+                  2.649
+                ],
+                "yaw": 2.9463,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-3",
+                "kind": "seat",
+                "p": [
+                  0,
+                  0.32,
+                  2.7
+                ],
+                "yaw": 3.1416,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-4",
+                "kind": "seat",
+                "p": [
+                  0.524,
+                  0.32,
+                  2.649
+                ],
+                "yaw": -2.9463,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-5",
+                "kind": "seat",
+                "p": [
+                  1.029,
+                  0.32,
+                  2.496
+                ],
+                "yaw": -2.7506,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-1",
+                "kind": "seat",
+                "p": [
+                  -1.267,
+                  0.48,
+                  2.938
+                ],
+                "yaw": 2.7344,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-2",
+                "kind": "seat",
+                "p": [
+                  -0.774,
+                  0.48,
+                  3.105
+                ],
+                "yaw": 2.8973,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-3",
+                "kind": "seat",
+                "p": [
+                  -0.26,
+                  0.48,
+                  3.189
+                ],
+                "yaw": 3.0602,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-4",
+                "kind": "seat",
+                "p": [
+                  0.26,
+                  0.48,
+                  3.189
+                ],
+                "yaw": -3.0602,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-5",
+                "kind": "seat",
+                "p": [
+                  0.774,
+                  0.48,
+                  3.105
+                ],
+                "yaw": -2.8973,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-6",
+                "kind": "seat",
+                "p": [
+                  1.267,
+                  0.48,
+                  2.938
+                ],
+                "yaw": -2.7344,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              }
+            ],
+            "components": {
+              "seat": {
+                "height": 0.32
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "note": "eden music",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-guitar-stand@1",
+          "name": "stage-guitar",
+          "p": [
+            89.9,
+            -30.3
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-keyboard-stand@1",
+          "name": "stage-keyboard",
+          "p": [
+            93.9,
+            -31.4
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-bass-stand@1",
+          "name": "stage-bass",
+          "p": [
+            94.5,
+            -29.9
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-music-stand-viola@1",
+          "name": "bandstand-viola",
+          "p": [
+            39,
+            -26.6
+          ],
+          "r": -2.9
+        },
+        {
+          "op": "place",
+          "def": "eden-guitar-stool@1",
+          "name": "amphitheatre-guitar",
+          "p": [
+            76.9,
+            80
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-amphitheatre-steps@1",
+          "name": "amphitheatre-steps",
+          "p": [
+            76,
+            80.6
+          ],
+          "r": 0
         }
       ]
     },

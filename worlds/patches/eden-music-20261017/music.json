@@ -1,0 +1,1068 @@
+{
+ "schema": "eden-2026-patch/1",
+ "id": "eden-music-20261017",
+ "note": "Lane L4a: the rest of old Eden's band. The performance stage gets its guitar, keyboard and bass beside the drum kit (old stage-guitar/keys/bass), the bandstand its fourth chair (the viola), the amphitheatre its stool and guitar (old amph-guitar). The engine reads them by tag (guitar, bass-guitar, keyboard-stand, violin); and the amphitheatre its two rows of stone steps (11 seats, old amph-seat-2-*/3-*).",
+ "ops": [
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-guitar-stand",
+    "version": 1,
+    "description": "An acoustic guitar on a floor stand; play the guitar.",
+    "tags": [
+     "eden",
+     "music",
+     "guitar"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      0.45,
+      1.4,
+      0.35
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.03,
+         0
+        ],
+        "r": 0.16,
+        "h": 0.04,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.3,
+         -0.06
+        ],
+        "r": 0.012,
+        "h": 0.55,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.32,
+         0
+        ],
+        "r": 0.19,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#c08a4a"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.56,
+         0
+        ],
+        "r": 0.145,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#c08a4a"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.4,
+         0.047
+        ],
+        "r": 0.05,
+        "h": 0.01,
+        "pitch": 1.5707963267948966,
+        "color": "#1a1a1a"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         0.94,
+         0
+        ],
+        "size": [
+         0.055,
+         0.48,
+         0.03
+        ],
+        "color": "#5a3a22"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         1.22,
+         0
+        ],
+        "size": [
+         0.085,
+         0.16,
+         0.03
+        ],
+        "color": "#2a1d14"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-bass-stand",
+    "version": 1,
+    "description": "A bass guitar on a floor stand, long neck and dark body; play the bass.",
+    "tags": [
+     "eden",
+     "music",
+     "bass-guitar"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      0.45,
+      1.6,
+      0.35
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.03,
+         0
+        ],
+        "r": 0.16,
+        "h": 0.04,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.3,
+         -0.06
+        ],
+        "r": 0.012,
+        "h": 0.55,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.32,
+         0
+        ],
+        "r": 0.19,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#2c3e57"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.56,
+         0
+        ],
+        "r": 0.145,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#2c3e57"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.4,
+         0.047
+        ],
+        "r": 0.05,
+        "h": 0.01,
+        "pitch": 1.5707963267948966,
+        "color": "#1a1a1a"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         1.03,
+         0
+        ],
+        "size": [
+         0.055,
+         0.66,
+         0.03
+        ],
+        "color": "#3a2616"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         1.4,
+         0
+        ],
+        "size": [
+         0.085,
+         0.16,
+         0.03
+        ],
+        "color": "#2a1d14"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-keyboard-stand",
+    "version": 1,
+    "description": "A stage keyboard on an X stand; play the keys.",
+    "tags": [
+     "eden",
+     "music",
+     "keyboard-stand"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      1.1,
+      1,
+      0.45
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         -0.25,
+         0.42,
+         0
+        ],
+        "size": [
+         0.04,
+         0.9,
+         0.04
+        ],
+        "roll": 0.62,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         -0.25,
+         0.42,
+         0
+        ],
+        "size": [
+         0.04,
+         0.9,
+         0.04
+        ],
+        "roll": -0.62,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0.25,
+         0.42,
+         0
+        ],
+        "size": [
+         0.04,
+         0.9,
+         0.04
+        ],
+        "roll": 0.62,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0.25,
+         0.42,
+         0
+        ],
+        "size": [
+         0.04,
+         0.9,
+         0.04
+        ],
+        "roll": -0.62,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         0.82,
+         0
+        ],
+        "size": [
+         1.02,
+         0.08,
+         0.32
+        ],
+        "color": "#1d1d1f"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         0.865,
+         0.06
+        ],
+        "size": [
+         0.9,
+         0.012,
+         0.15
+        ],
+        "color": "#f2efe6"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         0.875,
+         0.03
+        ],
+        "size": [
+         0.86,
+         0.012,
+         0.08
+        ],
+        "color": "#262626"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-music-stand-viola",
+    "version": 1,
+    "description": "A music stand with a viola case open beside it; play the viola (a violin pose).",
+    "tags": [
+     "eden",
+     "music",
+     "violin"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      0.5,
+      1.2,
+      0.4
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.55,
+         0
+        ],
+        "r": 0.01,
+        "h": 1.1,
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0,
+         1.12,
+         0
+        ],
+        "size": [
+         0.45,
+         0.3,
+         0.02
+        ],
+        "color": "#222222"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0.32,
+         0.06,
+         0.05
+        ],
+        "size": [
+         0.22,
+         0.1,
+         0.62
+        ],
+        "color": "#6b2f2a"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-guitar-stool",
+    "version": 1,
+    "description": "A tall stool with a guitar leaning on it, on the amphitheatre stage; sit and play.",
+    "tags": [
+     "eden",
+     "music",
+     "guitar"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      0.6,
+      1.1,
+      0.45
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0,
+         0.62,
+         0
+        ],
+        "r": 0.18,
+        "h": 0.05,
+        "color": "#7a5230"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0.1,
+         0.3,
+         0.1
+        ],
+        "r": 0.02,
+        "h": 0.6,
+        "color": "#4a3220"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         -0.1,
+         0.3,
+         0.1
+        ],
+        "r": 0.02,
+        "h": 0.6,
+        "color": "#4a3220"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0.1,
+         0.3,
+         -0.1
+        ],
+        "r": 0.02,
+        "h": 0.6,
+        "color": "#4a3220"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         -0.1,
+         0.3,
+         -0.1
+        ],
+        "r": 0.02,
+        "h": 0.6,
+        "color": "#4a3220"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0.33,
+         0.32,
+         0.05
+        ],
+        "r": 0.19,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#b9773c"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0.33,
+         0.56,
+         0.05
+        ],
+        "r": 0.145,
+        "h": 0.09,
+        "pitch": 1.5707963267948966,
+        "color": "#b9773c"
+       },
+       {
+        "collide": false,
+        "kind": "cyl",
+        "at": [
+         0.33,
+         0.4,
+         0.097
+        ],
+        "r": 0.05,
+        "h": 0.01,
+        "pitch": 1.5707963267948966,
+        "color": "#1a1a1a"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0.33,
+         0.94,
+         0.05
+        ],
+        "size": [
+         0.055,
+         0.48,
+         0.03
+        ],
+        "color": "#5a3a22"
+       },
+       {
+        "collide": false,
+        "kind": "box",
+        "at": [
+         0.33,
+         1.22,
+         0.05
+        ],
+        "size": [
+         0.085,
+         0.16,
+         0.03
+        ],
+        "color": "#2a1d14"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-amphitheatre-steps",
+    "version": 1,
+    "description": "Two curved rows of stone steps facing the amphitheatre stage; sit and watch.",
+    "tags": [
+     "eden",
+     "amphitheatre",
+     "seating",
+     "stone"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      7.0,
+      0.5,
+      7.0
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "box",
+        "at": [
+         -1.431,
+         0.16,
+         2.29
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": -0.5585,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -0.744,
+         0.16,
+         2.595
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": -0.2793,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.0,
+         0.16,
+         2.7
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.0,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.744,
+         0.16,
+         2.595
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.2793,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.431,
+         0.16,
+         2.29
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.5585,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -1.696,
+         0.24,
+         2.714
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": -0.5585,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -0.882,
+         0.24,
+         3.076
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": -0.2793,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.0,
+         0.24,
+         3.2
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.0,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.882,
+         0.24,
+         3.076
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.2793,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.696,
+         0.24,
+         2.714
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.5585,
+        "color": "#bdb2a0",
+        "collide": true
+       }
+      ]
+     }
+    },
+    "slots": [
+     {
+      "id": "step-2-seat-1",
+      "kind": "seat",
+      "p": [
+       -1.029,
+       0.32,
+       2.496
+      ],
+      "yaw": 2.7506,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-2",
+      "kind": "seat",
+      "p": [
+       -0.524,
+       0.32,
+       2.649
+      ],
+      "yaw": 2.9463,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-3",
+      "kind": "seat",
+      "p": [
+       -0.0,
+       0.32,
+       2.7
+      ],
+      "yaw": 3.1416,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-4",
+      "kind": "seat",
+      "p": [
+       0.524,
+       0.32,
+       2.649
+      ],
+      "yaw": -2.9463,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-5",
+      "kind": "seat",
+      "p": [
+       1.029,
+       0.32,
+       2.496
+      ],
+      "yaw": -2.7506,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-1",
+      "kind": "seat",
+      "p": [
+       -1.267,
+       0.48,
+       2.938
+      ],
+      "yaw": 2.7344,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-2",
+      "kind": "seat",
+      "p": [
+       -0.774,
+       0.48,
+       3.105
+      ],
+      "yaw": 2.8973,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-3",
+      "kind": "seat",
+      "p": [
+       -0.26,
+       0.48,
+       3.189
+      ],
+      "yaw": 3.0602,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-4",
+      "kind": "seat",
+      "p": [
+       0.26,
+       0.48,
+       3.189
+      ],
+      "yaw": -3.0602,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-5",
+      "kind": "seat",
+      "p": [
+       0.774,
+       0.48,
+       3.105
+      ],
+      "yaw": -2.8973,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-6",
+      "kind": "seat",
+      "p": [
+       1.267,
+       0.48,
+       2.938
+      ],
+      "yaw": -2.7344,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     }
+    ],
+    "components": {
+     "seat": {
+      "height": 0.32
+     }
+    }
+   }
+  },
+  {
+   "op": "place",
+   "def": "eden-guitar-stand@1",
+   "name": "stage-guitar",
+   "p": [
+    89.9,
+    -30.3
+   ],
+   "r": 3.1416
+  },
+  {
+   "op": "place",
+   "def": "eden-keyboard-stand@1",
+   "name": "stage-keyboard",
+   "p": [
+    93.9,
+    -31.4
+   ],
+   "r": 3.1416
+  },
+  {
+   "op": "place",
+   "def": "eden-bass-stand@1",
+   "name": "stage-bass",
+   "p": [
+    94.5,
+    -29.9
+   ],
+   "r": 3.1416
+  },
+  {
+   "op": "place",
+   "def": "eden-music-stand-viola@1",
+   "name": "bandstand-viola",
+   "p": [
+    39,
+    -26.6
+   ],
+   "r": -2.9
+  },
+  {
+   "op": "place",
+   "def": "eden-guitar-stool@1",
+   "name": "amphitheatre-guitar",
+   "p": [
+    76.9,
+    80
+   ],
+   "r": 3.1416
+  },
+  {
+   "op": "place",
+   "def": "eden-amphitheatre-steps@1",
+   "name": "amphitheatre-steps",
+   "p": [
+    76,
+    80.6
+   ],
+   "r": 0
+  }
+ ]
+}

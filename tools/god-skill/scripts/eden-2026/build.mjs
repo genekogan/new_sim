@@ -12,7 +12,7 @@ import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
 import {treeBatches} from './trees.mjs';
 import {lightOps,propOps} from './street-life.mjs';
-import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS,HOUSES,BARN,BARN_TOPS,SMALL_HOUSES} from './interiors.mjs';
+import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS,HOUSES,BARN,BARN_TOPS,SMALL_HOUSES,HOTELS} from './interiors.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
 const db=new Db(':memory:');
@@ -52,11 +52,23 @@ apply('world state',[{op:'world',state:genesis.state}]);
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='terrain'))apply(b.name,b.ops);
 apply('commons sleeping mat definition',COMMONS_DEFS);
 apply('interior defs',INTERIOR_DEFS);
-for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:op));
+// L4a (L1's door survey, team/scratch/d1-eden/door-survey2.mjs: 36 of 238 buildings could not be walked into): ~25 houses on
+// the hill, cliff and alpine slopes faced their door into the cut of their own foundation terrace (3-5 m of bank right
+// outside). They turn by quarter turns so the door looks along the slope; each turn below was chosen by re-running the
+// survey (a turn that broke a reachable house was taken back). DOOR_TURNS_JSON overrides the table for experiments.
+const DOOR_TURNS=process.env.DOOR_TURNS_JSON?JSON.parse(process.env.DOOR_TURNS_JSON):{'region-observatory-dome':1,
+ 'alpine-chalet-1':1,'alpine-chalet-2':1,'alpine-chalet-3':1,'alpine-chalet-4':1,'alpine-chalet-5':1,'alpine-chalet-6':1,'alpine-chalet-7':1,
+ 'cliff-house-7':1,'cliff-house-11':-1,'cliff-house-12':1,'cliff-house-14':1,'cliff-house-18':-1,'cliff-house-19':1,'cliff-house-20':1,
+ 'hillside-home-4':1,'hillside-home-5':1,'hillside-home-7':1,'hillside-home-9':1,'hillside-home-10':1,'hillside-home-11':-1,'hillside-home-12':1,
+ 'hillside-home-13':2,'hillside-home-14':-1,'hillside-home-15':1,'hillside-home-16':1};
+const doorTurn=op=>{const q=op.op==='place'?DOOR_TURNS[op.name]:0;if(!q)return op;const r=+((op.r??0)+q*Math.PI/2).toFixed(3);doorTurns.push({name:op.name,from:op.r??0,to:r});return{...op,r};};
+const doorTurns=[];
+for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-harbour-lighthouse'?{...op,p:[op.p[0],.1,op.p[1]]}:doorTurn(op)));
+console.log('door turns',doorTurns.length,JSON.stringify(doorTurns));
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
 for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
-for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES],['interiors: barn',BARN],['interiors: small houses',SMALL_HOUSES],['interiors: barn tops',BARN_TOPS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
+for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES],['interiors: barn',BARN],['interiors: small houses',SMALL_HOUSES],['interiors: barn tops',BARN_TOPS],['interiors: hotels',HOTELS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
 // V3: old Eden's town roofs were gardens too: planters (and on bigger roofs a bench or a parasol table) on the flat roofs
 // of the canal, old-town, seaside and cliff houses; deterministic by name, optional (droppable)
 {const roofOps=[];let k=0;for(const b of BUILDING_BATCHES)for(const op of b.ops){const pr=op.params??{};if(op.op!=='place'||pr.roof!=='flat'||!/^(canal-|market-street-|old-town-|seafront-hotel-|cliff-house-)/.test(op.name??''))continue;
@@ -87,6 +99,8 @@ const zoneOps=places.filter(p=>p.id!=='eden'&&!p.id.startsWith('int-')&&!/^commo
 for(let i=0;i<zoneOps.length;i+=12)apply(`named outdoor places ${i/12+1}`,zoneOps.slice(i,i+12));
 // lane E-life's old place schedules, on the named places above (worlds/patches/eden-life-20261017/schedules.json)
 {const ex=JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/extras.json`)).ops;apply('eden life extras defs',ex.filter(o=>o.op==='define'));apply('eden life extras',ex.filter(o=>o.op!=='define'),'any');}
+// lane L4a: the rest of old Eden's band (stage guitar/keys/bass, bandstand viola, amphitheatre guitar) (worlds/patches/eden-music-20261017)
+{const mu=JSON.parse(readFileSync(`${root}/worlds/patches/eden-music-20261017/music.json`)).ops;apply('eden music defs',mu.filter(o=>o.op==='define'));apply('eden music',mu.filter(o=>o.op!=='define'),'any');}
 apply('eden life schedules',JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/schedules.json`)).ops);
 const coverage=places.map(p=>({id:p.id,name:p.name,polygon:p.polygon,parent:p.parent,buildings:BUILDINGS.filter(b=>b.originalPlaceId===p.id).map(b=>b.name),zone:zoneOps.find(o=>o.name===`place-${p.id.replaceAll('.','-')}`.slice(0,48))?.name??null}));
 writeFileSync(`${root}/worlds/templates/eden-2026.json`,JSON.stringify(genesis,null,2)+'\n');
