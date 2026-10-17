@@ -20,13 +20,15 @@ export async function installWalkSettleWaitV1(host,enabled,drive){
 
 export function nativeLifecycleFlagV1(value){if(value!==undefined&&typeof value!=='boolean')throw Error('world.native-lifecycle-flag');return value===true;}
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,nativeLifecycleV1,prepareNativeLifecycle,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256,basePath=''}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,nativeLifecycleV1,prepareNativeLifecycle,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256,basePath='',launcherChild=false}){
  // basePath (world launcher fork, e.g. '/worlds'): served at <basePath>/w/<key> on a launcher child port with the launcher's build id.
+ // launcherChild: the same on a launcher that serves the original worlds at the root (basePath '', --old-worlds-root).
+ const child=!!basePath||launcherChild===true;
  if(basePath!==''&&!/^\/[a-z][a-z0-9-]{0,31}$/.test(basePath))throw Error('basePath must be one path segment like /worlds');
  const lifecycleEnabled=nativeLifecycleFlagV1(nativeLifecycleV1);if(prepareNativeLifecycle!==undefined&&(!lifecycleEnabled||typeof prepareNativeLifecycle!=='function'))throw Error('world.native-lifecycle-bootstrap-callback');
  if(walkSettleWaitV1!==undefined&&typeof walkSettleWaitV1!=='boolean')throw Error('world.walk-settle-wait-flag');
- if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||(basePath?port<1024||port>65535:port<4963||port>4969))throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
- if(!basePath&&!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
+ if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||(child?port<1024||port>65535:port<4963||port>4969))throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
+ if(!child&&!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  const exposure=worldAuthMode(authMode,{edgePublic:process.env.EDGE_PUBLIC,devAuth:process.env.DEV_AUTH,seedCast,nativeCast});
  // Validate explicit activation before a data directory/lock/database is touched.
  worldAccountAuthRequired(exposure,accountAuth);

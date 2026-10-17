@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Activate a world-launcher release ON THE BOX (release.sh runs it over ssh as root after the upload; also by hand):
-#   bash activate.sh <staging|production> <release dir> [--restart|--reload]
+#   bash activate.sh <staging|production|legacy> <release dir> [--restart|--reload]
 #
 # Without visible downtime (lane C4, backlog G9): when the running unit is the keeper (keeper.mjs) and this release
 # carries the same keeper, it switches the stage link and runs `systemctl reload`: the keeper hands the worlds over to
@@ -13,7 +13,7 @@
 # MAINPID_CMD / RELOAD_CMD / RESTART_CMD (systemctl show -p MainPID / reload / restart sim-worlds@<stage>).
 set -euo pipefail
 STAGE="${1:?stage}"; REL="${2:?release dir}"; FORCE="${3:-}"
-case "$STAGE" in staging|production) ;; *) echo "stage: staging or production"; exit 2;; esac
+case "$STAGE" in staging|production|legacy) ;; *) echo "stage: staging, production or legacy"; exit 2;; esac
 ROOT="${SIM_WORLDS_ROOT:-/srv/sim-worlds}"; CONF="${SIM_WORLDS_CONF:-/etc/sim-worlds/$STAGE.conf}"; UNIT="sim-worlds@$STAGE"
 mainpid() { if [ -n "${MAINPID_CMD:-}" ]; then eval "$MAINPID_CMD"; else systemctl show -p MainPID --value "$UNIT"; fi; }
 reload_unit() { if [ -n "${RELOAD_CMD:-}" ]; then eval "$RELOAD_CMD"; else systemctl reload "$UNIT"; fi; }
