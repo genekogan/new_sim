@@ -7,10 +7,15 @@ const put=(def,name,p,extra={})=>ops.push({op:'place',def:`core/${def}@1`,name,p
 const at=(def,id,extra={})=>put(def,id.replaceAll('.','-'),center(id),extra);
 const rect=(x,z,w,d)=>[[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]];
 
+// Old Eden's launch balloon was candy-striped (red gores, white seams wide as stripes, a yellow band at its widest):
+// the core balloon's own shapes plus six white gores along the envelope and the band.
+const CORE_BALLOON=JSON.parse(readFileSync(new URL('../../../../packages/world-compiler/src/core-kit/transport.json',import.meta.url))).find(d=>d.name==='core-balloon');
+const ENVELOPE=CORE_BALLOON.make.args.shapes[0],gore=a=>({kind:'sweep',at:[0,0,0],path:ENVELOPE.profile.map(([r,y])=>[+(Math.cos(a)*(r+.06)).toFixed(3),+(ENVELOPE.at[1]+y).toFixed(3),+(Math.sin(a)*(r+.06)).toFixed(3)]),r:.42,tint:'stripe',collide:false});
+const STRIPED_BALLOON={kind:'gen',gen:'kit/2',args:{...CORE_BALLOON.make.args,shapes:[...CORE_BALLOON.make.args.shapes,...[0,1,2,3,4,5].map(i=>gore(i*Math.PI/3)),{kind:'cyl',at:[0,ENVELOPE.at[1]+3.6,0],r:3.06,h:.55,segments:24,color:'#f0c040',collide:false}]}};
 // Library has beds but no low roll-out sleeping mat. Keep all thirty original
 // commons berths as editable bed slots rather than visually scaling a bed.
 export const COMMONS_DEFS=[{op:'define',def:{schema:'def/1',name:'eden-sleeping-mat',version:1,description:'A commons sleeping mat and pillow.',tags:['bed','mat','sleep','eden'],form:'point',make:{kind:'gen',gen:'kit/2',args:{shapes:[{kind:'box',at:[0,.035,0],size:[.82,.07,2],tint:'mat',round:.02},{kind:'box',at:[0,.1,-.78],size:[.58,.1,.3],tint:'pillow',round:.03}]}},params:{mat:{type:'color',default:'#607c78'},pillow:{type:'color',default:'#eee4d0'}},palette:{mat:'#607c78',pillow:'#eee4d0'},size:{box:[.82,.15,2]},components:{bed:{height:.08}},slots:[{id:'mat',kind:'bed',p:[0,.08,0],yaw:0,height:.08,accepts:{tags:['body']},capacity:1}]}},
-  {op:'define',def:{schema:'def/1',name:'eden-launch-balloon',version:1,extends:'core/balloon@1',description:'The library balloon moored at Eden launch height; the route needs a separate native ride binding.',tags:['balloon','carrier','eden'],form:'point',make:{kind:'none'},size:{box:[6.14,9.55,6],scale:[1,1.5]},components:{hover:{height:.15,bob:.06,period:9}}}},
+  {op:'define',def:{schema:'def/1',name:'eden-launch-balloon',version:1,extends:'core/balloon@1',description:'The library balloon moored at Eden launch height; the route needs a separate native ride binding.',tags:['balloon','carrier','eden'],form:'point',make:STRIPED_BALLOON,size:{box:[6.14,9.55,6],scale:[1,1.5]},components:{hover:{height:.15,bob:.06,period:9}}}},
 ];
 for(const p of P.filter(p=>/^commons-mat-\d+$/.test(p.id))) ops.push({op:'place',def:'eden-sleeping-mat@1',name:p.id,p:center(p.id),r:Math.PI/2,params:{mat:['#607c78','#a48b69','#677d94'][Number(p.id.split('-').at(-1))%3]}});
 // Open commons: a raised talk deck, working kitchen, reading and drawing tables.
