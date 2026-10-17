@@ -24,13 +24,6 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)",
-      "status": "todo",
-      "reason": "Baseline-only TODO: passes on the W51 re-seeded scene; lane L3 dropped its todo. Remove this entry once the gate baseline contains that change.",
-      "owner": "Suite owner (lane L3)"
-    },
-    {
-      "step": "V3-mars-engine",
       "id": "year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
@@ -73,24 +66,10 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
-      "status": "todo",
-      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
-      "owner": "Suite owner (lane L3)"
-    },
-    {
-      "step": "V3-mars-engine",
       "id": "year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "S s0995-carry: carry.path-occupied without end — idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house's A+B pin: held back)",
       "owner": "World / Core historical Mars construction owners"
-    },
-    {
-      "step": "V3-mars-engine",
-      "id": "year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
-      "status": "todo",
-      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
-      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -105,13 +84,6 @@
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
-    },
-    {
-      "step": "V3-mars-engine",
-      "id": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
-      "status": "todo",
-      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
-      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -133,13 +105,6 @@
       "status": "skip",
       "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
       "owner": "Godmode build/perf owners"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "elevated-floor exit uses its admitted height and a composed humanoid profile",
-      "status": "skip",
-      "reason": "Baseline-only skip: fixed in lane L3 (the test's own build 1.08 body, radius 0.311, plans at 0.371 m and building/1's 0.9 m interior doors give 0.35 m of raster clearance; it now uses build 1, radius 0.288, and runs). Remove this entry once the gate baseline contains the fix.",
-      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V5-server-full",
