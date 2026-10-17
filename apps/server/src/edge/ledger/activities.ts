@@ -138,7 +138,8 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     }
     return standAt.get(s.id)!;
   };
-  const live = data.spots.filter(s => w.enterable(s.place) && !!clearAt(s));
+  // only spots within reach are probed for clear ground (a far spot's probe paged in its nav tile for nothing)
+  const live = data.spots.filter(s => d2(s.at, w.me) <= SPOT_REACH && w.enterable(s.place) && !!clearAt(s));
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
     const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level);

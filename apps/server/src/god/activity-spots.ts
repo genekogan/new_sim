@@ -22,6 +22,8 @@ export type SpotsHost = {
   /** Innermost place holding a point (a room, a building, an area), and its name. */
   placeAt(at: V2, level: number): string | null;
   placeName(id: string): string | null;
+  /** Called before a derive (the god's places into the ledger's index). */
+  prepare?(): void;
 };
 
 /** How many seats per place offer the same seated activity (old Eden: 24 reading spots over the whole town). */
@@ -49,6 +51,7 @@ export class GodActivitySpots {
   data(): SpotsData {
     const key = `${this.h.version()}:${this.h.model.entities.size}`;
     if (this.cache?.key === key) return this.cache.value;
+    this.h.prepare?.();
     const t0 = performance.now(), value = this.derive();
     this.stats = { ms: Math.round(performance.now() - t0), spots: value.spots.length, shelves: value.shelves.length, derives: this.stats.derives + 1 };
     this.cache = { key, value };

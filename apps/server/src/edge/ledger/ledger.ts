@@ -14,6 +14,13 @@ import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
+/** Loops round a place (jog/run/cycle-around) are offered within this distance of its outline (m). */
+const AROUND_REACH = 150;
+const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) {if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;} return Math.hypot(Math.max(0, x0 - at[0], at[0] - x1), Math.max(0, z0 - at[1], at[1] - z1));};
+/** Places wider than this (m, either side of their box: a backdrop wood, a mountain, the sea) get no loop or stroll: a loop
+ *  through 5 spread points of one reads every nav tile under it (walk there, then stroll or wander). */
+const LOOP_SPAN = 160;
+const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
 import {isCampfire} from './fire.ts';
@@ -431,6 +438,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (c.verb !== 'walk' || !c.available || c.target?.kind !== 'place') continue;
       const place = this.places.byId.get(c.target.id), region = (w.regions as Record<string, {polygon: [number, number][]}>)[c.target.id];
       if (!place || !region || area(region.polygon) < 250 || place.enclosed || ['sleeping-mat', 'venue', 'building', 'room', 'water'].includes(place.kind)) continue;
+      if (bboxDistance(region.polygon, [me.pose.p[0], me.pose.p[2]]) > AROUND_REACH || bboxSpan(region.polygon) > LOOP_SPAN) continue;
       const route = this.strollRoute(c.target.id, region.polygon, [me.pose.p[0], me.pose.p[2]]); if (route.length < 2) continue;
       const id = 'stroll:' + c.target.id, label = `Stroll through ${place.name} (a loop of ${route.length} stops)`;
       caps.unshift({id, verb: 'stroll', label, target: c.target, available: true, params: {pause: {type: 'integer', min: 0, max: 60, default: 4}, via: {type: 'array', items: 'place name', maxItems: 4, optional: true}}});
@@ -463,6 +471,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       }
       for (const place of this.places.byId.values()) {
         if (place.parent === null || place.carrier || place.enclosed || area(place.polygon) < 250) continue;
+        // E-life (fine-tile thrash): loops round places within reach only. On Eden 2026 every lawn, wood and hill of the
+        // 1 km world was looped from anywhere: their clear spots paged in ~220 nav tiles on a Soul's first capabilities
+        if (bboxDistance(place.polygon, [me.pose.p[0], me.pose.p[2]]) > AROUND_REACH || bboxSpan(place.polygon) > LOOP_SPAN) continue;
         const native = (w.regions as Record<string, unknown>)[place.id];
         if (place.kind !== 'water' && !native && !this.placeWalkable?.(place.id)) continue;
         if (!['water', 'outdoor', 'park', 'garden', 'plaza', 'lawn', 'field', 'place', 'shore'].includes(place.kind)) continue;
