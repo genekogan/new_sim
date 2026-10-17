@@ -15,3 +15,10 @@ into `worlds/templates/eden-2026.json` (template edits are E-look's).
   post-letter 0→8, pull-ups 0→3, dips 0→1, situps 0→2, bench-press 0→1, lift-weights 0→1, yoga 0→1, play-volleyball 0→4,
   play-petanque 0→2 spots (`team/scratch/n2-life/patch-check.mjs`). Residents use the defs: test `eden-life` "B5/B3".
 - Gym benches and mats draw without colliders (`collide:false`), so a resident lies on them as on old Eden's scenery benches.
+
+## schedules.json (B9)
+Old Eden's 28 place schedule entries (`worlds/eden/places.v1.json`): open mic, kitchen preps, fire-circle times, shared meals,
+swims, the classroom skill share and study hour, the library reading hour, the dome circle, crafts in the pergola court,
+the amphitheatre/bandstand/stage music, afternoon tea, the woods walk and the night on the mats. They become `set` ops
+with `schedule.events` on the 16 matching Eden 2026 places (`at` HH:MM, `minutes`). Checked: they apply to 725db85c with no
+refusal and read back on the places exactly as old Eden's (`g-place-commons-deck` → open-mic `0 17 * * *` 45 min).
