@@ -1616,7 +1616,8 @@ export class MarsEngine implements Engine {
     return previewUpperFloorsV1(fact,{world:w,sceneLevels:source.map(l=>l.id),groundWorld:!!w.groundV1,
       bodiesOn:(levels)=>Object.keys(this.ents).sort().filter(id=>{const e=this.ents[id],h=e.human;if(e.kind!=='human'||!h)return false;if(levels.has(h.level??0))return true;
         const b=Object.values((w.upperFloorsV1 as UpperFloorsV1|undefined)?.buildings??{}).find(b=>b.levels.some(l=>levels.has(l.id)));
-        return !!b&&/^climb/.test(String(h.activity??''))&&e.pose.p[0]>=b.crop[0]-2&&e.pose.p[0]<=b.crop[2]+2&&e.pose.p[2]>=b.crop[1]-2&&e.pose.p[2]<=b.crop[3]+2;})});
+        return !!b&&/^climb/.test(String(h.activity??''))&&e.pose.p[0]>=b.crop[0]-2&&e.pose.p[0]<=b.crop[2]+2&&e.pose.p[2]>=b.crop[1]-2&&e.pose.p[2]<=b.crop[3]+2;}),
+      bodiesIn:(crop)=>Object.keys(this.ents).sort().filter(id=>{const e=this.ents[id],h=e.human;return e.kind==='human'&&!!h&&(h.level??0)===0&&e.pose.p[0]>=crop[0]&&e.pose.p[0]<=crop[2]&&e.pose.p[2]>=crop[1]&&e.pose.p[2]<=crop[3];})});
   }
   /** upper-floors/1: install a building's upper floors (cropped levels, floors, solids, stairs, rooms) or remove them; a fact
    *  that does not preview cleanly is a no-op (replay agrees). The planner re-bases once; walkers replan. */

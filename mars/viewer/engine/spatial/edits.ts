@@ -81,13 +81,18 @@ export type UpperFloorsBuildingV1 = {
   levels: { id: number; y: number; label: string; placeLevel: number }[];
   surfaces: Surface[]; solids: Obstacle[]; links: Link[];
   regions: { id: string; label: string; level: number; polygon: [number, number][] }[];
+  /** Authored-boundary box ids (world.authoredBoundariesV1) this building opens on its ground floor, e.g. a front-door
+   *  wall band: their collision is left out while the building is installed (its own solids stand in for the remains). */
+  openings?: string[];
 };
 export type UpperFloorsV1 = { version: 'upper-floors/1'; buildings: Record<string, UpperFloorsBuildingV1> };
 
 /** upper-floors/1 over a scene: each building's cropped levels, floors, solids (ids prefixed) and stairs. */
 export function withUpperFloors(scene: SpatialScene, world: WorldState): SpatialScene {
   const uf = world.upperFloorsV1; if (!uf) return scene;
-  const levels = [...scene.levels], surfaces = [...scene.surfaces], obstacles = [...scene.obstacles], links = [...scene.links];
+  const open = new Set(Object.values(uf.buildings).flatMap((b) => (b.openings ?? []).map((o) => 'authored-boundary:' + o)));
+  const levels = [...scene.levels], surfaces = [...scene.surfaces], links = [...scene.links];
+  const obstacles = open.size ? scene.obstacles.filter((o) => !open.has(o.id)) : [...scene.obstacles];
   for (const id of Object.keys(uf.buildings).sort()) {
     const b = uf.buildings[id];
     for (const l of b.levels) if (!levels.some((x) => x.id === l.id)) levels.push({ id: l.id, y: l.y, label: l.label, crop: [...b.crop] });

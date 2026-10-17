@@ -2,7 +2,9 @@
 // `upperFloorsV1` adds a building's upper floors to an existing world — or removes them again (the operator's rollback).
 // Pure validation and the world-state change; the engine (engine.ts) re-bases its Spatial and the fold adds the rooms'
 // kernel places. Geometry and its scene composition: mars/viewer/engine/spatial/edits.ts (UpperFloorsV1, withUpperFloors).
-//   {version:'upper-floors/1', building:{id, label, crop, levels, surfaces, solids, links, regions}}   install
+//   {version:'upper-floors/1', building:{id, label, crop, levels, surfaces, solids, links, regions, openings?}}   install
+// Rooms may also lie on the ground floor (level 0, e.g. a hotel lobby); `openings` names ground-floor authored walls (a door
+// band) the building opens while installed.
 //   {version:'upper-floors/1', remove:'<building id>'}                                                  remove
 import type { UpperFloorsBuildingV1, UpperFloorsV1 } from '../../../mars/viewer/engine/spatial/edits.ts';
 import type { WorldState } from '../../../mars/viewer/engine/world/types.ts';
@@ -20,7 +22,9 @@ const label = (s: unknown) => typeof s === 'string' && s.length > 0 && s.length 
 const inside = (crop: number[], x: number, z: number, pad = 0) => x >= crop[0] - pad && x <= crop[2] + pad && z >= crop[1] - pad && z <= crop[3] + pad;
 
 /** Engine levels of the world's static scene (ground, decks), so a building never reuses one. */
-export type UpperFloorsContext = { world: WorldState; sceneLevels: number[]; groundWorld: boolean; bodiesOn: (levels: Set<number>) => string[] };
+export type UpperFloorsContext = { world: WorldState; sceneLevels: number[]; groundWorld: boolean; bodiesOn: (levels: Set<number>) => string[];
+  /** Bodies on the ground floor (level 0) inside a crop: a building with ground rooms or door openings is removed only when it is empty. */
+  bodiesIn?: (crop: number[]) => string[] };
 
 /** Why this fact cannot be applied here (pure), or null. A building equal to the installed one is not an error (no-op). */
 export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Diag | null {
@@ -30,7 +34,7 @@ export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Dia
   if (f.remove !== undefined) {
     const b = installed[f.remove];
     if (!b) return { code: 'upper-floors.not-installed', message: `no upper floors installed for ${String(f.remove)}` };
-    const on = cx.bodiesOn(new Set(b.levels.map((l) => l.id)));
+    const on = [...new Set([...cx.bodiesOn(new Set(b.levels.map((l) => l.id))), ...(b.openings?.length || b.regions.some((r) => r.level === 0) ? cx.bodiesIn?.(b.crop) ?? [] : [])])].sort();
     if (on.length) return { code: 'upper-floors.occupied', message: `still upstairs in ${b.id}: ${on.join(', ')} (wait until they come down)` };
     return null;
   }
@@ -66,8 +70,17 @@ export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Dia
   }
   if (!Array.isArray(b.regions) || b.regions.length > 32) return { code: 'upper-floors.bad-regions', message: 'at most 32 rooms' };
   for (const r of b.regions) {
-    if (!r || !ID.test(String(r.id)) || cx.world.regions[r.id] || cx.world.entities[r.id] || !label(r.label) || !mine.has(r.level)) return { code: 'upper-floors.bad-region', message: `room ${r?.id}: a new id, label and one of the building's levels` };
+    if (!r || !ID.test(String(r.id)) || cx.world.regions[r.id] || cx.world.entities[r.id] || !label(r.label) || !(mine.has(r.level) || r.level === 0)) return { code: 'upper-floors.bad-region', message: `room ${r?.id}: a new id, label and one of the building's levels (or 0: a ground-floor room such as a lobby)` };
     if (!Array.isArray(r.polygon) || r.polygon.length < 3 || r.polygon.length > 64 || !r.polygon.every((p) => v2(p) && inside(crop, p[0], p[1], 0.01))) return { code: 'upper-floors.bad-region', message: `room ${r.id}: 3..64 [x,z] points inside the crop` };
+  }
+  if (b.openings !== undefined) {
+    const boxes = new Map((cx.world.authoredBoundariesV1?.boxes ?? []).map((x) => [x.id, x]));
+    if (!Array.isArray(b.openings) || b.openings.length > 16 || new Set(b.openings).size !== b.openings.length) return { code: 'upper-floors.bad-openings', message: 'at most 16 distinct authored-boundary ids' };
+    for (const id of b.openings) {
+      const x = boxes.get(id);
+      if (!x || x.kind !== 'wall' || x.collision !== 'solid' || !inside(crop, x.c[0], x.c[2]) || x.c[1] - x.half[1] > 1) return { code: 'upper-floors.bad-opening', message: `opening ${String(id)}: a solid ground-floor authored wall of this world inside the crop` };
+      if (Object.values(installed).some((o) => o.openings?.includes(id))) return { code: 'upper-floors.bad-opening', message: `opening ${id} is already opened by another building` };
+    }
   }
   return null;
 }
