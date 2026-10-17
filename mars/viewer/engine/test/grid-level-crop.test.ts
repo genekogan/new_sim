@@ -87,7 +87,7 @@ test('incremental updates of a cropped level equal a fresh build (random edits o
     const next = scene(true, extra), inc = updateGrids(prev, prevScene, next, 0.1), fresh = buildGrids(next, 0.1);
     assert.ok(inc, `step ${k}: incremental`);
     for (const [id, g] of fresh.levels) {
-      const h = inc!.levels.get(id)!;
+      const h: LevelGrid = inc!.levels.get(id)!;
       for (const key of ['nx', 'nz', 'ox', 'oz'] as const) assert.equal(h[key], g[key], `step ${k} level ${id} ${key}`);
       assert.equal(h.free.findIndex((v, i) => v !== g.free[i]), -1, `step ${k} level ${id} free`);
       assert.equal(h.clearance.findIndex((v, i) => v !== g.clearance[i]), -1, `step ${k} level ${id} clearance`);
