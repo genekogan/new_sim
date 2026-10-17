@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Operator step for old Eden's office upper floors on a world-launcher's fork (lane L4b, 2026-10-17; Gene's decision #5).
+// Operator step for old Eden's office upper floors (--building office, the default) and seafront hotels 1-3 (--building
+// hotels: a second, separate guarded install of three facts) on a world-launcher's fork (lane L4b, 2026-10-17; Gene's
+// decision #5). The descriptor's `upperFloors` is one fact path, or an array of them when both buildings are installed.
 // The engine support is upper-floors/1 (packages/engine-mars/src/upper-floors.ts): the fork's descriptor names a fact file
 // (`upperFloors`) that the edge server installs once at boot as a logged rules fact, plus an activity-spots file with the
 // twelve upstairs spots. Rollback is the {remove} fact (refused while anyone is upstairs; then retry later).
@@ -7,6 +9,7 @@
 // Run as the launcher's user from the release dir on the launcher's machine (eden2: cd /srv/sim-worlds/legacy && sudo -u
 // simworlds node --experimental-transform-types tools/upper-floors/upper-floors.mjs ...). No credentials are read.
 //
+//   (every command takes [--building office|hotels])
 //   review   --data <launcher data dir> [--slug eden]                       pure reads: state + what apply would write
 //   backup   --data <dir> --out <new abs dir>                               VACUUM INTO compact copy + descriptor + spots
 //   plan     --data <dir> --scratch <new abs dir> --port <free port>        boot a compact copy in this process (dev auth,
@@ -23,31 +26,46 @@ import { dirname, join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { officeFact, officeSpots } from './old-eden-office.mjs';
+import { hotelsFacts, hotelsRemoveFacts, hotelsSpots } from './old-eden-hotels.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const BUILDING = 'eden-office-1', AUTHOR = 'operator:upper-floors', DIR = 'upper-floors';
+const AUTHOR = 'operator:upper-floors', DIR = 'upper-floors';
+/** What each install puts in: its facts (installed in order), their removal, the spots it adds, the files it writes, and a
+ *  ground point a resident can walk to today (the plan's walker). The office's files stay byte-compatible with its first install. */
+export const BUILDINGS = {
+  office: { key: 'office', ids: ['eden-office-1'], facts: () => [officeFact()], file: () => officeFact(), removeFile: () => removeFact(), spots: officeSpots, ownPlaces: false, probe: null },
+  hotels: { key: 'hotels', ids: ['eden-hotel-1', 'eden-hotel-2', 'eden-hotel-3'], facts: hotelsFacts, file: hotelsFacts, removeFile: hotelsRemoveFacts, spots: hotelsSpots, ownPlaces: true, probe: [104, 128] },
+};
+const factsOf = (spec) => spec.facts();
+/** The descriptor's upper-floors fact files (a path or an array of them). */
+export const entriesOf = (d) => [d.upperFloors ?? []].flat().filter(Boolean);
+const upperFloorsValue = (list) => (list.length === 0 ? undefined : list.length === 1 ? list[0] : list);
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const pretty = (v) => JSON.stringify(v, null, 1) + '\n';
 
 /** Where everything lives for one fork under a launcher data dir. */
-export function layout(data, slug = 'eden') {
-  const art = join(data, 'forks/artifacts', DIR);
-  return { data, slug, descriptor: join(data, 'forks/descriptors', `${slug}.json`), db: join(data, 'worlds', slug, 'sim.db'), art,
-    fact: join(art, 'office.fact.json'), remove: join(art, 'office.remove.json'), spots: join(art, 'activity-spots.office.json') };
+export function layout(data, slug = 'eden', building = 'office') {
+  const art = join(data, 'forks/artifacts', DIR), spec = BUILDINGS[building]; assert(spec, `--building office|hotels, not ${building}`);
+  return { data, slug, descriptor: join(data, 'forks/descriptors', `${slug}.json`), db: join(data, 'worlds', slug, 'sim.db'), art, spec,
+    fact: join(art, `${building}.fact.json`), remove: join(art, `${building}.remove.json`), spots: join(art, `activity-spots.${building}.json`),
+    spotsRollback: join(art, `activity-spots.${building}-rollback.json`) };
 }
-export const removeFact = () => ({ version: 'upper-floors/1', remove: BUILDING });
+export const removeFact = () => ({ version: 'upper-floors/1', remove: 'eden-office-1' });
 
-/** The live spots file plus the office's upstairs spots; refuses ids or places that clash, places the rooms don't know. */
-export function mergeSpots(base, places, extra = officeSpots()) {
+/** The live spots file plus a building's spots; refuses ids or places that clash, places neither the place data nor the
+ *  building's own rooms (`ownRooms`, the facts' regions: hotel rooms are not in places.v1) know. */
+export function mergeSpots(base, places, extra = officeSpots(), ownRooms = []) {
   const ids = new Set(base.spots.map((s) => s.id)), clash = extra.filter((s) => ids.has(s.id)).map((s) => s.id);
   assert(!clash.length, `office spots already in the spots file: ${clash.join(', ')}`);
-  const placeIds = new Set(places.places.map((p) => p.id)), missing = [...new Set(extra.map((s) => s.place))].filter((p) => !placeIds.has(p));
+  const placeIds = new Set([...places.places.map((p) => p.id), ...ownRooms]), missing = [...new Set(extra.map((s) => s.place))].filter((p) => !placeIds.has(p));
   assert(!missing.length, `office rooms missing from the place data: ${missing.join(', ')}`);
   return { ...base, spots: [...base.spots, ...extra] };
 }
 /** The descriptor with the office installed (or removed again), every other field byte-identical in value. */
 export function editDescriptor(d, { upperFloors, activitySpots }) { return { ...d, activitySpots, upperFloors }; }
+const roomsOf = (spec) => factsOf(spec).flatMap((f) => f.building.regions.map((r) => r.id));
+const specSpots = (L, d) => mergeSpots(readJson(d.activitySpots), readJson(d.placeData), L.spec.spots(), L.spec.ownPlaces ? roomsOf(L.spec) : []);
 
 /** The release the launcher is serving now (keeper.json) and whether it carries upper-floors/1. */
 export function runningRelease(L) {
@@ -58,25 +76,30 @@ export function runningRelease(L) {
 /** Pure reads: what is installed now and what apply would write. */
 export function review(L) {
   const d = readJson(L.descriptor), out = { descriptor: L.descriptor, descriptorSHA256: sha(readFileSync(L.descriptor)), worldId: d.worldId,
-    upperFloors: d.upperFloors ?? null, activitySpots: d.activitySpots, release: runningRelease(L), files: {} };
+    building: L.spec.key, upperFloors: d.upperFloors ?? null, activitySpots: d.activitySpots, release: runningRelease(L), files: {} };
   for (const k of ['fact', 'remove', 'spots']) out.files[k] = existsSync(L[k]) ? sha(readFileSync(L[k])) : null;
-  out.last = lastFact(L.db);
-  out.state = !d.upperFloors ? (out.last?.install ? 'installed-without-descriptor?' : 'not-applied') : d.upperFloors === L.fact ? (out.last?.install ? 'applied' : 'descriptor-only (restart pending or refused)') : d.upperFloors === L.remove ? (out.last && !out.last.install ? 'rolled-back' : 'rollback pending or refused (someone upstairs?)') : 'unknown upperFloors path';
-  if (!d.upperFloors) {
-    const spots = mergeSpots(readJson(d.activitySpots), readJson(d.placeData)), fact = officeFact();
-    out.wouldWrite = { fact: { path: L.fact, sha256: sha(pretty(fact)), levels: fact.building.levels.map((l) => l.id), rooms: fact.building.regions.map((r) => r.id) },
-      spots: { path: L.spots, sha256: sha(pretty(spots)), spots: spots.spots.length, added: officeSpots().length }, descriptor: { upperFloors: L.fact, activitySpots: L.spots } };
+  const list = entriesOf(d), lasts = L.spec.ids.map((id) => lastFact(L.db, id)), all = (f) => lasts.every((x) => !!x && f(x));
+  out.last = lastFact(L.db, L.spec.ids); if (L.spec.ids.length > 1) out.lastEach = lasts;
+  out.state = list.includes(L.fact) ? (all((x) => x.install) ? 'applied' : 'descriptor-only (restart pending or refused)')
+    : list.includes(L.remove) ? (all((x) => !x.install) ? 'rolled-back' : 'rollback pending or refused (someone upstairs?)')
+    : list.every((p) => Object.keys(BUILDINGS).some((k) => p === join(L.art, `${k}.fact.json`) || p === join(L.art, `${k}.remove.json`))) ? (lasts.some((x) => x?.install) ? 'installed-without-descriptor?' : 'not-applied') : 'unknown upperFloors path';
+  if (out.state === 'not-applied') {
+    const spots = specSpots(L, d), facts = factsOf(L.spec);
+    out.wouldWrite = { fact: { path: L.fact, sha256: sha(pretty(L.spec.file())), levels: facts.flatMap((f) => f.building.levels.map((l) => l.id)), rooms: facts.flatMap((f) => f.building.regions.map((r) => r.id)) },
+      spots: { path: L.spots, sha256: sha(pretty(spots)), spots: spots.spots.length, added: L.spec.spots().length }, descriptor: { upperFloors: upperFloorsValue([...list, L.fact]), activitySpots: L.spots } };
   }
   return out;
 }
-/** The world log's last upper-floors fact (read-only open; WAL readers never block the writer). */
-export function lastFact(dbPath) {
+/** The world log's last upper-floors fact for these buildings (read-only open; WAL readers never block the writer). */
+export function lastFact(dbPath, buildings = ['eden-office-1']) {
   if (!existsSync(dbPath)) return null;
-  const db = new DatabaseSync(dbPath, { readOnly: true });
+  const want = new Set([buildings].flat()), db = new DatabaseSync(dbPath, { readOnly: true });
   try {
-    const r = db.prepare('SELECT seq,tick,at,payload FROM events WHERE author=? ORDER BY seq DESC LIMIT 1').get(AUTHOR);
-    if (!r) return null; const p = JSON.parse(r.payload).upperFloorsV1;
-    return { seq: r.seq, tick: r.tick, at: r.at, install: !!p?.building, building: p?.building?.id ?? p?.remove };
+    for (const r of db.prepare('SELECT seq,tick,at,payload FROM events WHERE author=? ORDER BY seq DESC').iterate(AUTHOR)) {
+      const p = JSON.parse(r.payload).upperFloorsV1, building = p?.building?.id ?? p?.remove;
+      if (want.has(building)) return { seq: r.seq, tick: r.tick, at: r.at, install: !!p?.building, building };
+    }
+    return null;
   } finally { db.close(); }
 }
 function maxSeq(dbPath) { const db = new DatabaseSync(dbPath, { readOnly: true }); try { return db.prepare('SELECT max(seq) AS s FROM events').get().s; } finally { db.close(); } }
@@ -94,7 +117,8 @@ export function backup(L, out) {
 /** What a capture of the running world is keyed by: every entity, region, world field, kernel thing and field, body
  *  pose and planner level/solid/surface/link — minus the office's own rooms, levels and `upper:<building>:` items. */
 export function capture(engine, kernel, office) {
-  const out = {}, put = (k, v) => { out[k] = sha(JSON.stringify(v) ?? 'undefined'); }, w = engine.world, mine = `upper:${office.building}:`;
+  const out = {}, put = (k, v) => { out[k] = sha(JSON.stringify(v) ?? 'undefined'); }, w = engine.world, mine = (office.buildings ?? [office.building]).map((b) => `upper:${b}:`);
+  const opened = new Set((office.openings ?? []).map((o) => 'authored-boundary:' + o));   // a hotel's door bands leave the scene while it is installed
   for (const [id, x] of Object.entries(w.entities)) put('entity:' + id, x);
   for (const [id, x] of Object.entries(w.regions)) if (!office.rooms.has(id)) put('region:' + id, x);
   for (const k of Object.keys(w)) if (!['entities', 'regions', 'upperFloorsV1'].includes(k)) put('world:' + k, w[k]);
@@ -104,7 +128,7 @@ export function capture(engine, kernel, office) {
   const b = engine.rt?.services?.spatial?.base;
   if (b) {
     for (const l of b.levels) if (!office.levels.has(l.id)) put('level:' + l.id, l);
-    for (const [kind, list] of [['solid', b.obstacles], ['surface', b.surfaces], ['link', b.links]]) for (const o of list) if (!String(o.id).startsWith(mine)) put(`${kind}:${o.id}`, o);
+    for (const [kind, list] of [['solid', b.obstacles], ['surface', b.surfaces], ['link', b.links]]) for (const o of list) if (!mine.some((m) => String(o.id).startsWith(m)) && !(kind === 'solid' && opened.has(o.id))) put(`${kind}:${o.id}`, o);
   }
   return out;
 }
@@ -122,8 +146,8 @@ const outside = (d) => ({ ...d, changed: d.changed.filter((k) => !LOG_COUNTERS.h
 /** Boot a compact copy in this process (no ticks between captures), install, check, remove, check. */
 export async function plan(L, { scratch, port, copy }) {
   assert(!existsSync(scratch), `${scratch} exists: pick a new scratch dir`); mkdirSync(scratch, { recursive: true });
-  const d = readJson(L.descriptor), fact = officeFact(), spotsFile = join(scratch, 'activity-spots.office.json');
-  writeFileSync(spotsFile, pretty(mergeSpots(readJson(d.activitySpots), readJson(d.placeData))));
+  const d = readJson(L.descriptor), facts = factsOf(L.spec), spotsFile = join(scratch, `activity-spots.${L.spec.key}.json`), spotList = L.spec.spots();
+  writeFileSync(spotsFile, pretty(specSpots(L, d)));
   if (copy) copyFileSync(copy, join(scratch, 'sim.db'));
   else { const db = new DatabaseSync(L.db, { readOnly: true }); try { db.exec(`VACUUM INTO '${join(scratch, 'sim.db').replaceAll("'", "''")}'`); } finally { db.close(); } }
   const { forkOptions } = await import(pathToFileURL(join(ROOT, 'tools/world-launcher/fork-world.mjs')).href);
@@ -133,27 +157,29 @@ export async function plan(L, { scratch, port, copy }) {
     officeStairGuards: f.officeStairGuards ?? false, ambient: o.ambient !== false, humanRest: f.humanRest ?? true, provisions: f.provisions ?? true, sequences: f.sequences ?? true, floorGoals: f.floorGoals ?? true,
     kitchen: f.kitchen ?? true, shore: f.shore ?? true, foodDeliveryId: f.foodDeliveryId, quietLandingCourtesy: f.quietLandingCourtesy ?? true, social: f.social ?? true, approachRetention: f.approachRetention ?? true,
     closedGoals: f.closedGoals ?? true, activateExpansion: f.activateExpansion ?? true });
-  const host = app.host, e = host.engine, receipt = { at: new Date().toISOString(), worldId: o.worldId, copy: join(scratch, 'sim.db'), factSHA256: sha(pretty(fact)) };
+  const host = app.host, e = host.engine, receipt = { at: new Date().toISOString(), building: L.spec.key, worldId: o.worldId, copy: join(scratch, 'sim.db'), factSHA256: sha(pretty(L.spec.file())) };
   try {
     host.stop();   // no ticks from here: every difference below is the fact's own
     const drive = async (p) => { let done = false, val, err; p.then((v) => { done = true; val = v; }, (x) => { done = true; err = x; });
       for (let i = 0; i < 200 && !done; i++) { await new Promise((r) => setImmediate(r)); host.drainInputs(); }
       assert(done, 'fact not settled by the sequencer'); if (err) throw err; return val; };
-    const office = { building: BUILDING, rooms: new Set(fact.building.regions.map((r) => r.id)), levels: new Set(fact.building.levels.map((l) => l.id)) };
-    // a resident on the ground who can walk to the foot of the office stairs today (not one in the shore's own domain)
-    const foot = fact.building.links.find((l) => l.from.level === 0).from.p;
+    const office = { buildings: facts.map((f) => f.building.id), rooms: new Set(facts.flatMap((f) => f.building.regions.map((r) => r.id))), levels: new Set(facts.flatMap((f) => f.building.levels.map((l) => l.id))), openings: facts.flatMap((f) => f.building.openings ?? []) };
+    // a resident on the ground who can walk to the foot of the office stairs today (hotels: to the harbour strip's east end,
+    // where their walkway starts; their lobbies have no floor until installed)
+    const foot = L.spec.probe ?? facts[0].building.links.find((l) => l.from.level === 0).from.p;
     const walker = Object.keys(e.ents).sort().find((id) => e.ents[id].kind === 'human' && (e.ents[id].human?.level ?? 0) === 0 && e.routeEstimateV1(id, foot, 0).ok);
-    const reach = () => officeSpots().map((s) => ({ spot: s.id, level: s.level, ...(walker ? e.routeEstimateV1(walker, s.at, s.level) : { ok: false, code: 'no-walker' }) }));
+    const reach = () => spotList.map((s) => ({ spot: s.id, level: s.level, ...(walker ? e.routeEstimateV1(walker, s.at, s.level) : { ok: false, code: 'no-walker' }) }));
+    const installAll = async (list) => { const outs = []; for (const f of list) outs.push(await drive(host.installUpperFloorsV1(f))); return { installed: outs.every((x) => x?.installed === true), each: outs }; };
     receipt.tick = e.world.tick; receipt.seqBefore = host.seq; receipt.walker = walker ?? null;
     const A = capture(e, host.kernel, office); receipt.compared = Object.keys(A).length;
     receipt.reachBefore = reach().filter((r) => r.ok).map((r) => r.spot);
-    receipt.install = await drive(host.installUpperFloorsV1(fact));
+    receipt.install = await installAll(facts);
     const B = capture(e, host.kernel, office);
     receipt.rooms = [...office.rooms].map((id) => ({ id, region: !!e.world.regions[id], place: !!host.kernel.things[id], placeLevel: e.world.regions[id]?.placeLevel ?? null }));
     receipt.levels = e.rt.services.spatial.base.levels.map((l) => l.id);
     receipt.reach = reach().map((r) => ({ spot: r.spot, ok: r.ok, ...(r.ok ? { metres: r.metres } : { code: r.code }) }));
     receipt.outsideOffice = outside(diffCaptures(A, B));
-    receipt.remove = await drive(host.installUpperFloorsV1(removeFact()));
+    receipt.remove = await installAll([L.spec.removeFile()].flat());
     const C = capture(e, host.kernel, office);
     receipt.afterRemove = { ...outside(diffCaptures(A, C)), rooms: [...office.rooms].filter((id) => e.world.regions[id] || host.kernel.things[id]), upperFloorsV1: !!e.world.upperFloorsV1 };
     receipt.seqAfter = host.seq;
@@ -189,8 +215,9 @@ function restartFork(L, d, flags) {
 export function apply(L, { backupDir, confirm, port, base }) {
   const b = checkBackup(L, backupDir), d = readJson(L.descriptor), rel = runningRelease(L);
   assert(rel.upperFloors !== false, `the running release ${rel.dir} has no upper-floors/1: refresh the legacy release from the trunk first`);
-  assert(!d.upperFloors, `descriptor already names ${d.upperFloors}: review first`);
-  const fact = officeFact(), spots = mergeSpots(readJson(d.activitySpots), readJson(d.placeData)), next = editDescriptor(d, { upperFloors: L.fact, activitySpots: L.spots });
+  const list = entriesOf(d);
+  assert(!list.some((p) => p === L.fact || p === L.remove), `descriptor already names ${d.upperFloors}: review first`);
+  const fact = L.spec.file(), spots = specSpots(L, d), next = editDescriptor(d, { upperFloors: upperFloorsValue([...list, L.fact]), activitySpots: L.spots });
   const steps = { write: [L.fact, L.spots, L.descriptor], restart: [`remove-fork ${L.slug}`, `register-fork ${L.slug}`, 'set-claimable false (when it was)'], backup: b.simDb };
   if (!confirm) return { dryRun: true, ...steps };
   mkdirSync(L.art, { recursive: true, mode: 0o755 });
@@ -199,11 +226,18 @@ export function apply(L, { backupDir, confirm, port, base }) {
 }
 export function rollback(L, { backupDir, confirm, port, base }) {
   const b = readJson(join(backupDir, 'backup.json')), d = readJson(L.descriptor);
-  assert.equal(d.upperFloors, L.fact, `descriptor does not name the installed office (${d.upperFloors ?? 'none'})`);
+  const list = entriesOf(d);
+  assert(list.includes(L.fact), `descriptor does not name the installed ${L.spec.key === 'office' ? 'office' : L.spec.key} (${d.upperFloors ?? 'none'})`);
   assert(b.activitySpots && existsSync(b.activitySpots), 'the original spots file named in the backup is missing');
-  const next = editDescriptor(d, { upperFloors: L.remove, activitySpots: b.activitySpots });
-  if (!confirm) return { dryRun: true, write: [L.remove, L.descriptor], activitySpots: b.activitySpots, note: 'refused at boot while anyone is upstairs: verify, and re-run restart later' };
-  writeAtomic(L.remove, pretty(removeFact())); writeAtomic(L.descriptor, JSON.stringify(next, null, 1) + '\n');
+  // the spots go back to the backup's file when that is exactly the live file minus this building's spots; otherwise (the
+  // other building was installed since) the live file minus only this building's spot ids
+  const own = new Set(L.spec.spots().map((s) => s.id)), live = existsSync(d.activitySpots) ? readJson(d.activitySpots) : null;
+  const kept = live && { ...live, spots: live.spots.filter((s) => !own.has(s.id)) }, same = !kept || JSON.stringify(kept) === JSON.stringify(readJson(join(backupDir, 'activity-spots.json')));
+  const spotsPath = same ? b.activitySpots : L.spotsRollback;
+  const next = editDescriptor(d, { upperFloors: upperFloorsValue(list.map((p) => (p === L.fact ? L.remove : p))), activitySpots: spotsPath });
+  const write = [L.remove, ...(same ? [] : [L.spotsRollback]), L.descriptor];
+  if (!confirm) return { dryRun: true, write, activitySpots: spotsPath, note: 'refused at boot while anyone is upstairs: verify, and re-run restart later' };
+  writeAtomic(L.remove, pretty(L.spec.removeFile())); if (!same) writeAtomic(L.spotsRollback, pretty(kept)); writeAtomic(L.descriptor, JSON.stringify(next, null, 1) + '\n');
   return { rolledBack: true, op: restartFork(L, next, { port, base }) };
 }
 export function verify(L, expect) {
@@ -214,9 +248,9 @@ export function verify(L, expect) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const argv = process.argv.slice(2), flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; }, has = (k) => argv.includes(`--${k}`);
   const cmd = argv[0], data = flag('data');
-  const usage = () => { console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//')).slice(8, 18).join('\n')); process.exit(2); };
+  const usage = () => { console.error(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//   ')).join('\n')); process.exit(2); };
   if (!data) usage();
-  const L = layout(resolve(data), flag('slug') ?? 'eden'), net = { port: Number(flag('port')), base: flag('base') ?? '' };
+  const L = layout(resolve(data), flag('slug') ?? 'eden', flag('building') ?? 'office'), net = { port: Number(flag('port')), base: flag('base') ?? '' };
   try {
     let out;
     if (cmd === 'review') out = review(L);

@@ -134,14 +134,16 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       const byId=new Map(JSON.parse(readFileSync(resolve(placeData),'utf8')).places.map(p=>[p.id,p]));
       const out=await drive(host.installPlaceRegionsV1(nativePlaces.filter(id=>byId.has(id)).map(id=>({id,label:byId.get(id).name,polygon:byId.get(id).polygon}))));
       if(out.admitted.length||out.refused.length)console.error('[edge] native places:',JSON.stringify({admitted:out.admitted,refused:out.refused.map(r=>r.id+' '+r.code),unknown:nativePlaces.filter(id=>!byId.has(id))}));}
-    // upper-floors/1 (descriptor `upperFloors`: path to an upper-floors/1 fact, tools/upper-floors): a building's upper floors
-    // installed once as a logged rules fact, or removed again ({remove}). Already applied: no-op. Refused: reported, the world
-    // boots without it (never half-installed). Read from the options object so the parameter list stays as the launcher's.
-    const upperFloorsFile=arguments[0]?.upperFloors;
-    if(upperFloorsFile){if(!host.installUpperFloorsV1)throw Error('selected runtime has no upper-floors/1');
-      const fact=JSON.parse(readFileSync(resolve(upperFloorsFile),'utf8')),done='remove' in fact?!host.engine.world.upperFloorsV1?.buildings?.[fact.remove]:!!host.engine.world.upperFloorsV1?.buildings?.[fact.building?.id];
-      try{const out=done?{installed:false}:await drive(host.installUpperFloorsV1(fact));console.error('[edge] upper-floors/1:',JSON.stringify({building:fact.building?.id??fact.remove,remove:'remove' in fact,installed:out.installed,already:done}));}
-      catch(error){console.error('[edge] upper-floors/1 refused:',error instanceof Error?error.message:String(error));}}
+    // upper-floors/1 (descriptor `upperFloors`: a path, or an array of paths, to upper-floors/1 facts, tools/upper-floors; each
+    // file holds one fact or an array of facts, installed in order): a building's upper floors installed once as a logged rules
+    // fact, or removed again ({remove}). Already applied: no-op. Refused: reported, the world boots without that building
+    // (never half-installed). Read from the options object so the parameter list stays as the launcher's.
+    const upperFloorsFiles=[arguments[0]?.upperFloors??[]].flat().filter(Boolean);
+    if(upperFloorsFiles.length){if(!host.installUpperFloorsV1)throw Error('selected runtime has no upper-floors/1');
+      for(const file of upperFloorsFiles)for(const fact of [JSON.parse(readFileSync(resolve(file),'utf8'))].flat()){
+        const done='remove' in fact?!host.engine.world.upperFloorsV1?.buildings?.[fact.remove]:!!host.engine.world.upperFloorsV1?.buildings?.[fact.building?.id];
+        try{const out=done?{installed:false}:await drive(host.installUpperFloorsV1(fact));console.error('[edge] upper-floors/1:',JSON.stringify({building:fact.building?.id??fact.remove,remove:'remove' in fact,installed:out.installed,already:done}));}
+        catch(error){console.error('[edge] upper-floors/1 refused:',error instanceof Error?error.message:String(error));}}}
     // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
     // CN5: a ride whose descriptor route changed flies the new one from its next flight (logged; only while parked and empty)
     for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier?.route&&host.engine.world.entities[o.params?.carrier]?.carrier&&host.engine.carrierRouteV1?.(o.params.carrier)!==o.carrier.route&&host.setCarrierRouteV1){

@@ -3,7 +3,7 @@
 // Pure validation and the world-state change; the engine (engine.ts) re-bases its Spatial and the fold adds the rooms'
 // kernel places. Geometry and its scene composition: mars/viewer/engine/spatial/edits.ts (UpperFloorsV1, withUpperFloors).
 //   {version:'upper-floors/1', building:{id, label, crop, levels, surfaces, solids, links, regions, openings?}}   install
-// Rooms may also lie on the ground floor (level 0, e.g. a hotel lobby); `openings` names ground-floor authored walls (a door
+// Rooms and floor surfaces may also lie on the ground floor (level 0 at y 0, e.g. a hotel lobby and its walkway); `openings` names ground-floor authored walls (a door
 // band) the building opens while installed.
 //   {version:'upper-floors/1', remove:'<building id>'}                                                  remove
 import type { UpperFloorsBuildingV1, UpperFloorsV1 } from '../../../mars/viewer/engine/spatial/edits.ts';
@@ -34,7 +34,7 @@ export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Dia
   if (f.remove !== undefined) {
     const b = installed[f.remove];
     if (!b) return { code: 'upper-floors.not-installed', message: `no upper floors installed for ${String(f.remove)}` };
-    const on = [...new Set([...cx.bodiesOn(new Set(b.levels.map((l) => l.id))), ...(b.openings?.length || b.regions.some((r) => r.level === 0) ? cx.bodiesIn?.(b.crop) ?? [] : [])])].sort();
+    const on = [...new Set([...cx.bodiesOn(new Set(b.levels.map((l) => l.id))), ...(b.openings?.length || b.regions.some((r) => r.level === 0) || b.surfaces.some((s) => s.level === 0) ? cx.bodiesIn?.(b.crop) ?? [] : [])])].sort();
     if (on.length) return { code: 'upper-floors.occupied', message: `still upstairs in ${b.id}: ${on.join(', ')} (wait until they come down)` };
     return null;
   }
@@ -54,7 +54,7 @@ export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Dia
   const ids = new Set<string>(), okId = (id: unknown) => typeof id === 'string' && ID.test(id) && !ids.has(id) && !!ids.add(id);
   if (!Array.isArray(b.surfaces) || !b.surfaces.length || b.surfaces.length > 64) return { code: 'upper-floors.bad-surfaces', message: '1..64 floor surfaces' };
   for (const s of b.surfaces) {
-    if (!okId(s?.id) || !mine.has(s.level) || s.y !== mine.get(s.level) || !obbOk(s.obb)) return { code: 'upper-floors.bad-surface', message: `surface ${s?.id}: id, one of the building's levels at its height, obb` };
+    if (!okId(s?.id) || !((mine.has(s.level) && s.y === mine.get(s.level)) || (s.level === 0 && s.y === 0)) || !obbOk(s.obb)) return { code: 'upper-floors.bad-surface', message: `surface ${s?.id}: id, one of the building's levels at its height (or the ground floor, level 0 at y 0: a lobby or walkway), obb` };
     if (!inside(crop, s.obb.c[0], s.obb.c[1])) return { code: 'upper-floors.bad-surface', message: `surface ${s.id} lies outside the crop` };
   }
   if (!Array.isArray(b.solids) || b.solids.length > 512) return { code: 'upper-floors.bad-solids', message: 'at most 512 solids' };
