@@ -112,6 +112,7 @@ function clip(gltf: GLTF, name: string) {
  * fitted by shoulders, the crowns are at ≈ 1.75 (woman), 1.77 (casual) and 1.88 m (punk, hair tips).
  * A composed look with a `height` stands bodyScaleOf × that tall (shoulders and everything else scale with it).
  */
+const standingBoxes = new WeakMap<GLTF, Map<TemplateAppearance | undefined, THREE.Box3>>();
 function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   const model = clone(gltf.scene);
   const actorAppearance=transferActorAppearance(gltf.scene,model,appearance);
@@ -122,7 +123,11 @@ function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   for(const [k,name] of Object.entries(EXTRA_CLIPS) as [ExtraClip,string][]){const c=THREE.AnimationClip.findByName(gltf.animations,name);if(c)extra[k]=mixer.clipAction(c);}
   idle.play();
   mixer.update(0.01);
-  const b = new THREE.Box3().setFromObject(model);
+  // The standing box of a fresh clone in the Idle pose depends only on the source and the look: skinned bounds walk
+  // every vertex through its bones, ~40 ms a call on a 4x-throttled phone, and every template asks five times.
+  const looks = standingBoxes.get(gltf) ?? standingBoxes.set(gltf, new Map()).get(gltf)!;
+  let b = looks.get(appearance)?.clone();
+  if (!b) { b = new THREE.Box3().setFromObject(model); looks.set(appearance, b.clone()); }
   if(b.isEmpty()||![...b.min.toArray(),...b.max.toArray()].every(Number.isFinite)||b.max.y-b.min.y<1e-5)throw Error('Body model has no finite standing height');
   let scale = PERSON_HEIGHT / (b.max.y - b.min.y);
   const place = () => {
@@ -179,6 +184,7 @@ function fitArms(gltf: GLTF) {
   }
   mixer.stopAllAction();
   mixer.uncacheRoot(model);
+  standingBoxes.delete(gltf);   // the arms are about to change: later fits measure the fitted body afresh
   // bone rest offsets (and the skin stretch axis: the child joint, in the parent bone's frame)
   const axis = new Map<string, [THREE.Vector3, number]>();
   gltf.scene.traverse((o) => {
@@ -233,7 +239,8 @@ function measureWalk(gltf: GLTF, name = 'Walk'): { walkSpeed: number; forward: n
   for (let i = 0; i <= N; i++) {
     walk.time = i * dt;
     mixer.update(0);
-    model.updateMatrixWorld(true);
+    // getWorldPosition updates the foot's own ancestor chain (updateWorldMatrix(true, false)): the same matrices
+    // a whole-model updateMatrixWorld(true) computes for it, without every other bone and mesh
     const ys = feet.map((f) => f!.getWorldPosition(p).y);
     const foot = ys[0] < ys[1] ? 0 : 1;
     const z = feet[foot]!.getWorldPosition(p).z;
