@@ -1271,7 +1271,10 @@ export class MarsEngine implements Engine {
   renderPlatformsV1(){return this.renderPlatformMetadata?structuredClone(this.renderPlatformMetadata):undefined;}
   configureRenderPlatformsV1(raw:RenderPlatformsV1){const metadata=renderPlatformsV1Schema.parse(raw);if(metadata.navHash!==hashOf((this.world as any).navV1??null)||metadata.baseStaticHash!==this.world.base.staticHash)throw Error('render-platforms.source-differs');if(hashOf(metadata)===hashOf(this.renderPlatformMetadata??null))return;this.finishRecorder();this.renderPlatformMetadata=structuredClone(metadata);this.renderBaseKey='';this.startRecorder();}
   private projectRenderPlatformsV1(scene:Record<string,unknown>|null){const m=this.renderPlatformMetadata;if(!scene||!m)return;if(m.navHash!==hashOf((this.world as any).navV1??null)||m.baseStaticHash!==this.world.base.staticHash){scene.platforms=[];return;}const {platforms,...provenance}=m;scene.platforms=structuredClone(platforms);scene.platformProvenance=structuredClone(provenance);}
-  private renderContextKeyV1(){return JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null,this.rulesVersion]);}
+  // E-life: the clock's day length, not its origin: a god setting the time of day moved the origin, the render base was
+  // captured again under a new hash and every viewer reinstalled the scene behind the arrival card (viewers read only
+  // dayTicks from the scene; the time itself travels in each take's env.datetime)
+  private renderContextKeyV1(){return JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock?.dayTicks??null,this.rulesVersion]);}
   private startRecorder() {
     if(this.readerRecordingDepth)return;
     // Authored render bases are immutable for this engine instance. Supported
