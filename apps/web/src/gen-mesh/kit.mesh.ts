@@ -186,10 +186,20 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   return root;
 }
 
+/** kitArgs.safeParse is a pure function of a def's `make.args`; every instance of a def passes the same object (L3e: ~1.3 s
+ *  of a 4x phone's Eden 2026 arrival was re-validating it per instance, twice). Defs are content-addressed and never edited
+ *  in place (the prototype cache above already relies on that), so one result per args object is the same answer. */
+const parsedArgs = new WeakMap<object, ReturnType<typeof kitArgs.safeParse>>();
+export function parseKitArgs(args: Record<string, unknown>): ReturnType<typeof kitArgs.safeParse> {
+  let r = parsedArgs.get(args);
+  if (!r) { r = kitArgs.safeParse(args); parsedArgs.set(args, r); }
+  return r;
+}
+
 registerMesh({
   gen: 'kit/2',
   build(ctx) {
-    const parsed = kitArgs.safeParse(ctx.args); if (!parsed.success) return null;
+    const parsed = parseKitArgs(ctx.args); if (!parsed.success) return null;
     const key = kitCacheKey(ctx, parsed.data);
     let proto = cache.get(key);
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {} }); cache.set(key, proto); }
@@ -197,7 +207,7 @@ registerMesh({
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
     return obj;
   },
-  instanceKey(ctx) { const a = kitArgs.safeParse(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },
+  instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },
 });
 
 // K2: $params can change geometry; both prototype and instance identity include numeric values.
