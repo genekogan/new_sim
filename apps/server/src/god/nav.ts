@@ -26,6 +26,9 @@ export type NavHost = {
   model: WorldModel;
   /** Changes when anything but a body's pose changed (the engine bridge's version); else the model's editSeq. */
   version?: () => number;
+  /** E-life: changes only with the god's edits (furniture, walls, doors placed): room goals are kept across engine
+   *  writebacks (a carried cup, a duck) that used to re-route every room near the Soul. Unset: `version`. */
+  staticVersion?: () => number;
   engine: Engine;
   /** Engine level of a standing height at (x, z): 0 on the ground (any terrain height), else a floor's level. */
   levelAt(x: number, z: number, y: number): number;
@@ -79,6 +82,8 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
+/** Upper-storey rooms are offered inside (or at the door of) their building, or to a Soul already upstairs (m). */
+const UPPER_ROOMS_WITHIN = 1;
 const BUILDINGS_WITHIN = 150;
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
@@ -280,7 +285,8 @@ export class GodNav {
     const E = this.h.engine;
     const centre = near(t.at, t.level, 40);
     if (!t.entry || !E.reachV1) return centre;
-    const key = `${this.cache?.key}|${t.ref}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
+    this.index(); const rv = `${this.h.staticVersion?.() ?? this.cache?.key}`;
+    const key = `${rv}|${t.ref}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
     const reach = (p: Vec2) => { const r = E.reachV1!({ p: t.entry!.p, level: t.entry!.level }, { p, level: t.level }); return r.ok; };
     let goal: { p: Vec2; level: number } | null = null;
     if (centre && inPoly(centre.p[0], centre.p[1], t.poly ?? []) && reach(centre.p)) goal = centre;
@@ -303,7 +309,7 @@ export class GodNav {
     // one entry per room per world version: drop an older version's entries, never clear mid-sweep (the Eden 2026 cafe
     // offers 268 rooms within 80 m; the old 200-entry cap cleared during every sweep, so each sweep past the 50-tick goal
     // cache re-routed every room: the cafe's ~10 s stalls)
-    if (this.roomsOf !== this.cache?.key) { this.rooms.clear(); this.roomsOf = this.cache?.key; }
+    if (this.roomsOf !== rv) { this.rooms.clear(); this.roomsOf = rv; }
     this.rooms.set(key, goal); if (this.rooms.size > 20_000) this.rooms.clear();
     if (!goal) this.blocked.set(t.ref, `Nothing inside ${t.ref} can be reached from its front door right now: furniture closes the way in.`); else this.blocked.delete(t.ref);
     return goal;
@@ -327,7 +333,14 @@ export class GodNav {
     // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
     // (and big stand-alone structures, so a Soul in a furnished room can still head for Freeside across the camp)
     for (const x of ranked.slice(SHOW)) if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
-    for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
+    // E-life: an upper storey's rooms are offered from close by (or from inside the building) only: each needs a multi-floor
+    // reach check from the front door, and near Eden 2026's 3-4 storey canal row ~100 of them made one capabilities call
+    // take 44 s (1600 floor windows built). Ground-floor rooms stay offered within ROOMS_WITHIN; walk to the building first.
+    for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) {
+      const rooms = (t.rooms ?? []).map((r) => this.thing(r)).filter((r): r is Thing => !!r);
+      const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
+      for (const rt of rooms) if (rt.level === 0 || inside) pick.push({ t: rt, d: this.distance(rt, here) });
+    }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
       const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
