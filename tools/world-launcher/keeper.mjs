@@ -212,8 +212,14 @@ async function shutdown(sig, code = 0) {
 for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => void shutdown(sig));
 process.on('SIGHUP', () => { log('SIGHUP: handover'); void handover().catch((e) => log(`handover error: ${e.message}`)); });
 
-await new Promise((yes) => server.listen(port, '127.0.0.1', yes));
-log(`holding 127.0.0.1:${port} (sha ${status.keeper.sha.slice(0, 12)}, data ${dataDir}, releases from ${link})`);
+// systemd socket activation (deploy/sim-worlds@.socket, optional): systemd holds the port across restarts, so a restart
+// (or a crash) queues new connections in the socket's backlog instead of refusing them (no Caddy 502 page); they are
+// answered once the next keeper is up. LISTEN_FDS=1: fd 3 is our listening socket. Without it, the keeper binds itself.
+const activated = process.env.LISTEN_FDS === '1' && (!process.env.LISTEN_PID || Number(process.env.LISTEN_PID) === process.pid);
+for (const k of ['LISTEN_FDS', 'LISTEN_PID', 'LISTEN_FDNAMES']) delete process.env[k];   // not for the launcher or the worlds
+await new Promise((yes) => (activated ? server.listen({ fd: 3 }, yes) : server.listen(port, '127.0.0.1', yes)));
+if (activated && server.address()?.port !== port) { log(`the socket from systemd is ${JSON.stringify(server.address())}, not 127.0.0.1:${port}: fix the .socket drop-in`); process.exit(1); }
+log(`holding 127.0.0.1:${port}${activated ? ' (socket from systemd)' : ''} (sha ${status.keeper.sha.slice(0, 12)}, data ${dataDir}, releases from ${link})`);
 writeStatus();
 try { await startFresh(); }
 catch (e) { log(`the first generation did not start: ${e.message}`); await shutdown('start failure', 1); }
