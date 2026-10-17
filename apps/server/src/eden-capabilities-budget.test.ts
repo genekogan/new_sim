@@ -34,7 +34,9 @@ test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after 
   assert.ok(floorBuilds <= 100, `window floors are built once per far room window (${floorBuilds} built, ${floorHits} reused)`);
   const sweep1 = new Set(built);
   assert.ok(sweep1.size <= nav.fineMax, `one sweep's fine tiles fit the cache (${sweep1.size} built, ${nav.fineMax} kept)`);
-  assert.ok(strandedMetrics().hits - h0 > 0, 'standing points in rooms the stairs do not reach are refused without a search');
+  // (E-life: upper-storey rooms are now checked only from inside their building, so a first sweep from outside may make
+  // no failed upstairs search at all; the stranded-search memo stays covered by its own path tests)
+  void strandedMetrics; void h0;
   assert.ok(nav.fineMax >= 40, 'paged worlds keep enough fine tiles for a capabilities sweep');
 
   // walk somewhere, past the per-thing goal cache (50 ticks): the next call recomputes every goal from warm tiles
