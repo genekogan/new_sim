@@ -103,5 +103,33 @@ group('scenery: avenue and commons trees', put => {
   for (let i = 0; i < 8; i++) put('tree', `south-avenue-tree-${i + 1}`, [-28 + i * 8, 92.5], {});
   for (const [i, x, z] of [[1, -34, -26], [2, -34, -12], [3, -34, 14], [4, -34, 28], [5, -26, 34], [6, -12, 34], [7, 14, 34], [8, -20, -34], [9, -4, -34], [10, 22, -34]]) put('tree', `commons-edge-tree-${i}`, [x, z], {});
 });
+// V5: the campus library annex's portico (old Eden: six columns carrying a flat entablature in front of the entrance);
+// the middle bay stays wide open over the door.
+const STONE = '#efe4cf', TRIM = '#e8e2d2';
+const porticoShapes = [
+  ...[-6, -3.8, -1.6, 1.6, 3.8, 6].flatMap(x => [
+    { kind: 'box', at: [x, 0.15, 1.0], size: [0.82, 0.3, 0.82], color: TRIM, material: 'stone' },
+    { kind: 'cyl', at: [x, 3.6, 1.0], r: 0.3, h: 6.6, segments: 14, color: STONE, material: 'stone' },
+    { kind: 'box', at: [x, 6.98, 1.0], size: [0.78, 0.16, 0.78], color: TRIM, material: 'stone', collide: false }]),
+  { kind: 'box', at: [0, 7.45, -0.05], size: [13.4, 0.8, 2.5], color: STONE, material: 'stone', collide: false },
+  { kind: 'box', at: [0, 7.95, -0.05], size: [13.8, 0.2, 2.75], color: TRIM, material: 'stone', collide: false },
+];
+groups.push({ label: 'scenery: annex portico', ops: [
+  kit('eden-annex-portico', 'A stone portico of six columns under a flat entablature, in front of a library entrance (old Eden campus annex).', [13.8, 8.1, 2.8], porticoShapes),
+  { op: 'place', def: 'eden-annex-portico@1', name: 'campus-annex-portico', p: [-12, -114.3] }] });
+
+// the old campus quad: a row of small trees before the annex and four benches facing the fountain
+group('scenery: campus quad', put => {
+  [-27, -21, -15, -9, -3, 3].forEach((x, i) => put('tree', `campus-annex-tree-${i + 1}`, [x, -113.2], { s: 0.55 }));
+  [[-21, -103, 0], [-3, -103, 0], [-21, -91, Math.PI], [-3, -91, Math.PI]].forEach(([x, z, r], i) => put('bench', `campus-quad-bench-${i + 1}`, [x, z], r ? { r } : {}));
+});
+// V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
+{
+  const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
+  const len = pts.slice(1).reduce((L, p, i) => L + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+  groups.push({ label: 'scenery: park pond kerb', ops: [{ op: 'place', def: 'core/garden-wall@1', name: 'park-pond-stone-kerb', shape: { path: pts },
+    params: { height: 0.42, thickness: 0.7, material: 'stone', color: '#b9b2a4', cap: true, gates: [{ at: 0.6, width: 3 }, { at: r3(len * 0.25), width: 1.8 }, { at: r3(len * 0.5), width: 1.8 }, { at: r3(len * 0.75), width: 1.8 }, { at: r3(len - 0.6), width: 3 }] } }] });
+}
+
 // (library and café interiors: interiors.mjs)
 export const SCENERY_BATCHES = groups;

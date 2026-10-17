@@ -53722,6 +53722,155 @@
         {
           "op": "place",
           "def": "core/woodland@1",
+          "name": "land-alpine-slope-pines",
+          "shape": {
+            "area": [
+              [
+                -170,
+                -335
+              ],
+              [
+                160,
+                -335
+              ],
+              [
+                160,
+                -205
+              ],
+              [
+                -170,
+                -205
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.007,
+            "minSpacing": 4.5,
+            "cluster": 0.35,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 7,
+                "maxSlope": 0.9,
+                "scale": [
+                  0.8,
+                  1.5
+                ]
+              },
+              {
+                "kind": "oak",
+                "weight": 1,
+                "maxSlope": 0.5
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "minSlope": 0.35
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "planting-2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "land-northwest-slope-pines",
+          "shape": {
+            "area": [
+              [
+                -470,
+                -470
+              ],
+              [
+                -170,
+                -470
+              ],
+              [
+                -170,
+                -225
+              ],
+              [
+                -470,
+                -225
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.005,
+            "minSpacing": 4.5,
+            "cluster": 0.35,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 8,
+                "maxSlope": 0.9,
+                "scale": [
+                  0.8,
+                  1.6
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "minSlope": 0.4
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "land-northeast-slope-pines",
+          "shape": {
+            "area": [
+              [
+                170,
+                -500
+              ],
+              [
+                450,
+                -500
+              ],
+              [
+                450,
+                -265
+              ],
+              [
+                170,
+                -265
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.005,
+            "minSpacing": 4.5,
+            "cluster": 0.35,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 8,
+                "maxSlope": 0.9,
+                "scale": [
+                  0.8,
+                  1.6
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "minSlope": 0.4
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
           "name": "land-north-mountain-pines",
           "shape": {
             "area": [
@@ -53768,13 +53917,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-2",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -54264,7 +54407,13 @@
             "color": "#4f7a3c",
             "flowers": false
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "planting-3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/hedge@1",
@@ -54333,13 +54482,7 @@
             "color": "#668943",
             "flowers": false
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/hedge@1",
@@ -56559,6 +56702,658 @@
             22,
             -34
           ]
+        }
+      ]
+    },
+    {
+      "note": "scenery: annex portico",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-annex-portico",
+            "version": 1,
+            "description": "A stone portico of six columns under a flat entablature, in front of a library entrance (old Eden campus annex).",
+            "tags": [
+              "eden",
+              "scenery"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                13.8,
+                8.1,
+                2.8
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      -6,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -6,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -6,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -3.8,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -3.8,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -3.8,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.6,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -1.6,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.6,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.6,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      1.6,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.6,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      3.8,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      3.8,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      3.8,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      6,
+                      0.15,
+                      1
+                    ],
+                    "size": [
+                      0.82,
+                      0.3,
+                      0.82
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      6,
+                      3.6,
+                      1
+                    ],
+                    "r": 0.3,
+                    "h": 6.6,
+                    "segments": 14,
+                    "color": "#efe4cf",
+                    "material": "stone"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      6,
+                      6.98,
+                      1
+                    ],
+                    "size": [
+                      0.78,
+                      0.16,
+                      0.78
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      7.45,
+                      -0.05
+                    ],
+                    "size": [
+                      13.4,
+                      0.8,
+                      2.5
+                    ],
+                    "color": "#efe4cf",
+                    "material": "stone",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      7.95,
+                      -0.05
+                    ],
+                    "size": [
+                      13.8,
+                      0.2,
+                      2.75
+                    ],
+                    "color": "#e8e2d2",
+                    "material": "stone",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-annex-portico@1",
+          "name": "campus-annex-portico",
+          "p": [
+            -12,
+            -114.3
+          ]
+        }
+      ]
+    },
+    {
+      "note": "scenery: campus quad",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-1",
+          "p": [
+            -27,
+            -113.2
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-2",
+          "p": [
+            -21,
+            -113.2
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-3",
+          "p": [
+            -15,
+            -113.2
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-4",
+          "p": [
+            -9.39,
+            -113.18
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-5",
+          "p": [
+            -3,
+            -113.2
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/tree@1",
+          "name": "campus-annex-tree-6",
+          "p": [
+            3,
+            -113.2
+          ],
+          "s": 0.55
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "campus-quad-bench-1",
+          "p": [
+            -21,
+            -103
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "campus-quad-bench-2",
+          "p": [
+            -3,
+            -103
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "campus-quad-bench-3",
+          "p": [
+            -21,
+            -91
+          ],
+          "r": 3.141592653589793
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "campus-quad-bench-4",
+          "p": [
+            -3,
+            -91
+          ],
+          "r": 3.141592653589793
+        }
+      ]
+    },
+    {
+      "note": "scenery: park pond kerb",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/garden-wall@1",
+          "name": "park-pond-stone-kerb",
+          "shape": {
+            "path": [
+              [
+                8.1,
+                112
+              ],
+              [
+                7.926,
+                113.502
+              ],
+              [
+                7.41,
+                114.967
+              ],
+              [
+                6.563,
+                116.358
+              ],
+              [
+                5.407,
+                117.643
+              ],
+              [
+                3.97,
+                118.788
+              ],
+              [
+                2.288,
+                119.767
+              ],
+              [
+                0.401,
+                120.554
+              ],
+              [
+                -1.643,
+                121.13
+              ],
+              [
+                -3.794,
+                121.482
+              ],
+              [
+                -6,
+                121.6
+              ],
+              [
+                -8.206,
+                121.482
+              ],
+              [
+                -10.357,
+                121.13
+              ],
+              [
+                -12.401,
+                120.554
+              ],
+              [
+                -14.288,
+                119.767
+              ],
+              [
+                -15.97,
+                118.788
+              ],
+              [
+                -17.407,
+                117.643
+              ],
+              [
+                -18.563,
+                116.358
+              ],
+              [
+                -19.41,
+                114.967
+              ],
+              [
+                -19.926,
+                113.502
+              ],
+              [
+                -20.1,
+                112
+              ],
+              [
+                -19.926,
+                110.498
+              ],
+              [
+                -19.41,
+                109.033
+              ],
+              [
+                -18.563,
+                107.642
+              ],
+              [
+                -17.407,
+                106.357
+              ],
+              [
+                -15.97,
+                105.212
+              ],
+              [
+                -14.288,
+                104.233
+              ],
+              [
+                -12.401,
+                103.446
+              ],
+              [
+                -10.357,
+                102.87
+              ],
+              [
+                -8.206,
+                102.518
+              ],
+              [
+                -6,
+                102.4
+              ],
+              [
+                -3.794,
+                102.518
+              ],
+              [
+                -1.643,
+                102.87
+              ],
+              [
+                0.401,
+                103.446
+              ],
+              [
+                2.288,
+                104.233
+              ],
+              [
+                3.97,
+                105.212
+              ],
+              [
+                5.407,
+                106.357
+              ],
+              [
+                6.563,
+                107.642
+              ],
+              [
+                7.41,
+                109.033
+              ],
+              [
+                7.926,
+                110.498
+              ],
+              [
+                8.1,
+                112
+              ]
+            ]
+          },
+          "params": {
+            "height": 0.42,
+            "thickness": 0.7,
+            "material": "stone",
+            "color": "#b9b2a4",
+            "cap": true,
+            "gates": [
+              {
+                "at": 0.6,
+                "width": 3
+              },
+              {
+                "at": 18.763,
+                "width": 1.8
+              },
+              {
+                "at": 37.526,
+                "width": 1.8
+              },
+              {
+                "at": 56.288,
+                "width": 1.8
+              },
+              {
+                "at": 74.451,
+                "width": 3
+              }
+            ]
+          }
         }
       ]
     },
@@ -59016,223 +59811,23 @@
         {
           "op": "place",
           "def": "core/woodland@1",
-          "name": "trees-old-n2ton1-n16",
+          "name": "trees-old-8-n15",
           "shape": {
             "area": [
               [
-                -40,
-                -320
-              ],
-              [
-                0,
-                -320
-              ],
-              [
-                0,
+                160,
                 -300
               ],
               [
-                -40,
-                -300
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-1-n16",
-          "shape": {
-            "area": [
-              [
-                20,
-                -320
-              ],
-              [
-                40,
-                -320
-              ],
-              [
-                40,
+                180,
                 -300
               ],
               [
-                20,
-                -300
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n16-n15",
-          "shape": {
-            "area": [
-              [
-                -320,
-                -300
-              ],
-              [
-                -300,
-                -300
-              ],
-              [
-                -300,
+                180,
                 -280
               ],
               [
-                -320,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n14ton9-n15",
-          "shape": {
-            "area": [
-              [
-                -280,
-                -300
-              ],
-              [
-                -160,
-                -300
-              ],
-              [
-                -160,
-                -280
-              ],
-              [
-                -280,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0086,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 18,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n8-n15",
-          "shape": {
-            "area": [
-              [
-                -160,
-                -300
-              ],
-              [
-                -140,
-                -300
-              ],
-              [
-                -140,
-                -280
-              ],
-              [
-                -160,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n5-n15",
-          "shape": {
-            "area": [
-              [
-                -100,
-                -300
-              ],
-              [
-                -80,
-                -300
-              ],
-              [
-                -80,
-                -280
-              ],
-              [
-                -100,
+                160,
                 -280
               ]
             ]
@@ -59245,532 +59840,6 @@
               {
                 "kind": "pine",
                 "weight": 1,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n3ton1-n15",
-          "shape": {
-            "area": [
-              [
-                -60,
-                -300
-              ],
-              [
-                0,
-                -300
-              ],
-              [
-                0,
-                -280
-              ],
-              [
-                -60,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 6,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-1to4-n15",
-          "shape": {
-            "area": [
-              [
-                20,
-                -300
-              ],
-              [
-                100,
-                -300
-              ],
-              [
-                100,
-                -280
-              ],
-              [
-                20,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 4,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-7to12-n15",
-          "shape": {
-            "area": [
-              [
-                140,
-                -300
-              ],
-              [
-                260,
-                -300
-              ],
-              [
-                260,
-                -280
-              ],
-              [
-                140,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0067,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 14,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-13to15-n15",
-          "shape": {
-            "area": [
-              [
-                260,
-                -300
-              ],
-              [
-                320,
-                -300
-              ],
-              [
-                320,
-                -280
-              ],
-              [
-                260,
-                -280
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0048,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 5,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "note": "trees 17",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n16ton15-n14",
-          "shape": {
-            "area": [
-              [
-                -320,
-                -280
-              ],
-              [
-                -280,
-                -280
-              ],
-              [
-                -280,
-                -260
-              ],
-              [
-                -320,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n14ton13-n14",
-          "shape": {
-            "area": [
-              [
-                -280,
-                -280
-              ],
-              [
-                -240,
-                -280
-              ],
-              [
-                -240,
-                -260
-              ],
-              [
-                -280,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0115,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 8,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n12ton11-n14",
-          "shape": {
-            "area": [
-              [
-                -240,
-                -280
-              ],
-              [
-                -200,
-                -280
-              ],
-              [
-                -200,
-                -260
-              ],
-              [
-                -240,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n10-n14",
-          "shape": {
-            "area": [
-              [
-                -200,
-                -280
-              ],
-              [
-                -180,
-                -280
-              ],
-              [
-                -180,
-                -260
-              ],
-              [
-                -200,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0172,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 6,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n9ton4-n14",
-          "shape": {
-            "area": [
-              [
-                -180,
-                -280
-              ],
-              [
-                -60,
-                -280
-              ],
-              [
-                -60,
-                -260
-              ],
-              [
-                -180,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0062,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 13,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n3-n14",
-          "shape": {
-            "area": [
-              [
-                -60,
-                -280
-              ],
-              [
-                -40,
-                -280
-              ],
-              [
-                -40,
-                -260
-              ],
-              [
-                -60,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 1,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n1to0-n14",
-          "shape": {
-            "area": [
-              [
-                -20,
-                -280
-              ],
-              [
-                20,
-                -280
-              ],
-              [
-                20,
-                -260
-              ],
-              [
-                -20,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 4,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-2-n14",
-          "shape": {
-            "area": [
-              [
-                40,
-                -280
-              ],
-              [
-                60,
-                -280
-              ],
-              [
-                60,
-                -260
-              ],
-              [
-                40,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-4-n14",
-          "shape": {
-            "area": [
-              [
-                80,
-                -280
-              ],
-              [
-                100,
-                -280
-              ],
-              [
-                100,
-                -260
-              ],
-              [
-                80,
-                -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
                 "scale": [
                   0.9,
                   1.4
@@ -59804,13 +59873,13 @@
             ]
           },
           "params": {
-            "density": 0.0086,
+            "density": 0.0058,
             "minSpacing": 3.2,
             "cluster": 0.3,
             "palette": [
               {
                 "kind": "pine",
-                "weight": 6,
+                "weight": 4,
                 "scale": [
                   0.9,
                   1.4
@@ -59822,7 +59891,7 @@
         {
           "op": "place",
           "def": "core/woodland@1",
-          "name": "trees-old-11to15-n14",
+          "name": "trees-old-11-n14",
           "shape": {
             "area": [
               [
@@ -59830,342 +59899,16 @@
                 -280
               ],
               [
-                320,
+                240,
                 -280
               ],
               [
-                320,
+                240,
                 -260
               ],
               [
                 220,
                 -260
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.008,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 14,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n15ton13-n13",
-          "shape": {
-            "area": [
-              [
-                -300,
-                -260
-              ],
-              [
-                -240,
-                -260
-              ],
-              [
-                -240,
-                -240
-              ],
-              [
-                -300,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 6,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "note": "trees 18",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n12-n13",
-          "shape": {
-            "area": [
-              [
-                -240,
-                -260
-              ],
-              [
-                -220,
-                -260
-              ],
-              [
-                -220,
-                -240
-              ],
-              [
-                -240,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0201,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 7,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n11ton7-n13",
-          "shape": {
-            "area": [
-              [
-                -220,
-                -260
-              ],
-              [
-                -120,
-                -260
-              ],
-              [
-                -120,
-                -240
-              ],
-              [
-                -220,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0052,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 9,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n5ton4-n13",
-          "shape": {
-            "area": [
-              [
-                -100,
-                -260
-              ],
-              [
-                -60,
-                -260
-              ],
-              [
-                -60,
-                -240
-              ],
-              [
-                -100,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0086,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 6,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n1-n13",
-          "shape": {
-            "area": [
-              [
-                -20,
-                -260
-              ],
-              [
-                0,
-                -260
-              ],
-              [
-                0,
-                -240
-              ],
-              [
-                -20,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-2to3-n13",
-          "shape": {
-            "area": [
-              [
-                40,
-                -260
-              ],
-              [
-                80,
-                -260
-              ],
-              [
-                80,
-                -240
-              ],
-              [
-                40,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-7to12-n13",
-          "shape": {
-            "area": [
-              [
-                140,
-                -260
-              ],
-              [
-                260,
-                -260
-              ],
-              [
-                260,
-                -240
-              ],
-              [
-                140,
-                -240
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0067,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 14,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-13-n13",
-          "shape": {
-            "area": [
-              [
-                260,
-                -260
-              ],
-              [
-                280,
-                -260
-              ],
-              [
-                280,
-                -240
-              ],
-              [
-                260,
-                -240
               ]
             ]
           },
@@ -60177,6 +59920,126 @@
               {
                 "kind": "pine",
                 "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13-n14",
+          "shape": {
+            "area": [
+              [
+                260,
+                -280
+              ],
+              [
+                280,
+                -280
+              ],
+              [
+                280,
+                -260
+              ],
+              [
+                260,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-15-n14",
+          "shape": {
+            "area": [
+              [
+                300,
+                -280
+              ],
+              [
+                320,
+                -280
+              ],
+              [
+                320,
+                -260
+              ],
+              [
+                300,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8to13-n13",
+          "shape": {
+            "area": [
+              [
+                160,
+                -260
+              ],
+              [
+                280,
+                -260
+              ],
+              [
+                280,
+                -240
+              ],
+              [
+                160,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 12,
                 "scale": [
                   0.9,
                   1.4
@@ -60228,46 +60091,6 @@
         {
           "op": "place",
           "def": "core/woodland@1",
-          "name": "trees-old-n17-n12",
-          "shape": {
-            "area": [
-              [
-                -340,
-                -240
-              ],
-              [
-                -320,
-                -240
-              ],
-              [
-                -320,
-                -220
-              ],
-              [
-                -340,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 1,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
           "name": "trees-old-n15-n12",
           "shape": {
             "area": [
@@ -60300,284 +60123,6 @@
                 "scale": [
                   0.9,
                   1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n9ton7-n12",
-          "shape": {
-            "area": [
-              [
-                -180,
-                -240
-              ],
-              [
-                -120,
-                -240
-              ],
-              [
-                -120,
-                -220
-              ],
-              [
-                -180,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0077,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 7,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              },
-              {
-                "kind": "oak",
-                "weight": 1,
-                "scale": [
-                  0.8,
-                  1.25
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n6-n12",
-          "shape": {
-            "area": [
-              [
-                -120,
-                -240
-              ],
-              [
-                -100,
-                -240
-              ],
-              [
-                -100,
-                -220
-              ],
-              [
-                -120,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0144,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "oak",
-                "weight": 5,
-                "scale": [
-                  0.8,
-                  1.25
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "note": "trees 19",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n4-n12",
-          "shape": {
-            "area": [
-              [
-                -80,
-                -240
-              ],
-              [
-                -60,
-                -240
-              ],
-              [
-                -60,
-                -220
-              ],
-              [
-                -80,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "oak",
-                "weight": 1,
-                "scale": [
-                  0.8,
-                  1.25
-                ]
-              },
-              {
-                "kind": "pine",
-                "weight": 1,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n3ton1-n12",
-          "shape": {
-            "area": [
-              [
-                -60,
-                -240
-              ],
-              [
-                0,
-                -240
-              ],
-              [
-                0,
-                -220
-              ],
-              [
-                -60,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0029,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 3,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-6-n12",
-          "shape": {
-            "area": [
-              [
-                120,
-                -240
-              ],
-              [
-                140,
-                -240
-              ],
-              [
-                140,
-                -220
-              ],
-              [
-                120,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0058,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 2,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-7-n12",
-          "shape": {
-            "area": [
-              [
-                140,
-                -240
-              ],
-              [
-                160,
-                -240
-              ],
-              [
-                160,
-                -220
-              ],
-              [
-                140,
-                -220
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0201,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "oak",
-                "weight": 1,
-                "scale": [
-                  0.8,
-                  1.25
-                ]
-              },
-              {
-                "kind": "pine",
-                "weight": 5,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              },
-              {
-                "kind": "poplar",
-                "weight": 1,
-                "scale": [
-                  0.8,
-                  1.25
                 ]
               }
             ]
@@ -60662,7 +60207,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 17",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -60826,7 +60377,7 @@
         {
           "op": "place",
           "def": "core/woodland@1",
-          "name": "trees-old-n9ton8-n11",
+          "name": "trees-old-n9-n11",
           "shape": {
             "area": [
               [
@@ -60834,11 +60385,11 @@
                 -220
               ],
               [
-                -140,
+                -160,
                 -220
               ],
               [
-                -140,
+                -160,
                 -200
               ],
               [
@@ -60848,21 +60399,13 @@
             ]
           },
           "params": {
-            "density": 0.0244,
+            "density": 0.0172,
             "minSpacing": 3.2,
             "cluster": 0.3,
             "palette": [
               {
-                "kind": "oak",
-                "weight": 2,
-                "scale": [
-                  0.8,
-                  1.25
-                ]
-              },
-              {
                 "kind": "pine",
-                "weight": 13,
+                "weight": 5,
                 "scale": [
                   0.9,
                   1.4
@@ -60870,7 +60413,7 @@
               },
               {
                 "kind": "poplar",
-                "weight": 2,
+                "weight": 1,
                 "scale": [
                   0.8,
                   1.25
@@ -60882,23 +60425,63 @@
         {
           "op": "place",
           "def": "core/woodland@1",
-          "name": "trees-old-n3-n11",
+          "name": "trees-old-n8-n11",
           "shape": {
             "area": [
               [
-                -60,
+                -160,
                 -220
               ],
               [
-                -40,
+                -140,
                 -220
               ],
               [
-                -40,
+                -140,
                 -200
               ],
               [
-                -60,
+                -160,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1-n11",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -220
+              ],
+              [
+                0,
+                -220
+              ],
+              [
+                0,
+                -200
+              ],
+              [
+                -20,
                 -200
               ]
             ]
@@ -60914,92 +60497,6 @@
                 "scale": [
                   0.9,
                   1.4
-                ]
-              }
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "note": "trees 20",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-n1to1-n11",
-          "shape": {
-            "area": [
-              [
-                -20,
-                -220
-              ],
-              [
-                40,
-                -220
-              ],
-              [
-                40,
-                -200
-              ],
-              [
-                -20,
-                -200
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0038,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "pine",
-                "weight": 4,
-                "scale": [
-                  0.9,
-                  1.4
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/woodland@1",
-          "name": "trees-old-6to7-n11",
-          "shape": {
-            "area": [
-              [
-                120,
-                -220
-              ],
-              [
-                160,
-                -220
-              ],
-              [
-                160,
-                -200
-              ],
-              [
-                120,
-                -200
-              ]
-            ]
-          },
-          "params": {
-            "density": 0.0043,
-            "minSpacing": 3.2,
-            "cluster": 0.3,
-            "palette": [
-              {
-                "kind": "oak",
-                "weight": 3,
-                "scale": [
-                  0.8,
-                  1.25
                 ]
               }
             ]
@@ -61212,7 +60709,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 18",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -61428,13 +60931,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 21",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -61730,7 +61227,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 19",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -61930,13 +61433,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 22",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -62224,7 +61721,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 20",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -62448,13 +61951,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 23",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -62750,7 +62247,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 21",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -62974,13 +62477,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 24",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -63276,7 +62773,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 22",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -63476,13 +62979,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 25",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -63802,7 +63299,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 23",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -64026,13 +63529,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 26",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -64328,7 +63825,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 24",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -64552,13 +64055,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 27",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -64846,7 +64343,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 25",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -65054,13 +64557,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 28",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -65348,7 +64845,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 26",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -65548,13 +65051,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 29",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",

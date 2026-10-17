@@ -147,6 +147,10 @@ const planting = [
   woodland('north-woods', [-20,-65,30,-32], 0.016),
   woodland('forest-campsite', [-176,-136,-106,-74], 0.011),
   woodland('east-hills-groves', [307,-148,425,71], 0.005),
+  // V8: old Eden's backdrop hills were forested to their crowns: pines up the slopes that face the village
+  woodland('alpine-slope-pines', [-170,-335,160,-205], 0.007, [{ kind: 'pine', weight: 7, maxSlope: 0.9, scale: [0.8,1.5] }, { kind: 'oak', weight: 1, maxSlope: 0.5 }, { kind: 'rock', weight: 1, minSlope: 0.35 }]),
+  woodland('northwest-slope-pines', [-470,-470,-170,-225], 0.005, [{ kind: 'pine', weight: 8, maxSlope: 0.9, scale: [0.8,1.6] }, { kind: 'rock', weight: 1, minSlope: 0.4 }]),
+  woodland('northeast-slope-pines', [170,-500,450,-265], 0.005, [{ kind: 'pine', weight: 8, maxSlope: 0.9, scale: [0.8,1.6] }, { kind: 'rock', weight: 1, minSlope: 0.4 }]),
   woodland('north-mountain-pines', [-430,-410,430,-335], 0.004, [{ kind: 'pine', weight: 7, maxSlope: 0.8, scale: [0.7,1.4] }, { kind: 'rock', weight: 2 }, { kind: 'boulder', weight: 1, minSlope: 0.25 }]),
   woodland('western-forest', [-429,-190,-285,90], 0.003),
   woodland('west-lake-willows', [-201,-47,-104,51], 0.006, [{ kind: 'birch', weight: 3, farWater: 3 }, { kind: 'oak', weight: 2, farWater: 5 }, { kind: 'reed', weight: 5, nearWater: 3, wet: 0.4 }, { kind: 'bush', weight: 2 }]),
