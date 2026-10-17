@@ -38,6 +38,10 @@ test('forkOptions: launcher settings over the descriptor; root path refused', ()
   const o = forkOptions({ worldKey: 'mars', worldId: 'mars-2026-1', marsWebDir: '/a/m' }, e, '/rel');
   assert.deepEqual([o.basePath, o.port, o.build, o.input, o.cliFile, o.marsWebDir], ['/worlds', 4630, 'we-x', '/rel', '/c.mjs', '/a/m']);
   assert.throws(() => forkOptions({ worldKey: 'mars', worldId: 'x' }, { ...e, WORLD_PATH: '/w/mars' }), /launcher base/);
+  // the launcher that took the original worlds over (--old-worlds-root) serves them at the root
+  const r = forkOptions({ worldKey: 'mars', worldId: 'mars-2026-1' }, { ...e, WORLD_PATH: '/w/mars', SIM_FORK_ROOT: '1' }, '/rel');
+  assert.deepEqual([r.basePath, r.launcherChild], ['', true]);
+  assert.throws(() => forkOptions({ worldKey: 'mars', worldId: 'x' }, { ...e, WORLD_PATH: '/w/eden', SIM_FORK_ROOT: '1' }), /not <base>\/w\/mars/);
   assert.throws(() => forkOptions({ worldKey: 'mars', worldId: 'x', port: 1 }, e), /comes from the launcher/);
   assert.throws(() => forkOptions({ worldKey: 'toy', worldId: 'x' }, { ...e, WORLD_PATH: '/worlds/w/toy' }), /not a forkable/);
 });
