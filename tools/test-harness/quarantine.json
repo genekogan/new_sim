@@ -26,8 +26,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: passes on the W51 re-seeded scene; lane L3 dropped its todo. Remove this entry once the gate baseline contains that change.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -75,8 +75,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 kitchen, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -89,8 +89,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 west-house, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 3/3 deck pieces, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
@@ -110,8 +110,8 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only TODO: re-pinned by lane L3 on the W51 re-seeded scene (24/24 at the canonical pose, 0 violations). Remove this entry once the gate baseline contains the re-pin.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V3-mars-engine",
