@@ -84,7 +84,7 @@ export const CORRIDOR_HALO = 1.5;
 
 /** A link direction prepare() dropped for lack of room at its approach (recorded only with `nameObstacles`). */
 type Dropped = { level: number; at: Vec2[]; farLevel: number; far: Vec2 };
-type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; N: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]>; dropped?: Dropped[] };
+type Prep = { r: number; lvIds: number[]; idxOf: Map<number, number>; off: number[]; total: number; gs: LevelGrid; gg: LevelGrid; sLv: number; gLv: number; s: number; gt: number; edges: Map<number, LinkEdge[]>; dropped?: Dropped[] };
 type Found = { goalId: number; chain: number[]; viaLink: Map<number, LinkEdge>; expanded: number };
 
 export function findRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts = {}): RouteResult {
@@ -125,8 +125,11 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
   const r = profile.radius + PLAN_MARGIN;
   const lvIds = [...grids.levels.keys()].sort((a, b) => a - b);
   const idxOf = new Map(lvIds.map((l, i) => [l, i]));
-  const g0 = grids.levels.get(lvIds[0])!;
-  const N = g0.nx * g0.nz;
+  // search ids: level i's cells start at off[i]. Levels of one extent give off[i] = i·N (unchanged ids); a cropped level
+  // (upper-floors/1, Level.crop) takes only its own cells, so a building's floors add its area, not the campus's.
+  const off: number[] = [];
+  let total = 0;
+  for (const id of lvIds) { off.push(total); const g = grids.levels.get(id)!; total += g.nx * g.nz; }
   const gs = grids.levels.get(start.level), gg = grids.levels.get(goal.level);
   if (!gs || !gg) return fail('route.unknown-level', `level ${!gs ? start.level : goal.level} does not exist`);
   const passable = (g: LevelGrid, c: number) => c >= 0 && g.clearance[c] >= r;
@@ -159,13 +162,13 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
         continue;
       }
       const len = dist2(approach, entry.p) + pathLen(link.path) + dist2(exit.p, centreOf(gx, cx));
-      const id = idxOf.get(entry.level)! * N + ca;
+      const id = off[idxOf.get(entry.level)!] + ca;
       const list = edges.get(id) ?? [];
       list.push({ link, ascending, toLevel: exit.level, toCell: cx, cost: len * 1.25, approach });
       edges.set(id, list);
     }
   }
-  return { r, lvIds, idxOf, N, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges, dropped };
+  return { r, lvIds, idxOf, off, total, gs, gg, sLv: idxOf.get(start.level)!, gLv: idxOf.get(goal.level)!, s, gt, edges, dropped };
 }
 
 /**
@@ -177,8 +180,7 @@ function prepare(grids: GridSet, scene: SpatialScene, profile: AgentProfile, sta
  * Returns null when the goal is unreachable, a diagnostic when the expansion limit is hit.
  */
 function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint32Array; gen: number } | null): Found | RouteResult | null {
-  const { r, lvIds, idxOf, N, gg, s, gt, edges, sLv, gLv } = prep;
-  const total = lvIds.length * N;
+  const { r, lvIds, idxOf, off, total, gg, s, gt, edges, sLv, gLv } = prep;
   const S = scratchFor(total);
   const gen = S.gen;
   const { gScore, came, pos, stamp, shut } = S;
@@ -186,7 +188,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   const heap = S.heap;
   heap.reset(pos);
   const Ls = lvIds.map((id) => grids.levels.get(id)!);
-  const startId = sLv * N + s, goalId = gLv * N + gt;
+  const startId = off[sLv] + s, goalId = off[gLv] + gt;
   const goalC = centreOf(gg, gt);
   const gx0 = goalC[0], gz0 = goalC[1];
   // octile distance from a cell centre to the goal cell centre (same float ops as centreOf)
@@ -220,9 +222,9 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
     shut[cur] = gen;
     if (cur === goalId) break;
     if (++expanded > maxExpand) return fail('route.search-limit', `route search exceeded ${maxExpand} expansions`);
-    const lv = Math.floor(cur / N), c = cur - lv * N;
+    const lv = levelOfId(off, cur), base = off[lv], c = cur - base;
     const g = Ls[lv];
-    const nx = g.nx, nz = g.nz, cl = g.clearance, base = lv * N, gc = gScore[cur];
+    const nx = g.nx, nz = g.nz, cl = g.clearance, gc = gScore[cur];
     const straight = g.cell, diag = SQ2 * g.cell;
     const ci = c % nx, cj = (c - ci) / nx;
     for (let dj = -1; dj <= 1; dj++) {
@@ -253,7 +255,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
     if (!hasEdges) continue;
     for (const e of edges.get(cur) ?? []) {
       const tl = idxOf.get(e.toLevel)!;
-      const nid = tl * N + e.toCell;
+      const nid = off[tl] + e.toCell;
       if (ms && ms[nid] !== mg) continue;
       const t = gc + e.cost;
       const fresh = stamp[nid] !== gen;
@@ -327,7 +329,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
   const reg = failRegion;
   failRegion = null;
   if (!reg) return [];
-  const { lvIds, N, r } = prep;
+  const { lvIds, off, r } = prep;
   // (+ 0.5 m: a small pocket's passable cells can sit ~0.9 m from an obstacle that closes it, e.g. the
   // people level with a goal in a ring, whose diagonal neighbours are nearer)
   const grow = r + 0.5;
@@ -349,7 +351,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
       const g = grids.levels.get(lvIds[lv])!;
       if (!atHeight(o, g)) continue;
       cells(g, o.obb.c, ext, (q) => pointInObb(q, o.obb, grow), (n) => {
-        if (reg.cells[lv * N + n] === reg.gen) inR = true;
+        if (reg.cells[off[lv] + n] === reg.gen) inR = true;
         else if (g.clearance[n] >= r) outside = true;
         return inR && outside;
       });
@@ -358,7 +360,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
   }
   const touches = (level: number, p: Vec2) => {
     const lv = prep.idxOf.get(level), g = grids.levels.get(level);
-    return lv !== undefined && !!g && cells(g, p, r + 0.6, (q) => dist2(q, p) <= r + 0.6, (n) => reg.cells[lv * N + n] === reg.gen);
+    return lv !== undefined && !!g && cells(g, p, r + 0.6, (q) => dist2(q, p) <= r + 0.6, (n) => reg.cells[off[lv] + n] === reg.gen);
   };
   for (const d of prep.dropped ?? []) {
     if (touches(d.level, d.at[0]) === touches(d.farLevel, d.far)) continue;
@@ -376,7 +378,7 @@ function regionObstacles(grids: GridSet, scene: SpatialScene, prep: Prep, want: 
  * `step()` visits one cell: −1 exhausted without the start, 1 met the start, 0 not decided yet.
  */
 function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, goalId: number) {
-  const { r, N, idxOf, edges } = prep;
+  const { r, off, idxOf, edges } = prep;
   if (!S.rseen || S.rseen.length !== S.total) { S.rseen = new Uint32Array(S.total); S.rq = new Int32Array(S.total); }
   const seen = S.rseen, q = S.rq!, gen = S.gen;
   let into: Map<number, number[]> | null = null;
@@ -384,7 +386,7 @@ function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, 
     into = new Map();
     for (const [from, list] of edges)
       for (const e of list) {
-        const to = idxOf.get(e.toLevel)! * N + e.toCell;
+        const to = off[idxOf.get(e.toLevel)!] + e.toCell;
         const l = into.get(to);
         if (l) l.push(from);
         else into.set(to, [from]);
@@ -397,9 +399,9 @@ function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, 
     step(): number {
       if (head === tail) return -1;
       const x = q[head++];
-      const lv = Math.floor(x / N), c = x - lv * N;
+      const lv = levelOfId(off, x), base = off[lv], c = x - base;
       const g = Ls[lv];
-      const nx = g.nx, nz = g.nz, cl = g.clearance, base = lv * N;
+      const nx = g.nx, nz = g.nz, cl = g.clearance;
       if (cl[c] >= r) {
         const xi = c % nx, xj = (c - xi) / nx;
         for (let dj = -1; dj <= 1; dj++) {
@@ -431,9 +433,16 @@ function reverseFlood(S: Scratch, prep: Prep, Ls: LevelGrid[], startId: number, 
   };
 }
 
+/** The level index of a search id (Prep.off: ascending level starts). */
+function levelOfId(off: number[], id: number): number {
+  let lv = off.length - 1;
+  while (lv > 0 && off[lv] > id) lv--;
+  return lv;
+}
+
 /** Cell chain → legs (string-pulled walk legs + link legs). */
 function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: Found, expanded: number): RouteResult {
-  const { r, lvIds, N, gg, gt } = prep;
+  const { r, lvIds, off, gg, gt } = prep;
   const { chain, viaLink } = found;
   const goalC = centreOf(gg, gt);
   const legs: Leg[] = [];
@@ -442,7 +451,7 @@ function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: 
   for (let k = 1; k < chain.length; k++) {
     const id = chain[k];
     const e = viaLink.get(id);
-    const g = grids.levels.get(lvIds[Math.floor(id / N)])!;
+    const lvAt = levelOfId(off, id), g = grids.levels.get(lvIds[lvAt])!;
     if (e) {
       // A running route owns its geometry; scene contributors may replace or edit links later.
       const link = structuredClone(e.link);
@@ -452,7 +461,7 @@ function assemble(grids: GridSet, prep: Prep, start: Place, goal: Place, found: 
       legs.push({ kind: 'link', link, ascending: e.ascending });
       pts = [exit.p];
       curLv = e.toLevel;
-    } else pts.push(centreOf(g, id % N));
+    } else pts.push(centreOf(g, id - off[lvAt]));
   }
   // a snapped goal (its own cell has no standing room) ends at the snapped standable cell centre, never
   // at the raw goal (review H2); walk_to reports the snap distance
@@ -476,21 +485,20 @@ function corridorRoute(grids: GridSet, scene: SpatialScene, profile: AgentProfil
   if ('ok' in cPrep) return null;
   const cFound = search(coarse, cPrep, opts, null);
   if (!cFound || 'ok' in cFound) return null;
-  const { N, lvIds } = prep;
-  const S = scratchFor(lvIds.length * N);
+  const { off, lvIds } = prep;
+  const S = scratchFor(prep.total);
   if (!S.mask) S.mask = new Uint32Array(S.total);
   if (S.maskGen >= 0xfffffffe) { S.maskGen = 0; S.mask.fill(0); }
   const mgen = ++S.maskGen;
   const k = Math.ceil(CORRIDOR_HALO / (f * grids.cell));
-  const Nc = cPrep.N;
   for (const id of cFound.chain) {
-    const lv = Math.floor(id / Nc), c = id - lv * Nc;
+    const lv = levelOfId(cPrep.off, id), c = id - cPrep.off[lv];
     const cg = coarse.levels.get(lvIds[lv])!, g = grids.levels.get(lvIds[lv])!;
     // coarse lattice cell K covers fine lattice cells K·f … K·f + f − 1 (see coarseGrids)
     const ci = cg.ox + (c % cg.nx), cj = cg.oz + Math.floor(c / cg.nx);
     const i0 = Math.max(0, (ci - k) * f - g.ox), i1 = Math.min(g.nx, (ci + k + 1) * f - g.ox);
     const j0 = Math.max(0, (cj - k) * f - g.oz), j1 = Math.min(g.nz, (cj + k + 1) * f - g.oz);
-    for (let j = j0; j < j1; j++) for (let i = i0, row = lv * N + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
+    for (let j = j0; j < j1; j++) for (let i = i0, row = off[lv] + j * g.nx; i < i1; i++) S.mask[row + i] = mgen;
   }
   const found = search(grids, prep, opts, { stamp: S.mask, gen: mgen });
   if (!found || 'ok' in found) return null;
