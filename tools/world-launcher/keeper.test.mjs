@@ -1,5 +1,5 @@
 // node --test tools/world-launcher/keeper.test.mjs
-// The keeper (keeper.mjs) and launcher handover, on lane C4's ports 6017–6019 only (keeper :6017, children 6018–6019).
+// The keeper (keeper.mjs) and launcher handover, on ports KEEPER_TEST_PORT (default 6017) to +2, and +3 to +5 for the socket-activation test.
 // Two throwaway "releases" in a temp dir: this launcher's own files plus fake-world.mjs as apps/server/src/main.ts, so the
 // real keeper forks the real launcher, which spawns fake worlds. Nothing outside the temp dir is read or written.
 import { test, before, after } from 'node:test';
