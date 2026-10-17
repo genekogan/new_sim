@@ -109,3 +109,39 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
   for (const [k, v] of Object.entries(outcomes)) assert.equal(v, 'completed seen', `${k}: ${v}`);
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
+
+test('B5/B3: the E-life patch gym, courts and band things are activity spots residents use', { timeout: 900000 }, async (t) => {
+  const { readFileSync } = await import('node:fs');
+  const batch = JSON.parse(readFileSync(new URL('../../../../worlds/patches/eden-life-20261017/batch.json', import.meta.url), 'utf8'));
+  const defines = batch.ops.filter((o: any) => o.op === 'define');
+  const w = await lifeWorld(t, [...defines,
+    { op: 'place', def: 'eden-pull-up-bar@1', name: 'pull-up-bar', p: [6, 10], r: 0 },
+    { op: 'place', def: 'eden-weight-bench@1', name: 'bench-press', p: [10, 10], r: Math.PI / 2 },
+    { op: 'place', def: 'eden-dumbbell-rack@1', name: 'dumbbells', p: [14, 10], r: 0 },
+    { op: 'place', def: 'eden-microphone@1', name: 'mic', p: [-6, 10], r: 0 },
+    { op: 'place', def: 'eden-music-stand-violin@1', name: 'violin', p: [-10, 10], r: 0 },
+    { op: 'place', def: 'eden-volleyball-net@1', name: 'volleyball', p: [0, 30], r: 0 },
+    { op: 'place', def: coreRef('see-saw'), name: 'see-saw', p: [-14, 22], r: 0 },
+  ]);
+  const ana = await w.soul('Ana'), bo = await w.soul('Bo');
+  const ids = w.edge.capabilities(ana).map((c: any) => c.id);
+  for (const p of ['pull-ups:', 'bench-press:', 'lift-weights:', 'sing:', 'play-music:', 'play-volleyball:', 'seesaw:']) assert.ok(ids.some((id: string) => id.startsWith(p)), `${p} offered: ${ids.filter((i: string) => /^(pull|bench|lift|sing|play|seesaw)/.test(i)).join(' ')}`);
+  const outcomes: Record<string, string> = {};
+  for (const [p, pose] of [['pull-ups:', 'pull-ups'], ['bench-press:', 'bench-press'], ['lift-weights:', 'lift-weights'], ['sing:', 'sing'], ['play-music:', 'play-music']] as const) {
+    const cap = w.edge.capabilities(ana).find((c: any) => c.id.startsWith(p))!;
+    const { r, seen } = await w.act(ana, cap.id, { seconds: 6 }, () => w.body(ana)?.human?.activity === pose ? { inst: w.body(ana).human.instrument ?? null } : null);
+    outcomes[p] = `${r.phase}${r.code ? ':' + r.code : ''}${seen ? ' seen' : ' NOT-SEEN'}`; console.error('[eden-life]', cap.id, outcomes[p], JSON.stringify(seen));
+    if (p === 'play-music:') assert.equal((seen as any)?.inst, 'violin');
+  }
+  for (const [k, v] of Object.entries(outcomes)) assert.equal(v, 'completed seen', `${k}: ${v}`);
+  // volleyball: two residents play across the net (a game needs a partner: both receipts complete, both seen playing)
+  const va = w.edge.capabilities(ana).find((c: any) => c.id.startsWith('play-volleyball:'))!;
+  const a1: any = await accept(w.host, w.edge.act(ana, { capability: va.id, params: { seconds: 20 } }));
+  assert.equal(a1.accepted, true, JSON.stringify(a1));
+  await w.settle(20);
+  const vb = w.edge.capabilities(bo).find((c: any) => c.id.startsWith('play-volleyball:') && c.available)!;
+  const b1 = await w.act(bo, vb.id, { seconds: 20 }, () => w.body(ana)?.human?.activity === 'play-volleyball' && w.body(bo)?.human?.activity === 'play-volleyball' ? true : null);
+  assert.ok(b1.seen, 'both played volleyball at once');
+  assert.equal(b1.r.phase, 'completed', JSON.stringify(b1.r));
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
