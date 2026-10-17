@@ -64256,6 +64256,172 @@
           "params": {
             "body": "#a8352d"
           }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-8",
+          "p": [
+            173,
+            -49.5
+          ],
+          "r": 1.736,
+          "params": {
+            "sz": 0.76
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-9",
+          "p": [
+            180,
+            -51
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-10",
+          "p": [
+            188,
+            -53
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-11",
+          "p": [
+            196,
+            -55
+          ],
+          "r": 1.816,
+          "params": {
+            "sz": 1.031
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-12",
+          "p": [
+            203.25,
+            -58.25
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-13",
+          "p": [
+            209.75,
+            -62.75
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-14",
+          "p": [
+            216.25,
+            -67.25
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-15",
+          "p": [
+            222.75,
+            -71.75
+          ],
+          "r": 2.176,
+          "params": {
+            "sz": 0.988
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-16",
+          "p": [
+            228.308,
+            -76.77
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-17",
+          "p": [
+            232.923,
+            -82.31
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-18",
+          "p": [
+            237.538,
+            -87.85
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rail-track@1",
+          "name": "railway-track-19",
+          "p": [
+            242.153,
+            -93.39
+          ],
+          "r": 2.447,
+          "params": {
+            "sz": 0.901
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/buffer-stop@1",
+          "name": "railway-buffer-stop",
+          "p": [
+            245.228,
+            -97.082
+          ],
+          "r": -0.695
         }
       ]
     },
@@ -67369,6 +67535,46 @@
       "ops": [
         {
           "op": "place",
+          "def": "core/footpath@1",
+          "name": "railway-bed",
+          "shape": {
+            "path": [
+              [
+                114,
+                -49
+              ],
+              [
+                150,
+                -49
+              ],
+              [
+                176,
+                -50
+              ],
+              [
+                200,
+                -56
+              ],
+              [
+                226,
+                -74
+              ],
+              [
+                246,
+                -98
+              ]
+            ]
+          },
+          "params": {
+            "width": 3.2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
           "def": "core/woodland@1",
           "name": "trees-meadow-tufts-1",
           "shape": {
@@ -67906,7 +68112,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67954,13 +68166,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68070,7 +68276,13 @@
             97.3
           ],
           "s": 0.65
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 4",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68080,13 +68292,7 @@
             100.45
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 4",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68196,7 +68402,13 @@
             114
           ],
           "s": 0.64
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 5",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68206,13 +68418,7 @@
             114.1
           ],
           "s": 0.69
-        }
-      ]
-    },
-    {
-      "note": "trees 5",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68292,7 +68498,13 @@
             91
           ],
           "s": 0.47
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 6",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68302,13 +68514,7 @@
             91
           ],
           "s": 0.47
-        }
-      ]
-    },
-    {
-      "note": "trees 6",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68418,7 +68624,13 @@
             -66.6
           ],
           "s": 0.63
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 7",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68428,13 +68640,7 @@
             -66.6
           ],
           "s": 0.66
-        }
-      ]
-    },
-    {
-      "note": "trees 7",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68544,7 +68750,13 @@
             -66.6
           ],
           "s": 0.61
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 8",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68554,13 +68766,7 @@
             -66.6
           ],
           "s": 0.66
-        }
-      ]
-    },
-    {
-      "note": "trees 8",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68670,7 +68876,13 @@
             -67.2
           ],
           "s": 0.48
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 9",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68680,13 +68892,7 @@
             -67.2
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 9",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68796,7 +69002,13 @@
             -88.7
           ],
           "s": 0.5
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 10",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68806,13 +69018,7 @@
             -88.7
           ],
           "s": 0.48
-        }
-      ]
-    },
-    {
-      "note": "trees 10",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -68922,7 +69128,13 @@
             -72
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 11",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/pine@1",
@@ -68932,13 +69144,7 @@
             -77
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 11",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/pine@1",
@@ -69048,7 +69254,13 @@
             -102
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 12",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69058,13 +69270,7 @@
             87.4
           ],
           "s": 0.64
-        }
-      ]
-    },
-    {
-      "note": "trees 12",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69174,7 +69380,13 @@
             96.7
           ],
           "s": 0.86
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 13",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69184,13 +69396,7 @@
             -24.3
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 13",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69376,7 +69582,13 @@
             -31.9
           ],
           "s": 0.66
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 15",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69386,13 +69598,7 @@
             -24.3
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 15",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69482,7 +69688,13 @@
             80
           ],
           "s": 0.37
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 16",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -69492,13 +69704,7 @@
             70.8
           ],
           "s": 0.56
-        }
-      ]
-    },
-    {
-      "note": "trees 16",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/pine@1",
@@ -69738,7 +69944,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 17",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69778,13 +69990,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 17",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70232,7 +70438,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 18",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70280,13 +70492,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 18",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70750,7 +70956,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 19",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70790,13 +71002,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 19",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71244,7 +71450,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 20",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71292,13 +71504,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 20",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71762,7 +71968,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 21",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -71802,13 +72014,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 21",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72288,7 +72494,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 22",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72328,13 +72540,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 22",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72806,7 +73012,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 23",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -72854,13 +73066,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 23",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -73348,7 +73554,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 24",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -73388,13 +73600,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 24",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -73866,7 +74072,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 25",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -73906,13 +74118,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 25",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -74368,7 +74574,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 26",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -74408,13 +74620,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 26",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -74862,7 +75068,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 27",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -74902,13 +75114,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 27",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -83115,6 +83321,391 @@
               }
             }
           }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-amphitheatre-steps",
+            "version": 1,
+            "description": "Two curved rows of stone steps facing the amphitheatre stage; sit and watch.",
+            "tags": [
+              "eden",
+              "amphitheatre",
+              "seating",
+              "stone"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                7,
+                0.5,
+                7
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.431,
+                      0.16,
+                      2.29
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": -0.5585,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.744,
+                      0.16,
+                      2.595
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": -0.2793,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.16,
+                      2.7
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.744,
+                      0.16,
+                      2.595
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0.2793,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.431,
+                      0.16,
+                      2.29
+                    ],
+                    "size": [
+                      0.861,
+                      0.32,
+                      0.5
+                    ],
+                    "yaw": 0.5585,
+                    "color": "#c9bfae",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.696,
+                      0.24,
+                      2.714
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": -0.5585,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.882,
+                      0.24,
+                      3.076
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": -0.2793,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.24,
+                      3.2
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.882,
+                      0.24,
+                      3.076
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0.2793,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.696,
+                      0.24,
+                      2.714
+                    ],
+                    "size": [
+                      1,
+                      0.48,
+                      0.5
+                    ],
+                    "yaw": 0.5585,
+                    "color": "#bdb2a0",
+                    "collide": true
+                  }
+                ]
+              }
+            },
+            "slots": [
+              {
+                "id": "step-2-seat-1",
+                "kind": "seat",
+                "p": [
+                  -1.029,
+                  0.32,
+                  2.496
+                ],
+                "yaw": 2.7506,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-2",
+                "kind": "seat",
+                "p": [
+                  -0.524,
+                  0.32,
+                  2.649
+                ],
+                "yaw": 2.9463,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-3",
+                "kind": "seat",
+                "p": [
+                  0,
+                  0.32,
+                  2.7
+                ],
+                "yaw": 3.1416,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-4",
+                "kind": "seat",
+                "p": [
+                  0.524,
+                  0.32,
+                  2.649
+                ],
+                "yaw": -2.9463,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-2-seat-5",
+                "kind": "seat",
+                "p": [
+                  1.029,
+                  0.32,
+                  2.496
+                ],
+                "yaw": -2.7506,
+                "height": 0.32,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-1",
+                "kind": "seat",
+                "p": [
+                  -1.267,
+                  0.48,
+                  2.938
+                ],
+                "yaw": 2.7344,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-2",
+                "kind": "seat",
+                "p": [
+                  -0.774,
+                  0.48,
+                  3.105
+                ],
+                "yaw": 2.8973,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-3",
+                "kind": "seat",
+                "p": [
+                  -0.26,
+                  0.48,
+                  3.189
+                ],
+                "yaw": 3.0602,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-4",
+                "kind": "seat",
+                "p": [
+                  0.26,
+                  0.48,
+                  3.189
+                ],
+                "yaw": -3.0602,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-5",
+                "kind": "seat",
+                "p": [
+                  0.774,
+                  0.48,
+                  3.105
+                ],
+                "yaw": -2.8973,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              },
+              {
+                "id": "step-3-seat-6",
+                "kind": "seat",
+                "p": [
+                  1.267,
+                  0.48,
+                  2.938
+                ],
+                "yaw": -2.7344,
+                "height": 0.48,
+                "accepts": {
+                  "tags": [
+                    "body"
+                  ]
+                },
+                "capacity": 1
+              }
+            ],
+            "components": {
+              "seat": {
+                "height": 0.32
+              }
+            }
+          }
         }
       ]
     },
@@ -83171,6 +83762,16 @@
             80
           ],
           "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-amphitheatre-steps@1",
+          "name": "amphitheatre-steps",
+          "p": [
+            76,
+            80.6
+          ],
+          "r": 0
         }
       ]
     },

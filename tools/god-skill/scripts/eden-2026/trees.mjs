@@ -37,6 +37,9 @@ const inside = (x, z, b, m = 0) => x > b[0] - m && x < b[2] + m && z > b[1] - m 
 export function treeBatches(existing = []) {
   const ops = [];
   for (const [name, w, pts] of OLD_PATHS) ops.push(path(name, pts, w));
+  // L4a: old Eden's rail bed (eden-regions/country.ts: a 3.2 m stone ribbon under the line, station to the buffer stop), so the
+  // woods leave the line clear; the track itself is scenery.mjs's
+  ops.push({ ...path('railway-bed', [[114, -49], [150, -49], [176, -50], [200, -56], [226, -74], [246, -98]], 3.2), name: 'railway-bed' });
   // old Eden's turf was full of small things: grass tufts, wild flowers and pebbles across the village meadow
   for (const [i, b] of [[-100, -65, 0, 10], [0, -65, 105, 10], [-100, 10, 0, 88], [0, 10, 105, 88]].entries()) ops.push(wood(`meadow-tufts-${i + 1}`, b, 0.03, [{ kind: 'grass', weight: 6, scale: [0.6, 1.2] }, { kind: 'flower', weight: 2, scale: [0.6, 1] }, { kind: 'rock', weight: 1, scale: [0.2, 0.4], maxSlope: 0.5 }], { minSpacing: 1.1, cluster: 0.5 }));
   for (const [name, b, step, kind] of OLD_WOODS) ops.push(wood(name, b, 0.75 / (step * step), palette({ [kind]: 1, ...(kind === 'round' ? { poplar: 0.15 } : {}) }), { minSpacing: Math.max(3, step * 0.6) }));

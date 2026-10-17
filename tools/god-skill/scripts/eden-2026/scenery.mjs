@@ -59,6 +59,14 @@ group('scenery: railway and train', put => {
   for (let i = 0; i < 7; i++) put('rail-track', `railway-track-${i + 1}`, [118 + i * 8, -49], { r: Math.PI / 2 });
   put('locomotive', 'railway-locomotive', [160, -49], { r: Math.PI / 2, params: { paint: '#2f6b4f' } });
   for (let i = 0; i < 4; i++) put('rail-wagon', `railway-carriage-${i + 1}`, [151.5 - i * 4.6, -49], { r: Math.PI / 2, params: { body: '#a8352d' } });
+  // L4a: old Eden's line did not end at the platform: it ran on east and up the hillside to a buffer stop at (246, -98)
+  // (eden-regions/country.ts RAIL, scenery there too). Same route here, straight pieces stretched to each leg (sz), the
+  // stop facing back down the line. Not a loop: old Eden's railway was a branch line out of the map, not a circuit.
+  { const legs = [[170, -49], [176, -50], [200, -56], [226, -74], [244.46, -96.16]]; let k = 8; // last leg stops 2.4 m short of (246, -98): the stop's own rails
+    for (let i = 1; i < legs.length; i++) { const [ax, az] = legs[i - 1], [bx, bz] = legs[i], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 8 - 0.25)), yaw = Math.atan2(bx - ax, bz - az);
+      for (let j = 0; j < n; j++) { const t = (j + 0.5) / n; put('rail-track', `railway-track-${k++}`, [ax + (bx - ax) * t, az + (bz - az) * t], { r: r3(yaw), ...(Math.abs(L / n - 8) > 0.01 ? { params: { sz: r3(L / n / 8) } } : {}) }); } }
+    const [ax, az] = legs[legs.length - 2], [ex, ez] = legs[legs.length - 1], u = Math.hypot(ex - ax, ez - az);
+    put('buffer-stop', 'railway-buffer-stop', [ex + (ex - ax) / u * 1.2, ez + (ez - az) / u * 1.2], { r: r3(Math.atan2(ax - ex, az - ez)) }); }
 });
 group('scenery: festival meadow', (put, ops) => {
   // big top: a striped canvas tent at circus scale; helter-skelter yellow tower; balloons; food stalls and lights

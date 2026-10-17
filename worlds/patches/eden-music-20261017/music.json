@@ -1,7 +1,7 @@
 {
  "schema": "eden-2026-patch/1",
  "id": "eden-music-20261017",
- "note": "Lane L4a: the rest of old Eden's band. The performance stage gets its guitar, keyboard and bass beside the drum kit (old stage-guitar/keys/bass), the bandstand its fourth chair (the viola), the amphitheatre its stool and guitar (old amph-guitar). The engine reads them by tag (guitar, bass-guitar, keyboard-stand, violin).",
+ "note": "Lane L4a: the rest of old Eden's band. The performance stage gets its guitar, keyboard and bass beside the drum kit (old stage-guitar/keys/bass), the bandstand its fourth chair (the viola), the amphitheatre its stool and guitar (old amph-guitar). The engine reads them by tag (guitar, bass-guitar, keyboard-stand, violin); and the amphitheatre its two rows of stone steps (11 seats, old amph-seat-2-*/3-*).",
  "ops": [
   {
    "op": "define",
@@ -620,6 +620,391 @@
    }
   },
   {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-amphitheatre-steps",
+    "version": 1,
+    "description": "Two curved rows of stone steps facing the amphitheatre stage; sit and watch.",
+    "tags": [
+     "eden",
+     "amphitheatre",
+     "seating",
+     "stone"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      7.0,
+      0.5,
+      7.0
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "box",
+        "at": [
+         -1.431,
+         0.16,
+         2.29
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": -0.5585,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -0.744,
+         0.16,
+         2.595
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": -0.2793,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.0,
+         0.16,
+         2.7
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.0,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.744,
+         0.16,
+         2.595
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.2793,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.431,
+         0.16,
+         2.29
+        ],
+        "size": [
+         0.861,
+         0.32,
+         0.5
+        ],
+        "yaw": 0.5585,
+        "color": "#c9bfae",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -1.696,
+         0.24,
+         2.714
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": -0.5585,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         -0.882,
+         0.24,
+         3.076
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": -0.2793,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.0,
+         0.24,
+         3.2
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.0,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.882,
+         0.24,
+         3.076
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.2793,
+        "color": "#bdb2a0",
+        "collide": true
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.696,
+         0.24,
+         2.714
+        ],
+        "size": [
+         1.0,
+         0.48,
+         0.5
+        ],
+        "yaw": 0.5585,
+        "color": "#bdb2a0",
+        "collide": true
+       }
+      ]
+     }
+    },
+    "slots": [
+     {
+      "id": "step-2-seat-1",
+      "kind": "seat",
+      "p": [
+       -1.029,
+       0.32,
+       2.496
+      ],
+      "yaw": 2.7506,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-2",
+      "kind": "seat",
+      "p": [
+       -0.524,
+       0.32,
+       2.649
+      ],
+      "yaw": 2.9463,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-3",
+      "kind": "seat",
+      "p": [
+       -0.0,
+       0.32,
+       2.7
+      ],
+      "yaw": 3.1416,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-4",
+      "kind": "seat",
+      "p": [
+       0.524,
+       0.32,
+       2.649
+      ],
+      "yaw": -2.9463,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-2-seat-5",
+      "kind": "seat",
+      "p": [
+       1.029,
+       0.32,
+       2.496
+      ],
+      "yaw": -2.7506,
+      "height": 0.32,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-1",
+      "kind": "seat",
+      "p": [
+       -1.267,
+       0.48,
+       2.938
+      ],
+      "yaw": 2.7344,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-2",
+      "kind": "seat",
+      "p": [
+       -0.774,
+       0.48,
+       3.105
+      ],
+      "yaw": 2.8973,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-3",
+      "kind": "seat",
+      "p": [
+       -0.26,
+       0.48,
+       3.189
+      ],
+      "yaw": 3.0602,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-4",
+      "kind": "seat",
+      "p": [
+       0.26,
+       0.48,
+       3.189
+      ],
+      "yaw": -3.0602,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-5",
+      "kind": "seat",
+      "p": [
+       0.774,
+       0.48,
+       3.105
+      ],
+      "yaw": -2.8973,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     },
+     {
+      "id": "step-3-seat-6",
+      "kind": "seat",
+      "p": [
+       1.267,
+       0.48,
+       2.938
+      ],
+      "yaw": -2.7344,
+      "height": 0.48,
+      "accepts": {
+       "tags": [
+        "body"
+       ]
+      },
+      "capacity": 1
+     }
+    ],
+    "components": {
+     "seat": {
+      "height": 0.32
+     }
+    }
+   }
+  },
+  {
    "op": "place",
    "def": "eden-guitar-stand@1",
    "name": "stage-guitar",
@@ -668,6 +1053,16 @@
     80
    ],
    "r": 3.1416
+  },
+  {
+   "op": "place",
+   "def": "eden-amphitheatre-steps@1",
+   "name": "amphitheatre-steps",
+   "p": [
+    76,
+    80.6
+   ],
+   "r": 0
   }
  ]
 }
