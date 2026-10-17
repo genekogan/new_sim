@@ -182,3 +182,26 @@ test('B2: a resident cooks a pot (4 portions) at a prep table; eating draws them
   assert.ok(m.reserve(`eat:${spot.id}`, 'r_1')); assert.equal(m.stock(k.key).portions, 3);
   day = 'd2'; assert.equal(m.stock(k.key).portions, 4);
 });
+
+test('B9: a resident gives a talk at the podium; another attends it from a seat, only while it is given', { timeout: 900000 }, async (t) => {
+  const w = await lifeWorld(t, [
+    { op: 'place', def: coreRef('podium'), name: 'podium', p: [0, 14], r: Math.PI },
+    { op: 'place', def: coreRef('bench'), name: 'front-bench', p: [0, 9] },
+  ]);
+  const ana = await w.soul('Ana'), bo = await w.soul('Bo');
+  const attend = () => w.edge.capabilities(bo).find((c: any) => c.id.startsWith('attend:'))!;
+  assert.equal(attend()?.available, false, 'nothing to attend yet: ' + JSON.stringify(attend()));
+  assert.equal(attend().blocked?.code, 'together.nobody-leading');
+  const talk = w.edge.capabilities(ana).find((c: any) => c.id.startsWith('lecture:'))!;
+  assert.ok(talk?.available, 'lecture offered at the podium');
+  const a: any = await accept(w.host, w.edge.act(ana, { capability: talk.id, params: { seconds: 120 } }));
+  assert.equal(a.accepted, true, JSON.stringify(a));
+  for (let i = 0; i < 400 && w.body(ana)?.human?.activity !== 'tell-story'; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
+  assert.equal(w.body(ana).human.activity, 'tell-story', 'Ana is giving the talk');
+  await w.settle(2);
+  const at = attend(); assert.equal(at.available, true, JSON.stringify(at));
+  const { r, seen } = await w.act(bo, at.id, { seconds: 10 }, () => w.body(bo)?.human?.activity === 'listen' && w.body(ana)?.human?.activity === 'tell-story' ? w.body(bo).human.baseActivity : null);
+  assert.equal(seen, 'sit', 'Bo listened seated while Ana talked');
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});

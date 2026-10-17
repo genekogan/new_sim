@@ -174,6 +174,21 @@ export class GodActivitySpots {
       let n = 0; for (const s of crowd) { if (n >= PER_PLACE.listen) break; if (used.has(`read.${s.id}`) || used.has(`eat.${s.id}`)) continue; seatSpot(s, 'listen', [r2(t.at[0]), r2(t.at[1])], { label: `a seat facing ${this.label(t, place)}` }); n++; }
     }
 
+    // B9 talks and classes: the classroom's teacher desk, a lectern or a podium is where a resident gives a talk or a
+    // lesson; the seats of that room (or facing the podium) attend it, once someone is giving it
+    for (const t of all) {
+      const at0 = this.place(t.at, t.level), pname = at0 ? this.h.placeName(at0) ?? '' : '';
+      const front = is(t, 'podium', 'lectern') || (/teacher/i.test(t.name) && /classroom|lecture|school/i.test(`${pname} ${at0 ?? ''}`));
+      if (!front) continue;
+      const at = this.standAt(t, t.slots.find(s => s.kind === 'stand')?.id); if (!at) continue;
+      const place = this.place(at, t.level), id = `lecture.${t.id}`.toLowerCase(), face: V2 = this.world(t, [0, t.size[2] / 2 + 6]);
+      add({ id, activity: 'lecture', base: 'idle', at, faceTo: is(t, 'podium', 'lectern') ? this.world(t, [0, 6]) : face, label: this.label(t, place), ...(place ? { place } : {}), ...(t.level ? { level: t.level } : {}) });
+      const room = place && /classroom|lecture|school|hall/i.test(`${place} ${this.h.placeName(place) ?? ''}`) ? place : undefined;
+      const fp = this.world(t, [0, 1]), fwd: V2 = [fp[0] - t.at[0], fp[1] - t.at[1]];
+      const audience = seats.filter(s => s.level === t.level && (room ? this.place(s.at, s.level) === room : d2(s.at, t.at) <= AUDIENCE_RADIUS && ((s.at[0] - t.at[0]) * fwd[0] + (s.at[1] - t.at[1]) * fwd[1]) > 1))
+        .sort((a, b) => d2(a.at, t.at) - d2(b.at, t.at) || (a.id < b.id ? -1 : 1)).slice(0, 12);
+      for (const s of audience) seatSpot(s, 'attend', [r2(at[0]), r2(at[1])], { requires: id, label: `a seat at ${this.label(t, place)}` });
+    }
     // B5 the playground and the gym and courts the god put up (tags say which apparatus)
     for (const t of all) {
       if (is(t, 'swings') && t.slots.some(s => s.kind === 'seat')) seatSpot(t, 'swing', undefined);

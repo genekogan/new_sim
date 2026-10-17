@@ -51,6 +51,9 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
   'book-club': {pose: 'read', prop: 'book', seconds: 600, label: 'Book club: read and talk it over together'},
   'cook-together': {pose: 'cook', prop: 'spoon', seconds: 300, label: 'Cook together at a preparation table'},
   'social-dance': {pose: 'dance', seconds: 180, label: 'Dance on the bandstand'}, 'yoga-class': {pose: 'yoga', seconds: 600, label: 'Join the yoga class'},
+  // E-life B9 (god worlds): a talk or lesson from a podium, a lectern or a classroom's teacher desk, and attending it from
+  // a seat in the room (offered once someone is giving it: the attend spot `requires` the lecture spot)
+  lecture: {pose: 'tell-story', seconds: 600, label: 'Give a talk or a lesson'}, attend: {pose: 'listen', seconds: 600, label: 'Attend the talk or class'},
   'play-frisbee': {seconds: 300, label: 'Throw a frisbee'}, 'play-petanque': {seconds: 600, label: 'Play pétanque'}, 'play-volleyball': {seconds: 300, label: 'Play beach volleyball'},
 };
 /** CN5 choreographed games at spots: 2–6 players; the world keeps the turns (social/pose.ts GAMES). */
