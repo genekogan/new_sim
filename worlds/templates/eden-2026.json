@@ -165,9 +165,9 @@
             -367
           ],
           "params": {
-            "height": 115,
-            "radius": 147,
-            "peak": 2.2
+            "height": 96,
+            "radius": 160,
+            "peak": 1.4
           }
         },
         {
@@ -179,9 +179,9 @@
             -394
           ],
           "params": {
-            "height": 128,
-            "radius": 138,
-            "peak": 2.4
+            "height": 104,
+            "radius": 155,
+            "peak": 1.5
           }
         },
         {
