@@ -8,7 +8,7 @@ const C = { walnut: '#5e3d27', oak: '#8a5a36', rust: '#b0573a', ochre: '#d19c3c'
 export const INTERIOR_DEFS = [
   // A ceiling pendant (old F.pendant): cord from the ceiling, a dark conical shade with a warm bulb; glows at night.
   { op: 'define', def: { schema: 'def/1', name: 'eden-pendant', version: 1, description: 'A ceiling pendant lamp: a dark conical shade on a cord, warm light (old Eden library and café).', tags: ['furniture', 'light', 'lamp', 'eden'], form: 'point',
-    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffc983', range: 2.6, on: true } }, size: { box: [0.6, 2.92, 0.6] },
+    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffc983', range: 1.4, on: true } }, size: { box: [0.6, 2.92, 0.6] },
     make: { kind: 'gen', gen: 'kit/2', args: { shapes: [
       { kind: 'cyl', at: [0, 2.62, 0], r: 0.008, h: 0.6, segments: 4, color: '#2b2623', collide: false },
       { kind: 'cone', at: [0, 2.19, 0], r: 0.3, h: 0.26, segments: 14, color: '#2f3332', collide: false },
@@ -29,7 +29,7 @@ export const LIBRARY = [
   L('reading-chair-west-1', 'chair', [71.2, -5.6], S, { params: { wood: C.walnut, cushion: C.sage } }), L('reading-chair-west-2', 'chair', [71.8, -7.2], N, { params: { wood: C.walnut, cushion: C.sage } }),
   L('reading-chair-east-1', 'chair', [76.2, -5.6], S, { params: { wood: C.walnut, cushion: C.sage } }), L('reading-chair-east-2', 'chair', [76.8, -7.2], N, { params: { wood: C.walnut, cushion: C.sage } }),
   L('armchair-sage', 'armchair', [75.9, -3.9], S, { params: { fabric: C.sage, wood: C.walnut } }), L('armchair-rose', 'armchair', [77.95, -3.9], S, { params: { fabric: C.rose, wood: C.walnut } }),
-  L('floor-lamp', 'floor-lamp', [69.7, -3.7], N), L('tall-plant', 'potted-plant', [71.6, -3.7], N, { params: { sy: 1.6 } }),
+  L('floor-lamp', 'floor-lamp', [69.7, -3.7], N, { state: { on: false } }), L('tall-plant', 'potted-plant', [71.6, -3.7], N, { params: { sy: 1.6 } }),
   L('desk-west', 'desk', [71.5, -9.3], N, { params: { top: C.walnut } }), L('desk-east', 'office-desk', [76.5, -9.4], N),
   L('desk-chair-west', 'chair', [71.5, -8.4], S, { params: { wood: C.walnut, cushion: C.sage } }), L('desk-chair-east', 'office-chair', [76.5, -8.4], S),
   ...[[71.5, -6.6], [76.5, -6.6], [71.3, -9], [76.3, -9], [74, -5]].map(([x, z], i) => L(`pendant-${i + 1}`, 'eden-pendant@1', [x, z], N)),
@@ -39,7 +39,7 @@ const on = (table, name, def, p, r = 0) => ({ op: 'place', def: `core/${def}@1`,
 export const LIBRARY_TOPS = [
   on('eden-library-1/library-reading-table-west', 'library-books-west', 'book-stack', [-0.2, 0.1]), on('eden-library-1/library-reading-table-east', 'library-books-east', 'book-stack', [-0.2, 0.1]),
   on('eden-library-1/library-desk-west', 'library-desk-lamp-west', 'desk-lamp', [-0.45, -0.1]), on('eden-library-1/library-desk-west', 'library-desk-books', 'book-stack', [0.3, 0]),
-  L('corner-lamp', 'floor-lamp', [77.1, -3.75], N),
+  L('corner-lamp', 'floor-lamp', [77.1, -3.75], N, { state: { on: false } }),
 ];
 
 // Café: one room 8 x 6 m (old int-cafe, the same frame: counter at the back, door at the front +z).
