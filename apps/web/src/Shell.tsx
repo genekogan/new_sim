@@ -1,4 +1,5 @@
 import {explorePresence} from './explore-data.ts';
+import {exploreAvailable} from './explore-control.ts';
 import {MySouls,useMySouls} from './MySouls.tsx';
 import {edenReleaseWorlds,edenExperienceEnabled} from './eden-release.ts';
 import {EdenTour,type EdenTourPlace} from './EdenTour.tsx';
@@ -143,6 +144,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
   const tourHandle=viewerHandle;
+  const exploreSeen=useRef(false),exploreOn=exploreAvailable(exploreSeen.current,viewerState);exploreSeen.current=exploreOn;  // V1: a viewer blip no longer unmounts Explore
   const exploreLocations=viewerHandle?.locations?.()??[];
   const exploreName=worldName;
   const localClassroomPresentation=classroomProjection(edenExpansion,sim.conn.welcome?.worldId,Object.hasOwn(r.entities,classroomScreenEntityId),viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason,lessonIndex,cfg.worldId);
@@ -161,7 +163,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         <span className={st.state === 'open' ? 'ok' : 'dim'}>{st.state === 'open' ? '● Connected' : 'Connecting…'}</span>
         </>}
         {!advanced&&<div className="hud-status" ref={setStatusSlot}/>}
-        {!advanced&&viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>{launcherWorld&&<GodBolt/>}<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
+        {!advanced&&exploreOn&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>{launcherWorld&&<GodBolt/>}<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
         {!advanced&&<div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button></div>}
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
