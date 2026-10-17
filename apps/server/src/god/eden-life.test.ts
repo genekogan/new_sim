@@ -109,6 +109,14 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
   }
   t.diagnostic(JSON.stringify(outcomes));
   for (const [k, v] of Object.entries(outcomes)) assert.equal(v, 'completed seen', `${k}: ${v}`);
+  // B8: a letter posted to a named resident is delivered to them
+  const bo = await w.soul('Bo');
+  const post = w.edge.capabilities(ana).find((c: any) => c.id.startsWith('post-letter:post-letter.'))!;
+  const sent = await w.act(ana, post.id, { to: 'Bo', title: 'Hello', text: 'See you at the piano.' });
+  assert.equal(sent.r.phase, 'completed', JSON.stringify(sent.r));
+  assert.ok(sent.r.outcome?.produced?.some((x: any) => x.kind === 'letter'), 'a letter was produced: ' + JSON.stringify(sent.r.outcome));
+  const mail = w.edge.outcomes.mailbox(bo.soulId);
+  assert.equal(mail.length, 1, 'Bo has the letter'); 
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
 
