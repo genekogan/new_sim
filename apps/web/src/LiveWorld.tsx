@@ -67,7 +67,7 @@ import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
-import { GodWorldLiving, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
+import { GodWorldLiving, calendarClock, entityWorldState, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
@@ -720,7 +720,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             for (const m of [...standIns.children]) if (!seen.has(m.name)) standIns.remove(m);
           }
           // world clock at the moment shown (the sim's clock, moved back by how far behind it we are)
-          const clock = take.finalState.env?.datetime ?? null;
+          // a world's `time.calendar` (MM-DD) dates its sky: the sun's path and the dusk follow that season, the hour stays the clock's
+          const clock = calendarClock(take.finalState.env?.datetime ?? null, entityWorldState(entityLayer));
           const ref = take.startTick + take.ticks;
           const clockOffset=(depictedTick-ref)*(dayTicks?86400/dayTicks:dt);
           const datetime = clock ? shiftIso(clock, clockOffset) : null;

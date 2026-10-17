@@ -243,7 +243,9 @@ export const worldStateSchema = z.object({
     /** R4-LIVE env setter: set the time of day to `hour` (0–24) once; `n` counts sets (the world clock applies each n once, moving forward). */
     set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable().optional(),
     /** The world clock stands still (the god paused time). */
-    paused: z.boolean().default(false) }).prefault({}),
+    paused: z.boolean().default(false),
+    /** Presentation season: the sky dates the clock to this month-day ("06-05"); the hour and every schedule stay the clock's. */
+    calendar: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/).optional() }).prefault({}),
   /** `kind` 'auto' = the scheduled weather of the live worlds (a kind per 2 h slot, seeded by the day, as on /w/eden); any
    *  other kind shows these channels as set (`setEnv` writes them from kind × intensity). 'storm' adds lightning and thunder. */
   weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0),
@@ -260,7 +262,7 @@ export type WorldState = z.infer<typeof worldStateSchema>;
 /** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
 export const worldPatchSchema = z.object({
   sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
-  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean() }).partial(),
+  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean(), calendar: z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/) }).partial(),
   weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1), strike: strikeSchema.nullable() }).partial(),
   constitution: z.string().max(20000),
   ground: z.object({ palette: worldStateSchema.shape.ground.unwrap().shape.palette.unwrap() }).partial(),

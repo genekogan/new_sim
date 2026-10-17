@@ -21,7 +21,8 @@
       "set": {
         "hour": 12,
         "n": 1
-      }
+      },
+      "calendar": "06-05"
     }
   },
   "batches": [
@@ -46,7 +47,8 @@
               "set": {
                 "hour": 12,
                 "n": 1
-              }
+              },
+              "calendar": "06-05"
             }
           }
         }
@@ -3521,14 +3523,15 @@
             -7
           ],
           "params": {
-            "wall": "#dfc9a3",
+            "wall": "#b3a487",
             "trim": "#6b4a2b",
-            "roofColor": "#63716c",
+            "roofColor": "#5f5a50",
             "w": 10.4,
             "d": 8.4,
             "floorHeight": 3.3,
-            "material": "brick",
-            "roof": "gable",
+            "material": "stone",
+            "roof": "flat",
+            "windows": 0.75,
             "plan": {
               "floors": [
                 {

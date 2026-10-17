@@ -133,7 +133,7 @@ for (const [i, x, z, w, r] of [[1, -116, 60, 16, 0], [2, -136, 60, 14, 0], [3, -
 courtyard('region-abbey.cloister', center('region-abbey.cloister'), 18, 16, { material: 'stone', wall: '#d8c9a8', roof: '#a8553a', trim: '#efe9dc' }, { floors: 2 });
 
 // Close-up east-side public quarter, with room ids matching furnish recipes.
-named('eden-library-1', 'hall', { w: 10.4, d: 8.4, floorHeight: 3.3, material: 'brick', wall: '#dfc9a3', roof: 'gable', roofColor: '#63716c', plan: oneRoom(10.4, 8.4, 'reading') }, { furnishStyle: null }); // furnished piece by piece like old Eden (interiors.mjs)
+named('eden-library-1', 'hall', { w: 10.4, d: 8.4, floorHeight: 3.3, material: 'stone', wall: '#b3a487', roof: 'flat', roofColor: '#5f5a50', windows: 0.75, plan: oneRoom(10.4, 8.4, 'reading') }, { furnishStyle: null }); // furnished piece by piece like old Eden (interiors.mjs)
 named('eden-office-1', 'hall', { w: 12, d: 8, floors: 3, floorHeight: 3, material: 'plaster', wall: '#d6d9d8', roof: 'flat', trim: '#52636a', plan: { floors: [
   { rooms: [room('reception', [0, 0, 12, 8])], exterior: [{ room: 'reception', wall: 's', kind: 'door', width: 1.6 }] },
   { rooms: [room('office', [0, 0, 12, 8])] }, { rooms: [room('meeting', [0, 0, 12, 8])] },

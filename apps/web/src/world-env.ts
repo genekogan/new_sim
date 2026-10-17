@@ -15,6 +15,14 @@ export function parseShotHour(search: string): number | null {
   return Number(hour.slice(0, 2)) * 60 + Number(hour.slice(3));
 }
 /** Keep the world's calendar date; replace only the presentation time. The streamed clock is never edited. */
+/** A world's presentation calendar: `state.time.calendar` "MM-DD" replaces the clock's month and day (the year, hour and
+ *  minutes stay), so the sky, sun path and dusk follow that season (Eden 2026: early June, so 19:00 is golden hour as on
+ *  old /w/eden). Presentation only: the server clock and every schedule keep the world clock. */
+export function calendarClock(clock: string | null, state: unknown): string | null {
+  const cal = (state as { time?: { calendar?: unknown } } | null)?.time?.calendar;
+  if (!clock || typeof cal !== 'string' || !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(cal) || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
+  return `${clock.slice(0, 5)}${cal}${clock.slice(10)}`;
+}
 export function shotClockAt(clock: string | null, hour: number | null): string | null {
   if (hour === null || !clock || !Number.isInteger(hour) || hour < 0 || hour >= 1440 || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
   return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;

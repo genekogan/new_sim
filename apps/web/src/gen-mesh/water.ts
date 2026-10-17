@@ -30,6 +30,8 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
       {
         vec2 p = uFlow > 0.0 ? vec2(vWaterUv.x - uTime * uFlow, vWaterUv.y) : vWaterWorld.xz;
         vec2 g = wv(p, normalize(vec2(1.0, 0.3)), 0.9, 1.3) * 0.05 + wv(p, normalize(vec2(-0.4, 1.0)), 1.7, 1.9) * 0.03 + wv(p, normalize(vec2(0.7, -0.8)), 3.1, 2.7) * 0.015;
+        // still water calms with distance: far off, the three regular waves under a low sun read as a tiled grid of glints
+        if (uFlow <= 0.0) g *= mix(1.0, 0.12, smoothstep(30.0, 110.0, length(vWaterWorld - cameraPosition)));
         if (uFlow > 0.0) g = g * 0.6 + vec2(sin(vWaterUv.x * 1.4 + sin(vWaterUv.y * 0.9) * 1.2 - uTime * uFlow * 1.7) * 0.012, 0.0); // ripples across the flow (no chevrons)
         vec3 wn = normalize(vec3(-g.x, 1.0, -g.y));
         normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
@@ -45,7 +47,9 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
         } // soft broken streaks, not a W across the bed
       }`)
       // flowing water: cap the sun glint at a pale blue so a grazing view never reads as a white strip
-      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  if (uFlow > 0.0) gl_FragColor.rgb = min(gl_FragColor.rgb, vec3(0.58, 0.74, 0.84));');
+      // still water: a low sun (a June dusk) lit every wave crest of the three-wave normal into a grid of white diamonds;
+      // the glint is capped at a bright sky blue there (it still reads as sun on water, never as a white tiled patch)
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  gl_FragColor.rgb = min(gl_FragColor.rgb, uFlow > 0.0 ? vec3(0.58, 0.74, 0.84) : vec3(0.7, 0.8, 0.87));');
   };
   m.customProgramCacheKey = () => `l3-water-${flow > 0 ? 'flow' : 'still'}`;
   cache.set(key, m);

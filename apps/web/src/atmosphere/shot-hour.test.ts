@@ -88,3 +88,14 @@ test('r2.1 shot readiness waits for the first world clock, gives up at its bound
   assert.ok(performance.now() - t0 < 1000, 'a clockless world still becomes ready');
   const abort = new AbortController(); abort.abort(); assert.equal(await whenShotClock(() => false, { timeoutMs: 5000, signal: abort.signal, frame }), false);
 });
+
+test('a world calendar dates the sky (Eden 2026: early June) and leaves the hour, year and bad values alone', async () => {
+  const { calendarClock } = await import('../world-env.ts');
+  const at = '2026-10-03T19:00:00.000Z', june = { time: { calendar: '06-05' } };
+  assert.equal(calendarClock(at, june), '2026-06-05T19:00:00.000Z');
+  assert.equal(calendarClock(at, null), at);
+  assert.equal(calendarClock(at, { time: { calendar: '13-01' } }), at);
+  assert.equal(calendarClock(null, june), null);
+  const { solarPosition } = await import('../../../../mars/viewer/engine/env/sun.ts');
+  assert.ok(solarPosition(calendarClock('2026-10-03T19:00:00', june)!).elevationDeg > solarPosition('2026-10-03T19:00:00').elevationDeg + 8, 'the June sun stands higher at 19:00');
+});
