@@ -201,7 +201,7 @@ for (const [id, def, w, d, floors, floorHeight, wall, roofColor, roof, material,
   if (def === 'windmill') { named(id, def, { paint: '#f4f2ec', sail: '#e2cfa8', vary: 0.1 }, { furnishStyle: null, metadata: { architecturalDecor: true } }); continue; }
   const params = { w, d, floors, floorHeight, wall, roofColor, roof, material, trim: id.includes('cliff-village') ? '#1f5fa8' : '#e9dfcc', windows: 0.6 };
   if (def === 'hall' && ['bar', 'hall', 'shop', 'cafe', 'garage'].includes(furnishStyle)) params.plan = openPlan(w, d, furnishStyle === 'garage' ? 'workshop' : furnishStyle === 'bar' ? 'bar' : furnishStyle === 'cafe' ? 'cafe' : furnishStyle, floors);
-  named(id, def, params, { r, furnishStyle, ...(def === 'cottage' && floors > 1 ? { metadata: { balconyPreferred: true } } : {}) });
+  named(id, def, params, { r, furnishStyle: id.endsWith('big-top') ? null : furnishStyle, ...(def === 'cottage' && floors > 1 ? { metadata: { balconyPreferred: true } } : {}) }); // the big top: ring and tiered seats (scenery.mjs)
 }
 
 // Campus quad: the annex and two long lecture halls retain their distinctive

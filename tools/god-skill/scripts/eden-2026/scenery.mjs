@@ -70,7 +70,8 @@ group('scenery: festival meadow', (put, ops) => {
   ops.push({ op: 'place', def: 'eden-big-top-canopy@1', name: 'festival-big-top-canopy', in: { parent: 'region-festival-meadow-big-top', slot: 'roof' }, p: [0, 0, 0] });
   // inside the tent: a sawdust ring and tiered seats facing it on four sides
   ops.push({ op: 'place', def: 'core/round-carpet-pack@1', name: 'big-top-ring', in: { parent: 'region-festival-meadow-big-top', slot: 'hall' }, p: [0, 0, 0] });
-  for (const [i, x, z, r] of [[1, 0, -6.5, 0], [2, 0, 6.5, Math.PI], [3, -6.5, 0, Math.PI / 2], [4, 6.5, 0, -Math.PI / 2]]) ops.push({ op: 'place', def: 'core/theatre-seats@1', name: `big-top-seats-${i}`, in: { parent: 'region-festival-meadow-big-top', slot: 'hall' }, p: [x, 0, z], ...(r ? { r: r3(r) } : {}) });
+  // three blocks of seats on each side, two rows deep, round the ring; an aisle from each door (north, south) to the ring
+  for (const [i, x, z, r] of [[-2.6, -6], [0, -6], [2.6, -6], [-2.6, -8.2], [0, -8.2], [2.6, -8.2]].flatMap(([u, v], k) => [0, 1, 2, 3].filter(q => !(u === 0 && q % 2 === 0)).map(q => { const a = q * Math.PI / 2, c = Math.cos(a), sn = Math.sin(a); return [k * 4 + q + 1, r3(u * c - v * sn), r3(u * sn + v * c), -a]; }))) ops.push({ op: 'place', def: 'core/theatre-seats@1', name: `big-top-seats-${i}`, in: { parent: 'region-festival-meadow-big-top', slot: 'hall' }, p: [x, 0, z], ...(r ? { r: r3(r) } : {}) });
   put('eden-helter-skelter@1', 'festival-helter-skelter', mid('region-festival-meadow.helter-skelter'));
   put('balloon', 'festival-balloon-2', [262, 70], { params: { env: '#d9473e', stripe: '#f4efe4' } });
   put('balloon', 'festival-balloon-3', [300, 48], { params: { env: '#3f7fb5', stripe: '#f2c14e' } });

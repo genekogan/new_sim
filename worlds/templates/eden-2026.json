@@ -18585,172 +18585,6 @@
       ]
     },
     {
-      "note": "furnish region-festival-meadow-big-top",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/long-table@1",
-          "name": "hall-table",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            0,
-            0,
-            -7.213
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-0",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            -6.033,
-            0,
-            0
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-1",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-2",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            6.033,
-            0,
-            0
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-3",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            -6.033,
-            0,
-            4.234
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-4",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            0,
-            0,
-            4.234
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench-5",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            6.033,
-            0,
-            4.234
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp-1",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            -10.52,
-            0,
-            -10.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f8",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp-2",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            10.52,
-            0,
-            10.52
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/piano@1",
-          "name": "hall-piano",
-          "in": {
-            "parent": "region-festival-meadow-big-top",
-            "slot": "hall"
-          },
-          "p": [
-            10.19,
-            0,
-            6.018
-          ],
-          "r": -1.571
-        }
-      ]
-    },
-    {
       "note": "furnish region-alpine-valley-station",
       "group": "eden-2026",
       "ops": [
@@ -62224,9 +62058,9 @@
             "slot": "hall"
           },
           "p": [
+            -2.6,
             0,
-            0,
-            -6.5
+            -6
           ]
         },
         {
@@ -62238,11 +62072,278 @@
             "slot": "hall"
           },
           "p": [
+            6,
             0,
-            0,
-            6.5
+            -2.6
           ],
-          "r": 3.142
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-3",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            2.6,
+            0,
+            6
+          ],
+          "r": -3.142
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-4",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -6,
+            0,
+            2.6
+          ],
+          "r": -4.712
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-6",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            6,
+            0,
+            0
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-8",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -6,
+            0,
+            0
+          ],
+          "r": -4.712
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-9",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            2.6,
+            0,
+            -6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-10",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            6,
+            0,
+            2.6
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-11",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -2.6,
+            0,
+            6
+          ],
+          "r": -3.142
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-12",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -6,
+            0,
+            -2.6
+          ],
+          "r": -4.712
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-13",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -2.6,
+            0,
+            -8.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-14",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            8.2,
+            0,
+            -2.6
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-15",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            2.6,
+            0,
+            8.2
+          ],
+          "r": -3.142
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-16",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -8.2,
+            0,
+            2.6
+          ],
+          "r": -4.712
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-18",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            8.2,
+            0,
+            0
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-20",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -8.2,
+            0,
+            0
+          ],
+          "r": -4.712
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-21",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            2.6,
+            0,
+            -8.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-22",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            8.2,
+            0,
+            2.6
+          ],
+          "r": -1.571
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-23",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -2.6,
+            0,
+            8.2
+          ],
+          "r": -3.142
+        },
+        {
+          "op": "place",
+          "def": "core/theatre-seats@1",
+          "name": "big-top-seats-24",
+          "in": {
+            "parent": "region-festival-meadow-big-top",
+            "slot": "hall"
+          },
+          "p": [
+            -8.2,
+            0,
+            -2.6
+          ],
+          "r": -4.712
         },
         {
           "op": "place",
