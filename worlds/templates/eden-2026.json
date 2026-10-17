@@ -3710,8 +3710,9 @@
             "roofColor": "#63736a",
             "w": 16,
             "d": 19,
-            "floorHeight": 4,
-            "roof": "hip",
+            "floorHeight": 2.6,
+            "roof": "none",
+            "windows": 0,
             "plan": {
               "floors": [
                 {
@@ -58484,6 +58485,26 @@
           "params": {
             "awning": "#d9473e"
           }
+        }
+      ]
+    },
+    {
+      "note": "scenery: classroom screen",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/screen@1",
+          "name": "classroom-court-screen",
+          "in": {
+            "parent": "eden-classroom-1",
+            "slot": "classroom"
+          },
+          "p": [
+            0,
+            0,
+            -8.6
+          ]
         }
       ]
     },

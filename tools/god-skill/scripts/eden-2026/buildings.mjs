@@ -140,7 +140,7 @@ named('eden-office-1', 'hall', { w: 12, d: 8, floors: 3, floorHeight: 3, materia
 ], stairs: [{ from: 0, to: 1, room: 'reception', wall: 'n', at: 0 }, { from: 1, to: 2, room: 'office', wall: 'n', at: 1 }] } }, { furnishStyle: null }); // furnished like old Eden (interiors.mjs)
 named('eden-barn-1', 'barn', { w: 12.4, d: 8.4, floorHeight: 4.2, material: 'wood', wall: '#8b4735', trim: '#d8c7a0', roof: 'gable', roofColor: '#5a5650' }, { furnishStyle: 'barn' });
 named('eden-market-1', 'pavilion', { w: 12, d: 6, floorHeight: 3.5, material: 'wood', wall: '#b08a5f', trim: '#6b4a2b', roof: 'gable', roofColor: '#6d735e' }, { furnishStyle: null });
-named('eden-classroom-1', 'hall', { w: 16, d: 19, floorHeight: 4, wall: '#dfd6bf', trim: '#6a7770', roof: 'hip', roofColor: '#63736a', plan: openPlan(16, 19, 'classroom') }, { coords: [42, -8.5], furnishStyle: 'school' });
+named('eden-classroom-1', 'hall', { w: 16, d: 19, floorHeight: 2.6, wall: '#dfd6bf', trim: '#6a7770', roof: 'none', roofColor: '#63736a', windows: 0, plan: openPlan(16, 19, 'classroom') }, { coords: [42, -8.5], furnishStyle: 'school' }); // old Eden: an open-air walled classroom court
 for (const [id, x, z, w, d, r, wall, roof, trim, front, back, style] of [
   ['int-cafe', 101.5, 25, 8, 6, -Math.PI / 2, '#e7d2b0', '#9b4a35', '#3f5f57', 'cafe', 'kitchen', 'cafe'],
   ['int-music-room', 101.1, 59, 7, 5, -Math.PI / 2, '#cfd8dc', '#4b5258', '#7a4a6a', 'hall', 'gallery', 'hall'],
