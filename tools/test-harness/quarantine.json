@@ -27,9 +27,9 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned",
       "status": "todo",
-      "reason": "Bug candidate: on the re-seeded east-house the first ground-floor deck strip places 0 of 3 deck pieces (kitchen and west-house place 3 with the same template).",
+      "reason": "Baseline-only (fixed on lane/d3c-yearbuild-20261017): not an engine bug; the test's literal strip < -9.5 filter was pre-W51 (strips now -2.65..7.11, 0 of 54 matched); now uses the shared firstGroundStrip rule, re-pinned 51205 / 73f54d61. The gate needs this entry while the baseline still has the todo.",
       "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
-      "exit": "find why east-house D0 strip has no sequenced deck piece (deck-piece 81 -> 54); fix or re-pin with the reason"
+      "exit": "drop this entry once the gate baseline contains the d3c fix"
     },
     {
       "step": "V3-mars-engine",

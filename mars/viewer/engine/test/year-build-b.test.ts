@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadCampusFile } from '../campus/history-node.ts';
 import { bomTotals, stockPiles } from '../campus/bom.ts';
-import { yearBuildSetup, compareToCanonical, compareB, kitOffsets } from '../scenarios/year-build.ts';
+import { yearBuildSetup, compareToCanonical, compareB, kitOffsets, firstGroundStrip } from '../scenarios/year-build.ts';
 import { rehearse } from '../rehearsal/rehearse.ts';
 import { hashOf } from '../core/hash.ts';
 import { publishCampusYear } from '../campus/history.ts';
@@ -118,11 +118,13 @@ test('set-part lift crews never walk through a bystander: the crew holds the par
 });
 
 /** Pinned: the first-bay tranche + its first ground-floor deck strip (default suite). */
-const PIN_BAY1_DECK = { ticks: 53604, hash: '94db263edb961cb21d491445e7d9401be0f3a7609a287680ed1052a6b67d73cb' };
+/** Re-pinned 2026-10-17 (L3c) on the W51 re-seeded mars-2022 (was 53604 94db263e…): 24/24 skeleton, 3/3 deck pieces, 0 violations. */
+const PIN_BAY1_DECK = { ticks: 51205, hash: '73f54d6111260b9c07b5f0195c5e79280209487e0218f49f18368f27b9694394' };
 
-test('year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned', { todo: W51_TODO }, () => {
-  const firstStrip = (p: { kind: string; meta: Record<string, number | string> }) => p.kind === 'deck' && Number(p.meta.level) < 1 && Number(p.meta.strip) < -9.5;
-  const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays: 1, phaseB: { sections: ['D0'], only: firstStrip } });
+test('year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned', () => {
+  // The first strip by the shared rule (lowest level, the strip next to frame line 0): the old literal `strip < -9.5` held
+  // only on the pre-W51 scene (W51 re-seeded east-house: its ground strips now run -2.65 .. +7.11, so it picked 0 of 54 pieces).
+  const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022), { bays: 1, phaseB: { sections: ['D0'], only: firstGroundStrip } });
   assert.equal(s.build.partsB!.parts.length, 3);
   const t0 = performance.now();
   const reh = rehearse(s.history, s.workspace, s.plan, s.cfg);
