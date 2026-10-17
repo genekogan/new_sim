@@ -9,12 +9,13 @@ const THREE = await import(createRequire(V + 'package.json').resolve('three'));
 const C = V + 'app/engine-view/content/';
 const { createEdenRegions } = await import(C + 'assets/eden-regions/index.ts');
 const { edenExpansionPlanting } = await import(C + 'environment/eden-expansion-landscape/planting.mjs');
-const trees: [string, number, number][] = [];
+const trees: [string, number, number, string?, number?][] = [];
 const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
 createEdenRegions(() => 0)?.group.traverse((o: any) => {
   if (!o.isInstancedMesh || !/canopy foliage/.test(o.name)) return;
-  const kind = o.name.replace(/^Regions | canopy foliage| far/g, '');
-  for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); m.decompose(p, q, s); trees.push([kind, +p.x.toFixed(1), +p.z.toFixed(1)]); }
+  const kind = o.name.replace(/^Regions | canopy foliage| far/g, ''), far = /far forests/.test(o.parent?.name ?? '');
+  // district trees (authored rows, squares, gardens) are marked 'set'; far forests are free scatter
+  for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); m.decompose(p, q, s); trees.push([kind, +p.x.toFixed(1), +p.z.toFixed(1), far ? 'far' : 'set', +s.x.toFixed(2)]); }
 });
 const pl = edenExpansionPlanting();
 for (const t of pl.plants) if (/tree|conifer/.test(t.kind)) trees.push([t.kind === 'conifer' ? 'conifer' : 'round', +t.p[0].toFixed(1), +t.p[2].toFixed(1)]);

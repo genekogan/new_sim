@@ -1,7 +1,8 @@
 // Eden 2026 tree density (gap V2): old /w/eden stood hundreds of round trees along its paths, round the commons and in
 // the south park, and conifer forests on the hills. Woodland areas (scatter/2: one entity per patch, instanced trees that
 // avoid solids, roads and water) are planted where old Eden had trees: its expansion forests and footpaths at their
-// original coordinates, and 20 m patches wherever old-trees.json (extract-old-trees.mts) has trees.
+// original coordinates, old district trees one by one where they stood, and 20 m patches wherever old-trees.json
+// (extract-old-trees.mts) has far-forest trees.
 import { readFileSync } from 'node:fs';
 const OLD = JSON.parse(readFileSync(new URL('./old-trees.json', import.meta.url))).trees;
 const rect = (x0, z0, x1, z1) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
@@ -37,9 +38,13 @@ export function treeBatches(existing = []) {
   const ops = [];
   for (const [name, w, pts] of OLD_PATHS) ops.push(path(name, pts, w));
   for (const [name, b, step, kind] of OLD_WOODS) ops.push(wood(name, b, 0.75 / (step * step), palette({ [kind]: 1, ...(kind === 'round' ? { poplar: 0.15 } : {}) }), { minSpacing: Math.max(3, step * 0.6) }));
+  // Old district trees (avenue rows, squares, campus quad) stand where they stood, one entity each.
+  const SET_DEF = { round: 'core/tree@1', conifer: 'core/pine@1', cypress: 'core/pine@1', poplar: 'core/birch@1' };
+  // The core trees are ~1.6x the old low-poly crowns (round: 2.5 m crown, 4 m tall at scale 1), hence s = 0.62 x old scale.
+  OLD.filter(t => t[3] === 'set').forEach(([k, x, z, , sc = 1], i) => ops.push({ op: 'place', def: SET_DEF[k] ?? 'core/tree@1', name: `trees-set-${i + 1}`, p: [x, z], s: Math.min(3, Math.max(0.3, Math.round(sc * 62) / 100)) }));
   const skip = [...existing, ...OLD_WOODS.map(w => w[1])];
   const C = 20, cells = new Map();
-  for (const [k, x, z] of OLD) { if (skip.some(b => inside(x, z, b))) continue; const key = `${Math.floor(x / C)},${Math.floor(z / C)}`; const c = cells.get(key) ?? cells.set(key, { n: 0, k: {} }).get(key); c.n++; c.k[k] = (c.k[k] ?? 0) + 1; }
+  for (const [k, x, z, how] of OLD) { if (how === 'set' || skip.some(b => inside(x, z, b))) continue; const key = `${Math.floor(x / C)},${Math.floor(z / C)}`; const c = cells.get(key) ?? cells.set(key, { n: 0, k: {} }).get(key); c.n++; c.k[k] = (c.k[k] ?? 0) + 1; }
   // Merge runs of neighbouring cells along x with the same leading kind and similar counts into one patch.
   const rows = new Map();
   for (const [key, c] of cells) { const [i, j] = key.split(',').map(Number); (rows.get(j) ?? rows.set(j, []).get(j)).push({ i, ...c }); }
