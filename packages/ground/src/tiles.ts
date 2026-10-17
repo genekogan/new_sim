@@ -54,13 +54,17 @@ export function tilesTouched(l: Landform): TileKey[] {
 export class Terrain {
   private tiles = new Map<TileKey, Float32Array>();
   private hashes = new Map<TileKey, string>();
+  // the tile asked for last: a viewer's terrain mesh samples it hundreds of times in a row (no key string, no lookup)
+  private lastTx = NaN; private lastTz = NaN; private last: Float32Array | null = null;
   ground: Ground;
   constructor(ground: Ground) { this.ground = ground; }
 
   tile(tx: number, tz: number): Float32Array {
+    if (tx === this.lastTx && tz === this.lastTz && this.last) return this.last;
     const k = tileKey(tx, tz);
     let t = this.tiles.get(k);
     if (!t) { t = bakeTile(this.ground, tx, tz); this.tiles.set(k, t); }
+    this.lastTx = tx; this.lastTz = tz; this.last = t;
     return t;
   }
   hash(tx: number, tz: number): string {
@@ -95,6 +99,7 @@ export class Terrain {
   invalidate(l: Landform): TileKey[] {
     const keys = tilesTouched(l);
     for (const k of keys) { this.tiles.delete(k); this.hashes.delete(k); }
+    this.last = null;
     return keys;
   }
   /** Replace the ground wholesale (e.g. after an edit batch) and invalidate the tiles any changed landform touches. */

@@ -18,6 +18,7 @@ import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
 import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
+import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 
@@ -329,7 +330,7 @@ export class WorldEntityLayer {
     const idx: number[] = [];
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, cc = a + nx + 1, dd = cc + 1; idx.push(a, cc, b, b, cc, dd); }
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); if (!computeVertexNormals(g)) g.computeVertexNormals();   // fast-geometry: same normals
     // Eden's meadow turf also takes the Eden realism ground shader (its own material, so a palette change never leaves it patched)
     const realism = groundRealismFor((m.state as { ground?: { palette?: string } }).ground?.palette);
     const mesh = new THREE.Mesh(g, this.material(realism ? 'terrain-meadow' : 'terrain', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: realism ? 1 : 0.95, metalness: 0 })));

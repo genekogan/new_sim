@@ -73,3 +73,22 @@ test('preciseBounds equals Box3.setFromObject(root, true); unsupported geometry 
   assert.equal(transformPoints(half.attributes.position, new THREE.Matrix4(), new Float32Array(9), 0), false);
   const skinned = new THREE.Group(); skinned.add(new THREE.SkinnedMesh(a)); assert.equal(preciseBounds(skinned), null);
 });
+
+test('computeVertexNormals equals three for an indexed grid, shared and degenerate triangles, and an existing normal', async () => {
+  const { computeVertexNormals } = await import('./fast-geometry.ts');
+  const make = () => { seed = 99;
+    const g = new THREE.BufferGeometry(), nx = 17, nz = 13, pos = new Float32Array((nx + 1) * (nz + 1) * 3), idx: number[] = [];
+    for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const k = (j * (nx + 1) + i) * 3; pos[k] = i * 2.5 - 9; pos[k + 1] = Math.sin(i * 0.7) * Math.cos(j * 1.3) * 3 + rnd() * 0.01; pos[k + 2] = j * 2.5 + 1e3; }
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+    idx.push(5, 5, 9, 7, 7, 7, 0, 200, 2);   // degenerate corners: three reads all three before writing
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setIndex(idx); return g;
+  };
+  const a = make(), b = make();
+  assert.equal(computeVertexNormals(a), true); b.computeVertexNormals();
+  same(a.attributes.normal.array as Float32Array, b.attributes.normal.array as Float32Array);
+  // again with the normals already present (reset to zero first)
+  assert.equal(computeVertexNormals(a), true); b.computeVertexNormals();
+  same(a.attributes.normal.array as Float32Array, b.attributes.normal.array as Float32Array);
+  const soup = new THREE.BufferGeometry(); soup.setAttribute('position', new THREE.BufferAttribute(new Float32Array(9), 3));
+  assert.equal(computeVertexNormals(soup), false);   // non-indexed: three's own path
+});

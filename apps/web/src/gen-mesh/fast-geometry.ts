@@ -106,3 +106,34 @@ export function preciseBounds(root: THREE.Object3D): THREE.Box3 | null {
   box.min.set(x0, y0, z0); box.max.set(x1, y1, z1);
   return box;
 }
+
+/** BufferGeometry.computeVertexNormals() for an indexed geometry with a plain position attribute: the same per-triangle
+ *  cross products accumulated through the Float32 normal array in the same order (each corner read before any is
+ *  written, as three does), then normalised. Returns false (nothing changed) for anything else. */
+export function computeVertexNormals(g: THREE.BufferGeometry): boolean {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute | undefined, index = g.index;
+  const p = plain(pos); if (!p || p.s < 3 || !pos || !index || index.normalized || (index as unknown as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute) return false;
+  let na = g.getAttribute('normal') as THREE.BufferAttribute | undefined;
+  if (na && na.count === pos.count && (na.normalized || (na as unknown as THREE.InterleavedBufferAttribute).isInterleavedBufferAttribute || !(na.array instanceof Float32Array) || na.itemSize !== 3)) return false;
+  if (!na || na.count !== pos.count) { na = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3); g.setAttribute('normal', na); }
+  else na.array.fill(0);
+  const n = na.array as Float32Array, ia = index.array;
+  for (let i = 0, il = index.count; i < il; i += 3) {
+    const vA = ia[i], vB = ia[i + 1], vC = ia[i + 2];
+    const ax = comp(p, vA, 0), ay = comp(p, vA, 1), az = comp(p, vA, 2), bx = comp(p, vB, 0), by = comp(p, vB, 1), bz = comp(p, vB, 2), cx = comp(p, vC, 0), cy = comp(p, vC, 1), cz = comp(p, vC, 2);
+    const cbx = cx - bx, cby = cy - by, cbz = cz - bz, abx = ax - bx, aby = ay - by, abz = az - bz;
+    const x = cby * abz - cbz * aby, y = cbz * abx - cbx * abz, z = cbx * aby - cby * abx;
+    const a0 = n[vA * 3] + x, a1 = n[vA * 3 + 1] + y, a2 = n[vA * 3 + 2] + z;
+    const b0 = n[vB * 3] + x, b1 = n[vB * 3 + 1] + y, b2 = n[vB * 3 + 2] + z;
+    const c0 = n[vC * 3] + x, c1 = n[vC * 3 + 1] + y, c2 = n[vC * 3 + 2] + z;
+    n[vA * 3] = a0; n[vA * 3 + 1] = a1; n[vA * 3 + 2] = a2;
+    n[vB * 3] = b0; n[vB * 3 + 1] = b1; n[vB * 3 + 2] = b2;
+    n[vC * 3] = c0; n[vC * 3 + 1] = c1; n[vC * 3 + 2] = c2;
+  }
+  for (let i = 0, il = na.count; i < il; i++) {
+    const x = n[i * 3], y = n[i * 3 + 1], z = n[i * 3 + 2], k = 1 / (Math.sqrt(x * x + y * y + z * z) || 1);
+    n[i * 3] = x * k; n[i * 3 + 1] = y * k; n[i * 3 + 2] = z * k;
+  }
+  na.needsUpdate = true;
+  return true;
+}
