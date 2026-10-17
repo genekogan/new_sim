@@ -94,3 +94,41 @@ test('freeze2/L3: room goals stay cached per world version past 200 rooms (no re
   world.tick += 200; sweep();
   assert.equal(reaches, first, 'the second sweep reuses every room goal of this world version');
 });
+
+// Lane M 2026-10-17 (Mars): from the kitchen's raised dining hall `walk:freeside` (~90 m) failed "too far to plan from
+// an upper floor; walk down first" (the engine pages long walks on the ground only). A far ground goal from a raised room
+// now walks out to the building's front first.
+test('from a raised room, a far ground goal is walked to via the building front; a near one directly', () => {
+  const entities = new Map<string, unknown>([
+    ['house', { id: 'house', name: 'house', def: 'house@1', in: { parent: 'world' } }],
+    ['shed', { id: 'shed', name: 'shed', def: 'shed@1', in: { parent: 'world' } }],
+    ['hut', { id: 'hut', name: 'hut', def: 'shed@1', in: { parent: 'world' } }],
+    ['me', { id: 'me', def: 'core/humanoid@1', in: { parent: 'world' } }],
+  ]);
+  const defs: Record<string, unknown> = {
+    'house@1': { name: 'house', form: 'point', components: {}, tags: ['building'], make: { kind: 'mesh' } },
+    'shed@1': { name: 'shed', form: 'point', components: {}, tags: [], make: { kind: 'mesh' } },
+    'core/humanoid@1': { name: 'core-humanoid', form: 'point', components: { body: {} }, tags: ['body'], make: { kind: 'none' } },
+  };
+  const bakes: Record<string, unknown> = {
+    'house@1': { rooms: [{ id: 'hall', polygon: [[-4, -3], [4, -3], [4, 3], [-4, 3]], y: 0.53 }], slots: [{ id: 'hall', kind: 'room', p: [0, 0.53, 0], yaw: 0 }],
+      openings: [{ id: 'front-door', kind: 'door', at: [0, 3], yaw: 0, width: 1, state: 'open' }] },
+    'shed@1': { slots: [], colliders: [] },
+  };
+  const poses: Record<string, { x: number; y: number; z: number; yaw: number; s: number }> = { house: { x: 0, y: 0, z: 0, yaw: 0, s: 1 }, shed: { x: 100, y: 0, z: 0, yaw: 0, s: 1 }, hut: { x: 20, y: 0, z: 0, yaw: 0, s: 1 }, me: { x: 0, y: 0.53, z: 0, yaw: 0, s: 1 } };
+  const nav = new GodNav({ model: {
+    entities, editSeq: 1, ground: () => ({ waters: [] }),
+    resolvedDef: (ref: string) => defs[ref], bake: (d: { name: string }) => bakes[`${d.name.replace(/^core-/, 'core/')}@1`] ?? { slots: [] },
+    worldPose: (e: { id: string }) => poses[e.id], pathOf: (id: string) => id, get: () => undefined,
+  }, engine: { world: { tick: 0, entities: { me: { pose: { p: [0, 0.53, 0], yaw: 0 }, human: { level: 1, activity: 'stand' } } } },
+    standableNearV1: (at: Vec2) => at, reachV1: () => ({ ok: true }), clearanceAtV1: () => 1,
+  }, levelAt: (_x: number, _z: number, y?: number) => ((y ?? 0) > 0.3 ? 1 : 0), engineOwned: () => false } as unknown as NavHost);
+  const caps: { id: string }[] = [], plans = new Map<string, { steps: { verb: string; params: Record<string, unknown> }[] }>();
+  nav.capabilities({ soulId: 's', entityId: 'me' } as never, caps as never, plans as never);
+  const far = plans.get('walk:shed'), near = plans.get('walk:hut');
+  assert.ok(far && near, `plans offered: ${[...plans.keys()].join(', ')}`);
+  assert.equal(far.steps.length, 2, JSON.stringify(far.steps));
+  assert.deepEqual([far.steps[0].verb, far.steps[0].params.level], ['mars:walk_to', 0]);
+  assert.ok(Math.abs((far.steps[0].params.z as number) - 3) < 1.5, `walks out through the front door first: ${JSON.stringify(far.steps[0])}`);
+  assert.equal(near.steps.length, 1, 'a near ground goal is planned directly');
+});

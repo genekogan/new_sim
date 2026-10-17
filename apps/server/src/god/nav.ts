@@ -80,6 +80,7 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
 const BUILDINGS_WITHIN = 150;
+const DOWN_FIRST_M = 60;     // from a raised floor, a ground goal farther than this is walked to via the building's front (the engine pages long walks on the ground only, from 72 m)
 const PLACE_M2 = 300;       // ... at least this big (a court or a garden, not a paving tile or an exhibit's pad)
 const PLACES_WITHIN = 400;   // an open area that is one of the world's places (a court, a garden) stays offered within this many metres
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
@@ -323,6 +324,8 @@ export class GodNav {
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
     const all = this.things();
+    // on a raised floor: the ground-level front of the building whose room I stand in (walked to first for far ground goals)
+    const exit = myLevel === 0 ? null : all.find((t) => t.kind === 'room' && t.level === myLevel && t.poly && inPoly(here[0], here[1], t.poly) && t.entry && t.entry.level === 0)?.entry ?? null;
     const ranked = all.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
     // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
@@ -342,8 +345,11 @@ export class GodNav {
       const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
       // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
       const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
-      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, go] });
-      if (place) this.placeCapabilities(t, place, here, d, [...stand, go], myLevel, caps, plans);
+      // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
+      // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
+      const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
+      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
+      if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
     }
   }
   /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend
