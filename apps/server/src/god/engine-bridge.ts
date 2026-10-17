@@ -852,6 +852,17 @@ export class EngineBridge {
     }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     this.sitHere(caps, plans, here);
+    this.fireLit(caps);
+  }
+  /** B6: a god-built campfire that has been put out warms nobody: warm-by-fire there is refused until someone lights it. */
+  private fireLit(caps: EdgeCapability[]) {
+    for (const c of caps) {
+      if (c.verb !== 'warm-by-fire' || !c.target) continue;
+      const e = this.model.entities.get(c.target.id), def = e ? this.model.resolvedDef(e.def) : undefined;
+      const lit = e?.state?.lit ?? (def?.state as Record<string, { default?: unknown }> | undefined)?.lit?.default;
+      if (lit !== false) continue;
+      c.available = false; c.blocked = { code: 'fire.out', reason: `${this.model.pathOf(e!.id)} is not lit; light it first (object:${e!.id}:light), then warm up by it.` };
+    }
   }
   /** SOULFIX: which storey of its building a thing upstairs stands on ("floor 1" = the first floor above the ground),
    *  from the building's own floor height (engine level ids are not storeys). */

@@ -16,6 +16,7 @@ import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
+import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
 import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
@@ -404,8 +405,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (me) {
       for (const e of Object.values(w.entities)) {
         // CN5 (acceptance): 150 m, so the fire is offered from the pond and the shore too
-        if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
-        const id = 'warm-by-fire:' + e.id, label = 'Warm up by the fire with whoever is there';
+        if (!isCampfire(e) || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
+        const id = 'warm-by-fire:' + e.id, label = e.def === 'campfire' ? 'Warm up by the fire with whoever is there' : `Warm up by ${e.label && !/^ew:/.test(e.label) ? e.label : 'the campfire'} with whoever is there`;
         caps.push({id, verb: 'warm-by-fire', label, target: {id: e.id, kind: 'object'}, available: true, params: secondsOf(120, 600)});
         plans.set(id, {label, steps: [{verb:'walk_to',params:{to:e.id,standoff:2}},{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
       }

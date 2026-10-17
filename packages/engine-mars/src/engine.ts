@@ -648,7 +648,7 @@ export class MarsEngine implements Engine {
         const n = secs(a.seconds, 120), pt = this.pointOf(a.at);
         const e = typeof a.at === 'string' ? this.ents[a.at] : undefined;
         const region = typeof a.at === 'string' && this.rt.world.regions[a.at] ? a.at : !e && pt ? Object.keys(this.rt.world.regions).sort().find((id) => inPoly(pt[0], pt[1], this.rt.world.regions[id].polygon)) : undefined;
-        const tries: Op[] = e ? [...(e.def === 'campfire' ? [{ verb: 'campfire_circle', params: { actors: [me], fire: e.id }, settle: 'held' } as Op] : []), { verb: 'gather', params: { actors: [me], fixture: e.id }, settle: 'held' }]
+        const tries: Op[] = e ? [...(e.def === 'campfire' || CATALOG[e.def]?.slots?.some((q) => q.kind === 'fire-circle') ? [{ verb: 'campfire_circle', params: { actors: [me], fire: e.id }, settle: 'held' } as Op] : []), { verb: 'gather', params: { actors: [me], fixture: e.id }, settle: 'held' }]
           : region ? [{ verb: 'gather', params: { actors: [me], region }, settle: 'held' }] : [];
         for (const op of tries) if ('verb' in op && !this.plan(op.verb, op.params)) return [op, { wait: n }];
         // No place to take (a full bench, a spot with no layout): stand near it instead.
