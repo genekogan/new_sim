@@ -122,7 +122,7 @@ void test('upper-floors/1 hotels: lobby floors, door openings and stairs install
   try{body.human.level=14;assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
     body.human.level=0;body.pose.p=[121.2,0,120];assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
     body.pose.p=[110,0,127];assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
-    assert.equal(f.host.installUpperFloorsV1 && e.previewUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-2'}),null,'the next hotel is empty');}
+    assert.equal(e.previewUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-2'}),null,'the next hotel is empty');}
   finally{body.pose.p=p;if(was===undefined)delete body.human.level;else body.human.level=was;}
   assert.equal(e.stateHash(),hash1);assert.equal(f.host.seq,seq1);
 
