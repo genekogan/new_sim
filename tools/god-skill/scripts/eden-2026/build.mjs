@@ -11,6 +11,7 @@ import {BUILDING_BATCHES,BUILDINGS,COURTYARDS} from './buildings.mjs';
 import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
 import {treeBatches} from './trees.mjs';
+import {lightOps,propOps} from './street-life.mjs';
 import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS} from './interiors.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
@@ -57,6 +58,7 @@ for(const b of SCENERY_BATCHES)apply(b.label,b.ops,'any');
 {const box=a=>{const xs=a.map(q=>q[0]),zs=a.map(q=>q[1]);return[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];};
  const existing=LANDSCAPE_BATCHES.flatMap(b=>b.ops).filter(o=>o.def==='core/woodland@1'&&o.shape?.area).map(o=>box(o.shape.area));
  const t=treeBatches(existing);for(let i=0;i<t.length;i+=12)apply(`trees ${i/12+1}`,t.slice(i,i+12),'any');}
+{const l=lightOps();for(let i=0;i<l.length;i+=14)apply(`night lights ${i/14+1}`,l.slice(i,i+14),'any');const p=propOps();for(let i=0;i<p.length;i+=14)apply(`street life ${i/14+1}`,p.slice(i,i+14),'any');}
 const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).places;
 // Invisible native land-use regions preserve outdoor destinations without
 // painting duplicate plazas over the gardens/water. Interior destinations are

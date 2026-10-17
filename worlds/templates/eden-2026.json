@@ -56304,7 +56304,8 @@
           },
           "params": {
             "stripes": true,
-            "edge": 2
+            "edge": 2,
+            "color": "#64953e"
           }
         }
       ]
@@ -65830,6 +65831,3727 @@
               }
             ]
           }
+        }
+      ]
+    },
+    {
+      "note": "night lights 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-1",
+          "p": [
+            131.3,
+            -28
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-2",
+          "p": [
+            141.7,
+            -28
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-3",
+          "p": [
+            131.3,
+            -20.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-4",
+          "p": [
+            141.7,
+            -20.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-5",
+          "p": [
+            131.3,
+            -13
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-6",
+          "p": [
+            141.7,
+            -13
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-7",
+          "p": [
+            131.3,
+            -5.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-8",
+          "p": [
+            141.7,
+            -5.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-9",
+          "p": [
+            131.3,
+            9.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-10",
+          "p": [
+            141.7,
+            9.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-11",
+          "p": [
+            131.3,
+            17
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-12",
+          "p": [
+            141.7,
+            17
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-13",
+          "p": [
+            131.3,
+            24.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-14",
+          "p": [
+            141.7,
+            24.5
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-15",
+          "p": [
+            131.3,
+            32
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-16",
+          "p": [
+            141.7,
+            32
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-17",
+          "p": [
+            131.3,
+            39.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-18",
+          "p": [
+            141.7,
+            39.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-19",
+          "p": [
+            131.3,
+            47
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-20",
+          "p": [
+            141.7,
+            47
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-21",
+          "p": [
+            127,
+            73
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-22",
+          "p": [
+            151,
+            73
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-23",
+          "p": [
+            139,
+            64.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-24",
+          "p": [
+            139,
+            81.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-25",
+          "p": [
+            116,
+            99.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-26",
+          "p": [
+            127,
+            99.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-27",
+          "p": [
+            138,
+            99.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-28",
+          "p": [
+            149,
+            99.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-29",
+          "p": [
+            160,
+            99.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-30",
+          "p": [
+            -87.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-31",
+          "p": [
+            -69.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-32",
+          "p": [
+            -51.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-33",
+          "p": [
+            -33.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-34",
+          "p": [
+            -15.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-35",
+          "p": [
+            20.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-36",
+          "p": [
+            38.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-37",
+          "p": [
+            56.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-38",
+          "p": [
+            74.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-39",
+          "p": [
+            92.5,
+            93.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-40",
+          "p": [
+            8.96,
+            119.51
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-41",
+          "p": [
+            -16.01,
+            123.22
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-42",
+          "p": [
+            -20.96,
+            104.49
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-43",
+          "p": [
+            4.01,
+            100.78
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-44",
+          "p": [
+            34,
+            95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-45",
+          "p": [
+            94,
+            95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-46",
+          "p": [
+            34,
+            129
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-47",
+          "p": [
+            92,
+            131
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-48",
+          "p": [
+            -30,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-49",
+          "p": [
+            -18,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-50",
+          "p": [
+            -6,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-51",
+          "p": [
+            6,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-52",
+          "p": [
+            18,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-53",
+          "p": [
+            30,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-54",
+          "p": [
+            42,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-55",
+          "p": [
+            54,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-56",
+          "p": [
+            66,
+            141
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 5",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-57",
+          "p": [
+            78,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-58",
+          "p": [
+            90,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-59",
+          "p": [
+            102,
+            141
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-60",
+          "p": [
+            10,
+            166.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-61",
+          "p": [
+            62,
+            174.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-62",
+          "p": [
+            -91,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-63",
+          "p": [
+            -71,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-64",
+          "p": [
+            -51,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-65",
+          "p": [
+            -31,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-66",
+          "p": [
+            -11,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-67",
+          "p": [
+            9,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-68",
+          "p": [
+            29,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-69",
+          "p": [
+            49,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-70",
+          "p": [
+            69,
+            -72.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 6",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-71",
+          "p": [
+            89,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-72",
+          "p": [
+            109,
+            -72.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-73",
+          "p": [
+            122,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-74",
+          "p": [
+            130,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-75",
+          "p": [
+            138,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-76",
+          "p": [
+            146,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-77",
+          "p": [
+            154,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-78",
+          "p": [
+            160.12,
+            128.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-79",
+          "p": [
+            170,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-80",
+          "p": [
+            178,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-81",
+          "p": [
+            186,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-82",
+          "p": [
+            194,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-83",
+          "p": [
+            202,
+            131.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-84",
+          "p": [
+            122,
+            -44.5
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 7",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-85",
+          "p": [
+            162,
+            -44.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-86",
+          "p": [
+            -112,
+            70
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-87",
+          "p": [
+            -121,
+            70
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-88",
+          "p": [
+            -130,
+            70
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-89",
+          "p": [
+            -139,
+            70
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-90",
+          "p": [
+            -148,
+            70
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-91",
+          "p": [
+            177,
+            39.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-92",
+          "p": [
+            177,
+            28.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-93",
+          "p": [
+            199,
+            39.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-94",
+          "p": [
+            199,
+            28.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-95",
+          "p": [
+            221,
+            39.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-96",
+          "p": [
+            221,
+            28.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-97",
+          "p": [
+            243,
+            39.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-98",
+          "p": [
+            243,
+            28.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 8",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-99",
+          "p": [
+            177,
+            79.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-100",
+          "p": [
+            177,
+            68.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-101",
+          "p": [
+            199,
+            79.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-102",
+          "p": [
+            199,
+            68.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-103",
+          "p": [
+            221,
+            79.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-104",
+          "p": [
+            221,
+            68.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-105",
+          "p": [
+            243,
+            79.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-106",
+          "p": [
+            243,
+            68.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-107",
+          "p": [
+            177,
+            117.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-108",
+          "p": [
+            177,
+            106.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-109",
+          "p": [
+            199,
+            117.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-110",
+          "p": [
+            199,
+            106.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-111",
+          "p": [
+            221,
+            117.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-112",
+          "p": [
+            221,
+            106.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 9",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-113",
+          "p": [
+            243,
+            117.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-114",
+          "p": [
+            243,
+            106.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-115",
+          "p": [
+            200.6,
+            39
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-116",
+          "p": [
+            211.4,
+            39
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-117",
+          "p": [
+            200.6,
+            61
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-118",
+          "p": [
+            211.4,
+            61
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-119",
+          "p": [
+            200.6,
+            83
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-120",
+          "p": [
+            211.4,
+            83
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-121",
+          "p": [
+            200.6,
+            105
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-122",
+          "p": [
+            211.4,
+            105
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-123",
+          "p": [
+            -66,
+            -139
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-124",
+          "p": [
+            -76,
+            -139
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-125",
+          "p": [
+            -208,
+            118
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-126",
+          "p": [
+            262,
+            129.8
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 10",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-127",
+          "p": [
+            286,
+            129.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-128",
+          "p": [
+            300,
+            129.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-district-129",
+          "p": [
+            1,
+            -192
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-1",
+          "p": [
+            32,
+            3.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-2",
+          "p": [
+            50,
+            3.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-3",
+          "p": [
+            63.75,
+            9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-4",
+          "p": [
+            60.25,
+            18
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-5",
+          "p": [
+            40.75,
+            25.72
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-6",
+          "p": [
+            31,
+            22.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-7",
+          "p": [
+            63.75,
+            28
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-8",
+          "p": [
+            58,
+            36.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-9",
+          "p": [
+            49,
+            39.75
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-10",
+          "p": [
+            40,
+            36.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-11",
+          "p": [
+            31,
+            39.75
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 11",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-12",
+          "p": [
+            -33.33,
+            23.65
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-13",
+          "p": [
+            -48.51,
+            23.53
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-14",
+          "p": [
+            -63.86,
+            29.73
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-15",
+          "p": [
+            -80.94,
+            23.51
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-16",
+          "p": [
+            -88.7,
+            31.36
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-17",
+          "p": [
+            -91.42,
+            46.09
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-18",
+          "p": [
+            -76.65,
+            54.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-19",
+          "p": [
+            -62.15,
+            59.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-20",
+          "p": [
+            -50.46,
+            50.41
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-21",
+          "p": [
+            -35.9,
+            40.35
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-22",
+          "p": [
+            -18.15,
+            58.86
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-23",
+          "p": [
+            -19.4,
+            71.79
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-24",
+          "p": [
+            -8.31,
+            75.85
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-25",
+          "p": [
+            7.05,
+            79.22
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 12",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-26",
+          "p": [
+            16.89,
+            73.08
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-27",
+          "p": [
+            23.41,
+            63.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-28",
+          "p": [
+            14.1,
+            56.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-29",
+          "p": [
+            7,
+            31.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-30",
+          "p": [
+            2.1,
+            38
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-31",
+          "p": [
+            -73.88,
+            65.12
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-32",
+          "p": [
+            -57.19,
+            69.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-33",
+          "p": [
+            -40.84,
+            72.48
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-34",
+          "p": [
+            -32.99,
+            64.87
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-35",
+          "p": [
+            29.9,
+            47.03
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-36",
+          "p": [
+            34.1,
+            61.53
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-37",
+          "p": [
+            34.59,
+            75.62
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-38",
+          "p": [
+            54.04,
+            74.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-39",
+          "p": [
+            69.76,
+            77.47
+          ]
+        }
+      ]
+    },
+    {
+      "note": "night lights 13",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-40",
+          "p": [
+            -31.5,
+            14
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/lamp-post@1",
+          "name": "lamp-street-41",
+          "p": [
+            -65.5,
+            -20
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard-light@1",
+          "name": "lamp-lantern-1",
+          "p": [
+            -53.5,
+            43
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard-light@1",
+          "name": "lamp-lantern-2",
+          "p": [
+            -46.5,
+            64
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard-light@1",
+          "name": "lamp-lantern-3",
+          "p": [
+            -94.5,
+            17.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard-light@1",
+          "name": "lamp-lantern-4",
+          "p": [
+            14,
+            -33.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard-light@1",
+          "name": "lamp-lantern-5",
+          "p": [
+            60.5,
+            46
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/twinkle-lights@1",
+          "name": "lights-pond-1",
+          "p": [
+            -42,
+            -13.5
+          ],
+          "r": 0.05
+        },
+        {
+          "op": "place",
+          "def": "core/twinkle-lights@1",
+          "name": "lights-pond-2",
+          "p": [
+            -34,
+            -13
+          ],
+          "r": -0.1
+        },
+        {
+          "op": "place",
+          "def": "core/twinkle-lights@1",
+          "name": "lights-pond-3",
+          "p": [
+            -42,
+            13.5
+          ],
+          "r": -0.05
+        },
+        {
+          "op": "place",
+          "def": "core/twinkle-lights@1",
+          "name": "lights-pond-4",
+          "p": [
+            -34,
+            13
+          ],
+          "r": 0.1
+        },
+        {
+          "op": "place",
+          "def": "core/string-lights@1",
+          "name": "lights-market-kiosks",
+          "p": [
+            57.5,
+            -24.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/string-lights@1",
+          "name": "lights-social-dining",
+          "p": [
+            23,
+            10.5
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-1",
+          "p": [
+            32.92,
+            11.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-2",
+          "p": [
+            35.08,
+            11.5
+          ],
+          "r": 0.6
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-3",
+          "p": [
+            50.85,
+            11.55
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-4",
+          "p": [
+            53.15,
+            11.55
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-5",
+          "p": [
+            32.25,
+            35.42
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-6",
+          "p": [
+            35.45,
+            35.42
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-7",
+          "p": [
+            52.55,
+            35.42
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-pot-8",
+          "p": [
+            55.45,
+            35.42
+          ],
+          "r": 0.8
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-1",
+          "p": [
+            72.55,
+            -2.55
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-2",
+          "p": [
+            75.45,
+            -2.55
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-3",
+          "p": [
+            71.4,
+            18.7
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-4",
+          "p": [
+            71.45,
+            21.3
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-5",
+          "p": [
+            63.09,
+            -16.36
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-6",
+          "p": [
+            67.52,
+            -14.02
+          ],
+          "r": 1
+        }
+      ]
+    },
+    {
+      "note": "street life 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-7",
+          "p": [
+            76.4,
+            -21.3
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerpot-8",
+          "p": [
+            79.19,
+            -21.47
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-1",
+          "p": [
+            32.75,
+            6.95
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-2",
+          "p": [
+            48.9,
+            6.95
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-3",
+          "p": [
+            37.4,
+            36.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-4",
+          "p": [
+            57.4,
+            36.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-5",
+          "p": [
+            84.98,
+            34.21
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-6",
+          "p": [
+            64,
+            -12.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-7",
+          "p": [
+            80.5,
+            -23.8
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/mailbox@1",
+          "name": "street-mailbox-8",
+          "p": [
+            72.6,
+            22.6
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/wheelie-bin@1",
+          "name": "street-wheelie-bin-wheeliebin-1",
+          "p": [
+            33,
+            19.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/wheelie-bin@1",
+          "name": "street-wheelie-bin-wheeliebin-2",
+          "p": [
+            33.75,
+            19.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/wheelie-bin@1",
+          "name": "street-wheelie-bin-wheeliebin-3",
+          "p": [
+            56.17,
+            15.96
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/wheelie-bin@1",
+          "name": "street-wheelie-bin-wheeliebin-4",
+          "p": [
+            58.05,
+            16.67
+          ],
+          "r": 1.57
+        }
+      ]
+    },
+    {
+      "note": "street life 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-1",
+          "p": [
+            36.7,
+            10.7
+          ],
+          "r": 3.49
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-2",
+          "p": [
+            57.89,
+            13.06
+          ],
+          "r": 1.87
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-3",
+          "p": [
+            64.61,
+            -13.52
+          ],
+          "r": 2.2
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-4",
+          "p": [
+            62.81,
+            -15.62
+          ],
+          "r": 2.6
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-5",
+          "p": [
+            41.4,
+            28.6
+          ],
+          "r": 2.2
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "street-chair-porchchair-6",
+          "p": [
+            41.6,
+            30
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-1",
+          "p": [
+            40.2,
+            7.35
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-2",
+          "p": [
+            56.72,
+            2.23
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-3",
+          "p": [
+            78.9,
+            2.43
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-4",
+          "p": [
+            81.65,
+            0
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-5",
+          "p": [
+            87,
+            9.6
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-6",
+          "p": [
+            40.42,
+            -20.74
+          ],
+          "r": 3.49
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-7",
+          "p": [
+            36.58,
+            -20.74
+          ],
+          "r": 2.79
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-8",
+          "p": [
+            43.81,
+            -24.23
+          ],
+          "r": 4.39
+        }
+      ]
+    },
+    {
+      "note": "street life 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-9",
+          "p": [
+            33.19,
+            -24.23
+          ],
+          "r": 1.89
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-10",
+          "p": [
+            57,
+            51.4
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-11",
+          "p": [
+            60.81,
+            50.25
+          ],
+          "r": 3.99
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-12",
+          "p": [
+            54.78,
+            49.83
+          ],
+          "r": 2.34
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-13",
+          "p": [
+            39.6,
+            79
+          ],
+          "r": 0.9
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-14",
+          "p": [
+            50.75,
+            -8
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "street-bench-15",
+          "p": [
+            50.75,
+            -3.5
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-1",
+          "p": [
+            38.95,
+            7.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-2",
+          "p": [
+            58.25,
+            2.22
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-3",
+          "p": [
+            77.25,
+            2.47
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-4",
+          "p": [
+            85.6,
+            9.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-5",
+          "p": [
+            33.4,
+            2.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-6",
+          "p": [
+            42.66,
+            -21.96
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-7",
+          "p": [
+            34.34,
+            -21.96
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 5",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-8",
+          "p": [
+            52.85,
+            -21.19
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-9",
+          "p": [
+            60.69,
+            49.08
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-10",
+          "p": [
+            70.5,
+            80
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-11",
+          "p": [
+            81.8,
+            80
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-12",
+          "p": [
+            41.22,
+            77.93
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bin@1",
+          "name": "street-bin-13",
+          "p": [
+            93.23,
+            -21.05
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/hydrant@1",
+          "name": "street-hydrant-1",
+          "p": [
+            60.13,
+            7.33
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/hydrant@1",
+          "name": "street-hydrant-2",
+          "p": [
+            60.5,
+            21.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-1",
+          "p": [
+            64.92,
+            3.02
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-2",
+          "p": [
+            64.1,
+            22.4
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-3",
+          "p": [
+            64.64,
+            41.63
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-4",
+          "p": [
+            46,
+            -22.9
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-5",
+          "p": [
+            38.68,
+            76.95
+          ],
+          "r": 0.8
+        },
+        {
+          "op": "place",
+          "def": "core/signpost@1",
+          "name": "street-signpost-6",
+          "p": [
+            11.12,
+            -31.12
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 6",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/bike-rack@1",
+          "name": "street-bike-rack-bikerack-1",
+          "p": [
+            53.8,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bike-rack@1",
+          "name": "street-bike-rack-bikerack-2",
+          "p": [
+            67.6,
+            1.7
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bike-rack@1",
+          "name": "street-bike-rack-bikerack-3",
+          "p": [
+            99.6,
+            13
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/bike-rack@1",
+          "name": "street-bike-rack-bikerack-4",
+          "p": [
+            93,
+            33.3
+          ],
+          "r": 0.6
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-1",
+          "p": [
+            53.4,
+            1.6
+          ],
+          "r": 0.05
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-2",
+          "p": [
+            54.2,
+            1.6
+          ],
+          "r": -0.06
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-3",
+          "p": [
+            54.9,
+            1.6
+          ],
+          "r": 0.03
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-4",
+          "p": [
+            67.2,
+            1.7
+          ],
+          "r": 0.04
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-5",
+          "p": [
+            68,
+            1.7
+          ],
+          "r": -0.05
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-6",
+          "p": [
+            99.6,
+            12.6
+          ],
+          "r": 1.62
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-7",
+          "p": [
+            99.6,
+            13.4
+          ],
+          "r": 1.53
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-8",
+          "p": [
+            92.67,
+            33.53
+          ],
+          "r": 0.6
+        },
+        {
+          "op": "place",
+          "def": "core/bicycle@1",
+          "name": "street-bicycle-bike-9",
+          "p": [
+            93.33,
+            33.07
+          ],
+          "r": 0.62
+        },
+        {
+          "op": "place",
+          "def": "core/notice-board@1",
+          "name": "street-notice-board-noticeboard-1",
+          "p": [
+            69.2,
+            -1.75
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 7",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/notice-board@1",
+          "name": "street-notice-board-noticeboard-2",
+          "p": [
+            44.3,
+            -28.5
+          ],
+          "r": -1.2
+        },
+        {
+          "op": "place",
+          "def": "core/notice-board@1",
+          "name": "street-notice-board-noticeboard-3",
+          "p": [
+            53,
+            44.6
+          ],
+          "r": 3.34
+        },
+        {
+          "op": "place",
+          "def": "core/notice-board@1",
+          "name": "street-notice-board-noticeboard-4",
+          "p": [
+            93.6,
+            30
+          ],
+          "r": -1.3
+        },
+        {
+          "op": "place",
+          "def": "core/notice-board@1",
+          "name": "street-notice-board-noticeboard-5",
+          "p": [
+            12.9,
+            -31.9
+          ],
+          "r": -2.2
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-1",
+          "p": [
+            29.65,
+            3.25
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-2",
+          "p": [
+            52.35,
+            3.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-3",
+          "p": [
+            41.05,
+            23.57
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-4",
+          "p": [
+            60.35,
+            36.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-5",
+          "p": [
+            42.35,
+            36.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-6",
+          "p": [
+            66.1,
+            9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-7",
+          "p": [
+            66.1,
+            28
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-8",
+          "p": [
+            28.65,
+            22.25
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/banner@1",
+          "name": "street-banner-9",
+          "p": [
+            59.59,
+            19.31
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "street-planter-box-planterbox-1",
+          "p": [
+            66.8,
+            -1.2
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 8",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "street-planter-box-planterbox-2",
+          "p": [
+            96.9,
+            10.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "street-planter-box-planterbox-3",
+          "p": [
+            50.75,
+            -5.75
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "street-planter-box-planterbox-4",
+          "p": [
+            50.75,
+            -10.5
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "street-flower-pot-flowerbuckets-1",
+          "p": [
+            57.5,
+            -26.15
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/rain-barrel@1",
+          "name": "street-rain-barrel-rainbarrel-1",
+          "p": [
+            37.85,
+            17.6
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/rain-barrel@1",
+          "name": "street-rain-barrel-rainbarrel-2",
+          "p": [
+            47.65,
+            17.6
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/rain-barrel@1",
+          "name": "street-rain-barrel-rainbarrel-3",
+          "p": [
+            27.65,
+            34.4
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/rain-barrel@1",
+          "name": "street-rain-barrel-rainbarrel-4",
+          "p": [
+            47.65,
+            25.6
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/rain-barrel@1",
+          "name": "street-rain-barrel-rainbarrel-5",
+          "p": [
+            86.1,
+            37.2
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/stump@1",
+          "name": "street-stump-1",
+          "p": [
+            13,
+            -37.7
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stump@1",
+          "name": "street-stump-2",
+          "p": [
+            17.2,
+            -32.4
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/log@1",
+          "name": "street-log-fallenlog-1",
+          "p": [
+            4.65,
+            -31.98
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/log@1",
+          "name": "street-log-fallenlog-2",
+          "p": [
+            13.89,
+            -43.36
+          ],
+          "r": 1.2
+        },
+        {
+          "op": "place",
+          "def": "core/log@1",
+          "name": "street-log-fallenlog-3",
+          "p": [
+            -2.5,
+            -31.4
+          ],
+          "r": -0.3
+        }
+      ]
+    },
+    {
+      "note": "street life 9",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-1",
+          "p": [
+            2,
+            -36.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-2",
+          "p": [
+            7.6,
+            -41.2
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-3",
+          "p": [
+            -3.5,
+            -38.5
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-4",
+          "p": [
+            18.93,
+            -38.77
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-5",
+          "p": [
+            11.5,
+            -31.6
+          ],
+          "r": 1.5
+        },
+        {
+          "op": "place",
+          "def": "core/mushrooms@1",
+          "name": "street-mushrooms-6",
+          "p": [
+            4.3,
+            -30.9
+          ],
+          "r": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/bollard@1",
+          "name": "street-bollard-1",
+          "p": [
+            70.1,
+            3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bollard@1",
+          "name": "street-bollard-2",
+          "p": [
+            72.57,
+            3.22
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/birdbath@1",
+          "name": "street-birdbath-birdbath-1",
+          "p": [
+            31.5,
+            19.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/birdbath@1",
+          "name": "street-birdbath-birdbath-2",
+          "p": [
+            73.5,
+            63.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/birdbath@1",
+          "name": "street-birdbath-birdbath-3",
+          "p": [
+            44.3,
+            33.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/swings@1",
+          "name": "street-swings-swing-1",
+          "p": [
+            55.1,
+            66
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/sandpit@1",
+          "name": "street-sandpit-sandbox-1",
+          "p": [
+            52.4,
+            67.4
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/hammock@1",
+          "name": "street-hammock-1",
+          "p": [
+            48.59,
+            70.54
+          ],
+          "r": 0.5
+        }
+      ]
+    },
+    {
+      "note": "street life 10",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "street-easel-1",
+          "p": [
+            62.77,
+            -14.12
+          ],
+          "r": 0.6
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "street-easel-2",
+          "p": [
+            61.6,
+            -20.2
+          ],
+          "r": -1.1
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "street-easel-3",
+          "p": [
+            81,
+            -20.8
+          ],
+          "r": 0.9
+        },
+        {
+          "op": "place",
+          "def": "core/watering-can@1",
+          "name": "street-watering-can-wateringcan-1",
+          "p": [
+            59.8,
+            51.2
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/watering-can@1",
+          "name": "street-watering-can-wateringcan-2",
+          "p": [
+            66.68,
+            49.66
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/watering-can@1",
+          "name": "street-watering-can-wateringcan-3",
+          "p": [
+            41.07,
+            15.79
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/watering-can@1",
+          "name": "street-watering-can-wateringcan-4",
+          "p": [
+            42.5,
+            34
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/picnic-table@1",
+          "name": "street-picnic-table-picnictable-1",
+          "p": [
+            55,
+            -22.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/picnic-table@1",
+          "name": "street-picnic-table-picnictable-2",
+          "p": [
+            59.5,
+            -22.3
+          ],
+          "r": 0.12
+        },
+        {
+          "op": "place",
+          "def": "core/picnic-table@1",
+          "name": "street-picnic-table-picnictable-3",
+          "p": [
+            84.6,
+            77.2
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/bird-table@1",
+          "name": "street-bird-table-birdhouse-1",
+          "p": [
+            82,
+            -18
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/bird-table@1",
+          "name": "street-bird-table-birdhouse-2",
+          "p": [
+            45.41,
+            52.02
+          ],
+          "r": -0.6
+        },
+        {
+          "op": "place",
+          "def": "core/bird-table@1",
+          "name": "street-bird-table-birdhouse-3",
+          "p": [
+            20.5,
+            -41
+          ],
+          "r": -0.8
+        },
+        {
+          "op": "place",
+          "def": "core/laundry-line@1",
+          "name": "street-laundry-line-laundryline-1",
+          "p": [
+            33.5,
+            20.6
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 11",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/laundry-line@1",
+          "name": "street-laundry-line-laundryline-2",
+          "p": [
+            54,
+            19.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/laundry-line@1",
+          "name": "street-laundry-line-laundryline-3",
+          "p": [
+            90,
+            44.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/laundry-line@1",
+          "name": "street-laundry-line-laundryline-4",
+          "p": [
+            71.5,
+            -12.8
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/laundry-line@1",
+          "name": "street-laundry-line-laundryline-5",
+          "p": [
+            46.95,
+            30.01
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "street-parasol-table-gardentable-1",
+          "p": [
+            50.26,
+            19.71
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "street-parasol-table-gardentable-2",
+          "p": [
+            97.35,
+            7.17
+          ],
+          "r": 0.8
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "street-parasol-table-gardentable-3",
+          "p": [
+            51,
+            -22.67
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/compost-heap@1",
+          "name": "street-compost-heap-compost-1",
+          "p": [
+            31.01,
+            21.67
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/compost-heap@1",
+          "name": "street-compost-heap-compost-2",
+          "p": [
+            41.94,
+            15.65
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/compost-heap@1",
+          "name": "street-compost-heap-compost-3",
+          "p": [
+            84,
+            57.5
+          ],
+          "r": 0.2
+        },
+        {
+          "op": "place",
+          "def": "core/compost-heap@1",
+          "name": "street-compost-heap-compost-4",
+          "p": [
+            43.15,
+            26.12
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/wheelbarrow@1",
+          "name": "street-wheelbarrow-1",
+          "p": [
+            35.35,
+            21.91
+          ],
+          "r": 0.6
+        },
+        {
+          "op": "place",
+          "def": "core/wheelbarrow@1",
+          "name": "street-wheelbarrow-2",
+          "p": [
+            41.84,
+            11.91
+          ],
+          "r": 1.2
+        },
+        {
+          "op": "place",
+          "def": "core/wheelbarrow@1",
+          "name": "street-wheelbarrow-3",
+          "p": [
+            90.6,
+            56.2
+          ],
+          "r": 0.4
+        }
+      ]
+    },
+    {
+      "note": "street life 12",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/wheelbarrow@1",
+          "name": "street-wheelbarrow-4",
+          "p": [
+            66,
+            52.6
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/toy-blocks@1",
+          "name": "street-toy-blocks-toys-1",
+          "p": [
+            54.2,
+            21.6
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/toy-blocks@1",
+          "name": "street-toy-blocks-toys-2",
+          "p": [
+            47.3,
+            26.9
+          ],
+          "r": 1.1
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-1",
+          "p": [
+            42.3,
+            9.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-2",
+          "p": [
+            73.8,
+            27.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-3",
+          "p": [
+            74.2,
+            28.1
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-4",
+          "p": [
+            73.7,
+            28.5
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-5",
+          "p": [
+            85.6,
+            55.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-6",
+          "p": [
+            86,
+            56
+          ],
+          "r": 1.3
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-7",
+          "p": [
+            57.6,
+            -28.3
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "street-sack-8",
+          "p": [
+            58,
+            -28.5
+          ],
+          "r": 1.7
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-1",
+          "p": [
+            66.2,
+            27.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-2",
+          "p": [
+            66.3,
+            28.25
+          ],
+          "r": 0.15
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-3",
+          "p": [
+            66.46,
+            29.1
+          ],
+          "r": 0.3
+        }
+      ]
+    },
+    {
+      "note": "street life 13",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-4",
+          "p": [
+            54.5,
+            -28.2
+          ],
+          "r": 0.1
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-5",
+          "p": [
+            55.1,
+            -28.45
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "street-crate-6",
+          "p": [
+            88.4,
+            -31
+          ],
+          "r": 0.2
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "street-barrel-1",
+          "p": [
+            66,
+            30
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "street-barrel-2",
+          "p": [
+            66.6,
+            30.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "street-barrel-3",
+          "p": [
+            60.5,
+            -28.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "street-barrel-4",
+          "p": [
+            61.1,
+            -28.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "street-barrel-5",
+          "p": [
+            88.66,
+            -31.64
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "street-chalkboard-1",
+          "p": [
+            66.2,
+            25.6
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "street-chalkboard-2",
+          "p": [
+            52.8,
+            -24.8
+          ],
+          "r": -0.5
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "street-chalkboard-3",
+          "p": [
+            62.2,
+            -24.9
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "street-chalkboard-4",
+          "p": [
+            76.1,
+            77
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/chalkboard@1",
+          "name": "street-chalkboard-5",
+          "p": [
+            91.65,
+            -21.31
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/phone-box@1",
+          "name": "street-phone-box-phonebox-1",
+          "p": [
+            33.5,
+            -0.4
+          ]
+        }
+      ]
+    },
+    {
+      "note": "street life 14",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/trough@1",
+          "name": "street-trough-1",
+          "p": [
+            80.9,
+            50.5
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/firewood@1",
+          "name": "street-firewood-1",
+          "p": [
+            86.1,
+            40.4
+          ],
+          "r": -1.57
+        },
+        {
+          "op": "place",
+          "def": "core/firewood@1",
+          "name": "street-firewood-2",
+          "p": [
+            90,
+            46.4
+          ],
+          "r": 3.14
+        },
+        {
+          "op": "place",
+          "def": "core/firewood@1",
+          "name": "street-firewood-3",
+          "p": [
+            72.6,
+            -21
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/firewood@1",
+          "name": "street-firewood-4",
+          "p": [
+            19.66,
+            -35.57
+          ],
+          "r": 1.57
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-1",
+          "p": [
+            39.4,
+            8.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-2",
+          "p": [
+            57.6,
+            1.5
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-3",
+          "p": [
+            31,
+            2.4
+          ],
+          "r": 2
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-4",
+          "p": [
+            42.6,
+            15
+          ],
+          "r": 0.5
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-5",
+          "p": [
+            84.6,
+            56.6
+          ],
+          "r": 1.2
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-6",
+          "p": [
+            40,
+            -21.6
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-7",
+          "p": [
+            57,
+            -21
+          ],
+          "r": 2.2
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-8",
+          "p": [
+            58.6,
+            50.4
+          ],
+          "r": 1
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-9",
+          "p": [
+            39,
+            58.2
+          ],
+          "r": 0.7
+        }
+      ]
+    },
+    {
+      "note": "street life 15",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-10",
+          "p": [
+            43.25,
+            62.1
+          ],
+          "r": 2.1
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-11",
+          "p": [
+            36.2,
+            62.3
+          ],
+          "r": 1.4
+        },
+        {
+          "op": "place",
+          "def": "core/leaf-litter@1",
+          "name": "street-leaf-litter-leaves-12",
+          "p": [
+            70.3,
+            62.8
+          ],
+          "r": 0.2
         }
       ]
     },

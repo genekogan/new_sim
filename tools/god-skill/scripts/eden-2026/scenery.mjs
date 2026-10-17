@@ -96,7 +96,7 @@ group('scenery: campus dome', put => {
 });
 group('scenery: lawns', (put, ops) => {
   // the old commons is mown in broad stripes (its south lawn is woodland park: trees.mjs)
-  ops.push({ op: 'place', def: 'core/lawn@1', name: 'commons-mown-lawn', shape: { area: rect(box('field')) }, params: { stripes: true, edge: 2 } });
+  ops.push({ op: 'place', def: 'core/lawn@1', name: 'commons-mown-lawn', shape: { area: rect(box('field')) }, params: { stripes: true, edge: 2, color: '#64953e' } });
 });
 group('scenery: avenue and commons trees', put => {
   for (let i = 0; i < 12; i++) if (i !== 5) put('tree', `north-avenue-tree-${i + 1}`, [-90 + i * 16, -78], {});   // i=5 (x -10) would stand in the campus view axis
