@@ -137,3 +137,11 @@ test('day/night conditions follow the world clock; frogs at ponds by night, gull
   assert.ok(ambienceAt({ ...sea, night: 0 }).some((e) => e.id === 'amb:gulls' && e.spec.kind === 'waterfowl'));
   assert.ok(!ambienceAt({ ...sea, night: 1 }).some((e) => e.id === 'amb:gulls'));
 });
+
+test('a resident who is speaking murmurs where they stand, alone or not; silent residents do not', () => {
+  const m = new Movement(), cam = { x: 0, y: 1.7, z: 0, ground: 0 };
+  const out = m.emitters([{ id: 'a', p: [5, 0, 5], speaking: true }, { id: 'b', p: [30, 0, 0] }], cam, 0);
+  const talk = out.filter((e) => e.id.startsWith('res:talk:'));
+  assert.deepEqual(talk.map((e) => e.id), ['res:talk:a']);
+  assert.equal(talk[0].spec.kind, 'chatter'); assert.equal(talk[0].state.size, 1); assert.equal(talk[0].pts[0][1], 1.6);
+});

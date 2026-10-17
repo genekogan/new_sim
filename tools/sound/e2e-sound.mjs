@@ -98,6 +98,22 @@ try {
           // residents: wherever they stand together, chatter (fake minds may wander; recorded, not required)
           report.places.residents = await page.evaluate(() => window.__simEntity.residents());
           await page.screenshot({ path: resolve(out, `day-knoll-dpr${dpr}.png`) }); report.shots.push(`day-knoll-dpr${dpr}.png`);
+          await step('a resident speaking: a murmur of her voice where she stands', async () => {
+            const me = await (await fetch(base + '/v1/me', { headers: { authorization: 'Bearer dev:admin' } })).json();
+            const ana = me.souls?.find((x) => x.name === 'Ana'); if (!ana) return { error: 'no Ana' };
+            const pair = await (await fetch(base + `/v1/souls/${ana.id}/pair`, { method: 'POST', headers: { authorization: 'Bearer dev:admin', 'content-type': 'application/json' }, body: '{}' })).json();
+            const cred = await (await fetch(base + '/v1/agent/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: pair.code, agent: 'r31v-sound' }) })).json();
+            const pos = (await page.evaluate(() => window.__simEntity.residents())).find((r) => r.id === ana.id)?.p ?? [0, 0, 0];
+            const g = await ground(pos[0] + 6, pos[2] + 6); await look([pos[0] + 6, g + 1.7, pos[2] + 6], [pos[0], g + 1.4, pos[2]]);
+            let hit = null, said = 0;
+            for (let t0 = Date.now(); Date.now() - t0 < 40000 && !hit;) {
+              if (Date.now() - t0 >= said * 8000) { await fetch(base + '/v1/edge/say', { method: 'POST', headers: { authorization: `Bearer ${cred.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ text: `Listen, the wind is up on the knoll today, and the ducks are loud at the pond (${said}).` }) }); said++; }
+              await sleep(500); const st = await page.evaluate(() => window.__edenSound.state()); hit = st.voices.find((v) => v.id === `res:talk:${ana.id}`) ?? null;
+            }
+            const st = await page.evaluate(() => ({ voices: window.__edenSound.state().voices.map((v) => `${v.kind}/${v.variant} ${v.id} g${v.gain}`), level: window.__edenSound.level() }));
+            report.places.speaking = { at: pos, ...st }; log(`   speaking: ${st.voices.join(' | ')}`);
+            return { hit, said };
+          }, (r) => !!r.hit);
           await step('mute silences the output; unmute brings it back', async () => {
             await page.click('.eden-sound-toggle button[data-sound="mute"]'); await sleep(1200); const off = await page.evaluate(() => window.__edenSound.level());
             await page.click('.eden-sound-toggle button[data-sound="mute"]'); await sleep(1500); const on = await page.evaluate(() => window.__edenSound.level());
