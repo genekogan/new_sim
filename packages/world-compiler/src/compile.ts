@@ -751,7 +751,10 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const slot = w.slotsOf(parent).find((x) => x.id === e.in.slot);
       if (!slot) return fail(i, 'slot.unknown', `${w.pathOf(parent.id)} has no slot ${e.in.slot}`);
       if (slot.accepts.kinds && !slot.accepts.kinds.includes(def.name) && !def.tags.some((t) => slot.accepts.kinds!.includes(t))) return fail(i, 'slot.incompatible', `${e.in.slot} accepts ${slot.accepts.kinds.join(', ')}`);
-      if (slot.accepts.tags && !def.tags.some((t) => slot.accepts.tags!.includes(t))) return fail(i, 'slot.incompatible', `${e.in.slot} accepts tags ${slot.accepts.tags.join(', ')}`);
+      // a thing a body can carry (components.carryable) fits a carry slot without the `item` tag: catalogue carryables
+      // such as core-watering-can are tagged object/tool, and the engine's write-back of one in a Soul's hands was refused
+      const carried = slot.kind === 'carry' && !!def.components?.carryable;
+      if (slot.accepts.tags && !carried && !def.tags.some((t) => slot.accepts.tags!.includes(t))) return fail(i, 'slot.incompatible', `${e.in.slot} accepts tags ${slot.accepts.tags.join(', ')}`);
       if (slot.accepts.maxSize && (baked.box[0] * s > slot.accepts.maxSize[0] || baked.box[1] * s > slot.accepts.maxSize[1] || baked.box[2] * s > slot.accepts.maxSize[2])) return fail(i, 'slot.incompatible', 'too big for the slot');
       const occupants = [...(w.children.get(parent.id) ?? [])].filter((c) => c !== e.id && w.entities.get(c)?.in.slot === e.in.slot).length;
       if (occupants >= slot.capacity) return fail(i, 'slot.full', `${e.in.slot} holds ${slot.capacity}`);

@@ -28,15 +28,16 @@ export function bearingOf(snapshot) {
 }
 export function makePatch(snapshot, spec, { group = `${spec.id}-${randomBytes(6).toString('hex')}` } = {}) {
   assert.equal(typeof snapshot.worldId, 'string', 'world identity required');
-  const bearing = bearingOf(snapshot);
+  // spec.frame 'world': placements are in the world's own frame as written (any world, e.g. Little Martians); default: the Mars campus frame
+  const bearing = spec.frame === 'world' ? null : bearingOf(snapshot);
   const taken = spec.items.filter((it) => findItem(snapshot, it)).map((it) => it.name);
   assert(!taken.length, `names already in the world (${taken.join(', ')}): applied before? use --recover or --rollback with its receipt`);
   for (const a of spec.anchors ?? []) assert(snapshot.entities.some((e) => e.name === a && e.in.parent === 'world'), `anchor ${a} missing: wrong world?`);
   const ops = [
     ...spec.defList.map((def) => ({ op: 'define', def })),
     // an item `in` a campus building is placed in its frame (it turns with the building); others are turned here
-    ...spec.items.map((it) => { if (it.in) return { op: 'place', def: it.def, name: it.name, in: { parent: it.in }, p: it.at, r: it.r ?? 0, ...(it.state ? { state: it.state } : {}), ...(it.params ? { params: it.params } : {}) };
-      const t = turn(it.at.length === 3 ? it.at : [it.at[0], it.at[1]], it.r ?? 0, bearing); return { op: 'place', def: it.def, name: it.name, p: t.p, r: t.r, ...(it.state ? { state: it.state } : {}), ...(it.params ? { params: it.params } : {}) }; }),
+    ...spec.items.map((it) => { if (it.in) return { op: 'place', def: it.def, name: it.name, in: { parent: it.in }, p: it.at, r: it.r ?? 0, ...(it.state ? { state: it.state } : {}), ...(it.params ? { params: it.params } : {}), ...(it.shape ? { shape: it.shape } : {}) };
+      const t = bearing === null ? { p: it.at, r: it.r ?? 0 } : turn(it.at.length === 3 ? it.at : [it.at[0], it.at[1]], it.r ?? 0, bearing); return { op: 'place', def: it.def, name: it.name, p: t.p, r: t.r, ...(it.state ? { state: it.state } : {}), ...(it.params ? { params: it.params } : {}), ...(it.shape ? { shape: it.shape } : {}) }; }),
   ];
   return { schema: 'mars-add-patch-receipt/1', spec: spec.id, worldId: snapshot.worldId, beforeSeq: snapshot.seq, bearing, names: spec.items.map((i) => i.name), items: spec.items.map((i) => ({ name: i.name, in: i.in ?? null })),
     batch: { group, clientRef: group, note: spec.note, ops } };
@@ -55,7 +56,7 @@ export function verify(snapshot, receipt, rollback = false) {
   for (const [i, e] of got.entries()) {
     assert(e, receipt.names[i] + ' present'); const w = want[i];
     const nd = (d) => String(d).replace(/^core\//, 'core-'); assert(nd(e.def) === nd(w.def), `${e.name} def ${e.def} vs ${w.def}`);
-    for (let j = 0; j < w.p.length; j += w.p.length === 3 ? 2 : 1) assert(Math.abs(e.p[j === 1 && w.p.length === 2 ? 2 : j] - w.p[j]) < 0.05, `${e.name}.p[${j}] ${e.p} vs ${w.p}`);
+    for (let j = 0; j < w.p.length; j += w.p.length === 3 ? 2 : 1) assert(Math.abs(e.p[j === 1 && w.p.length === 2 && e.p.length === 3 ? 2 : j] - w.p[j]) < 0.05, `${e.name}.p[${j}] ${e.p} vs ${w.p}`);
   }
 }
 /** Rollback = remove exactly the things this patch placed (by id), guarded: each must still be where the patch put it

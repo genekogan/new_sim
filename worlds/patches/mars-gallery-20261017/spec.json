@@ -1,0 +1,11 @@
+{
+  "schema": "mars-add-patch/1",
+  "id": "mars-gallery-20261017",
+  "note": "M2: Chiba's hall projection and six gallery monitors show the neon flower (or the Mars College card), switchable by residents, as in the sim.mars.college 2026 reference (studio/gallery.ts)",
+  "defs": "defs.json",
+  "anchors": ["chiba"],
+  "items": [
+    { "name": "hall-projection", "def": "mars-hall-projection@1", "in": "chiba", "at": [11.159, 0, 0.19], "r": -1.5735, "state": { "on": true, "program": "art" } },
+    { "name": "gallery-monitors", "def": "mars-gallery-monitors@1", "in": "chiba", "at": [5.688, 0, -5.332], "r": -0.0027, "state": { "on": true, "program": "art" } }
+  ]
+}

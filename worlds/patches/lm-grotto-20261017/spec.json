@@ -1,0 +1,11 @@
+{
+  "schema": "mars-add-patch/1",
+  "id": "lm-grotto-20261017",
+  "frame": "world",
+  "note": "LM: residents can walk into the Grotto of Painted Worlds again (its doorway had become a 0.8 m, 34-degree step down to the vault's floor pad)",
+  "defs": "defs.json",
+  "anchors": ["painted-grotto", "grotto-court", "grotto-walk"],
+  "items": [
+    { "name": "grotto-approach", "def": "lm-grotto-approach@1", "at": [45, 34.5], "r": 0 }
+  ]
+}

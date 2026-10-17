@@ -1,0 +1,10 @@
+{
+  "schema": "mars-add-patch/1",
+  "id": "mars-mimos-mat-20261017",
+  "note": "M2 residual: the dark continuous ground mat of Mimos's glazed tea room, as in the reference and the old /w/mars",
+  "defs": "defs.json",
+  "anchors": ["mimos"],
+  "items": [
+    { "name": "tea-room-mat", "def": "mars-tea-room-mat@1", "in": "mimos", "at": [2.824, 0.2403, -1.888], "r": 0 }
+  ]
+}

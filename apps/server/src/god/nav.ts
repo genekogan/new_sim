@@ -85,6 +85,9 @@ const ROOMS_WITHIN = 80;
 /** Upper-storey rooms are offered inside (or at the door of) their building, or to a Soul already upstairs (m). */
 const UPPER_ROOMS_WITHIN = 1;
 const BUILDINGS_WITHIN = 150;
+const DOWN_FIRST_M = 60;     // from a raised floor, a ground goal farther than this is walked to via the building's front (the engine pages long walks on the ground only, from 72 m)
+const PLACE_M2 = 300;       // ... at least this big (a court or a garden, not a paving tile or an exhibit's pad)
+const PLACES_WITHIN = 400;   // an open area that is one of the world's places (a court, a garden) stays offered within this many metres
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
@@ -327,12 +330,16 @@ export class GodNav {
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
     const all = this.things();
+    // on a raised floor: the ground-level front of the building whose room I stand in (walked to first for far ground goals)
+    const exit = myLevel === 0 ? null : all.find((t) => t.kind === 'room' && t.level === myLevel && t.poly && inPoly(here[0], here[1], t.poly) && t.entry && t.entry.level === 0)?.entry ?? null;
     const ranked = all.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
     // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
     // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
     // (and big stand-alone structures, so a Soul in a furnished room can still head for Freeside across the camp)
-    for (const x of ranked.slice(SHOW)) if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
+    // ... and the world's open-area places (courts, gardens) within PLACES_WITHIN (Little Martians: from Madmaraca's court 236 painted
+    // courts and 96 exhibits are nearer than the Minarete court, so `walk:minarete-court` was refused while jog-around was offered)
+    for (const x of ranked.slice(SHOW)) if (((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) || (x.d <= PLACES_WITHIN && !!x.t.area && polyArea(x.t.area) >= PLACE_M2 && !!this.h.placeOf?.(x.t.ref))) pick.push(x);
     // E-life: an upper storey's rooms are offered from close by (or from inside the building) only: each needs a multi-floor
     // reach check from the front door, and near Eden 2026's 3-4 storey canal row ~100 of them made one capabilities call
     // take 44 s (1600 floor windows built). Ground-floor rooms stay offered within ROOMS_WITHIN; walk to the building first.
@@ -351,8 +358,11 @@ export class GodNav {
       const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
       // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
       const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
-      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, go] });
-      if (place) this.placeCapabilities(t, place, here, d, [...stand, go], myLevel, caps, plans);
+      // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
+      // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
+      const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
+      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
+      if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
     }
   }
   /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend
