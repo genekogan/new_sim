@@ -676,16 +676,29 @@ type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Ar
 const scratches = new Map<number, Scratch>();
 const SCRATCHES = 3;
 /** Numeric diagnostics: search workspaces kept and their bytes. */
-export function scratchMetrics() { let bytes = 0; for (const sc of scratches.values()) for (const v of Object.values(sc)) if (ArrayBuffer.isView(v)) bytes += v.byteLength; return { entries: scratches.size, bytes, totals: [...scratches.keys()] }; }
+export function scratchMetrics() { let bytes = 0; for (const sc of [...scratches.values(), ...(bigScratch ? [bigScratch] : [])]) for (const v of Object.values(sc)) if (ArrayBuffer.isView(v)) bytes += v.byteLength; return { entries: scratches.size + (bigScratch ? 1 : 0), bytes, totals: [...scratches.keys(), ...(bigScratch ? [bigScratch.total] : [])] }; }
 /** E-life (memory): a workspace costs ~28 bytes a cell; one for a 4×4-tile window (16.4 M cells) is ~450 MB. Only
  *  workspaces up to this many cells are kept for reuse; a bigger search gets a fresh one that is freed after it (Eden
  *  2026 kept 403 MB of workspaces after one resident's first capabilities). Search results are unchanged. */
 export const SCRATCH_KEEP_CELLS = 2_500_000;
+/** L1: one workspace bigger than SCRATCH_KEEP_CELLS is kept for the next big search (any size up to its own: ids and
+ *  generations do not care), and let go after BIG_IDLE small searches in a row. A Soul's first look inside a multi-storey
+ *  house runs ~30 room-reach searches over ~4 M cells each; each used to get (and free) a fresh ~110 MB workspace. */
+let bigScratch: Scratch | null = null, smallRun = 0;
+const BIG_IDLE = 400;
+function newScratch(total: number): Scratch {
+  return { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
+}
 function scratchFor(total: number): Scratch {
   let sc = scratches.get(total);
-  if (!sc) {
-    sc = { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
-    if (total <= SCRATCH_KEEP_CELLS) {
+  if (total > SCRATCH_KEEP_CELLS) {
+    smallRun = 0;
+    if (!bigScratch || bigScratch.total < total) bigScratch = newScratch(total);
+    sc = bigScratch;
+  } else {
+    if (bigScratch && ++smallRun > BIG_IDLE) bigScratch = null;
+    if (!sc) {
+      sc = newScratch(total);
       if (scratches.size >= SCRATCHES) scratches.delete(scratches.keys().next().value!);
       scratches.set(total, sc);
     }
