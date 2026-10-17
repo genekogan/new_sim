@@ -19,6 +19,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
 import { BASE } from '../base-path.ts';
 import { mergeStatic } from './static-merge.ts';
+import { preciseBounds } from './fast-geometry.ts';
 import { addShadowProxy } from './shadow-proxy.ts';
 import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
 
@@ -73,7 +74,7 @@ function prepare(g: GLTF) {
   });
   // lane PERF: a static model's many nodes/materials become a few merged meshes (static-merge.ts)
   try { const r = mergeStatic(g.scene, g.animations.length > 0); if (r) g.userData.merged = r; } catch (e) { console.warn('static merge skipped', e); }
-  const box = new THREE.Box3().setFromObject(g.scene, true);
+  const box = preciseBounds(g.scene) ?? new THREE.Box3().setFromObject(g.scene, true);   // same box, typed-array loop (fast-geometry.ts)
   g.userData.bounds = box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(0.5, 1, 0.5)) : box;
   // lane PERF2: and its opaque casters become one shadow-only proxy (shadow-proxy.ts); after the bounds, which fit the model
   if (!g.animations.length) try { g.userData.shadowCasters = addShadowProxy(g.scene); } catch (e) { console.warn('shadow proxy skipped', e); }
