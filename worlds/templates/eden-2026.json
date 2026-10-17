@@ -10294,26 +10294,6 @@
         {
           "op": "place",
           "def": "core/parasol-table@1",
-          "name": "cafe-terrace-2",
-          "p": [
-            93,
-            27
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/parasol-table@1",
-          "name": "cafe-terrace-3",
-          "p": [
-            99.61,
-            31.19
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/parasol-table@1",
           "name": "cafe-terrace-4",
           "p": [
             99,
@@ -10498,28 +10478,10 @@
         {
           "op": "place",
           "def": "core/lamp-post@1",
-          "name": "east-lamp-101-4",
-          "p": [
-            101,
-            38
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/lamp-post@1",
           "name": "east-lamp-109-4",
           "p": [
             109,
             38
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/lamp-post@1",
-          "name": "east-lamp-101-5",
-          "p": [
-            101,
-            56
           ]
         },
         {
@@ -10776,15 +10738,6 @@
           "p": [
             -30,
             123
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/picnic-table@1",
-          "name": "park-picnic-east",
-          "p": [
-            24.11,
-            122.98
           ]
         },
         {
@@ -62495,36 +62448,9 @@
         {
           "op": "place",
           "def": "core/sheep@1",
-          "name": "farm-sheep-2",
-          "p": [
-            -55,
-            124
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/sheep@1",
-          "name": "farm-sheep-3",
-          "p": [
-            -52,
-            124
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/sheep@1",
           "name": "farm-sheep-4",
           "p": [
             -58,
-            127
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/sheep@1",
-          "name": "farm-sheep-5",
-          "p": [
-            -55,
             127
           ]
         },
@@ -62795,15 +62721,6 @@
           "p": [
             -90,
             -78
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "north-avenue-tree-2",
-          "p": [
-            -74.76,
-            -78.87
           ]
         },
         {
@@ -65571,36 +65488,6 @@
         {
           "op": "place",
           "def": "core/tree@1",
-          "name": "trees-set-30",
-          "p": [
-            -140.33,
-            86.01
-          ],
-          "s": 0.47
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-31",
-          "p": [
-            -135.57,
-            86.02
-          ],
-          "s": 0.47
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-32",
-          "p": [
-            -132,
-            86
-          ],
-          "s": 0.47
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
           "name": "trees-set-33",
           "p": [
             -128,
@@ -66615,16 +66502,6 @@
             50.7
           ],
           "s": 0.53
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-130",
-          "p": [
-            119.5,
-            12.5
-          ],
-          "s": 0.55
         }
       ]
     },
@@ -66632,16 +66509,6 @@
       "note": "trees 14",
       "group": "eden-2026",
       "ops": [
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-133",
-          "p": [
-            120.1,
-            46
-          ],
-          "s": 0.74
-        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -66735,16 +66602,6 @@
         {
           "op": "place",
           "def": "core/tree@1",
-          "name": "trees-set-143",
-          "p": [
-            119.1,
-            -16.3
-          ],
-          "s": 0.53
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
           "name": "trees-set-144",
           "p": [
             127.3,
@@ -66791,16 +66648,6 @@
         {
           "op": "place",
           "def": "core/tree@1",
-          "name": "trees-set-148",
-          "p": [
-            -122.24,
-            60.06
-          ],
-          "s": 0.81
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
           "name": "trees-set-149",
           "p": [
             -116.6,
@@ -66817,16 +66664,6 @@
             67.2
           ],
           "s": 0.79
-        },
-        {
-          "op": "place",
-          "def": "core/tree@1",
-          "name": "trees-set-151",
-          "p": [
-            -115.8,
-            56.2
-          ],
-          "s": 0.77
         },
         {
           "op": "place",
@@ -66893,16 +66730,6 @@
             60.1
           ],
           "s": 0.89
-        },
-        {
-          "op": "place",
-          "def": "core/pine@1",
-          "name": "trees-set-158",
-          "p": [
-            -129.8,
-            65.9
-          ],
-          "s": 0.79
         },
         {
           "op": "place",
@@ -73724,15 +73551,6 @@
         {
           "op": "place",
           "def": "core/lamp-post@1",
-          "name": "lamp-street-5",
-          "p": [
-            40.75,
-            25.72
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/lamp-post@1",
           "name": "lamp-street-6",
           "p": [
             31,
@@ -74184,120 +74002,6 @@
         {
           "op": "place",
           "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-1",
-          "p": [
-            32.92,
-            11.5
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-2",
-          "p": [
-            35.08,
-            11.5
-          ],
-          "r": 0.6
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-3",
-          "p": [
-            50.85,
-            11.55
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-4",
-          "p": [
-            53.15,
-            11.55
-          ],
-          "r": 1
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-5",
-          "p": [
-            32.25,
-            35.42
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-6",
-          "p": [
-            35.45,
-            35.42
-          ],
-          "r": 0.4
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-7",
-          "p": [
-            52.55,
-            35.42
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-pot-8",
-          "p": [
-            55.45,
-            35.42
-          ],
-          "r": 0.8
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-flowerpot-1",
-          "p": [
-            72.55,
-            -2.55
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-flowerpot-2",
-          "p": [
-            75.45,
-            -2.55
-          ],
-          "r": 1
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-flowerpot-3",
-          "p": [
-            71.4,
-            18.7
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
-          "name": "street-flower-pot-flowerpot-4",
-          "p": [
-            71.45,
-            21.3
-          ],
-          "r": 2
-        },
-        {
-          "op": "place",
-          "def": "core/flower-pot@1",
           "name": "street-flower-pot-flowerpot-5",
           "p": [
             63.09,
@@ -74339,64 +74043,6 @@
             -21.47
           ],
           "r": 2
-        },
-        {
-          "op": "place",
-          "def": "core/wheelie-bin@1",
-          "name": "street-wheelie-bin-wheeliebin-1",
-          "p": [
-            33,
-            19.4
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/wheelie-bin@1",
-          "name": "street-wheelie-bin-wheeliebin-2",
-          "p": [
-            33.75,
-            19.4
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/wheelie-bin@1",
-          "name": "street-wheelie-bin-wheeliebin-3",
-          "p": [
-            56.17,
-            15.96
-          ],
-          "r": 1.57
-        },
-        {
-          "op": "place",
-          "def": "core/wheelie-bin@1",
-          "name": "street-wheelie-bin-wheeliebin-4",
-          "p": [
-            58.05,
-            16.67
-          ],
-          "r": 1.57
-        },
-        {
-          "op": "place",
-          "def": "core/chair@1",
-          "name": "street-chair-porchchair-1",
-          "p": [
-            36.7,
-            10.7
-          ],
-          "r": 3.49
-        },
-        {
-          "op": "place",
-          "def": "core/chair@1",
-          "name": "street-chair-porchchair-2",
-          "p": [
-            57.89,
-            13.06
-          ],
-          "r": 1.87
         },
         {
           "op": "place",
@@ -74964,16 +74610,6 @@
         {
           "op": "place",
           "def": "core/notice-board@1",
-          "name": "street-notice-board-noticeboard-4",
-          "p": [
-            93.6,
-            30
-          ],
-          "r": -1.3
-        },
-        {
-          "op": "place",
-          "def": "core/notice-board@1",
           "name": "street-notice-board-noticeboard-5",
           "p": [
             12.9,
@@ -74998,15 +74634,6 @@
           "p": [
             52.35,
             3.25
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/banner@1",
-          "name": "street-banner-3",
-          "p": [
-            41.05,
-            23.57
           ]
         },
         {
@@ -75117,26 +74744,6 @@
             57.5,
             -26.15
           ]
-        },
-        {
-          "op": "place",
-          "def": "core/rain-barrel@1",
-          "name": "street-rain-barrel-rainbarrel-1",
-          "p": [
-            37.85,
-            17.6
-          ],
-          "r": 1.57
-        },
-        {
-          "op": "place",
-          "def": "core/rain-barrel@1",
-          "name": "street-rain-barrel-rainbarrel-2",
-          "p": [
-            47.65,
-            17.6
-          ],
-          "r": -1.57
         },
         {
           "op": "place",
@@ -75306,15 +74913,6 @@
       "note": "street life 9",
       "group": "eden-2026",
       "ops": [
-        {
-          "op": "place",
-          "def": "core/birdbath@1",
-          "name": "street-birdbath-birdbath-1",
-          "p": [
-            31.5,
-            19.3
-          ]
-        },
         {
           "op": "place",
           "def": "core/birdbath@1",
@@ -75510,15 +75108,6 @@
         {
           "op": "place",
           "def": "core/laundry-line@1",
-          "name": "street-laundry-line-laundryline-2",
-          "p": [
-            54,
-            19.4
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/laundry-line@1",
           "name": "street-laundry-line-laundryline-3",
           "p": [
             90,
@@ -75533,26 +75122,6 @@
             71.5,
             -12.8
           ]
-        },
-        {
-          "op": "place",
-          "def": "core/laundry-line@1",
-          "name": "street-laundry-line-laundryline-5",
-          "p": [
-            46.95,
-            30.01
-          ],
-          "r": 1.57
-        },
-        {
-          "op": "place",
-          "def": "core/parasol-table@1",
-          "name": "street-parasol-table-gardentable-1",
-          "p": [
-            50.26,
-            19.71
-          ],
-          "r": 0.3
         },
         {
           "op": "place",
@@ -75613,8 +75182,8 @@
           "def": "core/compost-heap@1",
           "name": "street-compost-heap-compost-4",
           "p": [
-            43.15,
-            26.12
+            42.41,
+            26.1
           ]
         },
         {

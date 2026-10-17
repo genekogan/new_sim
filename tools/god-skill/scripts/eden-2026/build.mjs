@@ -18,8 +18,15 @@ const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirS
 const db=new Db(':memory:');
 const god=new GodMode(db,{worldId:'eden-2026-build',ownerId:null,tick:()=>0,emit:()=>{},assetDir:`${out}/assets`,seed:'eden-2026'});
 const genesis={schema:'genesis/1',name:'Eden 2026',description:'A shared commons between a pond and a colourful village: furnished courtyard homes, libraries, a cafe and campus, market gardens, a park, canals and hills, with paths to lakes and the harbour. A new Eden world; the original Eden remains independent.',constants:{extent:1000,ground:'land'},state:{constitution:'# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.',sky:{palette:'eden-summer',sun:.8},ground:{palette:'meadow'},time:{dayTicks:72000,startTick:0,set:{hour:12,n:1},calendar:'06-05'}},batches:[]};
+// A root thing placed from old Eden's yard coordinates can land inside an eden-2026 building (a bin in a living room, a
+// tree in a kitchen). Outdoor batches leave those out (recorded); open structures (pavilion, bandstand, gazebo, greenhouse,
+// market) keep what stands under them.
+const OPEN=/pavilion|bandstand|gazebo|greenhouse|market/;
+const indoors=([x,z])=>BUILDINGS.some(b=>{if(OPEN.test(b.def)||OPEN.test(b.name))return false;const c=Math.cos(b.r??0),sn=Math.sin(b.r??0),dx=x-b.coords[0],dz=z-b.coords[1],lx=dx*c-dz*sn,lz=dx*sn+dz*c;return Math.abs(lx)<b.w/2+.3&&Math.abs(lz)<b.d/2+.3;});
+const OUTDOOR_BATCH=/^(scenery|trees|night lights|street life|commons|courtyard planting|public-life)/;
 const stats=[],adjustments=[];
-function apply(label,input,droppable=false){if(!input.length)return;const ops=structuredClone(input),turns=new Map(),starts=new Map(ops.map((o,i)=>[i,o.p]));let r;
+function apply(label,input,droppable=false){if(OUTDOOR_BATCH.test(label)){const kept=input.filter(o=>!(o.op==='place'&&!o.shape&&(!o.in||o.in.parent==='world')&&o.p?.length===2&&!/hill|mountain/.test(o.def)&&indoors(o.p)));if(kept.length<input.length)adjustments.push({indoorsLeftOut:input.filter(o=>!kept.includes(o)).map(o=>o.name),batch:label});input=kept;}
+  if(!input.length)return;const ops=structuredClone(input),turns=new Map(),starts=new Map(ops.map((o,i)=>[i,o.p]));let r;
   for(let attempt=0;attempt<40;attempt++){
     r=god.act({ops,group:'eden-2026'},label);if(r.accepted)break;
     const f=r.failures?.[0],op=ops[f?.op],p=f?.suggest?.p,start=starts.get(f?.op);
@@ -66,7 +73,10 @@ for(const b of SCENERY_BATCHES)apply(b.label,b.ops,'any');
 {const box=a=>{const xs=a.map(q=>q[0]),zs=a.map(q=>q[1]);return[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];};
  const existing=LANDSCAPE_BATCHES.flatMap(b=>b.ops).filter(o=>o.def==='core/woodland@1'&&o.shape?.area).map(o=>box(o.shape.area));
  const t=treeBatches(existing);for(let i=0;i<t.length;i+=12)apply(`trees ${i/12+1}`,t.slice(i,i+12),'any');}
-{const l=lightOps();for(let i=0;i<l.length;i+=14)apply(`night lights ${i/14+1}`,l.slice(i,i+14),'any');const p=propOps();for(let i=0;i<p.length;i+=14)apply(`street life ${i/14+1}`,p.slice(i,i+14),'any');}
+{// old street props stood in old Eden's yards; some of those spots are inside eden-2026's buildings (a bin in a living room):
+// a prop inside any building's walls (0.3 m margin) is left out
+const l=lightOps();for(let i=0;i<l.length;i+=14)apply(`night lights ${i/14+1}`,l.slice(i,i+14),'any');
+const p=propOps();for(let i=0;i<p.length;i+=14)apply(`street life ${i/14+1}`,p.slice(i,i+14),'any');}
 // lane E-life's patch (activity things old Eden residents used: gym, courts, music, post boxes, easels); folded in, droppable
 {const life=JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/batch.json`)).ops;apply('eden life defs',life.filter(o=>o.op==='define'));const pl=life.filter(o=>o.op!=='define');for(let i=0;i<pl.length;i+=10)apply(`eden life ${i/10+1}`,pl.slice(i,i+10),'any');}
 const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).places;
