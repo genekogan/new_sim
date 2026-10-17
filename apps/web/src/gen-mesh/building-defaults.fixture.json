@@ -57,10 +57,10 @@
   },
   {
     "name": "core-greenhouse",
-    "hash": "4fe879bb02004809df413d224790eb71f95ec376e6097410a3d3bf530fd96d9f",
-    "grid": "071480ba85608a4ace6a91242d89e9f77121662a5e8979d8bbb2d52f634723d5",
-    "tris": 760,
-    "draws": 10
+    "hash": "8464440fca9dbd10641cf8797f5b2163dd12d1f842ebc92a9c6fa0d785876523",
+    "grid": "c8db67c53700f8435f2e3e22a6708e4523ff1bad6494e7bf80f24bae7780b7ca",
+    "tris": 748,
+    "draws": 9
   },
   {
     "name": "core-pavilion",
@@ -162,8 +162,8 @@
   },
   {
     "name": "core-cafe",
-    "hash": "e1f4e3960e9cf26cfeb059eb21d713e6847aa2003f940c45981937c12ec92bd9",
-    "grid": "db58cdff6b106a2230f5b817280102fd80aa05b5108b4682764cb641f4f9e702",
+    "hash": "e3bfca35138e81fdfb1a64cbf3913f901d782add20d0da4b507c30d8d0b42b1a",
+    "grid": "9e3f61b7b0a21ba11d6c912a7d60dacebe055e65b7c219dfaa6c4f7518ff6544",
     "tris": 2736,
     "draws": 9
   },
@@ -183,10 +183,10 @@
   },
   {
     "name": "core-office-block",
-    "hash": "619cf9446f7042310345c5f06c947c6a4b198265792da71b878ade8ecb2d273f",
-    "grid": "5ef8e33c3a91089306cf83d7a935119a6665705afe37b6afaef956f3bdac7df5",
-    "tris": 5590,
-    "draws": 22
+    "hash": "94c58d1e86ca053d276f2b33092061d60b10d21324521c68b154a4f85fac4120",
+    "grid": "e8300f65e290ffe6cc9f6ad4b1bb79748f3ae265478cc21253b73e5b15ce0e8c",
+    "tris": 5578,
+    "draws": 21
   },
   {
     "name": "core-mall",
@@ -225,8 +225,8 @@
   },
   {
     "name": "core-library",
-    "hash": "30bfd1e42870af9528f6d73fde7b18d7bfea32dacda65a7f57c177211a0d2c1a",
-    "grid": "eb2a8b7c500a9dd4123330f7ffc6dad4c606a3db21b3c9f1e897b58774312f8d",
+    "hash": "ec7194687dc6963ac0fb0107f4dd0b9b1611a924b993a9333df7f2e53671fa0f",
+    "grid": "5c47a81dffb87630ecb4f56086b2b152bb3ed3e82c80b4fbd1c10c302d283a36",
     "tris": 4936,
     "draws": 9
   },

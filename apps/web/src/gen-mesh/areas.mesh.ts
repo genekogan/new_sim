@@ -4,6 +4,8 @@
 import { areaFrame } from '@sim/generators';
 import * as THREE from 'three';
 import { registerMesh, type MeshCtx } from './registry.ts';
+import { groundBaseFor, groundRealismFor } from './ground-palette.ts';
+import { applyWorldRealism } from '../WorldEdenRealism.ts';
 import { Soup, distEdge, drapeArea, h01, hf, inPoly, mix, rgb, scale, soupMesh, type RGB, type V3 } from './soup.ts';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -77,17 +79,27 @@ registerMesh({
     const poly = areaOf(ctx); if (!poly) return null;
     const mat = String(ctx.params.material ?? 'grass'), base = rgb(typeof ctx.params.color === 'string' ? ctx.params.color : PAINT[mat] ?? PAINT.grass);
     const edge = num(ctx.params.edge, 1), stripes = ctx.params.stripes === true && mat === 'grass', fr = areaFrame(poly), soup = new Soup();
-    const ground = rgb('#5f9a4c');
+    const pal = (ctx.model.state as { ground?: { palette?: string } }).ground?.palette, ground = rgb(groundBaseFor(pal));
     drapeArea(soup, poly, 1.5, G(ctx), 0.02, (x, z, d) => {
       let c = scale(base, 0.92 + hf(x, z) * 0.14);
       if (mat === 'rock') c = scale(c, 0.85 + h01(Math.floor(x / 1.5), Math.floor(z / 1.5), 3) * 0.3);
-      if (stripes) { const a = (x - fr.c[0]) * fr.u[0] + (z - fr.c[1]) * fr.u[1]; if (Math.floor(a / 4) % 2 === 0) c = scale(c, 1.12); }
+      // mown stripes read from a height like old Eden's commons: 3.5 m bands, light 1.2x / dark 0.9x
+      if (stripes) { const a = (x - fr.c[0]) * fr.u[0] + (z - fr.c[1]) * fr.u[1]; c = scale(c, Math.floor(a / 3.5) % 2 === 0 ? 1.2 : 0.9); }
       if (edge > 0 && d < edge) c = mix(ground, c, Math.min(1, d / edge * (0.7 + hf(x, z, 2) * 0.6)));
       return c;
     });
-    return soupMesh(soup, `lawn ${ctx.entity.name ?? ctx.entity.id}`, { shadow: false });
+    const mesh = soupMesh(soup, `lawn ${ctx.entity.name ?? ctx.entity.id}`, { shadow: false });
+    // On Eden's meadow, unstriped turf lawns take the same realism ground shader as the terrain around them.
+    if (mesh && groundRealismFor(pal) && !stripes && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf();
+    return mesh;
   },
 });
+
+let turf: THREE.MeshStandardMaterial | null = null;
+function meadowTurf() {
+  if (!turf) { turf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }); turf.name = 'meadow lawn turf'; applyWorldRealism(new THREE.Mesh(new THREE.BufferGeometry(), turf), { classify: () => 'ground' }); }
+  return turf;
+}
 
 // ---------- pitches ----------
 const WHITE = rgb('#f2efe6');

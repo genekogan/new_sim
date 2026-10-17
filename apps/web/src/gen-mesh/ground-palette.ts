@@ -1,11 +1,11 @@
 // Ground palettes: what the terrain is made of, read by the entity layer's terrain colouring.
-// `state.ground.palette` (patch 03) ∈ grass | desert | dust | sand | snow | rock | garden | playa. The
+// `state.ground.palette` (patch 03) ∈ grass | desert | dust | sand | snow | rock | garden | playa | meadow. The
 // colour is a pure function of height above base, slope and a little positional noise, so every
 // viewer paints the same ground. Owner: L3.
 import * as THREE from 'three';
 import { fbm, playaPatch, playaVein } from '@sim/generators';
 
-export const GROUND_PALETTES = ['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden', 'playa'] as const;
+export const GROUND_PALETTES = ['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden', 'playa', 'meadow'] as const;
 export type GroundPalette = (typeof GROUND_PALETTES)[number];
 type P = { low: string; base: string; high: string; rock: string; snow?: number; snowC?: string; rockFrom: number; noise: number; shore: string };
 const PAL: Record<GroundPalette, P> = {
@@ -17,8 +17,15 @@ const PAL: Record<GroundPalette, P> = {
   snow: { low: '#dfe6ea', base: '#eef2f5', high: '#f6f8fa', rock: '#7f858c', snow: 0, snowC: '#f8fafc', rockFrom: 0.75, noise: 0.03, shore: '#c9d2d8' },
   rock: { low: '#8a857b', base: '#8f8a80', high: '#a19c92', rock: '#6f6b65', snow: 120, snowC: '#eef0f2', rockFrom: 0.5, noise: 0.08, shore: '#8a857b' },
   // MARSLAND-NEAR: the Salton Sea playa (pale crusted cream, tan drainage veins and dusty patches; mottling in playaMottle)
+  // Eden: the old world's muted olive turf (#8a9b6e, sandy shore #b6ae89). The viewer adds the Eden realism ground shader
+  // (lush/dry fields, blade texture, straw flecks; WorldEdenRealism 'ground') on top — see groundRealismFor.
+  meadow: { low: '#b6ae89', base: '#7f9062', high: '#7e8a6e', rock: '#8d8a84', snow: 150, snowC: '#f2f4f6', rockFrom: 0.75, noise: 0.03, shore: '#b6ae89' },
   playa: { low: '#aaa8a2', base: '#b2b2b3', high: '#aaa392', rock: '#978d78', rockFrom: 0.5, noise: 0, shore: '#b4b4b1' },
 };
+/** Palettes whose terrain also takes the Eden realism ground shader (presentation only). */
+export const groundRealismFor = (palette: string | undefined) => palette === 'meadow';
+/** The level-ground colour of a palette (what a lawn's soft edge fades into). */
+export const groundBaseFor = (palette: string | undefined) => (PAL[(palette as GroundPalette) ?? 'grass'] ?? PAL.grass).base;
 const PLAYA = { crust: '#c5c6c6', dust: '#aaa392', vein: '#a69c87', grass: '#a89d78' };
 /** Playa mottling: soft crust/dust patches (40–200 m), thin tan veins with dry grass along them, fine speckle. */
 function playaMottle(c: THREE.Color, x: number, z: number) {

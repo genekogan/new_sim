@@ -28,6 +28,15 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
 
+/** Live viewers never read a take's static physics (entityPhysicsV1: every building's floors, walls and stairs; they
+ *  draw geometry from /v1/scene). On a built world it is ~3 MB of JSON per one-second chunk (Eden 2026), so the live
+ *  stream leaves it out; recorded takes (TAKES_PERSIST) and HTTP history keep the full chunk. */
+export function viewerChunk<T>(chunk: T): T {
+  const c = chunk as { take?: { finalState?: Record<string, unknown> } };
+  const state = c?.take?.finalState; if (!state || state.entityPhysicsV1 === undefined) return chunk;
+  const { entityPhysicsV1: _omit, ...rest } = state;
+  return { ...c, take: { ...c.take, finalState: rest } } as T;
+}
 export class Hub {
   wss: WebSocketServer;
   /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */
@@ -82,7 +91,7 @@ export class Hub {
           else if(scene)db.saveRenderSceneCapture(host.worldId,scene);
         }
         this.lastTakeTick = chunks.at(-1)!.toTick;
-        if (chunks.length) this.broadcast({t: 'takes', serverTick: tick, chunks});
+        if (chunks.length) this.broadcast({t: 'takes', serverTick: tick, chunks: chunks.map(viewerChunk)});
       },
       onBatch: (b) => this.broadcast({ t: 'batch', ...b, log: b.log.map(publicEvent) }),
       onHeartbeat: (h) => this.broadcast({ t: 'heartbeat', ...h, clients: this.clients.size }),
@@ -152,7 +161,7 @@ export class Hub {
       for (const v of this.brain.narratives.values()) this.send(c, { t: 'narrative', view: v });
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
-      this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: e.takeChunks?.(e.world.tick - 40) ?? []});
+      this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: (e.takeChunks?.(e.world.tick - 40) ?? []).map(viewerChunk)});
       for (const extra of this.joinMessages) { try { for (const x of extra()) this.send(c, x as ServerMsg); } catch { /* optional standing state */ } }
       this.sendStation(c);
       c.ready = c.ws.readyState===1&&c.helloGeneration===generation;

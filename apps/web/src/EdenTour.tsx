@@ -21,7 +21,8 @@ export function EdenTour({onView,souls=new Map(),present=new Set(),onSoul,previe
  const close=()=>{setOpen(false);setUnavailable('');};
  useEffect(()=>{const key=(e:KeyboardEvent)=>{if(!(e.metaKey||e.ctrlKey)||e.key.toLowerCase()!=='k'||e.altKey||e.shiftKey)return;if(document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')&&!dialog.current?.open)return;e.preventDefault();setOpen(o=>!o);};addEventListener('keydown',key);return()=>removeEventListener('keydown',key);},[]);
  useLayoutEffect(()=>{if(!open)return;const node=dialog.current,button=trigger.current;openReader.current?.();setQuery('');node?.showModal();search.current?.focus();const backdrop=(e:PointerEvent)=>{if(e.target!==node||!node)return;const b=node.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom){setOpen(false);setUnavailable('');}};node?.addEventListener('pointerdown',backdrop);return()=>{node?.removeEventListener('pointerdown',backdrop);node?.close();button?.focus();};},[open]);
- const shownLocations=useMemo(()=>locations.filter(p=>p.label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())),[query,locations]);
+ // accent- and case-blind: "cafe" finds "Café", "café" finds "Cafe"
+ const shownLocations=useMemo(()=>locations.filter(p=>searchKey(p.label).includes(searchKey(query.trim()))),[query,locations]);
  const roster=exploreSoulRoster(souls,presence,query,room),shownSouls=roster.souls;
  return <span className="eden-tour explore-control"><button ref={trigger} type="button" className="explore-open" aria-haspopup="dialog" aria-expanded={open} title={`Explore ${worldName} (⌘K / Ctrl+K)`} onClick={()=>setOpen(true)}><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m12.5 12.5 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg><span>Explore {worldName}</span><kbd>⌘K</kbd></button>
   {open&&<dialog ref={dialog} aria-modal="true" className="frosted-modal explore-modal" aria-labelledby="explore-title" onCancel={e=>{e.preventDefault();close();}}>
@@ -34,3 +35,5 @@ export function EdenTour({onView,souls=new Map(),present=new Set(),onSoul,previe
   </dialog>}
  </span>;
 }
+/** Lower-case, accents removed: what Explore's search compares. */
+export const searchKey=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();

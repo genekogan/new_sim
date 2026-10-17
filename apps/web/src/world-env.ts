@@ -15,6 +15,14 @@ export function parseShotHour(search: string): number | null {
   return Number(hour.slice(0, 2)) * 60 + Number(hour.slice(3));
 }
 /** Keep the world's calendar date; replace only the presentation time. The streamed clock is never edited. */
+/** A world's presentation calendar: `state.time.calendar` "MM-DD" replaces the clock's month and day (the year, hour and
+ *  minutes stay), so the sky, sun path and dusk follow that season (Eden 2026: early June, so 19:00 is golden hour as on
+ *  old /w/eden). Presentation only: the server clock and every schedule keep the world clock. */
+export function calendarClock(clock: string | null, state: unknown): string | null {
+  const cal = (state as { time?: { calendar?: unknown } } | null)?.time?.calendar;
+  if (!clock || typeof cal !== 'string' || !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(cal) || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
+  return `${clock.slice(0, 5)}${cal}${clock.slice(10)}`;
+}
 export function shotClockAt(clock: string | null, hour: number | null): string | null {
   if (hour === null || !clock || !Number.isInteger(hour) || hour < 0 || hour >= 1440 || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
   return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;
@@ -154,34 +162,55 @@ type ViewModel = {
   footprint(e: unknown): { c: [number, number]; half: [number, number]; y0: number; y1: number }[];
   editSeq?: number;
 };
-const IGNORE_TAGS = /^(terrain|landform|ground|path|road|vegetation|tree|plant|flower|rock|creature|animal|flag|marker|lamp|light)$/;
+const IGNORE_TAGS = /^(terrain|landform|ground|path|road|vegetation|tree|plant|flower|rock|creature|animal|flag|marker|lamp|light|zone|land-use|lake|sea|ocean|lawn|ground-paint|cover|ecology|boundary)$/;
+/** A thing's name as a place label: "region-campus-library-annex" -> "Campus library annex", "eden-library-1" -> "Library". */
+export function placeLabel(name: string): string {
+  const t = name.replace(/^(?:(?:region|place|land|int|eden)-)+/, '').replace(/-1$/, '').replace(/[-_]+/g, ' ').trim() || name.replace(/[-_]+/g, ' ');
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 let viewsCache: { key: string; views: TourViewLike[] } | null = null;
+type Box = { id: string; x0: number; z0: number; x1: number; z1: number; top: number };
 /** Up to 12 establishing views of what the god built: named top-level things with some size (houses, plazas, a
  *  fountain, a tower), biggest first, each seen from a seeded side at a distance that frames it (Eden's broadcast
  *  holds these when nothing is happening, and tours them when nobody is here). Cached per edit. */
-export function godTourViews(layer: unknown, groundAt: (x: number, z: number) => number | null): TourViewLike[] {
+export function godTourViews(layer: unknown, groundAt: (x: number, z: number) => number | null, limit = 12): TourViewLike[] {
   const m = (layer as { model?: ViewModel | null }).model; if (!m) return [];
   const key = `${m.editSeq ?? ''}:${m.entities.size}`;
-  if (viewsCache?.key === key) return viewsCache.views;
-  const found: { v: TourViewLike; size: number }[] = [];
+  if (viewsCache?.key === key) return viewsCache.views.slice(0, limit);
+  const found: { v: TourViewLike; size: number; dist: number; a: number; box: Box }[] = [], boxes: Box[] = [];
   for (const e of m.entities.values()) {
     if (e.in.parent !== 'world' || !e.name || /^flag[-:]/.test(e.name)) continue;
     // a landform-only def (hill, cutting) is ground, not a landmark; a thing that also carves (a pool's basin) still is one
     const d = m.resolvedDef(e.def); if (!d || (d.components?.landform && (!d.make || d.make.kind === 'none')) || (d.tags ?? []).some((t) => IGNORE_TAGS.test(t))) continue;
-    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, top = 0;
-    try { for (const b of m.footprint(e)) { const r = Math.hypot(b.half[0], b.half[1]); x0 = Math.min(x0, b.c[0] - r); x1 = Math.max(x1, b.c[0] + r); z0 = Math.min(z0, b.c[1] - r); z1 = Math.max(z1, b.c[1] + r); top = Math.max(top, b.y1 - b.y0); } } catch { continue; }
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, top = 0, high = -Infinity;
+    try { for (const b of m.footprint(e)) { const r = Math.hypot(b.half[0], b.half[1]); x0 = Math.min(x0, b.c[0] - r); x1 = Math.max(x1, b.c[0] + r); z0 = Math.min(z0, b.c[1] - r); z1 = Math.max(z1, b.c[1] + r); top = Math.max(top, b.y1 - b.y0); high = Math.max(high, b.y1); } } catch { continue; }
     if (e.shape?.area) for (const [x, z] of e.shape.area) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     if (!Number.isFinite(x0)) continue;
     const size = Math.max(x1 - x0, z1 - z0, top);
     if (Math.max(x1 - x0, z1 - z0) < 3) continue;  // a landmark has some ground to it (not a lamp-post or a sign)
+    if (Math.max(x1 - x0, z1 - z0) > 150) continue; // nor is it a whole region (a sea, a district outline)
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, g = groundAt(cx, cz) ?? 0;
     const dist = Math.max(10, Math.min(70, size * 1.9 + 6)), a = ((hashStr(e.id) % 360) / 360) * Math.PI * 2;
     const ex = cx + Math.cos(a) * dist, ez = cz + Math.sin(a) * dist, eg = groundAt(ex, ez) ?? g;
     const ty = g + Math.min(top, 8) * 0.45;
-    found.push({ size, v: { id: `god:${e.id}`, label: e.name.replace(/[-_]+/g, ' '), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) } });
+    const box: Box = { id: e.id, x0, z0, x1, z1, top: Number.isFinite(high) ? Math.max(high, g + top) : g + top }; boxes.push(box); // top: the highest collider, not one storey's height
+    found.push({ size, dist, a, box, v: { id: `god:${e.id}`, label: placeLabel(e.name), target: [cx, ty, cz], p: [ex, Math.max(eg + 2, ty) + dist * 0.38, ez], radius: Math.min(100, Math.hypot(x1 - x0, z1 - z0) / 2 + 1.5) } });
   }
-  const views = found.sort((a, b) => b.size - a.size).slice(0, 12).map((f) => f.v);
+  // the cache keeps up to 120 (Explore lists them all, searchable; the broadcast tour asks for 12). A part named after a
+  // bigger landmark ("Courtyard house 4 kitchen" beside "Courtyard house 4") is the same place: listed once.
+  const sorted = found.sort((a, b) => b.size - a.size), kept: TourViewLike[] = [];
+  for (const f of sorted) { const l = f.v.label.toLowerCase(); if (kept.some((k) => l.startsWith(k.label.toLowerCase() + ' '))) continue; kept.push(f.v); if (kept.length >= 120) break; }
+  // the side a view looks from: the seeded one unless taller things stand between it and the landmark (a little café
+  // behind a three-storey office); then the clearest of eight sides
+  for (const v of kept) { const f = found.find((x) => x.v === v)!; const [cx, ty, cz] = v.target; let best = f.a, bestHits = Infinity;
+    for (let k = 0; k < 8 && bestHits > 0; k++) { const a = f.a + (k * Math.PI) / 4, ex = cx + Math.cos(a) * f.dist, ez = cz + Math.sin(a) * f.dist, ey = (groundAt(ex, ez) ?? 0) + 2 + f.dist * 0.38;
+      const bx0 = Math.min(ex, cx), bx1 = Math.max(ex, cx), bz0 = Math.min(ez, cz), bz1 = Math.max(ez, cz);
+      const near = boxes.filter((b) => b !== f.box && b.x1 > bx0 && b.x0 < bx1 && b.z1 > bz0 && b.z0 < bz1);
+      let hits = 0; for (let t = 0.2; t < 0.95; t += 0.1) { const x = ex + (cx - ex) * t, z = ez + (cz - ez) * t, y = ey + (ty - ey) * t; for (const b of near) if (x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1 && b.top > y) hits++; }
+      if (hits < bestHits) { bestHits = hits; best = a; } }
+    if (best !== f.a) { const ex = cx + Math.cos(best) * f.dist, ez = cz + Math.sin(best) * f.dist, eg = groundAt(ex, ez) ?? 0; v.p = [ex, Math.max(eg + 2, ty) + f.dist * 0.38, ez]; } }
+  const views = kept;
   viewsCache = { key, views };
-  return views;
+  return views.slice(0, limit);
 }
 function hashStr(s: string) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }

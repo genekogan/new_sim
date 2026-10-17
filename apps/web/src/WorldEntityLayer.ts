@@ -12,7 +12,8 @@ import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
-import { terrainColorFor } from './gen-mesh/ground-palette.ts';
+import { terrainColorFor, groundRealismFor } from './gen-mesh/ground-palette.ts';
+import { applyWorldRealism } from './WorldEdenRealism.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 import { assetUrl } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
@@ -302,8 +303,11 @@ export class WorldEntityLayer {
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const a = j * (nx + 1) + i, b = a + 1, cc = a + nx + 1, dd = cc + 1; idx.push(a, cc, b, b, cc, dd); }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, this.material('terrain', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 })));
+    // Eden's meadow turf also takes the Eden realism ground shader (its own material, so a palette change never leaves it patched)
+    const realism = groundRealismFor((m.state as { ground?: { palette?: string } }).ground?.palette);
+    const mesh = new THREE.Mesh(g, this.material(realism ? 'terrain-meadow' : 'terrain', () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: realism ? 1 : 0.95, metalness: 0 })));
     mesh.name = `entity-terrain ${sx},${sz}`; mesh.receiveShadow = true;
+    if (realism) applyWorldRealism(mesh, { classify: () => 'ground' });
     return mesh;
   }
   private rebuildWater() {

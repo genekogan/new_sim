@@ -1,0 +1,303 @@
+{
+ "schema": "eden-2026-patch/1",
+ "id": "eden-life-schedules-20261017",
+ "note": "Lane E-life B9: old Eden's 28 place schedule entries (worlds/eden/places.v1.json) as schedule events on the matching Eden 2026 places, so residents see them in here/map/the town terminal like on old Eden (cron M H * * * -> at HH:MM, minutes = durationMinutes).",
+ "ops": [
+  {
+   "op": "set",
+   "id": "place-commons",
+   "schedule": {
+    "events": [
+     {
+      "name": "sleep-mats",
+      "label": "Night: sleep on a free mat (walk:commons-mat-N)",
+      "at": "23:30",
+      "minutes": 390
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-commons-deck",
+   "schedule": {
+    "events": [
+     {
+      "name": "open-mic",
+      "label": "Open mic: one speaker at a time",
+      "at": "17:00",
+      "minutes": 45
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-commons-kitchen",
+   "schedule": {
+    "events": [
+     {
+      "name": "cook-breakfast",
+      "label": "Breakfast prep",
+      "at": "07:30",
+      "minutes": 45
+     },
+     {
+      "name": "cook-lunch",
+      "label": "Lunch prep",
+      "at": "12:00",
+      "minutes": 45
+     },
+     {
+      "name": "cook-dinner",
+      "label": "Dinner prep",
+      "at": "18:30",
+      "minutes": 45
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-social-eden-fire-circle",
+   "schedule": {
+    "events": [
+     {
+      "name": "dawn-tea",
+      "label": "Dawn embers and first tea",
+      "at": "06:00",
+      "minutes": 60
+     },
+     {
+      "name": "fireside-chess",
+      "label": "Chess and slow talk by the fire",
+      "at": "13:30",
+      "minutes": 90
+     },
+     {
+      "name": "evening-fire",
+      "label": "Evening fire and stories",
+      "at": "20:30",
+      "minutes": 120
+     },
+     {
+      "name": "late-embers",
+      "label": "Late embers: quiet stories before sleep",
+      "at": "22:30",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-social-eden-dining",
+   "schedule": {
+    "events": [
+     {
+      "name": "breakfast",
+      "label": "Shared breakfast",
+      "at": "08:00",
+      "minutes": 60
+     },
+     {
+      "name": "lunch",
+      "label": "Shared lunch",
+      "at": "12:45",
+      "minutes": 60
+     },
+     {
+      "name": "table-tea",
+      "label": "Tea, cake and cards at the long table",
+      "at": "16:00",
+      "minutes": 45
+     },
+     {
+      "name": "dinner",
+      "label": "Shared dinner",
+      "at": "19:15",
+      "minutes": 75
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-shore-bank",
+   "schedule": {
+    "events": [
+     {
+      "name": "stargazing",
+      "label": "Stargazing by the pond",
+      "at": "01:00",
+      "minutes": 120
+     },
+     {
+      "name": "bank-sketching",
+      "label": "Sketching and stone-skipping on the bank",
+      "at": "09:30",
+      "minutes": 90
+     },
+     {
+      "name": "sunset-bank",
+      "label": "Watching the sunset over the pond",
+      "at": "18:15",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-shore-water",
+   "schedule": {
+    "events": [
+     {
+      "name": "morning-swim",
+      "label": "Morning swim",
+      "at": "07:00",
+      "minutes": 45
+     },
+     {
+      "name": "afternoon-swim",
+      "label": "Afternoon swim and floating",
+      "at": "15:00",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-classroom-1",
+   "schedule": {
+    "events": [
+     {
+      "name": "skill-share",
+      "label": "Morning skill share: teach what you know",
+      "at": "10:30",
+      "minutes": 60
+     },
+     {
+      "name": "study-hour",
+      "label": "Quiet study hour",
+      "at": "14:30",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-library-1",
+   "schedule": {
+    "events": [
+     {
+      "name": "reading-hour",
+      "label": "Quiet reading hour",
+      "at": "14:00",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-dome",
+   "schedule": {
+    "events": [
+     {
+      "name": "dome-morning",
+      "label": "Morning circle in the dome",
+      "at": "09:00",
+      "minutes": 45
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-pergola-court",
+   "schedule": {
+    "events": [
+     {
+      "name": "court-crafts",
+      "label": "Crafts and swaps in the court",
+      "at": "11:00",
+      "minutes": 90
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-eden-amphitheatre",
+   "schedule": {
+    "events": [
+     {
+      "name": "sunset-show",
+      "label": "Sunset performance",
+      "at": "18:00",
+      "minutes": 60
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-bandstand",
+   "schedule": {
+    "events": [
+     {
+      "name": "bandstand-music",
+      "label": "Music at the bandstand",
+      "at": "17:30",
+      "minutes": 45
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-eden-performance-stage",
+   "schedule": {
+    "events": [
+     {
+      "name": "stage-evening-music",
+      "label": "Live music on the performance stage",
+      "at": "20:00",
+      "minutes": 75
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "eden-tea-house",
+   "schedule": {
+    "events": [
+     {
+      "name": "afternoon-tea",
+      "label": "Afternoon tea",
+      "at": "15:30",
+      "minutes": 45
+     }
+    ]
+   }
+  },
+  {
+   "op": "set",
+   "id": "place-eden-north-woods",
+   "schedule": {
+    "events": [
+     {
+      "name": "woods-walk",
+      "label": "Afternoon walk in the woods",
+      "at": "16:00",
+      "minutes": 60
+     }
+    ]
+   }
+  }
+ ]
+}

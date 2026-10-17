@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import * as THREE from 'three';
-import {godTourViews} from '../src/world-env.ts';
+import {godTourViews, placeLabel} from '../src/world-env.ts';
 import {WorldPlacePreviews} from '../src/WorldPlacePreviews.ts';
 
 /** A 24 x 18 m hall at (60, 0, -40), built from 1 m tiles so slicing by radius is measurable. */
@@ -48,7 +48,7 @@ test('a thing that carves its own ground (a sunken pool) is still a landmark; a 
   const fp = () => [{c: [0, 0] as [number, number], half: [8, 5.5] as [number, number], y0: -1.6, y1: 0.2}];
   const m = (make: {kind: string}) => ({editSeq: Math.random(), entities: new Map([['p1', {id: 'p1', name: 'lido', def: 'core/swimming-pool@1', in: {parent: 'world'}}]]),
     resolvedDef: () => ({tags: ['water', 'body'], components: {landform: {kind: 'carve'}}, make}), footprint: fp});
-  assert.equal(godTourViews({model: m({kind: 'gen'})}, () => 0)[0]?.label, 'lido');
+  assert.equal(godTourViews({model: m({kind: 'gen'})}, () => 0)[0]?.label, 'Lido');
   assert.equal(godTourViews({model: m({kind: 'none'})}, () => 0).length, 0);
 });
 
@@ -62,4 +62,26 @@ test("a god thing drawn as instances is pictured even when its palette names wat
   await previews.captureLocation({id: 'god:p', label: 'lido', regionId: 'god:p', p: [40, 10, 0], target: [30, 0, -10], radius: 10}, 'k');
   assert.equal(rendered, 1, 'the instanced pool was put in the picture');
   previews.dispose();
+});
+
+test('Explore lists landmarks by readable names, not invisible land-use zones or whole seas (Eden 2026: no library was findable)', () => {
+  assert.equal(placeLabel('region-campus-library-annex'), 'Campus library annex');
+  assert.equal(placeLabel('eden-library-1'), 'Library');
+  assert.equal(placeLabel('int-cafe'), 'Cafe');
+  const fp = (half: number) => () => [{c: [0, 0] as [number, number], half: [half, half] as [number, number], y0: 0, y1: 4}];
+  const things: Record<string, {tags: string[]; half: number}> = { 'place-commons': {tags: ['zone', 'land-use'], half: 20}, 'land-southern-sea': {tags: ['water', 'lake'], half: 60}, 'eden-library-1': {tags: ['building'], half: 5}, 'big-district': {tags: ['building'], half: 90}, 'eden-library-1-annexe': {tags: ['building'], half: 3} };
+  const model = {editSeq: Math.random(), entities: new Map(Object.keys(things).map((n, i) => [`e${i}`, {id: `e${i}`, name: n, def: `d:${n}`, in: {parent: 'world'}}])),
+    resolvedDef: (ref: string) => ({tags: things[ref.slice(2)].tags}), footprint: (e: {name: string}) => fp(things[e.name].half)()};
+  assert.deepEqual(godTourViews({model}, () => 0, 60).map(v => v.label), ['Library']);
+});
+
+test('a small landmark is seen from a side where nothing taller stands in the way (a café behind an office)', () => {
+  const boxes: Record<string, {c: [number, number]; half: [number, number]; y1: number}> = {cafe: {c: [0, 0], half: [4, 3], y1: 3}};
+  // a ring of tall blocks on every side of the café but one
+  for (let k = 0; k < 8; k++) if (k !== 5) { const a = k * Math.PI / 4; boxes[`office-${k}`] = {c: [Math.cos(a) * 11, Math.sin(a) * 11], half: [3, 3], y1: 14}; }
+  const model = {editSeq: Math.random(), entities: new Map(Object.keys(boxes).map((n, i) => [`e${i}`, {id: `e${i}`, name: n, def: 'core/hall@1', in: {parent: 'world'}}])),
+    resolvedDef: () => ({tags: ['building']}), footprint: (e: {name: string}) => [{...boxes[e.name], y0: 0}]};
+  const cafe = godTourViews({model}, () => 0, 120).find(v => v.label === 'Cafe')!;
+  const a = Math.atan2(cafe.p[2] - cafe.target[2], cafe.p[0] - cafe.target[0]), gap = 5 * Math.PI / 4;
+  assert.ok(Math.abs(Math.atan2(Math.sin(a - gap), Math.cos(a - gap))) < 0.5, `view from ${(a * 180 / Math.PI).toFixed(0)}°, the open side is 225°`);
 });

@@ -20,11 +20,20 @@ export class ClockFrontiers {
     if(v.worldId!==worldId||hashOf(v)!==row.body_hash)throw new Error('clock-frontier.corrupt');
     this.validatePrefix(v);return v;
   }
+  // The head event is written once (append-only log), yet it was re-read, re-parsed and re-hashed up to three times a
+  // tick; on a built world it is the multi-MB genesis edit (Eden 2026: ~80% of every idle tick). Keep its hash while
+  // the stored row still has the same seq, size, time, tick and kind (a cheap read with no payload parse).
+  private heads=new Map<string,{seq:number;stamp:string;hash:string}>();
   headHash(worldId:string,seq:number):string {
     if(seq===0)return hashOf({worldId,throughSeq:0});
+    const row=this.db.db.prepare('SELECT length(payload) AS n, at, tick, kind FROM events WHERE world_id = ? AND seq = ?').get(worldId,seq) as {n:number;at:unknown;tick:number;kind:string}|undefined;
+    if(!row)throw new Error('clock-frontier.missing-prefix');
+    const stamp=`${row.n}:${String(row.at)}:${row.tick}:${row.kind}`,known=this.heads.get(worldId);
+    if(known&&known.seq===seq&&known.stamp===stamp)return known.hash;
     const event=this.db.events(worldId,seq-1,1)[0];
     if(event?.seq!==seq)throw new Error('clock-frontier.missing-prefix');
-    return hashOf(event);
+    const hash=hashOf(event);this.heads.set(worldId,{seq,stamp,hash});
+    return hash;
   }
   validatePrefix(v:ClockFrontierV1):void {
     const world=this.db.world(v.worldId);

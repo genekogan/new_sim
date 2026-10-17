@@ -38,6 +38,8 @@ export class GroundHost {
     ensureGroundTable(db);
     god.onCommit((c) => { if (c.diff.tiles.length || c.diff.world || c.diff.constants) this.sync(c.seq); });   // constants: the bounds grew (GOD-ENV)
     this.sync(god.model.editSeq);
+    // A separate accepted fact preserves historical landings and cannot overwrite queued runtime policies.
+    if (host.engine.groundReclaimEnabledV1?.() !== true) void host.enqueue('rules', 'god:ground', { groundReclaimV1: true, why: 'ground-reclaim/1: reclaimed Souls land on terrain or slab support from this point onward' });
   }
   private get engine(): Engine { return this.host.engine as unknown as Engine; }
   /** Store the current recipe and log a groundV1 fact when it differs from what the engine stands on. */
