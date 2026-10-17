@@ -5,6 +5,7 @@
 // and summary.json: self time by original source file and by function (via the build's source maps when served), the
 // main-thread busy/idle split, the resource waterfall (start/end of each request) and the timing marks.
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--interval 250]
+//   node tools/speed/profile-arrival.mjs <world-url> --out <dir> --analyze [--from ms] [--to ms]   (re-analyse a window)
 // Ports: lane ports only via SPEED_PORTS (the live 4930–4990 are always refused).
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -25,7 +26,7 @@ const cpu = Number(opt('cpu', '4')), mbps = Number(opt('mbps', '60')), interval 
 const pw = findPlaywright(); if (!pw) throw new Error('no playwright');
 
 const INIT = `(() => {
-  const P = window.__arr = { marks: {}, longtasks: [] };
+  const P = window.__arr = { marks: {}, longtasks: [], stages: [] };
   try { performance.setResourceTimingBufferSize(20000); } catch {}
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) P.longtasks.push([Math.round(e.startTime), Math.round(e.duration)]); }).observe({ type: 'longtask', buffered: true }); } catch {}
   const poll = setInterval(() => {
@@ -33,13 +34,15 @@ const INIT = `(() => {
     if (w?.layer?.active && P.marks.layerActive === undefined) P.marks.layerActive = performance.now();
     if (P.marks.live === undefined && [...document.querySelectorAll('.ok b, .ok')].some((e) => /\\bLive\\b/.test(e.textContent || ''))) P.marks.live = performance.now();
     if (w && P.marks.entity === undefined) P.marks.entity = performance.now();
+    const ag = window.__arrivalGate; if (ag && P.marks.gatePlanned === undefined && ag.left().length) P.marks.gatePlanned = performance.now(); if (ag && P.marks.gatePlanned !== undefined && P.marks.gateClear === undefined && !ag.pending()) P.marks.gateClear = performance.now(); if (ag && P.marks.gatePlanned !== undefined) { const L = ag.left(); const k = L.length + ':' + L.slice(0, 4).map((x) => x.slice(0, 8)).join(','); if (P.stages.at(-1)?.[1] !== 'gate ' + k) P.stages.push([Math.round(performance.now()), 'gate ' + k]); }
+    const st = window.__assetStages; if (st) { const n = {}; for (const v of Object.values(st)) n[v] = (n[v] ?? 0) + 1; const key = JSON.stringify(n); if (P.stages.at(-1)?.[1] !== key) P.stages.push([Math.round(performance.now()), key]); }
     const card = document.querySelector('.viewer-arrival'); if (card && P.marks.cardSeen === undefined) P.marks.cardSeen = performance.now();
     if (P.marks.cardSeen !== undefined && P.marks.cardDone === undefined && (!card || card.getAttribute('data-done') === 'true')) { P.marks.cardDone = performance.now(); clearInterval(poll); }
   }, 25);
 })();`;
 
-let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0;
-if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
+let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0, stages = [], assetTimes = {};
+if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [], stages = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
 else {
 console.log('Waiting for speed Chrome lease');
 const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinity });
@@ -61,12 +64,12 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });
   await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 });
   ({ profile } = await cdp.send('Profiler.stop'));
-  ({ marks, resources, longtasks, navStart } = await page.evaluate(() => ({ marks: window.__arr.marks, longtasks: window.__arr.longtasks, navStart: performance.timeOrigin,
+  ({ marks, resources, longtasks, stages, assetTimes, navStart } = await page.evaluate(() => ({ marks: window.__arr.marks, longtasks: window.__arr.longtasks, stages: window.__arr.stages, assetTimes: window.__assetTimes ?? {}, navStart: performance.timeOrigin,
     resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name.replace(location.origin, ''), start: Math.round(e.startTime), end: Math.round(e.responseEnd), kb: Math.round((e.encodedBodySize || 0) / 1024) })) })));
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
 for (const g of glbs) if (!resources.some((r) => r.name === g.url && Math.abs(r.start - g.start) < 50)) resources.push({ name: g.url, start: g.start, end: g.end, kb: null, via: 'context' });
-writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs }));
+writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes }));
 }
 
 // ---- analysis: self time per node, mapped through source maps where the script has one
@@ -83,7 +86,9 @@ const consumer = async (scriptUrl) => {
 };
 const dt = new Map(); // node id -> self microseconds
 const ids = profile.samples, deltas = profile.timeDeltas;
-for (let i = 0; i < ids.length; i++) { const next = i + 1 < deltas.length ? deltas[i + 1] : 0; dt.set(ids[i], (dt.get(ids[i]) ?? 0) + next); }
+// --from / --to <ms> (profile clock): self/inclusive totals of that window only (e.g. --analyze --from 3400 for after the downloads)
+const fromUs = Number(opt('from', '0')) * 1000, toUs = Number(opt('to', 'Infinity')) * 1000;
+{ let t = 0; for (let i = 0; i < ids.length; i++) { t += deltas[i]; if (t < fromUs || t > toUs) continue; const next = i + 1 < deltas.length ? deltas[i + 1] : 0; dt.set(ids[i], (dt.get(ids[i]) ?? 0) + next); } }
 const byFile = new Map(), byFn = new Map(), cats = { idle: 0, program: 0, gc: 0, js: 0 };
 const keyOf = new Map();
 for (const n of profile.nodes) {
