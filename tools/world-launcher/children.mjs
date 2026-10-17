@@ -5,7 +5,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { memAvailableMb, rotateLog } from './production.mjs';
+import { memAvailableMb, prewarmBlocked, rotateLog } from './production.mjs';
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
 export const STANDBY_MARK = '[standby] ready';
@@ -57,7 +57,10 @@ export class ChildPool {
     if (!k?.adopted) return k?.port ?? null;
     // pre-warm: the next process loads its code while the previous one still serves (no database, no port yet); until
     // it is ready the world stays 'running' on the old process, so visitors' requests do not wait for the warm-up
-    const warm = !this.o.prewarm ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
+    // ...only with memory for a second process of this world beside the first; otherwise it boots cold, as before
+    const noRoom = this.o.prewarm ? prewarmBlocked(this.o.minFreeMb ?? 0) : null;
+    if (noRoom) k.lastWarm = { ok: false, error: `cold: ${noRoom}` };
+    const warm = !this.o.prewarm || noRoom ? null : await this.standby(k).catch((e) => { k.lastWarm = { ok: false, error: e.message }; return null; });
     k.status = 'handover'; this.o.onChange?.(slug);
     k.ready = (async () => {
       k.pauseStart = Date.now();   // from here the world does not answer until the new process does
