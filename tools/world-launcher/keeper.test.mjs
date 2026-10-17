@@ -5,6 +5,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { connect } from 'node:net';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, symlinkSync, writeFileSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -75,6 +76,29 @@ test('reload hands every world to the new release with no refused connection and
   // the registry stayed one file with both worlds, and creating still works on the new launcher
   assert.equal((await api('/__sim/worlds', { method: 'POST', body: JSON.stringify({ name: 'Three' }) })).status, 503, 'two child ports, both busy: the cap still holds');
   assert.deepEqual(JSON.parse(readFileSync(join(data, 'worlds.json'), 'utf8')).worlds.map((w) => w.slug).sort(), ['one', 'two']);
+});
+test('a keep-alive connection idle at the switch still answers its next request (a POST), then closes cleanly', async () => {
+  // Caddy keeps idle connections to the launcher and may send on one at any instant; a POST on a connection the old
+  // launcher closes under it cannot be replayed (Caddy answers 502). The old launcher answers it, with Connection: close.
+  const sock = connect(PORT, '127.0.0.1'); let buf = '', ended = false;
+  sock.setEncoding('utf8'); sock.on('data', (d) => { buf += d; }); sock.on('close', () => { ended = true; });
+  const until = async (ok, what) => { for (let i = 0; i < 200 && !ok(); i++) await sleep(25); assert.ok(ok(), typeof what === 'function' ? what() : what); };
+  sock.write('GET /worlds/w/one/healthz HTTP/1.1\r\nHost: x\r\nConnection: keep-alive\r\n\r\n');
+  await until(() => /\r\n0\r\n\r\n$/.test(buf) || /content-length: \d+[\s\S]*\r\n\r\n\{[\s\S]*\}$/i.test(buf), () => `first response (${JSON.stringify(buf)})`);
+  assert.match(buf, /^HTTP\/1\.1 200/); assert.doesNotMatch(buf, /connection: close/i, 'kept alive before the switch'); buf = '';
+  const before = status().handover?.startedAt;
+  point(release('b2', { loadMs: 800 })); keeper.kill('SIGHUP');
+  await until(() => { const h = status().handover; return h && h.startedAt !== before && h.state === 'taking-over'; }, 'handover reached take-over');
+  await sleep(100);   // the old launcher has its retire message by now
+  assert.equal(ended, false, 'the idle connection was not closed at the switch');
+  const body = '{"x":1}';
+  sock.write(`POST /worlds/w/two/v1/probe-post HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\n\r\n${body}`);
+  await until(() => ended, () => `the connection closes after its answer (${JSON.stringify(buf)})`);
+  const code = Number(/^HTTP\/1\.1 (\d+)/.exec(buf)?.[1]);
+  assert.ok(code > 0 && code < 500, `the POST was answered, not dropped (${buf.slice(0, 200)})`); assert.match(buf, /connection: close/i);
+  for (let i = 0; i < 300 && status().handover?.state === 'taking-over'; i++) await sleep(50);
+  assert.equal(status().handover.state, 'done', JSON.stringify(status().handover));
+  assert.equal((await handover(B)).state, 'done');   // back to B for the tests below
 });
 test('a new release whose launcher cannot start changes nothing: the running one serves on', async () => {
   const { out: h, bad } = await watch(['one', 'two'], () => handover(release('broken', { brokenLauncher: true })));

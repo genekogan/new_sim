@@ -80,6 +80,8 @@ function hostHealth(dataDir) {
 const here = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(here, '../..');
 /** The Soul CLI and guides every world serves unless overridden (tools/world-launcher/soul/SOURCES.json). */
+/** Keep-alive idle timeout of the public server: longer than Caddy's upstream idle timeout (2 min). */
+export const KEEP_ALIVE_MS = 130_000;
 export const SOUL = { cli: join(here, 'soul/eden-agent.mjs'), skill: join(here, 'soul/skill.md'), instructions: join(here, 'soul/instructions.md') };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.md': 'text/markdown; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers }).end(JSON.stringify(body)); };
@@ -389,7 +391,10 @@ export async function openLauncher(cfg = {}) {
     // the worlds see people, not the proxy; locally it is set to the connecting address as before.
     const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
     const up = request({ hostname: '127.0.0.1', port: targetPort, path: path ?? req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': xff } }, (r) => {
-      res.writeHead(r.statusCode ?? 502, r.headers);
+      // hop-by-hop headers stay on their hop: an upstream `connection: keep-alive` would turn this server's own choice
+      // back on (forward() closes after its response; Node lets a user connection header override that)
+      const { connection: _c, 'keep-alive': _k, ...headers } = r.headers;
+      res.writeHead(r.statusCode ?? 502, headers);
       if (tee && (r.statusCode ?? 0) < 300) { const chunks = []; r.on('data', (c) => { if (chunks.length < 64) chunks.push(c); }); r.on('end', () => { try { tee(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not json */ } }); }
       r.pipe(res);
     });
@@ -561,7 +566,10 @@ export async function openLauncher(cfg = {}) {
       if (!res.headersSent) json(res, 500, { ok: false, code: 'internal', message: e.message }); else res.destroy();
     }
   });
-  server.requestTimeout = 0; server.timeout = 0; server.keepAliveTimeout = 5_000;
+  // Idle keep-alive connections outlive the proxy's own idle timeout (Caddy's upstream default is 2 min), so the proxy, not
+  // this server, closes them: a server-side close races a request the proxy is sending on that connection, and a POST
+  // lost that way is a 502 page (Node's 5 s default did this between releases too). headersTimeout stays above it.
+  server.requestTimeout = 0; server.timeout = 0; server.keepAliveTimeout = KEEP_ALIVE_MS; server.headersTimeout = KEEP_ALIVE_MS + 5_000;
   server.on('connection', (s) => { sockets.add(s); s.on('close', () => sockets.delete(s)); });
   /** Pipe an upgrade to a port; `refused` (optional) runs instead when nothing answers there before the pipe starts. */
   function pipeUpgrade(req, socket, head, p, refused) {
@@ -630,19 +638,19 @@ export async function openLauncher(cfg = {}) {
       log('handover abandoned: serving on as before');
     },
     /** Keeper, step 3: the next launcher serves new connections; anything still arriving here is forwarded to it. No
-     *  world starts here again. Idle connections close now, busy ones after their response. */
+     *  world starts here again. Idle connections are NOT closed here: the proxy in front (Caddy) may be sending a request
+     *  on one at this very instant, and a POST whose connection closes under it cannot be replayed (Caddy answers 502;
+     *  measured 4 in ~9800 requests at one switch). Each connection instead closes cleanly after its next response
+     *  (forward() answers with Connection: close), and whatever is still idle closes at exit. */
     retire() {
       phase = 'retired'; retiredTo = port; pool.fence(); retiredPidFile = gate?.pidFile ?? retiredPidFile;
       const g = gate; gate = null; g?.open(); handBack?.open();
-      server.keepAliveTimeout = 1;
-      for (const s of sockets) if (!s.simBusy && !s.simUpgraded) s.destroy();
     },
     /** Keeper, canary failed (the next launcher could not run its first world and has stopped it): serve again as
      *  before, booting that world here on this release's code. The other worlds never left this launcher. */
     async unretire(slug) {
       if (phase !== 'retired') throw new Error(`cannot unretire while ${phase}`);
       phase = 'active'; retiredTo = null; pool.unfence(); registry.frozen = false; pool.o.pidFile = retiredPidFile; pool.savePids(); registry.save();
-      server.keepAliveTimeout = 5_000;
       log(`the next launcher's canary failed: serving on as before${slug ? `, booting ${slug} here again` : ''}`);
       const w = slug ? registry.get(slug) : null;
       return w ? pool.ensure(worldEnv(w)) : null;
