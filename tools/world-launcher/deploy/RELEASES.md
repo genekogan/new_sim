@@ -51,6 +51,13 @@ at the next restart). Use it to ship a keeper change without a full restart.
 After a `--reload`, keeper.json still names the old keeper's sha, so the next release with an unchanged `keeper.mjs`
 would also restart: keep passing `--reload` until a planned `--restart` at a quiet time installs the new keeper.
 
+**A restart without the error page** (optional, `deploy/sim-worlds@.socket`): with the socket unit enabled for a stage,
+systemd holds the port, so during a restart new connections wait in the socket's backlog instead of being refused (no
+Caddy 502 page; requests wait for the new keeper, 1-1.6 s locally) and viewers reconnect as in a handover. Switching
+it on is itself one last restart (commands in the unit file's header). Measured through a Caddy stand-in under a
+POST/GET storm: restart without the socket 181 refused requests (502) per restart, with it 1 (a request in flight on
+the stopping launcher).
+
 `activate.sh` restarts the unit (all worlds blink, as before) on the first install of the keeper, when the release
 carries a changed `keeper.mjs`, or when given `release.sh --restart`. A change to the unit file or to
 `/etc/sim-worlds/<stage>.conf` (port, data, caps) also needs `--restart`, because the keeper keeps the arguments it
