@@ -139,7 +139,10 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     return standAt.get(s.id)!;
   };
   // only spots within reach are probed for clear ground (a far spot's probe paged in its nav tile for nothing)
-  const live = data.spots.filter(s => d2(s.at, w.me) <= SPOT_REACH && w.enterable(s.place) && !!clearAt(s));
+  // E-life (big derived worlds, `nearest`): a spot is probed for clear ground only when it is about to be offered (the
+  // nearest few per activity), not every spot within reach (1.5 s of a 4 s first sweep on Eden 2026); old worlds unchanged
+  const reach0 = data.spots.filter(s => d2(s.at, w.me) <= SPOT_REACH && w.enterable(s.place)), ok = (s: Spot) => !!clearAt(s);
+  const live = data.nearest ? reach0 : reach0.filter(ok);
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
     const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level);
@@ -178,7 +181,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   if (seat) add({id: 'sit:here', verb: 'sit', label: `Sit down on the nearest free seat (${seat.cap.label}, ${Math.round(seat.distance)} m)`, available: true, target: seat.cap.target, params: secondsParam(60)}, {label: 'Sit down', steps: seat.plan.steps, seconds: true});
   else add({id: 'sit:here', verb: 'sit', label: 'Sit down (no free seat within 30 m: on the ground here)', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
   for (const [act, sec] of [['lie', 120], ['nap', 300]] as const) {
-    const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
+    const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12 && (!data.nearest || ok(s))).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
     const spot = groundHere >= 0.95 ? null : w.open(w.me, 0.95, 30), canHere = groundHere >= 0.95 || !!spot;
     const plan: Plan = beds[0] ? {label: SPOT_ACTIVITIES[act].label, steps: spotSteps(beds[0], sec), seconds: true} : {label: SPOT_ACTIVITIES[act].label, steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose(act, sec)], seconds: true};
     add({id: `${act}:here`, verb: act, label: act === 'lie' ? (beds[0] ? `Lie down (${beds[0].label ?? beds[0].id})` : 'Lie down on the grass here') : (beds[0] ? `Take a nap (${beds[0].label ?? beds[0].id})` : 'Take a nap on the grass here'), available: !!beds[0] || canHere,
@@ -203,13 +206,17 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   }
   // ---- reading: a reading spot (with a shelf) nearby, else a free seat, else standing with the book you carry
   const readers = live.filter(s => s.activity === 'read' && !w.taken(s.at, s.id)).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id));
-  const near = readers.find(s => d2(s.at, w.me) <= 40);
+  const near = readers.find(s => d2(s.at, w.me) <= 40 && (!data.nearest || ok(s)));
   if (near) add({id: 'read:here', verb: 'read', label: `Read a book (${near.label ?? near.id}, ${Math.round(d2(near.at, w.me))} m; takes a book from the shelf and puts it back)`, available: true, target: {id: near.id, kind: 'spot'}, params: secondsParam(180)}, {label: 'Read a book', steps: readAt(near), seconds: true});
   else if (seat) add({id: 'read:here', verb: 'read', label: `Read a book on the nearest free seat (${seat.cap.label})`, available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...seat.plan.steps.filter(s => s.verb !== 'rest'), pose('read', 180, {prop: 'book'})], seconds: true});
   else add({id: 'read:here', verb: 'read', label: 'Read the book you carry, standing here', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...standFirst(w), pose('read', 180, {prop: 'book'})], seconds: true});
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
   const byPlace = new Map<string, Spot[]>();
-  for (const s of readers) for (const p of s.place ? [s.place, ...w.ancestors(s.place)] : []) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
+  for (const s of readers) {
+    const ps = s.place ? [s.place, ...w.ancestors(s.place)] : [];
+    if (data.nearest && (ps.every(p => byPlace.has(p)) || byPlace.size >= data.nearest * 4 || !ok(s))) continue;   // readers are nearest first
+    for (const p of ps) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
+  }
   const placesToRead = [...byPlace].sort((a, b) => a[0].localeCompare(b[0]));
   if (data.nearest) placesToRead.sort((a, b) => d2(a[1][0].at, w.me) - d2(b[1][0].at, w.me) || a[0].localeCompare(b[0])).splice(data.nearest * 2);
   for (const [place, list] of placesToRead) {
@@ -225,7 +232,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
-      if (data.nearest) {const n = offered.get(activity) ?? 0; if (n >= data.nearest) continue; offered.set(activity, n + 1);}
+      if (data.nearest) {const n = offered.get(activity) ?? 0; if (n >= data.nearest || !ok(s)) continue; offered.set(activity, n + 1);}
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';
@@ -233,7 +240,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     }
   }
   // ---- CN5 choreographed games: each court's free places (its spots, then extra places beside them up to 6 players)
-  for (const court of gameCourts(live, w)) {
+  for (const court of gameCourts(data.nearest ? live.filter(s => !(s.activity in GAME_ACTIVITIES) || ok(s)) : live, w)) {
     const playing = w.groupSize(court.group), full = playing >= GAME_MAX_PLAYERS;
     // a new player goes to the end/side with fewer players (a frisbee pair at the two ends, volleyball across the net)
     const used = (side: number) => court.slots.filter(x => x.side === side && w.taken(x.at, x.id)).length, sides = [...new Set(court.slots.map(x => x.side))], least = Math.min(...sides.map(used));
