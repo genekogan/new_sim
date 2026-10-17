@@ -22,13 +22,17 @@ function fixture(){const root=new THREE.Group(),geometry=new THREE.PlaneGeometry
 function caches(v:WorldRenderedVisibility){return (v as unknown as {instances:{cache:Map<THREE.Object3D,unknown>;meshCells:Map<THREE.Object3D,unknown>}}).instances;}
 
 test('a repeated static speech query avoids rebuilding triangle buckets, without changing its answer',()=>{
- const {root,geometry,material}=fixture(),v=new WorldRenderedVisibility(),position=geometry.attributes.position;
- const getX=position.getX;let reads=0;position.getX=function(i:number){reads++;return getX.call(this,i);};
- v.prepareFresh([root]);reads=0;const first=v.score(pose,['anchor'],subject),builtReads=reads;
- v.prepareFresh([root]);reads=0;const second=v.score(pose,['anchor'],subject),reusedReads=reads;
- assert.equal(first,stock([root]));assert.equal(second,first);assert.ok(builtReads>1000);assert.ok(reusedReads<builtReads/2,`static vertex reads ${builtReads} -> ${reusedReads}`);
- console.log(JSON.stringify({staticTriangleVertexReads:{first:builtReads,retained:reusedReads},scope:'geometry query work only; not frame-time/FPS'}));
- position.getX=getX;v.reset();geometry.dispose();material.dispose();
+ // Bucket building creates one indexed cell geometry per bucket (setIndex); counted instead of vertex reads since the
+ // build reads plain position arrays directly (lane L3, phone arrival).
+ const {root,geometry,material}=fixture(),v=new WorldRenderedVisibility(),setIndex=THREE.BufferGeometry.prototype.setIndex;
+ let built=0;THREE.BufferGeometry.prototype.setIndex=function(this:THREE.BufferGeometry,i:Parameters<typeof setIndex>[0]){built++;return setIndex.call(this,i);};
+ try{
+  v.prepareFresh([root]);built=0;const first=v.score(pose,['anchor'],subject),builtCells=built;
+  v.prepareFresh([root]);built=0;const second=v.score(pose,['anchor'],subject),rebuiltCells=built;
+  assert.equal(first,stock([root]));assert.equal(second,first);assert.ok(builtCells>1,`cells built ${builtCells}`);assert.equal(rebuiltCells,0,`cells rebuilt ${rebuiltCells}`);
+  console.log(JSON.stringify({staticTriangleCellsBuilt:{first:builtCells,retained:rebuiltCells},scope:'geometry query work only; not frame-time/FPS'}));
+ }finally{THREE.BufferGeometry.prototype.setIndex=setIndex;}
+ v.reset();geometry.dispose();material.dispose();
 });
 
 test('fresh speech decisions reuse static triangle cells, while opacity/visibility authority is current',()=>{
