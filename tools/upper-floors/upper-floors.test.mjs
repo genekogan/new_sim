@@ -35,6 +35,10 @@ test('review, backup, apply/rollback dry runs and verify on a throwaway launcher
   assert.equal(r.state, 'not-applied'); assert.equal(r.wouldWrite.spots.added, officeSpots().length); assert.deepEqual(r.wouldWrite.fact.rooms, ROOMS);
   const b = backup(L, join(root, 'bk'));
   assert.equal(b.activitySpots, spots); assert.equal(b.maxSeq, null); assert.throws(() => backup(L, join(root, 'bk')), /exists/);
+  writeFileSync(join(root, 'keeper.json'), JSON.stringify({ active: { dir: join(root, 'old-release'), build: 'old' } }));
+  assert.equal(review(L).release.upperFloors, false);
+  assert.throws(() => apply(L, { backupDir: join(root, 'bk'), confirm: false, port: 1 }), /refresh the legacy release/);
+  rmSync(join(root, 'keeper.json'));
   const dry = apply(L, { backupDir: join(root, 'bk'), confirm: false, port: 1 });
   assert.equal(dry.dryRun, true); assert.deepEqual(dry.write, [L.fact, L.spots, L.descriptor]);
   assert.equal(JSON.parse(readFileSync(L.descriptor, 'utf8')).upperFloors, undefined, 'a dry run writes nothing');

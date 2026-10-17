@@ -49,10 +49,16 @@ export function mergeSpots(base, places, extra = officeSpots()) {
 /** The descriptor with the office installed (or removed again), every other field byte-identical in value. */
 export function editDescriptor(d, { upperFloors, activitySpots }) { return { ...d, activitySpots, upperFloors }; }
 
+/** The release the launcher is serving now (keeper.json) and whether it carries upper-floors/1. */
+export function runningRelease(L) {
+  const k = join(L.data, 'keeper.json'); if (!existsSync(k)) return { dir: null, upperFloors: null };
+  const dir = readJson(k).active?.dir, entry = dir && join(dir, 'tools/core/edge-server.mjs');
+  return { dir, build: readJson(k).active?.build ?? null, upperFloors: !!entry && existsSync(entry) && readFileSync(entry, 'utf8').includes('upperFloors') && existsSync(join(dir, 'packages/engine-mars/src/upper-floors.ts')) };
+}
 /** Pure reads: what is installed now and what apply would write. */
 export function review(L) {
   const d = readJson(L.descriptor), out = { descriptor: L.descriptor, descriptorSHA256: sha(readFileSync(L.descriptor)), worldId: d.worldId,
-    upperFloors: d.upperFloors ?? null, activitySpots: d.activitySpots, files: {} };
+    upperFloors: d.upperFloors ?? null, activitySpots: d.activitySpots, release: runningRelease(L), files: {} };
   for (const k of ['fact', 'remove', 'spots']) out.files[k] = existsSync(L[k]) ? sha(readFileSync(L[k])) : null;
   out.last = lastFact(L.db);
   out.state = !d.upperFloors ? (out.last?.install ? 'installed-without-descriptor?' : 'not-applied') : d.upperFloors === L.fact ? (out.last?.install ? 'applied' : 'descriptor-only (restart pending or refused)') : d.upperFloors === L.remove ? (out.last && !out.last.install ? 'rolled-back' : 'rollback pending or refused (someone upstairs?)') : 'unknown upperFloors path';
@@ -181,7 +187,8 @@ function restartFork(L, d, flags) {
 }
 
 export function apply(L, { backupDir, confirm, port, base }) {
-  const b = checkBackup(L, backupDir), d = readJson(L.descriptor);
+  const b = checkBackup(L, backupDir), d = readJson(L.descriptor), rel = runningRelease(L);
+  assert(rel.upperFloors !== false, `the running release ${rel.dir} has no upper-floors/1: refresh the legacy release from the trunk first`);
   assert(!d.upperFloors, `descriptor already names ${d.upperFloors}: review first`);
   const fact = officeFact(), spots = mergeSpots(readJson(d.activitySpots), readJson(d.placeData)), next = editDescriptor(d, { upperFloors: L.fact, activitySpots: L.spots });
   const steps = { write: [L.fact, L.spots, L.descriptor], restart: [`remove-fork ${L.slug}`, `register-fork ${L.slug}`, 'set-claimable false (when it was)'], backup: b.simDb };
