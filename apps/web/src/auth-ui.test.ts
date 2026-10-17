@@ -112,5 +112,5 @@ await test('Share Soul, the connection prompt and the onboarding name work on a 
  assert.throws(()=>publicSoulLink(origin,path,'s_Avery'));assert.throws(()=>publicSoulLink(origin,'/w/willow-hollow','s_Avery',base));
  assert.ok(connectionSetupPrompt(origin+path,'s_Avery',undefined,base)?.includes(JSON.stringify(origin+path)));
  assert.equal(connectionSetupPrompt(origin+path,'s_Avery'),null);
- assert.equal(agentOnboarding(origin+path).world,'Willow-hollow');
+ assert.equal(agentOnboarding(origin+path).world,'Willow Hollow') // V1: slug words, never the raw slug;
 });
