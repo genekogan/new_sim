@@ -22,12 +22,12 @@ AUTH=/etc/sim-worlds/production-auth.env                  # the public Clerk set
 WORLDS="eden mars littlemartians"
 if [ "${LG_SCRATCH:-}" = 1 ]; then
   ROOT=/srv/sim-old-l2; LINK=$ROOT/current; DATA=$ROOT/data; CONF=$ROOT/legacy.conf; DROPIN=; UNIT=sim-old-l2-rehearsal
-  PORT=6320; RANGE=6321-6323; MEMHIGH=${LG_MEMHIGH:-2500M}; MEMMAX=${LG_MEMMAX:-3G}
+  PORT=6320; RANGE=6321-6323; MEMHIGH=${LG_MEMHIGH:-2G}; MEMMAX=${LG_MEMMAX:-2560M}
 else
   [ -z "${LG_MEMHIGH:-}${LG_MEMMAX:-}" ] || { echo "LG_MEM* overrides are for the rehearsal only"; exit 2; }
   ROOT=; LINK=/srv/sim-worlds/legacy; DATA=/srv/sim-worlds-data/legacy; CONF=/etc/sim-worlds/legacy.conf
   DROPIN=/etc/systemd/system/sim-worlds@legacy.service.d/10-memory.conf; UNIT=sim-worlds@legacy; PORT=4670; RANGE=4660-4662
-  MEMHIGH=2500M; MEMMAX=3G
+  MEMHIGH=2G; MEMMAX=2560M   # measured peak 1.51 GB (3 worlds booted + Chrome walk, L2 rehearsal); whole-box budget in t3-d2
 fi
 ARGS="--old-worlds-root --port $PORT --range $RANGE --data $DATA --public-origin https://sim.eden.art --auth-env $AUTH --max-worlds 3 --max-running 3 --min-free-mb 1500 --create-limit 0 --mars-web $LINK/mars-web --eager 3"
 say() { echo "[legacy $(date -u +%T)] $*"; }
