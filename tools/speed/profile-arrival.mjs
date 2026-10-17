@@ -38,8 +38,8 @@ const INIT = `(() => {
   }, 25);
 })();`;
 
-let profile, marks, resources, longtasks, navStart;
-if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
+let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0;
+if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
 else {
 console.log('Waiting for speed Chrome lease');
 const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinity });
@@ -49,12 +49,15 @@ try {
   await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
+  // GLB timing from the browser context (Playwright follows worker requests too; Resource Timing only sees the page's)
+  ctx.on('requestfinished', (r) => { if (!/\.glb(\?|$)/.test(r.url())) return; const t = r.timing(); glbs.push({ url: r.url().replace(/^https?:\/\/[^/]+/, ''), start: Math.round(t.startTime - navAt), end: Math.round(t.startTime + t.responseEnd - navAt), worker: (() => { try { r.frame(); return false; } catch { return true; } })() }); });
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval });
   await cdp.send('Profiler.start');
+  navAt = Date.now();
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });
   await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 });
   ({ profile } = await cdp.send('Profiler.stop'));
@@ -62,7 +65,8 @@ try {
     resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name.replace(location.origin, ''), start: Math.round(e.startTime), end: Math.round(e.responseEnd), kb: Math.round((e.encodedBodySize || 0) / 1024) })) })));
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
-writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart }));
+for (const g of glbs) if (!resources.some((r) => r.name === g.url && Math.abs(r.start - g.start) < 50)) resources.push({ name: g.url, start: g.start, end: g.end, kb: null, via: 'context' });
+writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs }));
 }
 
 // ---- analysis: self time per node, mapped through source maps where the script has one

@@ -22,10 +22,11 @@ import { mergeStatic } from './static-merge.ts';
 import { preciseBounds } from './fast-geometry.ts';
 import { addShadowProxy } from './shadow-proxy.ts';
 import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
+import { fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
-export function setAssetLoader(loader: GLTFLoader) { shared = loader; }
+export function setAssetLoader(loader: GLTFLoader) { shared = loader; warmAssetWorker(); }
 function loader(): GLTFLoader {
   return (shared ??= new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder));
 }
@@ -42,7 +43,7 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const hit = cache.get(sha);
   if (hit && (hit.settled || hit.by === l)) return hit.p;
   // lane PERF (texture-budget.ts): oversized textures are fitted before upload, and uploads are paced across frames
-  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { const st = ((globalThis as unknown as { __assetStages?: Record<string, string> }).__assetStages ??= {}); st[sha] = 'fit'; await fitTextures(g); st[sha] = 'prepare'; prepare(g); st[sha] = 'compile'; await compileModel(g); st[sha] = 'upload'; await uploadTextures(g); st[sha] = 'done'; return g; }), by: l, settled: false };
+  const entry = { p: download(l, assetUrl(sha)).then(async (g) => { const st = ((globalThis as unknown as { __assetStages?: Record<string, string> }).__assetStages ??= {}); st[sha] = 'fit'; await fitTextures(g); st[sha] = 'prepare'; prepare(g); st[sha] = 'compile'; await compileModel(g); st[sha] = 'upload'; await uploadTextures(g); st[sha] = 'done'; return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
@@ -50,6 +51,16 @@ export function loadAsset(sha: string): Promise<GLTF> {
     entry.settled = true; failed.add(sha); setTimeout(() => { if (cache.get(sha) === entry) cache.delete(sha); failed.delete(sha); }, 30_000);
   });
   return entry.p;
+}
+/** loadAsync, with the bytes downloaded in a worker when one is available (asset-fetch.ts); the loader's manager sees
+ *  the same itemStart / itemEnd (and itemError) as FileLoader gives it. */
+function download(l: GLTFLoader, url: string): Promise<GLTF> {
+  const bytes = fetchInWorker(url);
+  if (!bytes) return l.loadAsync(url);
+  l.manager.itemStart(url);
+  return bytes.then(
+    (buffer) => l.parseAsync(buffer, THREE.LoaderUtils.extractUrlBase(url)).then((g) => { l.manager.itemEnd(url); return g; }, (e: unknown) => { l.manager.itemError(url); l.manager.itemEnd(url); throw e; }),
+    (e: { unavailable?: boolean }) => { l.manager.itemEnd(url); if (e?.unavailable) return l.loadAsync(url); l.manager.itemError(url); throw e; });
 }
 export function assetFailed(sha: string) { return failed.has(sha); }
 /** W1: shot readiness includes parsing, texture upload and attached GLBs, without a fixed delay. */

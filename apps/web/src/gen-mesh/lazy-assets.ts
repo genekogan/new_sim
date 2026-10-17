@@ -120,6 +120,8 @@ if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unkno
 /** A model is in the scene (or its placeholder, when it failed): it no longer holds the arrival card. */
 export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
+/** The planned eager GLBs, nearest the arrival first (empty without a plan: then every load starts as its thing draws). */
+export const eagerShas = (): string[] => (LAZY && eager ? [...eager] : []);
 
 /** Defer one thing's GLB load: returns an invisible hook to add to the thing's group. `start` runs once when the queue
  * reaches it (near and in-view first), and its promise holds the slot through attachment. `owner` cancels on removal. */

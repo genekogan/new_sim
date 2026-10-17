@@ -15,9 +15,9 @@ import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, groundRealismFor } from './gen-mesh/ground-palette.ts';
 import { applyWorldRealism } from './WorldEdenRealism.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
-import { assetUrl } from './gen-mesh/gltf-assets.ts';
+import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
-import { planEager } from './gen-mesh/lazy-assets.ts';
+import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
 
@@ -103,6 +103,10 @@ export class WorldEntityLayer {
     const pose = at?.length === 3 && eyeQ?.length === 3 && [...at, ...eyeQ].every(Number.isFinite) ? { target: at, eye: eyeQ } : entityArrivalPose(this.viewBounds(), this.entityCount, this.groundAt, 45, innerWidth / Math.max(1, innerHeight), 1);
     const eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
+    // Phone arrival (lane d3): start the eager GLBs now, nearest first, so they download while the terrain and every
+    // thing's holder are built (~2 s of main thread on a 4x phone) instead of after; each thing's own loadAsset(sha)
+    // then joins the same cached promise. The arrival card still waits for them to be drawn.
+    for (const sha of eagerShas()) void loadAsset(sha).catch(() => {});
     this.seq = snap.seq;
     this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
     this.active = true;
