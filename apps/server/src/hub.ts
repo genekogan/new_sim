@@ -174,6 +174,7 @@ export class Hub {
       const ring = this.host.ring;
       // the join set is bounded (one per hello, hellos at most every 3 s) and is never dropped for backpressure
       c.joinSend=true;c.awaitingTakes=true;
+      try{
       const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
@@ -188,7 +189,8 @@ export class Hub {
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
       this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: (e.takeChunks?.(e.world.tick - 40) ?? []).map(viewerChunk)});
       for (const extra of this.joinMessages) { try { for (const x of extra()) this.send(c, x as ServerMsg); } catch { /* optional standing state */ } }
-      this.sendStation(c);c.joinSend=false;
+      this.sendStation(c);
+      }finally{c.joinSend=false;}
       c.ready = c.ws.readyState===1&&c.helloGeneration===generation;
     }
   }

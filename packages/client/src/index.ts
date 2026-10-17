@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
+import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
@@ -200,6 +200,8 @@ export class Connection {
     this.stats.state = 'connecting'; this.handlers.onChange?.();
     const ws = (this.ws = this.make(this.url));
     let active=true;
+    // the last entity table this socket received (take-entities-ref/1): a new socket starts empty, as does the server's view of it
+    const takeEntities:TakeEntitiesStateV1={last:null};
     const mine = () => active && this.ws === ws && !this.closed;      // a socket that has been replaced or closed must not touch the replica
     ws.onopen = async () => {
       if (!mine()) return;
@@ -208,7 +210,7 @@ export class Connection {
       if (!mine() || ws.readyState !== 1) return;
       // resume only from the same server process: batch numbers start again after a restart
       const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}),
-        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}),...(this.takeBoundaryTransport?{takeTransport:TAKE_BOUNDARY_WIRE_V1}:{}) };
+        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}),...(this.takeBoundaryTransport?{takeTransport:TAKE_BOUNDARY_WIRE_V1,takeEntities:TAKE_ENTITIES_WIRE_V1}:{}) };
       ws.send(JSON.stringify(hello));
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
@@ -228,6 +230,9 @@ export class Connection {
         if((m as {t:string}).t==='take-boundary-wire'){
           if(!this.takeBoundaryTransport||this.welcome?.takeTransport!==TAKE_BOUNDARY_WIRE_V1)throw new Error('unnegotiated take transport');
           m=hydrateTakeBoundaryWireV1(m) as ServerMsg;
+        }else if((m as {t:string}).t==='take-entities'){
+          if(!this.takeBoundaryTransport||this.welcome?.takeEntities!==TAKE_ENTITIES_WIRE_V1)throw new Error('unnegotiated take transport');
+          m=hydrateTakeEntitiesV1(m,takeEntities,p=>{if(!p||typeof p!=='object'||(p as {t?:unknown}).t!=='take-boundary-wire')return p;if(this.welcome?.takeTransport!==TAKE_BOUNDARY_WIRE_V1)throw new Error('unnegotiated take transport');return hydrateTakeBoundaryWireV1(p);}) as ServerMsg;
         }
       }catch{this.handlers.onError?.('takes.transport-invalid','The take transport cannot be restored exactly.');try{ws.close();}catch{/* closing */}return;}
       this.onMessage(m,receivedAtMs);
