@@ -30,21 +30,20 @@ export function carrierFraming(c: CarrierPose): [number, number, number][] {
   for (const [f, r] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) out.push(at(f * radius, r * radius, belly));
   return out;
 }
-/** Highest a rider's camera may stand above the basket floor: below the envelope's mouth line, so the envelope never sits
- * between the eye and the basket (V1 3.2 walk: at dpr 2 the orbit pulled out along a steep ray, ~19 m above the basket,
- * and the envelope hid the rider). Holds for any carrier: Eden 2026's native ride and god balloons alike. */
-export const RIDER_EYE_MAX = 4;
-/** Keep a rider's shot under the envelope: an eye above floor + RIDER_EYE_MAX comes down to it, keeping its distance to
- * the target and its bearing (or, straight overhead, the carrier's side); the target is not above the eye. */
-export function riderView(pose: CameraPose, c: CarrierPose): CameraPose {
-  const top = c.p[1] + RIDER_EYE_MAX, [ex, ey, ez] = pose.position, target: [number, number, number] = [pose.target[0], Math.min(pose.target[1], top), pose.target[2]];
-  if (ey <= top) return target[1] === pose.target[1] ? pose : { ...pose, target };
-  const d = Math.hypot(ex - target[0], ey - target[1], ez - target[2]), rise = top - target[1];
-  let hx = ex - target[0], hz = ez - target[2], h = Math.hypot(hx, hz);
-  if (h < 1e-3) { hx = -Math.sin(c.yaw); hz = Math.cos(c.yaw); h = 1; }
-  const out = Math.max(Math.sqrt(Math.max(0, d * d - rise * rise)), BALLOON.envelope.radius * 3);
-  return { ...pose, position: [target[0] + hx / h * out, top, target[2] + hz / h * out], target };
+/** V1 (3.2 walk): a rider's shot. The director framed basket + envelope from its elevated "context" ray, ~19 m above the
+ * basket at dpr 2, so the envelope hid the rider; and once the envelope blocked its own pose it stopped tracking and the
+ * balloon drifted out of a frozen frame. A ridden carrier gets its own side-on shot instead: the eye a little above the
+ * basket floor (under the envelope mouth), RIDER_DISTANCE out, looking at the basket and lower envelope. It holds for
+ * any carrier (Eden 2026's native ride and god balloons alike) because it uses only the carrier's pose. */
+export const RIDER_EYE_MAX = 4, RIDER_EYE = 3, RIDER_DISTANCE = 20, RIDER_AIM = 4;
+export function riderPose(c: CarrierPose, azimuth: number): CameraPose {
+  const [x, y, z] = c.p;
+  return { position: [x + Math.cos(azimuth) * RIDER_DISTANCE, y + RIDER_EYE, z + Math.sin(azimuth) * RIDER_DISTANCE], target: [x, y + RIDER_AIM, z], fov: 45 };
 }
+/** The side of the basket: perpendicular to the carrier's heading, then the other side, then the diagonals and ends. */
+export const riderAzimuths = (yaw: number) => [.5, -.5, .25, -.25, .75, -.75, 0, 1].map(k => yaw + k * Math.PI);
+/** The ride shot drifts slowly round the basket (radians per second) so a long ride is not a still. */
+const RIDER_DRIFT = .03;
 /** Rendered rays a frame may spend on a pending shot decision (beyond the
  * held shot's own tracking); one search step may finish past it. */
 const DECISION_RAYS = 100;
@@ -92,6 +91,7 @@ export class WorldBroadcast {
   private choice: DirectorChoice | null = null;
   private lastPick = -Infinity;
   private emptySince: number | null = null;
+  private ride: { azimuth: number; checked: number } | null = null;
   /** Set by the viewer: Soul → entity (for who is speaking) and whether Eden's town views apply. */
   hints?: () => { soulEntity(soulId: string): string | null; eden: boolean; daylight?: number | null;
     /** R4-LIVE: a god world's own establishing views (its named buildings, plazas, landmarks); Eden's when `eden`. */
@@ -114,7 +114,7 @@ export class WorldBroadcast {
     this.lastTick = this.lastDecisionWall = -Infinity;
     this.signature = '';
     this.semanticVersion = 0;
-    this.picker.reset(); this.tour.reset(); this.godViews?.tour.reset(); this.choice = null; this.lastPick = -Infinity; this.emptySince = null;
+    this.picker.reset(); this.tour.reset(); this.godViews?.tour.reset(); this.choice = null; this.lastPick = -Infinity; this.emptySince = null; this.ride = null;
   }
 
   sample(frame: Record<string, SampledEntity>, records: Record<string, Entity>, scene: SpatialScene | null,
@@ -145,13 +145,16 @@ export class WorldBroadcast {
       return this.tourShot(wallSeconds, hints?.daylight ?? null, prefer, renderRoots, v.tour);
     }
     const { focus, phase } = choice, members = choice.members.filter(id => frame[id]);
+    const ridden = frame[focus] && records[focus]?.body?.family !== 'floater' ? ridingCarrier(frame[focus].p, this.hints?.().carriers ?? []) : null;
+    if (ridden) { this.lastTick = tick; this.signature = ''; return { pose: this.riderShot(ridden, frame[focus].p, wallSeconds, movementDt, renderRoots), shot: `${choice.label}:ride-side` }; }
+    this.ride = null;
     // Conversations prefer the two-shot; everything else uses the readable "clear" program.
     this.director.policy = choice.twoShot ? 'restrained' : 'clear';
     const signature = JSON.stringify([phase, focus, members, aspect]);
     const changed = signature !== this.signature;
     if (changed) { this.semanticVersion++; this.signature = signature; }
     const subjects: Observation['subjects'] = {};
-    const carriers = this.hints?.().carriers ?? [], riding: Record<string, CarrierPose> = {};
+    const carriers = this.hints?.().carriers ?? [];
     let carrier: CarrierPose | null;
     for (const id of people) {
       const e = frame[id], body = records[id].body;
@@ -160,7 +163,6 @@ export class WorldBroadcast {
         subjects[id] = { p: [...e.p], yaw: e.yaw, height: b.hoverHeight + b.radius * 2,
           points: [[e.p[0], y, e.p[2]], [e.p[0], y + b.radius, e.p[2]]] };
       } else if (carrier = ridingCarrier(e.p, carriers)) {
-        riding[id] = carrier;
         // V1 (3.2 walk): a rider framed like a pedestrian put the camera ~4 m off and the basket filled the frame.
         // Frame the carrier (basket and envelope) instead; the rider's head and torso stay the visibility probes.
         subjects[id] = { p: [...e.p], yaw: e.yaw, height: 1.75, kind: 'human',
@@ -198,7 +200,23 @@ export class WorldBroadcast {
       if (!small) this.emptySince = null;
       else if ((this.emptySince ??= wallSeconds) <= wallSeconds - EMPTY_SECONDS) { this.picker.reject(choice.key, wallSeconds); this.lastPick = -Infinity; this.emptySince = null; }
     }
-    return result ? { ...result, ...(result.pose && riding[focus] ? { pose: riderView(result.pose, riding[focus]) } : {}), shot: `${choice.label}:${result.shot ?? ''}` } : result;
+    return result ? { ...result, shot: `${choice.label}:${result.shot ?? ''}` } : result;
+  }
+  /** The ride shot (see riderPose): a clear side is picked on entry and re-checked once a second against the drawn
+   * scenery (hills, trees, buildings near a low basket); a blocked side cuts to the next clear one. */
+  private riderShot(c: CarrierPose, rider: readonly number[], wallSeconds: number, step: number, renderRoots: readonly THREE.Object3D[]): CameraPose {
+    const head = [rider[0], rider[1] + 1.6, rider[2]];
+    let prepared = false;
+    const clear = (azimuth: number) => { if (!prepared) { this.rendered.prepare(renderRoots); prepared = true; }
+      const eye = riderPose(c, azimuth).position, length = Math.hypot(eye[0] - head[0], eye[1] - head[1], eye[2] - head[2]);
+      return this.rendered.evaluate(() => this.rendered.clear(eye, .8) && this.rendered.reach(eye, head) >= length - .6); };
+    if (!this.ride) this.ride = { azimuth: riderAzimuths(c.yaw).find(clear) ?? riderAzimuths(c.yaw)[0], checked: wallSeconds };
+    else {
+      this.ride.azimuth += RIDER_DRIFT * Math.max(0, Math.min(.1, step));
+      if (wallSeconds - this.ride.checked >= 1) { this.ride.checked = wallSeconds;
+        if (!clear(this.ride.azimuth)) this.ride.azimuth = riderAzimuths(this.ride.azimuth - Math.PI / 2).find(clear) ?? this.ride.azimuth; }
+    }
+    return riderPose(c, this.ride.azimuth);
   }
   /** A tour pose; a new move is checked once against the drawn scenery (clear path, target in sight). */
   private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[], tour: WorldTour = this.tour) {
