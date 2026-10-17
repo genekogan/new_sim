@@ -170,11 +170,13 @@ test('versioned stand cannot transfer a foreign or stale seat; explicit take_slo
   assert.equal(w.host.engine.programOf(other.entityId),otherProgram,'owned seat release preserves the independent actor timer');
 });
 
-// Known gap carried from the Godmode candidate: the upstairs route to the seat is unreachable here (stairs reach is owned by godmode/stairs-reach-20261015).
-test('elevated-floor exit uses its admitted height and a composed humanoid profile', {skip: 'upstairs seat route unreachable pre-seating; owned by godmode/stairs-reach'}, async t => {
+// A tall composed body (height 1.85: not HUMAN_PROFILE, radius 0.288). The skip this test carried ("upstairs route
+// unreachable", blamed on stairs reach) was its own build 1.08: radius 0.311 plans at 0.371 m, and building/1's 0.9 m
+// interior doors give only 0.35 m of raster clearance (the stairs themselves were fine; see L3 status, FOR GENE).
+test('elevated-floor exit uses its admitted height and a composed humanoid profile', async t => {
   const w=await setup(t),[soul]=w.souls;
   assert.ok(w.host.engine instanceof MarsEngine);
-  const look={...appearanceFromSeed(7),height:1.85,build:1.08};
+  const look={...appearanceFromSeed(7),height:1.85,build:1};
   assert.equal(w.host.engine.assignBodyV1(soul.entityId,{family:'humanoid',model:lookKey(look),params:compactLook(look)}),true);
   const r=w.god.act({ops:[
     {op:'define',def:{schema:'def/1',name:'stand-house',version:1,tags:['building'],size:{box:[8,6,6]},make:{kind:'gen',gen:'building/1'},params:{floors:{type:'int',min:1,max:6,default:2}},state:{doors:{type:'json',default:{}}},components:{foundation:{kind:'none'}}}},

@@ -138,8 +138,8 @@
       "step": "V5-server-full",
       "id": "elevated-floor exit uses its admitted height and a composed humanoid profile",
       "status": "skip",
-      "reason": "Upstairs seat route unreachable before seating; owned by godmode/stairs-reach (skip reason in the test).",
-      "owner": "Godmode stairs-reach owner"
+      "reason": "Baseline-only skip: fixed in lane L3 (the test's own build 1.08 body, radius 0.311, plans at 0.371 m and building/1's 0.9 m interior doors give 0.35 m of raster clearance; it now uses build 1, radius 0.288, and runs). Remove this entry once the gate baseline contains the fix.",
+      "owner": "Suite owner (lane L3)"
     },
     {
       "step": "V5-server-full",
