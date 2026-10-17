@@ -131,7 +131,7 @@ const streets = [
 const planting = [
   lawn('campus-quad-lawn', [-29,-109,5,-85], '#7fa858'),
   lawn('park-lawns-west', [-42,95,-21,133], '#84a76c'),
-  lawn('commons-south-lawn', [-25,32,24,79], '#8ca96d'),
+  // (old south lawn is the south-country woodland park with its loop paths: trees.mjs)
   lawn('botanic-zen-gravel', [-55,-165.5,-45,-158.5], '#d9d3c2', 'gravel'),
   area('garden-bed', 'commons-vegetable-garden', rect(31,44,45,73), { crop: 'vegetables', rows: 1.2, border: true }),
   area('garden-bed', 'commons-herb-garden', rect(49,43,61,56), { crop: 'herbs', rows: 0.8, border: true }),

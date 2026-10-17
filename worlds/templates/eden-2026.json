@@ -13,7 +13,7 @@
       "sun": 0.8
     },
     "ground": {
-      "palette": "grass"
+      "palette": "meadow"
     },
     "time": {
       "dayTicks": 72000,
@@ -38,7 +38,7 @@
               "sun": 0.8
             },
             "ground": {
-              "palette": "grass"
+              "palette": "meadow"
             },
             "time": {
               "dayTicks": 72000,
@@ -52549,36 +52549,6 @@
         {
           "op": "place",
           "def": "core/lawn@1",
-          "name": "land-commons-south-lawn",
-          "shape": {
-            "area": [
-              [
-                -25,
-                32
-              ],
-              [
-                24,
-                32
-              ],
-              [
-                24,
-                79
-              ],
-              [
-                -25,
-                79
-              ]
-            ]
-          },
-          "params": {
-            "material": "grass",
-            "color": "#8ca96d",
-            "edge": 1.2
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/lawn@1",
           "name": "land-botanic-zen-gravel",
           "shape": {
             "area": [
@@ -53015,13 +52985,7 @@
             "minSpacing": 4.5,
             "cluster": 0.35
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-2",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -53071,7 +53035,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "planting-2",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -53607,13 +53577,7 @@
             "color": "#4f7a3c",
             "flowers": false
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/hedge@1",
@@ -53636,7 +53600,13 @@
             "color": "#668943",
             "flowers": false
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "planting-3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/hedge@1",
@@ -55606,35 +55576,6 @@
             "stripes": true,
             "edge": 2
           }
-        },
-        {
-          "op": "place",
-          "def": "core/lawn@1",
-          "name": "south-mown-lawn",
-          "shape": {
-            "area": [
-              [
-                -29.5,
-                30
-              ],
-              [
-                28,
-                30
-              ],
-              [
-                28,
-                88
-              ],
-              [
-                -29.5,
-                88
-              ]
-            ]
-          },
-          "params": {
-            "stripes": true,
-            "edge": 2
-          }
         }
       ]
     },
@@ -56035,6 +55976,8424 @@
           "in": {
             "parent": "int-cafe",
             "slot": "cafe"
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-north-forest-loop",
+          "shape": {
+            "path": [
+              [
+                9,
+                -24
+              ],
+              [
+                24,
+                -28
+              ],
+              [
+                29,
+                -34
+              ],
+              [
+                22,
+                -43
+              ],
+              [
+                6,
+                -51
+              ],
+              [
+                -10,
+                -43
+              ],
+              [
+                -20,
+                -32
+              ],
+              [
+                -26,
+                -27
+              ]
+            ]
+          },
+          "params": {
+            "width": 3,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-north-lookout",
+          "shape": {
+            "path": [
+              [
+                6,
+                -51
+              ],
+              [
+                3,
+                -57
+              ]
+            ]
+          },
+          "params": {
+            "width": 2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-forest-reading",
+          "shape": {
+            "path": [
+              [
+                25,
+                -40
+              ],
+              [
+                16,
+                -36
+              ]
+            ]
+          },
+          "params": {
+            "width": 2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-birch-stop",
+          "shape": {
+            "path": [
+              [
+                -5,
+                -45.5
+              ],
+              [
+                -8,
+                -53
+              ]
+            ]
+          },
+          "params": {
+            "width": 2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-western-nature-loop",
+          "shape": {
+            "path": [
+              [
+                -38,
+                24
+              ],
+              [
+                -57,
+                27
+              ],
+              [
+                -68,
+                28
+              ],
+              [
+                -90,
+                24
+              ],
+              [
+                -92,
+                42
+              ],
+              [
+                -80,
+                57
+              ],
+              [
+                -56,
+                57
+              ],
+              [
+                -38,
+                44
+              ],
+              [
+                -38,
+                24
+              ]
+            ]
+          },
+          "params": {
+            "width": 3,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-western-link",
+          "shape": {
+            "path": [
+              [
+                -28,
+                18
+              ],
+              [
+                -38,
+                24
+              ]
+            ]
+          },
+          "params": {
+            "width": 3,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-commons-south-country",
+          "shape": {
+            "path": [
+              [
+                9,
+                30
+              ],
+              [
+                9,
+                34
+              ],
+              [
+                0,
+                34
+              ],
+              [
+                0,
+                53
+              ]
+            ]
+          },
+          "params": {
+            "width": 3,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-south-country-loop",
+          "shape": {
+            "path": [
+              [
+                0,
+                53
+              ],
+              [
+                -6,
+                53
+              ],
+              [
+                -20,
+                55
+              ],
+              [
+                -20,
+                68
+              ],
+              [
+                -13,
+                77
+              ],
+              [
+                0,
+                79
+              ],
+              [
+                21,
+                74
+              ],
+              [
+                22,
+                56
+              ],
+              [
+                6,
+                53
+              ],
+              [
+                0,
+                53
+              ]
+            ]
+          },
+          "params": {
+            "width": 2.5,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-south-country-west",
+          "shape": {
+            "path": [
+              [
+                -20,
+                60
+              ],
+              [
+                -25,
+                64
+              ],
+              [
+                -27,
+                66
+              ]
+            ]
+          },
+          "params": {
+            "width": 2.5,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-southern-forest-loop",
+          "shape": {
+            "path": [
+              [
+                -80,
+                57
+              ],
+              [
+                -68,
+                68
+              ],
+              [
+                -51,
+                73
+              ],
+              [
+                -30,
+                68
+              ],
+              [
+                -38,
+                44
+              ]
+            ]
+          },
+          "params": {
+            "width": 2.5,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-southern-clearing",
+          "shape": {
+            "path": [
+              [
+                -51,
+                73
+              ],
+              [
+                -49,
+                66
+              ]
+            ]
+          },
+          "params": {
+            "width": 2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "trees-path-meadow-stop",
+          "shape": {
+            "path": [
+              [
+                -44,
+                48.3
+              ],
+              [
+                -51,
+                45
+              ]
+            ]
+          },
+          "params": {
+            "width": 2,
+            "material": "gravel",
+            "maxGrade": 0,
+            "autoBridge": false,
+            "edging": false
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-north-canopy",
+          "shape": {
+            "area": [
+              [
+                -13,
+                -58
+              ],
+              [
+                23,
+                -58
+              ],
+              [
+                23,
+                -34
+              ],
+              [
+                -13,
+                -34
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0208,
+            "minSpacing": 3.5999999999999996,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 0.15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-west-pond-canopy",
+          "shape": {
+            "area": [
+              [
+                -58,
+                34
+              ],
+              [
+                -36,
+                34
+              ],
+              [
+                -36,
+                66
+              ],
+              [
+                -58,
+                66
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0208,
+            "minSpacing": 3.5999999999999996,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 0.15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-south-west-canopy",
+          "shape": {
+            "area": [
+              [
+                -68,
+                65
+              ],
+              [
+                -26,
+                65
+              ],
+              [
+                -26,
+                79
+              ],
+              [
+                -68,
+                79
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0153,
+            "minSpacing": 4.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 0.15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-south-park-canopy",
+          "shape": {
+            "area": [
+              [
+                -23,
+                35
+              ],
+              [
+                23,
+                35
+              ],
+              [
+                23,
+                77
+              ],
+              [
+                -23,
+                77
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.03,
+            "minSpacing": 3,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 0.15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-north-west-conifers",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -58
+              ],
+              [
+                -36,
+                -58
+              ],
+              [
+                -36,
+                -35
+              ],
+              [
+                -60,
+                -35
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0208,
+            "minSpacing": 3.5999999999999996,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-far-west-conifers",
+          "shape": {
+            "area": [
+              [
+                -95,
+                -56
+              ],
+              [
+                -69,
+                -56
+              ],
+              [
+                -69,
+                -40
+              ],
+              [
+                -95,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0153,
+            "minSpacing": 4.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-north-conifers",
+          "shape": {
+            "area": [
+              [
+                -27,
+                -62
+              ],
+              [
+                -19,
+                -62
+              ],
+              [
+                -19,
+                -42
+              ],
+              [
+                -27,
+                -42
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0208,
+            "minSpacing": 3.5999999999999996,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-north-east-canopy",
+          "shape": {
+            "area": [
+              [
+                37,
+                -59
+              ],
+              [
+                94,
+                -59
+              ],
+              [
+                94,
+                -34
+              ],
+              [
+                37,
+                -34
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0093,
+            "minSpacing": 5.3999999999999995,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 0.15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n2ton1-n16",
+          "shape": {
+            "area": [
+              [
+                -40,
+                -320
+              ],
+              [
+                0,
+                -320
+              ],
+              [
+                0,
+                -300
+              ],
+              [
+                -40,
+                -300
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1-n16",
+          "shape": {
+            "area": [
+              [
+                20,
+                -320
+              ],
+              [
+                40,
+                -320
+              ],
+              [
+                40,
+                -300
+              ],
+              [
+                20,
+                -300
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n16-n15",
+          "shape": {
+            "area": [
+              [
+                -320,
+                -300
+              ],
+              [
+                -300,
+                -300
+              ],
+              [
+                -300,
+                -280
+              ],
+              [
+                -320,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n14ton9-n15",
+          "shape": {
+            "area": [
+              [
+                -280,
+                -300
+              ],
+              [
+                -160,
+                -300
+              ],
+              [
+                -160,
+                -280
+              ],
+              [
+                -280,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 18,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8-n15",
+          "shape": {
+            "area": [
+              [
+                -160,
+                -300
+              ],
+              [
+                -140,
+                -300
+              ],
+              [
+                -140,
+                -280
+              ],
+              [
+                -160,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n5-n15",
+          "shape": {
+            "area": [
+              [
+                -100,
+                -300
+              ],
+              [
+                -80,
+                -300
+              ],
+              [
+                -80,
+                -280
+              ],
+              [
+                -100,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3ton1-n15",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -300
+              ],
+              [
+                0,
+                -300
+              ],
+              [
+                0,
+                -280
+              ],
+              [
+                -60,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1to4-n15",
+          "shape": {
+            "area": [
+              [
+                20,
+                -300
+              ],
+              [
+                100,
+                -300
+              ],
+              [
+                100,
+                -280
+              ],
+              [
+                20,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 4,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7to12-n15",
+          "shape": {
+            "area": [
+              [
+                140,
+                -300
+              ],
+              [
+                260,
+                -300
+              ],
+              [
+                260,
+                -280
+              ],
+              [
+                140,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0067,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 14,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13to15-n15",
+          "shape": {
+            "area": [
+              [
+                260,
+                -300
+              ],
+              [
+                320,
+                -300
+              ],
+              [
+                320,
+                -280
+              ],
+              [
+                260,
+                -280
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0048,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n16ton15-n14",
+          "shape": {
+            "area": [
+              [
+                -320,
+                -280
+              ],
+              [
+                -280,
+                -280
+              ],
+              [
+                -280,
+                -260
+              ],
+              [
+                -320,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n14ton13-n14",
+          "shape": {
+            "area": [
+              [
+                -280,
+                -280
+              ],
+              [
+                -240,
+                -280
+              ],
+              [
+                -240,
+                -260
+              ],
+              [
+                -280,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0115,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 8,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n12ton11-n14",
+          "shape": {
+            "area": [
+              [
+                -240,
+                -280
+              ],
+              [
+                -200,
+                -280
+              ],
+              [
+                -200,
+                -260
+              ],
+              [
+                -240,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10-n14",
+          "shape": {
+            "area": [
+              [
+                -200,
+                -280
+              ],
+              [
+                -180,
+                -280
+              ],
+              [
+                -180,
+                -260
+              ],
+              [
+                -200,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0172,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9ton4-n14",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -280
+              ],
+              [
+                -60,
+                -280
+              ],
+              [
+                -60,
+                -260
+              ],
+              [
+                -180,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0062,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 13,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3-n14",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -280
+              ],
+              [
+                -40,
+                -280
+              ],
+              [
+                -40,
+                -260
+              ],
+              [
+                -60,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1to0-n14",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -280
+              ],
+              [
+                20,
+                -280
+              ],
+              [
+                20,
+                -260
+              ],
+              [
+                -20,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 4,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-2-n14",
+          "shape": {
+            "area": [
+              [
+                40,
+                -280
+              ],
+              [
+                60,
+                -280
+              ],
+              [
+                60,
+                -260
+              ],
+              [
+                40,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-4-n14",
+          "shape": {
+            "area": [
+              [
+                80,
+                -280
+              ],
+              [
+                100,
+                -280
+              ],
+              [
+                100,
+                -260
+              ],
+              [
+                80,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8to9-n14",
+          "shape": {
+            "area": [
+              [
+                160,
+                -280
+              ],
+              [
+                200,
+                -280
+              ],
+              [
+                200,
+                -260
+              ],
+              [
+                160,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-11to15-n14",
+          "shape": {
+            "area": [
+              [
+                220,
+                -280
+              ],
+              [
+                320,
+                -280
+              ],
+              [
+                320,
+                -260
+              ],
+              [
+                220,
+                -260
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.008,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 14,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15ton13-n13",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -260
+              ],
+              [
+                -240,
+                -260
+              ],
+              [
+                -240,
+                -240
+              ],
+              [
+                -300,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n12-n13",
+          "shape": {
+            "area": [
+              [
+                -240,
+                -260
+              ],
+              [
+                -220,
+                -260
+              ],
+              [
+                -220,
+                -240
+              ],
+              [
+                -240,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0201,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 7,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11ton7-n13",
+          "shape": {
+            "area": [
+              [
+                -220,
+                -260
+              ],
+              [
+                -120,
+                -260
+              ],
+              [
+                -120,
+                -240
+              ],
+              [
+                -220,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0052,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 9,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n5ton4-n13",
+          "shape": {
+            "area": [
+              [
+                -100,
+                -260
+              ],
+              [
+                -60,
+                -260
+              ],
+              [
+                -60,
+                -240
+              ],
+              [
+                -100,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1-n13",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -260
+              ],
+              [
+                0,
+                -260
+              ],
+              [
+                0,
+                -240
+              ],
+              [
+                -20,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-2to3-n13",
+          "shape": {
+            "area": [
+              [
+                40,
+                -260
+              ],
+              [
+                80,
+                -260
+              ],
+              [
+                80,
+                -240
+              ],
+              [
+                40,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7to12-n13",
+          "shape": {
+            "area": [
+              [
+                140,
+                -260
+              ],
+              [
+                260,
+                -260
+              ],
+              [
+                260,
+                -240
+              ],
+              [
+                140,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0067,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 14,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 5",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13-n13",
+          "shape": {
+            "area": [
+              [
+                260,
+                -260
+              ],
+              [
+                280,
+                -260
+              ],
+              [
+                280,
+                -240
+              ],
+              [
+                260,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-15-n13",
+          "shape": {
+            "area": [
+              [
+                300,
+                -260
+              ],
+              [
+                320,
+                -260
+              ],
+              [
+                320,
+                -240
+              ],
+              [
+                300,
+                -240
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n17-n12",
+          "shape": {
+            "area": [
+              [
+                -340,
+                -240
+              ],
+              [
+                -320,
+                -240
+              ],
+              [
+                -320,
+                -220
+              ],
+              [
+                -340,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n12",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -240
+              ],
+              [
+                -280,
+                -240
+              ],
+              [
+                -280,
+                -220
+              ],
+              [
+                -300,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9ton7-n12",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -240
+              ],
+              [
+                -120,
+                -240
+              ],
+              [
+                -120,
+                -220
+              ],
+              [
+                -180,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 7,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6-n12",
+          "shape": {
+            "area": [
+              [
+                -120,
+                -240
+              ],
+              [
+                -100,
+                -240
+              ],
+              [
+                -100,
+                -220
+              ],
+              [
+                -120,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n4-n12",
+          "shape": {
+            "area": [
+              [
+                -80,
+                -240
+              ],
+              [
+                -60,
+                -240
+              ],
+              [
+                -60,
+                -220
+              ],
+              [
+                -80,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3ton1-n12",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -240
+              ],
+              [
+                0,
+                -240
+              ],
+              [
+                0,
+                -220
+              ],
+              [
+                -60,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6-n12",
+          "shape": {
+            "area": [
+              [
+                120,
+                -240
+              ],
+              [
+                140,
+                -240
+              ],
+              [
+                140,
+                -220
+              ],
+              [
+                120,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7-n12",
+          "shape": {
+            "area": [
+              [
+                140,
+                -240
+              ],
+              [
+                160,
+                -240
+              ],
+              [
+                160,
+                -220
+              ],
+              [
+                140,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0201,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8-n12",
+          "shape": {
+            "area": [
+              [
+                160,
+                -240
+              ],
+              [
+                180,
+                -240
+              ],
+              [
+                180,
+                -220
+              ],
+              [
+                160,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-10to11-n12",
+          "shape": {
+            "area": [
+              [
+                200,
+                -240
+              ],
+              [
+                240,
+                -240
+              ],
+              [
+                240,
+                -220
+              ],
+              [
+                200,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 4,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 6",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13-n12",
+          "shape": {
+            "area": [
+              [
+                260,
+                -240
+              ],
+              [
+                280,
+                -240
+              ],
+              [
+                280,
+                -220
+              ],
+              [
+                260,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-15to17-n12",
+          "shape": {
+            "area": [
+              [
+                300,
+                -240
+              ],
+              [
+                360,
+                -240
+              ],
+              [
+                360,
+                -220
+              ],
+              [
+                300,
+                -220
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 8,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n11",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -220
+              ],
+              [
+                -280,
+                -220
+              ],
+              [
+                -280,
+                -200
+              ],
+              [
+                -300,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10-n11",
+          "shape": {
+            "area": [
+              [
+                -200,
+                -220
+              ],
+              [
+                -180,
+                -220
+              ],
+              [
+                -180,
+                -200
+              ],
+              [
+                -200,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9ton8-n11",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -220
+              ],
+              [
+                -140,
+                -220
+              ],
+              [
+                -140,
+                -200
+              ],
+              [
+                -180,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0244,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 13,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3-n11",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -220
+              ],
+              [
+                -40,
+                -220
+              ],
+              [
+                -40,
+                -200
+              ],
+              [
+                -60,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1to1-n11",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -220
+              ],
+              [
+                40,
+                -220
+              ],
+              [
+                40,
+                -200
+              ],
+              [
+                -20,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0038,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 4,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6to7-n11",
+          "shape": {
+            "area": [
+              [
+                120,
+                -220
+              ],
+              [
+                160,
+                -220
+              ],
+              [
+                160,
+                -200
+              ],
+              [
+                120,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9-n11",
+          "shape": {
+            "area": [
+              [
+                180,
+                -220
+              ],
+              [
+                200,
+                -220
+              ],
+              [
+                200,
+                -200
+              ],
+              [
+                180,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-10to12-n11",
+          "shape": {
+            "area": [
+              [
+                200,
+                -220
+              ],
+              [
+                260,
+                -220
+              ],
+              [
+                260,
+                -200
+              ],
+              [
+                200,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0048,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-14to17-n11",
+          "shape": {
+            "area": [
+              [
+                280,
+                -220
+              ],
+              [
+                360,
+                -220
+              ],
+              [
+                360,
+                -200
+              ],
+              [
+                280,
+                -200
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0065,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 9,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n16ton14-n10",
+          "shape": {
+            "area": [
+              [
+                -320,
+                -200
+              ],
+              [
+                -260,
+                -200
+              ],
+              [
+                -260,
+                -180
+              ],
+              [
+                -320,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 7",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10-n10",
+          "shape": {
+            "area": [
+              [
+                -200,
+                -200
+              ],
+              [
+                -180,
+                -200
+              ],
+              [
+                -180,
+                -180
+              ],
+              [
+                -200,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9-n10",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -200
+              ],
+              [
+                -160,
+                -200
+              ],
+              [
+                -160,
+                -180
+              ],
+              [
+                -180,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8ton7-n10",
+          "shape": {
+            "area": [
+              [
+                -160,
+                -200
+              ],
+              [
+                -120,
+                -200
+              ],
+              [
+                -120,
+                -180
+              ],
+              [
+                -160,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3-n10",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -200
+              ],
+              [
+                -40,
+                -200
+              ],
+              [
+                -40,
+                -180
+              ],
+              [
+                -60,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1to1-n10",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -200
+              ],
+              [
+                40,
+                -200
+              ],
+              [
+                40,
+                -180
+              ],
+              [
+                -20,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3to5-n10",
+          "shape": {
+            "area": [
+              [
+                60,
+                -200
+              ],
+              [
+                120,
+                -200
+              ],
+              [
+                120,
+                -180
+              ],
+              [
+                60,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7-n10",
+          "shape": {
+            "area": [
+              [
+                140,
+                -200
+              ],
+              [
+                160,
+                -200
+              ],
+              [
+                160,
+                -180
+              ],
+              [
+                140,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8to9-n10",
+          "shape": {
+            "area": [
+              [
+                160,
+                -200
+              ],
+              [
+                200,
+                -200
+              ],
+              [
+                200,
+                -180
+              ],
+              [
+                160,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13-n10",
+          "shape": {
+            "area": [
+              [
+                260,
+                -200
+              ],
+              [
+                280,
+                -200
+              ],
+              [
+                280,
+                -180
+              ],
+              [
+                260,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-16to18-n10",
+          "shape": {
+            "area": [
+              [
+                320,
+                -200
+              ],
+              [
+                380,
+                -200
+              ],
+              [
+                380,
+                -180
+              ],
+              [
+                320,
+                -180
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10ton8-n9",
+          "shape": {
+            "area": [
+              [
+                -200,
+                -180
+              ],
+              [
+                -140,
+                -180
+              ],
+              [
+                -140,
+                -160
+              ],
+              [
+                -200,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0067,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n2-n9",
+          "shape": {
+            "area": [
+              [
+                -40,
+                -180
+              ],
+              [
+                -20,
+                -180
+              ],
+              [
+                -20,
+                -160
+              ],
+              [
+                -40,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 8",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n1-n9",
+          "shape": {
+            "area": [
+              [
+                -20,
+                -180
+              ],
+              [
+                0,
+                -180
+              ],
+              [
+                0,
+                -160
+              ],
+              [
+                -20,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-4to5-n9",
+          "shape": {
+            "area": [
+              [
+                80,
+                -180
+              ],
+              [
+                120,
+                -180
+              ],
+              [
+                120,
+                -160
+              ],
+              [
+                80,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-12-n9",
+          "shape": {
+            "area": [
+              [
+                240,
+                -180
+              ],
+              [
+                260,
+                -180
+              ],
+              [
+                260,
+                -160
+              ],
+              [
+                240,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-15-n9",
+          "shape": {
+            "area": [
+              [
+                300,
+                -180
+              ],
+              [
+                320,
+                -180
+              ],
+              [
+                320,
+                -160
+              ],
+              [
+                300,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-17-n9",
+          "shape": {
+            "area": [
+              [
+                340,
+                -180
+              ],
+              [
+                360,
+                -180
+              ],
+              [
+                360,
+                -160
+              ],
+              [
+                340,
+                -160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n8",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -160
+              ],
+              [
+                -280,
+                -160
+              ],
+              [
+                -280,
+                -140
+              ],
+              [
+                -300,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9ton8-n8",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -160
+              ],
+              [
+                -140,
+                -160
+              ],
+              [
+                -140,
+                -140
+              ],
+              [
+                -180,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3to5-n8",
+          "shape": {
+            "area": [
+              [
+                60,
+                -160
+              ],
+              [
+                120,
+                -160
+              ],
+              [
+                120,
+                -140
+              ],
+              [
+                60,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7-n8",
+          "shape": {
+            "area": [
+              [
+                140,
+                -160
+              ],
+              [
+                160,
+                -160
+              ],
+              [
+                160,
+                -140
+              ],
+              [
+                140,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8-n8",
+          "shape": {
+            "area": [
+              [
+                160,
+                -160
+              ],
+              [
+                180,
+                -160
+              ],
+              [
+                180,
+                -140
+              ],
+              [
+                160,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-12-n8",
+          "shape": {
+            "area": [
+              [
+                240,
+                -160
+              ],
+              [
+                260,
+                -160
+              ],
+              [
+                260,
+                -140
+              ],
+              [
+                240,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-15to17-n8",
+          "shape": {
+            "area": [
+              [
+                300,
+                -160
+              ],
+              [
+                360,
+                -160
+              ],
+              [
+                360,
+                -140
+              ],
+              [
+                300,
+                -140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 6,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 9",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n7",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -140
+              ],
+              [
+                -280,
+                -140
+              ],
+              [
+                -280,
+                -120
+              ],
+              [
+                -300,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n4ton3-n7",
+          "shape": {
+            "area": [
+              [
+                -80,
+                -140
+              ],
+              [
+                -40,
+                -140
+              ],
+              [
+                -40,
+                -120
+              ],
+              [
+                -80,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0101,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 7,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3-n7",
+          "shape": {
+            "area": [
+              [
+                60,
+                -140
+              ],
+              [
+                80,
+                -140
+              ],
+              [
+                80,
+                -120
+              ],
+              [
+                60,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0316,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 8,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-4to5-n7",
+          "shape": {
+            "area": [
+              [
+                80,
+                -140
+              ],
+              [
+                120,
+                -140
+              ],
+              [
+                120,
+                -120
+              ],
+              [
+                80,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 10,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7-n7",
+          "shape": {
+            "area": [
+              [
+                140,
+                -140
+              ],
+              [
+                160,
+                -140
+              ],
+              [
+                160,
+                -120
+              ],
+              [
+                140,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to10-n7",
+          "shape": {
+            "area": [
+              [
+                180,
+                -140
+              ],
+              [
+                220,
+                -140
+              ],
+              [
+                220,
+                -120
+              ],
+              [
+                180,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-12-n7",
+          "shape": {
+            "area": [
+              [
+                240,
+                -140
+              ],
+              [
+                260,
+                -140
+              ],
+              [
+                260,
+                -120
+              ],
+              [
+                240,
+                -120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10-n6",
+          "shape": {
+            "area": [
+              [
+                -200,
+                -120
+              ],
+              [
+                -180,
+                -120
+              ],
+              [
+                -180,
+                -100
+              ],
+              [
+                -200,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3-n6",
+          "shape": {
+            "area": [
+              [
+                -60,
+                -120
+              ],
+              [
+                -40,
+                -120
+              ],
+              [
+                -40,
+                -100
+              ],
+              [
+                -60,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n2to0-n6",
+          "shape": {
+            "area": [
+              [
+                -40,
+                -120
+              ],
+              [
+                20,
+                -120
+              ],
+              [
+                20,
+                -100
+              ],
+              [
+                -40,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3-n6",
+          "shape": {
+            "area": [
+              [
+                60,
+                -120
+              ],
+              [
+                80,
+                -120
+              ],
+              [
+                80,
+                -100
+              ],
+              [
+                60,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0259,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 8,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-4to5-n6",
+          "shape": {
+            "area": [
+              [
+                80,
+                -120
+              ],
+              [
+                120,
+                -120
+              ],
+              [
+                120,
+                -100
+              ],
+              [
+                80,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 10",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6to8-n6",
+          "shape": {
+            "area": [
+              [
+                120,
+                -120
+              ],
+              [
+                180,
+                -120
+              ],
+              [
+                180,
+                -100
+              ],
+              [
+                120,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 8,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-12-n6",
+          "shape": {
+            "area": [
+              [
+                240,
+                -120
+              ],
+              [
+                260,
+                -120
+              ],
+              [
+                260,
+                -100
+              ],
+              [
+                240,
+                -100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15ton14-n5",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -100
+              ],
+              [
+                -260,
+                -100
+              ],
+              [
+                -260,
+                -80
+              ],
+              [
+                -300,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n2to0-n5",
+          "shape": {
+            "area": [
+              [
+                -40,
+                -100
+              ],
+              [
+                20,
+                -100
+              ],
+              [
+                20,
+                -80
+              ],
+              [
+                -40,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3-n5",
+          "shape": {
+            "area": [
+              [
+                60,
+                -100
+              ],
+              [
+                80,
+                -100
+              ],
+              [
+                80,
+                -80
+              ],
+              [
+                60,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0316,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 8,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-4to5-n5",
+          "shape": {
+            "area": [
+              [
+                80,
+                -100
+              ],
+              [
+                120,
+                -100
+              ],
+              [
+                120,
+                -80
+              ],
+              [
+                80,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0101,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 7,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9-n5",
+          "shape": {
+            "area": [
+              [
+                180,
+                -100
+              ],
+              [
+                200,
+                -100
+              ],
+              [
+                200,
+                -80
+              ],
+              [
+                180,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0115,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-11-n5",
+          "shape": {
+            "area": [
+              [
+                220,
+                -100
+              ],
+              [
+                240,
+                -100
+              ],
+              [
+                240,
+                -80
+              ],
+              [
+                220,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 4,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-12-n5",
+          "shape": {
+            "area": [
+              [
+                240,
+                -100
+              ],
+              [
+                260,
+                -100
+              ],
+              [
+                260,
+                -80
+              ],
+              [
+                240,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-14to15-n5",
+          "shape": {
+            "area": [
+              [
+                280,
+                -100
+              ],
+              [
+                320,
+                -100
+              ],
+              [
+                320,
+                -80
+              ],
+              [
+                280,
+                -80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0072,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n4",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -80
+              ],
+              [
+                -280,
+                -80
+              ],
+              [
+                -280,
+                -60
+              ],
+              [
+                -300,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9-n4",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -80
+              ],
+              [
+                -160,
+                -80
+              ],
+              [
+                -160,
+                -60
+              ],
+              [
+                -180,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 11",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6-n4",
+          "shape": {
+            "area": [
+              [
+                -120,
+                -80
+              ],
+              [
+                -100,
+                -80
+              ],
+              [
+                -100,
+                -60
+              ],
+              [
+                -120,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n5to0-n4",
+          "shape": {
+            "area": [
+              [
+                -100,
+                -80
+              ],
+              [
+                20,
+                -80
+              ],
+              [
+                20,
+                -60
+              ],
+              [
+                -100,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0062,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 12,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1to2-n4",
+          "shape": {
+            "area": [
+              [
+                20,
+                -80
+              ],
+              [
+                60,
+                -80
+              ],
+              [
+                60,
+                -60
+              ],
+              [
+                20,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 4,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3to4-n4",
+          "shape": {
+            "area": [
+              [
+                60,
+                -80
+              ],
+              [
+                100,
+                -80
+              ],
+              [
+                100,
+                -60
+              ],
+              [
+                60,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0259,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 14,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 4,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-5-n4",
+          "shape": {
+            "area": [
+              [
+                100,
+                -80
+              ],
+              [
+                120,
+                -80
+              ],
+              [
+                120,
+                -60
+              ],
+              [
+                100,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9-n4",
+          "shape": {
+            "area": [
+              [
+                180,
+                -80
+              ],
+              [
+                200,
+                -80
+              ],
+              [
+                200,
+                -60
+              ],
+              [
+                180,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-10-n4",
+          "shape": {
+            "area": [
+              [
+                200,
+                -80
+              ],
+              [
+                220,
+                -80
+              ],
+              [
+                220,
+                -60
+              ],
+              [
+                200,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-11-n4",
+          "shape": {
+            "area": [
+              [
+                220,
+                -80
+              ],
+              [
+                240,
+                -80
+              ],
+              [
+                240,
+                -60
+              ],
+              [
+                220,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13-n4",
+          "shape": {
+            "area": [
+              [
+                260,
+                -80
+              ],
+              [
+                280,
+                -80
+              ],
+              [
+                280,
+                -60
+              ],
+              [
+                260,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-14to15-n4",
+          "shape": {
+            "area": [
+              [
+                280,
+                -80
+              ],
+              [
+                320,
+                -80
+              ],
+              [
+                320,
+                -60
+              ],
+              [
+                280,
+                -60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 10,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11ton10-n3",
+          "shape": {
+            "area": [
+              [
+                -220,
+                -60
+              ],
+              [
+                -180,
+                -60
+              ],
+              [
+                -180,
+                -40
+              ],
+              [
+                -220,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9-n3",
+          "shape": {
+            "area": [
+              [
+                -180,
+                -60
+              ],
+              [
+                -160,
+                -60
+              ],
+              [
+                -160,
+                -40
+              ],
+              [
+                -180,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 12",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6-n3",
+          "shape": {
+            "area": [
+              [
+                -120,
+                -60
+              ],
+              [
+                -100,
+                -60
+              ],
+              [
+                -100,
+                -40
+              ],
+              [
+                -120,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n5ton2-n3",
+          "shape": {
+            "area": [
+              [
+                -100,
+                -60
+              ],
+              [
+                -20,
+                -60
+              ],
+              [
+                -20,
+                -40
+              ],
+              [
+                -100,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0072,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 10,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1to3-n3",
+          "shape": {
+            "area": [
+              [
+                20,
+                -60
+              ],
+              [
+                80,
+                -60
+              ],
+              [
+                80,
+                -40
+              ],
+              [
+                20,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to12-n3",
+          "shape": {
+            "area": [
+              [
+                180,
+                -60
+              ],
+              [
+                260,
+                -60
+              ],
+              [
+                260,
+                -40
+              ],
+              [
+                180,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0079,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 7,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 3,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-13to15-n3",
+          "shape": {
+            "area": [
+              [
+                260,
+                -60
+              ],
+              [
+                320,
+                -60
+              ],
+              [
+                320,
+                -40
+              ],
+              [
+                260,
+                -40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n2",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -40
+              ],
+              [
+                -280,
+                -40
+              ],
+              [
+                -280,
+                -20
+              ],
+              [
+                -300,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11-n2",
+          "shape": {
+            "area": [
+              [
+                -220,
+                -40
+              ],
+              [
+                -200,
+                -40
+              ],
+              [
+                -200,
+                -20
+              ],
+              [
+                -220,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6-n2",
+          "shape": {
+            "area": [
+              [
+                120,
+                -40
+              ],
+              [
+                140,
+                -40
+              ],
+              [
+                140,
+                -20
+              ],
+              [
+                120,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-7-n2",
+          "shape": {
+            "area": [
+              [
+                140,
+                -40
+              ],
+              [
+                160,
+                -40
+              ],
+              [
+                160,
+                -20
+              ],
+              [
+                140,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9-n2",
+          "shape": {
+            "area": [
+              [
+                180,
+                -40
+              ],
+              [
+                200,
+                -40
+              ],
+              [
+                200,
+                -20
+              ],
+              [
+                180,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-10to11-n2",
+          "shape": {
+            "area": [
+              [
+                200,
+                -40
+              ],
+              [
+                240,
+                -40
+              ],
+              [
+                240,
+                -20
+              ],
+              [
+                200,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 4,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-14-n2",
+          "shape": {
+            "area": [
+              [
+                280,
+                -40
+              ],
+              [
+                300,
+                -40
+              ],
+              [
+                300,
+                -20
+              ],
+              [
+                280,
+                -20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 13",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-n1",
+          "shape": {
+            "area": [
+              [
+                -300,
+                -20
+              ],
+              [
+                -280,
+                -20
+              ],
+              [
+                -280,
+                0
+              ],
+              [
+                -300,
+                0
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11-n1",
+          "shape": {
+            "area": [
+              [
+                -220,
+                -20
+              ],
+              [
+                -200,
+                -20
+              ],
+              [
+                -200,
+                0
+              ],
+              [
+                -220,
+                0
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0115,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-5to7-n1",
+          "shape": {
+            "area": [
+              [
+                100,
+                -20
+              ],
+              [
+                160,
+                -20
+              ],
+              [
+                160,
+                0
+              ],
+              [
+                100,
+                0
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0067,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 7,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8-n1",
+          "shape": {
+            "area": [
+              [
+                160,
+                -20
+              ],
+              [
+                180,
+                -20
+              ],
+              [
+                180,
+                0
+              ],
+              [
+                160,
+                0
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0144,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-10to12-n1",
+          "shape": {
+            "area": [
+              [
+                200,
+                -20
+              ],
+              [
+                260,
+                -20
+              ],
+              [
+                260,
+                0
+              ],
+              [
+                200,
+                0
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 3,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-0",
+          "shape": {
+            "area": [
+              [
+                -300,
+                0
+              ],
+              [
+                -280,
+                0
+              ],
+              [
+                -280,
+                20
+              ],
+              [
+                -300,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11-0",
+          "shape": {
+            "area": [
+              [
+                -220,
+                0
+              ],
+              [
+                -200,
+                0
+              ],
+              [
+                -200,
+                20
+              ],
+              [
+                -220,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-5to7-0",
+          "shape": {
+            "area": [
+              [
+                100,
+                0
+              ],
+              [
+                160,
+                0
+              ],
+              [
+                160,
+                20
+              ],
+              [
+                100,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to11-0",
+          "shape": {
+            "area": [
+              [
+                180,
+                0
+              ],
+              [
+                240,
+                0
+              ],
+              [
+                240,
+                20
+              ],
+              [
+                180,
+                20
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0048,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11-1",
+          "shape": {
+            "area": [
+              [
+                -220,
+                20
+              ],
+              [
+                -200,
+                20
+              ],
+              [
+                -200,
+                40
+              ],
+              [
+                -220,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3ton1-1",
+          "shape": {
+            "area": [
+              [
+                -60,
+                20
+              ],
+              [
+                0,
+                20
+              ],
+              [
+                0,
+                40
+              ],
+              [
+                -60,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0048,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 5,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1-1",
+          "shape": {
+            "area": [
+              [
+                20,
+                20
+              ],
+              [
+                40,
+                20
+              ],
+              [
+                40,
+                40
+              ],
+              [
+                20,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 14",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-5to10-1",
+          "shape": {
+            "area": [
+              [
+                100,
+                20
+              ],
+              [
+                220,
+                20
+              ],
+              [
+                220,
+                40
+              ],
+              [
+                100,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0072,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-11-1",
+          "shape": {
+            "area": [
+              [
+                220,
+                20
+              ],
+              [
+                240,
+                20
+              ],
+              [
+                240,
+                40
+              ],
+              [
+                220,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-14-1",
+          "shape": {
+            "area": [
+              [
+                280,
+                20
+              ],
+              [
+                300,
+                20
+              ],
+              [
+                300,
+                40
+              ],
+              [
+                280,
+                40
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n11-2",
+          "shape": {
+            "area": [
+              [
+                -220,
+                40
+              ],
+              [
+                -200,
+                40
+              ],
+              [
+                -200,
+                60
+              ],
+              [
+                -220,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10ton9-2",
+          "shape": {
+            "area": [
+              [
+                -200,
+                40
+              ],
+              [
+                -160,
+                40
+              ],
+              [
+                -160,
+                60
+              ],
+              [
+                -200,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0072,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8-2",
+          "shape": {
+            "area": [
+              [
+                -160,
+                40
+              ],
+              [
+                -140,
+                40
+              ],
+              [
+                -140,
+                60
+              ],
+              [
+                -160,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6-2",
+          "shape": {
+            "area": [
+              [
+                -120,
+                40
+              ],
+              [
+                -100,
+                40
+              ],
+              [
+                -100,
+                60
+              ],
+              [
+                -120,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3ton2-2",
+          "shape": {
+            "area": [
+              [
+                -60,
+                40
+              ],
+              [
+                -20,
+                40
+              ],
+              [
+                -20,
+                60
+              ],
+              [
+                -60,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 3,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1-2",
+          "shape": {
+            "area": [
+              [
+                20,
+                40
+              ],
+              [
+                40,
+                40
+              ],
+              [
+                40,
+                60
+              ],
+              [
+                20,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "birch",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-3-2",
+          "shape": {
+            "area": [
+              [
+                60,
+                40
+              ],
+              [
+                80,
+                40
+              ],
+              [
+                80,
+                60
+              ],
+              [
+                60,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "birch",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6to7-2",
+          "shape": {
+            "area": [
+              [
+                120,
+                40
+              ],
+              [
+                160,
+                40
+              ],
+              [
+                160,
+                60
+              ],
+              [
+                120,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8-2",
+          "shape": {
+            "area": [
+              [
+                160,
+                40
+              ],
+              [
+                180,
+                40
+              ],
+              [
+                180,
+                60
+              ],
+              [
+                160,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 15",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to11-2",
+          "shape": {
+            "area": [
+              [
+                180,
+                40
+              ],
+              [
+                240,
+                40
+              ],
+              [
+                240,
+                60
+              ],
+              [
+                180,
+                60
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n10-3",
+          "shape": {
+            "area": [
+              [
+                -200,
+                60
+              ],
+              [
+                -180,
+                60
+              ],
+              [
+                -180,
+                80
+              ],
+              [
+                -200,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9-3",
+          "shape": {
+            "area": [
+              [
+                -180,
+                60
+              ],
+              [
+                -160,
+                60
+              ],
+              [
+                -160,
+                80
+              ],
+              [
+                -180,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8ton7-3",
+          "shape": {
+            "area": [
+              [
+                -160,
+                60
+              ],
+              [
+                -120,
+                60
+              ],
+              [
+                -120,
+                80
+              ],
+              [
+                -160,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0187,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "oak",
+                "weight": 9,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6-3",
+          "shape": {
+            "area": [
+              [
+                -120,
+                60
+              ],
+              [
+                -100,
+                60
+              ],
+              [
+                -100,
+                80
+              ],
+              [
+                -120,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n4ton2-3",
+          "shape": {
+            "area": [
+              [
+                -80,
+                60
+              ],
+              [
+                -20,
+                60
+              ],
+              [
+                -20,
+                80
+              ],
+              [
+                -80,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6to7-3",
+          "shape": {
+            "area": [
+              [
+                120,
+                60
+              ],
+              [
+                160,
+                60
+              ],
+              [
+                160,
+                80
+              ],
+              [
+                120,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to11-3",
+          "shape": {
+            "area": [
+              [
+                180,
+                60
+              ],
+              [
+                240,
+                60
+              ],
+              [
+                240,
+                80
+              ],
+              [
+                180,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0077,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 8,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-17-3",
+          "shape": {
+            "area": [
+              [
+                340,
+                60
+              ],
+              [
+                360,
+                60
+              ],
+              [
+                360,
+                80
+              ],
+              [
+                340,
+                80
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-4",
+          "shape": {
+            "area": [
+              [
+                -300,
+                80
+              ],
+              [
+                -280,
+                80
+              ],
+              [
+                -280,
+                100
+              ],
+              [
+                -300,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8ton7-4",
+          "shape": {
+            "area": [
+              [
+                -160,
+                80
+              ],
+              [
+                -120,
+                80
+              ],
+              [
+                -120,
+                100
+              ],
+              [
+                -160,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0216,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 15,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n6ton1-4",
+          "shape": {
+            "area": [
+              [
+                -120,
+                80
+              ],
+              [
+                0,
+                80
+              ],
+              [
+                0,
+                100
+              ],
+              [
+                -120,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0062,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 13,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 16",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-0to4-4",
+          "shape": {
+            "area": [
+              [
+                0,
+                80
+              ],
+              [
+                100,
+                80
+              ],
+              [
+                100,
+                100
+              ],
+              [
+                0,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0052,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 9,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-6to7-4",
+          "shape": {
+            "area": [
+              [
+                120,
+                80
+              ],
+              [
+                160,
+                80
+              ],
+              [
+                160,
+                100
+              ],
+              [
+                120,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 2,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-8-4",
+          "shape": {
+            "area": [
+              [
+                160,
+                80
+              ],
+              [
+                180,
+                80
+              ],
+              [
+                180,
+                100
+              ],
+              [
+                160,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to11-4",
+          "shape": {
+            "area": [
+              [
+                180,
+                80
+              ],
+              [
+                240,
+                80
+              ],
+              [
+                240,
+                100
+              ],
+              [
+                180,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0067,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 6,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              },
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-16to17-4",
+          "shape": {
+            "area": [
+              [
+                320,
+                80
+              ],
+              [
+                360,
+                80
+              ],
+              [
+                360,
+                100
+              ],
+              [
+                320,
+                100
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n15-5",
+          "shape": {
+            "area": [
+              [
+                -300,
+                100
+              ],
+              [
+                -280,
+                100
+              ],
+              [
+                -280,
+                120
+              ],
+              [
+                -300,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n9-5",
+          "shape": {
+            "area": [
+              [
+                -180,
+                100
+              ],
+              [
+                -160,
+                100
+              ],
+              [
+                -160,
+                120
+              ],
+              [
+                -180,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n5ton4-5",
+          "shape": {
+            "area": [
+              [
+                -100,
+                100
+              ],
+              [
+                -60,
+                100
+              ],
+              [
+                -60,
+                120
+              ],
+              [
+                -100,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0129,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 9,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n3-5",
+          "shape": {
+            "area": [
+              [
+                -60,
+                100
+              ],
+              [
+                -40,
+                100
+              ],
+              [
+                -40,
+                120
+              ],
+              [
+                -60,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-9to13-5",
+          "shape": {
+            "area": [
+              [
+                180,
+                100
+              ],
+              [
+                280,
+                100
+              ],
+              [
+                280,
+                120
+              ],
+              [
+                180,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0046,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "oak",
+                "weight": 8,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-17-5",
+          "shape": {
+            "area": [
+              [
+                340,
+                100
+              ],
+              [
+                360,
+                100
+              ],
+              [
+                360,
+                120
+              ],
+              [
+                340,
+                120
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0086,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n17ton16-6",
+          "shape": {
+            "area": [
+              [
+                -340,
+                120
+              ],
+              [
+                -300,
+                120
+              ],
+              [
+                -300,
+                140
+              ],
+              [
+                -340,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0043,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 3,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "note": "trees 17",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n8-6",
+          "shape": {
+            "area": [
+              [
+                -160,
+                120
+              ],
+              [
+                -140,
+                120
+              ],
+              [
+                -140,
+                140
+              ],
+              [
+                -160,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.023,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 8,
+                "scale": [
+                  0.6,
+                  0.8
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-1-6",
+          "shape": {
+            "area": [
+              [
+                20,
+                120
+              ],
+              [
+                40,
+                120
+              ],
+              [
+                40,
+                140
+              ],
+              [
+                20,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 1,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-2to4-6",
+          "shape": {
+            "area": [
+              [
+                40,
+                120
+              ],
+              [
+                100,
+                120
+              ],
+              [
+                100,
+                140
+              ],
+              [
+                40,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0125,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 13,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-5to10-6",
+          "shape": {
+            "area": [
+              [
+                100,
+                120
+              ],
+              [
+                220,
+                120
+              ],
+              [
+                220,
+                140
+              ],
+              [
+                100,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0058,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "poplar",
+                "weight": 12,
+                "scale": [
+                  0.8,
+                  1.25
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-16to18-6",
+          "shape": {
+            "area": [
+              [
+                320,
+                120
+              ],
+              [
+                380,
+                120
+              ],
+              [
+                380,
+                140
+              ],
+              [
+                320,
+                140
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0048,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 5,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-n17ton16-7",
+          "shape": {
+            "area": [
+              [
+                -340,
+                140
+              ],
+              [
+                -300,
+                140
+              ],
+              [
+                -300,
+                160
+              ],
+              [
+                -340,
+                160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 2,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-16-7",
+          "shape": {
+            "area": [
+              [
+                320,
+                140
+              ],
+              [
+                340,
+                140
+              ],
+              [
+                340,
+                160
+              ],
+              [
+                320,
+                160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-old-18-7",
+          "shape": {
+            "area": [
+              [
+                360,
+                140
+              ],
+              [
+                380,
+                140
+              ],
+              [
+                380,
+                160
+              ],
+              [
+                360,
+                160
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.0029,
+            "minSpacing": 3.2,
+            "cluster": 0.3,
+            "palette": [
+              {
+                "kind": "pine",
+                "weight": 1,
+                "scale": [
+                  0.9,
+                  1.4
+                ]
+              }
+            ]
           }
         }
       ]

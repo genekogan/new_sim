@@ -10,11 +10,12 @@ import {LANDSCAPE_BATCHES,LANDMARKS,LANDSCAPE_NOTES} from './landscape.mjs';
 import {BUILDING_BATCHES,BUILDINGS,COURTYARDS} from './buildings.mjs';
 import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
+import {treeBatches} from './trees.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
 const db=new Db(':memory:');
 const god=new GodMode(db,{worldId:'eden-2026-build',ownerId:null,tick:()=>0,emit:()=>{},assetDir:`${out}/assets`,seed:'eden-2026'});
-const genesis={schema:'genesis/1',name:'Eden 2026',description:'A shared commons between a pond and a colourful village: furnished courtyard homes, libraries, a cafe and campus, market gardens, a park, canals and hills, with paths to lakes and the harbour. A new Eden world; the original Eden remains independent.',constants:{extent:1000,ground:'land'},state:{constitution:'# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.',sky:{palette:'clear-day',sun:.8},ground:{palette:'grass'},time:{dayTicks:72000,startTick:0,set:{hour:12,n:1}}},batches:[]};
+const genesis={schema:'genesis/1',name:'Eden 2026',description:'A shared commons between a pond and a colourful village: furnished courtyard homes, libraries, a cafe and campus, market gardens, a park, canals and hills, with paths to lakes and the harbour. A new Eden world; the original Eden remains independent.',constants:{extent:1000,ground:'land'},state:{constitution:'# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.',sky:{palette:'clear-day',sun:.8},ground:{palette:'meadow'},time:{dayTicks:72000,startTick:0,set:{hour:12,n:1}}},batches:[]};
 const stats=[],adjustments=[];
 function apply(label,input,droppable=false){if(!input.length)return;const ops=structuredClone(input),turns=new Map(),starts=new Map(ops.map((o,i)=>[i,o.p]));let r;
   for(let attempt=0;attempt<40;attempt++){
@@ -50,6 +51,9 @@ for(let i=0;i<courtOps.length;i+=10)apply(`courtyard planting ${i/10+1}`,courtOp
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='detail'))apply(b.name,b.ops);
 apply('suburb streets',[...[[[172,34],[244,34]],[[172,74],[244,74]],[[172,112],[244,112]],[[206,34],[206,112]]].map((path,i)=>({op:'place',def:'core/footpath@1',name:`land-suburb-street-${i+1}`,shape:{path},params:{width:3,material:'cobble',maxGrade:0,autoBridge:false,edging:false}}))]);
 for(const b of SCENERY_BATCHES)apply(b.label,b.ops,'any');
+{const box=a=>{const xs=a.map(q=>q[0]),zs=a.map(q=>q[1]);return[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];};
+ const existing=LANDSCAPE_BATCHES.flatMap(b=>b.ops).filter(o=>o.def==='core/woodland@1'&&o.shape?.area).map(o=>box(o.shape.area));
+ const t=treeBatches(existing);for(let i=0;i<t.length;i+=12)apply(`trees ${i/12+1}`,t.slice(i,i+12),'any');}
 const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).places;
 // Invisible native land-use regions preserve outdoor destinations without
 // painting duplicate plazas over the gardens/water. Interior destinations are

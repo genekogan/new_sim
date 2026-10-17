@@ -14,35 +14,44 @@ import { vertexMaterial } from './soup.ts';
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
 /** A spatial test for "something is already here": solid footprints and paved / road surfaces. */
+type BlockShape = ({ kind: 'obb'; c: [number, number]; h: [number, number]; yaw: number } | { kind: 'poly'; p: [number, number][] } | { kind: 'line'; c: [number, number][]; w: number }) & { id: string };
+/** The blocked-ground index is the same for every scatter in one world state: built once per model revision (Eden 2026's
+ * ~240 woodlands each rebuilt it over all ~3,800 entities, ~18 s of first frame), keyed by the model's safety cache key. */
+const blockIndex = new WeakMap<object, { pad: number; cells: Map<string, BlockShape[]> }>();
 export function blockedBy(model: WorldModel, self: Entity, pad = 0.6): (x: number, z: number) => boolean {
-  type Shape = { kind: 'obb'; c: [number, number]; h: [number, number]; yaw: number } | { kind: 'poly'; p: [number, number][] } | { kind: 'line'; c: [number, number][]; w: number };
-  const cells = new Map<string, Shape[]>(), C = 16;
-  const put = (x0: number, z0: number, x1: number, z1: number, s: Shape) => { for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) { const k = `${gx},${gz}`; const l = cells.get(k); if (l) l.push(s); else cells.set(k, [s]); } };
-  for (const e of model.entities.values()) {
-    if (e.id === self.id) continue;
-    const d = model.resolvedDef(e.def); if (!d) continue;
-    const gen = d.make.kind === 'gen' ? d.make.gen : '';
-    if (gen === 'scatter/1' || gen === 'scatter/2' || gen === 'landform/1' || gen === 'lake/1' || gen === 'river/1' || gen.startsWith('cliff') || gen.startsWith('terrace') || gen.startsWith('brush') || gen.startsWith('channel') || gen === 'lawn/1' || gen === 'shore/1') continue;
-    if ((gen === 'road/1' || gen === 'path/1') && e.shape && 'path' in e.shape) {
-      const c = centreLine(e.shape), w = num(e.params?.width, gen === 'road/1' ? 6 : 1.6) + 2 * (num(e.params?.shoulder, gen === 'road/1' ? 0.6 : 0)) + pad * 2;
-      for (let i = 1; i < c.length; i++) put(Math.min(c[i - 1][0], c[i][0]) - w, Math.min(c[i - 1][1], c[i][1]) - w, Math.max(c[i - 1][0], c[i][0]) + w, Math.max(c[i - 1][1], c[i][1]) + w, { kind: 'line', c: [c[i - 1], c[i]], w: w / 2 });
-      continue;
-    }
-    if (e.shape && 'area' in e.shape && (gen === 'plaza/1' || gen === 'pitch/1' || gen === 'parking/1' || gen === 'deck/1' || gen === 'garden-bed/1' || gen === 'orchard/1')) {
-      const p = e.shape.area as [number, number][]; let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
-      put(x0 - pad, z0 - pad, x1 + pad, z1 + pad, { kind: 'poly', p }); continue;
-    }
-    for (const o of model.footprint(e, d)) { const r = Math.hypot(o.half[0], o.half[1]) + pad; put(o.c[0] - r, o.c[1] - r, o.c[0] + r, o.c[1] + r, { kind: 'obb', c: o.c, h: [o.half[0] + pad, o.half[1] + pad], yaw: o.yaw }); }
-  }
+  const C = 16, key = model.safetyCacheKey(), hit = blockIndex.get(key);
+  const cells = hit && hit.pad === pad ? hit.cells : blockCells(model, pad, C);
+  if (!hit || hit.pad !== pad) blockIndex.set(key, { pad, cells });
   return (x, z) => {
     const l = cells.get(`${Math.floor(x / C)},${Math.floor(z / C)}`); if (!l) return false;
     for (const s of l) {
+      if (s.id === self.id) continue;
       if (s.kind === 'obb') { const dx = x - s.c[0], dz = z - s.c[1], co = Math.cos(s.yaw), si = Math.sin(s.yaw); const lx = dx * co - dz * si, lz = dx * si + dz * co; if (Math.abs(lx) <= s.h[0] && Math.abs(lz) <= s.h[1]) return true; }
       else if (s.kind === 'poly') { if (inPoly(x, z, s.p)) return true; }
       else { const [a, b] = s.c, vx = b[0] - a[0], vz = b[1] - a[1], n = vx * vx + vz * vz; let t = n ? ((x - a[0]) * vx + (z - a[1]) * vz) / n : 0; t = t < 0 ? 0 : t > 1 ? 1 : t; if (Math.hypot(x - a[0] - vx * t, z - a[1] - vz * t) < s.w) return true; }
     }
     return false;
   };
+}
+function blockCells(model: WorldModel, pad: number, C: number): Map<string, BlockShape[]> {
+  const cells = new Map<string, BlockShape[]>();
+  const put = (x0: number, z0: number, x1: number, z1: number, s: BlockShape) => { for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) { const k = `${gx},${gz}`; const l = cells.get(k); if (l) l.push(s); else cells.set(k, [s]); } };
+  for (const e of model.entities.values()) {
+    const d = model.resolvedDef(e.def); if (!d) continue;
+    const gen = d.make.kind === 'gen' ? d.make.gen : '';
+    if (gen === 'scatter/1' || gen === 'scatter/2' || gen === 'landform/1' || gen === 'lake/1' || gen === 'river/1' || gen.startsWith('cliff') || gen.startsWith('terrace') || gen.startsWith('brush') || gen.startsWith('channel') || gen === 'lawn/1' || gen === 'shore/1') continue;
+    if ((gen === 'road/1' || gen === 'path/1') && e.shape && 'path' in e.shape) {
+      const c = centreLine(e.shape), w = num(e.params?.width, gen === 'road/1' ? 6 : 1.6) + 2 * (num(e.params?.shoulder, gen === 'road/1' ? 0.6 : 0)) + pad * 2;
+      for (let i = 1; i < c.length; i++) put(Math.min(c[i - 1][0], c[i][0]) - w, Math.min(c[i - 1][1], c[i][1]) - w, Math.max(c[i - 1][0], c[i][0]) + w, Math.max(c[i - 1][1], c[i][1]) + w, { kind: 'line', c: [c[i - 1], c[i]], w: w / 2, id: e.id });
+      continue;
+    }
+    if (e.shape && 'area' in e.shape && (gen === 'plaza/1' || gen === 'pitch/1' || gen === 'parking/1' || gen === 'deck/1' || gen === 'garden-bed/1' || gen === 'orchard/1')) {
+      const p = e.shape.area as [number, number][]; let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
+      put(x0 - pad, z0 - pad, x1 + pad, z1 + pad, { kind: 'poly', p, id: e.id }); continue;
+    }
+    for (const o of model.footprint(e, d)) { const r = Math.hypot(o.half[0], o.half[1]) + pad; put(o.c[0] - r, o.c[1] - r, o.c[0] + r, o.c[1] + r, { kind: 'obb', c: o.c, h: [o.half[0] + pad, o.half[1] + pad], yaw: o.yaw, id: e.id }); }
+  }
+  return cells;
 }
 
 const tint = new THREE.Color();

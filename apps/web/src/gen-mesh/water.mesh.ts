@@ -54,7 +54,7 @@ registerMesh({
     const soup = new Soup(), bankCol = rgb(BANKS[banks] ?? BANKS.grass), wet = scale(bankCol, 0.72);
     // the bank fades into the bare ground of the world's palette (green on grass, sand on desert…)
     const pal = (ctx.model.state as { ground?: { palette?: string } }).ground?.palette ?? 'grass';
-    const outer = rgb(pal === 'desert' || pal === 'dust' || pal === 'sand' ? '#d1ad74' : pal === 'snow' ? '#e6ebef' : pal === 'rock' ? '#9b958a' : '#6f9a4f');
+    const outer = rgb(pal === 'desert' || pal === 'dust' || pal === 'sand' ? '#d1ad74' : pal === 'snow' ? '#e6ebef' : pal === 'rock' ? '#9b958a' : pal === 'meadow' ? '#8a9b6e' : '#6f9a4f');
     const dry = mix(bankCol, outer, banks === 'grass' && outer[1] > outer[0] ? 0 : 0.35);
     const ACROSS = 4; // strips across the bank so the drape follows the trench wall (no terrain poking through)
     if (bankW > 0) for (const side of [1, -1]) for (let i = 0; i < c.length - 1; i++) {
