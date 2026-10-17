@@ -12,7 +12,7 @@ import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
 import {treeBatches} from './trees.mjs';
 import {lightOps,propOps} from './street-life.mjs';
-import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS} from './interiors.mjs';
+import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS,HOUSES} from './interiors.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
 const db=new Db(':memory:');
@@ -49,7 +49,7 @@ for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-ha
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
 for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
-for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
+for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
 const courtOps=[];for(const c of COURTYARDS){courtOps.push({op:'place',def:'core/flower-pot@1',name:`${c.name}-court-pot`.slice(0,48),p:[c.coords[0]+.7,c.coords[1]-.7]});if(c.court.w>=4) courtOps.push({op:'place',def:'core/round-table@1',name:`${c.name}-court-table`.slice(0,48),p:c.coords});}
 for(let i=0;i<courtOps.length;i+=10)apply(`courtyard planting ${i/10+1}`,courtOps.slice(i,i+10));
 for(const b of LANDSCAPE_BATCHES.filter(b=>b.phase==='detail'))apply(b.name,b.ops);

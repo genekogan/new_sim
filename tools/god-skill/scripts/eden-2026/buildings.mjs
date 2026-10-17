@@ -91,7 +91,7 @@ function named(id, def, params = {}, options = {}) {
 // The four little east-side houses and four Mediterranean-quarter houses all
 // have real open-sky courts. A single building/1 ring plan would draw its roof
 // over the hole, so four independently roofed, entered wings are intentional.
-function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace = false } = {}) {
+function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace = false, furnished = 'cottage' } = {}) {
   const wing = 3.2, gap = 0.4, middle = Math.max(3.2, d - 2 * wing - gap * 2);
   const label = byPlace.get(id)?.name ?? title(id), c = Math.cos(r), s = Math.sin(r);
   const turn = (x, z) => [coords[0] + x * c + z * s, coords[1] - x * s + z * c];
@@ -106,7 +106,7 @@ function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace =
     const p = { w: ww, d: dd, floors: levels, floorHeight: 2.8, material: palette.material, wall: palette.wall, trim: palette.trim, roofColor: palette.roof,
       roof: roofTerrace || side === 'study' ? 'flat' : 'shed', roofPitch: 20, windows: 0.45, plan: openPlan(ww, dd, kind, levels) };
     if (side === 'bedroom' || side === 'study') p.plan.floors[0].exterior.push({ room: kind, wall: side === 'bedroom' ? 'e' : 'w', kind: 'door', at: 0.5, width: 1.3 });
-    const b = add(id, 'hall', turn(x, z), p, { name: side === 'entry' ? group.name : `${group.name}-${side}`.slice(0, 48), displayName: `${label} — ${side === 'entry' ? 'entry and living room' : side} wing`, originalPlaceId: id, r, furnishStyle: 'cottage',
+    const b = add(id, 'hall', turn(x, z), p, { name: side === 'entry' ? group.name : `${group.name}-${side}`.slice(0, 48), displayName: `${label} — ${side === 'entry' ? 'entry and living room' : side} wing`, originalPlaceId: id, r, furnishStyle: furnished,
       metadata: { courtyardGroup: group.name, courtyardCenter: coords, courtyard: group.court, entry: side === 'entry', roomPurpose: kind, ...(roofTerrace && side === 'bedroom' ? { roofTerrace: true, terraceHeight: 2.82 } : {}) } });
     group.wings.push(b.name);
   }
@@ -124,8 +124,8 @@ function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace =
 }
 courtyard('eden-house-1', [34, 15], 11, 10.4, { material: 'brick', wall: '#a85a42', roof: '#8a3b2a', trim: '#e9dfcc' });
 courtyard('eden-house-2', [52, 15], 11, 10.4, { material: 'plaster', wall: '#d5d5cd', roof: '#5d6567', trim: '#45616c' }, { floors: 2 });
-courtyard('eden-house-3', [34, 30], 12, 11, { material: 'wood', wall: '#d7ba91', roof: '#776d5b', trim: '#8a603e' }, { floors: 2, roofTerrace: true });
-courtyard('eden-house-4', [54, 30], 12, 11, { material: 'stone', wall: '#d9d7c9', roof: '#696f68', trim: '#78725e' }, { floors: 2, roofTerrace: true });
+courtyard('eden-house-3', [34, 30], 12, 11, { material: 'wood', wall: '#d7ba91', roof: '#776d5b', trim: '#8a603e' }, { floors: 2, roofTerrace: true, furnished: null }); // furnished piece by piece (interiors.mjs)
+courtyard('eden-house-4', [54, 30], 12, 11, { material: 'stone', wall: '#d9d7c9', roof: '#696f68', trim: '#78725e' }, { floors: 2, roofTerrace: true, furnished: null });
 for (const [i, x, z, w, r] of [[1, -116, 60, 16, 0], [2, -136, 60, 14, 0], [3, -116, 80, 16, Math.PI], [4, -138, 80, 18, Math.PI]]) {
   const rr = rng(5300 + (i - 1) * 17), floors = 1 + (rr() < 0.5 ? 1 : 0);
   courtyard(`region-courtyard-quarter.house-${i}`, [x, z], w, 13, { material: 'plaster', wall: pick(rr, ['#efe4cf', '#e6c86e', '#e9b07a', '#d49a8c', '#f0d9a8', '#c96f4a', '#efe9dc']), roof: pick(rr, ['#a8553a', '#b86a45', '#c27a52']), trim: '#3a5a4a' }, { floors, r });

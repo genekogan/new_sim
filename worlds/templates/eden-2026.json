@@ -11103,748 +11103,6 @@
       ]
     },
     {
-      "note": "furnish eden-house-3",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "living-rug",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            0,
-            0,
-            0.154
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/sofa@1",
-          "name": "living-sofa",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            3.283,
-            0,
-            0.9
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/round-table@1",
-          "name": "living-table",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            0,
-            0,
-            0.178
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "living-bowl",
-          "in": {
-            "parent": "$f2",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/armchair@1",
-          "name": "living-armchair",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            5.34,
-            0,
-            0.445
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/bookshelf@1",
-          "name": "living-shelf",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            -5.58,
-            0,
-            -0.354
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/floor-lamp@1",
-          "name": "living-lamp",
-          "in": {
-            "parent": "eden-house-3",
-            "slot": "living"
-          },
-          "p": [
-            -5.52,
-            0,
-            1.12
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-3-kitchen",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/workbench@1",
-          "name": "kitchen-counter",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -5.342,
-            0,
-            0
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/table@1",
-          "name": "kitchen-table",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            0,
-            0,
-            0.191
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "kitchen-bowl",
-          "in": {
-            "parent": "$f1",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/chair@1",
-          "name": "kitchen-chair-1",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -4.204,
-            0,
-            0.224
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/chair@1",
-          "name": "kitchen-chair-2",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            4.204,
-            0,
-            0.224
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/stool@1",
-          "name": "kitchen-stool",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -5.56,
-            0,
-            -1.16
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/workbench@1",
-          "name": "kitchen-1-counter",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            0,
-            0,
-            -0.942
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/table@1",
-          "name": "kitchen-1-table",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            0,
-            0,
-            0.191
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "kitchen-1-bowl",
-          "in": {
-            "parent": "$f7",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/chair@1",
-          "name": "kitchen-1-chair-1",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            -4.204,
-            0,
-            0.224
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/chair@1",
-          "name": "kitchen-1-chair-2",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            4.204,
-            0,
-            0.224
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f11",
-          "def": "core/stool@1",
-          "name": "kitchen-1-stool",
-          "in": {
-            "parent": "eden-house-3-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            -5.56,
-            0,
-            -1.16
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-3-bedroom",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "bedroom-rug",
-          "in": {
-            "parent": "eden-house-3-bedroom",
-            "slot": "bedroom"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "bedroom-lamp",
-          "in": {
-            "parent": "eden-house-3-bedroom",
-            "slot": "bedroom"
-          },
-          "p": [
-            -1.12,
-            0,
-            -1.42
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-3-study",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "parlour-rug",
-          "in": {
-            "parent": "eden-house-3-study",
-            "slot": "parlour"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "eden-house-3-study",
-            "slot": "parlour"
-          },
-          "p": [
-            0.089,
-            0,
-            0
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-4",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "living-rug",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            0,
-            0,
-            0.154
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/sofa@1",
-          "name": "living-sofa",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            3.283,
-            0,
-            0.9
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/round-table@1",
-          "name": "living-table",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            0,
-            0,
-            0.178
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "living-bowl",
-          "in": {
-            "parent": "$f2",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/armchair@1",
-          "name": "living-armchair",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            5.34,
-            0,
-            0.445
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/bookshelf@1",
-          "name": "living-shelf",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            -5.58,
-            0,
-            -0.354
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/floor-lamp@1",
-          "name": "living-lamp",
-          "in": {
-            "parent": "eden-house-4",
-            "slot": "living"
-          },
-          "p": [
-            -5.52,
-            0,
-            1.12
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-4-kitchen",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/workbench@1",
-          "name": "kitchen-counter",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -5.342,
-            0,
-            0
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/table@1",
-          "name": "kitchen-table",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            0,
-            0,
-            0.191
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "kitchen-bowl",
-          "in": {
-            "parent": "$f1",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/chair@1",
-          "name": "kitchen-chair-1",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -4.204,
-            0,
-            0.224
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/chair@1",
-          "name": "kitchen-chair-2",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            4.204,
-            0,
-            0.224
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/stool@1",
-          "name": "kitchen-stool",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen"
-          },
-          "p": [
-            -5.56,
-            0,
-            -1.16
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/workbench@1",
-          "name": "kitchen-1-counter",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            0,
-            0,
-            -0.942
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/table@1",
-          "name": "kitchen-1-table",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            0,
-            0,
-            0.191
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "def": "core/bowl@1",
-          "name": "kitchen-1-bowl",
-          "in": {
-            "parent": "$f7",
-            "slot": "top"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/chair@1",
-          "name": "kitchen-1-chair-1",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            -4.204,
-            0,
-            0.224
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/chair@1",
-          "name": "kitchen-1-chair-2",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            4.204,
-            0,
-            0.224
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f11",
-          "def": "core/stool@1",
-          "name": "kitchen-1-stool",
-          "in": {
-            "parent": "eden-house-4-kitchen",
-            "slot": "kitchen-1"
-          },
-          "p": [
-            -5.56,
-            0,
-            -1.16
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-4-bedroom",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "bedroom-rug",
-          "in": {
-            "parent": "eden-house-4-bedroom",
-            "slot": "bedroom"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "bedroom-lamp",
-          "in": {
-            "parent": "eden-house-4-bedroom",
-            "slot": "bedroom"
-          },
-          "p": [
-            -1.12,
-            0,
-            -1.42
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-house-4-study",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/rug@1",
-          "name": "parlour-rug",
-          "in": {
-            "parent": "eden-house-4-study",
-            "slot": "parlour"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/round-table@1",
-          "name": "parlour-table",
-          "in": {
-            "parent": "eden-house-4-study",
-            "slot": "parlour"
-          },
-          "p": [
-            0.089,
-            0,
-            0
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
       "note": "furnish region-courtyard-quarter-house-1",
       "group": "eden-2026",
       "ops": [
@@ -51288,6 +50546,865 @@
             0,
             0
           ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: courtyard houses 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/fridge@1",
+          "name": "eden-house-3-fridge",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -5.35,
+            0,
+            -0.92
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sink@1",
+          "name": "eden-house-3-sink",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -4.35,
+            0,
+            -0.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stove@1",
+          "name": "eden-house-3-stove",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -3.35,
+            0,
+            -0.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-3-dining-rug",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/table@1",
+          "name": "eden-house-3-dining-table",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ],
+          "params": {
+            "top": "#8a5a36",
+            "legs": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-1",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.6,
+            0,
+            -0.42
+          ],
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-2",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.2,
+            0,
+            -0.42
+          ],
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-3",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.6,
+            0,
+            0.82
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-4",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.2,
+            0,
+            0.82
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-5",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2,
+            0,
+            0.2
+          ],
+          "r": 1.571,
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-3-dining-chair-6",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.8,
+            0,
+            0.2
+          ],
+          "r": -1.571,
+          "params": {
+            "wood": "#8a5a36",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-3-dining-pendant",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-3-kitchen-pendant",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -3.8,
+            0,
+            0.3
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: courtyard houses 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "eden-house-3-sofa",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -5.2,
+            0,
+            -0.35
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#8ea47f",
+            "pillow": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "eden-house-3-armchair",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -2.7,
+            0,
+            -0.4
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-3-living-rug",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -3.95,
+            0,
+            -0.4
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "eden-house-3-floor-lamp",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -2.5,
+            0,
+            -1.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-3-living-pendant",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -3.95,
+            0,
+            -0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/piano@1",
+          "name": "eden-house-3-piano",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            2.9,
+            0,
+            -0.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "eden-house-3-music-stool",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            2.9,
+            0,
+            0.15
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "eden-house-3-tall-shelf",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            4.7,
+            0,
+            1.2
+          ],
+          "r": 3.142,
+          "params": {
+            "sx": 0.9,
+            "sy": 1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "eden-house-3-plant",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "living"
+          },
+          "p": [
+            -1.6,
+            0,
+            1.15
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "eden-house-3-bed",
+          "in": {
+            "parent": "eden-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.55,
+            0,
+            0.35
+          ],
+          "params": {
+            "quilt": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "eden-house-3-wardrobe",
+          "in": {
+            "parent": "eden-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.55,
+            0,
+            -1.25
+          ],
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-3-bedroom-rug",
+          "in": {
+            "parent": "eden-house-3-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.45,
+            0,
+            -0.75
+          ],
+          "params": {
+            "border": "#d19c3c",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/fridge@1",
+          "name": "eden-house-4-fridge",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -5.35,
+            0,
+            -0.92
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sink@1",
+          "name": "eden-house-4-sink",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -4.35,
+            0,
+            -0.95
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: courtyard houses 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/stove@1",
+          "name": "eden-house-4-stove",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -3.35,
+            0,
+            -0.95
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-4-dining-rug",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/table@1",
+          "name": "eden-house-4-dining-table",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ],
+          "params": {
+            "top": "#c9b48f",
+            "legs": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-1",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.6,
+            0,
+            -0.42
+          ],
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-2",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.2,
+            0,
+            -0.42
+          ],
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-3",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.6,
+            0,
+            0.82
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-4",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.2,
+            0,
+            0.82
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-5",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2,
+            0,
+            0.2
+          ],
+          "r": 1.571,
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "eden-house-4-dining-chair-6",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            3.8,
+            0,
+            0.2
+          ],
+          "r": -1.571,
+          "params": {
+            "wood": "#c9b48f",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-4-dining-pendant",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            2.9,
+            0,
+            0.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-4-kitchen-pendant",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "kitchen"
+          },
+          "p": [
+            -3.8,
+            0,
+            0.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "eden-house-4-sofa",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -5.2,
+            0,
+            -0.35
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#34476b",
+            "pillow": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "eden-house-4-armchair",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -2.7,
+            0,
+            -0.4
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#c98a8a"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: courtyard houses 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-4-living-rug",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -3.95,
+            0,
+            -0.4
+          ],
+          "params": {
+            "border": "#6a4a7a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "eden-house-4-floor-lamp",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -2.5,
+            0,
+            -1.25
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "eden-house-4-living-pendant",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -3.95,
+            0,
+            -0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "eden-house-4-easel",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            2.9,
+            0,
+            -0.7
+          ],
+          "r": 2.67
+        },
+        {
+          "op": "place",
+          "def": "core/dresser@1",
+          "name": "eden-house-4-plan-chest",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            4.6,
+            0,
+            -1.15
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "eden-house-4-tall-shelf",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            4.7,
+            0,
+            1.2
+          ],
+          "r": 3.142,
+          "params": {
+            "sx": 0.9,
+            "sy": 1
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "eden-house-4-plant",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "living"
+          },
+          "p": [
+            -1.6,
+            0,
+            1.15
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "eden-house-4-bed",
+          "in": {
+            "parent": "eden-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.55,
+            0,
+            0.35
+          ],
+          "params": {
+            "quilt": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "eden-house-4-wardrobe",
+          "in": {
+            "parent": "eden-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            0.55,
+            0,
+            -1.25
+          ],
+          "params": {
+            "wood": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "eden-house-4-bedroom-rug",
+          "in": {
+            "parent": "eden-house-4-bedroom",
+            "slot": "bedroom"
+          },
+          "p": [
+            -0.45,
+            0,
+            -0.75
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
         }
       ]
     },

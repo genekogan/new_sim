@@ -94,3 +94,29 @@ export const OFFICE = [
   O('meeting', 'f2-sofa', 'sofa', [96.4, 18.0], S, { params: { fabric: C.rust, pillow: C.cream } }), O('meeting', 'f2-armchair', 'armchair', [93.9, 18.1], S, { params: { fabric: C.ochre } }),
 ];
 export const OFFICE_TOPS = ['f0', 'f1', 'f2'].flatMap(f => [on(`eden-office-1/office-${f}-desk-1`, `office-${f}-desk-lamp`, 'desk-lamp', [-0.4, -0.1]), on(`eden-office-1/office-${f}-desk-1`, `office-${f}-desk-books`, 'book-stack', [0.3, 0])]);
+
+// Courtyard houses 3 and 4 (old eden-interiors courtyardHouse): kitchen and dining in the north range, living room with a
+// piano (house 3) or an easel (house 4) in the south range, a bedroom in the west range. House 4 is house 3 moved 20 m east.
+export const HOUSES = [['eden-house-3', 0], ['eden-house-4', 1]].flatMap(([h, v]) => {
+  const wood = v ? C.ash : C.oak, fab = v ? C.teal : C.rust;
+  const k = (name, def, p, r, extra) => piece('kitchen', `${h}-kitchen`, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  const l = (name, def, p, r, extra) => piece('living', h, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  const b = (name, def, p, r, extra) => piece('bedroom', `${h}-bedroom`, `${h}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  return [
+    k('fridge', 'fridge', [-5.35, -0.92], N), k('sink', 'sink', [-4.35, -0.95], N), k('stove', 'stove', [-3.35, -0.95], N),
+    k('counter', 'counter', [-2.25, -0.97], N, { params: { cab: v ? C.sage : '#a85a42', top: C.ash } }),
+    k('dining-rug', 'rug', [2.9, 0.2], N, { params: { border: v ? C.sage : C.rust, field: C.cream } }),
+    k('dining-table', 'table', [2.9, 0.2], N, { params: { top: wood, legs: wood } }),
+    ...[[2.6, -0.42, N], [3.2, -0.42, N], [2.6, 0.82, S], [3.2, 0.82, S], [2.0, 0.2, W], [3.8, 0.2, E]].map(([x, z, r], i) => k(`dining-chair-${i + 1}`, 'chair', [x, z], r, { params: { wood, cushion: fab } })),
+    k('dining-pendant', 'eden-pendant@1', [2.9, 0.2], N), k('kitchen-pendant', 'eden-pendant@1', [-3.8, 0.3], N),
+    l('sofa', 'sofa', [-5.2, -0.35], W, { params: { fabric: v ? C.navy : C.sage, pillow: C.ochre } }),
+    l('armchair', 'armchair', [-2.7, -0.4], E, { params: { fabric: v ? C.rose : C.ochre } }),
+    l('living-rug', 'rug', [-3.95, -0.4], N, { params: { border: v ? '#6a4a7a' : C.navy, field: C.cream } }),
+    l('floor-lamp', 'floor-lamp', [-2.5, -1.25], N), l('living-pendant', 'eden-pendant@1', [-3.95, -0.4], N),
+    v ? l('easel', 'easel', [2.9, -0.7], PI * 0.85) : l('piano', 'piano', [2.9, -0.95], N),
+    v ? l('plan-chest', 'dresser', [4.6, -1.15], N) : l('music-stool', 'stool', [2.9, 0.15], N),
+    l('tall-shelf', 'bookcase', [4.7, 1.2], S, { params: { sx: 0.9, sy: 1 } }), l('plant', 'potted-plant', [-1.6, 1.15], N, { params: { sy: 1.4 } }),
+    b('bed', 'bed', [-0.55, 0.35], N, { params: { quilt: v ? C.teal : C.ochre } }), b('wardrobe', 'wardrobe', [0.55, -1.25], N, { params: { wood } }),
+    b('bedroom-rug', 'rug', [-0.45, -0.75], N, { params: { border: v ? C.teal : C.ochre, field: C.cream } }),
+  ];
+});
