@@ -4,13 +4,17 @@
 /** E-life P1 (determinism-preserving): an entity-physics/1 value (engine-mars entity-physics.ts) carries `hash`, the
  *  content hash of exactly its `levels`, `byEntity` and `assets`, and is replaced, never mutated, when it changes. Their
  *  stable text (2.6–3.6 MB on Eden 2026, ~45 ms each time) is cached by that hash, so the world's state hash and every
- *  take id hash the same bytes without re-serialising the static physics each time. Output is byte-identical. */
+ *  take id hash the same bytes without re-serialising the static physics each time. Output is byte-identical.
+ *  An entry is kept only when its text hashes to its key (entityPhysicsHash = sha256 of exactly this composition):
+ *  a physics-shaped copy whose text differs under the same `hash` (a snapshot's encoded data writes -0 as {"~n":"-0"})
+ *  must never seed the cache, or the world's state hash would read that text and a restart refuses the snapshot. */
 const PHYSICS_TEXT = new Map<string, { levels: string; byEntity: string; assets: string }>();
 function physicsText(v: Record<string, unknown>): { levels: string; byEntity: string; assets: string } {
   const key = v.hash as string;
   let hit = PHYSICS_TEXT.get(key);
   if (!hit) {
     hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity), assets: stableStringify(v.assets) };
+    if (sha256(`{"assets":${hit.assets},"byEntity":${hit.byEntity},"levels":${hit.levels}}`) !== key) return hit;
     if (PHYSICS_TEXT.size >= 4) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
     PHYSICS_TEXT.set(key, hit);
   }

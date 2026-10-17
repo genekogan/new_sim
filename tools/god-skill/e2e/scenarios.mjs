@@ -4,7 +4,7 @@
 // would, timing every batch, checking the server's answer against the world,
 // and photographing the result. Writes a report under .lane/e2e/<stamp>/.
 //
-//   node tools/god-skill/e2e/scenarios.mjs [--port 4991] [--slug e2e-<stamp>] [--keep]
+//   node tools/god-skill/e2e/scenarios.mjs [--port 4991] [--slug e2e-<stamp>] [--keep] [--no-shots]
 //
 // Starts its own server process on a fresh DATA_DIR (fake minds, DEV_AUTH),
 // so it never touches a running world. Screenshots need Google Chrome.
@@ -73,7 +73,7 @@ const find = (snap, name) => snap.entities.find((e) => e.name === name);
 
 // ---------- screenshots (Chrome via the viewer's Playwright)
 let chromium = null;
-try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
+if (!args['no-shots']) try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
 let browser = null, page = null, releaseChrome = () => {};
 async function shot(name, { eye, at, wait = 6000 } = {}) {
   if (!chromium) return;

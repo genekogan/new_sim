@@ -41,3 +41,16 @@ test('state and take hashes are byte-identical with the physics text cache and s
   assert.notEqual(stableStringify({ p: a }), stableStringify({ p: b }));
   assert.equal(stableStringify({ p: b }), reference({ p: b }));
 });
+
+test('a snapshot-encoded copy hashed first never seeds the physics text (restart after a world-edit with a -0 yaw)', async () => {
+  const { encode, decode } = await import('../../../mars/viewer/engine/runtime/codec.ts');
+  const world = { tick: 23, entities: {}, entityPhysicsV1: physics(9) };
+  // takeSnapshot's round-trip check hashes the encoded data (yaw -0 -> {"~n":"-0"}) before the world's state hash
+  const data = encode({ world });
+  hashOf(data); hashOf(encode(decode(JSON.parse(JSON.stringify(data)))));
+  const stateHash = hashOf(world);
+  assert.equal(stateHash, sha(reference(world)));
+  // what the restarted process computes from the stored blob
+  const restored = (decode(JSON.parse(JSON.stringify(data))) as { world: typeof world }).world;
+  assert.equal(hashOf(restored), stateHash);
+});
