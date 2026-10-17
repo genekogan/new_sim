@@ -120,3 +120,19 @@ export const HOUSES = [['eden-house-3', 0], ['eden-house-4', 1]].flatMap(([h, v]
     b('bedroom-rug', 'rug', [-0.45, -0.75], N, { params: { border: v ? C.teal : C.ochre, field: C.cream } }),
   ];
 });
+
+// Barn workshop (old eden-barn-1, interior 82.16..93.84 x 47.16..54.84, centre (88, 51), door south): workbench and tools
+// on the west wall, sawhorses and timber, hay and sacks in the north-east corner, barrels, a pottery shelf, a craft table
+// with stools on a rug, four lanterns.
+const B = (name, def, [x, z], r, extra) => piece('barn', 'eden-barn-1', `barn-${name}`, def, [x - 88, 0, z - 51], r, extra);
+export const BARN = [
+  B('workbench', 'workbench', [82.75, 49.6], W), B('toolbox', 'toolbox', [82.7, 51.4], W), B('ladder', 'ladder', [82.6, 53.6], W),
+  B('sawhorse-1', 'sawhorse', [85.2, 48.6], N), B('timber', 'timber-pile', [85.4, 52.8], W), B('plywood', 'plywood-stack', [87.2, 47.9], W),
+  ...[[90.6, 47.6], [91.6, 47.6], [90.6, 48.3], [93.1, 48.0]].map(([x, z], i) => B(`hay-${i + 1}`, 'sack', [x, z], i * 0.4)),
+  ...[[93.3, 53.1], [92.6, 53.4], [93.3, 54.0]].map(([x, z], i) => B(`barrel-${i + 1}`, 'barrel', [x, z], 0)),
+  B('pottery-shelf', 'shop-shelving', [91.2, 54.4], S, { params: { g0: '#c46a43', g1: '#c9a27a', g2: '#c46a43', g3: '#c9a27a' } }),
+  B('craft-rug', 'rug', [88, 50.6], N, { params: { border: '#7c5a3a', field: '#d19c3c' } }), B('craft-table', 'long-table', [88, 50.6], N),
+  ...[-0.8, 0, 0.8].flatMap((dx, i) => [B(`craft-stool-n-${i + 1}`, 'stool', [88 + dx, 49.9], N), B(`craft-stool-s-${i + 1}`, 'stool', [88 + dx, 51.3], S)]),
+  ...[[88, 48.6], [88, 52], [85, 51.4], [91, 49.8]].map(([x, z], i) => B(`lantern-${i + 1}`, 'eden-pendant@1', [x, z], N)),
+];
+export const BARN_TOPS = [on('eden-barn-1/barn-craft-table', 'barn-craft-pot', 'pot', [-0.6, 0]), on('eden-barn-1/barn-craft-table', 'barn-craft-crate', 'crate', [0.7, 0.05])];

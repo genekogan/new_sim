@@ -1136,14 +1136,14 @@
                         0.63
                       ]
                     ],
-                    "h": 0.96,
+                    "h": 0.74,
                     "tint": "basket"
                   },
                   {
                     "kind": "extrude",
                     "at": [
                       0,
-                      1,
+                      0.78,
                       0
                     ],
                     "polygon": [
@@ -13410,60 +13410,6 @@
           },
           "p": [
             -0.089,
-            0,
-            0
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-barn-1",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/workbench@1",
-          "name": "barn-workbench",
-          "in": {
-            "parent": "eden-barn-1",
-            "slot": "barn"
-          },
-          "p": [
-            -4.044,
-            0,
-            -3.542
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/bench-seat@1",
-          "name": "barn-bench",
-          "in": {
-            "parent": "eden-barn-1",
-            "slot": "barn"
-          },
-          "p": [
-            4.628,
-            0,
-            -1.953
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/long-table@1",
-          "name": "barn-table",
-          "in": {
-            "parent": "eden-barn-1",
-            "slot": "barn"
-          },
-          "p": [
-            0,
             0,
             0
           ],
@@ -55080,6 +55026,438 @@
             "border": "#2f6b6b",
             "field": "#f2ead8"
           }
+        }
+      ]
+    },
+    {
+      "note": "interiors: barn 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/workbench@1",
+          "name": "barn-workbench",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -5.25,
+            0,
+            -1.4
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "core/toolbox@1",
+          "name": "barn-toolbox",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -5.3,
+            0,
+            0.4
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "core/ladder@1",
+          "name": "barn-ladder",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -5.4,
+            0,
+            2.6
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "core/sawhorse@1",
+          "name": "barn-sawhorse-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -2.8,
+            0,
+            -2.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/timber-pile@1",
+          "name": "barn-timber",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -2.6,
+            0,
+            1.8
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "core/plywood-stack@1",
+          "name": "barn-plywood",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -0.8,
+            0,
+            -3.1
+          ],
+          "r": 1.571
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "barn-hay-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            2.6,
+            0,
+            -3.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "barn-hay-2",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            3.6,
+            0,
+            -3.4
+          ],
+          "r": 0.4
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "barn-hay-3",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            2.6,
+            0,
+            -2.7
+          ],
+          "r": 0.8
+        },
+        {
+          "op": "place",
+          "def": "core/sack@1",
+          "name": "barn-hay-4",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            5.1,
+            0,
+            -3
+          ],
+          "r": 1.2
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "barn-barrel-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            5.3,
+            0,
+            2.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "barn-barrel-2",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            4.6,
+            0,
+            2.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/barrel@1",
+          "name": "barn-barrel-3",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            5.3,
+            0,
+            3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/shop-shelving@1",
+          "name": "barn-pottery-shelf",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            3.2,
+            0,
+            3.4
+          ],
+          "r": 3.142,
+          "params": {
+            "g0": "#c46a43",
+            "g1": "#c9a27a",
+            "g2": "#c46a43",
+            "g3": "#c9a27a"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: barn 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "barn-craft-rug",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            -0.4
+          ],
+          "params": {
+            "border": "#7c5a3a",
+            "field": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/long-table@1",
+          "name": "barn-craft-table",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            -0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-n-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -0.8,
+            0,
+            -1.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-s-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -0.8,
+            0,
+            0.3
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-n-2",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            -1.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-s-2",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            0.3
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-n-3",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0.8,
+            0,
+            -1.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "barn-craft-stool-s-3",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0.8,
+            0,
+            0.3
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "barn-lantern-1",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            -2.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "barn-lantern-2",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            0,
+            0,
+            1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "barn-lantern-3",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            -3,
+            0,
+            0.4
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "barn-lantern-4",
+          "in": {
+            "parent": "eden-barn-1",
+            "slot": "barn"
+          },
+          "p": [
+            3,
+            0,
+            -1.2
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: barn tops 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/pot@1",
+          "name": "barn-craft-pot",
+          "in": {
+            "parent": "eden-barn-1/barn-craft-table",
+            "slot": "top"
+          },
+          "p": [
+            -0.6,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "barn-craft-crate",
+          "in": {
+            "parent": "eden-barn-1/barn-craft-table",
+            "slot": "top"
+          },
+          "p": [
+            0.7,
+            0,
+            0.05
+          ]
         }
       ]
     },
