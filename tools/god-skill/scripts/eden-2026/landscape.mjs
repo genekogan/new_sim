@@ -39,7 +39,7 @@ const terrain = [
   point('hill', 'cliff-village-bluff', [284,111], { height: 7, radius: 47, peak: 1.2 }),
   point('hill', 'east-rolling-shoulder', [366,-40], { height: 28, radius: 96, peak: 1.4 }),
   point('hill', 'northeast-ridge', [320,-224], { height: 45, radius: 132, peak: 1.7 }),
-  point('mountain', 'alpine-backdrop', [-7,-365], { height: 88, radius: 150, peak: 1.8 }),
+  point('mountain', 'alpine-backdrop', [-7,-365], { height: 74, radius: 165, peak: 1.25 }), // V8: a softer, forested backdrop like old Eden's hills
   point('mountain', 'northwest-backdrop', [-321,-367], { height: 115, radius: 147, peak: 2.2 }),
   point('mountain', 'northeast-backdrop', [305,-394], { height: 128, radius: 138, peak: 2.4 }),
   point('hill', 'western-hills', [-385,-65], { height: 45, radius: 125, peak: 1.6 }),
