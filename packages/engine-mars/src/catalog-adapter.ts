@@ -41,7 +41,7 @@ const short = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex'
 /** Engine asset id for a def at given params/scale: stable, namespaced, ≤ 80 chars. */
 export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'> & Partial<Pick<DefFacts, 'slots'>>, paramsKey: string): string {
   // A policy change gets a new asset identity. Old logged assets/active slots keep their original approach semantics.
-  const policy = (d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '') + (isFireCircleDef(d) ? '|fire-circle/1' : '');
+  const policy = (d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '') + (isFireCircleDef(d) ? '|fire-circle/1' : '') + (d.slots && crossSeated(d as Pick<DefFacts, 'slots' | 'box'>) ? '|seat-approach:slot' : '');
   return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi, '').slice(0, 48)}:${short(`${d.hash}|${paramsKey}|${d.box.map(r4).join(',')}${policy}`)}`;
 }
 
@@ -51,6 +51,19 @@ export function surfaceLattice(slot: string, w: number, d: number, y: number, cx
   const out: SurfaceSlotDef[] = [];
   for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) out.push({ id: `${slot}-r${i}c${j}`, local: [r4(cx + (j - (nx - 1) / 2) * SURFACE_PITCH), r4(y), r4(cz + (i - (nz - 1) / 2) * SURFACE_PITCH)] });
   return out;
+}
+
+/** E-life: a def whose seats face across it (a see-saw's two ends face each other over the plank): the approach in front of
+ *  a seat would be past the far end, behind whoever sits there (two on a see-saw faulted: bodies 0.46 m apart). Such a
+ *  def's seats are approached from the seat itself (engine `seatApproach: 'slot'`: in front of it, else behind it). */
+export function crossSeated(d: Pick<DefFacts, 'slots' | 'box'>): boolean {
+  const hx = d.box[0] / 2, hz = d.box[2] / 2;
+  return d.slots.some((s) => {
+    if (s.kind !== 'seat') return false;
+    const yaw = Math.PI / 2 - s.yaw, u = [Math.cos(yaw), Math.sin(yaw)], p = [s.p[0], s.p[2]], half = [hx, hz];
+    let t = Infinity; for (const k of [0, 1]) if (Math.abs(u[k]) > 1e-9) t = Math.min(t, ((u[k] > 0 ? half[k] : -half[k]) - p[k]) / u[k]);
+    return t > 1.0;
+  });
 }
 
 /** B6: an open fire people gather round (a campfire, a bonfire, a fire pit): its asset gets fire-circle places, so the
@@ -99,6 +112,7 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   const ring = Number(/ring of stones \((\d+(?:\.\d+)?) m\)/.exec(d.description ?? '')?.[1] ?? 1);
   const fire = isFireCircleDef(d) ? fireCircleSlots(Math.min(ring, Math.min(w, dd)), d.slots.filter((s) => s.kind === 'seat')) : [];
   if (seats.length || stands.length || fire.length) out.slots = [...seats, ...stands, ...fire];
+  if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
   const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);

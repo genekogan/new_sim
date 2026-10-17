@@ -245,3 +245,40 @@ test('P3: carrying a thing about re-derives no places (places follow god edits, 
   await w.settle(2); w.edge.capabilities(ana);
   assert.ok(derives >= 1, 'a god edit re-derives them');
 });
+
+test('group life: a see-saw for two, a story by the campfire (listeners only while it is told), tending a garden bed', { timeout: 900000 }, async (t) => {
+  const w = await lifeWorld(t, [
+    { op: 'place', def: coreRef('see-saw'), name: 'see-saw', p: [-10, 12] },
+    { op: 'place', def: coreRef('campfire'), name: 'story-fire', p: [10, 12] },
+    { op: 'place', def: coreRef('garden-bed'), name: 'veg-bed', shape: { area: [[20, 20], [24, 20], [24, 23], [20, 23]] } },
+  ]);
+  const ana = await w.soul('Ana'), bo = await w.soul('Bo');
+  const caps = (s: any) => w.edge.capabilities(s);
+  // see-saw: Ana waits on one end, Bo takes the other, both ride (the second end's approach was behind the first rider)
+  const a1 = caps(ana).find((c: any) => c.id.startsWith('seesaw:'))!;
+  const r1: any = await accept(w.host, w.edge.act(ana, { capability: a1.id, params: { seconds: 20 } }));
+  assert.equal(r1.accepted, true, JSON.stringify(r1));
+  for (let i = 0; i < 300; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
+  const b1 = caps(bo).find((c: any) => c.id.startsWith('seesaw:') && c.available);
+  assert.ok(b1, 'the other end is offered to Bo');
+  const both = await w.act(bo, b1!.id, { seconds: 20 }, () => w.body(ana)?.human?.activity === 'seesaw' && w.body(bo)?.human?.activity === 'seesaw' ? true : null);
+  assert.ok(both.seen, 'both on the see-saw at once'); assert.equal(both.r.phase, 'completed', JSON.stringify(both.r));
+  // a story: the listener's log is offered once someone tells
+  const hear0 = caps(bo).find((c: any) => c.id.startsWith('hear-story:'))!;
+  assert.equal(hear0.available, false);
+  const tell = caps(ana).find((c: any) => c.id.startsWith('tell-story:'))!;
+  const r2: any = await accept(w.host, w.edge.act(ana, { capability: tell.id, params: { seconds: 120 } }));
+  assert.equal(r2.accepted, true, JSON.stringify(r2));
+  for (let i = 0; i < 400 && w.body(ana)?.human?.activity !== 'tell-story'; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
+  await w.settle(2);
+  const hear = caps(bo).find((c: any) => c.id.startsWith('hear-story:') && c.available)!;
+  assert.ok(hear, 'a log is offered while Ana tells');
+  const h = await w.act(bo, hear.id, { seconds: 10 }, () => w.body(bo)?.human?.activity === 'listen' && w.body(ana)?.human?.activity === 'tell-story' ? true : null);
+  assert.ok(h.seen, 'Bo listened while Ana told the story');
+  // a garden bed is tended
+  const g = caps(bo).find((c: any) => c.id.startsWith('garden:'))!;
+  assert.ok(g, 'garden offered at the bed');
+  const gr = await w.act(bo, g.id, { seconds: 5 }, () => w.body(bo)?.human?.activity === 'garden' ? true : null);
+  assert.ok(gr.seen); assert.equal(gr.r.phase, 'completed', JSON.stringify(gr.r));
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
