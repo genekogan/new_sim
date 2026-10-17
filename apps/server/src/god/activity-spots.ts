@@ -139,6 +139,8 @@ export class GodActivitySpots {
       if (k === 'painting' || is(t, 'easel')) standSpot(t, 'paint');
       else if (k === 'cooking' || is(t, 'stove', 'hearth')) standSpot(t, 'cook');
       else if (is(t, 'arcade-cabinet', 'pool-table', 'dartboard', 'foosball')) standSpot(t, 'play-game', {}, t.slots.find(s => s.kind === 'stand')?.id);
+      // a workbench (old Eden's barn and workshop): make something by hand
+      else if (is(t, 'workbench', 'sawhorse', 'pottery-wheel') || k === 'workshop' || k === 'tools') standSpot(t, 'craft');
     }
     // B2 a preparation table with a cooking pot on it (old Eden's commons kitchen tables) is a place to cook
     const potsOn = new Set(all.filter(t => t.on && is(t, 'pot', 'cooking', 'kettle')).map(t => t.on!));
