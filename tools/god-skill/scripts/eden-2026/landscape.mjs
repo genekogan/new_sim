@@ -133,10 +133,8 @@ const planting = [
   lawn('park-lawns-west', [-42,95,-21,133], '#84a76c'),
   // (old south lawn is the south-country woodland park with its loop paths: trees.mjs)
   lawn('botanic-zen-gravel', [-55,-165.5,-45,-158.5], '#d9d3c2', 'gravel'),
-  area('garden-bed', 'commons-vegetable-garden', rect(31,44,45,73), { crop: 'vegetables', rows: 1.2, border: true }),
-  area('garden-bed', 'commons-herb-garden', rect(49,43,61,56), { crop: 'herbs', rows: 0.8, border: true }),
+  // old Eden's gardens were many small plots with grass walks between (not a few big fields): gardenPlots below
   area('flower-garden', 'commons-flowers', rect(64,42,76,56), { rows: 0.8 }),
-  area('garden-bed', 'commons-pumpkin-patch', rect(61,61,75,73), { crop: 'pumpkins', rows: 1.4 }),
   area('garden-bed', 'farm-wheat', rect(-101,95,-85,110), { crop: 'wheat', rows: 1.1 }),
   area('garden-bed', 'farm-vegetables', rect(-82,95,-64,110), { crop: 'vegetables', rows: 1.2 }),
   area('garden-bed', 'abbey-kitchen-garden', rect(-180,82,-156,92), { crop: 'herbs', rows: 1.1 }),
@@ -162,6 +160,15 @@ const planting = [
   area('wildflowers', 'festival-meadow-borders', rect(252,25,301,81), { density: 0.035, minSpacing: 1.3 }),
   area('wildflowers', 'east-hill-wildflowers', rect(305,-78,373,68), { density: 0.012, minSpacing: 2.2 }),
 ];
+
+// Small cultivated plots (old Eden: 'Cultivated garden plot' beds ~4 x 6 m with walks between), in the garden quarter's
+// former vegetable, herb and pumpkin fields; crops vary plot by plot.
+{
+  const CROPS = ['vegetables', 'herbs', 'mixed', 'pumpkins', 'vegetables', 'wheat'];
+  let n = 0;
+  for (const [x0, z0, x1, z1] of [[31,44,45,73], [49,43,61,56], [61,61,75,73]]) for (let z = z0; z + 5.2 <= z1 + 0.01; z += 6.6) for (let x = x0; x + 3.6 <= x1 + 0.01; x += 4.9)
+    planting.push(area('garden-bed', `garden-plot-${++n}`, rect(x, z, x + 3.6, z + 5.2), { crop: CROPS[(n * 7) % CROPS.length], rows: 0.9 + (n % 3) * 0.2, border: true }));
+}
 
 // A vineyard is rows rather than a dense random wood. Each native hedge follows
 // the terrain and no row extends across the avenue or the villa's footprint.

@@ -58119,66 +58119,6 @@
         },
         {
           "op": "place",
-          "def": "core/garden-bed@1",
-          "name": "land-commons-vegetable-garden",
-          "shape": {
-            "area": [
-              [
-                31,
-                44
-              ],
-              [
-                45,
-                44
-              ],
-              [
-                45,
-                73
-              ],
-              [
-                31,
-                73
-              ]
-            ]
-          },
-          "params": {
-            "crop": "vegetables",
-            "rows": 1.2,
-            "border": true
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/garden-bed@1",
-          "name": "land-commons-herb-garden",
-          "shape": {
-            "area": [
-              [
-                49,
-                43
-              ],
-              [
-                61,
-                43
-              ],
-              [
-                61,
-                56
-              ],
-              [
-                49,
-                56
-              ]
-            ]
-          },
-          "params": {
-            "crop": "herbs",
-            "rows": 0.8,
-            "border": true
-          }
-        },
-        {
-          "op": "place",
           "def": "core/flower-garden@1",
           "name": "land-commons-flowers",
           "shape": {
@@ -58203,35 +58143,6 @@
           },
           "params": {
             "rows": 0.8
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/garden-bed@1",
-          "name": "land-commons-pumpkin-patch",
-          "shape": {
-            "area": [
-              [
-                61,
-                61
-              ],
-              [
-                75,
-                61
-              ],
-              [
-                75,
-                73
-              ],
-              [
-                61,
-                73
-              ]
-            ]
-          },
-          "params": {
-            "crop": "pumpkins",
-            "rows": 1.4
           }
         },
         {
@@ -58577,13 +58488,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-2",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -58725,7 +58630,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "planting-2",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -59080,6 +58991,672 @@
         },
         {
           "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-1",
+          "shape": {
+            "area": [
+              [
+                31,
+                44
+              ],
+              [
+                34.6,
+                44
+              ],
+              [
+                34.6,
+                49.2
+              ],
+              [
+                31,
+                49.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "herbs",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-2",
+          "shape": {
+            "area": [
+              [
+                35.9,
+                44
+              ],
+              [
+                39.5,
+                44
+              ],
+              [
+                39.5,
+                49.2
+              ],
+              [
+                35.9,
+                49.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "mixed",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-3",
+          "shape": {
+            "area": [
+              [
+                40.8,
+                44
+              ],
+              [
+                44.4,
+                44
+              ],
+              [
+                44.4,
+                49.2
+              ],
+              [
+                40.8,
+                49.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "pumpkins",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-4",
+          "shape": {
+            "area": [
+              [
+                31,
+                50.6
+              ],
+              [
+                34.6,
+                50.6
+              ],
+              [
+                34.6,
+                55.800000000000004
+              ],
+              [
+                31,
+                55.800000000000004
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-5",
+          "shape": {
+            "area": [
+              [
+                35.9,
+                50.6
+              ],
+              [
+                39.5,
+                50.6
+              ],
+              [
+                39.5,
+                55.800000000000004
+              ],
+              [
+                35.9,
+                55.800000000000004
+              ]
+            ]
+          },
+          "params": {
+            "crop": "wheat",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-6",
+          "shape": {
+            "area": [
+              [
+                40.8,
+                50.6
+              ],
+              [
+                44.4,
+                50.6
+              ],
+              [
+                44.4,
+                55.800000000000004
+              ],
+              [
+                40.8,
+                55.800000000000004
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-7",
+          "shape": {
+            "area": [
+              [
+                31,
+                57.2
+              ],
+              [
+                34.6,
+                57.2
+              ],
+              [
+                34.6,
+                62.400000000000006
+              ],
+              [
+                31,
+                62.400000000000006
+              ]
+            ]
+          },
+          "params": {
+            "crop": "herbs",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-8",
+          "shape": {
+            "area": [
+              [
+                35.9,
+                57.2
+              ],
+              [
+                39.5,
+                57.2
+              ],
+              [
+                39.5,
+                62.400000000000006
+              ],
+              [
+                35.9,
+                62.400000000000006
+              ]
+            ]
+          },
+          "params": {
+            "crop": "mixed",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-9",
+          "shape": {
+            "area": [
+              [
+                40.8,
+                57.2
+              ],
+              [
+                44.4,
+                57.2
+              ],
+              [
+                44.4,
+                62.400000000000006
+              ],
+              [
+                40.8,
+                62.400000000000006
+              ]
+            ]
+          },
+          "params": {
+            "crop": "pumpkins",
+            "rows": 0.9,
+            "border": true
+          }
+        }
+      ]
+    },
+    {
+      "note": "planting-3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-10",
+          "shape": {
+            "area": [
+              [
+                31,
+                63.800000000000004
+              ],
+              [
+                34.6,
+                63.800000000000004
+              ],
+              [
+                34.6,
+                69
+              ],
+              [
+                31,
+                69
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-11",
+          "shape": {
+            "area": [
+              [
+                35.9,
+                63.800000000000004
+              ],
+              [
+                39.5,
+                63.800000000000004
+              ],
+              [
+                39.5,
+                69
+              ],
+              [
+                35.9,
+                69
+              ]
+            ]
+          },
+          "params": {
+            "crop": "wheat",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-12",
+          "shape": {
+            "area": [
+              [
+                40.8,
+                63.800000000000004
+              ],
+              [
+                44.4,
+                63.800000000000004
+              ],
+              [
+                44.4,
+                69
+              ],
+              [
+                40.8,
+                69
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-13",
+          "shape": {
+            "area": [
+              [
+                49,
+                43
+              ],
+              [
+                52.6,
+                43
+              ],
+              [
+                52.6,
+                48.2
+              ],
+              [
+                49,
+                48.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "herbs",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-14",
+          "shape": {
+            "area": [
+              [
+                53.9,
+                43
+              ],
+              [
+                57.5,
+                43
+              ],
+              [
+                57.5,
+                48.2
+              ],
+              [
+                53.9,
+                48.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "mixed",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-15",
+          "shape": {
+            "area": [
+              [
+                49,
+                49.6
+              ],
+              [
+                52.6,
+                49.6
+              ],
+              [
+                52.6,
+                54.800000000000004
+              ],
+              [
+                49,
+                54.800000000000004
+              ]
+            ]
+          },
+          "params": {
+            "crop": "pumpkins",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-16",
+          "shape": {
+            "area": [
+              [
+                53.9,
+                49.6
+              ],
+              [
+                57.5,
+                49.6
+              ],
+              [
+                57.5,
+                54.800000000000004
+              ],
+              [
+                53.9,
+                54.800000000000004
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-17",
+          "shape": {
+            "area": [
+              [
+                61,
+                61
+              ],
+              [
+                64.6,
+                61
+              ],
+              [
+                64.6,
+                66.2
+              ],
+              [
+                61,
+                66.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "wheat",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-18",
+          "shape": {
+            "area": [
+              [
+                65.9,
+                61
+              ],
+              [
+                69.5,
+                61
+              ],
+              [
+                69.5,
+                66.2
+              ],
+              [
+                65.9,
+                66.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-19",
+          "shape": {
+            "area": [
+              [
+                70.80000000000001,
+                61
+              ],
+              [
+                74.4,
+                61
+              ],
+              [
+                74.4,
+                66.2
+              ],
+              [
+                70.80000000000001,
+                66.2
+              ]
+            ]
+          },
+          "params": {
+            "crop": "herbs",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-20",
+          "shape": {
+            "area": [
+              [
+                61,
+                67.6
+              ],
+              [
+                64.6,
+                67.6
+              ],
+              [
+                64.6,
+                72.8
+              ],
+              [
+                61,
+                72.8
+              ]
+            ]
+          },
+          "params": {
+            "crop": "mixed",
+            "rows": 1.3,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-21",
+          "shape": {
+            "area": [
+              [
+                65.9,
+                67.6
+              ],
+              [
+                69.5,
+                67.6
+              ],
+              [
+                69.5,
+                72.8
+              ],
+              [
+                65.9,
+                72.8
+              ]
+            ]
+          },
+          "params": {
+            "crop": "pumpkins",
+            "rows": 0.9,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/garden-bed@1",
+          "name": "land-garden-plot-22",
+          "shape": {
+            "area": [
+              [
+                70.80000000000001,
+                67.6
+              ],
+              [
+                74.4,
+                67.6
+              ],
+              [
+                74.4,
+                72.8
+              ],
+              [
+                70.80000000000001,
+                72.8
+              ]
+            ]
+          },
+          "params": {
+            "crop": "vegetables",
+            "rows": 1.1,
+            "border": true
+          }
+        },
+        {
+          "op": "place",
           "def": "core/hedge@1",
           "name": "land-vine-row-1",
           "shape": {
@@ -59192,7 +59769,13 @@
             "color": "#668943",
             "flowers": false
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "planting-4",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/hedge@1",
@@ -59215,13 +59798,7 @@
             "color": "#4f7a3c",
             "flowers": false
           }
-        }
-      ]
-    },
-    {
-      "note": "planting-3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/hedge@1",
