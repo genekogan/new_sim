@@ -66,6 +66,24 @@ type Fact = { e: Entity; def: StoredDef | undefined; x: number; z: number; s: nu
 type Box = [number, number, number, number];
 const boxOf = (poly: Vec2[]): Box => { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of poly) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; } return [x0, z0, x1, z1]; };
 const inBoxPoly = (x: number, z: number, b: Box, poly: Vec2[]) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3] && inPoly(x, z, poly);
+/** Facts by a 16 m grid of their positions, so a place reads only the facts near it; candidates come back in fact (= the
+ *  model's entity) order, so every count, first-seen size and seat sum is the same as scanning all of them. */
+const CELL = 16, factGrids = new WeakMap<Fact[], Map<number, number[]>>();
+const cellKey = (cx: number, cz: number) => (cx + 32768) * 65536 + (cz + 32768);
+function factsNear(facts: Fact[], b: Box): Fact[] {
+  if (!(Number.isFinite(b[0]) && Number.isFinite(b[1]) && Number.isFinite(b[2]) && Number.isFinite(b[3]))) return [];
+  const cx0 = Math.floor(b[0] / CELL), cz0 = Math.floor(b[1] / CELL), cx1 = Math.floor(b[2] / CELL), cz1 = Math.floor(b[3] / CELL);
+  if ((cx1 - cx0 + 1) * (cz1 - cz0 + 1) > facts.length / 4 || Math.max(-cx0, -cz0, cx1, cz1) >= 32768) return facts;
+  let grid = factGrids.get(facts);
+  if (!grid) {
+    factGrids.set(facts, grid = new Map());
+    facts.forEach((f, i) => { if (!Number.isFinite(f.x) || !Number.isFinite(f.z)) return; const k = cellKey(Math.floor(f.x / CELL), Math.floor(f.z / CELL)), a = grid!.get(k); if (a) a.push(i); else grid!.set(k, [i]); });
+  }
+  const idx: number[] = []; let lists = 0;
+  for (let cx = cx0; cx <= cx1; cx++) for (let cz = cz0; cz <= cz1; cz++) { const a = grid.get(cellKey(cx, cz)); if (a) { for (const i of a) idx.push(i); lists++; } }
+  if (lists > 1) idx.sort((x, y) => x - y);
+  return idx.map((i) => facts[i]);
+}
 function across(poly: Vec2[]) { const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]); return [Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs)]; }
 
 export type PlacesHost = {
@@ -180,10 +198,12 @@ export class GodPlaces {
     const root = boot.find((p) => p.parent === null)?.id ?? null;
     const geo = new Map<object, { area: number; box: Box }>(), g = (q: { polygon: Vec2[] }) => { let v = geo.get(q); if (!v) geo.set(q, v = { area: areaOf(q.polygon), box: boxOf(q.polygon) }); return v; };
     const candidates = [...out.filter((q) => q.of !== 'room'), ...boot.filter((q) => q.parent !== null)].filter((q) => (q.level ?? 0) === 0);
+    // the smallest holder, the first of equals in candidate order (what a stable sort by area puts first)
+    const held = candidates.map((q) => ({ q, ...g(q) }));
     for (const p of out) {
-      const c = centroid(p.polygon), a = g(p).area;
-      const holders = candidates.filter((q) => q !== p && g(q).area > a && inBoxPoly(c[0], c[1], g(q).box, q.polygon)).sort((x, y) => g(x).area - g(y).area);
-      p.parent = p.of === 'room' ? (out.find((q) => q.of === 'building' && q.entity === p.entity)?.id ?? holders[0]?.id ?? root) : holders[0]?.id ?? root;
+      const c = centroid(p.polygon), a = g(p).area; let best: (typeof held)[number] | null = null;
+      for (const k of held) if (k.q !== p && k.area > a && (best === null || k.area < best.area) && inBoxPoly(c[0], c[1], k.box, k.q.polygon)) best = k;
+      p.parent = p.of === 'room' ? (out.find((q) => q.of === 'building' && q.entity === p.entity)?.id ?? best?.q.id ?? root) : best?.q.id ?? root;
     }
     this.facts = this.entityFacts(out);
     try { for (const p of out) { p.description = this.describe(p, out, things); if (p.of === 'room') { const n = this.seatsIn(p); p.capacity = n || null; } } } finally { this.facts = null; }
@@ -218,7 +238,7 @@ export class GodPlaces {
   /** Seats (seat slots of things) whose position is inside a place. */
   private seatsIn(p: GodPlace): number {
     const m = this.h.model, facts = this.facts ?? this.entityFacts([]), box = boxOf(p.polygon); let n = 0;
-    for (const f of facts) {
+    for (const f of factsNear(facts, box)) {
       if (f.seatSkip || !inBoxPoly(f.x, f.z, box, p.polygon)) continue;
       if (f.seats === undefined) { try { f.seats = m.bake(f.def!, f.e.params ?? {}, f.e.seed ?? 0, f.e.shape).slots.filter((s) => s.kind === 'seat').length; } catch { f.seats = 0; /* odd def */ } }
       n += f.seats;
@@ -244,7 +264,7 @@ export class GodPlaces {
     const m = this.h.model, own = m.entities.get(p.entity), ownDef = own ? m.resolvedDef(own.def) : undefined, kind = ownDef ? shortDef(ownDef) : p.of;
     const counts = new Map<string, number>(), sizes = new Map<string, number>(), facts = this.facts ?? this.entityFacts(all), box = boxOf(p.polygon);
     // areas, roads, waters are places or ground; bodies, flags and engine-owned things are not described (entityFacts)
-    for (const f of facts) {
+    for (const f of factsNear(facts, box)) {
       const e = f.e, def = f.def!;
       if (e.id === p.entity || f.describeSkip || !inBoxPoly(f.x, f.z, box, p.polygon)) continue;
       const b = f.building;
