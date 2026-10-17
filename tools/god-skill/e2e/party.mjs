@@ -275,7 +275,7 @@ try {
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:moss-cottage/living' } })).data;
     const r = await follow(a, { maxS: 200 });
     const placePath = (await cli('here')).data?.me?.placePath;
-    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room, placePath };
+    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room, placePath, ...(a.accepted ? {} : { reason: String(a.reason ?? a.message ?? '').slice(0, 300), from: (await observe()).self?.position }) };
   }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && (r.placePath ?? []).includes('moss-cottage/living'));
   { const p = f6?.end?.p ?? (await observe()).self.position; if (p) await shots([{ name: 's6-in-the-living-room-roof-hidden', eye: [p[0] + 3, p[1] + 7, p[2] + 4], at: [p[0], p[1] + 0.8, p[2]], wait: 7000, hideRoofs: true }]); }
 
