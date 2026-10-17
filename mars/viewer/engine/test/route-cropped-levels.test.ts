@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGrids, buildGridsOverFloors, type GridSet } from '../spatial/grid.ts';
-import { findRoute, type RouteOpts } from '../spatial/path.ts';
+import { PLAN_MARGIN, findRoute, type RouteOpts } from '../spatial/path.ts';
 import { HUMAN_PROFILE, type Level, type Link, type Obstacle, type SpatialScene, type Surface } from '../spatial/types.ts';
 import { seedRng, nextRandom } from '../core/rng.ts';
 
@@ -54,4 +54,31 @@ test('routes over cropped upper levels equal routes over full-window levels', ()
     }
   }
   assert.ok(routes > 200 && fails > 20 && linked > 50, `routes ${routes} (${linked} over stairs), failures ${fails}`);
+});
+
+// L1 (house first look): the reverse-flood proof also runs when the grids have more cells than `maxExpand` but no more
+// standing room (the search can close only those): results equal the plain search's, failures and search limits included.
+test('proveUnreachable gated on standing room: identical results when cells exceed maxExpand but standing room does not', () => {
+  const rng = seedRng('route-prove-passable'), rand = () => nextRandom(rng);
+  let gated = 0, fails = 0, limits = 0, routes = 0;
+  for (let s = 0; s < 10; s++) {
+    const sc = scene(rand), g = buildGrids(sc, 0.1), r = HUMAN_PROFILE.radius + PLAN_MARGIN;
+    let cells = 0, standing = 0;
+    for (const l of g.levels.values()) { cells += l.clearance.length; for (const c of l.clearance) if (c >= r) standing++; }
+    const pts = sc.surfaces.map((x) => ({ level: x.level, c: x.obb.c, h: x.obb.half }));
+    // above standing room (the proof now runs), and below it (it must not: the search limit can be the answer)
+    for (const maxExpand of [standing + 10, Math.floor(standing / 3)]) {
+      if (maxExpand >= cells) continue;
+      if (maxExpand > standing) gated++;
+      for (let k = 0; k < 10; k++) {
+        const a = pts[Math.floor(rand() * pts.length)], b = pts[Math.floor(rand() * pts.length)];
+        const at = (p: typeof a) => ({ level: p.level, p: [p.c[0] + (rand() - 0.5) * p.h[0], p.c[1] + (rand() - 0.5) * p.h[1]] as [number, number] });
+        const start = at(a), goal = at(b);
+        const want = findRoute(g, sc, HUMAN_PROFILE, start, goal, { maxExpand }), got = findRoute(g, sc, HUMAN_PROFILE, start, goal, { maxExpand, proveUnreachable: true });
+        assert.deepEqual(got, want, `scene ${s} route ${k} maxExpand ${maxExpand}`);
+        if (want.ok) routes++; else if (want.diagnostic.code === 'route.search-limit') limits++; else fails++;
+      }
+    }
+  }
+  assert.ok(gated >= 8 && routes > 40 && fails > 5, `gated scenes ${gated}, routes ${routes}, failures ${fails}, limits ${limits}`);
 });

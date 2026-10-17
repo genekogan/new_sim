@@ -228,7 +228,7 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   heap.push(startId, h(sLv, s), false);
   let expanded = 0;
   const hasEdges = edges.size > 0;
-  let rev = opts.proveUnreachable && !mask && startId !== goalId && prep.fullTotal <= maxExpand ? reverseFlood(S, prep, Ls, startId, goalId) : null;
+  let rev = opts.proveUnreachable && !mask && startId !== goalId && (prep.fullTotal <= maxExpand || passableCells(Ls, r, maxExpand) <= maxExpand) ? reverseFlood(S, prep, Ls, startId, goalId) : null;
   let lv = 0;
   while (heap.size) {
     if (rev) {
@@ -302,6 +302,29 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
  * and link edges fails the same way (null) without searching again, as long as that side fits the call's expansion limit. A Soul's capabilities try up to 14 standing points in each room the stairs do not
  * reach (Eden 2026: ~0.8 s each). Grids are never mutated after they are built, so they are told apart by identity.
  */
+/**
+ * L1: the search can close at most the cells a body of radius r stands on (each expansion closes one; links land on
+ * standing room), so when they number no more than `maxExpand`, 'route.search-limit' cannot be the answer either and
+ * the reverse flood is as exact as on a small grid. A paged window over a canal-row house has 11 floors, ~4.4 M cells
+ * (over the limit) of which ~1.4 M are standing room. Counted once per grid content (grids are never mutated), up to `cap`.
+ */
+const PASSABLE_KEEP = 64;
+const passableOf = new Map<string, number>();
+function passableCells(Ls: LevelGrid[], r: number, cap: number): number {
+  let n = 0;
+  for (const g of Ls) {
+    const key = `${serialOf(g)}|${r}`;
+    let k = passableOf.get(key);
+    if (k === undefined) {
+      k = 0; const cl = g.clearance;
+      for (let i = 0; i < cl.length; i++) if (cl[i] >= r) k++;
+      if (passableOf.size >= PASSABLE_KEEP) passableOf.delete(passableOf.keys().next().value!);
+      passableOf.set(key, k);
+    }
+    n += k; if (n > cap) return n;
+  }
+  return n;
+}
 const gridSerials = new WeakMap<LevelGrid, number>();
 let gridSerialNext = 0;
 const serialOf = (g: LevelGrid) => { const c = gridContentKeys.get(g); if (c) return c; let k = gridSerials.get(g); if (k === undefined) gridSerials.set(g, (k = ++gridSerialNext)); return `#${k}`; };
