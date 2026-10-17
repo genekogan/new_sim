@@ -112,7 +112,7 @@ async function replay(runDir) {
 
     const leases = new Map(), open = new Set(), stats = { hints: hints.length, hintsOutsideBuilds: 0, hintsRefused: 0, published: 0, acts: 0, actsRefused: 0, worldOnly: 0, nonSpatial: 0, maxReticles: 0 };
     const steps = [], plan = new Map(); let current = null, currentPlan = null;
-    const reticles = () => sites.inspect().sites.filter(s => s.gaze).map(s => ({ id: s.id, p: [s.gaze.at[0], s.gaze.at[2]], r: point ? 0 : s.gaze.size / 2 }));
+    const reticles = () => sites.inspect().sites.filter(s => s.gaze).map(s => ({ id: s.id, p: [s.gaze.at[0], s.gaze.at[2]], r: point ? 0 : (s.gaze.size ?? 0) / 2 })); // G2: the reticle is a fixed small screen mark now (no world size)
     const observe = () => {
       const seen = reticles(); stats.maxReticles = Math.max(stats.maxReticles, seen.length);
       for (const r of seen) for (const s of [current, currentPlan]) {
