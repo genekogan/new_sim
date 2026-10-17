@@ -130,3 +130,36 @@ test('SIGTERM stops the keeper, its launcher and every world', async () => {
   for (const pid of kids) assert.throws(() => process.kill(pid, 0), 'world process gone');
   assert.equal(status().active, null);
 });
+test('under socket activation (systemd holds the port, LISTEN_FDS=1) a keeper restart queues requests instead of refusing them', async (t) => {
+  // python3 stands in for systemd's sim-worlds@.socket: it binds the port, never accepts, and starts the keeper again
+  // with the socket as fd 3 whenever it exits (systemctl restart = stop + start)
+  const py = spawn('python3', ['-c', 'import sys; sys.exit(0)']); if (await new Promise((r) => { py.once('exit', (c) => r(c)); py.once('error', () => r(-1)); }) !== 0) { t.skip('no python3'); return; }
+  const P = PORT + 3, sdata = join(dir, 'data-socket'), pidFile = join(dir, 'socket-keeper.pid'), stopFile = join(dir, 'socket-stop'); mkdirSync(sdata, { recursive: true });
+  const holder = spawn('python3', ['-c', `
+import os, socket, subprocess, sys, time
+s = socket.socket(); s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('127.0.0.1', ${P})); s.listen(1024)
+if s.fileno() != 3: os.dup2(s.fileno(), 3)
+os.set_inheritable(3, True)
+while not os.path.exists(sys.argv[1]):
+    p = subprocess.Popen(sys.argv[3:], pass_fds=(3,), env={**os.environ, 'LISTEN_FDS': '1'})
+    open(sys.argv[2], 'w').write(str(p.pid)); p.wait(); time.sleep(0.05)
+`, stopFile, pidFile, process.execPath, join(A, 'tools/world-launcher/keeper.mjs'), '--link', A, '--port', String(P), '--range', `${P + 1}-${P + 2}`, '--data', sdata, '--base', '/worlds', '--eager', '0'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  let logs = ''; holder.stdout.on('data', (d) => { logs += d; }); holder.stderr.on('data', (d) => { logs += d; });
+  const get = (ms = 15_000) => fetch(`http://127.0.0.1:${P}/worlds/__sim/healthz`, { signal: AbortSignal.timeout(ms) });   // queued requests wait; startup polls do not
+  const keeperPid = () => { try { return Number(readFileSync(pidFile, 'utf8')); } catch { return 0; } };
+  try {
+    let up = false; for (let i = 0; i < 50 && !up; i++) { try { up = (await get(1000)).ok; } catch { await sleep(100); } }
+    assert.ok(up, `socket-activated keeper serves (${logs.slice(-800)})`); assert.match(logs, /socket from systemd/);
+    const first = keeperPid(); let stop = false; const bad = [];
+    const loop = (async () => { while (!stop) { try { const r = await get(); await r.arrayBuffer(); if (r.status >= 500) bad.push(r.status); } catch (e) { bad.push(e.cause?.code ?? e.message); } await sleep(20); } })();
+    await sleep(200); process.kill(first, 'SIGTERM');
+    for (let i = 0; i < 200 && (keeperPid() === first || !keeperPid()); i++) await sleep(50);
+    let back = false; for (let i = 0; i < 50 && !back; i++) { try { back = (await get(2000)).ok; } catch { /* restarting */ } if (!back) await sleep(100); }
+    await sleep(300); stop = true; await loop;
+    assert.ok(back && keeperPid() !== first, 'a new keeper took the same socket');
+    assert.deepEqual(bad, [], 'no request was refused while the keeper restarted');
+  } finally {
+    writeFileSync(stopFile, ''); const k = keeperPid(); try { if (k) process.kill(k, 'SIGTERM'); } catch { /* gone */ }
+    await new Promise((r) => (holder.exitCode !== null ? r() : holder.once('exit', r)));
+  }
+});
