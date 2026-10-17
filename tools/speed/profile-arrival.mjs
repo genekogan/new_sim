@@ -41,7 +41,7 @@ const INIT = `(() => {
   }, 25);
 })();`;
 
-let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0, stages = [], assetTimes = {};
+let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0, stages = [], assetTimes = {}, assetWorker = null;
 if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [], stages = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
 else {
 console.log('Waiting for speed Chrome lease');
@@ -64,12 +64,12 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });
   await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 });
   ({ profile } = await cdp.send('Profiler.stop'));
-  ({ marks, resources, longtasks, stages, assetTimes, navStart } = await page.evaluate(() => ({ marks: window.__arr.marks, longtasks: window.__arr.longtasks, stages: window.__arr.stages, assetTimes: window.__assetTimes ?? {}, navStart: performance.timeOrigin,
+  ({ marks, resources, longtasks, stages, assetTimes, assetWorker, navStart } = await page.evaluate(() => ({ marks: window.__arr.marks, longtasks: window.__arr.longtasks, stages: window.__arr.stages, assetTimes: window.__assetTimes ?? {}, assetWorker: window.__assetWorker ?? null, navStart: performance.timeOrigin,
     resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name.replace(location.origin, ''), start: Math.round(e.startTime), end: Math.round(e.responseEnd), kb: Math.round((e.encodedBodySize || 0) / 1024) })) })));
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
 for (const g of glbs) if (!resources.some((r) => r.name === g.url && Math.abs(r.start - g.start) < 50)) resources.push({ name: g.url, start: g.start, end: g.end, kb: null, via: 'context' });
-writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes }));
+writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes, assetWorker }));
 }
 
 // ---- analysis: self time per node, mapped through source maps where the script has one

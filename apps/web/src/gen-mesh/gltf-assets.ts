@@ -22,7 +22,7 @@ import { mergeStatic } from './static-merge.ts';
 import { preciseBounds } from './fast-geometry.ts';
 import { addShadowProxy } from './shadow-proxy.ts';
 import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
-import { fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
+import { decodedImagesOf, fetchInWorker, warmAssetWorker } from './asset-fetch.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
@@ -62,8 +62,45 @@ function download(l: GLTFLoader, url: string): Promise<GLTF> {
   if (!bytes) return l.loadAsync(url);
   l.manager.itemStart(url);
   return bytes.then(
-    (buffer) => l.parseAsync(buffer, THREE.LoaderUtils.extractUrlBase(url)).then((g) => { l.manager.itemEnd(url); return g; }, (e: unknown) => { l.manager.itemError(url); l.manager.itemEnd(url); throw e; }),
+    (buffer) => parseWithImages(l, buffer, THREE.LoaderUtils.extractUrlBase(url)).then((g) => { l.manager.itemEnd(url); return g; }, (e: unknown) => { l.manager.itemError(url); l.manager.itemEnd(url); throw e; }),
     (e: { unavailable?: boolean }) => { l.manager.itemEnd(url); if (e?.unavailable) return l.loadAsync(url); l.manager.itemError(url); throw e; });
+}
+// Phone arrival round 2 (lane L3): images the download worker already decoded (asset-fetch.ts) become the parser's image
+// sources, as GLTFLoader's own ImageBitmapLoader path would make them (Texture(bitmap), needsUpdate, the source's extras
+// and mimeType; one source shared as clones). Anything else, or a non-ImageBitmap loader, takes three's path.
+type Parser = { json: { images?: { mimeType?: string; extras?: unknown }[] }; sourceCache: Record<number, Promise<THREE.Texture>>; loadImageSource(i: number, loader: { isImageBitmapLoader?: boolean }): Promise<THREE.Texture> };
+let pendingImages: Map<number, ImageBitmap> | null = null;
+const withImagePlugin = new WeakSet<GLTFLoader>();
+function parseWithImages(l: GLTFLoader, buffer: ArrayBuffer, path: string): Promise<GLTF> {
+  const images = decodedImagesOf(buffer);
+  if (!images) return l.parseAsync(buffer, path);
+  if (!withImagePlugin.has(l)) {
+    withImagePlugin.add(l);
+    l.register((parser) => {
+      const pre = pendingImages, p = parser as unknown as Parser;
+      if (pre) {
+        const own = p.loadImageSource.bind(p);
+        p.loadImageSource = (i, loader) => {
+          const bmp = pre.get(i);
+          if (!bmp || loader.isImageBitmapLoader !== true) return own(i, loader);
+          if (p.sourceCache[i] !== undefined) return p.sourceCache[i].then((t) => t.clone());
+          pre.delete(i);
+          const def = p.json.images![i];
+          const t = new THREE.Texture(bmp); t.needsUpdate = true;
+          if (def.extras !== undefined && typeof def.extras === 'object') Object.assign(t.userData, def.extras);
+          t.userData.mimeType = def.mimeType;
+          return (p.sourceCache[i] = Promise.resolve(t));
+        };
+      }
+      return { name: 'EDEN_worker_images' } as never;
+    });
+  }
+  pendingImages = images;
+  let parsed: Promise<GLTF>;
+  try { parsed = l.parseAsync(buffer, path); } finally { pendingImages = null; }
+  // bitmaps the parse did not take (an unused image, a texture through another loader) are released
+  const release = () => { for (const b of images.values()) b.close(); images.clear(); };
+  return parsed.then((g) => { release(); return g; }, (e: unknown) => { release(); throw e; });
 }
 export function assetFailed(sha: string) { return failed.has(sha); }
 /** W1: shot readiness includes parsing, texture upload and attached GLBs, without a fixed delay. */
