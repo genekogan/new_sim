@@ -2335,7 +2335,8 @@ var PALETTE_LIST = [
   { id: "night", doc: "dark; every lamp lit (use --sun 0.05)" },
   { id: "midnight", doc: "darkest; every lamp lit" },
   { id: "mars-desert", doc: "the Mars camp template's sky (daylight)" },
-  { id: "lm-garden", doc: "the Little Martians garden template's sky (daylight)" }
+  { id: "lm-garden", doc: "the Little Martians garden template's sky (daylight)" },
+  { id: "eden-summer", doc: "the Eden 2026 template's sky: clear summer air, soft blue (daylight)" }
 ];
 
 // lib/schema-md.mjs

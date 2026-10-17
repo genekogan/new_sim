@@ -9,7 +9,7 @@
   "state": {
     "constitution": "# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.",
     "sky": {
-      "palette": "clear-day",
+      "palette": "eden-summer",
       "sun": 0.8
     },
     "ground": {
@@ -35,7 +35,7 @@
           "state": {
             "constitution": "# Eden 2026\nA welcoming shared landscape for rest, study, play, making, conversation and exploration. The commons lies between a pond and a neighbourhood of furnished houses. Paths connect the campus and library annex, cafe, market, gardens, park, canal quarter, hills and harbour.\nOriginal Eden remains preserved independently.",
             "sky": {
-              "palette": "clear-day",
+              "palette": "eden-summer",
               "sun": 0.8
             },
             "ground": {

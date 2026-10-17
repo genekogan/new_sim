@@ -9,5 +9,7 @@ const look = (zenith: string, horizon: string, fog: number): SkyLook => ({ zenit
 export const SKY_LOOKS: Record<string, SkyLook> = {
   // Mars College, Salton basin (2026 drone frames): deep blue overhead, pale near the horizon, clear dry air
   'mars-desert': look('#0466aa', '#79b6da', 0.2),
+  // Eden 2026: old /w/eden's clear summer air — a soft blue sky and less haze, so the far lakes and hills keep their colour
+  'eden-summer': look('#5f95c8', '#cfdce4', 0.45),
 };
 export const skyLook = (palette: unknown): SkyLook | null => (typeof palette === 'string' ? SKY_LOOKS[palette] ?? null : null);

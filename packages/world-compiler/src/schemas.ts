@@ -235,7 +235,7 @@ export type WorldConstants = z.infer<typeof worldConstantsSchema>;
 /** Sky palettes the `world` op accepts. The viewer's lamps read night/midnight as night and dawn/dusk/sunset/twilight as half-night; the rest follow `sun`. */
 /** Weather kinds of the `world` op (R4-LIVE): 'auto' follows the live worlds' schedule; 'manual' shows the channels as set. */
 export const WEATHER_KINDS = ['auto', 'manual', 'clear', 'cloudy', 'rain', 'wind', 'fog', 'storm'] as const;
-export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden'] as const;
+export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden', 'eden-summer'] as const;
 const strikeSchema = z.object({ x: num, z: num, n: z.number().int().min(1), tick: z.number().int().min(0) });
 export const worldStateSchema = z.object({
   sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
