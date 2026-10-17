@@ -180,6 +180,13 @@ for (let i = 0; i < 13; i++) {
 // Batches stay small enough for ordinary Godmode commits. Phase is consumed by
 // the template composer; do not put foundations between terrain sub-batches.
 const batches = (phase, name, ops, size = 18) => Array.from({ length: Math.ceil(ops.length / size) }, (_, i) => ({ name: `${name}-${i+1}`, phase, ops: ops.slice(i*size, (i+1)*size) }));
+// The abbey cloister (region-abbey.cloister, 18 x 16 round (-162,117.5)) sits on the abbey knoll's flank: its wings stand on
+// ~0.75 m foundations but the open court between them was left at the knoll's 2-4 m, so the court-side doors opened onto a
+// bank. Flatten the footprint to the wing floors; the 3 m inward edge keeps the court (3.2 m in) fully level. build.mjs
+// applies it as the very last op: placed earlier it would shift every later entity id, and overlapping foundation pads apply
+// in id order, so the cliff village's pads and the rail joints would resettle (L4a/doors, 2026-10-17).
+export const ABBEY_COURT = area('terrace', 'abbey-cloister-court', rect(-171,109.5,-153,125.5), { level: 0.75, edge: 3 });
+
 export const LANDSCAPE_BATCHES = [
   ...batches('terrain', 'relief-and-water', terrain),
   ...batches('detail', 'waterside', waterside),
