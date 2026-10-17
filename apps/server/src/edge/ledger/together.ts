@@ -90,7 +90,7 @@ type Follow = {receipt: string; soulId: string; target: string; untilTick: numbe
 
 /** What the ledger lends this module (closures over its internals). */
 export type TogetherPort = {
-  host: WorldHost; db: Db; places: PlaceIndex; spots: SpotsData;
+  host: WorldHost; db: Db; places: PlaceIndex; spots: () => SpotsData;
   body(entityId: string): NativeWorld['entities'][string] | undefined;
   perceived(soulId: string, radius: number): NearbyBody[];
   receipt(soulId: string, id: string): EdgeReceipt | null;
@@ -218,8 +218,8 @@ export class Together {
     if (this.sourceCache?.key === key) return this.sourceCache.list;
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
-    for (const s of this.p.spots.shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
-    for (const s of this.p.spots.spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
+    for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
+    for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       if (!this.w.regions[place.id] || place.kind === 'water' || place.carrier) continue;

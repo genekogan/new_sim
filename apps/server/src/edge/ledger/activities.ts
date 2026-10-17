@@ -16,8 +16,11 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
    *  waits for them and what happens alone (fail: "nobody came" is the honest verdict). */
   together?: {group: string; need: number; wait: number; alone: 'fail' | 'start'};
   /** R5: another spot that must be in use first (a listener's seat needs someone telling the story). */
-  requires?: string};
-export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2};
+  requires?: string;
+  /** E-life (god worlds): a native seat fixture to sit on first (a library armchair, a café chair, the piano's bench); the
+   *  activity is then done on that seat. `level`: the engine level the spot stands on (a desk upstairs). */
+  seat?: string; level?: number};
+export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
 export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[]};
@@ -105,7 +108,7 @@ export const STARS_FROM = 20, STARS_UNTIL = 5;
 
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const pose = (activity: string, seconds: number, extra: Record<string, unknown> = {}) => ({verb: 'mars:pose_v1', params: {activity, seconds, ...extra}});
-const walk = (to: V2) => ({verb: 'walk_to', params: {to: [to[0], to[1]]}});
+const walk = (to: V2, level?: number) => level ? {verb: 'mars:walk_to', params: {x: to[0], z: to[1], level}} : {verb: 'walk_to', params: {to: [to[0], to[1]]}};
 const standFirst = (w: ActivityWorld): Program['steps'] => w.seated ? [{verb: 'stand', params: {}}] : [];
 const secondsParam = (def: number, max = 1800) => ({seconds: {type: 'integer', min: 5, max, default: def}});
 export const ACTIVITY_SECONDS_MAX = 1800;
@@ -117,6 +120,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   // CN5 (acceptance): a spot World placed inside an obstacle (the picnic seats inside their table's box) is used from the
   // first clear point straight back from what it faces (≤ 0.9 m); one with no clear point near it is not offered
   const standAt = new Map<string, V2 | null>(), clearAt = (s: Spot): V2 | null => {
+    if (s.seat || s.level) return s.at;   // a seat fixture is approached by the engine's own sit; upstairs ground is not ours to probe
     if (!standAt.has(s.id)) {
       let at: V2 | null = s.at;
       // only a spot inside an obstacle (no clearance at all) moves; seats and benches close to furniture are as World placed them
@@ -131,7 +135,8 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const live = data.spots.filter(s => w.enterable(s.place) && !!clearAt(s));
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
-    return [...standFirst(w), walk(clearAt(s) ?? s.at), pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
+    const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level);
+    return [...standFirst(w), reach, pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
       ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {}),
       // leisure: done together (a see-saw): wait for the other end, then the same shared stretch for both
@@ -140,8 +145,8 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
   /** Reading at a spot: take a book from the nearest shelf, read, put it back. */
   const readAt = (s: Spot): Program['steps'] => {
-    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelf.at), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
-    return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...browse(3)];
+    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelf.at, shelf.level), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
+    return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3)];
   };
   // ---- sitting and lying, anywhere
   const seat = w.seat(30), groundHere = w.clearance(w.me[0], w.me[1]), sitGround = (sec: number): Program['steps'] => {
