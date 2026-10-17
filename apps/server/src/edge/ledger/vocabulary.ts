@@ -251,7 +251,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
     const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
     const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
-    return {kind: 'unknown', code: water ? 'ride.no-water-route' : 'ride.unavailable', reason: water ? 'No rowing punt is offered on that water. It needs water large enough for a safe loop and a reachable bank; nothing else was chosen.' : 'No matching ride is offered here; nothing else was chosen.', didYouMean: []};
+    // E-life (Eden 2026 quality case 22): with no punt anywhere in this world the refusal is terminal (the agent walked off to look)
+    const punts = water ? ctx.elsewhere?.('punt') : undefined;
+    return {kind: 'unknown', code: water ? 'ride.no-water-route' : 'ride.unavailable', reason: water ? (punts === null ? 'There is no rowing boat or punt to row in this world.' + NOWHERE : 'No rowing punt is offered on that water. It needs water large enough for a safe loop and a reachable bank; nothing else was chosen.') : 'No matching ride is offered here; nothing else was chosen.', didYouMean: []};
   }
   // CN5: "go fishing", "go swimming": the doing word decides; an unknown one is refused, never taken as a place
   const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
