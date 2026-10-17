@@ -80,6 +80,8 @@ const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
 const BUILDINGS_WITHIN = 150;
+const PLACE_M2 = 300;       // ... at least this big (a court or a garden, not a paving tile or an exhibit's pad)
+const PLACES_WITHIN = 400;   // an open area that is one of the world's places (a court, a garden) stays offered within this many metres
 const BIG_THING_M2 = 200;    // a root thing whose solids spread over at least this much ground is offered like a building
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
@@ -326,7 +328,9 @@ export class GodNav {
     // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
     // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
     // (and big stand-alone structures, so a Soul in a furnished room can still head for Freeside across the camp)
-    for (const x of ranked.slice(SHOW)) if ((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) pick.push(x);
+    // ... and the world's open-area places (courts, gardens) within PLACES_WITHIN (Little Martians: from Madmaraca's court 236 painted
+    // courts and 96 exhibits are nearer than the Minarete court, so `walk:minarete-court` was refused while jog-around was offered)
+    for (const x of ranked.slice(SHOW)) if (((x.t.kind === 'building' || x.t.big) && x.d <= BUILDINGS_WITHIN) || (x.d <= PLACES_WITHIN && !!x.t.area && polyArea(x.t.area) >= PLACE_M2 && !!this.h.placeOf?.(x.t.ref))) pick.push(x);
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;

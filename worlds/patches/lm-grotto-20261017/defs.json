@@ -1,0 +1,10 @@
+[
+ {
+  "schema": "def/1", "name": "lm-grotto-approach", "version": 1,
+  "description": "The gentle approach down into the Grotto of Painted Worlds: the ground in front of the vault's doorway eases down to the grotto floor (0.8 m lower) instead of dropping in a steep step.",
+  "tags": ["landform", "ground", "littlemartians"], "form": "point",
+  "make": { "kind": "none" },
+  "components": { "landform": { "kind": "plateau", "area": [[-5, -4.5], [5, -4.5], [5, 4.5], [-5, 4.5]], "h": -0.8, "edge": 7 } },
+  "layer": "surface", "size": { "box": [10, 0.1, 9] }
+ }
+]
