@@ -31,6 +31,26 @@ export function balloonRoute(name: string, home: V3): { route: string; keys: Rou
   return { route: `ring-150`, keys: ring };
 }
 
+/** E-life B7: a god's ferris wheel or carousel as a ride: its two-place car boards at the front and goes round with the
+ *  wheel (once round a ferris wheel at its own 0.8 rpm, 75 s; three turns of a carousel, 45 s), then back. Keys in the
+ *  thing's own frame (x across, y up, z out of its front), turned and moved by its world pose. */
+export function attractionRoute(kind: 'ferris-wheel' | 'carousel', wp: { x: number; z: number; yaw: number; s: number }, ground: number, size: [number, number, number]): { home: V3; keys: RouteKey[]; route: string } {
+  const c = Math.cos(wp.yaw), sn = Math.sin(wp.yaw), W = (x: number, y: number, z: number): V3 => [r2(wp.x + (x * c + z * sn) * wp.s), r2(ground + y * wp.s), r2(wp.z + (-x * sn + z * c) * wp.s)];
+  const keys: RouteKey[] = [];
+  if (kind === 'ferris-wheel') {
+    const R = Math.max(2, size[0] / 2 - 1.0), cy = R + 1.0, front = size[2] / 2 + 1.6, home = W(0, 0, front + 1.5);
+    keys.push({ t: 0, p: home }, { t: 6, p: W(0, cy - R, front) });
+    for (let k = 1; k <= 8; k++) { const a = (k / 8) * Math.PI * 2; keys.push({ t: 6 + k * 75 / 8, p: W(R * Math.sin(a), cy - R * Math.cos(a), front) }); }
+    keys.push({ t: 6 + 75 + 6, p: home });
+    return { home, keys, route: 'ferris-wheel-once' };
+  }
+  const R = Math.max(1.5, size[0] / 2 - 1.5), out = size[2] / 2 + 1.6, home = W(0, 0, out);
+  keys.push({ t: 0, p: home }, { t: 4, p: W(0, 0.6, R) });
+  for (let k = 1; k <= 24; k++) { const a = (k / 8) * Math.PI * 2; keys.push({ t: 4 + k * 45 / 24, p: W(R * Math.sin(a), 0.6, R * Math.cos(a)) }); }
+  keys.push({ t: 4 + 45 + 4, p: home });
+  return { home, keys, route: 'carousel-three-turns' };
+}
+
 export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: WorldModel; log?: (m: string) => void }) {
   const { host, edge, model } = o, log = o.log ?? (() => {});
   const engine = () => host.engine as any;
@@ -39,7 +59,15 @@ export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: W
   const wanted = (): (CarrierInstallSpec & { entity: string })[] => {
     const out: (CarrierInstallSpec & { entity: string })[] = [];
     for (const e of model.entities.values()) {
-      const def = model.resolvedDef(e.def) as any; if (!def?.components?.carrier || !(def.tags ?? []).includes('balloon')) continue;
+      const def = model.resolvedDef(e.def) as any; if (!def?.components?.carrier) continue;
+      const tags: string[] = def.tags ?? [], attraction = tags.includes('ferris-wheel') ? 'ferris-wheel' : tags.includes('carousel') ? 'carousel' : null;
+      if (attraction && e.in.parent === 'world') {
+        const wp = model.worldPose(e), name = String(e.name ?? ''), id = /^[a-z0-9][a-z0-9._-]{0,99}$/.test(name) && !model.entities.has(name) ? name : `ride-${e.id.toLowerCase()}`;
+        const baked = model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), r = attractionRoute(attraction, wp, model.terrain.sample(wp.x, wp.z), baked.box as [number, number, number]);
+        out.push({ entity: e.id, id, def: 'hot-air-balloon', label: (name || attraction).replace(/-/g, ' '), at: [r.home[0], r.home[2]], y: r.home[1], yaw: wp.yaw - Math.PI / 2, route: r.route, routeKeys: r.keys, waitSeconds: 30 });
+        continue;
+      }
+      if (!tags.includes('balloon')) continue;
       const wp = model.worldPose(e), home: V3 = [r2(wp.x), r2(model.terrain.sample(wp.x, wp.z)), r2(wp.z)];
       const name = String(e.name ?? ''), id = /^[a-z0-9][a-z0-9._-]{0,99}$/.test(name) && !model.entities.has(name) ? name : `ride-${e.id.toLowerCase()}`;
       const r = balloonRoute(name, home);
@@ -51,8 +79,9 @@ export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: W
     if (!edge.comms) return;
     for (const c of (engine().carriers?.() ?? []) as { id: string; def: string; label: string; pose: { p: number[] } }[]) {
       if (c.def !== 'hot-air-balloon' || edge.comms.objects.all().some((x) => x.id === `ride-${c.id}`)) continue;
+      const vehicle = /ferris/.test(c.id) ? 'ferris-wheel' : /carousel/.test(c.id) ? 'carousel' : 'balloon';
       const place = edge.places.containing(c.pose.p[0], c.pose.p[2], 0).find((p) => !p.carrier)?.id ?? [...edge.places.byId.values()].find((p) => p.parent === null)?.id;
-      if (place) try { edge.comms.objects.create({ id: `ride-${c.id}`, kind: 'ride', name: c.label, placeId: place, params: { carrier: c.id, vehicle: 'balloon' } }); } catch { /* exists */ }
+      if (place) try { edge.comms.objects.create({ id: `ride-${c.id}`, kind: 'ride', name: c.label, placeId: place, params: { carrier: c.id, vehicle } }); } catch { /* exists */ }
     }
   };
   const reconcile = () => {

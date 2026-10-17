@@ -282,3 +282,23 @@ test('group life: a see-saw for two, a story by the campfire (listeners only whi
   assert.ok(gr.seen); assert.equal(gr.r.phase, 'completed', JSON.stringify(gr.r));
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
+
+test('B7: a god-built ferris wheel is a ride: a resident boards, goes round the wheel (top >10 m) and steps off', { timeout: 900000 }, async (t) => {
+  const { Hono } = await import('hono');
+  const { mountEdgeRoutes, edgeSoulResolver } = await import('../edge/routes.ts');
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('ferris-wheel'), name: 'big-wheel', p: [20, 20] }]);
+  const app = new Hono(), comms = mountEdgeRoutes(app, { host: w.host, db: w.db, souls: w.souls, soul: edgeSoulResolver(w.host, w.souls, () => undefined), ledger: w.edge } as never);
+  t.after(() => comms.close());
+  const ana = await w.soul('Ana');
+  for (let i = 0; i < 60; i++) await w.settle(1);
+  assert.ok((w.host.engine as any).world.entities['big-wheel']?.carrier, 'a native car was installed at the wheel');
+  const join = w.edge.capabilities(ana).find((c: any) => c.id === 'object:ride-big-wheel:join');
+  assert.ok(join?.available, 'join offered');
+  const { r } = await w.act(ana, join!.id);
+  assert.equal(r.phase, 'completed', 'aboard: ' + JSON.stringify(r));
+  let maxY = 0, off = false;
+  for (let i = 0; i < 20 * 180; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); const b = w.body(ana); maxY = Math.max(maxY, b.pose.p[1]); if (maxY > 5 && !b.human.carrier) { off = true; break; } }
+  assert.ok(maxY > 10, `went round the wheel (top ${maxY.toFixed(1)} m)`);
+  assert.ok(off, 'stepped off after one turn');
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
