@@ -63530,6 +63530,157 @@
       ]
     },
     {
+      "note": "scenery: park pond lilies and stall",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-1",
+          "p": [
+            -10,
+            110
+          ],
+          "r": 0,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-2",
+          "p": [
+            -9.2,
+            110.8
+          ],
+          "r": 0.9,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-3",
+          "p": [
+            -7.5,
+            113
+          ],
+          "r": 1.8,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-4",
+          "p": [
+            -3,
+            109
+          ],
+          "r": 2.7,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-5",
+          "p": [
+            -2.2,
+            108.6
+          ],
+          "r": 3.6,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-6",
+          "p": [
+            1,
+            115
+          ],
+          "r": 4.5,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-7",
+          "p": [
+            1.8,
+            114.4
+          ],
+          "r": 5.4,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-8",
+          "p": [
+            -13,
+            115
+          ],
+          "r": 6.3,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-9",
+          "p": [
+            -12.3,
+            115.8
+          ],
+          "r": 7.2,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-10",
+          "p": [
+            -5,
+            116.5
+          ],
+          "r": 8.1,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-11",
+          "p": [
+            2.5,
+            110.5
+          ],
+          "r": 9,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/lilypad-pack@1",
+          "name": "park-pond-lilies-12",
+          "p": [
+            3.2,
+            111.2
+          ],
+          "r": 9.9,
+          "s": 2.5
+        },
+        {
+          "op": "place",
+          "def": "core/market-stall@1",
+          "name": "park-ice-cream-stall",
+          "p": [
+            -27,
+            104
+          ],
+          "r": 1.5707963267948966,
+          "params": {
+            "awning": "#e88aa0"
+          }
+        }
+      ]
+    },
+    {
       "note": "scenery: park pond kerb",
       "group": "eden-2026",
       "ops": [

@@ -159,6 +159,11 @@ group('scenery: market pergola stalls', put => {
   put('market-stall', 'market-pergola-stall-1', [66.5, 29.5], { params: { awning: '#d9473e' } }); put('market-stall', 'market-pergola-stall-2', [71.5, 29.5], { params: { awning: '#f2c14e' } });
   put('crate', 'market-pergola-crate-1', [69, 31.2]); put('crate', 'market-pergola-crate-2', [69.8, 31.3], { r: 0.4 }); put('barrel', 'market-pergola-barrel', [73.8, 31.4]);
 });
+// lily pads on the park pond and the pink-striped ice-cream stall by its west path (old Eden's park)
+group('scenery: park pond lilies and stall', put => {
+  [[-10, 110], [-9.2, 110.8], [-7.5, 113], [-3, 109], [-2.2, 108.6], [1, 115], [1.8, 114.4], [-13, 115], [-12.3, 115.8], [-5, 116.5], [2.5, 110.5], [3.2, 111.2]].forEach(([x, z], i) => put('lilypad-pack', `park-pond-lilies-${i + 1}`, [x, z], { r: i * 0.9, s: 2.5 }));
+  put('market-stall', 'park-ice-cream-stall', [-27, 104], { r: Math.PI / 2, params: { awning: '#e88aa0' } });
+});
 // V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
 {
   const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
