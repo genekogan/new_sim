@@ -22,7 +22,8 @@ const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i
 if (!url) { console.error('usage: profile-arrival.mjs <worldUrl> --out <dir>'); process.exit(2); }
 const target = new URL(url), port = Number(target.port);
 const lanePorts = (process.env.SPEED_PORTS ?? '').split(',').filter(Boolean).map(Number);
-if (!['localhost', '127.0.0.1'].includes(target.hostname) || (port >= 4930 && port <= 4990) || !(lanePorts.includes(port) || (port >= 5890 && port <= 5899))) throw new Error('lane ports only (SPEED_PORTS)');
+const live = args.includes('--live'); // read-only stranger load of the real site: https://sim.eden.art only, no dev flags
+if (live ? target.origin !== 'https://sim.eden.art' : (!['localhost', '127.0.0.1'].includes(target.hostname) || (port >= 4930 && port <= 4990) || !(lanePorts.includes(port) || (port >= 5890 && port <= 5899)))) throw new Error('lane ports only (SPEED_PORTS), or --live for https://sim.eden.art');
 const out = resolve(opt('out', '.lane/profile')); mkdirSync(out, { recursive: true });
 const desktop = args.includes('--desktop'), warm = args.includes('--warm');
 const cpu = Number(opt('cpu', desktop ? '1' : '4')), mbps = Number(opt('mbps', desktop ? '0' : '60')), interval = Number(opt('interval', '250'));
@@ -41,10 +42,12 @@ const INIT = `(() => {
     const ag = window.__arrivalGate; if (ag && P.marks.gatePlanned === undefined && ag.left().length) P.marks.gatePlanned = performance.now(); if (ag && P.marks.gatePlanned !== undefined && P.marks.gateClear === undefined && !ag.pending()) P.marks.gateClear = performance.now(); if (ag && P.marks.gatePlanned !== undefined) { const L = ag.left(); const k = L.length + ':' + L.slice(0, 4).map((x) => x.slice(0, 8)).join(','); if (P.stages.at(-1)?.[1] !== 'gate ' + k) P.stages.push([Math.round(performance.now()), 'gate ' + k]); }
     const st = window.__assetStages; if (st) { const n = {}; for (const v of Object.values(st)) n[v] = (n[v] ?? 0) + 1; const key = JSON.stringify(n); if (P.stages.at(-1)?.[1] !== key) P.stages.push([Math.round(performance.now()), key]); }
     const card = document.querySelector('.viewer-arrival'); if (card && P.marks.cardSeen === undefined) P.marks.cardSeen = performance.now();
+    const ct = card ? (card.textContent || '').trim().slice(0, 48) : ''; if (ct && P.cardText !== ct) { P.cardText = ct; P.stages.push([Math.round(performance.now()), 'card ' + ct]); }
     if (P.marks.cardSeen !== undefined && P.marks.cardDone === undefined && (!card || card.getAttribute('data-done') === 'true')) { P.marks.cardDone = performance.now(); clearInterval(poll); }
   }, 25);
 })();`;
 
+let wsFrames = [];
 let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0, stages = [], assetTimes = {}, assetWorker = null;
 if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [], stages = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
 else {
@@ -53,12 +56,13 @@ const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinit
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 try {
   const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: !desktop, hasTouch: !desktop });
-  await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
+  if (!live) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
   // GLB timing from the browser context (Playwright follows worker requests too; Resource Timing only sees the page's)
   ctx.on('requestfinished', (r) => { if (!/\.glb(\?|$)/.test(r.url())) return; const t = r.timing(); glbs.push({ url: r.url().replace(/^https?:\/\/[^/]+/, ''), start: Math.round(t.startTime - navAt), end: Math.round(t.startTime + t.responseEnd - navAt), worker: (() => { try { r.frame(); return false; } catch { return true; } })() }); });
   const cdp = await ctx.newCDPSession(page);
+  cdp.on('Network.webSocketFrameReceived', (e) => { if (navAt) wsFrames.push([Date.now() - navAt, (e.response?.payloadData ?? '').length]); });
   await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: !warm });
   if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0; }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
@@ -74,7 +78,7 @@ try {
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
 for (const g of glbs) if (!resources.some((r) => r.name === g.url && Math.abs(r.start - g.start) < 50)) resources.push({ name: g.url, start: g.start, end: g.end, kb: null, via: 'context' });
-writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes, assetWorker }));
+writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes, assetWorker, wsFrames }));
 }
 
 // ---- analysis: self time per node, mapped through source maps where the script has one
