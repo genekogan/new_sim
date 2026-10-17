@@ -22,11 +22,11 @@ export async function lifeWorld(t: any, ops: any[]) {
   const r: any = god.act({ ops }, 'set the scene');
   assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 800));
   await settle(3);
-  const souls: any[] = [];
+  const residents: any[] = [];
   const soul = async (name: string) => {
     await invite(f, name.toLowerCase());
     const row: any = await accept(f.host, f.souls.create(`dev:${name.toLowerCase()}`, { name, description: 'a resident' }));
-    const s = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner }; souls.push(s); await settle(3); return s;
+    const s = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner }; residents.push(s); await settle(3); return s;
   };
   const byName = (n: string) => [...god.model.entities.values()].find((e: any) => e.name === n) as any;
   const body = (s: any) => (f.host.engine.world as any).entities[s.entityId];
@@ -44,7 +44,7 @@ export async function lifeWorld(t: any, ops: any[]) {
     }
     return { r: edge.receipt(s.soulId, id) as any, seen };
   };
-  return { ...f, god, edge, bridge, settle, soul, byName, body, act, souls };
+  return { ...f, god, edge, bridge, settle, soul, byName, body, act, residents };
 }
 
 test('B6: a resident warms up by a god-built core campfire, and not by one that is put out', { timeout: 600000 }, async (t) => {
@@ -203,5 +203,28 @@ test('B9: a resident gives a talk at the podium; another attends it from a seat,
   const { r, seen } = await w.act(bo, at.id, { seconds: 10 }, () => w.body(bo)?.human?.activity === 'listen' && w.body(ana)?.human?.activity === 'tell-story' ? w.body(bo).human.baseActivity : null);
   assert.equal(seen, 'sit', 'Bo listened seated while Ana talked');
   assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
+
+test('B7: a god-built balloon is a native ride: a resident joins, flies its loop and steps out back home', { timeout: 900000 }, async (t) => {
+  const { Hono } = await import('hono');
+  const { mountEdgeRoutes, edgeSoulResolver } = await import('../edge/routes.ts');
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('balloon'), name: 'sky-balloon', p: [20, 20] }]);
+  const app = new Hono(), comms = mountEdgeRoutes(app, { host: w.host, db: w.db, souls: w.souls, soul: edgeSoulResolver(w.host, w.souls, () => undefined), ledger: w.edge } as never);
+  t.after(() => comms.close());
+  const ana = await w.soul('Ana');
+  for (let i = 0; i < 60; i++) await w.settle(1);
+  const carrier = (w.host.engine as any).world.entities['sky-balloon'];
+  assert.ok(carrier?.carrier, 'a native carrier was installed at the god balloon: ' + JSON.stringify(Object.keys((w.host.engine as any).world.entities).filter((k) => /balloon/.test(k))));
+  assert.deepEqual([Math.round(carrier.pose.p[0]), Math.round(carrier.pose.p[2])], [20, 20]);
+  const join = w.edge.capabilities(ana).find((c: any) => c.id === 'object:ride-sky-balloon:join');
+  assert.ok(join?.available, 'join offered: ' + w.edge.capabilities(ana).filter((c: any) => /ride|balloon/.test(c.id)).map((c: any) => c.id).join(' '));
+  const { r } = await w.act(ana, join!.id);
+  assert.equal(r.phase, 'completed', 'seated in the basket: ' + JSON.stringify(r));
+  let maxY = 0, landed = false;
+  for (let i = 0; i < 20 * 420; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); const b = w.body(ana); maxY = Math.max(maxY, b.pose.p[1]); if (maxY > 20 && !b.human.carrier) { landed = true; break; } }
+  assert.ok(maxY > 50, `flew up (max ${maxY.toFixed(1)} m)`);
+  assert.ok(landed, 'landed and stepped out');
+  assert.ok(Math.hypot(w.body(ana).pose.p[0] - 20, w.body(ana).pose.p[2] - 20) < 5, 'back at the launch spot');
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });

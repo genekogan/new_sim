@@ -20,6 +20,7 @@ import { GodPlaces, inPoly } from './places.ts';
 import { GodLayers } from './layers.ts';
 import { GodActivitySpots } from './activity-spots.ts';
 import { GodMeals } from './meals.ts';
+import { installGodRides } from './rides.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -112,6 +113,8 @@ export class EngineBridge {
   readonly activitySpots: GodActivitySpots;
   /** E-life B2: finite meals (meals.ts). */
   meals?: GodMeals;
+  /** E-life B7: god balloons as native rides (rides.ts). */
+  rides?: ReturnType<typeof installGodRides>;
   private godEdits = 0;
 
   constructor(o: BridgeOptions) {
@@ -164,6 +167,7 @@ export class EngineBridge {
       const edge = this.edge;
       this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
       edge.onReceipt((r) => { try { this.meals!.onReceipt(r); } catch (e) { this.log(`meals: ${(e as Error).message}`); } });
+      this.rides = installGodRides({ host: this.host, edge, model: this.god.model, log: (m) => this.log(m) });
     }
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
@@ -272,7 +276,9 @@ export class EngineBridge {
     if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
       const fp = this.model.footprint(e, def);
       const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
-      if (solids.length) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
+      // E-life B7: a god balloon is depiction; its body on the ground is the native ride installed at its spot (rides.ts)
+      const nativeRide = !!(def.components as Record<string, unknown>).carrier && def.tags.includes('balloon');
+      if (solids.length && !nativeRide) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
     }
     // closed doors block their gap
     const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;

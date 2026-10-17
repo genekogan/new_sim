@@ -1,0 +1,72 @@
+// E-life B7 (overnight 2026-10-17): a god-built balloon is a ride residents take, as old Eden's balloon was.
+// A god's balloon (a def with a `carrier` component tagged balloon: core/balloon, Eden 2026's launch balloon) is depiction
+// only; old Eden's ride was a native carrier (carrier/1: a basket with two places that flies a deterministic route and
+// lands, its riders carried and stepping out by themselves) plus the social `ride` object. This installs exactly that
+// native carrier at the god balloon's spot, through the host's logged rules fact (host.installCarrierV1, as the rowing
+// punts are installed), then publishes the `ride` object, so join/leave/invite/receipts are the old ride's own.
+//   • The balloon named `eden-balloon` at old Eden's launch meadow flies old Eden's sightseeing loop (11.2 min, brisk),
+//     moved to start and end at its home; the viewer's balloon ride follows the native carrier `eden-balloon`.
+//   • Any other god balloon flies a 6-minute loop round its own home (a 150 m ring at 60–80 m up).
+// Prospective only: a carrier is installed once (idempotent by id); earlier history replays unchanged.
+import type { WorldModel } from '@sim/world-compiler';
+import type { WorldHost } from '../world.ts';
+import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { CARRIER_ROUTES, type CarrierInstallSpec, type RouteKey } from '../../../../mars/viewer/engine/vehicles/carrier.ts';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type V3 = [number, number, number];
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** The native carrier route for a balloon at `home`: old Eden's loop moved to it, or a ring round it. */
+export function balloonRoute(name: string, home: V3): { route: string; keys: RouteKey[] } {
+  const old = CARRIER_ROUTES['eden-commons-loop-brisk'], k0 = old.keys[0].p;
+  if (name === 'eden-balloon' && Math.hypot(home[0] - k0[0], home[2] - k0[2]) < 25) {
+    const d: V3 = [home[0] - k0[0], home[1] - k0[1], home[2] - k0[2]];
+    return { route: 'eden-commons-loop-brisk', keys: old.keys.map((k, i) => ({ t: k.t, p: (i === 0 || i === old.keys.length - 1 ? [...home] : [r2(k.p[0] + d[0]), r2(k.p[1] + d[1]), r2(k.p[2] + d[2])]) as V3 })) };
+  }
+  const ring: RouteKey[] = [{ t: 0, p: [...home] as V3 }, { t: 30, p: [r2(home[0]), r2(home[1] + 30), r2(home[2])] }];
+  for (let i = 0; i <= 8; i++) { const a = (i / 8) * Math.PI * 2; ring.push({ t: 60 + i * 30, p: [r2(home[0] + 150 * Math.sin(a)), r2(home[1] + 60 + 20 * Math.sin(2 * a)), r2(home[2] - 150 + 150 * Math.cos(a))] }); }
+  ring.push({ t: 360, p: [...home] as V3 });
+  // the ring starts and ends straight above home (a = 0 → (x, z - 150 + 150)); the climb and descent are vertical
+  return { route: `ring-150`, keys: ring };
+}
+
+export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: WorldModel; log?: (m: string) => void }) {
+  const { host, edge, model } = o, log = o.log ?? (() => {});
+  const engine = () => host.engine as any;
+  let busy = false, retryAt = 0, closed = false;
+  /** The god balloons and the native carrier each one should have. */
+  const wanted = (): (CarrierInstallSpec & { entity: string })[] => {
+    const out: (CarrierInstallSpec & { entity: string })[] = [];
+    for (const e of model.entities.values()) {
+      const def = model.resolvedDef(e.def) as any; if (!def?.components?.carrier || !(def.tags ?? []).includes('balloon')) continue;
+      const wp = model.worldPose(e), home: V3 = [r2(wp.x), r2(model.terrain.sample(wp.x, wp.z)), r2(wp.z)];
+      const name = String(e.name ?? ''), id = /^[a-z0-9][a-z0-9._-]{0,99}$/.test(name) && !model.entities.has(name) ? name : `ride-${e.id.toLowerCase()}`;
+      const r = balloonRoute(name, home);
+      out.push({ entity: e.id, id, def: 'hot-air-balloon', label: (name || 'balloon').replace(/-/g, ' '), at: [home[0], home[2]], y: home[1], yaw: Math.PI, route: r.route, routeKeys: r.keys, waitSeconds: 60 });
+    }
+    return out;
+  };
+  const publish = () => {
+    if (!edge.comms) return;
+    for (const c of (engine().carriers?.() ?? []) as { id: string; def: string; label: string; pose: { p: number[] } }[]) {
+      if (c.def !== 'hot-air-balloon' || edge.comms.objects.all().some((x) => x.id === `ride-${c.id}`)) continue;
+      const place = edge.places.containing(c.pose.p[0], c.pose.p[2], 0).find((p) => !p.carrier)?.id ?? [...edge.places.byId.values()].find((p) => p.parent === null)?.id;
+      if (place) try { edge.comms.objects.create({ id: `ride-${c.id}`, kind: 'ride', name: c.label, placeId: place, params: { carrier: c.id, vehicle: 'balloon' } }); } catch { /* exists */ }
+    }
+  };
+  const reconcile = () => {
+    if (closed || busy) return;
+    publish();
+    if (host.engine.world.tick < retryAt) return;
+    retryAt = host.engine.world.tick + 20 * 60;
+    const missing = wanted().filter((s) => !engine().world.entities[s.id]?.carrier);
+    if (!missing.length) return;
+    busy = true;
+    void (async () => { for (const spec of missing) { if (closed) break; const { entity: _e, ...s } = spec; try { await host.installCarrierV1(s); log(`balloon ride installed: ${s.id} (${s.route})`); } catch (error) { log(`balloon ride refused: ${s.id}: ${error instanceof Error ? error.message : String(error)}`); } } publish(); })()
+      .finally(() => { busy = false; });
+  };
+  const listener = { afterTick: (tick: number) => { if (tick % 20 === 10) reconcile(); } };
+  host.listeners.push(listener as never);
+  return { reconcile, wanted, close() { closed = true; const at = host.listeners.indexOf(listener as never); if (at >= 0) host.listeners.splice(at, 1); } };
+}
