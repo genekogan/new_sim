@@ -319,18 +319,20 @@ export async function main(args = process.argv.slice(2)) {
   let out = join(ROOT, '.lane/release-gate', new Date().toISOString().replace(/[:.]/g, '-'));
   try {
     const candidateRef = args.shift();
-    if (!candidateRef || candidateRef.startsWith('-')) throw Error('usage: release-gate.sh <candidate-ref> [--out <dir>] [--baseline-results <dir> --candidate-results <dir>]');
+    if (!candidateRef || candidateRef.startsWith('-')) throw Error('usage: release-gate.sh <candidate-ref> [--baseline <ref>] [--out <dir>] [--baseline-results <dir> --candidate-results <dir>]');
     const options = {};
     while (args.length) {
       const option = args.shift();
-      if (!['--out', '--baseline-results', '--candidate-results', '--node'].includes(option) || !args.length) throw Error(`invalid option ${option}`);
+      if (!['--out', '--baseline', '--baseline-results', '--candidate-results', '--node'].includes(option) || !args.length) throw Error(`invalid option ${option}`);
       if (options[option]) throw Error(`duplicate option ${option}`);
       options[option] = args.shift();
     }
     if (options['--out']) out = resolve(options['--out']);
     if (existsSync(join(out, 'receipt.json'))) { const previous = out; out = join(out, `rejected-attempt-${Date.now()}`); throw Error(`output already has a receipt: ${previous}`); }
     mkdirSync(out, { recursive: true });
-    const baselineSha = git('rev-parse', '--verify', 'main^{commit}');
+    // the baseline is what is live: main by default; a release line compares with its live release (e.g. --baseline 19d17c90)
+    const baselineRef = options['--baseline'] || 'main';
+    const baselineSha = git('rev-parse', '--verify', `${baselineRef}^{commit}`);
     const candidateSha = git('rev-parse', '--verify', `${candidateRef}^{commit}`);
     const harnessRef = git('rev-parse', 'HEAD');
     const harnessTree = git('rev-parse', `${harnessRef}:tools/test-harness`);
@@ -341,7 +343,7 @@ export async function main(args = process.argv.slice(2)) {
     validateQuarantine(manifest);
     const node = options['--node'] || '22';
     if (!['22', '26'].includes(node)) throw Error('supported Node versions: 22, 26');
-    receipt = { ...receipt, refs: { baseline: { ref: 'main', sha: baselineSha }, candidate: { ref: candidateRef, sha: candidateSha } },
+    receipt = { ...receipt, refs: { baseline: { ref: baselineRef, sha: baselineSha }, candidate: { ref: candidateRef, sha: candidateSha } },
       harness: { ref: harnessRef, tree: harnessTree, archiveSha256: sha256(harnessArchive) }, quarantineSha256: sha256(manifestBytes), node, exclusions: EXPECTED_SKIP, scopeExclusions: manifest.scopeExclusions };
     const imported = Boolean(options['--baseline-results'] || options['--candidate-results']);
     if (imported && !(options['--baseline-results'] && options['--candidate-results'])) throw Error('provide both audited result directories or neither');

@@ -6,6 +6,9 @@
 bash /absolute/checkout/tools/test-harness/release-gate.sh <candidate-ref> --out /absolute/scratch/gate/<run>
 ```
 
+`--baseline <ref>` (default `main`) compares with another baseline, e.g. the live release of a release line
+(`--baseline 19d17c90` for 3.0.1); the receipt records it.
+
 Run from a committed harness checkout. The gate pins `main`, the candidate and the invocation's harness before
 starting **two isolated Modal runs concurrently**. Both source archives receive the identical committed harness.
 It prints one `RELEASE_GATE` line and writes `receipt.json` with exact source/harness/archive/quarantine hashes,
