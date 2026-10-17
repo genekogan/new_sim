@@ -72,7 +72,7 @@ export function hotelFact(h) {
       box(`bed-${l.id}-${j + 1}`, bx - 1.3, -HOTEL_DEPTH / 2 + 0.67, bx - 0.6, -HOTEL_DEPTH / 2 + 2.73, y, y + 0.6, 'Bed');
       box(`desk-${l.id}-${j + 1}`, bx + 0.73, -HOTEL_DEPTH / 2 + 1.8, bx + 1.37, -HOTEL_DEPTH / 2 + 2.4, y, y + 0.8, 'Writing desk');
       const [rx0, rx1] = c.roomX(bx);
-      regions.push({ id: `${h.id}-room-${f}0${j + 1}`, label: `Room ${f}0${j + 1}`, level: l.id, polygon: rect(X(rx0), Z(iz0), X(rx1), Z(HOTEL_DEPTH / 2 + 1.15)) });
+      regions.push({ id: `${h.id}-room-${f}0${j + 1}`, label: `Room ${f}0${j + 1}, ${h.label.toLowerCase()}`, level: l.id, polygon: rect(X(rx0), Z(iz0), X(rx1), Z(HOTEL_DEPTH / 2 + 1.15)) });
     }
   }
   const floorY = [0, ...levels.map((l) => l.y)], levelIds = [0, ...levels.map((l) => l.id)], links = [];
@@ -98,8 +98,8 @@ export function hotelsSpots() {
     for (const [k, z] of [0.3, 1.3].entries()) spots.push({ id: `hotel-${h.n}-lobby-sofa-${k + 1}`, place: `${h.id}-lobby`, activity: 'read', base: 'sit', at: [X(x0 + 0.62), Z(z)], faceTo: [X(x0 + 1.6), Z(z)], seatHeight: 0.45, level: 0, label: `${h.label} lobby sofa` });
     for (const [j, bx] of c.guestColumns.entries()) {
       const room = `${h.id}-room-10${j + 1}`;
-      spots.push({ id: `hotel-${h.n}-room-10${j + 1}-desk`, place: room, activity: 'write', base: 'sit', at: [X(bx + 1.05), Z(-2.0)], faceTo: [X(bx + 1.05), Z(-2.9)], seatHeight: 0.48, level: l.id, label: `Room 10${j + 1} desk (${h.label.toLowerCase()})` },
-        { id: `hotel-${h.n}-room-10${j + 1}-balcony`, place: room, activity: 'drink', base: 'idle', title: 'Look out over the sea', at: [X(bx), Z(5.6)], faceTo: [X(bx), Z(8)], level: l.id, label: `Room 10${j + 1} balcony (${h.label.toLowerCase()})` });
+      spots.push({ id: `hotel-${h.n}-room-10${j + 1}-desk`, place: room, activity: 'write', base: 'sit', at: [X(bx + 1.05), Z(-2.0)], faceTo: [X(bx + 1.05), Z(-2.9)], seatHeight: 0.48, level: l.id, label: `Room 10${j + 1} desk, ${h.label.toLowerCase()}` },
+        { id: `hotel-${h.n}-room-10${j + 1}-balcony`, place: room, activity: 'drink', base: 'idle', title: 'Look out over the sea', at: [X(bx), Z(5.6)], faceTo: [X(bx), Z(8)], level: l.id, label: `Room 10${j + 1} balcony, ${h.label.toLowerCase()}` });
     }
   }
   return spots;
