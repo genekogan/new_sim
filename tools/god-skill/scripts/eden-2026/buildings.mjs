@@ -80,6 +80,8 @@ function add(id, defName, coords, params = {}, options = {}) {
     const [a, b, c, e] = aabb(metadata, 0.3);
     if (BUILDINGS.some(q => { const [x, z, xx, zz] = aabb(q); return a < xx && c > x && b < zz && e > z; })) return null;
   }
+  // V3: old Eden's upper floors had balconies with flowers: half of the 2+ storey homes and shops get one (stable by name)
+  if (['cottage', 'townhouse', 'shop'].includes(defName) && (p.floors ?? defaults.floors ?? 1) >= 2 && p.balcony === undefined && !p.plan && ([...name].reduce((a, c) => (a * 33 + c.charCodeAt(0)) >>> 0, 5) % 2 === 0 || options.metadata?.balconyPreferred)) p.balcony = true;
   ops.push({ op: 'place', def, name, p: metadata.coords, ...(metadata.r ? { r: metadata.r } : {}), ...(Object.keys(p).length ? { params: p } : {}) });
   BUILDINGS.push(metadata);
   return metadata;

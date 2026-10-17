@@ -1,0 +1,87 @@
+{
+ "schema": "eden-2026-patch/1",
+ "id": "eden-life-extras-20261017",
+ "note": "Lane E-life: old Eden's park picnic blanket (4 places round it) and its second hammock, at old Eden's coordinates (south-west lawn of the park). The engine reads the blanket by its tag picnic-blanket.",
+ "ops": [
+  {
+   "op": "define",
+   "def": {
+    "schema": "def/1",
+    "name": "eden-picnic-blanket",
+    "version": 1,
+    "description": "A checked picnic blanket spread on the lawn, with a basket; sit round it and have a picnic.",
+    "tags": [
+     "eden",
+     "picnic",
+     "picnic-blanket"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      1.8,
+      0.25,
+      1.8
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "box",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "size": [
+         1.6,
+         0.02,
+         1.6
+        ],
+        "color": "#c94a4a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.3,
+         0.12,
+         0.3
+        ],
+        "size": [
+         0.4,
+         0.22,
+         0.28
+        ],
+        "color": "#a07a4a",
+        "collide": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "op": "place",
+   "def": "eden-picnic-blanket@1",
+   "name": "park-picnic-blanket",
+   "p": [
+    -13,
+    127
+   ],
+   "r": 0
+  },
+  {
+   "op": "place",
+   "def": "core/hammock@1",
+   "name": "park-hammock-2",
+   "p": [
+    -19.9,
+    130
+   ],
+   "r": 1.5708
+  }
+ ]
+}

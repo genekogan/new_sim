@@ -86,6 +86,7 @@ const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).plac
 const zoneOps=places.filter(p=>p.id!=='eden'&&!p.id.startsWith('int-')&&!/^commons-mat-/.test(p.id)&&!BUILDINGS.some(b=>b.originalPlaceId===p.id)).map(p=>({op:'place',def:'core/zone@1',name:`place-${p.id.replaceAll('.','-')}`.slice(0,48),shape:{area:p.polygon},params:{use:/farm|garden|vineyard/.test(p.id)?'farm':/market|cafe|shop|hotel/.test(p.id)?'commercial':/commons|campus|library/.test(p.id)?'civic':/lake|pond|river|mountain|shore/.test(p.id)?'wild':'park'}}));
 for(let i=0;i<zoneOps.length;i+=12)apply(`named outdoor places ${i/12+1}`,zoneOps.slice(i,i+12));
 // lane E-life's old place schedules, on the named places above (worlds/patches/eden-life-20261017/schedules.json)
+{const ex=JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/extras.json`)).ops;apply('eden life extras defs',ex.filter(o=>o.op==='define'));apply('eden life extras',ex.filter(o=>o.op!=='define'),'any');}
 apply('eden life schedules',JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/schedules.json`)).ops);
 const coverage=places.map(p=>({id:p.id,name:p.name,polygon:p.polygon,parent:p.parent,buildings:BUILDINGS.filter(b=>b.originalPlaceId===p.id).map(b=>b.name),zone:zoneOps.find(o=>o.name===`place-${p.id.replaceAll('.','-')}`.slice(0,48))?.name??null}));
 writeFileSync(`${root}/worlds/templates/eden-2026.json`,JSON.stringify(genesis,null,2)+'\n');

@@ -5155,7 +5155,8 @@
             "floorHeight": 2.9,
             "roof": "hip",
             "material": "plaster",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -5274,7 +5275,8 @@
             "floorHeight": 3,
             "roof": "hip",
             "material": "plaster",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -5395,7 +5397,8 @@
             "floorHeight": 2.9,
             "roof": "gable",
             "material": "wood",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -5417,7 +5420,8 @@
             "floorHeight": 3,
             "roof": "gable",
             "material": "wood",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -5705,7 +5709,8 @@
             "floorHeight": 3,
             "roof": "gable",
             "material": "stone",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -6108,7 +6113,8 @@
             "floorHeight": 2.8,
             "roof": "gable",
             "material": "wood",
-            "windows": 0.6
+            "windows": 0.6,
+            "balcony": true
           }
         },
         {
@@ -6614,7 +6620,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6656,7 +6663,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6698,7 +6706,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6740,7 +6749,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "flat",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6788,7 +6798,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "gable",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6809,7 +6820,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6851,7 +6863,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6872,7 +6885,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "gable",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6914,7 +6928,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -6962,7 +6977,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -7004,7 +7020,8 @@
             "floors": 4,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -7046,7 +7063,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "gable",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -7067,7 +7085,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         },
         {
@@ -7109,7 +7128,8 @@
             "floors": 3,
             "floorHeight": 2.9,
             "roof": "hip",
-            "windows": 0.65
+            "windows": 0.65,
+            "balcony": true
           }
         }
       ]
@@ -7135,7 +7155,8 @@
             "d": 8,
             "floors": 3,
             "material": "plaster",
-            "roof": "gable"
+            "roof": "gable",
+            "balcony": true
           }
         },
         {
@@ -7175,7 +7196,8 @@
             "d": 8,
             "floors": 2,
             "material": "plaster",
-            "roof": "flat"
+            "roof": "flat",
+            "balcony": true
           }
         },
         {
@@ -7215,7 +7237,8 @@
             "d": 8,
             "floors": 2,
             "material": "plaster",
-            "roof": "hip"
+            "roof": "hip",
+            "balcony": true
           }
         },
         {
@@ -7255,7 +7278,8 @@
             "d": 8,
             "floors": 3,
             "material": "plaster",
-            "roof": "gable"
+            "roof": "gable",
+            "balcony": true
           }
         },
         {
@@ -7301,7 +7325,8 @@
             "d": 8,
             "floors": 2,
             "material": "plaster",
-            "roof": "flat"
+            "roof": "flat",
+            "balcony": true
           }
         },
         {
@@ -7320,7 +7345,8 @@
             "d": 6,
             "floors": 2,
             "roof": "gable",
-            "porch": 1.6
+            "porch": 1.6,
+            "balcony": true
           }
         },
         {
@@ -7358,7 +7384,8 @@
             "d": 6,
             "floors": 2,
             "roof": "gable",
-            "porch": 1.6
+            "porch": 1.6,
+            "balcony": true
           }
         },
         {
@@ -7397,7 +7424,8 @@
             "d": 6,
             "floors": 2,
             "roof": "gable",
-            "porch": 1.6
+            "porch": 1.6,
+            "balcony": true
           }
         },
         {
@@ -7437,7 +7465,8 @@
             "d": 6,
             "floors": 2,
             "roof": "gable",
-            "porch": 1.6
+            "porch": 1.6,
+            "balcony": true
           }
         }
       ]
@@ -8781,7 +8810,8 @@
             "floorHeight": 2.7,
             "material": "plaster",
             "roof": "flat",
-            "windows": 0.5
+            "windows": 0.5,
+            "balcony": true
           }
         },
         {
@@ -9042,7 +9072,8 @@
             "floorHeight": 2.7,
             "material": "plaster",
             "roof": "flat",
-            "windows": 0.5
+            "windows": 0.5,
+            "balcony": true
           }
         }
       ]
@@ -9069,7 +9100,8 @@
             "floorHeight": 2.7,
             "material": "plaster",
             "roof": "flat",
-            "windows": 0.5
+            "windows": 0.5,
+            "balcony": true
           }
         },
         {
@@ -9111,7 +9143,8 @@
             "floorHeight": 2.7,
             "material": "plaster",
             "roof": "flat",
-            "windows": 0.5
+            "windows": 0.5,
+            "balcony": true
           }
         },
         {
@@ -9172,7 +9205,8 @@
             "d": 7.848,
             "floors": 2,
             "material": "plaster",
-            "roof": "shed"
+            "roof": "shed",
+            "balcony": true
           }
         },
         {
@@ -9278,7 +9312,8 @@
             "d": 6.52,
             "floors": 2,
             "material": "plaster",
-            "roof": "hip"
+            "roof": "hip",
+            "balcony": true
           }
         },
         {
@@ -9424,7 +9459,8 @@
             "d": 6.843,
             "floors": 2,
             "material": "plaster",
-            "roof": "flat"
+            "roof": "flat",
+            "balcony": true
           }
         },
         {
@@ -14936,11 +14972,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -0.79,
             0,
-            0,
-            1.205
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -15455,11 +15491,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.475,
             0,
-            0,
-            2.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -16185,11 +16221,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.475,
             0,
-            0,
-            2.205
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -16625,11 +16661,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -0.001,
+            -1.142,
             0,
-            2.205
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -17531,11 +17567,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.04,
             0,
-            0,
-            1.205
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -22407,11 +22443,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -22441,9 +22477,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -23349,11 +23385,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -23383,9 +23419,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -24435,11 +24471,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -24469,9 +24505,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -25521,11 +25557,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -25555,9 +25591,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -26463,11 +26499,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -26497,9 +26533,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -27006,11 +27042,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -27040,9 +27076,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -27804,11 +27840,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -27838,9 +27874,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -28203,11 +28239,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -28237,9 +28273,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -29145,11 +29181,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -29179,9 +29215,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -29943,11 +29979,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -29977,9 +30013,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -30885,11 +30921,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -30919,9 +30955,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -31827,11 +31863,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -31861,9 +31897,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -32226,11 +32262,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -32260,9 +32296,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -33024,11 +33060,11 @@
             "slot": "bedroom"
           },
           "p": [
-            0.756,
+            -0.756,
             0,
-            1.036
+            -1.036
           ],
-          "r": -1.571
+          "r": 1.571
         },
         {
           "op": "place",
@@ -33058,9 +33094,9 @@
           "p": [
             -0.855,
             0,
-            -1.65
+            1.65
           ],
-          "r": 0
+          "r": 3.142
         },
         {
           "op": "place",
@@ -33375,11 +33411,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.56,
             0,
-            0,
-            1.23
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -33917,11 +33953,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.56,
             0,
-            0,
-            1.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -34459,11 +34495,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.56,
             0,
-            0,
-            1.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -34905,11 +34941,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.56,
             0,
-            0,
-            1.23
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -35447,11 +35483,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.56,
             0,
-            0,
-            1.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -35686,11 +35722,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.04,
             0,
-            0,
-            0.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -35718,11 +35754,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.752,
+            1.752,
             0,
             0.928
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -35736,7 +35772,7 @@
           "p": [
             1.818,
             0,
-            0.875
+            -0.875
           ],
           "r": -1.571
         },
@@ -36374,11 +36410,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.04,
             0,
-            0,
-            0.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -36406,11 +36442,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.752,
+            1.752,
             0,
             0.928
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -36424,7 +36460,7 @@
           "p": [
             1.818,
             0,
-            0.875
+            -0.875
           ],
           "r": -1.571
         },
@@ -37062,11 +37098,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.04,
             0,
-            0,
-            0.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -37094,11 +37130,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.752,
+            1.752,
             0,
             0.928
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -37112,7 +37148,7 @@
           "p": [
             1.818,
             0,
-            0.875
+            -0.875
           ],
           "r": -1.571
         },
@@ -37750,11 +37786,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.04,
             0,
-            0,
-            0.705
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -37782,11 +37818,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.752,
+            1.752,
             0,
             0.928
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -37800,7 +37836,7 @@
           "p": [
             1.818,
             0,
-            0.875
+            -0.875
           ],
           "r": -1.571
         },
@@ -47758,11 +47794,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -2.256,
             0,
-            0,
-            1.629
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -49213,11 +49249,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -0.948,
             0,
-            0,
-            0.965
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -49245,11 +49281,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -1.659,
+            1.659,
             0,
             1.136
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -49263,7 +49299,7 @@
           "p": [
             1.725,
             0,
-            1.057
+            -1.057
           ],
           "r": -1.571
         },
@@ -51196,11 +51232,11 @@
             "slot": "bedroom"
           },
           "p": [
+            -1.981,
             0,
-            0,
-            1.127
+            0
           ],
-          "r": 3.142
+          "r": 1.571
         },
         {
           "op": "place",
@@ -51228,11 +51264,11 @@
             "slot": "bedroom"
           },
           "p": [
-            -2.693,
+            2.693,
             0,
             1.266
           ],
-          "r": 1.571
+          "r": -1.571
         },
         {
           "op": "place",
@@ -51246,7 +51282,7 @@
           "p": [
             2.759,
             0,
-            1.17
+            -1.17
           ],
           "r": -1.571
         },
@@ -79507,6 +79543,98 @@
           "params": {
             "use": "wild"
           }
+        }
+      ]
+    },
+    {
+      "note": "eden life extras defs",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-picnic-blanket",
+            "version": 1,
+            "description": "A checked picnic blanket spread on the lawn, with a basket; sit round it and have a picnic.",
+            "tags": [
+              "eden",
+              "picnic",
+              "picnic-blanket"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                1.8,
+                0.25,
+                1.8
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.01,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      0.02,
+                      1.6
+                    ],
+                    "color": "#c94a4a",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.3,
+                      0.12,
+                      0.3
+                    ],
+                    "size": [
+                      0.4,
+                      0.22,
+                      0.28
+                    ],
+                    "color": "#a07a4a",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "note": "eden life extras",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-picnic-blanket@1",
+          "name": "park-picnic-blanket",
+          "p": [
+            -13,
+            127
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "def": "core/hammock@1",
+          "name": "park-hammock-2",
+          "p": [
+            -19.9,
+            130
+          ],
+          "r": 1.5708
         }
       ]
     },

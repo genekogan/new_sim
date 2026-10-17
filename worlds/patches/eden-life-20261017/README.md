@@ -22,3 +22,7 @@ swims, the classroom skill share and study hour, the library reading hour, the d
 the amphitheatre/bandstand/stage music, afternoon tea, the woods walk and the night on the mats. They become `set` ops
 with `schedule.events` on the 16 matching Eden 2026 places (`at` HH:MM, `minutes`). Checked: they apply to 725db85c with no
 refusal and read back on the places exactly as old Eden's (`g-place-commons-deck` → open-mic `0 17 * * *` 45 min).
+
+## extras.json
+Old Eden's park picnic blanket (four places round it, tag `picnic-blanket`) and its second hammock, at old Eden's coordinates
+on the park's south-west lawn. Applies with no refusal; picnic 0 → 4 and hammock 1 → 2 spots.
