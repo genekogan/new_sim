@@ -39,9 +39,10 @@ chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf
 install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds-backups
 
 install -m 644 "$UNIT_SRC" /etc/systemd/system/sim-worlds@.service
-install -d /etc/systemd/system/sim-worlds@staging.service.d /etc/systemd/system/sim-worlds@production.service.d
-printf '[Service]\nMemoryHigh=2500M\nMemoryMax=3G\n' > /etc/systemd/system/sim-worlds@staging.service.d/10-memory.conf
-printf '[Service]\nMemoryHigh=5G\nMemoryMax=6G\n' > /etc/systemd/system/sim-worlds@production.service.d/10-memory.conf
+# Memory budget per stage: written once, never overwritten (release.sh runs this on every release; an operator's raise,
+# e.g. production 8G/9G on 2026-10-17, must survive it). legacy = the three original worlds (old-worlds/README.md).
+mem() { local d=/etc/systemd/system/sim-worlds@$1.service.d; install -d "$d"; [ -f "$d/10-memory.conf" ] || printf '[Service]\nMemoryHigh=%s\nMemoryMax=%s\n' "$2" "$3" > "$d/10-memory.conf"; }
+mem staging 2500M 3G; mem production 5G 6G
 install -m 644 "$HERE/sim-worlds-backup@.service" /etc/systemd/system/sim-worlds-backup@.service
 install -m 644 "$HERE/sim-worlds-backup@.timer" /etc/systemd/system/sim-worlds-backup@.timer
 install -m 644 "$HERE/sim-worlds-health@.service" /etc/systemd/system/sim-worlds-health@.service
