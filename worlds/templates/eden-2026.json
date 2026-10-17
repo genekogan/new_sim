@@ -7622,7 +7622,12 @@
                   "wall": "w",
                   "at": 1
                 }
-              ]
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
             }
           }
         },
@@ -7753,7 +7758,12 @@
                   "wall": "w",
                   "at": 1
                 }
-              ]
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
             }
           }
         },
@@ -7884,7 +7894,12 @@
                   "wall": "w",
                   "at": 1
                 }
-              ]
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
             }
           }
         },
@@ -8015,7 +8030,12 @@
                   "wall": "w",
                   "at": 1
                 }
-              ]
+              ],
+              "balcony": {
+                "floor": 1,
+                "room": "guest-1-east",
+                "at": 0.8
+              }
             }
           }
         },

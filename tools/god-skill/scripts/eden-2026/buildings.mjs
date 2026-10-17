@@ -236,10 +236,11 @@ for (let i = 0; i < 9; i++) add(`market-street-shop-${i + 1}`, 'shop', [113.1 + 
 for (const [side, z, r] of [['north', 56.5, 0], ['south', 89.5, Math.PI]]) for (let i = 0; i < 4; i++) add(`old-town-${side}-arcade-${i + 1}`, 'shop', [124.5 + i * 9.6, z], { w: 9, d: 6, floors: 2, wall: side === 'north' ? '#e6c86e' : '#e9b07a', trim: '#e8e2d2', roof: 'gable', roofColor: '#8a3a2a', porch: 1.6 }, { r, originalPlaceId: `region-old-town.${side}-arcade`, district: 'region-old-town', furnishStyle: 'shop', avoidOverlap: true });
 // Old Eden's hotels had guest rooms on every upper floor (bed, desk, chair behind each balcony): a lobby downstairs and two
 // guest rooms per upper floor, furnished in interiors.mjs (HOTELS). Stairs: lobby north wall, then the west room's west wall.
+// The street-front balcony (trunk's autoPlan gave each hotel one) opens off room 102, east of its desk.
 const hotelPlan = () => ({ floors: [
   { rooms: [room('lobby', [0, 0, 12.5, 10])], exterior: [{ room: 'lobby', wall: 's', kind: 'door', at: 0.5, width: 1.6 }] },
   ...[1, 2].map(k => ({ rooms: [room(`guest-${k}-west`, [0, 0, 6.25, 10], `Guest room ${k}01`), room(`guest-${k}-east`, [6.25, 0, 12.5, 10], `Guest room ${k}02`)], doors: [{ between: [`guest-${k}-west`, `guest-${k}-east`], at: 0.5, width: 1 }] })),
-], stairs: [{ from: 0, to: 1, room: 'lobby', wall: 'n', at: 0 }, { from: 1, to: 2, room: 'guest-1-west', wall: 'w', at: 1 }] });
+], stairs: [{ from: 0, to: 1, room: 'lobby', wall: 'n', at: 0 }, { from: 1, to: 2, room: 'guest-1-west', wall: 'w', at: 1 }], balcony: { floor: 1, room: 'guest-1-east', at: 0.8 } });
 for (let i = 0; i < 4; i++) add(`seafront-hotel-${i + 1}`, 'hall', [120 + i * 14.5, 121], { w: 12.5, d: 10, floors: 3, floorHeight: 3.1, wall: ['#efe9dc', '#e6c86e', '#a9c3b0', '#9db8c9'][i], trim: ['#2f6f8f', '#3d5a80', '#c45a4a', '#5a8a6a'][i], roof: 'flat', balcony: true, plan: hotelPlan() }, { originalPlaceId: 'region-seaside-resort.hotels', district: 'region-seaside-resort', furnishStyle: null, avoidOverlap: true });
 for (let i = 0; i < 3; i++) add(`makers-greenhouse-${i + 1}`, 'greenhouse', [148 + i * 9, -98], { w: 7, d: 14, floorHeight: 2.8, material: 'glass', wall: '#cfe6ea', roofColor: '#dff0f2', roof: 'gable' }, { originalPlaceId: 'region-makers-yard.greenhouses', district: 'region-makers-yard', furnishStyle: null });
 
