@@ -25,15 +25,16 @@ const GL_ARGS = process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swifts
 const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; };
 import { acquireLock, holder, liveness, lockStatus, parseHolder } from './locks.mjs';
 import { atomicWrite } from './state.mjs';
+import { listenerAt, readWarm, treeRssMb, warmStatus, writeWarm } from './warm.mjs';
 import { chromeLease as lease } from './chrome-lease.mjs';
 /** A few headless Chromes at a time on a shared machine (the lanes' lease slots); EDEN_GOD_NO_LEASE=1 skips it. */
 export const chromeLease = (holder = 'eden-god', o) => (process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {}) : lease(holder, o));
 const KEEPER = '.eden-god.look.json';
-const IDLE_MS = 20 * 60_000;
+const IDLE_MS = 20 * 60_000, MEM_EVERY_MS = 60_000, MAX_MB = () => Number(process.env.EDEN_GOD_KEEPER_MAX_MB ?? 1536);
 
 export function findPlaywright({ timeoutMs = 60_000 } = {}) { // first fetch of playwright-core (~10 MB) on a fresh or busy machine
   const here = (() => { try { return dirname(fileURLToPath(import.meta.url)); } catch { return process.cwd(); } })();
-  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, process.cwd(), here, resolve(here, '../..'), resolve(here, '../../..'), resolve(here, '../../../mars/viewer'), resolve(here, '../../mars/viewer'), resolve(here, '../mars/viewer')].filter(Boolean);
+  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, readWarm()?.pwFrom /* G1: the folder the warm keeper found */, process.cwd(), here, resolve(here, '../..'), resolve(here, '../../..'), resolve(here, '../../../mars/viewer'), resolve(here, '../../mars/viewer'), resolve(here, '../mars/viewer')].filter(Boolean);
   for (const b of bases) {
     const pkg = existsSync(resolve(b, 'package.json')) ? resolve(b, 'package.json') : resolve(b, 'noop.js');
     for (const name of ['playwright-core', 'playwright', '@playwright/test']) {
@@ -71,36 +72,59 @@ const freePort = () => new Promise((res, rej) => { const s = createServer(); s.u
 const alive = async (port) => { try { const r = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(3000) }); return r.ok; } catch { return false; } };
 export const readKeeper = () => { try { return JSON.parse(readFileSync(KEEPER, 'utf8')); } catch { return null; } };
 
-/** The keeper process body (`eden-god.mjs look-keeper <worldUrl> <port>`): one Chrome, one tab on the world, until idle. */
-export async function keeper(worldUrl, port) {
-  const release = acquireLock(`${KEEPER}.lock`, { label: 'look keeper' });
+/** The keeper process body (`eden-god.mjs look-keeper <worldUrl> <port>`): one Chrome, one tab on the world, until idle.
+ * G1 warm mode (`look-keeper <world> 0 --warm`, started in the background by pair/listen/status): picks its own port, quits
+ * quietly when another keeper holds the folder, records its phases in .eden-god.warm.json, and allows a slow first
+ * Playwright fetch. Either way it stays while this folder's listener runs and reloads (then quits) above its memory cap. */
+export async function keeper(worldUrl, port, { warm = false } = {}) {
+  let release;
+  try { release = acquireLock(`${KEEPER}.lock`, { label: 'look keeper' }); }
+  catch (e) { if (warm) process.exit(0); throw e; }
+  const me = holder('look keeper'), phase = (p, extra = {}) => writeWarm({ world: worldUrl, pid: process.pid, holder: me, phase: p, ...extra });
   let browser;
   try {
-  const pw = findPlaywright(); if (!pw) throw new Error('no Playwright package found');
+  if (!port) port = await freePort();
+  phase('fetch');
+  const pw = findPlaywright({ timeoutMs: warm ? 180_000 : 60_000 }); if (!pw) throw new Error('no Playwright package found');
+  phase('chrome', process.env.EDEN_GOD_PLAYWRIGHT_FROM ? { pwFrom: process.env.EDEN_GOD_PLAYWRIGHT_FROM } : {});
   browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
   // keep the WebGL drawing buffer so the canvas can be read back at any time (page.screenshot stalls on a slow software compositor)
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: 'commit', timeout: 25_000 });
-  const identity = holder('look keeper');
-  const write = () => atomicWrite(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 30_000 }));
+  const identity = me;
+  let rssMb = null;
+  const write = () => atomicWrite(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 30_000, ...(rssMb != null ? { rssMb } : {}) }));
   write();
-  let lastUse = statSync(KEEPER).mtimeMs;
+  phase('ready');
+  let lastUse = statSync(KEEPER).mtimeMs, nextMem = Date.now() + MEM_EVERY_MS, over = false;
   process.once('exit', () => { try { if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync(KEEPER, { force: true }); } finally { release(); } });
   for (;;) {
     await new Promise((r) => setTimeout(r, 5000));
     let last = 0; try { last = statSync(KEEPER).mtimeMs; } catch { break; }
     if (last !== lastUse) lastUse = last;
-    if (Date.now() - lastUse > IDLE_MS || readKeeper()?.pid !== process.pid) break;
+    if (Date.now() - Math.max(lastUse, listenerAt()) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
+    if (Date.now() >= nextMem) {
+      nextMem = Date.now() + MEM_EVERY_MS;
+      const ps = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,command='], { encoding: 'utf8', timeout: 5000, maxBuffer: 1 << 24 });
+      rssMb = ps.status === 0 ? treeRssMb(ps.stdout, port) : null;
+      if (rssMb != null && rssMb > MAX_MB()) {
+        if (over) { phase('recycle', { reason: `memory ${rssMb} MB over ${MAX_MB()} MB` }); break; }
+        over = true; await page.reload({ waitUntil: 'commit', timeout: 25_000 }).catch(() => {});
+      } else over = false;
+    }
     // Refresh liveness without changing the idle-use timestamp.
     write(); utimesSync(KEEPER, new Date(lastUse), new Date(lastUse));
   }
-  } finally { if (browser) await browser.close().catch(() => {}); release(); }
+  } catch (e) { phase('failed', { error: String(e?.message ?? e).split('\n')[0].slice(0, 200) }); if (!warm) throw e; }
+  finally { if (browser) await browser.close().catch(() => {}); release(); }
   process.exit(0);
 }
 
 async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
+  // G1: a background warm-up is starting this folder's keeper: wait for it rather than start a second one
+  for (let i = 0; i < 120 && warmStatus(worldUrl) === 'warming'; i++) { await new Promise((r) => setTimeout(r, 250)); runtime.signal?.throwIfAborted(); }
   const k = readKeeper();
   if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && k.world === worldUrl && await alive(k.port)) { const now = new Date(); try { utimesSync(KEEPER, now, now); } catch { /* fine */ } return k; }
   if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && liveness(parseHolder(k.holder)) !== 'alive') throw Object.assign(new Error('lock.busy: look keeper identity is uncertain; run doctor after its 30 s TTL'), { code: 'lock.busy' });
@@ -128,7 +152,16 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
     throw e;
   }
 }
-export function stopKeeper() { const k = readKeeper(); if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
+export function stopKeeper() {
+  const k = readKeeper(), w = readWarm(), wh = parseHolder(w?.holder);
+  if (k?.pid && liveness(parseHolder(k.holder)) === 'alive') try { process.kill(k.pid); } catch { /* gone */ }
+  // a background warm-up still starting (no keeper file yet): it is ours, stop it too
+  const starting = !k && wh && wh.pid === w.pid && ['fetch', 'chrome'].includes(w.phase) && liveness(wh) === 'alive';
+  if (starting) try { process.kill(w.pid); } catch { /* gone */ }
+  rmSync(KEEPER, { force: true });
+  writeWarm({ ...(w ?? {}), holder: undefined, phase: 'stopped' });
+  return k ? `stopped the look keeper (pid ${k.pid})` : starting ? `stopped the look keeper warm-up (pid ${w.pid})` : 'no look keeper running';
+}
 
 /** r2.1: how many snapshot entities the viewer's entity layer actually draws (its `layer.drawn`). Resident bodies
  *  (`components.body`, make 'none'), prefab containers (make 'parts') and defs the snapshot cannot resolve are never

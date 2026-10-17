@@ -597,7 +597,7 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5, existsSync as existsSync7, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync5, existsSync as existsSync8, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve5 } from "node:path";
 
 // lib/mirror.mjs
@@ -1727,8 +1727,8 @@ function exportGenesis(snapshot3, { name } = {}) {
 }
 
 // lib/look.mjs
-import { spawn, spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync5, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
+import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
+import { existsSync as existsSync6, mkdirSync as mkdirSync2, readFileSync as readFileSync6, writeFileSync as writeFileSync4, rmSync as rmSync3, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve as resolve4 } from "node:path";
@@ -1799,6 +1799,149 @@ async function withRemoteLook(args, runtime, local) {
   }
 }
 
+// lib/warm.mjs
+import { spawn } from "node:child_process";
+import { existsSync as existsSync5, readFileSync as readFileSync5, rmSync as rmSync2 } from "node:fs";
+var WARM = ".eden-god.warm.json";
+var LISTENER = ".eden-god.listen.json";
+var KEEPER = ".eden-god.look.json";
+var STARTING_MS = 5 * 6e4;
+var FAILED_RETRY_MS = 10 * 6e4;
+var REMOTE_RETRY_MS = 60 * 6e4;
+var read2 = (f) => {
+  try {
+    return JSON.parse(readFileSync5(f, "utf8"));
+  } catch {
+    return null;
+  }
+};
+var pidAlive = (pid) => {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+};
+var readWarm = () => read2(WARM);
+var writeWarm = (patch) => {
+  try {
+    atomicWrite(WARM, JSON.stringify({ ...readWarm() ?? {}, ...patch, at: Date.now() }));
+  } catch {
+  }
+};
+function warmEnabled(state = (() => {
+  try {
+    return load();
+  } catch {
+    return {};
+  }
+})(), env2 = process.env, chrome = () => {
+  const c = chromeCandidates();
+  return !c || c.some(existsSync5);
+}) {
+  if (env2.EDEN_GOD_WARM === "0" || env2.EDEN_GOD_LOOK === "remote") return false;
+  if (!state?.world) return false;
+  if (env2.EDEN_GOD_WARM === "1") return true;
+  if (env2.NODE_TEST_CONTEXT) return false;
+  return !!state.token && !state.identity && chrome();
+}
+function warmStatus(world, now = Date.now()) {
+  const k = read2(KEEPER);
+  if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale) return k.world === world ? "ready" : "other";
+  const w = readWarm();
+  if (!w || w.world && w.world !== world) return "none";
+  if (w.phase === "stopped") return "stopped";
+  if (w.phase === "failed") return now - (w.at ?? 0) < FAILED_RETRY_MS ? "failed" : "none";
+  if (w.phase === "ready") return "none";
+  const h = parseHolder(w.holder), live = h ? liveness(h) === "alive" : pidAlive(w.pid);
+  return live && now - (w.at ?? 0) < STARTING_MS ? "warming" : "none";
+}
+function startWarm(world, cliPath, { force = false, spawnFn = spawn } = {}) {
+  const st = warmStatus(world);
+  if (st === "ready" || st === "warming" || st === "other" || st === "failed" || st === "stopped" && !force) return st;
+  try {
+    const child = spawnFn(process.execPath, [cliPath, "look-keeper", world, "0", "--warm"], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
+    child.on?.("error", () => {
+    });
+    child.unref?.();
+    if (!child.pid) return "none";
+    const cur = readWarm();
+    if (!(cur?.pid === child.pid)) writeWarm({ world, pid: child.pid, holder: void 0, phase: "starting", error: void 0, reason: void 0 });
+    return "started";
+  } catch {
+    return "none";
+  }
+}
+function autoWarm(cliPath, { force = false, pairing = false } = {}) {
+  try {
+    const s = load();
+    if (warmEnabled(pairing ? { ...s, token: s.token ?? "pairing" } : s)) return startWarm(s.world, cliPath, { force });
+  } catch {
+  }
+  return "off";
+}
+function listenerBeat() {
+  try {
+    atomicWrite(LISTENER, JSON.stringify({ holder: holder("eden-god listen"), at: Date.now() }));
+  } catch {
+  }
+}
+var listenerAt = () => read2(LISTENER)?.at ?? 0;
+var remoteKnownUnavailable = (s = load(), now = Date.now()) => s.remoteLook?.ok === false && now - (s.remoteLook.at ?? 0) < REMOTE_RETRY_MS;
+var markRemote = (ok2) => {
+  try {
+    save({ remoteLook: { ok: ok2, at: Date.now() } });
+  } catch {
+  }
+};
+async function lookRoute({ world, cliPath, single, deadlineAt, signal, remote, wait = sleep, now = Date.now }) {
+  if (!warmEnabled()) return "cold";
+  let st = warmStatus(world);
+  if (st === "ready") return "keeper";
+  if (st === "none") st = startWarm(world, cliPath) === "started" ? "warming" : warmStatus(world);
+  if (st !== "warming") return "cold";
+  if (single && !remoteKnownUnavailable()) {
+    try {
+      const shot = await remote();
+      markRemote(true);
+      return { shot };
+    } catch (e) {
+      signal?.throwIfAborted();
+      if (/look\.unavailable|503/.test(String(e.message))) markRemote(false);
+    }
+  }
+  while (now() < deadlineAt - 15e3) {
+    signal?.throwIfAborted();
+    st = warmStatus(world);
+    if (st === "ready") return "keeper";
+    if (st !== "warming") return "cold";
+    await wait(250);
+  }
+  return "cold";
+}
+function treeRssMb(psText, port) {
+  const rows = psText.split("\n").map((l) => l.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+(.*)$/)).filter(Boolean).map((m) => ({ pid: +m[1], ppid: +m[2], rss: +m[3], cmd: m[4] }));
+  const roots = rows.filter((r) => r.cmd.includes(`--remote-debugging-port=${port}`) && !rows.some((p) => p.pid === r.ppid && p.cmd.includes(`--remote-debugging-port=${port}`)));
+  if (!roots.length) return null;
+  const kids = /* @__PURE__ */ new Map();
+  for (const r of rows) {
+    if (!kids.has(r.ppid)) kids.set(r.ppid, []);
+    kids.get(r.ppid).push(r);
+  }
+  let kb2 = 0;
+  const seen = /* @__PURE__ */ new Set(), stack = [...roots];
+  while (stack.length) {
+    const r = stack.pop();
+    if (seen.has(r.pid)) continue;
+    seen.add(r.pid);
+    kb2 += r.rss;
+    stack.push(...kids.get(r.pid) ?? []);
+  }
+  return Math.round(kb2 / 1024);
+}
+
 // lib/look.mjs
 var GL_ARGS = process.env.EDEN_GOD_GL === "swiftshader" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : ["--ignore-gpu-blocklist"];
 var PRESERVE = () => {
@@ -1810,8 +1953,10 @@ var PRESERVE = () => {
 };
 var chromeLease2 = (holder2 = "eden-god", o) => process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {
 }) : chromeLease(holder2, o);
-var KEEPER = ".eden-god.look.json";
+var KEEPER2 = ".eden-god.look.json";
 var IDLE_MS = 20 * 6e4;
+var MEM_EVERY_MS = 6e4;
+var MAX_MB = () => Number(process.env.EDEN_GOD_KEEPER_MAX_MB ?? 1536);
 function findPlaywright({ timeoutMs = 6e4 } = {}) {
   const here = (() => {
     try {
@@ -1820,9 +1965,9 @@ function findPlaywright({ timeoutMs = 6e4 } = {}) {
       return process.cwd();
     }
   })();
-  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, process.cwd(), here, resolve4(here, "../.."), resolve4(here, "../../.."), resolve4(here, "../../../mars/viewer"), resolve4(here, "../../mars/viewer"), resolve4(here, "../mars/viewer")].filter(Boolean);
+  const bases = [process.env.EDEN_GOD_PLAYWRIGHT_FROM, readWarm()?.pwFrom, process.cwd(), here, resolve4(here, "../.."), resolve4(here, "../../.."), resolve4(here, "../../../mars/viewer"), resolve4(here, "../../mars/viewer"), resolve4(here, "../mars/viewer")].filter(Boolean);
   for (const b of bases) {
-    const pkg = existsSync5(resolve4(b, "package.json")) ? resolve4(b, "package.json") : resolve4(b, "noop.js");
+    const pkg = existsSync6(resolve4(b, "package.json")) ? resolve4(b, "package.json") : resolve4(b, "noop.js");
     for (const name of ["playwright-core", "playwright", "@playwright/test"]) {
       try {
         const m = createRequire(pkg)(name);
@@ -1875,29 +2020,41 @@ var alive = async (port) => {
 };
 var readKeeper = () => {
   try {
-    return JSON.parse(readFileSync5(KEEPER, "utf8"));
+    return JSON.parse(readFileSync6(KEEPER2, "utf8"));
   } catch {
     return null;
   }
 };
-async function keeper(worldUrl, port) {
-  const release = acquireLock(`${KEEPER}.lock`, { label: "look keeper" });
+async function keeper(worldUrl, port, { warm = false } = {}) {
+  let release;
+  try {
+    release = acquireLock(`${KEEPER2}.lock`, { label: "look keeper" });
+  } catch (e) {
+    if (warm) process.exit(0);
+    throw e;
+  }
+  const me = holder("look keeper"), phase = (p, extra = {}) => writeWarm({ world: worldUrl, pid: process.pid, holder: me, phase: p, ...extra });
   let browser;
   try {
-    const pw = findPlaywright();
+    if (!port) port = await freePort();
+    phase("fetch");
+    const pw = findPlaywright({ timeoutMs: warm ? 18e4 : 6e4 });
     if (!pw) throw new Error("no Playwright package found");
+    phase("chrome", process.env.EDEN_GOD_PLAYWRIGHT_FROM ? { pwFrom: process.env.EDEN_GOD_PLAYWRIGHT_FROM } : {});
     browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
     await ctx.addInitScript(PRESERVE);
     const page = await ctx.newPage();
     await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 25e3 });
-    const identity = holder("look keeper");
-    const write = () => atomicWrite(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 3e4 }));
+    const identity = me;
+    let rssMb = null;
+    const write = () => atomicWrite(KEEPER2, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 3e4, ...rssMb != null ? { rssMb } : {} }));
     write();
-    let lastUse = statSync3(KEEPER).mtimeMs;
+    phase("ready");
+    let lastUse = statSync3(KEEPER2).mtimeMs, nextMem = Date.now() + MEM_EVERY_MS, over = false;
     process.once("exit", () => {
       try {
-        if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync2(KEEPER, { force: true });
+        if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync3(KEEPER2, { force: true });
       } finally {
         release();
       }
@@ -1906,15 +2063,32 @@ async function keeper(worldUrl, port) {
       await new Promise((r) => setTimeout(r, 5e3));
       let last = 0;
       try {
-        last = statSync3(KEEPER).mtimeMs;
+        last = statSync3(KEEPER2).mtimeMs;
       } catch {
         break;
       }
       if (last !== lastUse) lastUse = last;
-      if (Date.now() - lastUse > IDLE_MS || readKeeper()?.pid !== process.pid) break;
+      if (Date.now() - Math.max(lastUse, listenerAt()) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
+      if (Date.now() >= nextMem) {
+        nextMem = Date.now() + MEM_EVERY_MS;
+        const ps = spawnSync2("ps", ["-A", "-o", "pid=,ppid=,rss=,command="], { encoding: "utf8", timeout: 5e3, maxBuffer: 1 << 24 });
+        rssMb = ps.status === 0 ? treeRssMb(ps.stdout, port) : null;
+        if (rssMb != null && rssMb > MAX_MB()) {
+          if (over) {
+            phase("recycle", { reason: `memory ${rssMb} MB over ${MAX_MB()} MB` });
+            break;
+          }
+          over = true;
+          await page.reload({ waitUntil: "commit", timeout: 25e3 }).catch(() => {
+          });
+        } else over = false;
+      }
       write();
-      utimesSync2(KEEPER, new Date(lastUse), new Date(lastUse));
+      utimesSync2(KEEPER2, new Date(lastUse), new Date(lastUse));
     }
+  } catch (e) {
+    phase("failed", { error: String(e?.message ?? e).split("\n")[0].slice(0, 200) });
+    if (!warm) throw e;
   } finally {
     if (browser) await browser.close().catch(() => {
     });
@@ -1923,11 +2097,15 @@ async function keeper(worldUrl, port) {
   process.exit(0);
 }
 async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
+  for (let i = 0; i < 120 && warmStatus(worldUrl) === "warming"; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    runtime.signal?.throwIfAborted();
+  }
   const k = readKeeper();
   if (k && !lockStatus(parseHolder(k.holder), k.heartbeatAt ?? 0).stale && k.world === worldUrl && await alive(k.port)) {
     const now = /* @__PURE__ */ new Date();
     try {
-      utimesSync2(KEEPER, now, now);
+      utimesSync2(KEEPER2, now, now);
     } catch {
     }
     return k;
@@ -1937,9 +2115,9 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
     process.kill(k.pid);
   } catch {
   }
-  rmSync2(KEEPER, { force: true });
+  rmSync3(KEEPER2, { force: true });
   const port = await freePort();
-  const child = spawn(process.execPath, [cliPath, "look-keeper", worldUrl, String(port)], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
+  const child = spawn2(process.execPath, [cliPath, "look-keeper", worldUrl, String(port)], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
   let failure;
   child.once("error", (e) => {
     failure = e;
@@ -1966,19 +2144,25 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
       process.kill(process.platform === "win32" ? child.pid : -child.pid);
     } catch {
     }
-    if (readKeeper()?.pid === child.pid) rmSync2(KEEPER, { force: true });
+    if (readKeeper()?.pid === child.pid) rmSync3(KEEPER2, { force: true });
     runtime.keeperChild = null;
     throw e;
   }
 }
 function stopKeeper() {
-  const k = readKeeper();
+  const k = readKeeper(), w = readWarm(), wh = parseHolder(w?.holder);
   if (k?.pid && liveness(parseHolder(k.holder)) === "alive") try {
     process.kill(k.pid);
   } catch {
   }
-  rmSync2(KEEPER, { force: true });
-  return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
+  const starting = !k && wh && wh.pid === w.pid && ["fetch", "chrome"].includes(w.phase) && liveness(wh) === "alive";
+  if (starting) try {
+    process.kill(w.pid);
+  } catch {
+  }
+  rmSync3(KEEPER2, { force: true });
+  writeWarm({ ...w ?? {}, holder: void 0, phase: "stopped" });
+  return k ? `stopped the look keeper (pid ${k.pid})` : starting ? `stopped the look keeper warm-up (pid ${w.pid})` : "no look keeper running";
 }
 function drawableCount(snapshot3 = {}) {
   const lib = /* @__PURE__ */ new Map();
@@ -2362,20 +2546,31 @@ function schemaMarkdown(s) {
 }
 
 // lib/inbox.mjs
-async function listen(flags2 = {}) {
+var transient = (status2) => status2 === 0 || status2 === 408 || status2 === 429 || status2 >= 500;
+async function listen(flags2 = {}, { poll: pollFn, beat = () => {
+}, wait = sleep } = {}) {
   const seconds = flags2.timeout === void 0 ? 25 : Number(flags2.timeout);
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 55 || flags2.timeout === true) throw new Error("listen --timeout takes seconds from 0 to 55");
   if (flags2.after !== void 0 && (typeof flags2.after !== "string" || !flags2.after)) throw new Error("listen --after needs a message id");
   if (seconds === 0 && !flags2.once) throw new Error("listen --timeout 0 requires --once");
   if (flags2.follow && flags2.once) throw new Error("listen takes --follow or --once, not both");
-  if (flags2.follow) return followInbox({ poll: (after) => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), after: flags2.after });
-  const query2 = new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...flags2.after ? { after: flags2.after } : {} });
+  const poll = pollFn ?? ((after) => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }));
+  if (flags2.follow) return followInbox({ poll, after: flags2.after, beat, wait });
+  let delay = 0;
   for (; ; ) {
-    const data = ok(await call(`/v1/god/inbox/listen?${query2}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }), "listen");
+    beat();
+    const r = await poll(flags2.after);
+    if (!flags2.once && transient(r.status)) {
+      delay = Math.min(3e4, delay ? delay * 2 : 1e3);
+      await wait(delay);
+      continue;
+    }
+    delay = 0;
+    const data = ok(r, "listen");
     if (!data?.inbox) throw new Error("listen: this world does not serve the owner inbox yet");
     const message = data.inbox.latest;
     if (flags2.once || message && message.state !== "acknowledged" && message.id !== flags2.after) return data;
-    await sleep(50);
+    await wait(50);
   }
 }
 async function ack(id, reply) {
@@ -2383,11 +2578,13 @@ async function ack(id, reply) {
   if (reply !== void 0 && (typeof reply !== "string" || reply.length > 140)) throw new Error("ack reply must be at most 140 characters");
   return ok(await call(`/v1/god/inbox/${encodeURIComponent(id)}/ack`, { body: reply === void 0 ? {} : { reply } }), "ack");
 }
-async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false }) {
+async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false, beat = () => {
+} }) {
   let last = after, delay = 0;
   while (!stop()) {
+    beat();
     const r = await poll(last);
-    if (r.status === 0 || r.status === 429 || r.status >= 500) {
+    if (transient(r.status)) {
       delay = Math.min(3e4, delay ? delay * 2 : 1e3);
       await wait(delay);
       continue;
@@ -2706,7 +2903,7 @@ var LAYERS_POS = { hours: 1, event: 2, own: 2, access: 2, price: 2, currency: 1,
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00 (or 07:00-15:00@sat,sun) [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) \xB7 event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] (adds one event; its set appears while it is on) \xB7 event <ref> <name> --remove \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/governance.mjs
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
 var clip = (s, n) => {
   const t = String(s ?? "").replace(/\s+/g, " ").trim();
   return t.length > n ? t.slice(0, n - 1) + "\u2026" : t;
@@ -2751,7 +2948,7 @@ function decideBody(id, decision, f = {}) {
   let text;
   if (f.text !== void 0) {
     if (typeof f.text !== "string" || !f.text.trim()) throw new Error("--text needs the new constitution (markdown, or a file holding it)");
-    text = existsSync6(f.text) && !f.text.includes("\n") ? readFileSync6(f.text, "utf8") : f.text;
+    text = existsSync7(f.text) && !f.text.includes("\n") ? readFileSync7(f.text, "utf8") : f.text;
   }
   return { decision, ...reason ? { reason } : {}, ...text !== void 0 ? { text } : {} };
 }
@@ -2795,6 +2992,7 @@ async function register(url, identity) {
 async function pair(agent = "eden-god " + SKILL_VERSION) {
   const start = ok(await call("/v1/god/pair/start", { as: "none", body: { agent } }), "pair");
   console.error(start.tell_your_human);
+  autoWarm(SELF, { force: true, pairing: true });
   for (let i = 0; i < 300; i++) {
     const p = ok(await call("/v1/god/pair/poll", { as: "none", body: { poll_token: start.poll_token } }), "pair");
     if (p.status === "approved") {
@@ -3840,7 +4038,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
       if (typeof f.file !== "string") throw new Error("--file needs a plan file or inline JSON");
       let plan;
       try {
-        plan = JSON.parse(f.file.trim().startsWith("{") ? f.file : readFileSync7(f.file, "utf8"));
+        plan = JSON.parse(f.file.trim().startsWith("{") ? f.file : readFileSync8(f.file, "utf8"));
       } catch (e) {
         throw new Error(`--file: cannot read the plan (${e.message})`);
       }
@@ -3900,7 +4098,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
     for (const k of ["at", "offset", "size", "yaw", "mass", "root"]) if (f[k] !== void 0) throw new Error(`--${k} does not apply to a district chapter: the plan holds each plot's rectangle and massing`);
     const plots = buildValues(f.plots, ",", "plots", 8, 8), steps2 = f.steps === void 0 ? void 0 : buildValues(f.steps, ",", "steps", 24, 60);
     if (f.title !== void 0 && (typeof f.title !== "string" || !f.title.trim() || f.title.length > 80)) throw new Error("--title is 1..80 characters");
-    const brief = f.brief === void 0 ? void 0 : existsSync7(f.brief) ? readFileSync7(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync8(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     const asks = buildValues(f.asks, ";", "asks", 64, 500), include = buildValues(f.include, ",", "include", 512, 300);
     body = { id: arg, district: { id: f.district, ...plots ? { plots } : {} }, ...f.title ? { title: f.title } : {}, ...steps2 ? { steps: steps2 } : {}, ...asks ? { asks } : {}, ...include ? { include } : {}, ...brief !== void 0 ? { brief } : {} };
@@ -3911,7 +4109,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
     const steps2 = f.steps.split(",").map((x) => x.trim());
     if (steps2.length > 24 || steps2.some((x) => !x || x.length > 60)) throw new Error("--steps needs 1..24 labels, each 1..60 characters");
     const massing = inheritedMassing ?? parseMassing(f.mass), site = await buildSite(f);
-    const brief = f.brief === void 0 ? void 0 : existsSync7(f.brief) ? readFileSync7(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync8(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     const asks = buildValues(f.asks, ";", "asks", 64, 500), include = buildValues(f.include, ",", "include", 512, 300);
     body = { id: arg, title: f.title, steps: steps2, site, massing, ...asks ? { asks } : {}, ...include ? { include } : {}, ...brief !== void 0 ? { brief } : {}, ...f.root ? { root: f.root } : {} };
@@ -3963,7 +4161,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
   if (sub === "claim") {
     const file = claimFile(r.claim.id), release = acquireLock(`${file}.lock`, { label: "claim state creation" });
     try {
-      const previous = existsSync7(file) ? JSON.parse(readFileSync7(file, "utf8")) : null;
+      const previous = existsSync8(file) ? JSON.parse(readFileSync8(file, "utf8")) : null;
       if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + "\n");
     } finally {
       release();
@@ -4231,8 +4429,18 @@ async function lookInner(flags2 = {}, runtime = {}, signal) {
     ...flags2.width ? { width: num(flags2.width) } : {},
     ...flags2.h ? { height: num(flags2.h) } : {}
   };
-  let shot;
-  if (!flags2.keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
+  let shot, keep = !!flags2.keep;
+  if (!keep && !flags2.remote && !runtime.shoot) {
+    const route = await lookRoute({ world: args.worldUrl, cliPath: SELF, single: !args.views && count === 1, deadlineAt: runtime.deadlineAt, signal, remote: () => remoteLook({ ...args, timeoutMs: Math.max(1, runtime.deadlineAt - Date.now() - 15e3) }, { deadlineAt: runtime.deadlineAt, signal }) });
+    if (route?.shot) shot = route.shot;
+    else if (route === "keeper") {
+      keep = true;
+      args.keep = true;
+      args.timeoutMs = Math.max(1, runtime.deadlineAt - Date.now());
+    }
+  }
+  if (shot) {
+  } else if (!keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
   else {
     const child = spawnSync3(process.execPath, [SELF, "look-shot", JSON.stringify(args)], { encoding: "utf8", cwd: process.cwd(), env: process.env, timeout: Math.max(1, runtime.deadlineAt - Date.now()), killSignal: "SIGKILL", maxBuffer: 1 << 24 });
     if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || "").trim().slice(0, 500)}`);
@@ -4252,7 +4460,7 @@ async function exportWorld(file, flags2 = {}) {
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
 var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
-  const g = JSON.parse(readFileSync7(file, "utf8"));
+  const g = JSON.parse(readFileSync8(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
   const out = [];
   const s = await snapshot2();
@@ -4272,7 +4480,7 @@ var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   return out.join("\n");
 });
 async function define(json2) {
-  const def = typeof json2 === "string" ? JSON.parse(existsSync7(json2) ? readFileSync7(json2, "utf8") : json2) : json2;
+  const def = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -4281,7 +4489,7 @@ async function define(json2) {
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function defineKit(json2, flags2 = {}) {
-  const k = typeof json2 === "string" ? JSON.parse(existsSync7(json2) ? readFileSync7(json2, "utf8") : json2) : json2;
+  const k = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   if (!k.box && k.shapes.some((s) => s.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s[key] !== void 0) || JSON.stringify(s).includes("$"))) throw new Error("define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry");
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
@@ -4440,7 +4648,7 @@ function checkArgs(cmd, f, rest) {
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
 var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
-var readArg = (r) => r[0] !== void 0 ? existsSync7(r[0]) && !r[0].trim().startsWith("{") ? readFileSync7(r[0], "utf8") : r[0] : readFileSync7(0, "utf8");
+var readArg = (r) => r[0] !== void 0 ? existsSync8(r[0]) && !r[0].trim().startsWith("{") ? readFileSync8(r[0], "utf8") : r[0] : readFileSync8(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
   trace: (r, f) => trace(f),
@@ -4448,7 +4656,10 @@ var COMMANDS = {
     if (r[0] !== "look" || !r[1]) throw Error("usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]");
     return kitLook(readArg(r.slice(1)), f);
   },
-  listen: (r, f) => listen(f),
+  listen: (r, f) => listen(f, { beat: () => {
+    listenerBeat();
+    autoWarm(SELF);
+  } }),
   ack: (r) => ack(r[0], r[1]),
   build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
@@ -4486,7 +4697,7 @@ var COMMANDS = {
   history: (r, f) => history(r[0] ? Number(r[0]) : 20, f),
   resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f),
-  "look-keeper": (r) => keeper(r[0], Number(r[1])),
+  "look-keeper": (r, f) => keeper(r[0], Number(r[1]), { warm: f.warm !== void 0 }),
   "look-shot": async (r) => {
     const res = await shoot(JSON.parse(r[0]));
     console.log(JSON.stringify(res));
@@ -4565,6 +4776,7 @@ ${LAYERS_HELP}
 ${SECRET_HELP}
 ${GOV_HELP}
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
+var NO_WARM = /* @__PURE__ */ new Set(["help", "register", "mint", "pair", "doctor", "look", "look-shot", "look-keeper"]);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
   const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
@@ -4601,6 +4813,7 @@ ${HELP}`);
     appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: [cmd, ...argv].join(" "), phase: "start" }) + "\n");
   } catch {
   }
+  if (!NO_WARM.has(cmd ?? "help")) autoWarm(SELF, { force: ["status", "listen"].includes(cmd) });
   Promise.resolve(fn(rest, f)).then((out) => {
     record(out);
     if (typeof out === "string") console.log(out);

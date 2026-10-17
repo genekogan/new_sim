@@ -21,13 +21,15 @@ const STARTING_MS = 5 * 60_000, FAILED_RETRY_MS = 10 * 60_000, REMOTE_RETRY_MS =
 const read = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; } };
 const pidAlive = (pid) => { if (!Number.isSafeInteger(pid) || pid <= 0) return false; try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
 export const readWarm = () => read(WARM);
-export const writeWarm = (patch) => { try { atomicWrite(WARM, JSON.stringify({ ...patch, at: Date.now() })); } catch { /* best effort */ } };
+/** Merges into the marker (so `pwFrom`, the Playwright folder the keeper found, survives phase changes). */
+export const writeWarm = (patch) => { try { atomicWrite(WARM, JSON.stringify({ ...(readWarm() ?? {}), ...patch, at: Date.now() })); } catch { /* best effort */ } };
 
 /** Does this folder warm up? (a human-paired folder on a machine that has Google Chrome where Playwright looks) */
 export function warmEnabled(state = (() => { try { return load(); } catch { return {}; } })(), env = process.env, chrome = () => { const c = chromeCandidates(); return !c || c.some(existsSync); }) {
   if (env.EDEN_GOD_WARM === '0' || env.EDEN_GOD_LOOK === 'remote') return false;
   if (!state?.world) return false;
   if (env.EDEN_GOD_WARM === '1') return true;
+  if (env.NODE_TEST_CONTEXT) return false; // a CLI run by node --test: no background browsers
   return !!state.token && !state.identity && chrome();
 }
 
@@ -53,14 +55,15 @@ export function startWarm(world, cliPath, { force = false, spawnFn = spawn } = {
     child.on?.('error', () => {});
     child.unref?.();
     if (!child.pid) return 'none';
-    const cur = readWarm(); if (!(cur?.pid === child.pid)) writeWarm({ world, pid: child.pid, phase: 'starting' });
+    const cur = readWarm(); if (!(cur?.pid === child.pid)) writeWarm({ world, pid: child.pid, holder: undefined, phase: 'starting', error: undefined, reason: undefined });
     return 'started';
   } catch { return 'none'; }
 }
 
 /** The commands' hook: never throws, never waits. */
-export function autoWarm(cliPath, { force = false } = {}) {
-  try { const s = load(); if (warmEnabled(s)) return startWarm(s.world, cliPath, { force }); } catch { /* never hold a command up */ }
+export function autoWarm(cliPath, { force = false, pairing = false } = {}) {
+  // pairing: the token arrives only when the owner approves; the keeper needs none, so it starts now
+  try { const s = load(); if (warmEnabled(pairing ? { ...s, token: s.token ?? 'pairing' } : s)) return startWarm(s.world, cliPath, { force }); } catch { /* never hold a command up */ }
   return 'off';
 }
 

@@ -142,3 +142,24 @@ test('god inbox --follow prints one JSON line per new message, retries outages a
   await assert.rejects(listen({ follow: true, once: true }), /not both/);
   assert.doesNotThrow(() => checkArgs('listen', { follow: true }, []));
 });
+
+test('G1: listen retries network, 408, 429 and 5xx quietly and exits only with a message', async () => {
+  const answers = [{ status: 0, data: { code: 'unreachable' } }, { status: 503, data: {} }, { status: 429, data: {} }, { status: 408, data: {} }, { status: 502, data: {} },
+    { status: 200, data: envelope(latest('old', 'acknowledged')) }, { status: 200, data: envelope(latest('next')) }];
+  const waits = [], beats = [], errors = [], error = console.error;
+  console.error = (...a) => errors.push(a);
+  try {
+    const got = await listen({}, { poll: async () => answers.shift(), beat: () => beats.push(1), wait: async ms => { waits.push(ms); } });
+    assert.equal(got.inbox.latest.id, 'next');
+  } finally { console.error = error; }
+  assert.deepEqual(waits, [1000, 2000, 4000, 8000, 16000, 50]);
+  assert.equal(beats.length, 7, 'a heartbeat before every poll');
+  assert.equal(errors.length, 0, 'quiet on stderr');
+  // --once still answers after one poll, and permanent refusals still throw
+  await assert.rejects(listen({ once: true }, { poll: async () => ({ status: 503, data: {} }) }), /HTTP 503/);
+  await assert.rejects(listen({}, { poll: async () => ({ status: 403, data: { error: 'revoked' } }) }), /HTTP 403/);
+  // the backoff is capped at 30 s
+  const many = Array.from({ length: 8 }, () => ({ status: 500, data: {} })).concat([{ status: 200, data: envelope(latest('m')) }]), w2 = [];
+  await listen({}, { poll: async () => many.shift(), wait: async ms => { w2.push(ms); } });
+  assert.equal(Math.max(...w2), 30000);
+});
