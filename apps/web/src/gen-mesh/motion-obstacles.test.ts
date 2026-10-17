@@ -1,0 +1,51 @@
+// Creatures share one solid-footprint scan per synchronous task (lane L3e: at arrival every creature refreshed its own
+// scan of every entity's footprint, ~2.8 s of Eden 2026's 4x-phone arrival). Each creature must still get exactly the
+// boxes the original per-creature loop built, and an edit must be seen at once.
+//   node --test apps/web/src/gen-mesh/motion-obstacles.test.ts
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { CORE_KIT, WorldModel, applyBatch, type DefInput } from '@sim/world-compiler';
+import terrainKit from '../../../../packages/world-compiler/src/core-kit/terrain.json' with { type: 'json' };
+import { solidFootprints, surroundings } from './motion.ts';
+
+function world() {
+  const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'obstacles' });
+  const have = new Set(CORE_KIT.map((d) => d.name));
+  for (const d of [...CORE_KIT, ...(terrainKit as unknown as DefInput[]).filter((d) => !have.has(d.name))]) w.defineDef(d, 'core', 0);
+  return w;
+}
+const add = (w: WorldModel, ops: unknown[]) => { const r = applyBatch(w, { ops } as never, 'god', 0) as { result: { accepted: boolean } }; assert.equal(r.result.accepted, true, JSON.stringify(r.result)); };
+
+/** The scan as it was before L3e: every creature walks every entity's footprint itself. */
+function original(w: WorldModel, cx: number, cz: number, reach: number, skip: Set<string>) {
+  const out: unknown[] = [];
+  for (const e of w.entities.values()) {
+    if (skip.has(e.id)) continue;
+    const d = w.resolvedDef(e.def); if (!d || d.layer !== 'solid' || d.make.kind === 'none') continue;
+    let fp; try { fp = w.footprint(e, d); } catch { continue; }
+    for (const b of fp) if (Math.hypot(b.c[0] - cx, b.c[1] - cz) < reach + Math.hypot(b.half[0], b.half[1]) && b.y1 - b.y0 > 0.12) out.push(b);
+  }
+  return out;
+}
+
+test('every creature gets the boxes its own scan built; one scan is shared; an edit is seen at once', () => {
+  const w = world();
+  const ops: unknown[] = [];
+  for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) ops.push({ op: 'place', def: 'core/bench@1', name: `bench-${i}-${j}`, p: [i * 7 - 18, j * 7 - 18], yaw: (i * 37 + j * 11) % 360 });
+  ops.push({ op: 'place', def: 'core/woodland@1', name: 'wood', shape: { area: [[30, 30], [60, 30], [60, 60], [30, 60]] } });
+  add(w, ops);
+  const homes: [number, number, string][] = [[0, 0, 'bench-2-2'], [-18, -18, 'bench-0-0'], [17, 3, 'bench-5-3'], [45, 45, 'wood'], [-40, 10, '']];
+  let footprints = 0; const fp = w.footprint.bind(w); w.footprint = ((...a: Parameters<typeof fp>) => { footprints++; return fp(...a); }) as typeof w.footprint;
+  const want = homes.map(([x, z, id]) => JSON.stringify(original(w, x, z, 16, new Set(id ? [w.get(id)!.id] : []))));
+  const perCreature = footprints; footprints = 0;
+  const got = homes.map(([x, z, id]) => JSON.stringify(surroundings(w, [x, z], 12, 'land', new Set(id ? [w.get(id)!.id] : [])).obstacles.list(0)));
+  assert.deepEqual(got, want, 'each creature sees exactly the original boxes');
+  assert.ok(want.some((s) => s !== '[]') && want.some((s) => s === '[]'), 'the homes cover near and far solids');
+  assert.ok(footprints <= w.entities.size && perCreature >= (homes.length - 1) * footprints, `all the creatures in one task share a single scan (${footprints} vs ${perCreature})`);
+  const before = solidFootprints(w);
+  add(w, [{ op: 'place', def: 'core/bench@1', name: 'bench-new', p: [-40, 10] }]);
+  assert.notEqual(solidFootprints(w), before, 'an edit in the same task drops the shared scan');
+  const skip = new Set<string>();
+  assert.equal(JSON.stringify(surroundings(w, [-40, 10], 12, 'land', skip).obstacles.list(0)), JSON.stringify(original(w, -40, 10, 16, skip)));
+  assert.ok(surroundings(w, [-40, 10], 12, 'land', skip).obstacles.list(0).length > 0, 'the new bench is an obstacle');
+});
