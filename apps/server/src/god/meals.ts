@@ -47,7 +47,9 @@ export class GodMeals {
     if (b) { const k = ks.find((x) => x.key === b); if (k) return k; }
     if (s.activity === 'cook') return ks.find((x) => x.cook === s.id) ?? null;
     if (b && this.h.place(b)?.kind === 'building') return null;   // a building with no kitchen of its own: bring your own
-    return ks.map((k) => ({ k, d: Math.hypot(k.at[0] - s.at[0], k.at[1] - s.at[1]) })).filter((x) => x.d <= OUTDOOR_REACH).sort((a, b) => a.d - b.d || (a.k.key < b.k.key ? -1 : 1))[0]?.k ?? null;
+    // an outdoor table eats from the nearest public kitchen (the commons kitchen, a café) before anyone's house
+    const home = (k: Kitchen) => /house|home|cottage|cabin|chalet|flat|apartment|villa|lodge|studio/i.test(k.name) ? 1 : 0;
+    return ks.map((k) => ({ k, d: Math.hypot(k.at[0] - s.at[0], k.at[1] - s.at[1]) })).filter((x) => x.d <= OUTDOOR_REACH).sort((a, b) => home(a.k) - home(b.k) || a.d - b.d || (a.k.key < b.k.key ? -1 : 1))[0]?.k ?? null;
   }
   stock(key: string): { portions: number; dish: string | null; pots: number } {
     // the morning pot: on a world with days, a kitchen that has not been stocked today gets one pot (4 portions)
