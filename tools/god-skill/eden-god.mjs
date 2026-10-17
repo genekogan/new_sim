@@ -2045,7 +2045,7 @@ async function keeper(worldUrl, port, { warm = false } = {}) {
     const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
     await ctx.addInitScript(PRESERVE);
     const page = await ctx.newPage();
-    await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 25e3 });
+    await page.goto(`${worldUrl}?shot=1&eye=0,60,60&at=0,0,0`, { waitUntil: "commit", timeout: 25e3 });
     const identity = me;
     let rssMb = null;
     const write = () => atomicWrite(KEEPER2, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 3e4, ...rssMb != null ? { rssMb } : {} }));

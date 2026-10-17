@@ -92,7 +92,8 @@ export async function keeper(worldUrl, port, { warm = false } = {}) {
   // keep the WebGL drawing buffer so the canvas can be read back at any time (page.screenshot stalls on a slow software compositor)
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
-  await page.goto(`${worldUrl}?shot=1`, { waitUntil: 'commit', timeout: 25_000 });
+  // with a camera in the URL, so the first look only moves it (a look reloads a tab that has none)
+  await page.goto(`${worldUrl}?shot=1&eye=0,60,60&at=0,0,0`, { waitUntil: 'commit', timeout: 25_000 });
   const identity = me;
   let rssMb = null;
   const write = () => atomicWrite(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now(), holder: identity, heartbeatAt: Date.now(), ttlMs: 30_000, ...(rssMb != null ? { rssMb } : {}) }));
