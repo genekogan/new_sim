@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { officeFact, officeSpots } from './old-eden-office.mjs';
 import { layout, mergeSpots, editDescriptor, diffCaptures, review, backup, apply, rollback, verify, removeFact } from './upper-floors.mjs';
+import { HOTELS, hotelsFacts, hotelsSpots, hotelOpenings } from './old-eden-hotels.mjs';
 
 const ROOMS = ['eden-office-1-floor-1', 'eden-office-1-floor-2', 'int-office-studio', 'int-office-upper-lounge'];
 const places = { places: [...ROOMS, 'commons'].map((id) => ({ id })) };
@@ -58,4 +59,35 @@ test('review, backup, apply/rollback dry runs and verify on a throwaway launcher
   assert.equal(verify(L, 'removed').ok, false, 'remove not logged yet (refused while someone is upstairs)');
   add(2, { upperFloorsV1: removeFact() }); w.close();
   assert.deepEqual({ ok: verify(L, 'removed').ok, state: verify(L).state }, { ok: true, state: 'rolled-back' });
+});
+
+test('hotels: openings are real Builder door bands, apply after the office makes an array, rollback keeps the office', async (t) => {
+  const R = new URL('../../mars/viewer/app/engine-view/content/assets/eden-regions/', import.meta.url).href;
+  const { Builder } = await import(R + 'kit.ts'), { Terrain } = await import(R + 'terrain.ts'), { Trees } = await import(R + 'trees.ts'), { buildResort, resortPads } = await import(R + 'resort-lake.ts');
+  const b = new Builder('legacy'), ter = new Terrain(() => 0); resortPads(ter); buildResort(b, ter, new Trees());
+  const facts = hotelsFacts(); assert.deepEqual(facts.map((f) => f.building.id), ['eden-hotel-1', 'eden-hotel-2', 'eden-hotel-3']);
+  for (const [i, f] of facts.entries()) {
+    const { bands } = hotelOpenings(HOTELS[i]); assert.deepEqual(f.building.openings, bands.map((x) => x.id));
+    for (const x of bands) { const v = b.boundaries.find((y) => y.id === x.id); assert.ok(v, x.id);
+      assert.deepEqual([v.c[0] - v.half[0], v.c[0] + v.half[0]].map((n) => +n.toFixed(3)), [x.x0, x.x1], x.id); }
+  }
+  const spotIds = hotelsSpots().map((s) => s.id), rooms = new Set(facts.flatMap((f) => f.building.regions.map((r) => r.id)));
+  assert.equal(new Set(spotIds).size, spotIds.length); assert.ok(hotelsSpots().every((s) => rooms.has(s.place)));
+  const root = mkdtempSync(join(tmpdir(), 'upper-floors-h-')); t.after(() => rmSync(root, { recursive: true, force: true }));
+  const O = layout(root, 'eden'), H = layout(root, 'eden', 'hotels'); mkdirSync(join(root, 'forks/descriptors'), { recursive: true }); mkdirSync(join(root, 'worlds/eden'), { recursive: true });
+  const spots = join(root, 'spots.json'), placeData = join(root, 'places.json');
+  writeFileSync(spots, JSON.stringify({ spots: [{ id: 'commons-bench', place: 'commons' }] })); writeFileSync(placeData, JSON.stringify(places));
+  const db = new DatabaseSync(O.db); db.exec('CREATE TABLE events (world_id TEXT, seq INTEGER, tick INTEGER, kind TEXT, author TEXT, payload TEXT, at INTEGER, soul_id TEXT)'); db.close();
+  // the office installed first: its fact path in the descriptor, its spots merged
+  const officeSpotsFile = join(root, 'office-spots.json'); writeFileSync(officeSpotsFile, JSON.stringify(mergeSpots({ spots: [{ id: 'commons-bench', place: 'commons' }] }, places)));
+  writeFileSync(O.descriptor, JSON.stringify({ worldId: 'w', worldKey: 'eden', activitySpots: officeSpotsFile, placeData, upperFloors: O.fact }));
+  const r = review(H); assert.equal(r.state, 'not-applied'); assert.deepEqual(r.wouldWrite.descriptor.upperFloors, [O.fact, H.fact]); assert.equal(r.wouldWrite.spots.added, spotIds.length);
+  backup(H, join(root, 'bk'));
+  const dry = apply(H, { backupDir: join(root, 'bk'), confirm: false, port: 1 }); assert.equal(dry.dryRun, true); assert.deepEqual(dry.write, [H.fact, H.spots, H.descriptor]);
+  // as if applied: both buildings named, hotel spots merged on the office's
+  mkdirSync(H.art, { recursive: true }); const live = JSON.parse(readFileSync(officeSpotsFile, 'utf8')); writeFileSync(H.spots, JSON.stringify({ ...live, spots: [...live.spots, ...hotelsSpots()] }));
+  writeFileSync(H.descriptor, JSON.stringify({ worldId: 'w', worldKey: 'eden', activitySpots: H.spots, placeData, upperFloors: [O.fact, H.fact] }));
+  const rb = rollback(H, { backupDir: join(root, 'bk'), confirm: false, port: 1 });
+  assert.equal(rb.dryRun, true); assert.equal(rb.activitySpots, officeSpotsFile, 'live minus the hotel spots is exactly the backed-up office file');
+  assert.equal(rollback(O, { backupDir: join(root, 'bk'), confirm: false, port: 1 }).dryRun, true, 'the office can still roll back on its own');
 });
