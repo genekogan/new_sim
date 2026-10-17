@@ -298,7 +298,10 @@ house/lamp --near house/bed --dir e` or `--by 0.5,0` works in the world frame, a
 decides its parent (still on the table if over its top, else the room the point is in, else the world
 root), which the answer says. **Sky**: `sky` alone shows the sky, the weather and the palettes:
 `clear-day` (default), `golden-hour` (with `--sun 0.3–0.4`), `dawn`, `sunset`, `dusk`, `twilight` (lamps
-half lit), `night`, `midnight` (every lamp lit), `mars-desert`, `lm-garden`; an unknown name is refused.
+half lit), `night`, `midnight` (every lamp lit), `mars-desert`, `lm-garden`, `eden-summer`; an unknown name is refused.
+Two more `world` state fields: `ground.palette` `meadow` (Eden's olive turf with lush/dry mottling; also grass, garden, desert, dust,
+sand, snow, rock, playa) and `time.calendar` "MM-DD" (the sky's season, e.g. "06-05" for a June dusk; the clock and schedules
+are unchanged).
 `sky` keeps the weather and `weather` keeps the sky. Today the viewer's sky colour does not change
 with the palette; the palette and `--sun` light the lamps.
 
