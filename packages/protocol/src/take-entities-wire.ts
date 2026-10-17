@@ -4,8 +4,9 @@
 // moved or was edited), so a peer that announces this contract receives each chunk's table as
 //   - the full table (the first one on the connection, or when a patch would not be smaller),
 //   - {"$takeEntitiesRefV1": id}: the same table as the previous chunk this connection received, or
-//   - {"$takeEntitiesPatchV1": {base, n, del, set}}: the previous table with `set` entries replaced or appended
-//     and `del` keys removed (only when the result has exactly the key order of the real table).
+//   - {"$takeEntitiesPatchV1": {base, n, del, ins, set}}: the previous table without the `del` keys, each new key inserted
+//     at its index (`ins`: [index, key] ascending), then `set` values assigned (only when the result has exactly the key
+//     order of the real table).
 // The client restores the exact take (same keys, same order, same values; JSON.stringify identical) before any
 // other code reads it. Canonical takes, recordings, HTTP history and peers that did not announce it never see refs.
 // The envelope is {t:'take-entities', contract, ids, payload}: ids[i] is chunk i's table id (null: no table);
@@ -30,7 +31,7 @@ export class TakeEntitiesEncoderV1{
  private recent:TableInfo[]=[];private nextId=1;
  private patches=new Map<string,JsonObject|null>();
  private keep:number;
- constructor(keep=8){this.keep=keep;}
+ constructor(keep=16){this.keep=keep;}
  private describe(table:JsonObject):TableInfo|null{
   const known=this.info.get(table);if(known!==undefined)return known;
   const keys=Object.keys(table),parts:string[]=new Array(keys.length);
@@ -48,13 +49,15 @@ export class TakeEntitiesEncoderV1{
  private patch(base:TableInfo,next:TableInfo,table:JsonObject):JsonObject|null{
   const key=base.id+'>'+next.id;if(this.patches.has(key))return this.patches.get(key)!;
   base.index??=new Map(base.keys.map((k,i)=>[k,base.parts[i]]));next.index??=new Map(next.keys.map((k,i)=>[k,next.parts[i]]));
-  const set:JsonObject={},del:string[]=[],added:string[]=[];let bytes=0;
+  const set:JsonObject={},del:string[]=[],ins:[number,string][]=[];let bytes=0;
   for(const k of base.keys)if(!next.index.has(k))del.push(k);
-  for(let i=0;i<next.keys.length;i++){const k=next.keys[i],was=base.index.get(k);if(was===next.parts[i])continue;if(was===undefined)added.push(k);set[k]=table[k];bytes+=k.length+next.parts[i].length+4;}
-  // the client rebuilds by walking the base keys, then appending the new ones: only exact key orders are patched
-  const sim:Record<string,1>={},gone=new Set(del);for(const k of base.keys)if(!gone.has(k))sim[k]=1;for(const k of added)sim[k]=1;
-  const order=Object.keys(sim),exact=order.length===next.keys.length&&order.every((k,i)=>k===next.keys[i]);
-  const out=exact&&bytes+del.join('","').length<next.json.length/2?{[PATCH]:{base:base.id,n:next.keys.length,del,set}}:null;
+  for(let i=0;i<next.keys.length;i++){const k=next.keys[i],was=base.index.get(k);if(was===next.parts[i])continue;if(was===undefined){ins.push([i,k]);bytes+=k.length+12;}set[k]=table[k];bytes+=k.length+next.parts[i].length+4;}
+  // the client rebuilds the base keys without `del`, inserts each new key at its index, then assigns: patch only when
+  // that rebuild has exactly the real key order (an object's own order rules, so this is checked on a real object)
+  const gone=new Set(del),order=base.keys.filter(k=>!gone.has(k));for(const [i,k] of ins)order.splice(i,0,k);
+  const sim:Record<string,1>={};for(const k of order)sim[k]=1;
+  const rebuilt=Object.keys(sim),exact=rebuilt.length===next.keys.length&&rebuilt.every((k,i)=>k===next.keys[i]);
+  const out=exact&&bytes+del.join('","').length<next.json.length/2?{[PATCH]:{base:base.id,n:next.keys.length,del,ins,set}}:null;
   this.patches.set(key,out);if(this.patches.size>64)this.patches.delete(this.patches.keys().next().value!);
   return out;
  }
@@ -100,11 +103,19 @@ export function hydrateTakeEntitiesV1(input:unknown,state:TakeEntitiesStateV1,in
   const keys=Object.keys(sent);
   if(keys.length===1&&keys[0]===REF){if(sent[REF]!==id||!last||last.id!==id)fail('unknown reference');table=last.table;}
   else if(keys.length===1&&keys[0]===PATCH){
-   const p=sent[PATCH] as {base?:unknown;n?:unknown;del?:unknown;set?:unknown};
-   if(!record(p)||Object.keys(p).sort().join(',')!=='base,del,n,set'||!last||p.base!==last.id||!Array.isArray(p.del)||!record(p.set)||!Number.isSafeInteger(p.n))fail('patch shape');
-   const gone=new Set(p.del as unknown[]),set=p.set as JsonObject,out:JsonObject={};
-   for(const k of Object.keys(last.table))if(!gone.has(k))out[k]=Object.hasOwn(set,k)?deepFreeze(set[k]):last.table[k];
-   for(const k of Object.keys(set)){if(k==='__proto__')fail('patch key');if(!Object.hasOwn(last.table,k))out[k]=deepFreeze(set[k]);}
+   const p=sent[PATCH] as {base?:unknown;n?:unknown;del?:unknown;ins?:unknown;set?:unknown};
+   if(!record(p)||Object.keys(p).sort().join(',')!=='base,del,ins,n,set'||!last||p.base!==last.id||!Array.isArray(p.del)||!Array.isArray(p.ins)||!record(p.set)||!Number.isSafeInteger(p.n))fail('patch shape');
+   const gone=new Set(p.del as unknown[]),set=p.set as JsonObject,base=last.table,keys=Object.keys(base).filter(k=>!gone.has(k)),added=new Set<string>();
+   let at=-1;
+   for(const e of p.ins as unknown[]){
+    if(!Array.isArray(e)||e.length!==2||!Number.isSafeInteger(e[0])||typeof e[1]!=='string')fail('patch insert');
+    const [i,k]=e as [number,string];
+    if(i<=at||i>keys.length||k==='__proto__'||Object.hasOwn(base,k)||!Object.hasOwn(set,k)||added.has(k))fail('patch insert');
+    keys.splice(i,0,k);added.add(k);at=i;
+   }
+   for(const k of Object.keys(set))if(!Object.hasOwn(base,k)&&!added.has(k))fail('patch key');
+   const out:JsonObject={};
+   for(const k of keys)out[k]=Object.hasOwn(set,k)?deepFreeze(set[k]):base[k];
    if(Object.keys(out).length!==p.n)fail('patch size');
    table=Object.freeze(out);
   }else table=deepFreeze(sent) as JsonObject;

@@ -54,6 +54,12 @@ test('round trip: every decoded takes message is JSON.stringify-identical; repea
  assert.ok(wire<raw*.6,`wire ${wire} vs raw ${raw}`);
 });
 
+test('a key inserted mid-table (a new soul or edit) travels as a patch with its index, exactly',()=>{
+ const a=tableOf(60),mid:Table={};for(const [k,v] of Object.entries(a)){mid[k]=v;if(k==='e20')mid.h_new=entity('h_new',5);}
+ const enc=new TakeEntitiesEncoderV1(),peer={last:null as number|null},s:TakeEntitiesStateV1={last:null};
+ for(const m of [takes(1,[chunk(1,a)]),takes(2,[chunk(2,mid)])]){const w=encodeFor(enc,peer,m);assert.equal(JSON.stringify(hydrateTakeEntitiesV1(w,s)),JSON.stringify(m));if(m.serverTick===2)assert.deepEqual(w.payload.chunks[0].take.finalState.entities.$takeEntitiesPatchV1.ins,[[21,'h_new']]);}
+});
+
 test('peers are independent, a dropped message leaves both sides in step, and decoded tables are frozen and shared',()=>{
  const enc=new TakeEntitiesEncoderV1(),ms=stream(),late={last:null as number|null},early={last:null as number|null};
  const sEarly:TakeEntitiesStateV1={last:null},sLate:TakeEntitiesStateV1={last:null};
