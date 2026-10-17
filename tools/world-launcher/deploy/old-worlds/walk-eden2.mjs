@@ -2,9 +2,12 @@
 // Real Chrome (GPU), under the Chrome lease; dpr 1 and 2; drag, wheel, hold W, double-click, New Soul click.
 //   node walk-eden2.mjs <outDir>   (WALK_BUILDS='{"eden2":5771}' = label -> tunnel port; WALK_LEASE = Chrome lease holder)
 import {mkdirSync,writeFileSync} from 'node:fs';import {resolve} from 'node:path';import {createRequire} from 'node:module';
-import {chromeLease} from '<worktrees>/lane-kit/tools/god-skill/lib/chrome-lease.mjs';
+import {existsSync} from 'node:fs';import {fileURLToPath} from 'node:url';
+import {chromeLease} from '<team>/ops/chrome-lease.mjs';   // the shared 3-slot lease (T3-COMMON)
 const out=resolve(process.argv[2]);mkdirSync(out,{recursive:true});
-const {chromium}=createRequire('<worktrees>/lane-kit/mars/viewer/package.json')('@playwright/test');
+// Playwright from a Sim checkout: this file's own repo, or WALK_ROOT when run from the kit's run copies (team/runtime/sim-old-cloud/bin)
+const here=resolve(fileURLToPath(new URL('../../../..',import.meta.url))),root=process.env.WALK_ROOT??(existsSync(`${here}/mars/viewer/package.json`)?here:'<worktrees>/d2-kit');
+const {chromium}=createRequire(`${root}/mars/viewer/package.json`)('@playwright/test');
 const builds=JSON.parse(process.env.WALK_BUILDS??'{"eden2":5771}');  // label → first port of that build's eden/mars/littlemartians
 const worlds=['eden','mars','littlemartians'];const W=1352,H=780;
 const geometry=()=>{const c=document.querySelector('canvas[aria-label="Live 3D view of the world"]');const r=c?.getBoundingClientRect();return {window:[innerWidth,innerHeight],dpr:devicePixelRatio,canvasCss:r&&[Math.round(r.width),Math.round(r.height)],buffer:c&&[c.width,c.height]};};
