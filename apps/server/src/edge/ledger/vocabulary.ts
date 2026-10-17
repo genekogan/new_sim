@@ -270,7 +270,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // Unsupported motions are refused honestly, with the nearest real things to do.
   // Quality 22/29/30: a refusal for something that exists nowhere is terminal (NOWHERE); one whose verb a world can
   // offer (fish, swing, picnic…) may exist elsewhere, so it keeps todo's place-specific wording.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? elsewhereReason(offer, ctx, offer === 'ride-attraction' && ctx.elsewhere?.(offer) ? 'No Ferris wheel or carousel ride is offered from here.' : reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer && offer !== 'feed-birds' ? elsewhereReason(offer, ctx, offer === 'ride-attraction' && ctx.elsewhere?.(offer) ? 'No Ferris wheel or carousel ride is offered from here.' : reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
