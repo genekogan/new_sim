@@ -265,7 +265,9 @@ export class GodActivitySpots {
    *  frisbee on. Read from the entity world (they are ground, not engine fixtures). */
   private grounds(add: (s: Spot) => void) {
     const m = this.h.model, creatures: V2[] = [];
-    for (const e of m.entities.values()) { const d = m.resolvedDef(e.def); if (d && (d.tags.includes('duck') || d.tags.includes('koi') || d.tags.includes('swan') || /duck|koi|swan/.test(d.name))) { const wp = m.worldPose(e); creatures.push([wp.x, wp.z]); } }
+    const kinds = new Map<string, string>();
+    for (const e of m.entities.values()) { const d = m.resolvedDef(e.def); const k = d ? ['duck', 'swan', 'koi', 'goose'].find(x => d.tags.includes(x) || d.name.includes(x)) : undefined; if (k) { const wp = m.worldPose(e); creatures.push([wp.x, wp.z]); kinds.set(`${Math.round(wp.x)},${Math.round(wp.z)}`, k); } }
+    const kindAt = (q: V2) => kinds.get(`${Math.round(q[0])},${Math.round(q[1])}`) ?? 'fish';
     for (const e of m.entities.values()) {
       if (e.in.parent !== 'world' || !e.shape) continue;
       const def = m.resolvedDef(e.def); if (!def) continue;
@@ -288,7 +290,8 @@ export class GodActivitySpots {
           let best: V2 = poly[0], bd = Infinity;
           for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], dx = b[0] - a[0], dz = b[1] - a[1], L = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((cc[0] - a[0]) * dx + (cc[1] - a[1]) * dz) / L)), q: V2 = [a[0] + dx * t, a[1] + dz * t]; if (d2(q, cc) < bd) { bd = d2(q, cc); best = q; } }
           const out: V2 = [best[0] - pc[0], best[1] - pc[1]], n = Math.hypot(out[0], out[1]) || 1, at: V2 = [r2(best[0] + out[0] / n * 1.6), r2(best[1] + out[1] / n * 1.6)], place = this.place(at, 0);
-          add({ id: `feed.${e.id}`.toLowerCase(), activity: 'feed', base: 'idle', at, faceTo: [r2(cc[0]), r2(cc[1])], also: ['fish'], label: `the bank of ${name}, by the ${inside.length > 1 ? 'birds and fish' : 'creature'} in it`, ...(place ? { place } : {}) });
+          const what = [...new Set(inside.map(kindAt))].map(k => (k === 'goose' ? 'geese' : k === 'koi' || k === 'fish' ? k : `${k}s`)).join(' and ');
+          add({ id: `feed.${e.id}`.toLowerCase(), activity: 'feed', base: 'idle', at, faceTo: [r2(cc[0]), r2(cc[1])], also: ['fish'], title: `Feed the ${what}`, label: `the bank of ${name}`, ...(place ? { place } : {}) });
         }
       }
       if ((kind === 'football-pitch' || kind === 'pitch') && sh.area?.length) {

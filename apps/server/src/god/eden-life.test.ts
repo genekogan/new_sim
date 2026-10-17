@@ -262,6 +262,8 @@ test('group life: a see-saw for two, a story by the campfire (listeners only whi
     { op: 'place', def: coreRef('see-saw'), name: 'see-saw', p: [-10, 12] },
     { op: 'place', def: coreRef('campfire'), name: 'story-fire', p: [10, 12] },
     { op: 'place', def: coreRef('garden-bed'), name: 'veg-bed', shape: { area: [[20, 20], [24, 20], [24, 23], [20, 23]] } },
+    { op: 'place', def: coreRef('pond'), name: 'duck-pond', shape: { area: [[-30, 20], [-18, 20], [-18, 30], [-30, 30]] } },
+    { op: 'place', def: coreRef('duck'), name: 'duck-1', p: [-24, 25] },
   ]);
   const ana = await w.soul('Ana'), bo = await w.soul('Bo');
   const caps = (s: any) => w.edge.capabilities(s);
@@ -286,6 +288,10 @@ test('group life: a see-saw for two, a story by the campfire (listeners only whi
   assert.ok(hear, 'a log is offered while Ana tells');
   const h = await w.act(bo, hear.id, { seconds: 10 }, () => w.body(bo)?.human?.activity === 'listen' && w.body(ana)?.human?.activity === 'tell-story' ? true : null);
   assert.ok(h.seen, 'Bo listened while Ana told the story');
+  // the ducks on the pond are fed from its bank ("feed the ducks" was refused on Eden 2026: "the ponds have koi")
+  const fd: any = await accept(w.host, w.edge.act(bo, { capability: 'feed the ducks' }));
+  assert.equal(fd.accepted, true, JSON.stringify(fd).slice(0, 400)); assert.match(fd.receipt.capability, /^feed:feed\./);
+  await w.act(bo, 'stand:here');
   // a garden bed is tended
   const g = caps(bo).find((c: any) => c.id.startsWith('garden:'))!;
   assert.ok(g, 'garden offered at the bed');

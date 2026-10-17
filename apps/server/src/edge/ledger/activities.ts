@@ -19,7 +19,9 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
   requires?: string;
   /** E-life (god worlds): a native seat fixture to sit on first (a library armchair, a café chair, the piano's bench); the
    *  activity is then done on that seat. `level`: the engine level the spot stands on (a desk upstairs). */
-  seat?: string; level?: number};
+  seat?: string; level?: number;
+  /** E-life: the activity's own title at this spot when the default does not fit ("Feed the ducks and swans"). */
+  title?: string};
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
@@ -225,7 +227,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     add({id: 'read:' + place, verb: 'read', label: `Read a book in ${name}`, available: true, target: {id: place, kind: 'place'}, params: secondsParam(180)}, {label: `Read a book in ${name}`, steps: readAt(s), seconds: true});
   }
   // ---- every other free spot within reach: play-piano:<spot>, paint:<spot>, use-computer:<spot>, sing:<spot>, listen:<seat>…
-  const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
+  const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : (activity === s.activity && s.title) || def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
   const offered = new Map<string, number>(), ordered = data.nearest ? [...live].sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id)) : live;
   for (const s of ordered) {
     if (s.base === 'lie' && !LYING_SPOT.has(s.activity)) continue;

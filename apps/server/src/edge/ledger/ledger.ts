@@ -1025,8 +1025,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const here: [number, number] | null = me ? [me.pose.p[0], me.pose.p[2]] : null;
     // r3 quality (23/29): the nearest spot (or bicycle dock) for a spot-based verb anywhere in this world, beyond offer reach
     const elsewhere = (verb: string) => {
-      const marks = verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
-        : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined;
+      // E-life: a ferris wheel or carousel ride (a native car at it) anywhere in this world, for "ride the ferris wheel"
+      const rideMarks = verb === 'ride-attraction' ? this.carriersNative().filter(c => /ferris|carousel/i.test(c.id)).map(c => ({at: [c.pose.p[0], c.pose.p[2]] as [number, number], label: c.label, place: undefined as string | undefined})) : null;
+      if (rideMarks && !rideMarks.length) return undefined;
+      const marks = rideMarks ?? (verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
+        : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined);
       if (!marks) return undefined;
       const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
         return {label: m.label, distance: here ? Math.hypot(m.at[0] - here[0], m.at[1] - here[1]) : 0, ...(pl && known.includes(pl) ? {place: pl.name, placeId: pl.id} : {})};})

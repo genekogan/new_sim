@@ -148,7 +148,7 @@ export const NOT_YET: [RegExp, string, string[], string?][] = [
   [/\b(?:ferris wheel|big wheel|carousel|merry[- ]go[- ]round)\b/i, 'The Ferris wheel and the carousel at the seaside resort are scenery for now: the resort cannot be walked to yet, so they cannot be ridden. Nothing else was chosen.', ['swing', 'seesaw', 'stroll'], 'ride-attraction'],
   [/\b(?:have|having|go for|go on|for) (?:a |some )?picnic\b|^picnic\b|\bpicnicking\b/i, 'There is no picnic blanket laid out here right now; eat at a table or sit on the grass instead.', ['eat', 'sit-ground', 'sit'], 'picnic'],
   [/\bstar[- ]?gaz\w*|\b(?:watch|look at|count) (?:the )?stars\b/i, 'Stargazing needs open grass and a world with nights.', ['lie', 'sit-ground'], 'stargaze'],
-  [/\bfeed(?:ing)? (?:the |some )?(?:ducks?|geese|goose|swans?|birds?|pigeons?|gulls?)\b/i, 'There are no ducks or birds to feed here; the ponds have koi, which can be fed from a marked bank.', ['feed', 'stroll', 'sit'], undefined],
+  [/\bfeed(?:ing)? (?:the |some )?(?:ducks?|geese|goose|swans?|birds?|pigeons?|gulls?)\b/i, 'There are no ducks or birds to feed here; the ponds have koi, which can be fed from a marked bank.', ['feed', 'stroll', 'sit'], 'feed-birds'],
   [/\b(?:feed(?:ing)? (?:the |some )?(?:fish|koi|carp))\b/i, 'There is nowhere to feed the koi from here right now: it is offered at a marked pond bank.', ['stroll', 'sit'], 'feed'],
   [/\b(?:skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance'], 'cycle'],
 ];
@@ -255,7 +255,12 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   }
   // CN5: "go fishing", "go swimming": the doing word decides; an unknown one is refused, never taken as a place
   const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
-  const offeredVerbs = new Set(ctx.caps.map(c => c.verb)), notYet = NOT_YET.filter(([, , , v]) => !v || !offeredVerbs.has(v));
+  // E-life: two refusals give way to what a god world really offers: ducks to feed (a feed bank by ducks or swans) and a
+  // ride on the ferris wheel or carousel (their ride objects); old worlds keep them
+  const offeredVerbs = new Set(ctx.caps.map(c => c.verb));
+  if (ctx.caps.some(c => c.verb === 'feed' && /\b(?:ducks?|swans?|geese|birds?)\b/i.test(c.label))) offeredVerbs.add('feed-birds');
+  if (ctx.caps.some(c => c.verb === 'object' && /ferris|carousel/i.test(c.id))) offeredVerbs.add('ride-attraction');
+  const notYet = NOT_YET.filter(([, , , v]) => !v || !offeredVerbs.has(v));
   if (going && !notYet.some(([re]) => re.test(text))) {
     const [verb, ...more] = (GO_ING[going[1]] ?? '').split(' ');
     if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.${NOWHERE}`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
@@ -265,7 +270,7 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   // Unsupported motions are refused honestly, with the nearest real things to do.
   // Quality 22/29/30: a refusal for something that exists nowhere is terminal (NOWHERE); one whose verb a world can
   // offer (fish, swing, picnic…) may exist elsewhere, so it keeps todo's place-specific wording.
-  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? elsewhereReason(offer, ctx, reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer, offer] of notYet) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason: offer ? elsewhereReason(offer, ctx, offer === 'ride-attraction' && ctx.elsewhere?.(offer) ? 'No Ferris wheel or carousel ride is offered from here.' : reason) : reason + NOWHERE, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   const verbs = new Set(ctx.caps.map(c => c.verb));
   // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
   // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
