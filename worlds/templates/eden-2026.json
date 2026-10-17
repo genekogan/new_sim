@@ -4885,7 +4885,7 @@
           "params": {
             "wall": "#e8d8b8",
             "trim": "#e9dfcc",
-            "roofColor": "#a97951",
+            "roofColor": "#7a4a9a",
             "w": 6,
             "d": 6,
             "floors": 1,
@@ -63409,6 +63409,234 @@
         {
           "op": "place",
           "def": "core/woodland@1",
+          "name": "trees-meadow-tufts-1",
+          "shape": {
+            "area": [
+              [
+                -100,
+                -65
+              ],
+              [
+                0,
+                -65
+              ],
+              [
+                0,
+                10
+              ],
+              [
+                -100,
+                10
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.03,
+            "minSpacing": 1.1,
+            "cluster": 0.5,
+            "palette": [
+              {
+                "kind": "grass",
+                "weight": 6,
+                "scale": [
+                  0.6,
+                  1.2
+                ]
+              },
+              {
+                "kind": "flower",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  1
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "scale": [
+                  0.2,
+                  0.4
+                ],
+                "maxSlope": 0.5
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-meadow-tufts-2",
+          "shape": {
+            "area": [
+              [
+                0,
+                -65
+              ],
+              [
+                105,
+                -65
+              ],
+              [
+                105,
+                10
+              ],
+              [
+                0,
+                10
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.03,
+            "minSpacing": 1.1,
+            "cluster": 0.5,
+            "palette": [
+              {
+                "kind": "grass",
+                "weight": 6,
+                "scale": [
+                  0.6,
+                  1.2
+                ]
+              },
+              {
+                "kind": "flower",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  1
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "scale": [
+                  0.2,
+                  0.4
+                ],
+                "maxSlope": 0.5
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-meadow-tufts-3",
+          "shape": {
+            "area": [
+              [
+                -100,
+                10
+              ],
+              [
+                0,
+                10
+              ],
+              [
+                0,
+                88
+              ],
+              [
+                -100,
+                88
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.03,
+            "minSpacing": 1.1,
+            "cluster": 0.5,
+            "palette": [
+              {
+                "kind": "grass",
+                "weight": 6,
+                "scale": [
+                  0.6,
+                  1.2
+                ]
+              },
+              {
+                "kind": "flower",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  1
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "scale": [
+                  0.2,
+                  0.4
+                ],
+                "maxSlope": 0.5
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
+          "name": "trees-meadow-tufts-4",
+          "shape": {
+            "area": [
+              [
+                0,
+                10
+              ],
+              [
+                105,
+                10
+              ],
+              [
+                105,
+                88
+              ],
+              [
+                0,
+                88
+              ]
+            ]
+          },
+          "params": {
+            "density": 0.03,
+            "minSpacing": 1.1,
+            "cluster": 0.5,
+            "palette": [
+              {
+                "kind": "grass",
+                "weight": 6,
+                "scale": [
+                  0.6,
+                  1.2
+                ]
+              },
+              {
+                "kind": "flower",
+                "weight": 2,
+                "scale": [
+                  0.6,
+                  1
+                ]
+              },
+              {
+                "kind": "rock",
+                "weight": 1,
+                "scale": [
+                  0.2,
+                  0.4
+                ],
+                "maxSlope": 0.5
+              }
+            ]
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/woodland@1",
           "name": "trees-north-canopy",
           "shape": {
             "area": [
@@ -63765,7 +63993,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -63805,13 +64039,7 @@
             87.4
           ],
           "s": 0.67
-        }
-      ]
-    },
-    {
-      "note": "trees 3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -63891,7 +64119,13 @@
             100.45
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 4",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -63931,13 +64165,7 @@
             105.9
           ],
           "s": 0.66
-        }
-      ]
-    },
-    {
-      "note": "trees 4",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64017,7 +64245,13 @@
             114.1
           ],
           "s": 0.69
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 5",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64057,13 +64291,7 @@
             112.93
           ],
           "s": 0.64
-        }
-      ]
-    },
-    {
-      "note": "trees 5",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64143,7 +64371,13 @@
             91
           ],
           "s": 0.47
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 6",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64183,13 +64417,7 @@
             -66.6
           ],
           "s": 0.68
-        }
-      ]
-    },
-    {
-      "note": "trees 6",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64269,7 +64497,13 @@
             -66.6
           ],
           "s": 0.66
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 7",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64309,13 +64543,7 @@
             -84.5
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 7",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64395,7 +64623,13 @@
             -66.6
           ],
           "s": 0.66
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 8",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64435,13 +64669,7 @@
             -66.6
           ],
           "s": 0.59
-        }
-      ]
-    },
-    {
-      "note": "trees 8",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64521,7 +64749,13 @@
             -67.2
           ],
           "s": 0.53
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 9",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64561,13 +64795,7 @@
             -78
           ],
           "s": 0.55
-        }
-      ]
-    },
-    {
-      "note": "trees 9",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64647,7 +64875,13 @@
             -88.7
           ],
           "s": 0.48
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 10",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64687,13 +64921,7 @@
             -99.5
           ],
           "s": 0.54
-        }
-      ]
-    },
-    {
-      "note": "trees 10",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64773,7 +65001,13 @@
             -77
           ],
           "s": 0.62
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 11",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/pine@1",
@@ -64813,13 +65047,7 @@
             -87
           ],
           "s": 0.62
-        }
-      ]
-    },
-    {
-      "note": "trees 11",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/pine@1",
@@ -64899,7 +65127,13 @@
             87.4
           ],
           "s": 0.64
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 12",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -64939,13 +65173,7 @@
             87.4
           ],
           "s": 0.68
-        }
-      ]
-    },
-    {
-      "note": "trees 12",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65025,7 +65253,13 @@
             -24.3
           ],
           "s": 0.53
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 13",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65065,13 +65299,7 @@
             13.2
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 13",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65131,7 +65359,13 @@
             12.5
           ],
           "s": 0.55
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 14",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65171,13 +65405,7 @@
             28.2
           ],
           "s": 0.53
-        }
-      ]
-    },
-    {
-      "note": "trees 14",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65257,7 +65485,13 @@
             -24.3
           ],
           "s": 0.53
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 15",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65297,13 +65531,7 @@
             60.06
           ],
           "s": 0.81
-        }
-      ]
-    },
-    {
-      "note": "trees 15",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/tree@1",
@@ -65383,7 +65611,13 @@
             70.8
           ],
           "s": 0.56
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 16",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/pine@1",
@@ -65413,13 +65647,7 @@
             -60.6
           ],
           "s": 0.85
-        }
-      ]
-    },
-    {
-      "note": "trees 16",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/birch@1",
@@ -65679,7 +65907,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 17",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -65839,13 +66073,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 17",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -66181,7 +66409,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 18",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -66341,13 +66575,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 18",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -66691,7 +66919,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 19",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -66859,13 +67093,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 19",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67193,7 +67421,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 20",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67353,13 +67587,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 20",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67703,7 +67931,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 21",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -67879,13 +68113,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 21",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68229,7 +68457,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 22",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68405,13 +68639,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 22",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68755,7 +68983,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 23",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -68931,13 +69165,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 23",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69289,7 +69517,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 24",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69457,13 +69691,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 24",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69807,7 +70035,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 25",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -69975,13 +70209,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 25",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70309,7 +70537,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 26",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70477,13 +70711,7 @@
               }
             ]
           }
-        }
-      ]
-    },
-    {
-      "note": "trees 26",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/woodland@1",
@@ -70803,7 +71031,13 @@
               }
             ]
           }
-        },
+        }
+      ]
+    },
+    {
+      "note": "trees 27",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/woodland@1",

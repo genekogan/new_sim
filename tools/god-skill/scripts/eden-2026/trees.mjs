@@ -37,6 +37,8 @@ const inside = (x, z, b, m = 0) => x > b[0] - m && x < b[2] + m && z > b[1] - m 
 export function treeBatches(existing = []) {
   const ops = [];
   for (const [name, w, pts] of OLD_PATHS) ops.push(path(name, pts, w));
+  // old Eden's turf was full of small things: grass tufts, wild flowers and pebbles across the village meadow
+  for (const [i, b] of [[-100, -65, 0, 10], [0, -65, 105, 10], [-100, 10, 0, 88], [0, 10, 105, 88]].entries()) ops.push(wood(`meadow-tufts-${i + 1}`, b, 0.03, [{ kind: 'grass', weight: 6, scale: [0.6, 1.2] }, { kind: 'flower', weight: 2, scale: [0.6, 1] }, { kind: 'rock', weight: 1, scale: [0.2, 0.4], maxSlope: 0.5 }], { minSpacing: 1.1, cluster: 0.5 }));
   for (const [name, b, step, kind] of OLD_WOODS) ops.push(wood(name, b, 0.75 / (step * step), palette({ [kind]: 1, ...(kind === 'round' ? { poplar: 0.15 } : {}) }), { minSpacing: Math.max(3, step * 0.6) }));
   // Old district trees (avenue rows, squares, campus quad) stand where they stood, one entity each.
   const SET_DEF = { round: 'core/tree@1', conifer: 'core/pine@1', cypress: 'core/pine@1', poplar: 'core/birch@1' };
