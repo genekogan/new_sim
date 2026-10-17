@@ -144,13 +144,14 @@ S12() { scenario S12 "final review: Eden's runner never exits after its normal c
   run S12
   ok "rollback path: lingering closed writer detected by its receipt, killed, eden restarted; exit 0" 'has "closed normally (CLOSURE.json, lock released) but lingers" && has "writer $sp: closed-lingering" && ! kill -0 $sp 2>/dev/null && has "eden=STARTED" && listening 6330 && [ $RC = 0 ]'
   done_s S12; }
-S13() { scenario S13 "L2: eden2 history written by the current release (legacy stage, fork mode) copies back and opens on the 1080cfa9 writers"
+S13() { scenario S13 "L2: eden2 history written by the current release (legacy stage): copied back only where the 1080cfa9 code opens it"
   L2D=/srv/sim-old-l2/data; for w in $WORLDS; do test -s $L2D/worlds/$w/sim.db || { echo "  FAIL no legacy rehearsal data in $L2D (run legacy-rehearsal.sh first)"; FAILS=$((FAILS+1)); return; }; done
   ! systemctl is-active -q sim-old-l2-rehearsal || { echo "  FAIL the legacy rehearsal unit is still running"; FAILS=$((FAILS+1)); return; }
   reset 4670; for w in $WORLDS; do rm -f $RT/data/worlds/$w/sim.db; python3 $K/compact-copy.py $L2D/worlds/$w/sim.db $RT/data/worlds/$w/sim.db > /dev/null; done
   run S13
-  ok "all three copied back from the legacy-written history" '[ $(grep -c "eden2 history copied back" $RT/logs/out.txt) = 3 ]'
-  ok "1080cfa9 writers ready on it (history-prefix + Soul gates), exit 0" 'has "eden=STARTED" && has "mars=STARTED" && has "littlemartians=STARTED" && listening 6330 && listening 6331 && listening 6332 && [ $RC = 0 ]'
+  ok "mars/LM: copied back and open on 1080cfa9" 'has "mars: eden2 history copied back" && has "littlemartians: eden2 history copied back"'
+  ok "eden: the punt event does not open on 1080cfa9 -> laptop data kept (same inode), eden2 history kept on eden2" 'has "WARN eden: eden2.s newer history does not open" && [ "$(stat -c %i $L/eden/sim.db)" = "$(echo $ino_before | cut -d" " -f1)" ] && ls $RT/data/kept-eden-*.db >/dev/null && ! ls -d $L/eden/check-* >/dev/null 2>&1'
+  ok "all three writers ready (history-prefix + Soul gates), exit 0" 'has "eden=STARTED" && has "mars=STARTED" && has "littlemartians=STARTED" && listening 6330 && listening 6331 && listening 6332 && [ $RC = 0 ]'
   done_s S13; }
 
 for p in 6330 6331 6332; do listening $p && { echo "port $p busy; abort"; exit 2; }; done

@@ -146,6 +146,17 @@ pull() { # $1 world|accounts  $2 laptop dst  $3 eden2 src  $4 expected-json  $5 
   rsync -az $RSRC$RDATA/rollback-$w.db "$inc" || { rm -f "$inc"; say "STOP-NOTE $w: copy failed; laptop untouched"; return 1; }
   got=$(eval "${5//\{\}/\"$inc\"}"); ok=$(python3 -c "import sqlite3,sys;print(sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True).execute('pragma quick_check').fetchone()[0])" "$inc")
   [ "$got" = "$want" ] && [ "$ok" = ok ] || { say "STOP-NOTE $w: pulled copy does not verify (quick_check $ok); kept as $inc, laptop untouched"; return 1; }
+  # L2: eden2 ran the current release; its history must also OPEN on the laptop's 1080cfa9 code (checkOnly boot of a copy).
+  # Eden on the current release appends a rules event the 1080cfa9 engine cannot replay (the pond punt, carrierV1/rowing-punt,
+  # rehearsal S13), so Eden normally fails here: the laptop then restarts from its own data (the state at the freeze) and
+  # eden2's history is kept on eden2 as kept-<world>-<now>.db for reconciliation. Nothing is deleted either way.
+  if [ $w != accounts ]; then local cdir; cdir=$(dirname "$dst")/check-$NOW; mkdir -p "$cdir"; cp "$inc" "$cdir/sim.db"
+    (cd ${TEST:-/tmp} || exit 1; SIM_PORT_MAP=${RB_PORT_MAP:-} AUTH_PROVIDER=clerk ACCOUNT_REGISTRY_PATH=$ACC $N ${RB_PORT_MAP:+--import=$KITBIN/port-map.mjs} \
+      --experimental-transform-types --env-file=$ENV $KITBIN/run-world.mjs $DESC/$w.json --check "$cdir") > $LOGD/check-$w-$NOW.log 2>&1 < /dev/null
+    if ! grep -q '"phase":"check"' $LOGD/check-$w-$NOW.log; then rm -rf "$cdir" "$inc"; e2 "mv $RDATA/rollback-$w.db $RDATA/kept-$w-$NOW.db"
+      say "WARN $w: eden2's newer history does not open on the laptop's 1080cfa9 code ($(grep -m1 -o 'Error: .*' $LOGD/check-$w-$NOW.log | cut -c1-120)); the laptop restarts from its own data (state at the freeze); eden2's history kept on eden2: $RDATA/kept-$w-$NOW.db"
+      return 2; fi
+    rm -rf "$cdir"; fi
   local keep=$(dirname "$dst")/pre-rollback-$NOW; mkdir -p "$keep"
   for f in "$dst" "$dst-wal" "$dst-shm"; do [ -e "$f" ] && mv "$f" "$keep/"; done   # same names: the WAL stays paired with its DB
   mv "$inc" "$dst" && e2 "rm -f $RDATA/rollback-$w.db"; say "$w: eden2 history copied back (originals kept in $keep/)"; }
@@ -165,7 +176,7 @@ else
     if [ "$a" = "$b" ]; then say "$w: identical, laptop kept"; continue; fi
     b2=$(e2 "python3 $RBIN/parity.py $src $(wid $w) $am" 2>/dev/null)
     if [ "$bm" -ge "$am" ] && [ -n "$b2" ] && [ "$(jget "$b2" prefixSHA256)" = "$(jget "$a" prefixSHA256)" ]; then
-      pull $w "$dst" $src "$b" "python3 $KITBIN/parity.py {} $(wid $w)" || setst $w FAILED
+      pull $w "$dst" $src "$b" "python3 $KITBIN/parity.py {} $(wid $w)"; [ $? = 1 ] && setst $w FAILED
     else setst $w FAILED; say "STOP-NOTE $w: eden2 history does not extend the laptop's (maxSeq $bm vs $am or prefix differs); laptop untouched, not restarted"; fi
   done
   ha=$(python3 $KITBIN/dbhash.py "$ACC" 2>/dev/null); hb=$(e2 "python3 $RBIN/dbhash.py $RACC" 2>/dev/null)
