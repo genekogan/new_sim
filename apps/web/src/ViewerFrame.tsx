@@ -5,6 +5,7 @@ import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './Worl
 import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import { assetBytes, megabytes } from './asset-bytes.ts';
+import { hourLabel, setVisitorPreviewHour, subscribeVisitorHour, visitorPreviewHour } from './visitor-hour.ts';
 import { arrivalGate } from './gen-mesh/lazy-assets.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
@@ -58,6 +59,9 @@ export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible:
  * "Following … ×" chip, and one camera help card (opened from the header's camera button). */
 export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationChange, worldTime, connected = true, connecting = false, worldName, followName, slots, initial }: { handle: WorldViewerHandle | null; state: WorldViewerState | null; dt: number; navigationOpen: boolean; onNavigationChange: (open: boolean) => void; onNavigationOpen?: () => void; worldTime?: string; connected?: boolean; connecting?: boolean; worldName?: string; followName?: string | null; slots?: { status: HTMLElement | null; camera: HTMLElement | null }; initial?: InitialWorldProgress | null }) {
   const [cameraNote, setCameraNote] = useState('');
+  const previewHour = useSyncExternalStore(subscribeVisitorHour, visitorPreviewHour, visitorPreviewHour);
+  const [hourOpen, setHourOpen] = useState(false);
+  const hourButton = useRef<HTMLButtonElement>(null);
   // DLG3 (Gene): the history scrub ("Back 1 min") is hidden for now; `?rewind` keeps it reachable for tests.
   const [rewind] = useState(() => { try { return new URLSearchParams(location.search).has('rewind'); } catch { return false; } });
   const help = useRef<HTMLDivElement>(null);
@@ -133,7 +137,13 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   const statusBlock = <div className="viewer-history" data-viewer-navigation={state?.manualNavigation ?? ''} data-viewer-input={state?.inputOwned ?? false} data-viewer-mode={state?.cameraMode ?? ''} data-viewer-presentation={state?.presentation ?? ''} data-viewer-tick={state?.shownTick ?? ''} data-viewer-selection={state?.selection.soulId ?? state?.selection.entityId ?? ''} data-viewer-ready={!!handle}>
       <div className="row viewer-status">
         <span className={statusClass} data-viewer-status data-viewer-live={live} title={state?.shownTick == null ? undefined : `Recorded tick ${state.shownTick.toFixed(0)}`}>{status}</span>
-        {state?.shownTick != null && !arriving && worldTime && <span className="world-time">{worldTime.includes(' · ') ? <><span className="world-day">{worldTime.split(' · ')[0]} </span>{worldTime.split(' · ').slice(1).join(' · ')}</> : worldTime}</span>}
+        {state?.shownTick != null && !arriving && worldTime && <button ref={hourButton} type="button" className="world-time world-time-button" aria-expanded={hourOpen} title="Preview the time of day (only you see it)" onClick={() => setHourOpen(!hourOpen)}>{previewHour != null ? <>Preview {hourLabel(previewHour)}</> : worldTime.includes(' · ') ? <><span className="world-day">{worldTime.split(' · ')[0]} </span>{worldTime.split(' · ').slice(1).join(' · ')}</> : worldTime}</button>}
+        {hourOpen && !arriving && createPortal(<div className="time-preview" role="group" aria-label="Preview the time of day" style={(() => { const r = hourButton.current?.getBoundingClientRect(); return { top: (r?.bottom ?? 48) + 8, left: Math.max(16, (r?.left ?? 16) - 12) }; })()}>
+          <label>Time of day <b>{previewHour != null ? hourLabel(previewHour) : 'now'}</b>
+            <input type="range" min={0} max={1425} step={15} value={previewHour ?? 720} aria-label="Preview hour" onChange={(e) => setVisitorPreviewHour(Number(e.target.value))} /></label>
+          <button type="button" onClick={() => { setVisitorPreviewHour(null); setHourOpen(false); }}>Back to now</button>
+          <span className="dim">Only you see this; the world's clock does not change.</span>
+        </div>, document.body)}
         {!arriving&&!!state?.assetDownloads?.pending&&<span className="asset-download-note" role="status" title="Actual asset downloads; the world stays usable while art arrives.">Art loading · {state.assetDownloads.loaded}/{state.assetDownloads.total}</span>}
         {settledReason && !lost && <span role="status" className="warn viewer-reason" title={settledReason}>{settledReason}</span>}
         {rewind && <button disabled={!handle || state?.shownTick == null || state.loading} onClick={() => { if (state?.shownTick != null) void handle?.seek(Math.max(0, state.shownTick - 60 / dt)); }}>Back 1 min</button>}

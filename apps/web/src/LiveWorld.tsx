@@ -67,6 +67,7 @@ import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
+import { visitorPreviewHour } from './visitor-hour.ts';
 import { GodWorldLiving, godRoomViews, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
@@ -724,7 +725,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const ref = take.startTick + take.ticks;
           const clockOffset=(depictedTick-ref)*(dayTicks?86400/dayTicks:dt);
           const datetime = clock ? shiftIso(clock, clockOffset) : null;
-          light.update(shotClockAt(clock?shiftIso(clock,clockOffset,true):null,shotHour));
+          light.update(shotClockAt(clock?shiftIso(clock,clockOffset,true):null,shotHour??visitorPreviewHour()));
           entityLayer.sites.setWorldClock(datetime,dayTicks?86400/(dayTicks*dt):1);
           const godLit=!!godLiving&&entityLayer.active;light.setNightLighting(!!expansion||godLit);if(!godLit)setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
@@ -828,7 +829,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;
-      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
+      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}

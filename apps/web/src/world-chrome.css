@@ -218,3 +218,10 @@
  .explore-modal.explore-modal button,.dialogue-dock.dialogue-dock button,.soul-card.soul-card button,.account-menu-items.account-menu-items button{min-height:44px;min-width:44px;box-sizing:border-box}
  .gp-card summary{display:flex;align-items:center}
 }
+/* M2 (lane M): the visitor's time-of-day preview, opened from the world time in the status chip */
+.viewer-status .world-time-button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.time-preview{position:fixed;z-index:1000;display:flex;flex-direction:column;gap:6px;min-width:240px;max-width:min(320px,calc(100vw - 32px));padding:10px 12px;border-radius:12px;background:rgba(250,248,244,.96);color:#1d1b18;box-shadow:0 4px 18px rgba(0,0,0,.18);font:13px/1.35 system-ui,sans-serif}
+.time-preview label{display:flex;flex-direction:column;gap:4px}
+.time-preview input[type=range]{width:100%}
+.time-preview button{align-self:flex-start;font:inherit;padding:3px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.2);background:#fff;cursor:pointer}
+.time-preview .dim{opacity:.7;font-size:12px}
