@@ -104,6 +104,42 @@ export class PlaceIndex {
     return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inOutline(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || outlineOf(a.polygon).area - outlineOf(b.polygon).area);
   }
   ref(p: Place): PlaceRef {return {id: p.id, name: p.name, kind: p.kind};}
+  /** containing(x, z, level)[0] for many points while the index does not change (lane L1: Eden 2026's activity spots
+   *  asked containing() once per spot, every place each time: 0.8 s of a new Soul's first listing). Built now, over the
+   *  places as they are now; use it and drop it within one synchronous pass. Same answer: the candidates are every place
+   *  whose outline box (as inOutline widens it) holds the point, plus every place without a usable box; the innermost is the
+   *  smallest area, the earliest in the index on a tie (containing's stable sort), else the smallest root (earliest on a tie). Any non-finite
+   *  point or area falls back to containing() itself. */
+  locator(cell = 8): (x: number, z: number, level?: number) => Place | undefined {
+    const order = new Map<Place, number>(), always: Place[] = [], grid = new Map<string, Place[]>();
+    let root: Place | undefined, odd = false;
+    const MAX_CELLS = 4096;
+    for (const p of this.byId.values()) {
+      order.set(p, order.size);
+      if (p.carrier) continue;
+      const o = outlineOf(p.polygon);
+      if (!Number.isFinite(o.area)) odd = true;
+      if (p.parent === null) { if (!root || o.area < outlineOf(root.polygon).area) root = p; continue; }   // roots: smallest, earliest on a tie
+      if (!o.box) { always.push(p); continue; }
+      const lv = p.level ?? 0;
+      const x0 = Math.floor((o.minX - o.eps) / cell), x1 = Math.floor((o.maxX + o.eps) / cell), z0 = Math.floor(o.minZ / cell), z1 = Math.floor(o.maxZ / cell);
+      if (!(Number.isFinite(x0) && Number.isFinite(x1) && Number.isFinite(z0) && Number.isFinite(z1)) || (x1 - x0 + 1) * (z1 - z0 + 1) > MAX_CELLS) { always.push(p); continue; }
+      for (let i = x0; i <= x1; i++) for (let k = z0; k <= z1; k++) { const key = `${lv}|${i}|${k}`; const l = grid.get(key); if (l) l.push(p); else grid.set(key, [p]); }
+    }
+    if (odd) return (x, z, level = 0) => this.containing(x, z, level)[0];
+    return (x, z, level = 0) => {
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return this.containing(x, z, level)[0];
+      let best: Place | undefined, bestArea = Infinity, bestOrder = Infinity;
+      const consider = (p: Place) => {
+        if ((p.level ?? 0) !== level || !inOutline(x, z, p.polygon)) return;
+        const a = outlineOf(p.polygon).area, n = order.get(p)!;
+        if (a < bestArea || (a === bestArea && n < bestOrder)) { best = p; bestArea = a; bestOrder = n; }
+      };
+      for (const p of grid.get(`${level}|${Math.floor(x / cell)}|${Math.floor(z / cell)}`) ?? []) consider(p);
+      for (const p of always) consider(p);
+      return best ?? root;
+    };
+  }
 }
 
 export type Happening = {placeId: string; place: string; id: string; label: string; now: boolean; startsInMinutes: number; endsInMinutes: number; distance: number | null};

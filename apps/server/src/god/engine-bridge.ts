@@ -164,7 +164,7 @@ export class EngineBridge {
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
-      placeAt: (at, level) => this.places.placeAt(at, level), prepare: () => this.places.sync(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
     if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
     if (this.edge) {
       const edge = this.edge;
