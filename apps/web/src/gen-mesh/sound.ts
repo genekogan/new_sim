@@ -120,7 +120,7 @@ function makeVoice(c: AudioContext, kind: SoundKind, variant: number, source: So
     case 'chime': { const base = [1600, 1200, 2100][variant] ?? 1600; every((at) => { bell(c, out, at, base + Math.floor(r() * 4) * 240, 0.2); return 1.5 + r() * 3; }); break; }
     case 'chatter': {
       bed('bandpass', 600, 0.8, 0.05);   // room tone under the voices
-      every((at, e) => { const people = Math.max(2, Math.min(6, Number(e.state.size) || 2)), who = Math.floor(r() * people), f0 = [120, 210, 165, 240, 105, 190][who] * (variant === 2 ? 1.1 : 1);
+      every((at, e) => { const people = Math.max(1, Math.min(6, Number(e.state.size) || 2)), who = Math.floor(r() * people), f0 = [120, 210, 165, 240, 105, 190][who] * (variant === 2 ? 1.1 : 1);
         let a = at; const n = 2 + Math.floor(r() * 5); for (let k = 0; k < n; k++) { const d = 0.09 + r() * 0.14; syllable(c, out, a, f0 * (0.95 + r() * 0.15), d, 0.22); a += d + 0.02; }
         return a - at + 0.15 + r() * (variant === 1 ? 0.3 : 0.7); });
       break; }

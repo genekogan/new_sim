@@ -19,7 +19,7 @@ export type DistanceDetailOptions = {
   minRadiusPx: number;
   /** Shadow casters stop casting beyond near + perMetre·radius metres (as WorldShadowDetail does for the Eden expansion). */
   shadowNear: number; shadowPerMetre: number; shadowMaxRadius: number;
-  /** Bodies (Souls, kin) further than this many metres are drawn as flat stand-ins. */
+  /** Bodies (Souls, kin) further than this many metres stop casting shadows (Infinity: never). */
   standInDistance: number;
   /** Rescan the scene for candidates every n frames. */
   rescanFrames: number;
@@ -28,7 +28,7 @@ export const PHONE_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 
 /** Release 3.1: desktops get only the invisible part of distance detail — meshes under half a CSS pixel of radius are
  *  not drawn, small casters far away stop casting — and mesh LOD at half a pixel of error. No flat cards, same pixel
  *  ratio and shadow map. `?desktopDetail=0` turns it off. */
-export const DESKTOP_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 0.5, shadowNear: 60, shadowPerMetre: 30, shadowMaxRadius: 6, standInDistance: 80, rescanFrames: 90 });
+export const DESKTOP_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 0.5, shadowNear: 60, shadowPerMetre: 30, shadowMaxRadius: 6, standInDistance: Infinity, rescanFrames: 90 });
 
 export type QualityEnvironment = { search: string; coarsePointer: boolean; screen: readonly [number, number]; deviceMemory?: number };
 export function pickQualityTier(env: QualityEnvironment): QualitySettings {

@@ -76,7 +76,23 @@ export function labelSprite(text: string): THREE.Sprite {
   c2.font = '600 28px system-ui, sans-serif'; c2.fillStyle = '#fff'; c2.textBaseline = 'middle'; c2.fillText(text, 14, 23);
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.scale.set((w / 44) * 1.2, 1.2, 1); sprite.renderOrder = 10; return sprite;
+  sprite.scale.set((w / 44) * 1.2, 1.2, 1); sprite.renderOrder = 10;
+  // a 1.2 m label drawn over everything grew to fill the screen when the camera stood beside the flag: cap it on screen
+  const base = sprite.scale.clone(), size = new THREE.Vector2(), at = new THREE.Vector3();
+  sprite.onBeforeRender = (renderer, _scene, camera) => {
+    const cam = camera as THREE.PerspectiveCamera; if (!cam.isPerspectiveCamera) return;
+    const d = at.setFromMatrixPosition(sprite.matrixWorld).distanceTo(cam.position), px = renderer.getSize(size).y / (2 * Math.tan((cam.fov * Math.PI) / 360));
+    const e = sprite.matrixWorld.elements, k = labelScale(d, px, Math.hypot(e[4], e[5], e[6]) / sprite.scale.y || 1);
+    if (Math.abs(sprite.scale.y - base.y * k) > 1e-4) { sprite.scale.copy(base).multiplyScalar(k); sprite.updateMatrixWorld(); }
+  };
+  return sprite;
+}
+/** Scale factor (≤ 1) that keeps a 1.2 m label at most LABEL_MAX_PX CSS pixels tall at distance `d` (`px` pixels per
+ *  metre at 1 m; `parentScale` the world scale above the sprite). */
+export const LABEL_MAX_PX = 26;
+export function labelScale(d: number, px: number, parentScale = 1): number {
+  const tall = (1.2 * Math.abs(parentScale) * px) / Math.max(0.05, d);
+  return tall > LABEL_MAX_PX ? LABEL_MAX_PX / tall : 1;
 }
 function hashSeed(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0) % 100000; }
 export type { MeshCtx };

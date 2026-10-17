@@ -254,10 +254,11 @@ export function ambienceAt(L: Listener): Emitter[] {
 
 // ---------------------------------------------------------------- residents and the visitor
 
-export type Resident = { id: string; p: readonly [number, number, number] };
+/** `speaking`: the resident is saying something right now (a speech line shown in the last few seconds). */
+export type Resident = { id: string; p: readonly [number, number, number]; speaking?: boolean };
 type Track = { p: readonly [number, number, number]; t: number; speed: number };
 
-/** Footsteps where residents walk and chatter where two or more stand within 4 m of each other; the visitor's own
+/** Footsteps where residents walk, a resident's murmur while they speak, and chatter where two or more stand within 4 m of each other; the visitor's own
  *  footsteps when the camera moves at walking speed within 2.6 m of the ground. Keeps a short motion memory. */
 export class Movement {
   private tracks = new Map<string, Track>();
@@ -269,6 +270,8 @@ export class Movement {
       const prev = this.tracks.get(r.id), dt = prev ? t - prev.t : 0;
       const speed = prev && dt > 0.05 ? Math.hypot(r.p[0] - prev.p[0], r.p[2] - prev.p[2]) / dt : prev?.speed ?? 0;
       this.tracks.set(r.id, { p: r.p, t: prev && dt <= 0.05 ? prev.t : t, speed: prev && dt <= 0.05 ? prev.speed : speed });
+      // a resident who is talking right now: a murmur of their voice where they stand (the words are on screen)
+      if (r.speaking) out.push({ id: `res:talk:${r.id}`, source: 'resident', state: { size: 1 }, area: false, pts: [[r.p[0], r.p[1] + 1.6, r.p[2]]], spec: { kind: 'chatter', radius: 16, volume: 0.2, variant: variantOf('chatter', r.id) } });
       if (speed > 0.4 && speed < 6) out.push({ id: `res:steps:${r.id}`, source: 'resident', state: { speed }, area: false, pts: [[r.p[0], r.p[1], r.p[2]]], spec: { kind: 'footsteps', radius: 12, volume: 0.22, variant: variantOf('footsteps', r.id) } });
     }
     for (const id of [...this.tracks.keys()]) if (!seen.has(id)) this.tracks.delete(id);

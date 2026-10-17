@@ -48,3 +48,13 @@ test('distance detail: follows moving and scaled meshes and the camera', () => {
   detail.apply(s.root,s.camera,844);assert.equal(s.far.visible,true);assert.equal(s.near.visible,false);detail.restore();
   assert.equal(s.near.visible,true);
 });
+
+test('far bodies stay drawn but stop casting shadows on phones; near bodies and desktops keep them', () => {
+  const s=scene();s.body.castShadow=true;
+  const nearBody=new THREE.SkinnedMesh(new THREE.SphereGeometry(0.4,8,4),new THREE.MeshBasicMaterial());nearBody.position.set(0,1,-10);nearBody.castShadow=true;s.root.add(nearBody);s.root.updateMatrixWorld(true);
+  const phone=new WorldDistanceDetail(PHONE_DETAIL);phone.apply(s.root,s.camera,844);
+  assert.equal(s.body.visible,true);assert.equal(s.body.castShadow,false);assert.equal(nearBody.castShadow,true);assert.equal(phone.stats.bodyShadowsSkipped,1);
+  phone.restore();assert.equal(s.body.castShadow,true,'restored after the frame');
+  const desk=new WorldDistanceDetail(pickQualityTier({search:'',coarsePointer:false,screen:[1440,900]}).detail!);desk.apply(s.root,s.camera,900);
+  assert.equal(s.body.castShadow,true);assert.equal(desk.stats.bodyShadowsSkipped,0);desk.restore();
+});

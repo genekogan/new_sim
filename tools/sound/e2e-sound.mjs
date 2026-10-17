@@ -94,10 +94,26 @@ try {
           await step('in the wood: the trees rustle as one voice, birds sing up in its trees', () => where('wood', 0, 70, [10, 75]), (s) => s.voices.filter((v) => v.kind === 'leaves').length >= 1 && s.voices.some((v) => v.id.startsWith('amb:birds') && v.kind === 'birds') && s.world.trees > 0);
           await step('flower beds: bees by day', () => where('flowers', 1.5, 3, [1.5, 6]), (s) => kinds(s).has('bees'));
           const street = await step('between the houses: sheltered', () => where('street', 43, 21, [60, 21]), (s) => s.ctx === 'running');
-          await step('on the knoll: exposed — more wind, gusts, flags flapping', () => where('knoll', 0, -110.5, [0, -100]), (s) => s.world.exposure > (street?.world.exposure ?? 1) && s.voices.some((v) => v.id === 'amb:gusts') && kinds(s).has('flag'));
+          await step('on the knoll: exposed — more wind, gusts, flags flapping', () => where('knoll', 1, -116, [0, -104]), (s) => s.world.exposure > (street?.world.exposure ?? 1) && s.voices.some((v) => v.id === 'amb:gusts') && kinds(s).has('flag'));
           // residents: wherever they stand together, chatter (fake minds may wander; recorded, not required)
           report.places.residents = await page.evaluate(() => window.__simEntity.residents());
           await page.screenshot({ path: resolve(out, `day-knoll-dpr${dpr}.png`) }); report.shots.push(`day-knoll-dpr${dpr}.png`);
+          await step('a resident speaking: a murmur of her voice where she stands', async () => {
+            const me = await (await fetch(base + '/v1/me', { headers: { authorization: 'Bearer dev:admin' } })).json();
+            const ana = me.souls?.find((x) => x.name === 'Ana'); if (!ana) return { error: 'no Ana' };
+            const pair = await (await fetch(base + `/v1/souls/${ana.id}/pair`, { method: 'POST', headers: { authorization: 'Bearer dev:admin', 'content-type': 'application/json' }, body: '{}' })).json();
+            const cred = await (await fetch(base + '/v1/agent/pair', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code: pair.code, agent: 'r31v-sound' }) })).json();
+            const pos = (await page.evaluate(() => window.__simEntity.residents())).find((r) => r.id === ana.id)?.p ?? [0, 0, 0];
+            const g = await ground(pos[0] + 6, pos[2] + 6); await look([pos[0] + 6, g + 1.7, pos[2] + 6], [pos[0], g + 1.4, pos[2]]);
+            let hit = null, said = 0;
+            for (let t0 = Date.now(); Date.now() - t0 < 40000 && !hit;) {
+              if (Date.now() - t0 >= said * 8000) { await fetch(base + '/v1/edge/say', { method: 'POST', headers: { authorization: `Bearer ${cred.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ text: `Listen, the wind is up on the knoll today, and the ducks are loud at the pond (${said}).` }) }); said++; }
+              await sleep(500); const st = await page.evaluate(() => window.__edenSound.state()); hit = st.voices.find((v) => v.id === `res:talk:${ana.id}`) ?? null;
+            }
+            const st = await page.evaluate(() => ({ voices: window.__edenSound.state().voices.map((v) => `${v.kind}/${v.variant} ${v.id} g${v.gain}`), level: window.__edenSound.level() }));
+            report.places.speaking = { at: pos, ...st }; log(`   speaking: ${st.voices.join(' | ')}`);
+            return { hit, said };
+          }, (r) => !!r.hit);
           await step('mute silences the output; unmute brings it back', async () => {
             await page.click('.eden-sound-toggle button[data-sound="mute"]'); await sleep(1200); const off = await page.evaluate(() => window.__edenSound.level());
             await page.click('.eden-sound-toggle button[data-sound="mute"]'); await sleep(1500); const on = await page.evaluate(() => window.__edenSound.level());
@@ -118,6 +134,25 @@ try {
         await page.screenshot({ path: resolve(out, `toggle-dpr${dpr}.png`), clip: { x: 1440 - 140, y: 900 - 70, width: 140, height: 70 } }); report.shots.push(`toggle-dpr${dpr}.png`);
         await step(`dpr ${dpr}: no page errors`, () => errors, (e) => e.length === 0);
         await page.context().close();
+      }
+      // a phone: the first tap unlocks audio, the speaker buttons are tappable, mute silences it
+      {
+        const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+        const page = await ctx.newPage(); const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
+        await page.goto(`${base}?dev=1`, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => !!window.__simEntity?.layer?.model && !!window.__edenSound, null, { timeout: 180_000 }); await sleep(4000);
+        const before = await page.evaluate(() => window.__edenSound.state().ctx);
+        await page.touchscreen.tap(195, 600); await sleep(3000);
+        const after = await page.evaluate(() => ({ ctx: window.__edenSound.state().ctx, level: window.__edenSound.level(), voices: window.__edenSound.state().voices.length }));
+        await step('phone: no audio before the first tap; the tap starts it', () => ({ before, ...after }), (r) => r.before === 'none' && r.ctx === 'running' && r.level > 0);
+        const box = await page.locator('.eden-sound-toggle button[data-sound="mute"]').boundingBox();
+        await page.locator('.eden-sound-toggle button[data-sound="mute"]').tap(); await sleep(1200);
+        const muted = await page.evaluate(() => ({ muted: window.__edenSound.state().muted, level: window.__edenSound.level() }));
+        await step('phone: the speaker button is a 34 px target in the bottom-right corner and mutes on tap', () => ({ box, ...muted }), (r) => r.muted && r.level === 0 && r.box && r.box.x + r.box.width <= 390 && r.box.y + r.box.height <= 844);
+        await page.screenshot({ path: resolve(out, 'phone-dpr3.png') }); report.shots.push('phone-dpr3.png');
+        await page.locator('.eden-sound-toggle button[data-sound="mute"]').tap();
+        await step('phone: no page errors', () => errors, (e) => e.length === 0);
+        await ctx.close();
       }
     } finally { await browser.close(); }
   } finally { release(); }

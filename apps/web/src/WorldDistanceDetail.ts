@@ -9,21 +9,24 @@ import type {DistanceDetailOptions} from './quality-tier.ts';
  *  - a small shadow caster beyond `shadowNear + shadowPerMetre·radius` metres does not cast (as WorldShadowDetail does
  *    for the Eden expansion on every tier).
  * Like WorldShadowDetail it is render-time only: `apply` runs just before renderer.render and `restore` right after,
- * so scene state, picking, tests and the static batches' change checks never see a hidden mesh. Skinned bodies, lines,
- * points, sprites and anything with frustum culling turned off (sky, horizon, overlays) are never touched; bodies far
- * away are WorldFarStandIns' job. The candidate list is rescanned every `rescanFrames` frames. */
+ * so scene state, picking, tests and the static batches' change checks never see a hidden mesh. Lines, points, sprites
+ * and anything with frustum culling turned off (sky, horizon, overlays) are never touched. Skinned bodies (Souls, kin)
+ * are never hidden; beyond `standInDistance` metres they stop casting shadows (release 3.1: a resident 100 m away is a
+ * few pixels tall on a phone, yet each of its body parts cost a skinned draw in the shadow pass). The candidate list is rescanned every `rescanFrames` frames. */
 type Candidate={mesh:THREE.Mesh;centre:THREE.Vector3;radius:number};
+const tmpBody=new THREE.Vector3();
 export class WorldDistanceDetail{
- private candidates:Candidate[]=[];private frame=0;private hidden:THREE.Mesh[]=[];private noShadow:THREE.Mesh[]=[];
+ private candidates:Candidate[]=[];private bodies:THREE.SkinnedMesh[]=[];private frame=0;private hidden:THREE.Mesh[]=[];private noShadow:THREE.Mesh[]=[];
  private world=new THREE.Vector3();private sphere=new THREE.Sphere();
  /** Last apply(): meshes not drawn, casters skipped, candidates considered, CPU ms. */
- readonly stats={culled:0,shadowSkipped:0,candidates:0,cpuMs:0};
+ readonly stats={culled:0,shadowSkipped:0,candidates:0,bodyShadowsSkipped:0,cpuMs:0};
  private o:DistanceDetailOptions;
  constructor(o:DistanceDetailOptions){this.o=o;}
  private scan(root:THREE.Object3D){
-  this.candidates=[];
+  this.candidates=[];this.bodies=[];
   root.traverse(obj=>{
    const m=obj as THREE.Mesh;
+   if(m.isMesh&&(m as THREE.SkinnedMesh).isSkinnedMesh&&!m.userData.keepDetail){this.bodies.push(m as THREE.SkinnedMesh);return;}
    if(!m.isMesh||(m as THREE.SkinnedMesh).isSkinnedMesh||!m.frustumCulled||m.userData.keepDetail)return;
    const im=m as THREE.InstancedMesh;
    if(im.isInstancedMesh){if(!im.boundingSphere)im.computeBoundingSphere();if(!im.boundingSphere)return;this.sphere.copy(im.boundingSphere);}
@@ -44,6 +47,9 @@ export class WorldDistanceDetail{
    if(r*pxPerUnit/d<this.o.minRadiusPx){m.visible=false;this.hidden.push(m);culled++;continue;}
    if(m.castShadow&&r<this.o.shadowMaxRadius&&d>this.o.shadowNear+this.o.shadowPerMetre*r){m.castShadow=false;this.noShadow.push(m);skipped++;}
   }
+  let bodySkipped=0;const far2=this.o.standInDistance*this.o.standInDistance;
+  if(Number.isFinite(far2))for(const b of this.bodies){if(!b.castShadow||!b.parent)continue;b.getWorldPosition(tmpBody);if(tmpBody.distanceToSquared(cam)>far2){b.castShadow=false;this.noShadow.push(b);bodySkipped++;}}
+  this.stats.bodyShadowsSkipped=bodySkipped;
   this.stats.culled=culled;this.stats.shadowSkipped=skipped;this.stats.candidates=this.candidates.length;this.stats.cpuMs=performance.now()-t0;
  }
  /** Call right after renderer.render. */
