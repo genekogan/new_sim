@@ -136,20 +136,6 @@
     },
     {
       "step": "V5-server-full",
-      "id": "Eden 2026: a new Soul's capabilities stay within budget, first and after a walk",
-      "status": "skip",
-      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
-      "owner": "Core / engine content owners"
-    },
-    {
-      "step": "V5-server-full",
-      "id": "Eden 2026: /here in the cafe gives the same frame and capabilities, reads the place path a few times, within budget",
-      "status": "skip",
-      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
-      "owner": "Core / engine content owners"
-    },
-    {
-      "step": "V5-server-full",
       "id": "elevated-floor exit uses its admitted height and a composed humanoid profile",
       "status": "skip",
       "reason": "Upstairs seat route unreachable before seating; owned by godmode/stairs-reach (skip reason in the test).",
