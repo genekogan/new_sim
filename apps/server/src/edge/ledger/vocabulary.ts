@@ -244,7 +244,9 @@ function resolveWords(input: string, ctx: VocabContext): VocabResult {
   if ((colon < 0 || ['ride', 'fly', 'balloon', 'row', 'punt', 'boat'].includes(head)) && rideIntent && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|see[- ]?saw|teeter[- ]?totter|swings?|ferris|big wheel|carousel|merry[- ]go[- ]round)\b/.test(text)) {
     const water = /\b(?:row|rowing|punt|boat|boating)\b/.test(text), air = /\b(?:balloon|fly|flight|flying|hot[- ]air)\b/.test(text);
     const action = /\b(?:leave|disembark|alight)\b/.test(text) ? 'leave' : /\b(?:start|depart)\b/.test(text) ? 'start' : 'join';
-    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing/i.test(c.id + ' ' + c.label) : air ? /balloon/i.test(c.id + ' ' + c.label) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));
+    // the vehicle is told by the ride's id (ride-eden-punt, ride-eden-balloon), never by the join label, which reads the same
+    // for every ride ("…punt receipt includes disembarkation"): "row a boat" took Eden 2026's balloon (quality case 22)
+    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === action && (water ? /punt|rowing|boat|canoe|kayak/i.test(c.id) && !/balloon/i.test(c.id) : air ? /balloon/i.test(c.id) : /ride|balloon|carrier|punt/i.test(c.id + ' ' + c.label)));
     const target = text.replace(/\b(?:let|lets|s|go|for|take|have|a|an|the|ride|rides|row|rowing|boat|boating|punt|balloon|fly|flight|flying|in|on|at|around|start|leave|disembark|depart|out|of|to|loop|together)\b/g, ' ').replace(/[:.!]/g, ' ').trim();
     const words = tokens(target), named = words.length ? rides.filter(c => {const t = ctx.target(c); return words.every(w => tokenHit(w, tokens([c.id, c.label, ...t.names, ...t.around].join(' '))));}) : rides;
     const pick = named.sort((a, b) => Number(b.available) - Number(a.available) || dist(ctx.target(a).at, ctx.me) - dist(ctx.target(b).at, ctx.me) || a.id.localeCompare(b.id))[0];

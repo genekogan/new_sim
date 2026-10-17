@@ -225,6 +225,9 @@ test('B7: a god-built balloon is a native ride: a resident joins, flies its loop
   const carrier = (w.host.engine as any).world.entities['sky-balloon'];
   assert.ok(carrier?.carrier, 'a native carrier was installed at the god balloon: ' + JSON.stringify(Object.keys((w.host.engine as any).world.entities).filter((k) => /balloon/.test(k))));
   assert.deepEqual([Math.round(carrier.pose.p[0]), Math.round(carrier.pose.p[2])], [20, 20]);
+  // quality case 22: rowing words never board the balloon (the join label mentions a punt for every ride)
+  const row: any = await accept(w.host, w.edge.act(ana, { capability: 'row a boat' }));
+  assert.equal(row.accepted, false, JSON.stringify(row)); assert.equal(row.code, 'ride.no-water-route');
   const join = w.edge.capabilities(ana).find((c: any) => c.id === 'object:ride-sky-balloon:join');
   assert.ok(join?.available, 'join offered: ' + w.edge.capabilities(ana).filter((c: any) => /ride|balloon/.test(c.id)).map((c: any) => c.id).join(' '));
   const { r } = await w.act(ana, join!.id);
