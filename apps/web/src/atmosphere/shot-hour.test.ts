@@ -75,7 +75,8 @@ test('the same world at shot noon/night changes real sun, ambient, sky bodies, p
 test('LiveWorld sends the shot clock to lighting/atmosphere and the real clock to world-time labels', () => {
   const source = readFileSync(new URL('../LiveWorld.tsx', import.meta.url), 'utf8');
   assert.match(source, /light\.update\(shotClockAt\(/);
-  assert.match(source, /clock:shotClockAt\(shown\.current\?\.datetime\?\?null,shotHour\)/);
+  // 3.2: a visitor's time-of-day preview (visitor-hour.ts, view only) stands in for the shot hour when no shot hour is set
+  assert.match(source, /clock:shotClockAt\(shown\.current\?\.datetime\?\?null,shotHour\?\?visitorPreviewHour\(\)\)/);
   assert.match(source, /sites\.setWorldClock\(datetime,dayTicks\?86400\/\(dayTicks\*dt\):1\)/);
   assert.match(source, /shown\.current = \{ tick: depictedTick, datetime, take, entities: sampled\.entities \}/);
 });
