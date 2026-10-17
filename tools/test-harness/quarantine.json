@@ -23,7 +23,7 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 east-house A+B: plan \u2014 material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
+      "id": "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
@@ -51,14 +51,14 @@
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 east-house A+B: section boundaries \u2014 A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)",
+      "id": "year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022, all four houses A+B: plans through the same rules \u2014 counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table",
+      "id": "year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
@@ -74,7 +74,7 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
-      "reason": "content parked (W51 re-seeded the 2022 scene after this run was pinned on the pre-W51 scene, 0ee1da11 @564548): re-run and re-pin with the content agent \u2014 see HISTORICAL_CONTENT.md",
+      "reason": "content parked (W51 re-seeded the 2022 scene after this run was pinned on the pre-W51 scene, 0ee1da11 @564548): re-run and re-pin with the content agent — see HISTORICAL_CONTENT.md",
       "owner": "World / Core historical Mars construction owners"
     },
     {
@@ -88,7 +88,7 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
-      "reason": "S s0995-carry: carry.path-occupied without end \u2014 idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house's A+B pin: held back)",
+      "reason": "S s0995-carry: carry.path-occupied without end — idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house's A+B pin: held back)",
       "owner": "World / Core historical Mars construction owners"
     },
     {
@@ -102,19 +102,19 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 west-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
-      "reason": "S s1328-carry: carry.gather-stuck \u2014 m1 and m2 meet head-on in the take-out strip of pile-2x4-16ft-1 gathering round the handrail stock (the gather sends each carrier to the end the other stands at); needs a crossing-free gather assignment",
+      "reason": "S s1328-carry: carry.gather-stuck — m1 and m2 meet head-on in the take-out strip of pile-2x4-16ft-1 gathering round the handrail stock (the gather sends each carrier to the end the other stands at); needs a crossing-free gather assignment",
       "owner": "World / Core historical Mars construction owners"
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 east-house, phase A: plan \u2014 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
+      "id": "year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
     },
     {
       "step": "V3-mars-engine",
-      "id": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (\u2264 1 cm / 1\u00b0), pinned",
+      "id": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned",
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
@@ -132,6 +132,83 @@
       "status": "todo",
       "reason": "2022 reconciliation W51; re-pin by W52",
       "owner": "World / Core historical Mars construction owners"
+    },
+    {
+      "step": "V3-packages",
+      "id": "world-compiler > 40 furnished library buildings + church replay: plan latency",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "Eden 2026: a new Soul's capabilities stay within budget, first and after a walk",
+      "status": "skip",
+      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
+      "owner": "Core / engine content owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "Eden 2026: /here in the cafe gives the same frame and capabilities, reads the place path a few times, within budget",
+      "status": "skip",
+      "reason": "Needs worlds/templates/eden-2026.json, which is not tracked (lane/engine content); the rest of the edge capability suite runs.",
+      "owner": "Core / engine content owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "elevated-floor exit uses its admitted height and a composed humanoid profile",
+      "status": "skip",
+      "reason": "Upstairs seat route unreachable before seating; owned by godmode/stairs-reach (skip reason in the test).",
+      "owner": "Godmode stairs-reach owner"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: capabilities for 20 Souls, idle evacuation with 8 sites",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: commitBatch 300 five-place batches with/without build plus 300 undos",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: 300 five-place build commits with two live claims versus none; 200-upsert check",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: onDone with 256 roots and 5000 entities stays below 20ms",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: median act overhead with origins versus without origins is below 2%",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: a real-engine walk-out of 16 residents among many entities",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
+    },
+    {
+      "step": "V5-server-full",
+      "id": "bench: walk-out planning for N residents among M entities stays fast",
+      "status": "skip",
+      "reason": "Opt-in performance bench (BUILD_BENCH / GOD_WALKOUT_BENCH / GOD_SAFETY_BENCH env and similar); timing benches stay out of the CPU correctness gate on shared Modal CPUs.",
+      "owner": "Godmode build/perf owners"
     }
   ],
   "scopeExclusions": [
