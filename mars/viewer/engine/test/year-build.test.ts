@@ -13,10 +13,13 @@ import { yearBuildSetup, compareToCanonical } from '../scenarios/year-build.ts';
 import { rehearse } from '../rehearsal/rehearse.ts';
 import { hashOf } from '../core/hash.ts';
 import { HistoryError } from '../history/store.ts';
-const W51_TODO = '2022 reconciliation W51; re-pin by W52'; // mars-2022 re-seeded (RECONCILIATION_2022 §a–§f): neighbours, stairs, solar and trailers moved in every crop
 
 
-test('year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic', { todo: W51_TODO }, () => {
+// Re-pinned on the W51 re-seeded scene (L3, 2026-10-17): the skeleton is unchanged (54 beams + 12 uprights, the same
+// verbs, bundles and an empty refused list); W51 added roofs, fixtures, the 45° solar triangle frames (structural members)
+// and their modules to the crop, which phase A reports unplaced (was deck-sheet 27, solar 20, stair-part 21, wall 4), and
+// the moved yard adds 3 walk_to steps (552 -> 555).
+test('year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic', () => {
   const s = yearBuildSetup(2022, 'east-house', loadCampusFile(2022));
   const b = s.build;
   // the acceptance target is the protected checkpoint the graph came from
@@ -24,9 +27,9 @@ test('year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenc
   assert.throws(() => s.history.commit(s.canonical, s.history.read(s.canonical), { kind: 'design-edit', note: 'x' }), (e: unknown) => e instanceof HistoryError && e.code === 'protected');
   const kinds = (xs: { kind: string }[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x.kind] = (m[x.kind] ?? 0) + 1), m), {});
   assert.deepEqual(kinds(b.sequenced), { beam: 54, upright: 12 });
-  assert.deepEqual(kinds(b.unplaced), { 'feature:deck-sheet': 27, 'feature:solar': 20, 'feature:stair-part': 21, 'feature:wall': 4 });
+  assert.deepEqual(kinds(b.unplaced), { 'feature:deck-sheet': 27, 'feature:fixture': 7, 'feature:roof': 14, 'feature:solar': 92, 'feature:stair-part': 29, 'feature:structural-member': 36, 'feature:wall': 5 });
   assert.ok(b.unplaced.filter((u) => u.kind === 'feature:stair-part').every((u) => /no catalog flight of their width/.test(u.reason)));
-  assert.equal(b.template.steps.length, 552);
+  assert.equal(b.template.steps.length, 555);
   const verbs = kinds(b.template.steps.map((x) => ({ kind: x.verb })));
   assert.equal(verbs.take_from_bundle, 66);
   assert.equal(verbs.carry, 66);
@@ -81,8 +84,13 @@ function runAndCompare(bays?: number) {
 const PIN_BAY1 = { ticks: 39347, hash: '462a2f4a9feefec238d3cbbca1e99b90194ca0d9e6b0bf4162182448b747f645' };
 /** Pinned: the whole east-house skeleton (YEAR_BUILD_FULL=1; ≈ 40–55 s wall). Re-pinned (was 116477 ticks, 14d5c768…c89a):
  *  walker fallback + hypot + encounters on the smoothed path, 2026-09-28; re-pinned (was 117125 ticks, 35d12886…11da):
- *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; 0 violations, 66/66 at the canonical pose. */
-const PIN_FULL = { ticks: 117277, hash: 'd382e4614e8ae157ad971ab7a4cb2b922c4737197006b39b4a209dc0db040617' };
+ *  no walker jumps: snaps walked, teleport 0.15 m, overspeed invariant, 2026-09-28; re-pinned (was 117277 ticks, d382e461…0617):
+ *  the W51 re-seeded scene (yard and neighbours moved, 3 more walk_to steps), L3 2026-10-17; 0 violations, 66/66 at the
+ *  canonical pose (max 0.94 mm). */
+const PIN_FULL = { ticks: 123818, hash: '8c57862eaeb66bc13000329475329db24639ec549bf6b036ca9cb8d2f0b2ee68' };
+/** The opt-in skip's TAP directive, kept verbatim from before the re-pin: the release gate matches a documented skip by its
+ *  directive text against the baseline (tools/test-harness/quarantine.json carries the current reason). */
+const OPT_IN_SKIP = '2022 reconciliation W51; re-pin by W52';
 
 test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 violations, every sequenced part at its canonical pose (≤ 1 cm / 1°), pinned', () => {
   const { s, reh, cmp, E } = runAndCompare(1);
@@ -93,7 +101,7 @@ test('year build 2022 east-house, phase A, first bay (6 frames + 18 beams): 0 vi
   assert.equal(reh.report.finalStateHash, PIN_BAY1.hash);
 });
 
-test('year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)', { todo: W51_TODO, skip: process.env.YEAR_BUILD_FULL !== '1' }, () => {
+test('year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)', { skip: process.env.YEAR_BUILD_FULL !== '1' && OPT_IN_SKIP }, () => {
   const { reh, cmp, E } = runAndCompare();
   assert.equal(cmp.length, 66);
   for (const id of ['pile-upright-16ft-kit-1', 'pile-upright-16ft-kit-2', 'pile-beam-12ft-1', 'pile-beam-12ft-2', 'pile-beam-12ft-3']) assert.equal(E[id], undefined, `${id} emptied`);

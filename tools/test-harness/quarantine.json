@@ -19,85 +19,97 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "W51 re-seed + engine gap: no stringer/tread/handrail/post/panel parts (stair unplaced), deck-piece 54 (was 81), wall-panel 18 (was 25). Not a re-pin: pinning now would bless the missing stair.",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "RECONCILIATION_2022 §b engine stair rule (stringerRule/treadRule/catalog flight for the W51 parallel stair; today every stair part is unplaced); then re-pin, checking the deck/wall deltas"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pushed in over the edge beams, screwed): 0 violations, at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Bug candidate: on the re-seeded east-house the first ground-floor deck strip places 0 of 3 deck pieces (kitchen and west-house place 3 with the same template).",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "find why east-house D0 strip has no sequenced deck piece (deck-piece 81 -> 54); fix or re-pin with the reason"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, Kit offsets reported, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Opt-in (YEAR_BUILD_FULL=1); depends on the east-house A+B plan and first-strip entries.",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "both of those green, then a full run re-pinned"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house A+B: section boundaries — A, D0, D1, D2, S, W, P(+END) start at fixed plan steps and each is a barrier (the chapter takes are cut there)",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Engine gap: section S (stair) is empty because every stair part is unplaced, so W starts where S does (step 953).",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "RECONCILIATION_2022 §b engine stair rule (stringerRule/treadRule/catalog flight for the W51 parallel stair; today every stair part is unplaced)"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022, all four houses A+B: plans through the same rules — counts by kind, unplaced with reasons, the yard clear of the neighbours' work zones, deterministic; report-only table",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "W51 re-seed + engine gaps: chiba plans 1031 steps (pinned 1460): stairs unplaced on every house, solar per §d engine solar frame (solar-frame-45-2x4 + install_panel; a tilted module now reads as a flat 1.18 m panel).",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "RECONCILIATION_2022 §b engine stair rule (stringerRule/treadRule/catalog flight for the W51 parallel stair; today every stair part is unplaced) and §d engine solar frame (solar-frame-45-2x4 + install_panel; a tilted module now reads as a flat 1.18 m panel); then re-pin the table"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Bug candidate: the chiba first-bay rehearsal ends aborted on the re-seeded scene (kitchen and west-house with the same template complete).",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "diagnose the abort (yard/piles vs the shifted neighbours first); fix or re-pin"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 chiba A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "content parked (W51 re-seeded the 2022 scene after this run was pinned on the pre-W51 scene, 0ee1da11 @564548): re-run and re-pin with the content agent — see HISTORICAL_CONTENT.md",
-      "owner": "World / Core historical Mars construction owners"
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "content agent re-run after the chiba first-bay abort is fixed (HISTORICAL_CONTENT.md)"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 kitchen A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "S s0995-carry: carry.path-occupied without end — idle m4, nudged onto the stair foot by make-ways, has no room to step aside (parking clear of the carry corridors moves east-house's A+B pin: held back)",
-      "owner": "World / Core historical Mars construction owners"
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "engine carry fix for s0995 carry.path-occupied (idle m4 on the stair foot), then a full run re-pinned"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 west-house A+B (skeleton, decks, stair, walls, solar) from the piles: 0 violations, every sequenced part at its target, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
       "reason": "S s1328-carry: carry.gather-stuck — m1 and m2 meet head-on in the take-out strip of pile-2x4-16ft-1 gathering round the handrail stock (the gather sends each carrier to the end the other stands at); needs a crossing-free gather assignment",
-      "owner": "World / Core historical Mars construction owners"
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "engine carry fix for s1328 carry.gather-stuck (head-on gather in the take-out strip), then a full run re-pinned"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, phase A: plan — 12 frames + 54 beams sequenced, everything else reported (not faked), deterministic",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Baseline-only: re-pinned on the W51 scene by L3 (year-build.test.ts; skeleton unchanged, new roof/fixture/solar-frame content reported unplaced, 552 -> 555 steps); passes on this head.",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "drop when the gate baseline contains the re-pin"
     },
     {
       "step": "V3-mars-engine",
       "id": "year build 2022 east-house, phase A, whole skeleton (12 frames + 54 beams) from the piles: 0 violations, all at the canonical pose, pinned (YEAR_BUILD_FULL=1)",
       "status": "skip",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Opt-in (YEAR_BUILD_FULL=1). Re-pinned on the W51 scene by L3: 123818 ticks, 8c57862e..., 0 violations, 66/66 (was 117277 / d382e461); the skip directive text is kept verbatim for the gate.",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "drop when the gate baseline contains the re-pin and the skip directive is reworded"
     },
     {
       "step": "V3-mars-engine",
       "id": "bill of materials + piles, 2022 east-house: exact skeleton counts, bundles like the photos, one yard clear of everything",
       "status": "todo",
-      "reason": "2022 reconciliation W51; re-pin by W52",
-      "owner": "World / Core historical Mars construction owners"
+      "reason": "Engine gap: tilted solar modules read flat (solar-panel 1.18x0.65 x8 + 1.18x1.02 x9, pinned 1.59x1.07 x10); plywood-4x8 89 (was 79, W51 re-seed).",
+      "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
+      "exit": "§d engine solar frame (solar-frame-45-2x4 + install_panel; a tilted module now reads as a flat 1.18 m panel); then re-pin counts"
     },
     {
       "step": "V3-packages",
