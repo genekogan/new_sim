@@ -58532,6 +58532,70 @@
       ]
     },
     {
+      "note": "scenery: greenhouse beds and harbour stall",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "greenhouse-bed-1",
+          "p": [
+            65.2,
+            34.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "greenhouse-bed-2",
+          "p": [
+            68,
+            34.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "greenhouse-bed-3",
+          "p": [
+            70.8,
+            34.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "greenhouse-bed-4",
+          "p": [
+            65.2,
+            36
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "greenhouse-bed-5",
+          "p": [
+            70.8,
+            36
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/market-stall@1",
+          "name": "harbour-market-stall",
+          "p": [
+            24,
+            136.5
+          ],
+          "r": 3.141592653589793,
+          "params": {
+            "awning": "#d9473e"
+          }
+        }
+      ]
+    },
+    {
       "note": "scenery: park pond kerb",
       "group": "eden-2026",
       "ops": [

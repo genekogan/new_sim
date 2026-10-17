@@ -146,6 +146,11 @@ group('scenery: roof gardens', (put, ops) => {
   roof('eden-office-1', 'office-roof-planter-2', 'planter-box', [-2.5, 0, -3]); roof('eden-office-1', 'office-roof-bench', 'bench', [-3.5, 0, 1.5]);
   roof('eden-library-1', 'library-roof-planter-1', 'planter-box', [-3.5, 0, -3]); roof('eden-library-1', 'library-roof-planter-2', 'planter-box', [3.5, 0, -3]);
 });
+// old Eden's garden greenhouse was full of raised beds; the harbour boardwalk had a striped market stall
+group('scenery: greenhouse beds and harbour stall', put => {
+  [[65.2, 34.1], [68.0, 34.1], [70.8, 34.1], [65.2, 36.0], [70.8, 36.0]].forEach(([x, z], i) => put('planter-box', `greenhouse-bed-${i + 1}`, [x, z]));
+  put('market-stall', 'harbour-market-stall', [24, 136.5], { r: Math.PI, params: { awning: '#d9473e' } });
+});
 // V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
 {
   const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
