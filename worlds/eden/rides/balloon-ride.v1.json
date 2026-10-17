@@ -1,0 +1,39 @@
+{
+  "contract": "eden-rides/1",
+  "note": "World data for the balloon ride (CN5 / OBJECT-CONTRACT-v1 §7, PLACE-DATA-v1 carrier places). Positions are world metres; a route point is [t seconds from lift-off, x, y, z] of the basket FLOOR centre. The path is a time-parametrised cubic Hermite spline (tangents (p[i+1]-p[i-1])/(t[i+1]-t[i-1]), zero at launch and landing), so every viewer and replay agree for a given departure tick. Basket-local frame: +x = forward (engine yaw 0 faces +x), +z = right; yaw follows travel.",
+  "vehicles": [
+    {
+      "def": "hot-air-balloon",
+      "basket": {"length": 1.5, "width": 1.2, "height": 1.1},
+      "envelope": {"radius": 4.2, "mouthHeight": 3.2, "crownHeight": 12.9},
+      "seats": [
+        {"slot": "rider-a", "at": [0.12, -0.3], "yaw": 0.35, "pose": "stand, hands on the rim"},
+        {"slot": "rider-b", "at": [0.12, 0.3], "yaw": -0.35, "pose": "stand, hands on the rim"}
+      ],
+      "mount": {"at": [-1.25, 0], "steps": [0.25, 0.5], "note": "two-step wooden block behind the basket; riders step up and in"}
+    }
+  ],
+  "routes": [
+    {
+      "id": "eden-commons-loop",
+      "name": "Over the pond, the west lake, the coast, the harbour and back",
+      "vehicle": "hot-air-balloon",
+      "launch": {"place": "field", "at": [-20, 0, -9], "yaw": 3.1416, "clearRadius": 8},
+      "minutes": 18.7,
+      "points": [
+        [0, -20, 0, -9],
+        [40, -28, 25, -6],
+        [120, -55, 55, 0],
+        [240, -150, 75, 5],
+        [360, -260, 85, 80],
+        [480, -480, 95, 150],
+        [600, -300, 90, 230],
+        [720, 60, 80, 215],
+        [840, 160, 70, 140],
+        [960, 70, 50, 40],
+        [1060, 0, 25, -8],
+        [1120, -20, 0, -9]
+      ]
+    }
+  ]
+}

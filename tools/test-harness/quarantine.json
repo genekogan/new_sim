@@ -9,12 +9,6 @@
       "owner": "release-owner (L1)"
     },
     {
-      "step": "V4-web",
-      "id": "the route data file and the renderer agree byte for byte on vehicles and routes",
-      "reason": "Tracked main lacks worlds/eden/rides/balloon-ride.v1.json. Preserve full route/vehicle conformance assertion pending published data; other balloon assertions still run.",
-      "owner": "World / Core ride-data owners"
-    },
-    {
       "step": "V3-mars-engine",
       "id": "full re-extraction reproduces the committed contentHash (CAMPUS_FULL=1)",
       "status": "skip",
