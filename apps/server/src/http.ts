@@ -40,7 +40,7 @@ import { defaultAssetDir } from './god/assets.ts';
 import { mountEnvRoutes } from './god/world-env.ts';
 import { mountJoinRoutes, PUBLISHED_SOUL_CLI, safeWorldName } from './god/join.ts';
 import type { GodMode } from './god/god.ts';
-import {Travel,TravelError,launcherSite} from './travel/travel.ts';
+import {Travel,TravelError,launcherSite,TRAVEL_CONTRACT} from './travel/travel.ts';
 import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
@@ -76,6 +76,10 @@ export function buildApp(d: Deps) {
       isGod: async (c) => { const t = bearer(c); if (t?.startsWith('god_')) { const w = god.godIdentity(t); return !!w && !w.child; } const u = t ? await d.auth.userFromToken(t) : null; return !!u && !!god.owner && u.id === god.owner; } });
     const t = travel; setTimeout(() => { void t.reconcile().then((r) => { if (r.length) console.log(`[travel] reconciled ${r.join(', ')}`); }, () => {}); }, 3000).unref?.();
   }
+  // A world without travel (no Godmode: the original worlds and their forks, plain local worlds) still answers the public
+  // visitors read every world page makes (SoulTravel.tsx): travel is not available here and nobody is visiting. Before
+  // this it was a 404 in every visitor's console, again every 15 s (lane L2, live old worlds 2026-10-17).
+  if (!travel) app.get('/v1/world/visitors', c => c.json({contract: TRAVEL_CONTRACT, world: d.cfg.worldKey, available: false, open: false, visitors: [], recent: []}, 200, {'cache-control': 'no-store'}));
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };

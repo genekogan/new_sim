@@ -10,7 +10,7 @@ import './SoulTravel.css';
 
 type LogEntry={at:number;kind:'travel'|'refused'|'recalled';from:string;fromName:string;to:string;toName:string;code?:string};
 type Status={available:boolean;state:'present'|'departing'|'away';here:string;home:string;atHome:boolean;open:boolean;log:LogEntry[]};
-type Visitors={open:boolean;visitors:{soulId:string;name:string;home:string}[]};
+type Visitors={available?:boolean;open:boolean;visitors:{soulId:string;name:string;home:string}[]};
 type SiteWorld={slug:string;name:string};
 
 let worldsOnce:Promise<SiteWorld[]>|null=null;
@@ -21,11 +21,21 @@ export function siteWorlds():Promise<SiteWorld[]>{
 }
 const nameOf=(worlds:SiteWorld[],slug:string)=>worlds.find(w=>w.slug===slug)?.name??slug;
 
-/** This world's visitors (polled; shared by every card on the page). */
+/** This world's visitors: one poll for the whole page, shared by every card. A world without travel (no Godmode: the
+ * original worlds, plain local worlds) answers available:false, or 404 on an older server; it is not asked again. */
+const NO_TRAVEL:Visitors={available:false,open:false,visitors:[]};
+const visitorSubs=new Set<(v:Visitors)=>void>();
+let visitorsNow:Visitors|null=null,visitorsTimer:ReturnType<typeof setInterval>|undefined;
+const stopVisitors=()=>{clearInterval(visitorsTimer);visitorsTimer=undefined;};
+function readVisitors(){
+ void fetch(apiPath('/v1/world/visitors'),{cache:'no-store'}).then(r=>r.status===404?NO_TRAVEL:r.ok?r.json():null).then((d:Visitors|null)=>{
+  if(!d||!Array.isArray(d.visitors))return;visitorsNow=d;if(d.available===false)stopVisitors();for(const f of visitorSubs)f(d);}).catch(()=>{});
+}
 function useVisitors():Visitors|null{
- const [v,setV]=useState<Visitors|null>(null);
- useEffect(()=>{let live=true;const read=()=>fetch(apiPath('/v1/world/visitors'),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(live&&d&&Array.isArray(d.visitors))setV(d);}).catch(()=>{});
-  void read();const t=setInterval(read,15_000);return()=>{live=false;clearInterval(t);};},[]);
+ const [v,setV]=useState<Visitors|null>(visitorsNow);
+ useEffect(()=>{visitorSubs.add(setV);if(visitorsNow)setV(visitorsNow);
+  if(!visitorsTimer&&visitorsNow?.available!==false){readVisitors();visitorsTimer=setInterval(readVisitors,15_000);}
+  return()=>{visitorSubs.delete(setV);if(!visitorSubs.size)stopVisitors();};},[]);
  return v;
 }
 function useWorlds(){const [w,setW]=useState<SiteWorld[]>([]);useEffect(()=>{let live=true;void siteWorlds().then(x=>{if(live)setW(x);});return()=>{live=false;};},[]);return w;}
@@ -39,7 +49,7 @@ export function VisitorFrom({soulId}:{soulId:string}){
 /** The world's visitors in one line (under "Meet its Souls"): who is here from elsewhere, and whether it is closed. */
 export function VisitorsLine(){
  const v=useVisitors(),worlds=useWorlds();
- if(!v||(v.open&&!v.visitors.length))return null;
+ if(!v||v.available===false||(v.open&&!v.visitors.length))return null;
  return <p className="soul-visitors" data-visitors={v.visitors.length} data-open={v.open?'1':'0'}>
   {v.visitors.length?<>Visiting now: {v.visitors.map((x,i)=><span key={x.soulId}>{i?', ':''}<b>{x.name}</b> from {nameOf(worlds,x.home)}</span>)}</>:null}
   {!v.open&&<span className="soul-dim">{v.visitors.length?' · ':''}Closed to new visitors</span>}
