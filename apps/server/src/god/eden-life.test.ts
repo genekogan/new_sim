@@ -48,7 +48,8 @@ export async function lifeWorld(t: any, ops: any[]) {
 }
 
 test('B6: a resident warms up by a god-built core campfire, and not by one that is put out', { timeout: 600000 }, async (t) => {
-  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('campfire'), name: 'commons-fire', p: [0, 0] }]);
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('campfire'), name: 'commons-fire', p: [0, 0] },
+    { op: 'place', def: coreRef('bookcase'), name: 'camp-books', p: [8, 0] }, { op: 'place', def: coreRef('armchair'), name: 'camp-chair', p: [8, 3], r: Math.PI }]);
   const ana = await w.soul('Ana');
   const fire = w.byName('commons-fire');
   const caps = w.edge.capabilities(ana), cap = caps.find((c: any) => c.id === `warm-by-fire:${fire.id}`);
@@ -62,6 +63,11 @@ test('B6: a resident warms up by a god-built core campfire, and not by one that 
   assert.ok(seen, 'the body took a place at the fire and warmed itself (activity warm)');
   assert.ok((seen as any).d > 1.2 && (seen as any).d < 2.4, `stood round the fire: ${JSON.stringify(seen)}`);
   assert.equal(r.phase, 'completed', JSON.stringify(r));
+  // E-life proof: still holding a place at the fire, the next seated activity first leaves the circle (it faulted)
+  assert.equal(w.body(ana).human.activity, 'warm');
+  const read = w.edge.capabilities(ana).find((c: any) => c.id.startsWith('read:read.'))!;
+  const rd = await w.act(ana, read.id, { seconds: 5 });
+  assert.equal(rd.r.phase, 'completed', JSON.stringify(rd.r));
   // put out: refused with the reason and the way to light it
   assert.equal((w.god.act({ ops: [{ op: 'set', id: fire.id, state: { lit: false } }] }, 'put it out') as any).accepted, true);
   await w.settle(2);
@@ -81,6 +87,9 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
     { op: 'place', def: coreRef('stove'), name: 'stove', p: [14, 20] },
     { op: 'place', def: coreRef('picnic-table'), name: 'picnic-table', p: [0, 2] },
     { op: 'place', def: coreRef('piano'), name: 'piano', p: [14, 6] },
+    { op: 'place', def: coreRef('podium'), name: 'podium', p: [-20, 0] },
+    { op: 'place', def: coreRef('bench'), name: 'audience-bench', p: [-20, 6], r: Math.PI },
+    { op: 'place', def: coreRef('swings'), name: 'swings', p: [-20, 24] },
   ]);
   const ana = await w.soul('Ana');
   const caps = w.edge.capabilities(ana), ids = caps.map((c: any) => c.id);
@@ -88,7 +97,7 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
   for (const p of want) assert.ok(ids.some((id: string) => id.startsWith(p)), `${p} offered: ${ids.filter((i: string) => /^(read|write|paint|post|cook|eat|drink|play)/.test(i)).join(' ')}`);
   t.diagnostic(JSON.stringify(w.bridge.activitySpots.stats));
   const outcomes: Record<string, string> = {};
-  for (const p of ['read:read.', 'write:write.', 'paint:paint.', 'post-letter:post-letter.', 'eat:eat.', 'play-piano:play-piano.', 'cook:cook.']) {
+  for (const p of ['read:read.', 'write:write.', 'paint:paint.', 'post-letter:post-letter.', 'eat:eat.', 'play-piano:play-piano.', 'cook:cook.', 'listen:listen.', 'swing:swing.']) {
     const cap = w.edge.capabilities(ana).find((c: any) => c.id.startsWith(p))!, pose = p.split(':')[0].replace('post-letter', 'post-letter');
     const { r, seen } = await w.act(ana, cap.id, { seconds: 6 }, () => w.body(ana)?.human?.activity === pose ? { at: w.body(ana).pose.p, base: w.body(ana).human.baseActivity } : null);
     if (p === 'read:read.') assert.ok(seen && Math.hypot((seen as any).at[0] - 1.5, (seen as any).at[2] - 15) < 1.0 && (seen as any).base === "sit", `read sitting in the armchair: ${JSON.stringify(seen)}`);

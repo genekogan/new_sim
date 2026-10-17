@@ -140,6 +140,8 @@ export class GodActivitySpots {
       if (!t.c.surface || !(is(t, 'table', 'cafe', 'picnic-table', 'parasol-table', 'round-table', 'long-table') || t.tags.has('table'))) continue;
       if (t.c.workstation || is(t, 'school-desk', 'desk', 'office-desk', 'workbench')) continue;
       const place = this.place(t.at, t.level), face: V2 = [r2(t.at[0]), r2(t.at[1])];
+      // not in a library, a classroom, an office or a study: their tables are for reading and work (old Eden: book club)
+      if (/librar|classroom|school|office|study|reading|lecture/i.test(`${place ?? ''} ${place ? this.h.placeName(place) ?? '' : ''} ${t.name}`)) continue;
       if (t.slots.some(s => s.kind === 'seat')) { if (room('eat', place)) seatSpot(t, 'eat', face, { also: ['drink'], prop: 'plate' }); continue; }
       for (const s of seatsAt(t).slice(0, 2)) { if (used.has(`eat.${s.id}`) || used.has(`read.${s.id}`) || !room('eat', place)) continue; seatSpot(s, 'eat', face, { also: ['drink'], label: `${this.label(t, place)}` }); }
     }

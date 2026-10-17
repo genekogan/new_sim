@@ -145,10 +145,24 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
       // leisure: done together (a see-saw): wait for the other end, then the same shared stretch for both
       ...(s.together ? {group: s.together.group, need: s.together.need, waitSeconds: s.together.wait, alone: s.together.alone, seatTogether: true} : {})})];
   };
-  const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
+  // E-life: a derived shelf's browse point may lie against furniture: step it straight back from the shelf to clear ground
+  // (≤ 0.9 m), as spots do; one with no clear point is not browsed (reading still takes the book you have)
+  const shelfAt = new Map<string, V2 | null>(), shelfStand = (s: Shelf): V2 | null => {
+    if (s.level || !s.faceTo || !(w.clearance(w.me[0], w.me[1]) > 0)) return s.at;
+    if (!shelfAt.has(s.id)) {
+      let at: V2 | null = s.at;
+      if (w.clearance(s.at[0], s.at[1]) < STAND_CLEAR) {
+        const L = d2(s.at, s.faceTo), back: V2 = L > 1e-6 ? [(s.at[0] - s.faceTo[0]) / L, (s.at[1] - s.faceTo[1]) / L] : [0, 0]; at = null;
+        for (let t = 0.1; t <= 0.9 + 1e-9 && L > 1e-6; t += 0.1) {const p: V2 = [Math.round((s.at[0] + back[0] * t) * 100) / 100, Math.round((s.at[1] + back[1] * t) * 100) / 100]; if (w.clearance(p[0], p[1]) >= STAND_CLEAR) {at = p; break;}}
+      }
+      shelfAt.set(s.id, at);
+    }
+    return shelfAt.get(s.id)!;
+  };
+  const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15 && !!shelfStand(s)).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
   /** Reading at a spot: take a book from the nearest shelf, read, put it back. */
   const readAt = (s: Spot): Program['steps'] => {
-    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelf.at, shelf.level), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
+    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelfStand(shelf)!, shelf.level), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
     return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3)];
   };
   // ---- sitting and lying, anywhere
