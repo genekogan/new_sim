@@ -19,8 +19,13 @@ Status, rehearsal evidence, Gene's runbook: `team/lanes/t3-d2-laptop-exit.md` (v
   (transient unit, ports 6320-6323); `legacy-rehearsal.sh up|down|purge` drives it.
 - Redirect switch (off): `/srv/sim-worlds-data/legacy/redirects.json`, see `tools/world-launcher/redirects.mjs` and
   `legacy-redirects.sh`. Only page loads of `/`, `/w/<key>`, `/w/<key>/` are redirected (302); `?stay=1` keeps the original.
-- Later code updates of the legacy stage: `release.sh legacy`, then on eden2 `ln -sfn <release> /srv/sim-worlds/legacy` and
-  `bash <release>/tools/world-launcher/deploy/activate.sh legacy <release>` (keeper handover, no visible downtime).
+- Later code updates of the legacy stage: `release.sh legacy` (uploads `/srv/sim-old/releases/we-<sha12>-root`), then on eden2
+  `cd <release> && sha256sum -c --quiet FILES.sha256 && bash <release>/tools/world-launcher/deploy/activate.sh legacy <release> --reload`
+  (keeper handover, no visible downtime; health + each world's boot smoke, else back to `legacy.previous`). Don't `ln` the stage
+  link yourself first: activate.sh moves it and records `/srv/sim-worlds/legacy.previous` only when the link still points at the
+  old release, and that is what its automatic rollback (and a manual one) goes back to. Then set `bin/LEGACY-RELEASE` to the
+  new build so the laptop kit's checks name it. Manual rollback: `bash <previous>/tools/world-launcher/deploy/activate.sh legacy
+  $(readlink -f /srv/sim-worlds/legacy.previous) --reload`.
 - `rollback.sh` stops `sim-worlds@legacy` instead of the sim-old units; everything else as v1 (below).
 - Not used by v2: `pack-release.py`, `verify-release.py`, `run-world.mjs` on eden2, `port-map.mjs`, the sim-old units
   (v1 artifacts; the laptop side of rollback still uses `run-world.mjs` and the 1080cfa9 descriptors).
