@@ -39,8 +39,6 @@ chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf
 install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds-backups
 
 install -m 644 "$UNIT_SRC" /etc/systemd/system/sim-worlds@.service
-# optional: holds the port across restarts once enabled per stage (see its header); installing it enables nothing
-install -m 644 "$HERE/sim-worlds@.socket" /etc/systemd/system/sim-worlds@.socket
 install -d /etc/systemd/system/sim-worlds@staging.service.d /etc/systemd/system/sim-worlds@production.service.d
 printf '[Service]\nMemoryHigh=2500M\nMemoryMax=3G\n' > /etc/systemd/system/sim-worlds@staging.service.d/10-memory.conf
 printf '[Service]\nMemoryHigh=5G\nMemoryMax=6G\n' > /etc/systemd/system/sim-worlds@production.service.d/10-memory.conf
@@ -49,4 +47,4 @@ install -m 644 "$HERE/sim-worlds-backup@.timer" /etc/systemd/system/sim-worlds-b
 install -m 644 "$HERE/sim-worlds-health@.service" /etc/systemd/system/sim-worlds-health@.service
 install -m 644 "$HERE/sim-worlds-health@.timer" /etc/systemd/system/sim-worlds-health@.timer
 systemctl daemon-reload
-echo "installed: user simworlds, /srv/sim-worlds{,-data}, /etc/sim-worlds/{staging,production}.conf, sim-worlds@.{service,socket}, sim-worlds-{backup,health}@.{service,timer} (nothing started)"
+echo "installed: user simworlds, /srv/sim-worlds{,-data}, /etc/sim-worlds/{staging,production}.conf, sim-worlds@.service, sim-worlds-{backup,health}@.{service,timer} (nothing started)"
