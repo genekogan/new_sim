@@ -57150,6 +57150,294 @@
       ]
     },
     {
+      "note": "scenery: roof gardens",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-3-roof-planter-1",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "roof"
+          },
+          "p": [
+            -4.2,
+            0,
+            0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-3-roof-planter-2",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "roof"
+          },
+          "p": [
+            4.2,
+            0,
+            0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "eden-house-3-roof-bench",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0.7
+          ],
+          "r": 3.141592653589793
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "eden-house-3-roof-pot",
+          "in": {
+            "parent": "eden-house-3",
+            "slot": "roof"
+          },
+          "p": [
+            -1.6,
+            0,
+            -0.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-3-kitchen-roof-planter-1",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            -3.8,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-3-kitchen-roof-planter-2",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            -1.6,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-3-kitchen-roof-planter-3",
+          "in": {
+            "parent": "eden-house-3-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            2.4,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-4-roof-planter-1",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "roof"
+          },
+          "p": [
+            -4.2,
+            0,
+            0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-4-roof-planter-2",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "roof"
+          },
+          "p": [
+            4.2,
+            0,
+            0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "eden-house-4-roof-bench",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "roof"
+          },
+          "p": [
+            0,
+            0,
+            0.7
+          ],
+          "r": 3.141592653589793
+        },
+        {
+          "op": "place",
+          "def": "core/flower-pot@1",
+          "name": "eden-house-4-roof-pot",
+          "in": {
+            "parent": "eden-house-4",
+            "slot": "roof"
+          },
+          "p": [
+            -1.6,
+            0,
+            -0.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-4-kitchen-roof-planter-1",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            -3.8,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-4-kitchen-roof-planter-2",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            -1.6,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "eden-house-4-kitchen-roof-planter-3",
+          "in": {
+            "parent": "eden-house-4-kitchen",
+            "slot": "roof"
+          },
+          "p": [
+            2.4,
+            0,
+            -0.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/parasol-table@1",
+          "name": "office-roof-parasol",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "roof"
+          },
+          "p": [
+            2.5,
+            0,
+            1.2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "office-roof-planter-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "roof"
+          },
+          "p": [
+            -4.5,
+            0,
+            -3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "office-roof-planter-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "roof"
+          },
+          "p": [
+            -2.5,
+            0,
+            -3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bench@1",
+          "name": "office-roof-bench",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "roof"
+          },
+          "p": [
+            -3.5,
+            0,
+            1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "library-roof-planter-1",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "roof"
+          },
+          "p": [
+            -3.5,
+            0,
+            -3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/planter-box@1",
+          "name": "library-roof-planter-2",
+          "in": {
+            "parent": "eden-library-1",
+            "slot": "roof"
+          },
+          "p": [
+            3.5,
+            0,
+            -3
+          ]
+        }
+      ]
+    },
+    {
       "note": "scenery: park pond kerb",
       "group": "eden-2026",
       "ops": [

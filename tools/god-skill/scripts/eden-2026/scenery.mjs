@@ -123,6 +123,20 @@ group('scenery: campus quad', put => {
   [-27, -21, -15, -9, -3, 3].forEach((x, i) => put('tree', `campus-annex-tree-${i + 1}`, [x, -113.2], { s: 0.55 }));
   [[-21, -103, 0], [-3, -103, 0], [-21, -91, Math.PI], [-3, -91, Math.PI]].forEach(([x, z, r], i) => put('bench', `campus-quad-bench-${i + 1}`, [x, z], r ? { r } : {}));
 });
+// V3: old Eden's flat roofs were gardens: raised planters, a bench and a parasol table on the courtyard houses' terraces
+// and the office roof (slot 'roof' of each flat-roofed building; local metres from the building centre).
+group('scenery: roof gardens', (put, ops) => {
+  const roof = (parent, name, def, p, r = 0) => ops.push({ op: 'place', def: `core/${def}@1`, name, in: { parent, slot: 'roof' }, p, ...(r ? { r } : {}) });
+  for (const h of ['eden-house-3', 'eden-house-4']) {
+    roof(h, `${h}-roof-planter-1`, 'planter-box', [-4.2, 0, 0.6]); roof(h, `${h}-roof-planter-2`, 'planter-box', [4.2, 0, 0.6]);
+    roof(h, `${h}-roof-bench`, 'bench', [0, 0, 0.7], Math.PI); roof(h, `${h}-roof-pot`, 'flower-pot', [-1.6, 0, -0.9]);
+    roof(`${h}-kitchen`, `${h}-kitchen-roof-planter-1`, 'planter-box', [-3.8, 0, -0.6]); roof(`${h}-kitchen`, `${h}-kitchen-roof-planter-2`, 'planter-box', [-1.6, 0, -0.6]);
+    roof(`${h}-kitchen`, `${h}-kitchen-roof-planter-3`, 'planter-box', [2.4, 0, -0.6]);
+  }
+  roof('eden-office-1', 'office-roof-parasol', 'parasol-table', [2.5, 0, 1.2]); roof('eden-office-1', 'office-roof-planter-1', 'planter-box', [-4.5, 0, -3]);
+  roof('eden-office-1', 'office-roof-planter-2', 'planter-box', [-2.5, 0, -3]); roof('eden-office-1', 'office-roof-bench', 'bench', [-3.5, 0, 1.5]);
+  roof('eden-library-1', 'library-roof-planter-1', 'planter-box', [-3.5, 0, -3]); roof('eden-library-1', 'library-roof-planter-2', 'planter-box', [3.5, 0, -3]);
+});
 // V7: the park pond's stone kerb (old Eden: a stepped stone basin), with gaps at the jetty and three swimming steps.
 {
   const pts = Array.from({ length: 41 }, (_, i) => { const a = i / 40 * Math.PI * 2; return [r3(-6 + Math.cos(a) * 14.1), r3(112 + Math.sin(a) * 9.6)]; });
