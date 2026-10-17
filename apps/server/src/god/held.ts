@@ -11,7 +11,7 @@ import type { WorldModel } from '@sim/world-compiler';
 import { groundPutDistance, groundPutNeed } from '../../../../mars/viewer/engine/items/actions.ts';
 
 type Ents = Record<string, any>;
-export type HeldHost = { engine: { world: { entities: Ents }; standableNearV1?: (at: [number, number], level?: number, except?: string, minClear?: number, maxRing?: number) => [number, number] | null }; model: WorldModel; minds: Map<string, { entityId: string }> };
+export type HeldHost = { engine: { world: { entities: Ents; tick?: number }; standableNearV1?: (at: [number, number], level?: number, except?: string, minClear?: number, maxRing?: number) => [number, number] | null }; model: WorldModel; minds: Map<string, { entityId: string }> };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function heldGodThing(ents: Ents, body: string): any | null {
