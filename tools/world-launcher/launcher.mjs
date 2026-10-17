@@ -432,6 +432,7 @@ export async function openLauncher(cfg = {}) {
   const sockets = new Set();
   const server = createServer(async (req, res) => {
     const sock = req.socket; sock.simBusy = (sock.simBusy ?? 0) + 1; res.once('close', () => { sock.simBusy--; });
+    if (closed) res.shouldKeepAlive = false;   // stopping: answered, then this connection ends (see close())
     if (retiredTo) { forward(req, res); return; }
     // while the next launcher is being prepared, creations and operator changes wait: they run here if it fails, there if not
     if (gate && req.method === 'POST' && (req.url ?? '').startsWith(`${B}/__sim/`)) { await gate.p; if (retiredTo) { forward(req, res); return; } }
@@ -691,7 +692,19 @@ export async function openLauncher(cfg = {}) {
     },
     /** Open (non-upgraded) requests still being answered here. */
     busy() { let n = 0; for (const s of sockets) if (s.simBusy && !s.simUpgraded) n++; return n; },
-    close: async () => { if (closed) return; closed = true; const done = new Promise((r) => server.close(() => r())); for (const s of sockets) s.destroy(); await pool.closeAll(); await done; },
+    /** Stop. When systemd holds the port (keeper under socket activation, SIM_PORT_HELD=1), new connections wait in its
+     *  backlog for the next keeper, so this launcher can end its own gently first: each connection ends after its next
+     *  answer (Connection: close; none is cut under a request the proxy is sending), requests in flight finish while
+     *  their worlds still run, and only connections idle through `idleMs` (or anything after `drainMs`) are cut. Without
+     *  a held port every moment here is refused connections, so it stops at once, as before. After a handover (`gentle`)
+     *  the keeper's port is served by the next launcher, so that exit is gentle too. */
+    close: async ({ drainMs = 3_000, idleMs = 1_500, gentle = process.env.SIM_PORT_HELD === '1' } = {}) => {
+      if (closed) return; closed = true;
+      const live = () => [...sockets].filter((s) => !s.simUpgraded);
+      if (gentle) for (const t0 = Date.now(); live().length && Date.now() - t0 < drainMs && (Date.now() - t0 < idleMs || live().some((s) => s.simBusy));) await new Promise((r) => setTimeout(r, 20));
+      const done = new Promise((r) => server.close(() => r()));   // (Node's close() also cuts idle connections: only now)
+      for (const s of sockets) s.destroy(); await pool.closeAll(); await done;
+    },
   };
 }
 
@@ -734,7 +747,7 @@ function serveKeeper(l, stop) {
     else if (m.t === 'unretire') reply(l.unretire(m.slug).then((p) => ({ slug: m.slug ?? null, port: p ?? null })));
     else if (m.t === 'exit') {
       // the last forwarded responses finish (up to 10 s), then this generation is gone
-      const t0 = Date.now(); const done = () => (l.busy() === 0 || Date.now() - t0 > 10_000 ? stop('handed over') : setTimeout(done, 100)); done();
+      const t0 = Date.now(); const done = () => (l.busy() === 0 || Date.now() - t0 > 10_000 ? stop('handed over', true) : setTimeout(done, 100)); done();
     }
   });
   process.on('disconnect', () => stop('keeper gone'));
@@ -755,7 +768,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
       ...(underKeeper ? { listen: false, adopt: process.env.SIM_ADOPT ? JSON.parse(process.env.SIM_ADOPT) : null } : {}) });
     let stopping = false;
-    const stop = (why) => { if (stopping) return; stopping = true; console.log(`[launcher] ${why}: stopping worlds…`); void l.close().then(() => process.exit(0)); };
+    const stop = (why, gentle) => { if (stopping) return; stopping = true; console.log(`[launcher] ${why}: stopping worlds…`); void l.close(gentle ? { gentle } : {}).then(() => process.exit(0)); };
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => stop(sig));
     if (underKeeper) serveKeeper(l, stop);
   } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; if (underKeeper) process.disconnect?.(); }
