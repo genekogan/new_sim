@@ -14,7 +14,7 @@ export async function lifeWorld(t: any, ops: any[]) {
   const f = fixture(':memory:', factory, { durableClockV1: true });
   const god = new GodMode(f.db, { worldId: f.host.worldId, ownerId: 'dev:admin', tick: () => f.host.engine.world.tick, emit: () => {} });
   const edge = new EdgeLedger(f.host, f.db);
-  const bridge = installEngineBridge({ host: f.host, god, edge, log: () => {} });
+  const bridge = installEngineBridge({ host: f.host, god, edge, log: () => {}, worldLore: true });
   const settle = async (n = 4) => { for (let i = 0; i < n; i++) { f.host.tickOnce(); await setImmediate(); f.host.drainInputs(); } };
   f.brain.quiesce();
   t.after(() => { f.brain.quiesce(); f.host.stop(); f.db.close(); });
@@ -78,6 +78,7 @@ test('B6: a resident warms up by a god-built core campfire, and not by one that 
 
 test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a piano are activity spots', { timeout: 900000 }, async (t) => {
   const w = await lifeWorld(t, [
+    { op: 'world', state: { constitution: '# Eden (test)\nA small village.' } },
     { op: 'place', def: coreRef('bookcase'), name: 'oak-bookcase', p: [0, 12] },
     { op: 'place', def: coreRef('armchair'), name: 'reading-chair', p: [1.5, 15], r: Math.PI },
     { op: 'place', def: coreRef('desk'), name: 'writing-desk', p: [8, 12] },
@@ -100,6 +101,7 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
   for (const p of ['read:read.', 'write:write.', 'paint:paint.', 'post-letter:post-letter.', 'eat:eat.', 'play-piano:play-piano.', 'cook:cook.', 'listen:listen.', 'swing:swing.']) {
     const cap = w.edge.capabilities(ana).find((c: any) => c.id.startsWith(p))!, pose = p.split(':')[0].replace('post-letter', 'post-letter');
     const { r, seen } = await w.act(ana, cap.id, { seconds: 6 }, () => w.body(ana)?.human?.activity === pose ? { at: w.body(ana).pose.p, base: w.body(ana).human.baseActivity } : null);
+    if (p === 'read:read.') assert.match(String(r.outcome?.summary), /^Read .+, passage 1 of \d+\.$/, 'a book from the Eden library, not the constitution');
     if (p === 'read:read.') assert.ok(seen && Math.hypot((seen as any).at[0] - 1.5, (seen as any).at[2] - 15) < 1.0 && (seen as any).base === "sit", `read sitting in the armchair: ${JSON.stringify(seen)}`);
     if (p === 'play-piano:play-piano.') assert.ok(seen && Math.hypot((seen as any).at[0] - 14, (seen as any).at[2] - 6) < 1.2, `played from the piano bench: ${JSON.stringify(seen)}`);
     outcomes[p] = `${r.phase}${r.code ? ':' + r.code : ''}${seen ? ' seen' : ' NOT-SEEN'}`; console.error('[eden-life]', cap.id, outcomes[p], JSON.stringify(cap.label));

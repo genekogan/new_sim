@@ -38,7 +38,11 @@ export function installWorldLore(L: EdgeLedger, god: GodMode) {
     // no Eden place lore: an empty place path matches none of it
     return terminal(receipt, snapshot ? { ...snapshot, placePath: [] } : snapshot, eff);
   };
+  const libraryRead = typeof o.readPassage === 'function' ? o.readPassage.bind(o) : null;
   o.readPassage = (context: any, out: any) => {
+    // E-life: a book taken from a god-built bookcase (a derived reading spot, read:read.<seat>, or reading in a place with
+    // shelves, read:g-<place>) on Eden 2026 is a book of the Eden library, as on old Eden; elsewhere it reads the lore
+    if (libraryRead && /^read:(?:read\.|g-)/.test(String(context.capability ?? '')) && /^\s*#?\s*Eden\b/.test(String(god.model.state.constitution ?? ''))) return libraryRead(context, out);
     const target = String(context.capability ?? '').slice('read:'.length), e: any = target ? god.model.entities.get(target) : undefined;
     const def = e ? god.model.resolvedDef(e.def) : undefined, words = (e && def ? signText(e, def) ?? '' : '').trim();
     if (words) {
