@@ -1,0 +1,36 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "Release 3.2 (2026-10-17), reviewed by the release owner. Lane n1 (2d1760f1) stopped drawing a ceiling slab under a glass roof (greenhouse beds show from outside). Three documented glass-material gallery-budget overruns therefore shrink by 12-44 triangles but stay over 6000: core-hotel glass 6558 -> 6546, core-lighthouse glass 6222 -> 6178, core-apartment-block random[1] 6312 -> 6300 (same def hashes, same stage/code/field). Re-pinned with the new detail; no budget, sample or gap check is relaxed; nothing else is accepted.",
+  "findings": [
+    {
+      "def": "core-apartment-block@1",
+      "hash": "fa018aa5d14dfdabbab933aa1c10a6ef150d8fb3aea959aa5680a6800bb8f28f",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6300 > 6000",
+      "fields": [
+        "random[1]"
+      ]
+    },
+    {
+      "def": "core-hotel@1",
+      "hash": "c7c868e3c1559b67584e596f3eaef8bf3c0d47c0af2e4ca215046a094b09ce47",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6546 > 6000",
+      "fields": [
+        "params.material=glass"
+      ]
+    },
+    {
+      "def": "core-lighthouse@1",
+      "hash": "788a9901741b2b9d223e3c959eebb455c10514724e627934b2bb695aa4f058ea",
+      "stage": "gallery-budget",
+      "code": "triangles",
+      "detail": "6178 > 6000",
+      "fields": [
+        "params.material=glass"
+      ]
+    }
+  ]
+}

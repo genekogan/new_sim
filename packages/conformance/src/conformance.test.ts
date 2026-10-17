@@ -30,8 +30,10 @@ test('EF4 small-K gate: every library def places, bakes, furnishes and builds ga
   const integration = JSON.parse(readFileSync(new URL('../conformance/integration-3baa4c51.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
   // Trunk release 3: lane/bugs' new animal (flee) and excavator (digging arm) revisions, reviewed; see the record's note.
   const trunk3 = JSON.parse(readFileSync(new URL('../conformance/trunk-r3-20261016.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
+  // Release 3.2: glass roofs lost their ceiling slab (fewer triangles, still over budget); exact re-pins, see the record's note.
+  const trunk32 = JSON.parse(readFileSync(new URL('../conformance/trunk-r32-20261017.json', import.meta.url), 'utf8')) as Pick<typeof known, 'findings'>;
   const signature = (f: Finding) => JSON.stringify([f.def, f.hash, f.field, f.stage, f.code, f.detail]);
-  const allowed = new Set([...known.findings, ...integration.findings, ...trunk3.findings].flatMap(f => f.fields.map(field => signature({ ...f, field }))));
+  const allowed = new Set([...known.findings, ...integration.findings, ...trunk3.findings, ...trunk32.findings].flatMap(f => f.fields.map(field => signature({ ...f, field }))));
   const newFindings = report.findings.filter(f => !allowed.has(signature(f)));
   assert.deepEqual(newFindings, [], `Undocumented conformance failures: ${JSON.stringify(newFindings.slice(0, 12))}`);
   assert.deepEqual(report.qualificationGaps, known.qualificationGaps, 'rendering gaps changed: qualify them or document the exact gap');
