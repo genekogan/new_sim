@@ -29,6 +29,13 @@ try {
   const later = live.entities.filter((e) => e.in.parent === 'world' && e.name && !tnames.has(e.name));
   const ops = later.map((e) => ({ op: 'place', def: e.def, name: e.name, ...Object.fromEntries(['p', 'r', 's', 'shape', 'params', 'state', 'constraints'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])) }));
   if (ops.length && !args.includes('--no-later')) { const r = await ctx.api('/v1/god/act', { body: { note: 'the live world\'s later god additions (from its public snapshot)', ops } }); out.applied.later = { names: later.map((e) => e.name), accepted: r.accepted, failures: r.failures }; console.log('later', JSON.stringify(out.applied.later).slice(0, 300)); }
+  // the template may since have gained things the live world was born without (e.g. lm-grotto-20261017): remove them so
+  // the copy matches live, unless --keep-template-additions
+  if (!args.includes('--keep-template-additions')) {
+    const s0 = await ctx.api('/v1/world/snapshot', { as: 'public' }), ln = new Set(live.entities.map((e) => e.name));
+    const extraIds = s0.entities.filter((e) => e.in.parent === 'world' && e.name && !ln.has(e.name) && !later.some((x) => x.name === e.name)).map((e) => e.id);
+    if (extraIds.length) { const r = await ctx.api('/v1/god/act', { body: { note: 'match the live world: remove template additions it was born without', ops: extraIds.map((id) => ({ op: 'remove', id })) } }); out.applied.removedTemplateAdditions = { n: extraIds.length, accepted: r.accepted }; }
+  }
   extra.forEach((spec, i) => {
     const env = { ...process.env, EDEN_GOD_TOKEN_FILE: tokenFile }, rc = `${S}/extra${i}.receipt.json`; rmSync(rc, { force: true });
     const argv = [`${ROOT}/tools/mars-rotation/add-patch.mjs`, '--spec', spec, '--base', ctx.base, '--receipt', rc];

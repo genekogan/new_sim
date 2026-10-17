@@ -1,0 +1,11 @@
+[
+ {
+  "schema": "def/1", "name": "mars-tea-room-mat", "version": 1,
+  "description": "The dark ground mat that covers the floor of Mimos's glazed tea room (sim.mars.college 2026 reference), 7.1 x 3.9 m.",
+  "tags": ["furniture", "rug", "floor", "decor", "mars"], "form": "point",
+  "make": { "kind": "gen", "gen": "kit/2", "args": { "round": 0, "shapes": [ { "kind": "box", "at": [0, 0.006, 0], "size": [7.1, 0.012, 3.85], "round": 0, "tint": "mat", "collide": false } ] } },
+  "params": { "mat": { "type": "color", "default": "#58594f", "doc": "mat colour" } },
+  "palette": { "mat": "#58594f" },
+  "layer": "surface", "size": { "box": [7.1, 0.05, 3.85] }
+ }
+]
