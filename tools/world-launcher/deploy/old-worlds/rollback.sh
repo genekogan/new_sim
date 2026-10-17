@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Roll the old worlds back to the laptop after cutover.sh. Lane CLOUD2 2026-10-11; rewritten by lane KIT 2026-10-15 after
-# safety review KIT-REVIEW-1 and incident INCIDENT-20261015-MARS-LM (team/reviews/sim-release-20261015/). Run ON THE LAPTOP.
+# safety review KIT-REVIEW-1 and incident INCIDENT-20261015-MARS-LM (team/reviews/sim-release-20261015/); lane L2 2026-10-17:
+# eden2 side is now the legacy stage (sim-worlds@legacy on the current release, data /srv/sim-worlds-data/legacy). A history
+# written there opens on the laptop's 1080cfa9 code (rehearsed: L2 S13); if a restarted writer is NOT READY, its originals
+# are in pre-rollback-<now>/ next to the DB (move them back to undo). Run ON THE LAPTOP.
 #   bash rollback.sh <cutover-TS>        (TS from the cutover log name, e.g. 20261016-140000). Safe to re-run.
 # 0 Classify each world on the laptop: SERVED (its port has a listener: left alone), HUNG (one of its writers is alive but
 #   not listening: waited up to RB_HUNG_WAIT s, then SIGKILLed; its close already stopped the world clock, SQLite commits
@@ -8,7 +11,7 @@
 #   a writer of that world -> FAILED (never signalled).
 # 1 Caddy: the catch-all `reverse_proxy 127.0.0.1:4670` goes back to 4505 (sed on that line only; other edits kept; backup
 #   sim.caddy.post-kit-<now>.bak), validate, reload. Anything else -> STOP before touching eden2 or the laptop data.
-# 2 Stop + disable the eden2 sim-old units (only now that Caddy no longer routes to them).
+# 2 Stop + disable the eden2 legacy stage (only now that Caddy no longer routes to it; each world saves a snapshot and exits).
 # 3 History back, only if eden2 was public (sim.caddy had 4670, or eden2 holds a SERVED-<TS> marker written by cutover before
 #   its Caddy change and consumed only by a rollback that completed; independent of the TS you type) and
 #   only for CLOSED/HUNG worlds: full parity JSON compared; eden2 copied back only when it differs AND extends the laptop
@@ -27,10 +30,10 @@ set -uo pipefail
 TS=${1:?usage: rollback.sh <cutover-TS>}; H=<team>/runtime/sim-old-cloud; NOW=$(date -u +%Y%m%d-%H%M%S)
 KITBIN=${RB_KITBIN:-$H/bin}; N=${RB_NODE:-~/.nvm/versions/node/v22.20.0/bin/node}
 ENV=${RB_ENV:-<team>/pm-integration/auth-account-20261009/clerk-publication-types-003/STAGED-PUBLIC-SETTINGS.env}
-E2=${RB_E2:-root@eden2}; RDATA=${RB_RDATA:-/srv/sim-old-data}; RBIN=/srv/sim-old/current/bin
+E2=${RB_E2:-root@eden2}; RDATA=${RB_RDATA:-/srv/sim-worlds-data/legacy}; RBIN=${RB_RBIN:-/srv/sim-worlds/legacy/tools/world-launcher/deploy/old-worlds}
 CADDY=${RB_CADDY:-/etc/caddy/sites/sim.caddy}
 CVALIDATE=${RB_CADDY_VALIDATE:-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile}; CRELOAD=${RB_CADDY_RELOAD:-systemctl reload caddy}
-UNITS=${RB_UNITS-sim-old-proxy sim-old@eden sim-old@mars sim-old@littlemartians}
+UNITS=${RB_UNITS-sim-worlds@legacy}
 ACC=${RB_ACC:-<team>/runtime/production-accounts/accounts.sqlite}; PROD_DESC=$H/rollback/descriptors-1080cfa9; DESC=${RB_DESC:-$PROD_DESC}
 LPORTS=${RB_LPORTS:-eden:4950,mars:4963,littlemartians:4964}; HUNG_WAIT=${RB_HUNG_WAIT:-120}; PUBLIC=${RB_PUBLIC:-1}
 LOGD=${RB_LOG_DIR:-$H/logs}; LOG=$LOGD/rollback-$NOW.log; TEST=${RB_LAPTOP_ROOT:-}
@@ -44,6 +47,7 @@ if [ -n "$TEST" ]; then
   case "${RB_CADDY_VALIDATE:-}:${RB_CADDY_RELOAD:-}" in true:true|true:false|false:true|false:false) ;; *) echo "test mode needs RB_CADDY_VALIDATE and RB_CADDY_RELOAD set to true/false stand-ins"; exit 2;; esac
   [ "$(uname)" = Linux ] || { echo "test mode runs only on eden2 (never on the laptop)"; exit 2; }
   for v in "$TEST" "$RDATA" "$CADDY" "$ACC" "$DESC" "$LOGD" "$RECEIPTS"; do case "$v" in /srv/sim-old-rbtest/*) ;; *) echo "test mode: $v is outside /srv/sim-old-rbtest"; exit 2;; esac; done
+  case "$RBIN" in /srv/sim-old-rbtest/*|/srv/sim-old/releases/*) ;; *) echo "test mode: RB_RBIN must be the scratch kit or a staged release"; exit 2;; esac
   [ -n "${RB_LPORTS:-}" ] || { echo "test mode needs RB_LPORTS"; exit 2; }
   case "$LPORTS" in *49[0-9][0-9]*|*466[0-9]*|*4670*) echo "test mode: RB_LPORTS must not name live ports"; exit 2;; esac
 fi
@@ -59,7 +63,7 @@ alive() { kill -0 $1 2>/dev/null; }
 # Live writers anywhere on this host, detected generally (never hard-coded PIDs): the test mode must never target one.
 live_set() { { for p in 4950 4963 4964 4970 4660 4661 4662; do listeners $p; done
   pgrep -f 'convergence-world-run\.mjs' ; pgrep -f "run-world\.mjs $PROD_DESC/"; pgrep -f 'run-world\.mjs /srv/sim-old/current/descriptors/'
-  [ "$(uname)" = Linux ] && for u in sim-old@eden sim-old@mars sim-old@littlemartians sim-old-proxy; do systemctl show -p MainPID --value $u; done; } 2>/dev/null | grep -v '^0$' | sort -u; }
+  [ "$(uname)" = Linux ] && for u in sim-old@eden sim-old@mars sim-old@littlemartians sim-old-proxy sim-worlds@legacy sim-worlds@production; do m=$(systemctl show -p MainPID --value $u); echo $m; [ "$m" != 0 ] && for c in $(pgrep -P $m); do echo $c; pgrep -P $c; done; done; } 2>/dev/null | grep -v '^0$' | sort -u; }
 writers() { # $1 world -> PIDs of that world's laptop writers
   if [ -n "$TEST" ]; then
     [ -f $TEST/.pids ] || return 0
@@ -145,15 +149,16 @@ pull() { # $1 world|accounts  $2 laptop dst  $3 eden2 src  $4 expected-json  $5 
   local keep=$(dirname "$dst")/pre-rollback-$NOW; mkdir -p "$keep"
   for f in "$dst" "$dst-wal" "$dst-shm"; do [ -e "$f" ] && mv "$f" "$keep/"; done   # same names: the WAL stays paired with its DB
   mv "$inc" "$dst" && e2 "rm -f $RDATA/rollback-$w.db"; say "$w: eden2 history copied back (originals kept in $keep/)"; }
+rdb() { echo $RDATA/worlds/$1/sim.db; }; RACC=$RDATA/forks/accounts.sqlite
 if [ $SERVED = 1 ]; then for w in $WORLDS; do [ "$(st $w)" = SERVED ] || continue
-  b=$(e2 "python3 $RBIN/parity.py $RDATA/$w/sim.db $(wid $w)" 2>/dev/null); bm=$(jget "$b" maxSeq) || { say "WARN $w: served on the laptop; eden2 history unreadable, not compared"; continue; }
+  b=$(e2 "python3 $RBIN/parity.py $(rdb $w) $(wid $w)" 2>/dev/null); bm=$(jget "$b" maxSeq) || { say "WARN $w: served on the laptop; eden2 history unreadable, not compared"; continue; }
   a2=$(python3 $KITBIN/parity.py "$(ddir $w)/sim.db" $(wid $w) $bm 2>/dev/null)
   if [ "$(jget "$a2" maxSeq 2>/dev/null)" -ge "$bm" ] 2>/dev/null && [ "$(jget "$a2" prefixSHA256)" = "$(jget "$b" prefixSHA256)" ]; then say "$w: served on the laptop and its history contains eden2's events"
   else say "WARN $w: left alone because a laptop writer serves it, but eden2 holds event history the laptop lacks (eden2 maxSeq $bm); reconcile by hand"; fi; done; fi
 if [ $SERVED = 0 ]; then say "eden2 never served the public (no 4670, no SERVED marker): laptop data is authoritative, nothing copied back"
 else
   for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac
-    dst=$(ddir $w)/sim.db; src=$RDATA/$w/sim.db
+    dst=$(ddir $w)/sim.db; src=$(rdb $w)
     a=$(python3 $KITBIN/parity.py "$dst" $(wid $w) 2>/dev/null); b=$(e2 "python3 $RBIN/parity.py $src $(wid $w)" 2>/dev/null)
     am=$(jget "$a" maxSeq) && bm=$(jget "$b" maxSeq) || { setst $w FAILED; say "STOP-NOTE $w: cannot read parity (laptop '${a:0:60}', eden2 '${b:0:60}'); laptop untouched, not restarted"; continue; }
     say "$w laptop $a"; say "$w eden2  $b"
@@ -163,12 +168,12 @@ else
       pull $w "$dst" $src "$b" "python3 $KITBIN/parity.py {} $(wid $w)" || setst $w FAILED
     else setst $w FAILED; say "STOP-NOTE $w: eden2 history does not extend the laptop's (maxSeq $bm vs $am or prefix differs); laptop untouched, not restarted"; fi
   done
-  ha=$(python3 $KITBIN/dbhash.py "$ACC" 2>/dev/null); hb=$(e2 "python3 $RBIN/dbhash.py $RDATA/accounts/accounts.sqlite" 2>/dev/null)
+  ha=$(python3 $KITBIN/dbhash.py "$ACC" 2>/dev/null); hb=$(e2 "python3 $RBIN/dbhash.py $RACC" 2>/dev/null)
   holders=$(lsof -t "$ACC" "$ACC-wal" 2>/dev/null | sort -u | tr '\n' ' '); [ "$(uname)" = Darwin ] && holders=$(/usr/sbin/lsof -t "$ACC" "$ACC-wal" 2>/dev/null | sort -u | tr '\n' ' ')
   if ! jget "$hb" sha256 >/dev/null; then say "WARN accounts: eden2 registry unreadable; laptop registry kept"
   elif [ "$ha" = "$hb" ]; then say "accounts: identical, laptop kept"
   elif [ -n "${holders// /}" ]; then say "STOP-NOTE accounts: differs, but the registry is open by pid(s) $holders (a served laptop writer); not swapped; reconcile by hand"
-  else pull accounts "$ACC" $RDATA/accounts/accounts.sqlite "$hb" "python3 $KITBIN/dbhash.py {}" || say "WARN accounts: laptop registry kept"; fi
+  else pull accounts "$ACC" $RACC "$hb" "python3 $KITBIN/dbhash.py {}" || say "WARN accounts: laptop registry kept"; fi
 fi
 
 # 4 restart laptop writers in a new session (no controlling terminal; run-world.mjs also ignores SIGHUP)
@@ -181,7 +186,7 @@ for w in $WORLDS; do case $(st $w) in CLOSED|HUNG) ;; *) continue;; esac
 for w in $WORLDS; do [ "$(st $w)" = STARTED ] || continue; L=$LOGD/laptop-$w-$NOW.log
   for i in $(seq 1 100); do grep -q '"phase":"ready"' $L 2>/dev/null && break; grep -q 'refused\|^Error' $L 2>/dev/null && break; sleep 3; done
   if grep -q '"phase":"ready"' $L 2>/dev/null; then say "$w: $(grep -h '"phase":"ready"' $L | cut -c1-200)"
-  else setst $w FAILED; say "STOP-NOTE $w: writer NOT READY - see $L"; fi; done
+  else setst $w FAILED; say "STOP-NOTE $w: writer NOT READY - see $L$(ls -d $(ddir $w)/pre-rollback-$NOW 2>/dev/null | sed 's/^/; the laptop originals are in /')"; fi; done
 # all worlds settled and eden2's served marker consumed only when nothing failed (a re-run still sees it otherwise)
 if [ $SERVED = 1 ] && ! grep -q "] STOP-NOTE " "$LOG"; then e2 "for m in $RDATA/SERVED-*; do case \"\$m\" in *'*'*|*.rolledback-*) ;; *) mv \"\$m\" \"\$m.rolledback-$NOW\";; esac; done"; fi
 [ "$PUBLIC" = 1 ] && for w in $WORLDS; do say "public /w/$w/v1/config $(curl -s -o /dev/null -w '%{http_code}' https://sim.eden.art/w/$w/v1/config)"; done
