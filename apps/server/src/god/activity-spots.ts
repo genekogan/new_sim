@@ -255,6 +255,8 @@ export class GodActivitySpots {
         add({ id: `yoga-class.${t.id}.front`.toLowerCase(), activity: 'yoga-class', base: 'idle', at: this.world(t, [0, 0]), faceTo: this.world(t, [0, 4]), together, label: `the teacher's mat (${this.label(t, place)})`, ...(place ? { place } : {}) });
         for (const [k, l] of ([[-2, 2.6], [0, 2.6], [2, 2.6], [-2, 5], [0, 5], [2, 5]] as V2[]).entries()) add({ id: `yoga-class.${t.id}.${k}`.toLowerCase(), activity: 'yoga-class', base: 'idle', at: this.world(t, l), faceTo: face, together, label: `a mat in the yoga class (${this.label(t, place)})`, ...(place ? { place } : {}) });
       }
+      // a picnic blanket: four places round it, sitting on the blanket (old Eden: picnic spots at seat height 0.2)
+      if (t.tags.has('picnic-blanket')) ([[0, -0.85], [0.85, 0], [0, 0.85], [-0.85, 0]] as V2[]).forEach((l, k) => add({ id: `picnic.${t.id}.${k}`.toLowerCase(), activity: 'picnic', base: 'sit', at: this.world(t, l), faceTo: [r2(t.at[0]), r2(t.at[1])], seatHeight: 0.2, label: this.label(t, place), ...(place ? { place } : {}) }));
       // a hammock: lie in it (its cloth at the bed slot's height)
       if (is(t, 'hammock')) { const h = 0.62; add({ id: `hammock.${t.id}`.toLowerCase(), activity: 'hammock', base: 'lie', at: [r2(t.at[0]), r2(t.at[1])], seatHeight: h, label: this.label(t, place), ...(place ? { place } : {}) }); }
     }
