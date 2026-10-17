@@ -19,7 +19,8 @@ export function lightOps() {
   return ops;
 }
 
-const PROP = { bench: 'bench', bin: 'bin', mailbox: 'mailbox', wheelieBin: 'wheelie-bin', porchChair: 'chair', signpost: 'signpost', bikeRack: 'bike-rack', bike: 'bicycle',
+// old mailboxes stand where lane E-life's post boxes go (worlds/patches/eden-life-20261017)
+const PROP = { bench: 'bench', bin: 'bin', wheelieBin: 'wheelie-bin', porchChair: 'chair', signpost: 'signpost', bikeRack: 'bike-rack', bike: 'bicycle',
   noticeBoard: 'notice-board', banner: 'banner', planterBox: 'planter-box', pot: 'flower-pot', flowerPot: 'flower-pot', flowerBuckets: 'flower-pot', rainBarrel: 'rain-barrel',
   stump: 'stump', fallenLog: 'log', mushrooms: 'mushrooms', bollard: 'bollard', birdBath: 'birdbath', swing: 'swings', sandbox: 'sandpit', hammock: 'hammock', easel: 'easel',
   wateringCan: 'watering-can', picnicTable: 'picnic-table', laundryLine: 'laundry-line', gardenTable: 'parasol-table', compost: 'compost-heap', wheelbarrow: 'wheelbarrow',

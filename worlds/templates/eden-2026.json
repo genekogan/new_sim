@@ -67713,82 +67713,6 @@
         },
         {
           "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-1",
-          "p": [
-            32.75,
-            6.95
-          ],
-          "r": 3.14
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-2",
-          "p": [
-            48.9,
-            6.95
-          ],
-          "r": 3.14
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-3",
-          "p": [
-            37.4,
-            36.3
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-4",
-          "p": [
-            57.4,
-            36.3
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-5",
-          "p": [
-            84.98,
-            34.21
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-6",
-          "p": [
-            64,
-            -12.8
-          ]
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-7",
-          "p": [
-            80.5,
-            -23.8
-          ],
-          "r": 0.4
-        },
-        {
-          "op": "place",
-          "def": "core/mailbox@1",
-          "name": "street-mailbox-8",
-          "p": [
-            72.6,
-            22.6
-          ],
-          "r": 1.57
-        },
-        {
-          "op": "place",
           "def": "core/wheelie-bin@1",
           "name": "street-wheelie-bin-wheeliebin-1",
           "p": [
@@ -67824,13 +67748,7 @@
             16.67
           ],
           "r": 1.57
-        }
-      ]
-    },
-    {
-      "note": "street life 3",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/chair@1",
@@ -67909,7 +67827,13 @@
             56.72,
             2.23
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 3",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/bench@1",
@@ -67969,13 +67893,7 @@
             -24.23
           ],
           "r": 4.39
-        }
-      ]
-    },
-    {
-      "note": "street life 4",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/bench@1",
@@ -68054,7 +67972,13 @@
             38.95,
             7.2
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 4",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/bin@1",
@@ -68108,13 +68032,7 @@
             34.34,
             -21.96
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 5",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/bin@1",
@@ -68186,7 +68104,13 @@
             60.5,
             21.3
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 5",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/signpost@1",
@@ -68244,13 +68168,7 @@
             11.12,
             -31.12
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 6",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/bike-rack@1",
@@ -68328,7 +68246,13 @@
             1.7
           ],
           "r": 0.04
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 6",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/bicycle@1",
@@ -68387,13 +68311,7 @@
             69.2,
             -1.75
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 7",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/notice-board@1",
@@ -68470,7 +68388,13 @@
             60.35,
             36.25
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 7",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/banner@1",
@@ -68526,13 +68450,7 @@
             66.8,
             -1.2
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 8",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/planter-box@1",
@@ -68610,7 +68528,13 @@
             25.6
           ],
           "r": -1.57
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 8",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/rain-barrel@1",
@@ -68669,13 +68593,7 @@
             -31.4
           ],
           "r": -0.3
-        }
-      ]
-    },
-    {
-      "note": "street life 9",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/mushrooms@1",
@@ -68752,7 +68670,13 @@
             72.57,
             3.22
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 9",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/birdbath@1",
@@ -68809,13 +68733,7 @@
             70.54
           ],
           "r": 0.5
-        }
-      ]
-    },
-    {
-      "note": "street life 10",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/easel@1",
@@ -68894,7 +68812,13 @@
             55,
             -22.4
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 10",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/picnic-table@1",
@@ -68953,13 +68877,7 @@
             33.5,
             20.6
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 11",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/laundry-line@1",
@@ -69035,7 +68953,13 @@
             31.01,
             21.67
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 11",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/compost-heap@1",
@@ -69093,13 +69017,7 @@
             56.2
           ],
           "r": 0.4
-        }
-      ]
-    },
-    {
-      "note": "street life 12",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/wheelbarrow@1",
@@ -69176,7 +69094,13 @@
             85.6,
             55.6
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 12",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/sack@1",
@@ -69235,13 +69159,7 @@
             29.1
           ],
           "r": 0.3
-        }
-      ]
-    },
-    {
-      "note": "street life 13",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/crate@1",
@@ -69316,7 +69234,13 @@
             88.66,
             -31.64
           ]
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 13",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/chalkboard@1",
@@ -69374,13 +69298,7 @@
             33.5,
             -0.4
           ]
-        }
-      ]
-    },
-    {
-      "note": "street life 14",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/trough@1",
@@ -69459,7 +69377,13 @@
             2.4
           ],
           "r": 2
-        },
+        }
+      ]
+    },
+    {
+      "note": "street life 14",
+      "group": "eden-2026",
+      "ops": [
         {
           "op": "place",
           "def": "core/leaf-litter@1",
@@ -69519,13 +69443,7 @@
             58.2
           ],
           "r": 0.7
-        }
-      ]
-    },
-    {
-      "note": "street life 15",
-      "group": "eden-2026",
-      "ops": [
+        },
         {
           "op": "place",
           "def": "core/leaf-litter@1",
@@ -69555,6 +69473,1197 @@
             62.8
           ],
           "r": 0.2
+        }
+      ]
+    },
+    {
+      "note": "eden life defs",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-pull-up-bar",
+            "version": 1,
+            "description": "An outdoor gym pull-up bar: two steel posts and a bar at 2.2 m; do pull-ups.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "pull-up-bar"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                1.4,
+                2.3,
+                0.2
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.65,
+                      1.15,
+                      0
+                    ],
+                    "r": 0.05,
+                    "h": 2.3,
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.65,
+                      1.15,
+                      0
+                    ],
+                    "r": 0.05,
+                    "h": 2.3,
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      2.2,
+                      0
+                    ],
+                    "r": 0.025,
+                    "h": 1.3,
+                    "color": "#5d646b",
+                    "roll": 1.5708,
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-dip-bars",
+            "version": 1,
+            "description": "Outdoor gym parallel dip bars (1.2 m high); do dips.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "dip-bars"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.7,
+                1.25,
+                1.2
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      -0.3,
+                      1.2,
+                      0
+                    ],
+                    "size": [
+                      0.05,
+                      0.05,
+                      1.2
+                    ],
+                    "color": "#5d646b",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0.3,
+                      1.2,
+                      0
+                    ],
+                    "size": [
+                      0.05,
+                      0.05,
+                      1.2
+                    ],
+                    "color": "#5d646b",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.3,
+                      0.6,
+                      -0.55
+                    ],
+                    "r": 0.04,
+                    "h": 1.2,
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.3,
+                      0.6,
+                      -0.55
+                    ],
+                    "r": 0.04,
+                    "h": 1.2,
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.3,
+                      0.6,
+                      0.55
+                    ],
+                    "r": 0.04,
+                    "h": 1.2,
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.3,
+                      0.6,
+                      0.55
+                    ],
+                    "r": 0.04,
+                    "h": 1.2,
+                    "color": "#5d646b"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-weight-bench",
+            "version": 1,
+            "description": "An outdoor gym bench press: a padded flat bench (0.49 m) under a barbell rack; lie on it and press.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "weight-bench"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.5,
+                1.2,
+                1.4
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.45,
+                      0
+                    ],
+                    "size": [
+                      0.32,
+                      0.08,
+                      1.25
+                    ],
+                    "color": "#2f3b46",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.2,
+                      0
+                    ],
+                    "size": [
+                      0.08,
+                      0.4,
+                      1
+                    ],
+                    "color": "#5d646b",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.3,
+                      0.6,
+                      -0.5
+                    ],
+                    "r": 0.03,
+                    "h": 1.2,
+                    "color": "#5d646b",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.3,
+                      0.6,
+                      -0.5
+                    ],
+                    "r": 0.03,
+                    "h": 1.2,
+                    "color": "#5d646b",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      1.1,
+                      -0.5
+                    ],
+                    "r": 0.02,
+                    "h": 1.6,
+                    "color": "#888888",
+                    "roll": 1.5708,
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-situp-bench",
+            "version": 1,
+            "description": "An outdoor gym flat bench (0.46 m) for sit-ups.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "exercise-mat"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.4,
+                0.46,
+                1.3
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.42,
+                      0
+                    ],
+                    "size": [
+                      0.32,
+                      0.08,
+                      1.25
+                    ],
+                    "color": "#2f3b46",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.19,
+                      0
+                    ],
+                    "size": [
+                      0.08,
+                      0.38,
+                      1
+                    ],
+                    "color": "#5d646b",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-dumbbell-rack",
+            "version": 1,
+            "description": "A low rack of dumbbells by the outdoor gym; lift weights.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "dumbbells"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                1,
+                0.6,
+                0.4
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.3,
+                      0
+                    ],
+                    "size": [
+                      1,
+                      0.05,
+                      0.35
+                    ],
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.15,
+                      0
+                    ],
+                    "size": [
+                      0.9,
+                      0.3,
+                      0.05
+                    ],
+                    "color": "#5d646b"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.3,
+                      0.4,
+                      0
+                    ],
+                    "r": 0.06,
+                    "h": 0.25,
+                    "color": "#222222",
+                    "roll": 1.5708,
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.4,
+                      0
+                    ],
+                    "r": 0.07,
+                    "h": 0.25,
+                    "color": "#222222",
+                    "roll": 1.5708,
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.3,
+                      0.4,
+                      0
+                    ],
+                    "r": 0.08,
+                    "h": 0.25,
+                    "color": "#222222",
+                    "roll": 1.5708,
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-yoga-mat",
+            "version": 1,
+            "description": "A rolled-out exercise mat on the lawn; do yoga.",
+            "tags": [
+              "eden",
+              "gym",
+              "sport",
+              "yoga-mat"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.7,
+                0.05,
+                1.8
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.025,
+                      0
+                    ],
+                    "size": [
+                      0.65,
+                      0.05,
+                      1.8
+                    ],
+                    "color": "#6a8f6a",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-volleyball-net",
+            "version": 1,
+            "description": "A beach volleyball net (9 m) on posts across a sand court; two a side play.",
+            "tags": [
+              "eden",
+              "sport",
+              "volleyball-net"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                9.2,
+                2.5,
+                8
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.01,
+                      0
+                    ],
+                    "size": [
+                      9,
+                      0.02,
+                      8
+                    ],
+                    "color": "#e3d3a4",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -4.6,
+                      1.25,
+                      0
+                    ],
+                    "r": 0.05,
+                    "h": 2.5,
+                    "color": "#dddddd"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      4.6,
+                      1.25,
+                      0
+                    ],
+                    "r": 0.05,
+                    "h": 2.5,
+                    "color": "#dddddd"
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      2,
+                      0
+                    ],
+                    "size": [
+                      9.2,
+                      0.9,
+                      0.02
+                    ],
+                    "color": "#f4f4f4",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-petanque-piste",
+            "version": 1,
+            "description": "A gravel pétanque piste (3 × 12 m) edged with timber; throw boules toward the jack.",
+            "tags": [
+              "eden",
+              "sport",
+              "petanque"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                3,
+                0.1,
+                12
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      0.02,
+                      0
+                    ],
+                    "size": [
+                      3,
+                      0.04,
+                      12
+                    ],
+                    "color": "#cbb894",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -1.55,
+                      0.05,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.1,
+                      12
+                    ],
+                    "color": "#8a6a45",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      1.55,
+                      0.05,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.1,
+                      12
+                    ],
+                    "color": "#8a6a45",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-microphone",
+            "version": 1,
+            "description": "A microphone on a stand; sing into it.",
+            "tags": [
+              "eden",
+              "music",
+              "microphone"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.3,
+                1.6,
+                0.3
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.8,
+                      0
+                    ],
+                    "r": 0.012,
+                    "h": 1.6,
+                    "color": "#222222",
+                    "collide": false
+                  },
+                  {
+                    "kind": "sphere",
+                    "at": [
+                      0,
+                      1.62,
+                      0.02
+                    ],
+                    "r": 0.035,
+                    "color": "#333333",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.01,
+                      0
+                    ],
+                    "r": 0.14,
+                    "h": 0.02,
+                    "color": "#222222",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-music-stand-violin",
+            "version": 1,
+            "description": "A music stand with a violin case open beside it; play the violin.",
+            "tags": [
+              "eden",
+              "music",
+              "violin"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.5,
+                1.2,
+                0.4
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.55,
+                      0
+                    ],
+                    "r": 0.01,
+                    "h": 1.1,
+                    "color": "#222222",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.12,
+                      0
+                    ],
+                    "size": [
+                      0.45,
+                      0.3,
+                      0.02
+                    ],
+                    "color": "#222222",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-music-stand-cello",
+            "version": 1,
+            "description": "A music stand with a cello resting on its side; play the cello.",
+            "tags": [
+              "eden",
+              "music",
+              "cello"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                0.5,
+                1.2,
+                0.6
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.55,
+                      0
+                    ],
+                    "r": 0.01,
+                    "h": 1.1,
+                    "color": "#222222",
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.12,
+                      0
+                    ],
+                    "size": [
+                      0.45,
+                      0.3,
+                      0.02
+                    ],
+                    "color": "#222222",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-drum-kit",
+            "version": 1,
+            "description": "A drum kit: bass drum, snare, toms and two cymbals; play the drums.",
+            "tags": [
+              "eden",
+              "music",
+              "drum-kit"
+            ],
+            "form": "point",
+            "size": {
+              "box": [
+                1.6,
+                1.2,
+                1.2
+              ]
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      0.3,
+                      0
+                    ],
+                    "r": 0.28,
+                    "h": 0.4,
+                    "color": "#8a2a2a",
+                    "roll": 1.5708,
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      -0.45,
+                      0.6,
+                      0.15
+                    ],
+                    "r": 0.18,
+                    "h": 0.15,
+                    "color": "#dddddd",
+                    "collide": false
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0.45,
+                      1,
+                      0
+                    ],
+                    "r": 0.22,
+                    "h": 0.01,
+                    "color": "#c9a227",
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "note": "eden life 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pull-up-bar@1",
+          "name": "gym-pull-up-bar-low",
+          "p": [
+            -14.9,
+            86.4
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-pull-up-bar@1",
+          "name": "gym-pull-up-bar-mid",
+          "p": [
+            -14.9,
+            85
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-pull-up-bar@1",
+          "name": "gym-pull-up-bar-high",
+          "p": [
+            -14.9,
+            83.6
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-dip-bars@1",
+          "name": "gym-dip-bars",
+          "p": [
+            -11.4,
+            85
+          ],
+          "r": -1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-situp-bench@1",
+          "name": "gym-flat-bench-1",
+          "p": [
+            -9.6,
+            85
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-situp-bench@1",
+          "name": "gym-flat-bench-2",
+          "p": [
+            -7.8,
+            85
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-weight-bench@1",
+          "name": "gym-bench-press",
+          "p": [
+            -4.75,
+            85
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-dumbbell-rack@1",
+          "name": "gym-dumbbells",
+          "p": [
+            -2,
+            85
+          ],
+          "r": -1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-yoga-mat@1",
+          "name": "gym-yoga-mat",
+          "p": [
+            1,
+            85.6
+          ],
+          "r": 1.5708
+        },
+        {
+          "op": "place",
+          "def": "eden-volleyball-net@1",
+          "name": "park-volleyball-court",
+          "p": [
+            4,
+            132
+          ],
+          "r": 1.5708
+        }
+      ]
+    },
+    {
+      "note": "eden life 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-petanque-piste@1",
+          "name": "park-petanque-piste",
+          "p": [
+            -4,
+            124
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "def": "eden-music-stand-violin@1",
+          "name": "bandstand-violin-1",
+          "p": [
+            37.6,
+            -25.4
+          ],
+          "r": 2.4
+        },
+        {
+          "op": "place",
+          "def": "eden-music-stand-violin@1",
+          "name": "bandstand-violin-2",
+          "p": [
+            38.2,
+            -25
+          ],
+          "r": 3
+        },
+        {
+          "op": "place",
+          "def": "eden-music-stand-cello@1",
+          "name": "bandstand-cello",
+          "p": [
+            39.4,
+            -25.4
+          ],
+          "r": -2.4
+        },
+        {
+          "op": "place",
+          "def": "eden-microphone@1",
+          "name": "stage-microphone-lead",
+          "p": [
+            92,
+            -28.6
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-microphone@1",
+          "name": "stage-microphone-2",
+          "p": [
+            90.6,
+            -28.8
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-drum-kit@1",
+          "name": "stage-drum-kit",
+          "p": [
+            92,
+            -31
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "eden-microphone@1",
+          "name": "amphitheatre-microphone",
+          "p": [
+            76,
+            80.8
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-1",
+          "p": [
+            32.75,
+            6.95
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-2",
+          "p": [
+            48.9,
+            6.95
+          ],
+          "r": 0
+        }
+      ]
+    },
+    {
+      "note": "eden life 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-3",
+          "p": [
+            37.4,
+            36.3
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-4",
+          "p": [
+            57.4,
+            36.3
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-5",
+          "p": [
+            84.98,
+            34.21
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-6",
+          "p": [
+            64,
+            -12.8
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-7",
+          "p": [
+            80.5,
+            -23.8
+          ],
+          "r": 3.1416
+        },
+        {
+          "op": "place",
+          "def": "core/postbox@1",
+          "name": "eden-postbox-8",
+          "p": [
+            72.6,
+            22.6
+          ],
+          "r": -1.5708
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "artists-green-easel-1",
+          "p": [
+            -82,
+            -104
+          ],
+          "r": 0.3
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "artists-green-easel-2",
+          "p": [
+            -77,
+            -106
+          ],
+          "r": 0
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "artists-green-easel-3",
+          "p": [
+            -66,
+            -104
+          ],
+          "r": -0.3
         }
       ]
     },

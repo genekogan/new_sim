@@ -59,6 +59,8 @@ for(const b of SCENERY_BATCHES)apply(b.label,b.ops,'any');
  const existing=LANDSCAPE_BATCHES.flatMap(b=>b.ops).filter(o=>o.def==='core/woodland@1'&&o.shape?.area).map(o=>box(o.shape.area));
  const t=treeBatches(existing);for(let i=0;i<t.length;i+=12)apply(`trees ${i/12+1}`,t.slice(i,i+12),'any');}
 {const l=lightOps();for(let i=0;i<l.length;i+=14)apply(`night lights ${i/14+1}`,l.slice(i,i+14),'any');const p=propOps();for(let i=0;i<p.length;i+=14)apply(`street life ${i/14+1}`,p.slice(i,i+14),'any');}
+// lane E-life's patch (activity things old Eden residents used: gym, courts, music, post boxes, easels); folded in, droppable
+{const life=JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/batch.json`)).ops;apply('eden life defs',life.filter(o=>o.op==='define'));const pl=life.filter(o=>o.op!=='define');for(let i=0;i<pl.length;i+=10)apply(`eden life ${i/10+1}`,pl.slice(i,i+10),'any');}
 const places=JSON.parse(readFileSync(`${root}/worlds/eden/places.v1.json`)).places;
 // Invisible native land-use regions preserve outdoor destinations without
 // painting duplicate plazas over the gardens/water. Interior destinations are
