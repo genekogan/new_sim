@@ -176,6 +176,22 @@ export class Souls {
     for(const [key,pair] of this.pairings)if(pair.soulId===soul.id)this.pairings.delete(key);
     this.lifecycle.pump();return accepted;
   }
+  /** Operator retirement (retire-residents.ts, release 3.1.1): the same retire an owner's DELETE performs, with the site
+   * operator's authority instead of the owner's (it runs only from a one-shot maintenance file on the world's own box).
+   * Lifecycle worlds journal it exactly like acceptLifecycleRetire, including its control-ready check. */
+  async operatorRetire(soulId:string){
+    const current=this.db.soul(soulId);
+    if(!current||current.retired_at!==null||current.world_id!==this.host.worldId)throw new ApiError(404,'not-found','no such soul');
+    if(!this.lifecycle){await this.retire(current);return;}
+    const scope={worldId:this.host.worldId,soulId:current.id,entityId:current.entity_id,owner:current.owner};
+    this.lifecycle.journal.acceptRetire(scope,'lc_'+randomBytes(16).toString('hex'),()=>{
+      const now=this.db.soul(soulId);
+      if(!now||now.retired_at!==null||now.world_id!==this.host.worldId||now.owner!==current.owner)throw new ApiError(404,'not-found','no such soul');
+      this.requireControlReady(now);return true;
+    });
+    for(const [key,pair] of this.pairings)if(pair.soulId===soulId)this.pairings.delete(key);
+    this.lifecycle.pump();
+  }
   async waitLifecycle(userId:string,requestId:string):Promise<SoulLifecycle>{
     const deadline=performance.now()+2000;
     for(;;){

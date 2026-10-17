@@ -168,6 +168,8 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 // One-shot operator maintenance only; ordinary boots never rewrite existing looks.
 // Set per boot by LEGACY_LOOKS_MODE, or per world by a one-shot <DATA_DIR>/legacy-looks.env (launcher children).
 {const {legacyLookBootHook}=await import('./edge/body/migrate-looks.ts');await legacyLookBootHook(host,db,edge,config.dataDir,process.env);}
+// One-shot operator maintenance: <DATA_DIR>/retire-residents.env retires Souls with no signed-in owner (retire-residents.ts).
+{const {retireResidentsBootHook}=await import('./retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,config.dataDir,process.env);}
 server.listen(config.port, config.host, () => console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`));
 
 let closing = false;
