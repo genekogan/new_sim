@@ -960,7 +960,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const navIds = new Set(((w as {navV1?: {solids: {id: string}[]}}).navV1?.solids ?? []).map(x => x.id));
     const enclosingBuilding = (place: string | undefined) => {let out: string | null = null; for (let p = place ? this.places.byId.get(place) : undefined; p; p = p.parent ? this.places.byId.get(p.parent) : undefined) if (p.enclosed && (p.level ?? 0) === 0) out = p.id; return out;};
     const level = me.human?.level ?? 0, h = me.human;
-    return {me: here, seated: !!h && (h.activity === 'sit' || h.baseActivity === 'sit'),
+    return {me: here, level, seated: !!h && (h.activity === 'sit' || h.baseActivity === 'sit'),
       clearance: (x: number, z: number) => level === 0 && engine.clearanceAtV1 ? engine.clearanceAtV1(x, z) : 0,
       open: (at: [number, number], min: number, rings: number) => level === 0 && engine.nearestStandableV1 ? engine.nearestStandableV1(at, soul.entityId, min, rings) : null,
       taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),

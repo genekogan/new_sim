@@ -133,3 +133,13 @@ test('group life: story circle needs a teller, book club, cooking together, yoga
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
   await w.replayExact();
 });
+
+test('upper-floors/1: a level-0 spot inside a building (a hotel lobby sofa) is walked to with its level from upstairs, plainly from the ground', () => {
+  const spot = {id: 'lobby-sofa', place: 'lobby', activity: 'read', base: 'sit', at: [10, 10], faceTo: [11, 10], seatHeight: 0.45, level: 0, label: 'Lobby sofa'};
+  const data = loadSpots({contract: 'activity-spots/1', spots: [spot]}).data;
+  const w = (level: number) => ({me: [10, 12] as [number, number], level, seated: false, clearance: () => 2, open: () => null, taken: () => false, enterable: () => true, seat: () => null,
+    placeName: () => null, ancestors: () => [], groupSize: () => 0, clock: null});
+  const reach = (level: number) => activityCapabilities(data, w(level)).plans.get('read:lobby-sofa')!.steps.find(s => /walk_to/.test(s.verb))!;
+  assert.deepEqual(reach(18), {verb: 'mars:walk_to', params: {x: 10, z: 10, level: 0}}, 'from the first floor: down the stairs, not across the floor above');
+  assert.deepEqual(reach(0), {verb: 'walk_to', params: {to: [10, 10]}}, 'from the ground: unchanged');
+});
