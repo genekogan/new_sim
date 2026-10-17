@@ -11,8 +11,25 @@ import { WorldDirector, type DirectorChoice, type Landmark } from './WorldDirect
 import { WORLD_PLACE_VIEWS, REGION_PLACE_VIEWS } from './WorldPlaces.ts';
 import { WorldTour, type TourView } from './WorldTour.ts';
 import { speakingNow } from './dialogue-speaking.ts';
+import { BALLOON } from './WorldBalloonRide.ts';
 
 export type WorldCameraMode = 'broadcast' | 'manual' | 'follow';
+export type CarrierPose = { p: readonly number[]; yaw: number };
+/** A body standing in a carrier's basket (within its footprint, at its floor) rides it. */
+export function ridingCarrier(p: readonly number[], carriers: readonly CarrierPose[]): CarrierPose | null {
+  const { length, width, height } = BALLOON.basket, reach = Math.hypot(length, width) / 2 + .15;
+  for (const c of carriers) if (Math.hypot(p[0] - c.p[0], p[2] - c.p[2]) <= reach && p[1] > c.p[1] - .4 && p[1] < c.p[1] + height) return c;
+  return null;
+}
+/** The carrier's visual envelope for sizing a shot: basket corners and the lower envelope (its 3.8 m ring, 7.2 m up). */
+export function carrierFraming(c: CarrierPose): [number, number, number][] {
+  const { basket: { length, width, height } } = BALLOON, [x, y, z] = c.p, cs = Math.cos(c.yaw), sn = Math.sin(c.yaw), belly = 7.2, radius = 3.8;
+  const at = (f: number, r: number, h: number): [number, number, number] => [x + f * cs - r * sn, y + h, z + f * sn + r * cs];
+  const out: [number, number, number][] = [];
+  for (const [f, r] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) out.push(at(f * length / 2, r * width / 2, 0), at(f * length / 2, r * width / 2, height));
+  for (const [f, r] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) out.push(at(f * radius, r * radius, belly));
+  return out;
+}
 /** Rendered rays a frame may spend on a pending shot decision (beyond the
  * held shot's own tracking); one search step may finish past it. */
 const DECISION_RAYS = 100;
@@ -63,7 +80,9 @@ export class WorldBroadcast {
   /** Set by the viewer: Soul → entity (for who is speaking) and whether Eden's town views apply. */
   hints?: () => { soulEntity(soulId: string): string | null; eden: boolean; daylight?: number | null;
     /** R4-LIVE: a god world's own establishing views (its named buildings, plazas, landmarks); Eden's when `eden`. */
-    views?: readonly TourView[] };
+    views?: readonly TourView[];
+    /** V1: where the world's ride carriers are this frame (basket floor centre and yaw): Eden's balloon, a god's balloons. */
+    carriers?: readonly CarrierPose[] };
   private godViews: { key: string; tour: WorldTour; views: readonly TourView[]; landmarks: readonly Landmark[] } | null = null;
   /** The establishing views of this world: Eden's town, a god world's own landmarks, or none. */
   private viewsOf(hints: ReturnType<NonNullable<WorldBroadcast['hints']>> | undefined): { tour: WorldTour; views: readonly TourView[]; landmarks: readonly Landmark[] } | null {
@@ -117,12 +136,20 @@ export class WorldBroadcast {
     const changed = signature !== this.signature;
     if (changed) { this.semanticVersion++; this.signature = signature; }
     const subjects: Observation['subjects'] = {};
+    const carriers = this.hints?.().carriers ?? [];
+    let carrier: CarrierPose | null;
     for (const id of people) {
       const e = frame[id], body = records[id].body;
       if (body?.family === 'floater') {
         const b = floaterBody(body), y = e.p[1] + b.hoverHeight;
         subjects[id] = { p: [...e.p], yaw: e.yaw, height: b.hoverHeight + b.radius * 2,
           points: [[e.p[0], y, e.p[2]], [e.p[0], y + b.radius, e.p[2]]] };
+      } else if (carrier = ridingCarrier(e.p, carriers)) {
+        // V1 (3.2 walk): a rider framed like a pedestrian put the camera ~4 m off and the basket filled the frame.
+        // Frame the carrier (basket and envelope) instead; the rider's head and torso stay the visibility probes.
+        subjects[id] = { p: [...e.p], yaw: e.yaw, height: 1.75, kind: 'human',
+          points: [[e.p[0], e.p[1] + 1.05, e.p[2]], [e.p[0], e.p[1] + 1.65, e.p[2]]],
+          framingPoints: carrierFraming(carrier) };
       } else {
         const height = e.activity === 'sit' ? 1.35 : 1.75;
         subjects[id] = { p: [...e.p], yaw: e.yaw, height, kind: 'human',
