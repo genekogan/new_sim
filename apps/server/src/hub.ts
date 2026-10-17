@@ -37,6 +37,12 @@ export function viewerChunk<T>(chunk: T): T {
   const { entityPhysicsV1: _omit, ...rest } = state;
   return { ...c, take: { ...c.take, finalState: rest } } as T;
 }
+/** P2 (E-life): an HTTP take history reply (/v1/takes, /v1/take) as the live stream sends it, without each chunk's static
+ *  physics; `full` (the `?physics=1` query) keeps the canonical chunks for tools that replay from them. */
+export function publicTakes<T>(value: T, full = false): T {
+  const v = value as { chunks?: unknown[] };
+  return !full && Array.isArray(v?.chunks) ? { ...v, chunks: v.chunks.map((k) => viewerChunk(k)) } as T : value;
+}
 export class Hub {
   wss: WebSocketServer;
   /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */

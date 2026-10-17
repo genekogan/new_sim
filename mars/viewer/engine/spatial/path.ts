@@ -654,12 +654,20 @@ class Heap {
 type Scratch = { total: number; gen: number; gScore: Float64Array; came: Int32Array; pos: Int32Array; stamp: Uint32Array; shut: Uint32Array; heap: Heap; mask?: Uint32Array; maskGen: number; rseen?: Uint32Array; rq?: Int32Array };
 const scratches = new Map<number, Scratch>();
 const SCRATCHES = 3;
+/** Numeric diagnostics: search workspaces kept and their bytes. */
+export function scratchMetrics() { let bytes = 0; for (const sc of scratches.values()) for (const v of Object.values(sc)) if (ArrayBuffer.isView(v)) bytes += v.byteLength; return { entries: scratches.size, bytes, totals: [...scratches.keys()] }; }
+/** E-life (memory): a workspace costs ~28 bytes a cell; one for a 4×4-tile window (16.4 M cells) is ~450 MB. Only
+ *  workspaces up to this many cells are kept for reuse; a bigger search gets a fresh one that is freed after it (Eden
+ *  2026 kept 403 MB of workspaces after one resident's first capabilities). Search results are unchanged. */
+export const SCRATCH_KEEP_CELLS = 2_500_000;
 function scratchFor(total: number): Scratch {
   let sc = scratches.get(total);
   if (!sc) {
-    if (scratches.size >= SCRATCHES) scratches.delete(scratches.keys().next().value!);
     sc = { total, gen: 0, gScore: new Float64Array(total), came: new Int32Array(total), pos: new Int32Array(total), stamp: new Uint32Array(total), shut: new Uint32Array(total), heap: new Heap(), maskGen: 0 };
-    scratches.set(total, sc);
+    if (total <= SCRATCH_KEEP_CELLS) {
+      if (scratches.size >= SCRATCHES) scratches.delete(scratches.keys().next().value!);
+      scratches.set(total, sc);
+    }
   }
   if (sc.gen >= 0xfffffffe) {
     sc.gen = 0;

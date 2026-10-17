@@ -2,6 +2,7 @@
 // perceive from where it stands. Strictly local: Souls and things in the same enclosed place (or, outdoors, not
 // inside one) within sight radius and with a clear sightline (nav/1 solids); never other places, never conversation
 // content, never owner data. Read-only; deterministic for a given world state. No model calls.
+import {isCampfire} from '../ledger/fire.ts';
 import {clockAt} from '@sim/brain';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import type {EdgeLedger} from '../ledger/ledger.ts';
@@ -79,7 +80,7 @@ export class Perception {
   things(radius = OBJECT_RADIUS): Located[] {
     const out: Located[] = [...this.seats(radius)];
     for (const e of Object.values(this.w.entities)) {
-      if (e.def !== 'campfire') continue; const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at);
+      if (!isCampfire(e)) continue; const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at);
       if (d <= Math.max(radius, SIGHT_RADIUS)) out.push({kind: 'fire', id: e.id, name: e.label ?? 'campfire', at, entityId: e.id, distance: d});
     }
     for (const s of this.L.spots.spots) {

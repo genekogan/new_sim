@@ -22,7 +22,9 @@ const TOL = 0.03;
  */
 /** activities/1 overlays (social/pose.ts) that may sit on a held seat; eat/drink only with a pose prop (native items keep their own rule). */
 const POSE_OVERLAY_SET: ReadonlySet<string> = new Set(['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'cook', 'play-game', 'craft', 'post-letter', 'wave',
-  'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down']);
+  'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
+  // E-life: the CN5/leisure overlays done on a held seat on god worlds (an audience bench, a desk chair, a swing's seat)
+  'use-computer', 'sing', 'listen', 'lift-weights', 'swing', 'seesaw', 'picnic', 'tell-story']);
 export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {

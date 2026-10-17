@@ -298,7 +298,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
     (window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
-    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false;
+    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null;
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -747,6 +747,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const ridePreview=rideOverride&&!past.current?(()=>{const st=previewState((performance.now()-rideStart)/1000,rideOverride.speed),ids=rideOverride.names.flatMap(n=>{const soul=souls.find(x=>x.name.toLowerCase()===n);return soul?[soul.id]:[];});return {riders:ids.slice(0,st.aboard),phase:st.phase,flight:st.flight};})():null;
       // Riders stand in the basket for labels, speech, camera and drawing (presentation only; the recording is untouched).
       const at = balloonRide.update(shown.current,{dt,seconds:atmosphereSeconds,eden:!!expansion,history:!!past.current,soulEntity:id=>s.conn.replica.souls.get(id)?.entityId??null,preview:ridePreview});
+      // E-life B7: a god's balloon flies with its native ride (the recorded carrier entity of the same name)
+      if(entityLayer.active&&!expansion){if(refresh||!rideNames)rideNames=entityLayer.rideNames();for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number]}|undefined;entityLayer.poseOverride(n,e?.p??null);}}
       const cards = refresh ? cardsAt(s.plays, at.tick) : null;
       const alive = new Set<string>();
       let focus: THREE.Vector3 | null = null;

@@ -14,7 +14,7 @@ import { newId, type Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
-import type { Hub } from './hub.ts';
+import { publicTakes, type Hub } from './hub.ts';
 import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
 import { edgeSkillStub } from './edge/skill-stub.ts';
@@ -161,9 +161,12 @@ export function buildApp(d: Deps) {
   });
   // The archive/live canonical Takes remain full; only the public response copy
   // uses a self-contained dictionary when this exact capability is requested.
-  const takeReply=(c:Context,value:unknown)=>c.req.query('takeTransport')===TAKE_BOUNDARY_WIRE_V1
+  // P2 (E-life): viewers never read a take's static physics (entityPhysicsV1, ~3 MB per chunk on Eden 2026; the web drops
+  // it on receipt), so the public reply leaves it out like the live stream; ?physics=1 keeps the canonical full chunks.
+  const lean=(c:Context,value:unknown)=>publicTakes(value,c.req.query('physics')==='1');
+  const takeReply=(c0:Context,value0:unknown)=>{const c=c0,value=lean(c0,value0);return c.req.query('takeTransport')===TAKE_BOUNDARY_WIRE_V1
     ?c.body(stringifyTakeBoundaryWireV1(value),200,{'Content-Type':'application/json; charset=UTF-8','Cache-Control':'no-store'})
-    :c.json(value as never,200,{'Cache-Control':'no-store'});
+    :c.json(value as never,200,{'Cache-Control':'no-store'});};
   app.get('/v1/takes', async c => { const from=intQ(c,'from',0,0,Number.MAX_SAFE_INTEGER),to=intQ(c,'to',d.host.engine.world.tick,0,Number.MAX_SAFE_INTEGER),limit=intQ(c,'limit',120,1,120); // Recordings off (default): only the engine's in-memory live buffer exists; older moments answer empty.
     const takes=!d.cfg.takesPersist?{chunks:(d.host.engine.takeChunks?.(from)??[]).filter(k=>k.fromTick<to).slice(0,limit),next:null}:d.takes?await d.takes.read(from,to,limit):d.db.takes(d.host.worldId,from,to,limit); return takeReply(c,{serverTick:d.host.engine.world.tick,...takes}); });
   app.get('/v1/take', c => takeReply(c,{ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }));

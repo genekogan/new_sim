@@ -16,11 +16,19 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
    *  waits for them and what happens alone (fail: "nobody came" is the honest verdict). */
   together?: {group: string; need: number; wait: number; alone: 'fail' | 'start'};
   /** R5: another spot that must be in use first (a listener's seat needs someone telling the story). */
-  requires?: string};
-export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2};
+  requires?: string;
+  /** E-life (god worlds): a native seat fixture to sit on first (a library armchair, a café chair, the piano's bench); the
+   *  activity is then done on that seat. `level`: the engine level the spot stands on (a desk upstairs). */
+  seat?: string; level?: number;
+  /** E-life: the activity's own title at this spot when the default does not fit ("Feed the ducks and swans"). */
+  title?: string};
+export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
-export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[]};
+export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[];
+  /** E-life (derived spots on big god worlds): offer only the nearest N free spots per activity and the nearest N places to
+   *  read in (Eden 2026 has ~300 tables and ~100 bookcases; all of them within 200 m made a 470 kB list). Unset: all. */
+  nearest?: number};
 export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
 
 /** Activities a spot may offer, with their default prop and seconds. */
@@ -45,6 +53,9 @@ export const SPOT_ACTIVITIES: Record<string, {prop?: string; seconds: number; la
   'book-club': {pose: 'read', prop: 'book', seconds: 600, label: 'Book club: read and talk it over together'},
   'cook-together': {pose: 'cook', prop: 'spoon', seconds: 300, label: 'Cook together at a preparation table'},
   'social-dance': {pose: 'dance', seconds: 180, label: 'Dance on the bandstand'}, 'yoga-class': {pose: 'yoga', seconds: 600, label: 'Join the yoga class'},
+  // E-life B9 (god worlds): a talk or lesson from a podium, a lectern or a classroom's teacher desk, and attending it from
+  // a seat in the room (offered once someone is giving it: the attend spot `requires` the lecture spot)
+  lecture: {pose: 'tell-story', seconds: 600, label: 'Give a talk or a lesson'}, attend: {pose: 'listen', seconds: 600, label: 'Attend the talk or class'},
   'play-frisbee': {seconds: 300, label: 'Throw a frisbee'}, 'play-petanque': {seconds: 600, label: 'Play pétanque'}, 'play-volleyball': {seconds: 300, label: 'Play beach volleyball'},
 };
 /** CN5 choreographed games at spots: 2–6 players; the world keeps the turns (social/pose.ts GAMES). */
@@ -105,7 +116,7 @@ export const STARS_FROM = 20, STARS_UNTIL = 5;
 
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const pose = (activity: string, seconds: number, extra: Record<string, unknown> = {}) => ({verb: 'mars:pose_v1', params: {activity, seconds, ...extra}});
-const walk = (to: V2) => ({verb: 'walk_to', params: {to: [to[0], to[1]]}});
+const walk = (to: V2, level?: number) => level ? {verb: 'mars:walk_to', params: {x: to[0], z: to[1], level}} : {verb: 'walk_to', params: {to: [to[0], to[1]]}};
 const standFirst = (w: ActivityWorld): Program['steps'] => w.seated ? [{verb: 'stand', params: {}}] : [];
 const secondsParam = (def: number, max = 1800) => ({seconds: {type: 'integer', min: 5, max, default: def}});
 export const ACTIVITY_SECONDS_MAX = 1800;
@@ -117,6 +128,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   // CN5 (acceptance): a spot World placed inside an obstacle (the picnic seats inside their table's box) is used from the
   // first clear point straight back from what it faces (≤ 0.9 m); one with no clear point near it is not offered
   const standAt = new Map<string, V2 | null>(), clearAt = (s: Spot): V2 | null => {
+    if (s.seat || s.level) return s.at;   // a seat fixture is approached by the engine's own sit; upstairs ground is not ours to probe
     if (!standAt.has(s.id)) {
       let at: V2 | null = s.at;
       // only a spot inside an obstacle (no clearance at all) moves; seats and benches close to furniture are as World placed them
@@ -128,20 +140,39 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     }
     return standAt.get(s.id)!;
   };
-  const live = data.spots.filter(s => w.enterable(s.place) && !!clearAt(s));
+  // only spots within reach are probed for clear ground (a far spot's probe paged in its nav tile for nothing)
+  // E-life (big derived worlds, `nearest`): a spot is probed for clear ground only when it is about to be offered (the
+  // nearest few per activity), not every spot within reach (1.5 s of a 4 s first sweep on Eden 2026); old worlds unchanged
+  const reach0 = data.spots.filter(s => d2(s.at, w.me) <= SPOT_REACH && w.enterable(s.place)), ok = (s: Spot) => !!clearAt(s);
+  const live = data.nearest ? reach0 : reach0.filter(ok);
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], body = def.pose ?? activity, lying = s.base === 'lie', act = lying && !LYING_SPOT.has(body) ? 'lie' : body, prop = s.prop ?? def.prop;
-    return [...standFirst(w), walk(clearAt(s) ?? s.at), pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
+    const reach = s.seat ? {verb: 'sit', params: {on: s.seat, seconds: 1}} : walk(clearAt(s) ?? s.at, s.level);
+    return [...standFirst(w), reach, pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
       ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {}),
       // leisure: done together (a see-saw): wait for the other end, then the same shared stretch for both
       ...(s.together ? {group: s.together.group, need: s.together.need, waitSeconds: s.together.wait, alone: s.together.alone, seatTogether: true} : {})})];
   };
-  const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
+  // E-life: a derived shelf's browse point may lie against furniture: step it straight back from the shelf to clear ground
+  // (≤ 0.9 m), as spots do; one with no clear point is not browsed (reading still takes the book you have)
+  const shelfAt = new Map<string, V2 | null>(), shelfStand = (s: Shelf): V2 | null => {
+    if (s.level || !s.faceTo || !(w.clearance(w.me[0], w.me[1]) > 0)) return s.at;
+    if (!shelfAt.has(s.id)) {
+      let at: V2 | null = s.at;
+      if (w.clearance(s.at[0], s.at[1]) < STAND_CLEAR) {
+        const L = d2(s.at, s.faceTo), back: V2 = L > 1e-6 ? [(s.at[0] - s.faceTo[0]) / L, (s.at[1] - s.faceTo[1]) / L] : [0, 0]; at = null;
+        for (let t = 0.1; t <= 0.9 + 1e-9 && L > 1e-6; t += 0.1) {const p: V2 = [Math.round((s.at[0] + back[0] * t) * 100) / 100, Math.round((s.at[1] + back[1] * t) * 100) / 100]; if (w.clearance(p[0], p[1]) >= STAND_CLEAR) {at = p; break;}}
+      }
+      shelfAt.set(s.id, at);
+    }
+    return shelfAt.get(s.id)!;
+  };
+  const shelfNear = (at: V2) => data.shelves.filter(s => w.enterable(s.place) && d2(s.at, at) <= 15 && !!shelfStand(s)).sort((a, b) => d2(a.at, at) - d2(b.at, at) || a.id.localeCompare(b.id))[0];
   /** Reading at a spot: take a book from the nearest shelf, read, put it back. */
   const readAt = (s: Spot): Program['steps'] => {
-    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelf.at), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
-    return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...browse(3)];
+    const shelf = shelfNear(s.at), browse = (sec: number) => shelf ? [walk(shelfStand(shelf)!, shelf.level), pose('browse', sec, {prop: 'book', ...(shelf.faceTo ? {face: shelf.faceTo} : {})})] : [];
+    return [...standFirst(w), ...browse(4), ...spotSteps(s).filter(x => x.verb !== 'stand'), ...(s.seat && shelf ? [{verb: 'stand', params: {}}] : []), ...browse(3)];
   };
   // ---- sitting and lying, anywhere
   const seat = w.seat(30), groundHere = w.clearance(w.me[0], w.me[1]), sitGround = (sec: number): Program['steps'] => {
@@ -152,7 +183,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   if (seat) add({id: 'sit:here', verb: 'sit', label: `Sit down on the nearest free seat (${seat.cap.label}, ${Math.round(seat.distance)} m)`, available: true, target: seat.cap.target, params: secondsParam(60)}, {label: 'Sit down', steps: seat.plan.steps, seconds: true});
   else add({id: 'sit:here', verb: 'sit', label: 'Sit down (no free seat within 30 m: on the ground here)', available: true, params: secondsParam(120)}, {label: 'Sit on the ground', steps: sitGround(120), seconds: true});
   for (const [act, sec] of [['lie', 120], ['nap', 300]] as const) {
-    const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
+    const beds = live.filter(s => s.base === 'lie' && s.activity === act && !w.taken(s.at, s.id) && d2(s.at, w.me) <= 12 && (!data.nearest || ok(s))).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me));
     const spot = groundHere >= 0.95 ? null : w.open(w.me, 0.95, 30), canHere = groundHere >= 0.95 || !!spot;
     const plan: Plan = beds[0] ? {label: SPOT_ACTIVITIES[act].label, steps: spotSteps(beds[0], sec), seconds: true} : {label: SPOT_ACTIVITIES[act].label, steps: [...standFirst(w), ...(spot ? [walk(spot)] : []), pose(act, sec)], seconds: true};
     add({id: `${act}:here`, verb: act, label: act === 'lie' ? (beds[0] ? `Lie down (${beds[0].label ?? beds[0].id})` : 'Lie down on the grass here') : (beds[0] ? `Take a nap (${beds[0].label ?? beds[0].id})` : 'Take a nap on the grass here'), available: !!beds[0] || canHere,
@@ -177,25 +208,33 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   }
   // ---- reading: a reading spot (with a shelf) nearby, else a free seat, else standing with the book you carry
   const readers = live.filter(s => s.activity === 'read' && !w.taken(s.at, s.id)).sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id));
-  const near = readers.find(s => d2(s.at, w.me) <= 40);
+  const near = readers.find(s => d2(s.at, w.me) <= 40 && (!data.nearest || ok(s)));
   if (near) add({id: 'read:here', verb: 'read', label: `Read a book (${near.label ?? near.id}, ${Math.round(d2(near.at, w.me))} m; takes a book from the shelf and puts it back)`, available: true, target: {id: near.id, kind: 'spot'}, params: secondsParam(180)}, {label: 'Read a book', steps: readAt(near), seconds: true});
   else if (seat) add({id: 'read:here', verb: 'read', label: `Read a book on the nearest free seat (${seat.cap.label})`, available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...seat.plan.steps.filter(s => s.verb !== 'rest'), pose('read', 180, {prop: 'book'})], seconds: true});
   else add({id: 'read:here', verb: 'read', label: 'Read the book you carry, standing here', available: true, params: secondsParam(180)}, {label: 'Read a book', steps: [...standFirst(w), pose('read', 180, {prop: 'book'})], seconds: true});
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
   const byPlace = new Map<string, Spot[]>();
-  for (const s of readers) for (const p of s.place ? [s.place, ...w.ancestors(s.place)] : []) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
-  for (const [place, list] of [...byPlace].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const s of readers) {
+    const ps = s.place ? [s.place, ...w.ancestors(s.place)] : [];
+    if (data.nearest && (ps.every(p => byPlace.has(p)) || byPlace.size >= data.nearest * 4 || !ok(s))) continue;   // readers are nearest first
+    for (const p of ps) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
+  }
+  const placesToRead = [...byPlace].sort((a, b) => a[0].localeCompare(b[0]));
+  if (data.nearest) placesToRead.sort((a, b) => d2(a[1][0].at, w.me) - d2(b[1][0].at, w.me) || a[0].localeCompare(b[0])).splice(data.nearest * 2);
+  for (const [place, list] of placesToRead) {
     const s = list[0], name = w.placeName(place) ?? place;
     if (d2(s.at, w.me) > 200) continue;
     add({id: 'read:' + place, verb: 'read', label: `Read a book in ${name}`, available: true, target: {id: place, kind: 'place'}, params: secondsParam(180)}, {label: `Read a book in ${name}`, steps: readAt(s), seconds: true});
   }
   // ---- every other free spot within reach: play-piano:<spot>, paint:<spot>, use-computer:<spot>, sing:<spot>, listen:<seat>…
-  const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
-  for (const s of live) {
+  const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : (activity === s.activity && s.title) || def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
+  const offered = new Map<string, number>(), ordered = data.nearest ? [...live].sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id)) : live;
+  for (const s of ordered) {
     if (s.base === 'lie' && !LYING_SPOT.has(s.activity)) continue;
     if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
+      if (data.nearest) {const n = offered.get(activity) ?? 0; if (n >= data.nearest || !ok(s)) continue; offered.set(activity, n + 1);}
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';
@@ -203,7 +242,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     }
   }
   // ---- CN5 choreographed games: each court's free places (its spots, then extra places beside them up to 6 players)
-  for (const court of gameCourts(live, w)) {
+  for (const court of gameCourts(data.nearest ? live.filter(s => !(s.activity in GAME_ACTIVITIES) || ok(s)) : live, w)) {
     const playing = w.groupSize(court.group), full = playing >= GAME_MAX_PLAYERS;
     // a new player goes to the end/side with fewer players (a frisbee pair at the two ends, volleyball across the net)
     const used = (side: number) => court.slots.filter(x => x.side === side && w.taken(x.at, x.id)).length, sides = [...new Set(court.slots.map(x => x.side))], least = Math.min(...sides.map(used));

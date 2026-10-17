@@ -1,8 +1,26 @@
 // Content addressing for world states, plans and takes. Synchronous and
 // dependency-free so it runs identically in Node tests, browsers and Workers.
 
+/** E-life P1 (determinism-preserving): an entity-physics/1 value (engine-mars entity-physics.ts) carries `hash`, the
+ *  content hash of exactly its `levels`, `byEntity` and `assets`, and is replaced, never mutated, when it changes. Their
+ *  stable text (2.6–3.6 MB on Eden 2026, ~45 ms each time) is cached by that hash, so the world's state hash and every
+ *  take id hash the same bytes without re-serialising the static physics each time. Output is byte-identical. */
+const PHYSICS_TEXT = new Map<string, { levels: string; byEntity: string; assets: string }>();
+function physicsText(v: Record<string, unknown>): { levels: string; byEntity: string; assets: string } {
+  const key = v.hash as string;
+  let hit = PHYSICS_TEXT.get(key);
+  if (!hit) {
+    hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity), assets: stableStringify(v.assets) };
+    if (PHYSICS_TEXT.size >= 4) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
+    PHYSICS_TEXT.set(key, hit);
+  }
+  return hit;
+}
+const isPhysics = (v: Record<string, unknown>) => v.version === 'entity-physics/1' && typeof v.hash === 'string' && (v.hash as string).length === 64;
+
 /** JSON with sorted object keys; undefined fields dropped; -0 normalised. */
-export function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown, known?: ReadonlyMap<object, string>): string {
+  if (value !== null && typeof value === 'object' && known?.has(value)) return known.get(value)!;
   if (value === null || typeof value !== 'object') {
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) throw new Error(`non-finite number in hashed state: ${value}`);
@@ -10,11 +28,12 @@ export function stableStringify(value: unknown): string {
     }
     return JSON.stringify(value) ?? 'null';
   }
-  if (Array.isArray(value)) return `[${value.map((v) => (v === undefined ? 'null' : stableStringify(v))).join(',')}]`;
+  if (Array.isArray(value)) return `[${value.map((v) => (v === undefined ? 'null' : stableStringify(v, known))).join(',')}]`;
   const keys = Object.keys(value as object)
     .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
     .sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`;
+  const cached = isPhysics(value as Record<string, unknown>) ? physicsText(value as Record<string, unknown>) : null;
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${cached && (k === 'levels' || k === 'byEntity' || k === 'assets') ? cached[k] : stableStringify((value as Record<string, unknown>)[k], known)}`).join(',')}}`;
 }
 
 const K = new Uint32Array([

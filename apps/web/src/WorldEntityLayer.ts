@@ -146,6 +146,27 @@ export class WorldEntityLayer {
     }
   }
 
+  /** E-life B7: god things that follow a native engine entity of the same name (a god balloon flying as its native ride,
+   *  server god/rides.ts): world position from the recording, or none (back at its own pose). */
+  private overrides = new Map<string, THREE.Vector3>();
+  /** Names of world-level god things with a native ride twin: the god's balloons (def carrier + tag balloon). */
+  rideNames(): string[] {
+    if (!this.model) return [];
+    const out: string[] = [];
+    for (const e of this.model.entities.values()) { if (!e.name || e.in.parent !== 'world') continue; const def = this.model.resolvedDef(e.def) as (StoredDef & { components: Record<string, unknown> }) | undefined; if (def?.components.carrier && def.tags.includes('balloon')) out.push(e.name); }
+    return out;
+  }
+  /** Draw the god thing named `name` where its native twin is (`p`: the recorded engine position), or at its own pose (null).
+   *  It keeps its own height above the ground: drawn y = its own y + (recorded y − the ground at its home). */
+  poseOverride(name: string, p: readonly [number, number, number] | null) {
+    const e = this.model ? [...this.model.entities.values()].find((x) => x.name === name && x.in.parent === 'world') : undefined;
+    if (!e) return;
+    if (!p) { if (this.overrides.delete(e.id)) { const d = this.drawn.get(e.id); if (d) d.settled = false; } return; }
+    const d = this.drawn.get(e.id); if (!d) return;
+    const g = this.groundAt(d.to.p.x, d.to.p.z) ?? 0;
+    const v = this.overrides.get(e.id) ?? new THREE.Vector3(); v.set(p[0], d.to.p.y + (p[1] - g), p[2]); this.overrides.set(e.id, v);
+  }
+
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
@@ -162,18 +183,20 @@ export class WorldEntityLayer {
     for (const [id, d] of this.drawn) {
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
+      const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id);
       const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
-        if (inHand || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
+        if (inHand || ride || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
         continue;
       }
       d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
-      if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
+      if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
+      if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
     void dt;
   }

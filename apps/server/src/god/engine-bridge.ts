@@ -18,6 +18,9 @@ import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
 import { GodLayers } from './layers.ts';
+import { GodActivitySpots } from './activity-spots.ts';
+import { GodMeals } from './meals.ts';
+import { installGodRides } from './rides.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -106,14 +109,23 @@ export class EngineBridge {
   readonly notices: GodNotices;
   /** R8: "the god changed something near you", one per request, rate-limited per resident (map-notices.ts). */
   readonly mapNotices: MapNotices;
+  /** E-life: the old worlds' activity spots, derived from what the god built (activity-spots.ts). */
+  readonly activitySpots: GodActivitySpots;
+  /** E-life B2: finite meals (meals.ts). */
+  meals?: GodMeals;
+  /** E-life B7: god balloons as native rides (rides.ts). */
+  rides?: ReturnType<typeof installGodRides>;
+  private godEdits = 0;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
+    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
+    // descriptions that list the things in a place catch up once a minute (1200 ticks)
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
       this.places.sync();
       return {
@@ -123,7 +135,7 @@ export class EngineBridge {
       };
     };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
-    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
+    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     this.host.listeners.push({
       afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) { this.rescueTrapped(); this.evacuateSites(); } } },
@@ -150,6 +162,15 @@ export class EngineBridge {
     // R8: residents near a visible map change hear of it once per request; a build near them, at start and at done.
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
+    this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
+      placeAt: (at, level) => this.places.placeAt(at, level), prepare: () => this.places.sync(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+    if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
+    if (this.edge) {
+      const edge = this.edge;
+      this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
+      edge.onReceipt((r) => { try { this.meals!.onReceipt(r); } catch (e) { this.log(`meals: ${(e as Error).message}`); } });
+      this.rides = installGodRides({ host: this.host, edge, model: this.god.model, log: (m) => this.log(m) });
+    }
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
     if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
@@ -257,7 +278,9 @@ export class EngineBridge {
     if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
       const fp = this.model.footprint(e, def);
       const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
-      if (solids.length) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
+      // E-life B7: a god balloon is depiction; its body on the ground is the native ride installed at its spot (rides.ts)
+      const nativeRide = !!(def.components as Record<string, unknown>).carrier && def.tags.includes('balloon');
+      if (solids.length && !nativeRide) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
     }
     // closed doors block their gap
     const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;
@@ -750,7 +773,15 @@ export class EngineBridge {
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
       if (typeof input?.capability === 'string' && /^(buy|pay|sell):/.test(input.capability)) return self.trade(L, soul, input as { capability: string; params?: unknown; clientRef?: unknown });
-      return act(soul, input as never);
+      const res: any = await act(soul, input as never);
+      // E-life B2: an accepted eat takes its portion from the kitchen now; the receipt says which meal it is
+      if (res?.accepted && res.receipt?.id && typeof input?.capability === 'string' && self.meals) {
+        const meal = self.meals.reserve(input.capability, res.receipt.id);
+        if (meal) { const row = L.db.db.prepare('SELECT detail FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?').get(L.host.worldId, res.receipt.id) as { detail: string | null } | undefined;
+          const d = row?.detail ? JSON.parse(row.detail) : {}; L.db.db.prepare('UPDATE edge_receipts_v1 SET detail=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({ ...d, meal }), L.host.worldId, res.receipt.id);
+          res.receipt = L.receipt(soul.soulId, res.receipt.id) ?? res.receipt; }
+      }
+      return res;
     };
   }
   /** Bed slots describe an intended use point; they do not yet provide native support/contact or ownership.
@@ -852,6 +883,18 @@ export class EngineBridge {
     }
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     this.sitHere(caps, plans, here);
+    this.fireLit(caps);
+    try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
+  }
+  /** B6: a god-built campfire that has been put out warms nobody: warm-by-fire there is refused until someone lights it. */
+  private fireLit(caps: EdgeCapability[]) {
+    for (const c of caps) {
+      if (c.verb !== 'warm-by-fire' || !c.target) continue;
+      const e = this.model.entities.get(c.target.id), def = e ? this.model.resolvedDef(e.def) : undefined;
+      const lit = e?.state?.lit ?? (def?.state as Record<string, { default?: unknown }> | undefined)?.lit?.default;
+      if (lit !== false) continue;
+      c.available = false; c.blocked = { code: 'fire.out', reason: `${this.model.pathOf(e!.id)} is not lit; light it first (object:${e!.id}:light), then warm up by it.` };
+    }
   }
   /** SOULFIX: which storey of its building a thing upstairs stands on ("floor 1" = the first floor above the ground),
    *  from the building's own floor height (engine level ids are not storeys). */

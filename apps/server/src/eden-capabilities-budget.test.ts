@@ -18,15 +18,25 @@ const FIRST_BUDGET_MS = 40_000, LATER_BUDGET_MS = 20_000;
 test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after a walk', { timeout: 600_000, skip: NO_EDEN }, async (t) => {
   const w = await bootEden();
   t.after(() => w.close());
-  const nav = (w.host.engine as unknown as { rt: { services: { spatial: { ground: { stats: Record<string, number>; fineMax: number } } } } }).rt.services.spatial.ground;
+  const nav = (w.host.engine as unknown as { rt: { services: { spatial: { ground: { stats: Record<string, number>; fineMax: number; fine: Map<string, unknown>; keyOf(tx: number, tz: number, rel: unknown): string; fineTile(tx: number, tz: number, rel: unknown, key?: string): unknown } } } } }).rt.services.spatial.ground;
+  // which fine tiles each sweep builds (a build of a tile an earlier sweep already built is a rebuild: LRU thrash)
+  const built: string[] = [], fineTile = nav.fineTile.bind(nav);
+  nav.fineTile = (tx, tz, rel, key = nav.keyOf(tx, tz, rel)) => { if (!nav.fine.has(key)) built.push(key); return fineTile(tx, tz, rel, key); };
   const s0 = { ...nav.stats }, h0 = strandedMetrics().hits;
   const first = timed(() => w.edge.capabilities(w.soul));
   assert.ok(first.value.length > 300, `a full list (${first.value.length})`);
   assert.ok(first.value.some((c) => c.verb === 'walk' && c.available), 'some walk is available');
   assert.ok(first.ms < FIRST_BUDGET_MS, `first capabilities took ${Math.round(first.ms)} ms (budget ${FIRST_BUDGET_MS})`);
+  // E-life: the sweep now reads only nearby places' tiles (loops/strolls within reach; spots probed within reach), so the
+  // far rooms' window floors are read about once each: bounded builds is the check (P4's failure mode was a build per
+  // standing point, thousands), not more reuse than builds
   const floorBuilds = nav.stats.floorBuilds - s0.floorBuilds, floorHits = nav.stats.floorHits - s0.floorHits;
-  assert.ok(floorHits > floorBuilds, `window floors are reused (${floorBuilds} built, ${floorHits} reused)`);
-  assert.ok(strandedMetrics().hits - h0 > 0, 'standing points in rooms the stairs do not reach are refused without a search');
+  assert.ok(floorBuilds <= 100, `window floors are built once per far room window (${floorBuilds} built, ${floorHits} reused)`);
+  const sweep1 = new Set(built);
+  assert.ok(sweep1.size <= nav.fineMax, `one sweep's fine tiles fit the cache (${sweep1.size} built, ${nav.fineMax} kept)`);
+  // (E-life: upper-storey rooms are now checked only from inside their building, so a first sweep from outside may make
+  // no failed upstairs search at all; the stranded-search memo stays covered by its own path tests)
+  void strandedMetrics; void h0;
   assert.ok(nav.fineMax >= 40, 'paged worlds keep enough fine tiles for a capabilities sweep');
 
   // walk somewhere, past the per-thing goal cache (50 ticks): the next call recomputes every goal from warm tiles
@@ -34,8 +44,8 @@ test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after 
   const acted = await accept(w.host, Promise.resolve(w.edge.act(w.soul, { capability: walk.id }))) as { accepted?: boolean };
   assert.equal(acted.accepted, true, JSON.stringify(acted));
   await w.settle(60);
-  const s1 = { ...nav.stats };
+  built.length = 0;
   const later = timed(() => w.edge.capabilities(w.soul));
   assert.ok(later.ms < LATER_BUDGET_MS, `capabilities after walking took ${Math.round(later.ms)} ms (budget ${LATER_BUDGET_MS})`);
-  assert.equal(nav.stats.fineBuilds - s1.fineBuilds, 0, 'no fine tile rebuilt for a second sweep');
+  assert.deepEqual(built.filter((k) => sweep1.has(k)), [], 'no fine tile rebuilt for a second sweep (new ground near where it walked is built once)');
 });

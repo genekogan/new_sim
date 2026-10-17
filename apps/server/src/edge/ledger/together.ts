@@ -90,7 +90,7 @@ type Follow = {receipt: string; soulId: string; target: string; untilTick: numbe
 
 /** What the ledger lends this module (closures over its internals). */
 export type TogetherPort = {
-  host: WorldHost; db: Db; places: PlaceIndex; spots: SpotsData;
+  host: WorldHost; db: Db; places: PlaceIndex; spots: () => SpotsData;
   body(entityId: string): NativeWorld['entities'][string] | undefined;
   perceived(soulId: string, radius: number): NearbyBody[];
   receipt(soulId: string, id: string): EdgeReceipt | null;
@@ -218,8 +218,8 @@ export class Together {
     if (this.sourceCache?.key === key) return this.sourceCache.list;
     const out: {id: string; kind: ItemKind; label: string; at: V2; face?: V2; place: string | null}[] = [];
     const nameOf = (id?: string) => (id ? this.p.places.byId.get(id)?.name : undefined) ?? 'the shelf';
-    for (const s of this.p.spots.shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
-    for (const s of this.p.spots.spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
+    for (const s of this.p.spots().shelves) out.push({id: 'shelf:' + s.id, kind: 'book', label: `a shelf in ${nameOf(s.place)}`, at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
+    for (const s of this.p.spots().spots) if (s.activity === 'write' || s.activity === 'post-letter') out.push({id: 'spot:' + s.id, kind: 'letter', label: s.label ?? 'a writing desk', at: s.at, ...(s.faceTo ? {face: s.faceTo} : {}), place: s.place ?? null});
     const engine = this.p.host.engine as unknown as {nearestStandableV1?: (at: V2, except?: string, min?: number, rings?: number) => V2 | null};
     for (const place of [...this.p.places.byId.values()].sort((a, b) => a.id.localeCompare(b.id))) {
       if (!this.w.regions[place.id] || place.kind === 'water' || place.carrier) continue;
@@ -676,10 +676,11 @@ export class Together {
     const held = this.heldBy(soul.soulId);
     const give = /^(?:give|hand|pass|offer)\s+(.+?)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:book|flower|flowers|cup|tea|coffee|food|snack|letter|tool|frisbee|it|this|that|thing)$/.exec(t) ?? /^(?:give|hand|pass|offer)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:\w+\s+)?(?:to)\s+(.+)$/.exec(t) ?? /^(?:give|hand|pass)\s+(?:it|this|that)\s+to\s+(.+)$/.exec(t);
     if (give) {
-      if (!held) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+      // a world may offer its own give for what is in the hand (a god-built thing: god/held.ts)
+      if (!held && !caps.some(c => c.verb === 'give')) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const o = who(give[1]); if (!o) return notHere('give', give[1]);
       const c = capFor('give', o); if (!c) return tooFar('give', o);
-      return {capability: c.id, note: `${raw} is ${c.id} (${held.name})`};
+      return {capability: c.id, note: `${raw} is ${c.id}${held ? ` (${held.name})` : ''}`};
     }
     if (/^(?:put\s+(?:it|this|that|the\s+\w+|my\s+\w+)\s+down|put\s+down(?:\s+.*)?|drop(?:\s+.*)?|set\s+(?:it|.+)\s+down|leave\s+(?:it|the\s+\w+)\s+here|put\s+(?:it|the\s+\w+)\s+back)$/.test(t)) {
       if (!held) return {code: 'hands.empty', reason: 'You are not holding anything.', did_you_mean: []};

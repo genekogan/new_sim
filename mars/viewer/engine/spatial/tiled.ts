@@ -25,9 +25,9 @@ export const FINE_APRON_M = 2;
 export const FINE_LRU = 24;
 /** Paged: fine tiles kept at least (Spatial.syncPaged); a Soul's capabilities read ~30 tiles round it in one sweep, which
  *  a smaller LRU misses on every pass (engine P4). */
-export const FINE_LRU_PAGED = 40;
+export const FINE_LRU_PAGED = 48;   // E-life: 40 + the walk windows; a nearby sweep reads ~37 tiles on Eden 2026 (2.9 MB each)
 /** Paged: bytes of upper-floor grids kept over windows (GroundNav.floorsOver); a 2-tile window's floor is ~7 MB. */
-export const FLOORS_OVER_BYTES = 192 * 1024 * 1024;
+export const FLOORS_OVER_BYTES = 64 * 1024 * 1024;   // E-life (memory): was 192 MB; Eden 2026 used 105 MB after one resident
 /** Largest window (tiles per side): 6 × 64 m = 384 m. Routes needing more are refused ('ground.too-far'). */
 export const MAX_WINDOW_TILES = 6;
 /** Longest hop (m along the coarse path) planned by the fine planner at once. */

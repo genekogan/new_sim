@@ -7,7 +7,7 @@
 // Frames. The entity world uses the three.js convention (yaw about +Y: x' = x cos + z sin, z' = −x sin + z cos);
 // the Mars engine rotates the other way (x' = x cos − z sin). A pose with entity yaw θ is Mars yaw −θ, and local
 // (x, z) offsets map unchanged. A seat's occupant faces the def's front (+z local), turned by the slot's own yaw.
-import { CATALOG, type AssetDef, type SlotDef } from '../../../mars/viewer/engine/world/catalog.ts';
+import { CATALOG, fireRingRadius, type AssetDef, type SlotDef } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { SurfaceSlotDef } from '../../../mars/viewer/engine/world/catalog-items.ts';
 import { createHash } from 'node:crypto';
 
@@ -30,7 +30,7 @@ export type DefFacts = {
 
 /** Components that make a def an engine fixture or item (everything else becomes plain solids/floors/links). */
 export const FIXTURE_COMPONENTS = ['seat', 'bed', 'surface', 'container', 'carryable', 'readable', 'workstation', 'instrument', 'boardGame', 'display'] as const;
-export const isFixtureDef = (d: Pick<DefFacts, 'components'>) => FIXTURE_COMPONENTS.some((k) => !!d.components[k]);
+export const isFixtureDef = (d: Pick<DefFacts, 'components'> & Partial<Pick<DefFacts, 'tags' | 'name' | 'ref'>>) => FIXTURE_COMPONENTS.some((k) => !!d.components[k]) || isFireCircleDef(d);
 /** A small one-hand item the engine's items verbs (take_item / put_item) can carry. */
 export const isCarryableDef = (d: Pick<DefFacts, 'components'>) => !!d.components.carryable;
 
@@ -41,7 +41,7 @@ const short = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex'
 /** Engine asset id for a def at given params/scale: stable, namespaced, ≤ 80 chars. */
 export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'> & Partial<Pick<DefFacts, 'slots'>>, paramsKey: string): string {
   // A policy change gets a new asset identity. Old logged assets/active slots keep their original approach semantics.
-  const policy = d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '';
+  const policy = (d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '') + (isFireCircleDef(d) ? '|fire-circle/1' : '') + (d.slots && crossSeated(d as Pick<DefFacts, 'slots' | 'box'>) ? '|seat-approach:slot' : '');
   return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi, '').slice(0, 48)}:${short(`${d.hash}|${paramsKey}|${d.box.map(r4).join(',')}${policy}`)}`;
 }
 
@@ -50,6 +50,34 @@ export function surfaceLattice(slot: string, w: number, d: number, y: number, cx
   const nx = Math.max(1, Math.floor((w - 2 * SURFACE_MARGIN) / SURFACE_PITCH) + 1), nz = Math.max(1, Math.floor((d - 2 * SURFACE_MARGIN) / SURFACE_PITCH) + 1);
   const out: SurfaceSlotDef[] = [];
   for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) out.push({ id: `${slot}-r${i}c${j}`, local: [r4(cx + (j - (nx - 1) / 2) * SURFACE_PITCH), r4(y), r4(cz + (i - (nz - 1) / 2) * SURFACE_PITCH)] });
+  return out;
+}
+
+/** E-life: a def whose seats face across it (a see-saw's two ends face each other over the plank): the approach in front of
+ *  a seat would be past the far end, behind whoever sits there (two on a see-saw faulted: bodies 0.46 m apart). Such a
+ *  def's seats are approached from the seat itself (engine `seatApproach: 'slot'`: in front of it, else behind it). */
+export function crossSeated(d: Pick<DefFacts, 'slots' | 'box'>): boolean {
+  const hx = d.box[0] / 2, hz = d.box[2] / 2;
+  return d.slots.some((s) => {
+    if (s.kind !== 'seat') return false;
+    const yaw = Math.PI / 2 - s.yaw, u = [Math.cos(yaw), Math.sin(yaw)], p = [s.p[0], s.p[2]], half = [hx, hz];
+    let t = Infinity; for (const k of [0, 1]) if (Math.abs(u[k]) > 1e-9) t = Math.min(t, ((u[k] > 0 ? half[k] : -half[k]) - p[k]) / u[k]);
+    return t > 1.0;
+  });
+}
+
+/** B6: an open fire people gather round (a campfire, a bonfire, a fire pit): its asset gets fire-circle places, so the
+ *  engine's campfire_circle (warm-by-fire) works on a god-built fire exactly as on the old worlds' native campfire. */
+export const isFireCircleDef = (d: Partial<Pick<DefFacts, 'tags' | 'name' | 'ref'>>) => !!d.tags?.includes('fire') && (d.tags.includes('camp') || /campfire|bonfire|fire-?pit/i.test(`${d.name ?? ''} ${d.ref ?? ''}`));
+/** Fire-circle places round a fire whose stone ring is `ring` m across: 8 on the engine's fire-ring radius, each facing the
+ *  fire, leaving out any within 0.7 m of one of the def's own seats (a campfire's logs). Local frame, Mars yaw. */
+export function fireCircleSlots(ring: number, seats: { p: [number, number, number] }[]): SlotDef[] {
+  const R = fireRingRadius(ring, ring), out: SlotDef[] = [];
+  for (let k = 0; k < 8; k++) {
+    const a = (k * Math.PI) / 4, x = r4(R * Math.cos(a)), z = r4(R * Math.sin(a));
+    if (seats.some((s) => Math.hypot(s.p[0] - x, s.p[2] - z) < 0.7)) continue;
+    out.push({ id: `ring${k}`, kind: 'fire-circle', local: [x, z], yaw: r4(a + Math.PI) });
+  }
   return out;
 }
 
@@ -75,10 +103,16 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   if (c.carryable) {
     // one hand, palm under the base (catalog-items.ts hand1): the engine's take_item / put_item / serve verbs
     out.handling = { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'hand', local: [0, 0, 0] }] }, carryHeight: 0.95, hands: 1, small: true };
-  } else if (!isFloatingDef(d)) out.obstacle = true;
+  // B6: a fire's box spans its logs; its stone ring and logs are the entity's own solids, so the box is no obstacle
+  // (people stand inside it, round the fire)
+  } else if (!isFloatingDef(d) && !isFireCircleDef(d)) out.obstacle = true;
   const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw), approachPolicy: 'reachable/1' }));
   const stands: SlotDef[] = d.slots.filter((s) => s.kind === 'stand').map((s) => ({ id: s.id, kind: 'stand' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
-  if (seats.length || stands.length) out.slots = [...seats, ...stands];
+  // B6: the stone ring is the def's description's size when it says so ("a ring of stones (1.6 m)"), else 1 m
+  const ring = Number(/ring of stones \((\d+(?:\.\d+)?) m\)/.exec(d.description ?? '')?.[1] ?? 1);
+  const fire = isFireCircleDef(d) ? fireCircleSlots(Math.min(ring, Math.min(w, dd)), d.slots.filter((s) => s.kind === 'seat')) : [];
+  if (seats.length || stands.length || fire.length) out.slots = [...seats, ...stands, ...fire];
+  if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
   const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
   else if (c.surface) out.surfaceSlots = surfaceLattice('top', w, dd, c.surface.height ?? h);

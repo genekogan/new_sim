@@ -14,8 +14,16 @@ import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
+/** Loops round a place (jog/run/cycle-around) are offered within this distance of its outline (m). */
+const AROUND_REACH = 150;
+const bboxDistance = (p: [number, number][], at: [number, number]) => {let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of p) {if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;} return Math.hypot(Math.max(0, x0 - at[0], at[0] - x1), Math.max(0, z0 - at[1], at[1] - z1));};
+/** Places wider than this (m, either side of their box: a backdrop wood, a mountain, the sea) get no loop or stroll: a loop
+ *  through 5 spread points of one reads every nav tile under it (walk there, then stroll or wander). */
+const LOOP_SPAN = 160;
+const bboxSpan = (p: [number, number][]) => {const xs = p.map(q => q[0]), zs = p.map(q => q[1]); return Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));};
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
+import {isCampfire} from './fire.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, SPOT_ACTIVITIES, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
 import {Intents,walkWithDestinationWords,walkWithFallback, attentionWords, type IntentInput} from '../intents/intents.ts';
@@ -124,13 +132,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
   ownerControlGrace(soulId:string){this.db.db.prepare('INSERT INTO edge_owner_control_v1(world_id,soul_id,until_ms) VALUES(?,?,?) ON CONFLICT(world_id,soul_id) DO UPDATE SET until_ms=MAX(until_ms,excluded.until_ms)').run(this.host.worldId,soulId,this.controlNow()+10000);}
   private ownerControls(soulId:string){const r=this.db.db.prepare('SELECT until_ms FROM edge_owner_control_v1 WHERE world_id=? AND soul_id=?').get(this.host.worldId,soulId) as {until_ms:number}|undefined;return !!r&&r.until_ms>this.controlNow();}
   /** activities/1: World's activity spots, shelves, interiors and scenery solids (validated; refused entries listed). */
-  readonly spots: SpotsData;
+  private readonly baseSpots: SpotsData;
+  /** E-life (world-engine worlds only): activity spots derived from the god's things (god/activity-spots.ts), merged
+   *  after the world's own authored spots. Unset on Eden/Mars/LM. Must return the same object while nothing changed. */
+  spotsProvider?: () => SpotsData | null;
+  private mergedSpots: {from: SpotsData; value: SpotsData} | null = null;
+  get spots(): SpotsData {
+    const extra = this.spotsProvider?.(); if (!extra) return this.baseSpots;
+    if (this.mergedSpots?.from !== extra) {const b = this.baseSpots; this.mergedSpots = {from: extra, value: {contract: 'activity-spots/1', spots: [...b.spots, ...extra.spots], shelves: [...b.shelves, ...extra.shelves], interiors: b.interiors, solids: b.solids, rings: b.rings, platforms: b.platforms, ...(b.docks || extra.docks ? {docks: [...(b.docks ?? []), ...(extra.docks ?? [])]} : {}), ...(extra.nearest ? {nearest: extra.nearest} : {})}};}
+    return this.mergedSpots.value;
+  }
   readonly outcomes:ActionOutcomes;
   readonly spotsRefused: string[];
   constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean; spots?: unknown;now?:()=>number} = {}) {
     this.host = host; this.db = db; this.ambient = options.ambient === true;
     this.controlNow=options.now??Date.now;
-    const spots = loadSpots(options.spots); this.spots = spots.data; this.spotsRefused = spots.refused;
+    const spots = loadSpots(options.spots); this.baseSpots = spots.data; this.spotsRefused = spots.refused;
     db.db.exec(`CREATE TABLE IF NOT EXISTS edge_receipts_v1 (world_id TEXT NOT NULL, receipt_id TEXT NOT NULL, soul_id TEXT NOT NULL, capability TEXT NOT NULL, phase TEXT NOT NULL,
       accepted_tick INTEGER NOT NULL, started_tick INTEGER, ended_tick INTEGER, code TEXT, reason TEXT, program_id TEXT, client_ref TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, receipt_id));
       CREATE INDEX IF NOT EXISTS edge_receipts_v1_soul ON edge_receipts_v1 (world_id, soul_id, phase);
@@ -149,7 +166,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.outcomes=new ActionOutcomes(db.db,host.worldId);
     this.syncCarrierPlaces();
     // together/1: gestures, invitations, follows and items (core-next4)
-    this.together = new Together({host, db, places: this.places, spots: this.spots,
+    this.together = new Together({host, db, places: this.places, spots: () => this.spots,
       body: id => this.body(id), perceived: (id, r) => this.perceivedBodies(id, r), receipt: (sid, id) => this.receipt(sid, id),
       fail: (id, code, reason) => this.update(id, {phase: 'failed', code, reason}), complete: id => this.update(id, {phase: 'completed'}),
       running: (sid, id) => {const m = this.host.minds.get(sid), r = this.rows('receipt_id=?', id)[0]; return !!m && !!r?.program_id && this.host.engine.programOf(m.entityId) === r.program_id;},
@@ -404,8 +421,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (me) {
       for (const e of Object.values(w.entities)) {
         // CN5 (acceptance): 150 m, so the fire is offered from the pond and the shore too
-        if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
-        const id = 'warm-by-fire:' + e.id, label = 'Warm up by the fire with whoever is there';
+        if (!isCampfire(e) || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
+        const id = 'warm-by-fire:' + e.id, label = e.def === 'campfire' ? 'Warm up by the fire with whoever is there' : `Warm up by ${e.label && !/^ew:/.test(e.label) ? e.label : 'the campfire'} with whoever is there`;
         caps.push({id, verb: 'warm-by-fire', label, target: {id: e.id, kind: 'object'}, available: true, params: secondsOf(120, 600)});
         plans.set(id, {label, steps: [{verb:'walk_to',params:{to:e.id,standoff:2}},{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
       }
@@ -421,6 +438,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (c.verb !== 'walk' || !c.available || c.target?.kind !== 'place') continue;
       const place = this.places.byId.get(c.target.id), region = (w.regions as Record<string, {polygon: [number, number][]}>)[c.target.id];
       if (!place || !region || area(region.polygon) < 250 || place.enclosed || ['sleeping-mat', 'venue', 'building', 'room', 'water'].includes(place.kind)) continue;
+      if (bboxDistance(region.polygon, [me.pose.p[0], me.pose.p[2]]) > AROUND_REACH || bboxSpan(region.polygon) > LOOP_SPAN) continue;
       const route = this.strollRoute(c.target.id, region.polygon, [me.pose.p[0], me.pose.p[2]]); if (route.length < 2) continue;
       const id = 'stroll:' + c.target.id, label = `Stroll through ${place.name} (a loop of ${route.length} stops)`;
       caps.unshift({id, verb: 'stroll', label, target: c.target, available: true, params: {pause: {type: 'integer', min: 0, max: 60, default: 4}, via: {type: 'array', items: 'place name', maxItems: 4, optional: true}}});
@@ -444,6 +462,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const bikesOut = () => outMemo ??= [...this.host.minds.values()].filter(m => m.soulId !== soul.soulId && this.openReceipts(m.soulId).some(r => /^cycle(?:-around)?:/.test(r.capability))).length;
       for (const c of [...caps]) {
         if (c.verb !== 'walk' || !c.target || this.places.byId.get(c.target.id)?.kind === 'water') continue;
+        // world-engine worlds: jog/run to outdoor places only (Eden 2026 offered 480 gait variants, one per room, chair and
+        // lamp it can walk to: a third of a 400 kB list); old worlds unchanged
+        if (this.placeWalkable) {const pl = c.target.kind === 'place' ? this.places.byId.get(c.target.id) : undefined; if (!pl || pl.enclosed || ['room', 'building'].includes(pl.kind)) continue;}
         const base = plans.get(c.id); if (!base || !base.steps.some(s => s.verb === 'walk_to')) continue;
         for (const gait of ['jog', 'run'] as const) {
           const id = `${gait}:${c.target.id}`, label = `${gait === 'jog' ? 'Jog' : 'Run'} to ${this.places.byId.get(c.target.id)?.name ?? c.label.replace(/^walk to /i, '')} (${gait === 'jog' ? '2.5' : '4'} m/s on dry ground)`;
@@ -453,6 +474,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       }
       for (const place of this.places.byId.values()) {
         if (place.parent === null || place.carrier || place.enclosed || area(place.polygon) < 250) continue;
+        // E-life (fine-tile thrash): loops round places within reach only. On Eden 2026 every lawn, wood and hill of the
+        // 1 km world was looped from anywhere: their clear spots paged in ~220 nav tiles on a Soul's first capabilities
+        if (bboxDistance(place.polygon, [me.pose.p[0], me.pose.p[2]]) > AROUND_REACH || bboxSpan(place.polygon) > LOOP_SPAN) continue;
         const native = (w.regions as Record<string, unknown>)[place.id];
         if (place.kind !== 'water' && !native && !this.placeWalkable?.(place.id)) continue;
         if (!['water', 'outdoor', 'park', 'garden', 'plaza', 'lawn', 'field', 'place', 'shore'].includes(place.kind)) continue;
@@ -941,7 +965,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       open: (at: [number, number], min: number, rings: number) => level === 0 && engine.nearestStandableV1 ? engine.nearestStandableV1(at, soul.entityId, min, rings) : null,
       taken: (at: [number, number], spotId?: string) => others.some(o => Math.hypot(o[0] - at[0], o[1] - at[1]) < 0.7) || (!!spotId && claimed.has(spotId)),
       // a spot inside a building is offered only when that building's interior was admitted (its walls are a shell, nav/1)
-      enterable: (place: string | undefined) => {const b = enclosingBuilding(place); return !b || !!w.regions[b] || [...navIds].some(id => id.startsWith('nav-solid:' + b + '#w'));},
+      enterable: (place: string | undefined) => {const b = enclosingBuilding(place); return !b || !!w.regions[b] || !!this.placeWalkable?.(b) || [...navIds].some(id => id.startsWith('nav-solid:' + b + '#w'));},
       seat: (radius: number) => {
         const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
         const pick = free[0]; return pick && plans.get(pick.c.id) ? {cap: pick.c, plan: plans.get(pick.c.id)!, distance: pick.d} : null;
@@ -1001,8 +1025,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const here: [number, number] | null = me ? [me.pose.p[0], me.pose.p[2]] : null;
     // r3 quality (23/29): the nearest spot (or bicycle dock) for a spot-based verb anywhere in this world, beyond offer reach
     const elsewhere = (verb: string) => {
-      const marks = verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
-        : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined;
+      // E-life: a ferris wheel or carousel ride (a native car at it) anywhere in this world, for "ride the ferris wheel"
+      const rideMarks = verb === 'ride-attraction' ? this.carriersNative().filter(c => /ferris|carousel/i.test(c.id)).map(c => ({at: [c.pose.p[0], c.pose.p[2]] as [number, number], label: c.label, place: undefined as string | undefined}))
+        : verb === 'punt' ? this.carriersNative().filter(c => c.def === 'rowing-punt').map(c => ({at: [c.pose.p[0], c.pose.p[2]] as [number, number], label: c.label, place: undefined as string | undefined})) : null;
+      if (rideMarks && !rideMarks.length) return verb === 'punt' ? null : undefined;
+      const marks = rideMarks ?? (verb === 'cycle' ? (this.spots.docks ?? []).map(k => ({at: k.at, label: k.label ?? 'a bicycle dock', place: k.place}))
+        : verb in SPOT_ACTIVITIES ? this.spots.spots.filter(x => x.activity === verb || x.also?.includes(verb)).map(x => ({at: x.at, label: x.label ?? `a ${verb} spot`, place: x.place})) : undefined);
       if (!marks) return undefined;
       const best = marks.map(m => {const placeId = m.place ?? around(m.at[0], m.at[1])[0], pl = placeId ? this.places.byId.get(placeId) : undefined;
         return {label: m.label, distance: here ? Math.hypot(m.at[0] - here[0], m.at[1] - here[1]) : 0, ...(pl && known.includes(pl) ? {place: pl.name, placeId: pl.id} : {})};})
@@ -1240,9 +1268,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
 }
 
 /** Receipt detail (Core-A): channel (body | attention | none), chosen (what an intent picked), endedAt (terminal). */
-function detailOf(r: Row): {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown} {
+function detailOf(r: Row): {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown} {
   if (!r.detail) return {};
-  try {const d = JSON.parse(r.detail) as {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown}; return {...(d.channel ? {channel: d.channel} : {}), ...(d.chosen ? {chosen: d.chosen} : {}), ...(d.endedAt ? {endedAt: d.endedAt} : {}), ...(d.alternatives ? {alternatives: d.alternatives} : {})};}
+  try {const d = JSON.parse(r.detail) as {channel?: string; chosen?: unknown; endedAt?: unknown; alternatives?: unknown; meal?: unknown}; return {...(d.channel ? {channel: d.channel} : {}), ...(d.chosen ? {chosen: d.chosen} : {}), ...(d.endedAt ? {endedAt: d.endedAt} : {}), ...(d.alternatives ? {alternatives: d.alternatives} : {}), ...(d.meal ? {meal: d.meal} : {})};}
   catch {return {};}
 }
 

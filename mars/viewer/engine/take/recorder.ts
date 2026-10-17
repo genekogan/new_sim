@@ -8,7 +8,7 @@
 // (`thinChanges`): keyframes, linear in between, each recorded tick reproduced within the field's tolerance.
 // mars-take/4: tracks at TRACK_TOL (4 mm / 8 mrad, position holds exact at both ends), `entities0` + `removed`, and
 // `compactEvents` on finish.
-import { hashOf, stableStringify } from '../core/hash.ts';
+import { hashOf, sha256, stableStringify } from '../core/hash.ts';
 import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL, type ChangeEvent, type PoseSample, type Take, type TakeEntity0, type TakeEvent, type TakeHands } from './types.ts';
@@ -232,7 +232,12 @@ export class TakeRecorder implements RuntimeObserver {
       this.flushTrack(tr);
       tracks[id] = dedupeTicks(tr.out);
     }
-    const finalState = structuredClone(this.rt.world);
+    // E-life P1: the static entity physics (entity-physics/1, ~3 MB on Eden 2026) is replaced, never mutated, when it
+    // changes, so the take shares it instead of deep-copying it every take; everything else is copied as before
+    const { entityPhysicsV1: physics, ...rest } = this.rt.world as typeof this.rt.world & { entityPhysicsV1?: unknown };
+    const finalState = (physics === undefined ? structuredClone(this.rt.world) : { ...structuredClone(rest), entityPhysicsV1: physics }) as typeof this.rt.world;
+    // E-life P1: the final state is serialised once for its hash and reused inside the take id (byte-identical)
+    const finalText = stableStringify(finalState);
     const changes = thinChanges(dedupeChanges(this.changes), { ...INTERP_FIELDS, ...this.opts.fieldTol });
     const entities0: Record<string, TakeEntity0> = {};
     for (const id of [...this.first.keys()].sort()) entities0[id] = this.first.get(id)!;
@@ -250,19 +255,19 @@ export class TakeRecorder implements RuntimeObserver {
       tracks,
       changes,
       events: this.opts.compactEvents === false ? this.events : compactEvents(this.events),
-      finalStateHash: hashOf(finalState),
+      finalStateHash: sha256(finalText),
       finalState,
       entities0,
       removed: changes.filter((c) => c[2] === 'present' && c[3] === false).map((c) => ({ id: c[1], t: c[0] })),
     };
-    return { ...stripUndefined(body), id: takeIdOf(body) } as Take;
+    return { ...stripUndefined(body), id: takeIdOf(body, new Map([[finalState, finalText]])) } as Take;
   }
 }
 
 /** The take's content address (every field except `id`). */
-export function takeIdOf(take: Omit<Take, 'id'> | Take): string {
+export function takeIdOf(take: Omit<Take, 'id'> | Take, known?: ReadonlyMap<object, string>): string {
   const { id: _id, ...body } = take as Take;
-  return hashOf(body).slice(0, 24);
+  return sha256(stableStringify(body, known)).slice(0, 24);
 }
 
 function withinTol(pred: PoseSample, actual: PoseSample, tol: { pos: number; ang: number }) {
