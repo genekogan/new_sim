@@ -3,7 +3,7 @@
 // squarish-section torus with tread blocks (216 tris), a creosote is a few lumpy leaf clusters on
 // thin stems (≈ 120 tris), a tuft is a fan of thin blades (≤ 30 tris). Lines, rings and scrub are one
 // InstancedMesh per kind (a 500 m tyre ring = 1 draw call, a 1.2 km scrub field = 5).
-import { offsetAlong, scrubPoints, tireLine, tireRingPath, trackLines, type TirePose } from '@sim/generators';
+import { installScrubVerdicts, offsetAlong, scrubPoints, tireLine, tireRingPath, trackLines, type TirePose } from '@sim/generators';
 import type { Entity } from '@sim/world-compiler';
 import * as THREE from 'three';
 import { blockedBy } from './ecology.mesh.ts';
@@ -135,31 +135,64 @@ registerMesh({
   instanceKey(ctx) { return `${ctx.params.height}|${ctx.params.variant}|${ctx.params.color}`; },
 });
 
+// Phone arrival (lane L3): the scatter's noise verdicts come from a worker (scrub.worker.ts); the scrub fills in when they
+// arrive (well before the arrival card lifts), and this thread only replays the random stream, `blocked` and spacing.
+// Same points either way. No Worker (tests, old browsers) or `?scrubWorker=0`: computed in place, as before.
+type Verdicts = { key: string; marks: Uint8Array[] };
+let scrubWorker: Worker | null | undefined;
+const scrubWaits = new Map<number, (v: Verdicts | null) => void>();
+let scrubId = 0;
+function verdictsInWorker(area: [number, number][], params: Record<string, unknown>, seed: number): Promise<Verdicts | null> | null {
+  if (scrubWorker === undefined) {
+    try {
+      const off = typeof location !== 'undefined' && new URLSearchParams(location.search).get('scrubWorker') === '0';
+      scrubWorker = off || typeof Worker === 'undefined' ? null : new Worker(new URL('./scrub.worker.ts', import.meta.url), { type: 'module' });
+    } catch { scrubWorker = null; }
+    if (scrubWorker) {
+      scrubWorker.onmessage = (ev: MessageEvent<{ id: number; v: Verdicts | null }>) => { const f = scrubWaits.get(ev.data.id); scrubWaits.delete(ev.data.id); f?.(ev.data.v); };
+      scrubWorker.onerror = () => { for (const f of scrubWaits.values()) f(null); scrubWaits.clear(); scrubWorker?.terminate(); scrubWorker = null; };
+    }
+  }
+  const w = scrubWorker; if (!w) return null;
+  return new Promise((resolve) => {
+    const id = ++scrubId; scrubWaits.set(id, resolve);
+    try { w.postMessage({ id, area, params, seed }); } catch { scrubWaits.delete(id); resolve(null); }
+  });
+}
+
 registerMesh({
   gen: 'desert-scrub/1', world: true,
   build(ctx) {
     const e = ctx.entity; if (!e.shape || !('area' in e.shape)) return null;
-    const water = (x: number, z: number) => { const g = ctx.model.ground(); for (const w of g.waters) if (w.area && w.level > ctx.model.terrain.sample(x, z) && inside(x, z, w.area as [number, number][])) return true; return false; };
-    const blocked = blockedBy(ctx.model, e), pts = scrubPoints(e.shape.area as [number, number][], ctx.params as never, seedOf(e), (x, z) => blocked(x, z) || water(x, z));
+    const area = e.shape.area as [number, number][], seed = seedOf(e);
     const group = new THREE.Group(); group.name = `desert-scrub ${e.name ?? e.id}`;
-    const byK: (typeof pts)[] = [[], [], [], [], []];
-    for (const p of pts) byK[p.k].push(p);
-    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
-    byK.forEach((list, k) => {
-      if (!list.length) return;
-      const im = new THREE.InstancedMesh(scrubGeometry(k), vertexMaterial(), list.length);
-      list.forEach((p, i) => {
-        q.setFromAxisAngle(up, p.yaw); const wide = 0.9 + p.tone * 0.35;
-        pos.set(p.x, ctx.model.terrain.sample(p.x, p.z) - 0.03 * p.s, p.z); sc.set(p.s * wide, p.s, p.s * wide);
-        m.compose(pos, q, sc); im.setMatrixAt(i, m);
-        const t = 0.82 + p.tone * 0.3; tint.setRGB(t, t * (0.98 + p.tone * 0.04), t * 0.94); im.setColorAt(i, tint);
+    const fill = () => {
+      const water = (x: number, z: number) => { const g = ctx.model.ground(); for (const w of g.waters) if (w.area && w.level > ctx.model.terrain.sample(x, z) && inside(x, z, w.area as [number, number][])) return true; return false; };
+      const blocked = blockedBy(ctx.model, e), pts = scrubPoints(area, ctx.params as never, seed, (x, z) => blocked(x, z) || water(x, z));
+      const byK: (typeof pts)[] = [[], [], [], [], []];
+      for (const p of pts) byK[p.k].push(p);
+      const m = new THREE.Matrix4(), q = new THREE.Quaternion(), pos = new THREE.Vector3(), sc = new THREE.Vector3();
+      byK.forEach((list, k) => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(scrubGeometry(k), vertexMaterial(), list.length);
+        list.forEach((p, i) => {
+          q.setFromAxisAngle(up, p.yaw); const wide = 0.9 + p.tone * 0.35;
+          pos.set(p.x, ctx.model.terrain.sample(p.x, p.z) - 0.03 * p.s, p.z); sc.set(p.s * wide, p.s, p.s * wide);
+          m.compose(pos, q, sc); im.setMatrixAt(i, m);
+          const t = 0.82 + p.tone * 0.3; tint.setRGB(t, t * (0.98 + p.tone * 0.04), t * 0.94); im.setColorAt(i, tint);
+        });
+        im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.castShadow = k <= 2; im.receiveShadow = true; im.name = `scrub:${k}`; im.computeBoundingSphere(); im.userData.cameraTransparent = true;
+        group.add(im);
       });
-      im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
-      im.castShadow = k <= 2; im.receiveShadow = true; im.name = `scrub:${k}`; im.computeBoundingSphere(); im.userData.cameraTransparent = true;
-      group.add(im);
-    });
-    group.userData.points = pts.length;
-    return group.children.length ? group : null;
+      group.userData.points = pts.length;
+    };
+    const verdicts = verdictsInWorker(area, ctx.params as Record<string, unknown>, seed);
+    if (!verdicts) { fill(); return group.children.length ? group : null; }
+    let gone = false;
+    group.addEventListener('removed', () => { gone = true; });
+    void verdicts.then((v) => { if (gone) return; if (v) installScrubVerdicts(v); fill(); });
+    return group;
   },
 });
 function inside(px: number, pz: number, poly: [number, number][]) { let r = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) r = !r; } return r; }

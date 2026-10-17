@@ -2,7 +2,7 @@
 // equal the original single-pass algorithm (kept verbatim below as `reference`) for any `blocked`, cached or not.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scrubPoints, playaVein, fbm, type ScrubPoint } from './desert.ts';
+import { scrubPoints, scrubVerdicts, installScrubVerdicts, playaVein, fbm, type ScrubPoint } from './desert.ts';
 import { bounds2, n, pointInPoly, rng } from './geom.ts';
 import type { Value } from './fields.ts';
 import type { Vec2 } from './types.ts';
@@ -67,6 +67,21 @@ test('scrub points: cached replays equal the original algorithm for any blocked,
   assert.deepEqual(scrubPoints(area, { density: 0.004 }, 5, blockA, 40), reference(area, { density: 0.004 }, 5, blockA, 40));
 });
 
+test('scrub verdicts computed elsewhere (a worker) and installed give the same points for any blocked', () => {
+  const params = { density: 0.004, grass: 3, toward: 'sw', clear: [[10, 10, 25]] } as Record<string, Value>;
+  for (const seed of [7, 8]) {
+    const want = [undefined, blockA, blockB].map((b) => reference(area, params, seed, b));
+    const v = structuredClone(scrubVerdicts(area, params, seed));   // what postMessage delivers
+    assert.ok(v.marks.length === 2 && v.marks.every((a) => a.some((x) => x === 1)), 'both passes carry verdicts');
+    for (let k = 100; k < 106; k++) scrubPoints(area, { density: 0.001 }, k);   // evicts the local memo (it keeps 4)
+    installScrubVerdicts(v);
+    for (const k of [1, 0, 2]) assert.deepEqual(scrubPoints(area, params, seed, [undefined, blockA, blockB][k]), want[k], `seed ${seed} blocked ${k}`);
+    // installing into a memo that already holds some verdicts keeps both
+    installScrubVerdicts(structuredClone(scrubVerdicts(area, params, seed)));
+    assert.deepEqual(scrubPoints(area, params, seed, blockB), want[2]);
+  }
+});
+
 test('desert-scrub physics counts lazily and reports the same tris and notes as the eager count', async () => {
   const { desertScrubGen } = await import('./desert.ts');
   const params = { density: 0.004, grass: 3, toward: 'se', gradient: 0.6, veins: 0.6, cluster: 0.35, minHeight: 0.4, maxHeight: 1.6, minSpacing: 2.5, clear: [[0, 0, 30]] } as Record<string, Value>;
@@ -77,4 +92,18 @@ test('desert-scrub physics counts lazily and reports the same tris and notes as 
   assert.deepEqual(b.notes, [`${per[0] + per[1] + per[2]} creosote bushes, ${per[3] + per[4]} grass tufts (before exclusions; 5 instanced meshes, decor)`]);
   assert.deepEqual(JSON.parse(JSON.stringify(b)), { box: b.box, colliders: [], slots: [], tris, notes: b.notes });
   assert.deepEqual({ ...b }, { box: b.box, colliders: [], slots: [], tris, notes: b.notes });
+});
+
+test('playaVein off the veins returns early with the same value (bit-identical to the full formula)', () => {
+  const sstep = (a: number, b: number, t: number) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
+  const full = (x: number, z: number) => {
+    const wx = x + (fbm(x, z, 60, 2, 5) - 0.5) * 50, wz = z + (fbm(x, z, 60, 2, 9) - 0.5) * 50;
+    const big = 1 - Math.abs(fbm(wx, wz, 90, 2, 21) * 2 - 1), small = 1 - Math.abs(fbm(wx * 1.1, wz * 1.1, 32, 2, 33) * 2 - 1);
+    const thin = sstep(0.955, 0.995, big), fine = sstep(0.97, 0.997, small) * (0.35 + 0.65 * fbm(x, z, 40, 1, 41));
+    const breakup = sstep(0.32, 0.62, fbm(x, z, 45, 2, 47));
+    return Math.max(thin * (0.25 + 0.75 * breakup), fine * 0.75 * breakup);
+  };
+  let on = 0;
+  for (let x = -600; x <= 600; x += 1.9) for (let z = -600; z <= 600; z += 7.3) { const v = full(x, z); if (v > 0) on++; assert.ok(Object.is(playaVein(x, z), v), `${x},${z}`); }
+  assert.ok(on > 1000, `veins sampled: ${on}`);
 });

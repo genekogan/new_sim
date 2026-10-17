@@ -38,7 +38,9 @@ export function playaVein(x: number, z: number): number {
   const wx = x + (fbm(x, z, 60, 2, 5) - 0.5) * 50, wz = z + (fbm(x, z, 60, 2, 9) - 0.5) * 50;
   const big = 1 - Math.abs(fbm(wx, wz, 90, 2, 21) * 2 - 1);      // ridge where the noise crosses 0.5
   const small = 1 - Math.abs(fbm(wx * 1.1, wz * 1.1, 32, 2, 33) * 2 - 1);
-  const thin = sstep(0.955, 0.995, big), fine = sstep(0.97, 0.997, small) * (0.35 + 0.65 * fbm(x, z, 40, 1, 41));
+  const thin = sstep(0.955, 0.995, big), f0 = sstep(0.97, 0.997, small);
+  if (thin === 0 && f0 === 0) return 0;   // off every vein (most of the playa): the same 0 without the last two noises
+  const fine = f0 * (0.35 + 0.65 * fbm(x, z, 40, 1, 41));
   const breakup = sstep(0.32, 0.62, fbm(x, z, 45, 2, 47));        // veins come and go, never one long river
   return Math.max(thin * (0.25 + 0.75 * breakup), fine * 0.75 * breakup);
 }
@@ -195,9 +197,10 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
   const grad = (x: number, z: number) => { if (!dir || !g) return 1; const t = Math.max(-1, Math.min(1, ((x - cx) / hx) * dir[0] + ((z - cz) / hz) * dir[1])); return 1 + g * t; };
   const clump = (x: number, z: number) => 1 - cluster + cluster * 2 * fbm(x, z, 35, 2, 77);
   const out: ScrubPoint[] = [];
-  const cell = Math.max(0.5, spacing), grid = new Map<string, Vec2[]>();
-  const free = (x: number, z: number, sp: number) => { const gx = Math.floor(x / cell), gz = Math.floor(z / cell), s2 = sp * sp; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (const [px, pz] of grid.get(`${gx + dx},${gz + dz}`) ?? []) if ((px - x) ** 2 + (pz - z) ** 2 < s2) return false; return true; };
-  const mark = (x: number, z: number) => { const k = `${Math.floor(x / cell)},${Math.floor(z / cell)}`; const l = grid.get(k); if (l) l.push([x, z]); else grid.set(k, [[x, z]]); };
+  // spacing grid keyed by an integer per cell (was `${gx},${gz}` strings: half the replay's time); cells are exact integers
+  const cell = Math.max(0.5, spacing), grid = new Map<number, number[]>(), ck = (gx: number, gz: number) => gx * 1048576 + gz;
+  const free = (x: number, z: number, sp: number) => { const gx = Math.floor(x / cell), gz = Math.floor(z / cell), s2 = sp * sp; for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const l = grid.get(ck(gx + dx, gz + dz)); if (l) for (let i = 0; i < l.length; i += 2) if ((l[i] - x) ** 2 + (l[i + 1] - z) ** 2 < s2) return false; } return true; };
+  const mark = (x: number, z: number) => { const k = ck(Math.floor(x / cell), Math.floor(z / cell)); const l = grid.get(k); if (l) l.push(x, z); else grid.set(k, [x, z]); };
   const inClear = (x: number, z: number) => clears.some(([qx, qz, r]) => (x - qx) ** 2 + (z - qz) ** 2 < r * r);
   // two passes: bushes (follow the veins a little), then grass (hugs the veins)
   const passes: { dens: number; vein: number; bush: boolean; seedK: number }[] = [
@@ -207,7 +210,7 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
   // The same area is scattered twice in a viewer (the bake's physics() counts it, the mesh places it with `blocked`):
   // the random stream and each trial's noise test depend only on the stream position, so both are memoised per
   // (area, params, seed) and a second call replays them; only `blocked` and spacing are evaluated again.
-  const memo = scrubMemo([area, seed, cap, density, grass, g, veins, cluster, String(params.toward ?? 'none'), clears]);   // what the verdicts read
+  const memo = scrubMemo(scrubKey(area, params, seed, cap));   // what the verdicts read
   for (const [pi, ps] of passes.entries()) {
     if (ps.dens <= 0) continue;
     const maxMult = (1 + (dir ? g : 0)) * (1 - ps.vein + ps.vein / VEIN_MEAN) * (1 + cluster);
@@ -237,13 +240,37 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
 // A few recent scatters (key = everything the verdicts read): each trial's noise verdict by its position in the pass's
 // random stream (the stream itself is a cheap xorshift and is regenerated). One byte per stream position.
 type ScrubMemo = { get(pass: number, at: number): boolean | undefined; set(pass: number, at: number, ok: boolean): void };
-const scrubMemos = new Map<string, ScrubMemo>();
-function scrubMemo(inputs: unknown[]): ScrubMemo {
-  const key = JSON.stringify(inputs);
+const scrubMemos = new Map<string, ScrubMemo & { marks: Uint8Array[] }>();
+/** Everything a scatter's noise verdicts read (scrubPoints' normalised params), as the memo key. */
+function scrubKey(area: Vec2[], params: Record<string, Value>, seed: number, cap: number): string {
+  const density = n(params.density, 0.0015), grass = n(params.grass, 3), g = Math.min(1, Math.max(0, n(params.gradient, 0.6))), veins = Math.min(1, Math.max(0, n(params.veins, 0.6)));
+  const cluster = Math.min(1, Math.max(0, n(params.cluster, 0.35)));
+  return JSON.stringify([area, seed, cap, density, grass, g, veins, cluster, String(params.toward ?? 'none'), clearsOf(params.clear)]);
+}
+/** Phone arrival (lane L3): the noise verdicts of a scatter (pointInPoly, playa veins, clumps — the costly pure part),
+ *  computed where nothing is blocked (a worker); `installScrubVerdicts` hands them to the viewer's thread, whose
+ *  scrubPoints then only replays the random stream, `blocked` and spacing. Same points as computing them in place. */
+export function scrubVerdicts(area: Vec2[], params: Record<string, Value>, seed: number, cap = 30000): { key: string; marks: Uint8Array[] } {
+  scrubPoints(area, params, seed, () => false, cap);
+  const key = scrubKey(area, params, seed, cap);
+  return { key, marks: scrubMemos.get(key)?.marks.map((a) => a.slice()) ?? [] };
+}
+export function installScrubVerdicts(v: { key: string; marks: Uint8Array[] }) {
+  scrubMemo(v.key);
+  const { marks } = scrubMemos.get(v.key)!;
+  v.marks.forEach((a, pass) => {
+    const cur = marks[pass];
+    if (!cur) { marks[pass] = a; return; }
+    const out = cur.length >= a.length ? cur : (() => { const b = new Uint8Array(a.length); b.set(cur); return b; })();
+    for (let at = 0; at < a.length; at++) if (a[at] && !out[at]) out[at] = a[at];
+    marks[pass] = out;
+  });
+}
+function scrubMemo(key: string): ScrubMemo {
   let m = scrubMemos.get(key);
   if (m) { scrubMemos.delete(key); scrubMemos.set(key, m); return m; }
   const marks: Uint8Array[] = [];   // 0 unknown, 1 pass, 2 fail
-  m = {
+  m = { marks,
     get(pass, at) { const v = marks[pass]?.[at]; return v === 1 ? true : v === 2 ? false : undefined; },
     set(pass, at, ok) {
       let a = marks[pass] ?? new Uint8Array(1024);
