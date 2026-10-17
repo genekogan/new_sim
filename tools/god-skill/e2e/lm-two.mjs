@@ -180,7 +180,8 @@ try {
   bootMs = await boot();
   log(`▶ world "${slug}" on :${port} booted from littlemartians-two.json in ${bootMs.toFixed(0)} ms (empty asset dir)`);
   await step('G0 the owner mints a god token', async () => { const r = await api('/v1/god/mint', { as: 'admin', body: { label: 'e2e lm-two' } }); godToken = r.data.token; return { status: r.status, token: !!godToken }; }, (r) => r.status === 200 && r.token);
-  await step(`G0 the world is the template: ${placeOps} entities`, async () => ({ count: Number(/(\d+) entities/.exec(serverLog)?.[1] ?? -1), placeOps }), (r) => r.count === placeOps);
+  // the count is in the result, not the step name: a template edit (3.2: + the grotto approach landform, 432 -> 433) must not rename the assertion
+  await step('G0 the world is the template: one entity per place op', async () => ({ count: Number(/(\d+) entities/.exec(serverLog)?.[1] ?? -1), placeOps }), (r) => r.count === placeOps);
   await step('G1 all 113 lm/map places resolve (old ids kept): an entity, a building room, or the arrival flag', async () => {
     const missing = [];
     const rooms = {};
