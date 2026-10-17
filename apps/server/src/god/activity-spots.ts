@@ -32,7 +32,7 @@ const SHELF_READ_RADIUS = 8, TABLE_SEAT_GAP = 1.0, AUDIENCE_RADIUS = 30;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
-type Thing = { id: string; e: Entity; def: StoredDef; name: string; tags: Set<string>; c: Record<string, any>; at: V2; y: number; yaw: number; level: number; size: [number, number, number]; slots: { id: string; kind: string; local: V2; yaw: number }[] };
+type Thing = { on?: string; id: string; e: Entity; def: StoredDef; name: string; tags: Set<string>; c: Record<string, any>; at: V2; y: number; yaw: number; level: number; size: [number, number, number]; slots: { id: string; kind: string; local: V2; yaw: number }[] };
 
 /** Words that say what a def is (its name without `core-`, its tags). */
 const kindOf = (t: Thing) => t.def.name.replace(/^core-/, '');
@@ -63,7 +63,7 @@ export class GodActivitySpots {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const a = CATALOG[x.def]; if (!a) continue;
       const at: V2 = [x.pose.p[0], x.pose.p[2]], y = x.pose.p[1];
-      out.push({ id, e, def, name: (e.name ?? kindOf({ def } as Thing)).replace(/-/g, ' '), tags: new Set(def.tags), c: def.components as Record<string, any>, at, y, yaw: x.pose.yaw ?? 0,
+      out.push({ ...(x.support?.kind === 'resting-on' ? { on: String(x.support.on) } : {}), id, e, def, name: (e.name ?? kindOf({ def } as Thing)).replace(/-/g, ' '), tags: new Set(def.tags), c: def.components as Record<string, any>, at, y, yaw: x.pose.yaw ?? 0,
         level: this.h.levelAt(at[0], at[1], y), size: a.size as [number, number, number], slots: (a.slots ?? []).map(s => ({ id: s.id, kind: s.kind, local: s.local as V2, yaw: s.yaw })) });
     }
     return out.sort((a, b) => (a.id < b.id ? -1 : 1));
@@ -132,6 +132,9 @@ export class GodActivitySpots {
       else if (k === 'cooking' || is(t, 'stove', 'hearth')) standSpot(t, 'cook');
       else if (is(t, 'arcade-cabinet', 'pool-table', 'dartboard', 'foosball')) standSpot(t, 'play-game', {}, t.slots.find(s => s.kind === 'stand')?.id);
     }
+    // B2 a preparation table with a cooking pot on it (old Eden's commons kitchen tables) is a place to cook
+    const potsOn = new Set(all.filter(t => t.on && is(t, 'pot', 'cooking', 'kettle')).map(t => t.on!));
+    for (const t of all) if (potsOn.has(t.id) && t.c.surface && !t.c.workstation) standSpot(t, 'cook', { label: `the cooking pot on ${this.label(t, this.place(t.at, t.level))}` });
     // B8 post letters at postboxes and mailboxes
     for (const t of all) if (is(t, 'postbox', 'mailbox', 'post-box', 'letterbox')) standSpot(t, 'post-letter', {}, 'post');
 

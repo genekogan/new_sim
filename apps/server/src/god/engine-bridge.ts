@@ -19,6 +19,7 @@ import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
 import { GodLayers } from './layers.ts';
 import { GodActivitySpots } from './activity-spots.ts';
+import { GodMeals } from './meals.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -109,6 +110,8 @@ export class EngineBridge {
   readonly mapNotices: MapNotices;
   /** E-life: the old worlds' activity spots, derived from what the god built (activity-spots.ts). */
   readonly activitySpots: GodActivitySpots;
+  /** E-life B2: finite meals (meals.ts). */
+  meals?: GodMeals;
   private godEdits = 0;
 
   constructor(o: BridgeOptions) {
@@ -157,6 +160,11 @@ export class EngineBridge {
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
       placeAt: (at, level) => this.places.placeAt(at, level), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
     if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); this.places.sync(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
+    if (this.edge) {
+      const edge = this.edge;
+      this.meals = new GodMeals({ db: this.god.db, worldId: this.host.worldId, spots: () => edge.spots, place: (id) => edge.places.byId.get(id) as never, day: () => this.layers.dayKey() });
+      edge.onReceipt((r) => { try { this.meals!.onReceipt(r); } catch (e) { this.log(`meals: ${(e as Error).message}`); } });
+    }
     if (this.edge) this.hookEdge(this.edge);
     // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
     if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
@@ -757,7 +765,15 @@ export class EngineBridge {
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
       if (typeof input?.capability === 'string' && /^(buy|pay|sell):/.test(input.capability)) return self.trade(L, soul, input as { capability: string; params?: unknown; clientRef?: unknown });
-      return act(soul, input as never);
+      const res: any = await act(soul, input as never);
+      // E-life B2: an accepted eat takes its portion from the kitchen now; the receipt says which meal it is
+      if (res?.accepted && res.receipt?.id && typeof input?.capability === 'string' && self.meals) {
+        const meal = self.meals.reserve(input.capability, res.receipt.id);
+        if (meal) { const row = L.db.db.prepare('SELECT detail FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?').get(L.host.worldId, res.receipt.id) as { detail: string | null } | undefined;
+          const d = row?.detail ? JSON.parse(row.detail) : {}; L.db.db.prepare('UPDATE edge_receipts_v1 SET detail=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({ ...d, meal }), L.host.worldId, res.receipt.id);
+          res.receipt = L.receipt(soul.soulId, res.receipt.id) ?? res.receipt; }
+      }
+      return res;
     };
   }
   /** Bed slots describe an intended use point; they do not yet provide native support/contact or ownership.
@@ -860,6 +876,7 @@ export class EngineBridge {
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
     this.sitHere(caps, plans, here);
     this.fireLit(caps);
+    try { this.meals?.capabilities(caps); } catch (e) { this.log(`meals capabilities: ${(e as Error).message}`); }
   }
   /** B6: a god-built campfire that has been put out warms nobody: warm-by-fire there is refused until someone lights it. */
   private fireLit(caps: EdgeCapability[]) {

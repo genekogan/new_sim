@@ -98,7 +98,7 @@ test('B1/B4/B8/B2/B3: god-built shelves, desks, easels, postboxes, tables and a 
   for (const p of want) assert.ok(ids.some((id: string) => id.startsWith(p)), `${p} offered: ${ids.filter((i: string) => /^(read|write|paint|post|cook|eat|drink|play)/.test(i)).join(' ')}`);
   t.diagnostic(JSON.stringify(w.bridge.activitySpots.stats));
   const outcomes: Record<string, string> = {};
-  for (const p of ['read:read.', 'write:write.', 'paint:paint.', 'post-letter:post-letter.', 'eat:eat.', 'play-piano:play-piano.', 'cook:cook.', 'listen:listen.', 'swing:swing.']) {
+  for (const p of ['read:read.', 'write:write.', 'paint:paint.', 'post-letter:post-letter.', 'cook:cook.', 'eat:eat.', 'play-piano:play-piano.', 'listen:listen.', 'swing:swing.']) {
     const cap = w.edge.capabilities(ana).find((c: any) => c.id.startsWith(p))!, pose = p.split(':')[0].replace('post-letter', 'post-letter');
     const { r, seen } = await w.act(ana, cap.id, { seconds: 6 }, () => w.body(ana)?.human?.activity === pose ? { at: w.body(ana).pose.p, base: w.body(ana).human.baseActivity } : null);
     if (p === 'read:read.') assert.match(String(r.outcome?.summary), /^Read .+, passage 1 of \d+\.$/, 'a book from the Eden library, not the constitution');
@@ -146,4 +146,39 @@ test('B5/B3: the E-life patch gym, courts and band things are activity spots res
   assert.ok(b1.seen, 'both played volleyball at once');
   assert.equal(b1.r.phase, 'completed', JSON.stringify(b1.r));
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
+
+test('B2: a resident cooks a pot (4 portions) at a prep table; eating draws them; none left refuses', { timeout: 900000 }, async (t) => {
+  const w = await lifeWorld(t, [
+    { op: 'place', tmp: '$prep', def: coreRef('long-table'), name: 'prep-table', p: [0, 14] },
+    { op: 'place', def: coreRef('pot'), name: 'cooking-pot', in: { parent: '$prep', slot: 'top' }, p: [0, 0, 0] },
+    { op: 'place', def: coreRef('picnic-table'), name: 'picnic-table', p: [8, 14] },
+  ]);
+  const ana = await w.soul('Ana');
+  const eatCap = () => w.edge.capabilities(ana).find((c: any) => c.id.startsWith('eat:eat.'))!;
+  const cook = w.edge.capabilities(ana).find((c: any) => c.id.startsWith('cook:cook.'));
+  assert.ok(cook?.available, 'cook offered at the prep table with a pot: ' + w.edge.capabilities(ana).filter((c: any) => /^(cook|eat)/.test(c.id)).map((c: any) => c.id).join(' '));
+  assert.match(cook!.label, /makes 4 portions/);
+  assert.equal(eatCap().available, false); assert.equal(eatCap().blocked?.code, 'meal.none');
+  const ck = await w.act(ana, cook!.id, { seconds: 5 });
+  assert.equal(ck.r.phase, 'completed', JSON.stringify(ck.r));
+  await w.settle(2);
+  const e1 = eatCap(); assert.equal(e1.available, true, JSON.stringify(e1)); assert.match(e1.label, /\(4 portions left\)/);
+  const ate = await w.act(ana, e1.id, { seconds: 5 });
+  assert.equal(ate.r.phase, 'completed', JSON.stringify(ate.r));
+  assert.equal(ate.r.meal?.left, 3, JSON.stringify(ate.r.meal));
+  await w.settle(2);
+  assert.match(eatCap().label, /\(3 portions left\)/);
+  // three more, then none: the fifth is refused until someone cooks again
+  for (let i = 0; i < 3; i++) { const r = await w.act(ana, eatCap().id, { seconds: 5 }); assert.equal(r.r.phase, 'completed'); await w.settle(2); }
+  assert.equal(eatCap().blocked?.code, 'meal.none');
+  // a drink needs no kitchen
+  assert.ok(w.edge.capabilities(ana).find((c: any) => c.id.startsWith('drink:eat.'))?.available);
+  // on a world with days, every kitchen starts each day with a morning pot (4 portions), never more than it had
+  const { GodMeals } = await import('./meals.ts');
+  let day = 'd1'; const m = new GodMeals({ db: w.db, worldId: 'morning-pot', spots: () => w.edge.spots, place: (id) => w.edge.places.byId.get(id) as never, day: () => day });
+  const spot = w.edge.spots.spots.find((s: any) => s.activity === 'eat')!, k = m.kitchenFor(spot)!;
+  assert.equal(m.stock(k.key).portions, 4);
+  assert.ok(m.reserve(`eat:${spot.id}`, 'r_1')); assert.equal(m.stock(k.key).portions, 3);
+  day = 'd2'; assert.equal(m.stock(k.key).portions, 4);
 });
