@@ -676,10 +676,11 @@ export class Together {
     const held = this.heldBy(soul.soulId);
     const give = /^(?:give|hand|pass|offer)\s+(.+?)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:book|flower|flowers|cup|tea|coffee|food|snack|letter|tool|frisbee|it|this|that|thing)$/.exec(t) ?? /^(?:give|hand|pass|offer)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:\w+\s+)?(?:to)\s+(.+)$/.exec(t) ?? /^(?:give|hand|pass)\s+(?:it|this|that)\s+to\s+(.+)$/.exec(t);
     if (give) {
-      if (!held) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+      // a world may offer its own give for what is in the hand (a god-built thing: god/held.ts)
+      if (!held && !caps.some(c => c.verb === 'give')) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const o = who(give[1]); if (!o) return notHere('give', give[1]);
       const c = capFor('give', o); if (!c) return tooFar('give', o);
-      return {capability: c.id, note: `${raw} is ${c.id} (${held.name})`};
+      return {capability: c.id, note: `${raw} is ${c.id}${held ? ` (${held.name})` : ''}`};
     }
     if (/^(?:put\s+(?:it|this|that|the\s+\w+|my\s+\w+)\s+down|put\s+down(?:\s+.*)?|drop(?:\s+.*)?|set\s+(?:it|.+)\s+down|leave\s+(?:it|the\s+\w+)\s+here|put\s+(?:it|the\s+\w+)\s+back)$/.test(t)) {
       if (!held) return {code: 'hands.empty', reason: 'You are not holding anything.', did_you_mean: []};

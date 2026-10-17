@@ -319,3 +319,23 @@ test('B7: a god-built ferris wheel is a ride: a resident boards, goes round the 
   assert.ok(off, 'stepped off after one turn');
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
+
+test('give: a resident hands a god-built book to another (sets it down at their feet; they pick it up)', { timeout: 600000 }, async (t) => {
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('table'), tmp: '$t', name: 'table', p: [0, 6] }, { op: 'place', def: coreRef('book'), name: 'novel', in: { parent: '$t', slot: 'top' }, p: [0, 0, 0] }]);
+  const ana = await w.soul('Ana'), bo = await w.soul('Bo');
+  const book = w.byName('novel');
+  assert.equal((await w.act(ana, `pick-up:${book.id}`)).r.phase, 'completed');
+  // "pick up a book and give it to Bo": the give is offered and resolves from plain words
+  const give: any = await accept(w.host, w.edge.act(ana, { capability: 'give the book to Bo' }));
+  assert.equal(give.accepted, true, JSON.stringify(give).slice(0, 500));
+  assert.equal(give.receipt.capability, `give:${bo.soulId}`);
+  let r: any; for (let i = 0; i < 4000; i++) { w.host.tickOnce(); if (i % 20 === 0) { await w.settle(1); r = w.edge.receipt(ana.soulId, give.receipt.id); if (r && !['waiting', 'started'].includes(r.phase)) break; } }
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  assert.match(r.outcome.summary, /at Bo's feet/);
+  const e = (w.host.engine as any).world.entities[book.id], bb = w.body(bo);
+  assert.equal(e.support?.kind, 'ground');
+  assert.ok(Math.hypot(e.pose.p[0] - bb.pose.p[0], e.pose.p[2] - bb.pose.p[2]) < 2.5, 'the book lies by Bo');
+  const pick = w.edge.capabilities(bo).find((c: any) => c.id === `pick-up:${book.id}`);
+  assert.ok(pick?.available, 'Bo can pick it up');
+  assert.equal((await w.act(bo, pick!.id)).r.phase, 'completed');
+});

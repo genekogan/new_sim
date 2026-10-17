@@ -33,7 +33,7 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
   const putting = new Map<string, string>(), act = L.act.bind(L);
   (L as any).act = async (soul: { soulId: string; entityId: string }, input: { capability?: unknown }) => {
     const c = typeof input?.capability === 'string' ? input.capability : '';
-    if (/^put-(on|down)(:|$)/.test(c)) { const x = heldGodThing(ents(), soul.entityId); if (x) putting.set(soul.soulId, x.id); }
+    if (/^(?:put|give|hand|pass|drop|set)\b/i.test(c)) { const x = heldGodThing(ents(), soul.entityId); if (x) putting.set(soul.soulId, x.id); }
     return act(soul as never, input as never);
   };
   // put it down here (the edge offers put-down:here only for its own items)
@@ -54,11 +54,26 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
       ...(face !== yaw0 ? [{ verb: 'mars:walk_to', params: { x: p[0], z: p[2], level, face: Math.atan2(Math.sin(face), Math.cos(face)) } }] : []),
       { verb: 'mars:put_item', params: { item: x.id, surfaceSlot: 'ground' } }] });
   };
+  // E-life (quality case 35): hand a god-built thing to someone near: walk up to them and set it down at their feet for
+  // them to pick up (the engine has no hand-to-hand transfer); they hear of it. Offered where the edge offers no give.
+  const prev2 = L.worldProfile;
+  L.worldProfile = (soul, caps, plans) => {
+    prev2?.(soul, caps, plans);
+    const x = heldGodThing(ents(), soul.entityId); if (!x) return;
+    const me = ents()[soul.entityId], seated = me?.human?.activity === 'sit' || me?.human?.baseActivity === 'sit';
+    for (const o of L.perceivedBodies(soul.soulId, 20)) {
+      const id = `give:${o.soulId}`; if (caps.some((c) => c.id === id)) continue;
+      const label = `Hand ${name(x.id)} to ${o.name}: walk up and set it down at their feet for them to pick up`;
+      caps.push({ id, verb: 'give', label, target: { id: o.soulId, kind: 'soul' }, available: true });
+      plans.set(id, { label, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), { verb: 'walk_to', params: { to: o.entityId, standoff: 1.2 } }, { verb: 'mars:put_item', params: { item: x.id, surfaceSlot: 'ground' } }] });
+    }
+  };
   // receipts: what changed
   const outcomes = (L as any).outcomes, terminal = outcomes.terminal.bind(outcomes);
   outcomes.terminal = (receipt: any, snapshot: any, effects: any = {}) => {
     const [kind, target] = String(receipt.capability ?? '').split(':');
-    if (receipt.phase !== 'completed' || !['pick-up', 'put-on', 'put-down'].includes(kind) || outcomes.read(receipt.id)) return terminal(receipt, snapshot, effects);
+    if (receipt.phase !== 'completed' || !['pick-up', 'put-on', 'put-down', 'give'].includes(kind) || outcomes.read(receipt.id)) return terminal(receipt, snapshot, effects);
+    if (kind === 'give' && !putting.has(outcomes.context(receipt.id)?.soulId ?? '')) return terminal(receipt, snapshot, effects);   // an edge item's give
     const ctx = outcomes.context(receipt.id), body = ctx ? h.minds.get(ctx.soulId)?.entityId : undefined;
     if (!body) return terminal(receipt, snapshot, effects);
     let eff = effects;
@@ -70,6 +85,12 @@ export function installHeld(L: EdgeLedger, h: HeldHost) {
       const id = putting.get(ctx.soulId), x = id ? ents()[id] : undefined;
       if (x && !(x.support?.kind === 'in-hand' && x.support.by === body)) {
         const where = x.support?.kind === 'resting-on' ? `on ${name(x.support.on)}` : 'on the ground';
+        if (kind === 'give') {
+          const to = h.minds.get(target), toName = (to as { name?: string } | undefined)?.name ?? 'them';
+          try { (L.comms as any)?.streams?.deliver?.(target, 'world.notice', h.engine.world.tick ?? 0, { text: `${(h.minds.get(ctx.soulId) as { name?: string } | undefined)?.name ?? 'Someone'} set ${name(x.id)} down at your feet for you: pick-up:${x.id}.` }); } catch { /* notices are best effort */ }
+          eff = { ...effects, summary: `Set ${name(x.id)} down at ${toName}'s feet for them to pick up (pick-up:${x.id}); it is not in their hand until they do.`, changed: [...(effects.changed ?? []), { id: x.id, kind: 'item-placed', summary: `${name(x.id)} is on the ground by ${toName}.`, source: `item:${x.id}:placed` }] };
+          putting.delete(ctx.soulId); return terminal(receipt, snapshot, eff);
+        }
         eff = { ...effects, summary: `Put ${name(x.id)} down ${where}.`, changed: [...(effects.changed ?? []), { id: x.id, kind: 'item-placed', summary: `${name(x.id)} is ${where}; your hands are free.`, source: `item:${x.id}:placed` }] };
       }
       putting.delete(ctx.soulId);
