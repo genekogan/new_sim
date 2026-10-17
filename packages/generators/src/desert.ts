@@ -204,16 +204,23 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
     { dens: density, vein: veins, bush: true, seedK: 0x3c05 },
     { dens: density * grass, vein: Math.min(1, veins * 1.4), bush: false, seedK: 0x6a55 },
   ];
-  for (const ps of passes) {
+  // The same area is scattered twice in a viewer (the bake's physics() counts it, the mesh places it with `blocked`):
+  // the random stream and each trial's noise test depend only on the stream position, so both are memoised per
+  // (area, params, seed) and a second call replays them; only `blocked` and spacing are evaluated again.
+  const memo = scrubMemo(area, params, seed, cap);
+  for (const [pi, ps] of passes.entries()) {
     if (ps.dens <= 0) continue;
     const maxMult = (1 + (dir ? g : 0)) * (1 - ps.vein + ps.vein / VEIN_MEAN) * (1 + cluster);
-    const tries = Math.min(cap * 4, Math.floor(A * ps.dens * maxMult)), rnd = rng(((seed | 0) ^ ps.seedK) || 1);
+    const tries = Math.min(cap * 4, Math.floor(A * ps.dens * maxMult)), gen = rng(((seed | 0) ^ ps.seedK) || 1);
+    let j = 0; const rnd = () => { j++; return gen(); };
     for (let i = 0; i < tries && out.length < cap; i++) {
-      const x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0), r = rnd(), r2 = rnd(), r3 = rnd(), r4 = rnd();
-      if (!pointInPoly(x, z, area)) continue;
-      const m = grad(x, z) * (1 - ps.vein + (ps.vein * playaVein(x, z)) / VEIN_MEAN) * clump(x, z);
-      if (r * maxMult > m) continue;
-      if (inClear(x, z) || blocked(x, z)) continue;
+      const at = j, x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0), r = rnd(), r2 = rnd(), r3 = rnd(), r4 = rnd();
+      let pass = memo.get(pi, at);
+      if (pass === undefined) {
+        pass = pointInPoly(x, z, area) && !(r * maxMult > grad(x, z) * (1 - ps.vein + (ps.vein * playaVein(x, z)) / VEIN_MEAN) * clump(x, z)) && !inClear(x, z);
+        memo.set(pi, at, pass);
+      }
+      if (!pass || blocked(x, z)) continue;
       if (ps.bush) {
         if (!free(x, z, spacing)) continue;
         const h = hMin + (hMax - hMin) * Math.pow(r2, 1.6);
@@ -225,6 +232,28 @@ export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: n
     }
   }
   return out;
+}
+
+// A few recent scatters (key = area, params, seed, cap): each trial's noise verdict by its position in the pass's
+// random stream (the stream itself is a cheap xorshift and is regenerated). One byte per stream position.
+type ScrubMemo = { get(pass: number, at: number): boolean | undefined; set(pass: number, at: number, ok: boolean): void };
+const scrubMemos = new Map<string, ScrubMemo>();
+function scrubMemo(area: Vec2[], params: Record<string, Value>, seed: number, cap: number): ScrubMemo {
+  const key = JSON.stringify([area, params, seed, cap]);
+  let m = scrubMemos.get(key);
+  if (m) { scrubMemos.delete(key); scrubMemos.set(key, m); return m; }
+  const marks: Uint8Array[] = [];   // 0 unknown, 1 pass, 2 fail
+  m = {
+    get(pass, at) { const v = marks[pass]?.[at]; return v === 1 ? true : v === 2 ? false : undefined; },
+    set(pass, at, ok) {
+      let a = marks[pass] ?? new Uint8Array(1024);
+      if (at >= a.length) { const b = new Uint8Array(Math.max(at + 1, a.length * 2)); b.set(a); a = b; }
+      marks[pass] = a; a[at] = ok ? 1 : 2;
+    },
+  };
+  scrubMemos.set(key, m);
+  while (scrubMemos.size > 4) scrubMemos.delete(scrubMemos.keys().next().value!);
+  return m;
 }
 
 /** Mean of playaVein over a large area (measured), so `density` stays the true average whatever `veins` is. */
