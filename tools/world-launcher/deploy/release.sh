@@ -60,7 +60,8 @@ fi
 REL="$RELROOT/$BUILD"
 echo "== upload to $HOST:$REL"
 PREV="$(ssh "$HOST" "readlink /srv/sim-worlds/$STAGE 2>/dev/null || true")"
-ssh "$HOST" "install -d -m 750 $RELROOT $REL"
+# never re-mode an existing releases root (install -d would chmod it; /srv/sim-old/releases must stay traversable)
+ssh "$HOST" "[ -d $RELROOT ] || install -d -m 750 $RELROOT; install -d -m 750 $REL"
 rsync -az --delete ${PREV:+--link-dest="$PREV/"} --exclude node_modules "$OUT/" "$HOST:$REL/"
 
 echo "== install (user, dirs, unit; idempotent) and Linux dependencies"
