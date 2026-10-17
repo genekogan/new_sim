@@ -26,6 +26,8 @@ export type SpotsHost = {
 
 /** How many seats per place offer the same seated activity (old Eden: 24 reading spots over the whole town). */
 const PER_PLACE = { read: 4, eat: 3, write: 2, 'use-computer': 3, listen: 8 } as const;
+/** Free spots offered per activity (nearest first) and places to read in. */
+const NEAREST = 4;
 const SHELF_READ_RADIUS = 8, TABLE_SEAT_GAP = 1.0, AUDIENCE_RADIUS = 30;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const d2 = (a: V2, b: V2) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -70,12 +72,12 @@ export class GodActivitySpots {
   /** A local (x, z) of a thing in world coordinates (engine poses carry Mars yaw: x' = x cos − z sin). */
   private world(t: Thing, l: V2): V2 { const c = Math.cos(t.yaw), s = Math.sin(t.yaw); return [r2(t.at[0] + l[0] * c - l[1] * s), r2(t.at[1] + l[0] * s + l[1] * c)]; }
   /** Where a body stands to use a thing: its own `stand` slot (a postbox's letter slot, a bookcase's browse point), else
-   *  in front of it (+z local, the def's front), on clear ground at its level; null when nowhere is clear. */
+   *  in front of it (+z local, the def's front). */
   private standAt(t: Thing, slot?: string): V2 | null {
     const s = t.slots.find(q => q.kind === 'stand' && (!slot || q.id === slot));
-    const want = s ? this.world(t, s.local) : this.world(t, [0, t.size[2] / 2 + 0.45]);
-    const f = this.h.engine.standableNearV1; if (!f) return want;
-    return f.call(this.h.engine, want, t.level, undefined, 0.3, 6);
+    // No standing-ground probe here (it paged in fine nav tiles across the whole world: 18 s on Eden 2026); the ledger's
+    // activities step a spot that lies inside furniture back out at offer time, near the Soul, from warm tiles.
+    return s ? this.world(t, s.local) : this.world(t, [0, t.size[2] / 2 + 0.45]);
   }
   private place(at: V2, level: number) { return this.h.placeAt(at, level) ?? undefined; }
   private label(t: Thing, place?: string) { const p = place ? this.h.placeName(place) : null; return `${t.name}${p && p.toLowerCase() !== t.name.toLowerCase() ? ` in ${p}` : ''}`.slice(0, 80); }
@@ -186,7 +188,7 @@ export class GodActivitySpots {
       if (t.tags.has('petanque')) for (const [k, x] of [['a', -0.6], ['b', 0.6]] as const)
         add({ id: `play-petanque.${t.id}.${k}`.toLowerCase(), activity: 'play-petanque', base: 'idle', at: this.world(t, [x, -t.size[2] / 2 + 0.6]), faceTo: this.world(t, [x, t.size[2] / 2]), label: this.label(t, place), ...(place ? { place } : {}) });
     }
-    return { contract: 'activity-spots/1', spots, shelves, interiors: [], solids: [], rings: [], platforms: [] };
+    return { contract: 'activity-spots/1', spots, shelves, interiors: [], solids: [], rings: [], platforms: [], nearest: NEAREST };
   }
 }
 

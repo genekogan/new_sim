@@ -132,7 +132,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private mergedSpots: {from: SpotsData; value: SpotsData} | null = null;
   get spots(): SpotsData {
     const extra = this.spotsProvider?.(); if (!extra) return this.baseSpots;
-    if (this.mergedSpots?.from !== extra) {const b = this.baseSpots; this.mergedSpots = {from: extra, value: {contract: 'activity-spots/1', spots: [...b.spots, ...extra.spots], shelves: [...b.shelves, ...extra.shelves], interiors: b.interiors, solids: b.solids, rings: b.rings, platforms: b.platforms, ...(b.docks || extra.docks ? {docks: [...(b.docks ?? []), ...(extra.docks ?? [])]} : {})}};}
+    if (this.mergedSpots?.from !== extra) {const b = this.baseSpots; this.mergedSpots = {from: extra, value: {contract: 'activity-spots/1', spots: [...b.spots, ...extra.spots], shelves: [...b.shelves, ...extra.shelves], interiors: b.interiors, solids: b.solids, rings: b.rings, platforms: b.platforms, ...(b.docks || extra.docks ? {docks: [...(b.docks ?? []), ...(extra.docks ?? [])]} : {}), ...(extra.nearest ? {nearest: extra.nearest} : {})}};}
     return this.mergedSpots.value;
   }
   readonly outcomes:ActionOutcomes;

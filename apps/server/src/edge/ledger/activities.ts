@@ -23,7 +23,10 @@ export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 
 export type Shelf = {id: string; place?: string; at: V2; faceTo?: V2; level?: number};
 /** todo (leisure): a bicycle dock: `bikes` bicycles stand in it; a ride takes one and brings it back. */
 export type Dock = {id: string; place?: string; at: V2; faceTo?: V2; bikes: number; label?: string};
-export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[]};
+export type SpotsData = {contract: 'activity-spots/1'; spots: Spot[]; shelves: Shelf[]; interiors: Interior[]; solids: Solid[]; rings: Ring[]; platforms: Platform[]; docks?: Dock[];
+  /** E-life (derived spots on big god worlds): offer only the nearest N free spots per activity and the nearest N places to
+   *  read in (Eden 2026 has ~300 tables and ~100 bookcases; all of them within 200 m made a 470 kB list). Unset: all. */
+  nearest?: number};
 export type Plan = {label: string; steps: Program['steps']; seconds?: boolean};
 
 /** Activities a spot may offer, with their default prop and seconds. */
@@ -189,18 +192,22 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   // read:<place>: every place that has reading spots (the room and its building), nearest free spot in it
   const byPlace = new Map<string, Spot[]>();
   for (const s of readers) for (const p of s.place ? [s.place, ...w.ancestors(s.place)] : []) byPlace.set(p, [...(byPlace.get(p) ?? []), s]);
-  for (const [place, list] of [...byPlace].sort((a, b) => a[0].localeCompare(b[0]))) {
+  const placesToRead = [...byPlace].sort((a, b) => a[0].localeCompare(b[0]));
+  if (data.nearest) placesToRead.sort((a, b) => d2(a[1][0].at, w.me) - d2(b[1][0].at, w.me) || a[0].localeCompare(b[0])).splice(data.nearest * 2);
+  for (const [place, list] of placesToRead) {
     const s = list[0], name = w.placeName(place) ?? place;
     if (d2(s.at, w.me) > 200) continue;
     add({id: 'read:' + place, verb: 'read', label: `Read a book in ${name}`, available: true, target: {id: place, kind: 'place'}, params: secondsParam(180)}, {label: `Read a book in ${name}`, steps: readAt(s), seconds: true});
   }
   // ---- every other free spot within reach: play-piano:<spot>, paint:<spot>, use-computer:<spot>, sing:<spot>, listen:<seat>…
   const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
-  for (const s of live) {
+  const offered = new Map<string, number>(), ordered = data.nearest ? [...live].sort((a, b) => d2(a.at, w.me) - d2(b.at, w.me) || a.id.localeCompare(b.id)) : live;
+  for (const s of ordered) {
     if (s.base === 'lie' && !LYING_SPOT.has(s.activity)) continue;
     if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
+      if (data.nearest) {const n = offered.get(activity) ?? 0; if (n >= data.nearest) continue; offered.set(activity, n + 1);}
       // R5: a listener's seat is offered once someone is telling the story (its required spot is in use)
       const needs = s.requires ? data.spots.find(x => x.id === s.requires) : undefined, missing = !!needs && !w.taken(needs.at, needs.id);
       const waiting = s.together ? w.groupSize(s.together.group) : 0, withWho = s.together ? (waiting ? `; ${waiting} waiting on the other end, join them` : (s.together.alone === 'start' ? `; starts after ${s.together.wait} s, others may join` : `; waits up to ${s.together.wait} s for someone to join`)) : '';
