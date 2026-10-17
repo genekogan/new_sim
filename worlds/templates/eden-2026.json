@@ -7512,7 +7512,118 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ]
+            }
           }
         },
         {
@@ -7532,7 +7643,118 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ]
+            }
           }
         },
         {
@@ -7552,7 +7774,118 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ]
+            }
           }
         },
         {
@@ -7572,7 +7905,118 @@
             "floors": 3,
             "floorHeight": 3.1,
             "roof": "flat",
-            "balcony": true
+            "balcony": true,
+            "plan": {
+              "floors": [
+                {
+                  "rooms": [
+                    {
+                      "id": "lobby",
+                      "name": "Lobby",
+                      "rect": [
+                        0,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "exterior": [
+                    {
+                      "room": "lobby",
+                      "wall": "s",
+                      "kind": "door",
+                      "at": 0.5,
+                      "width": 1.6
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-1-west",
+                      "name": "Guest room 101",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-1-east",
+                      "name": "Guest room 102",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-1-west",
+                        "guest-1-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                },
+                {
+                  "rooms": [
+                    {
+                      "id": "guest-2-west",
+                      "name": "Guest room 201",
+                      "rect": [
+                        0,
+                        0,
+                        6.25,
+                        10
+                      ]
+                    },
+                    {
+                      "id": "guest-2-east",
+                      "name": "Guest room 202",
+                      "rect": [
+                        6.25,
+                        0,
+                        12.5,
+                        10
+                      ]
+                    }
+                  ],
+                  "doors": [
+                    {
+                      "between": [
+                        "guest-2-west",
+                        "guest-2-east"
+                      ],
+                      "at": 0.5,
+                      "width": 1
+                    }
+                  ]
+                }
+              ],
+              "stairs": [
+                {
+                  "from": 0,
+                  "to": 1,
+                  "room": "lobby",
+                  "wall": "n",
+                  "at": 0
+                },
+                {
+                  "from": 1,
+                  "to": 2,
+                  "room": "guest-1-west",
+                  "wall": "w",
+                  "at": 1
+                }
+              ]
+            }
           }
         },
         {
@@ -38142,286 +38586,6 @@
       ]
     },
     {
-      "note": "furnish seafront-hotel-1",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-1",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-2",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-2",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-3",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-3",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish seafront-hotel-4",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/bench-seat@1",
-          "name": "hall-bench",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "hall"
-          },
-          "p": [
-            5.835,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/floor-lamp@1",
-          "name": "hall-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "hall"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "gallery"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/floor-lamp@1",
-          "name": "gallery-2-lamp",
-          "in": {
-            "parent": "seafront-hotel-4",
-            "slot": "gallery-2"
-          },
-          "p": [
-            -5.77,
-            0,
-            -4.52
-          ],
-          "r": 0
-        }
-      ]
-    },
-    {
       "note": "furnish castle-keep",
       "group": "eden-2026",
       "ops": [
@@ -55273,6 +55437,2470 @@
             0.7,
             0,
             0.05
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel1-reception",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#2f6b6b",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel1-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel1-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#2f6b6b",
+            "pillow": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel1-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel1-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel1-plant-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel1-plant-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel1-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-101-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-101-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-101-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-102-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-102-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-102-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-201-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-201-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-201-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel1-202-bed",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel1-202-desk",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel1-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#2f6b6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel1-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel1-202-rug",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#2f6b6b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel1-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-1",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel2-reception",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#34476b",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel2-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel2-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#34476b",
+            "pillow": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel2-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel2-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel2-plant-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel2-plant-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel2-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-101-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-101-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-101-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-102-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-102-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 5",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-102-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-201-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-201-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-201-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel2-202-bed",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel2-202-desk",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel2-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel2-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel2-202-rug",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#34476b",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel2-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-2",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 6",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel3-reception",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#b0573a",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel3-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel3-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#b0573a",
+            "pillow": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel3-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel3-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel3-plant-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel3-plant-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel3-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-101-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-101-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 7",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-101-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-102-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-102-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-102-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-201-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-201-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-201-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 8",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel3-202-bed",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel3-202-desk",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel3-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#b0573a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel3-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel3-202-rug",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#b0573a",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel3-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-3",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/counter@1",
+          "name": "hotel4-reception",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -4.45
+          ],
+          "params": {
+            "cab": "#8ea47f",
+            "top": "#c9b48f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/bookcase@1",
+          "name": "hotel4-reception-shelf",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            5.1,
+            0,
+            -4.5
+          ],
+          "params": {
+            "sx": 0.9,
+            "sy": 0.9
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-lounge-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "hotel4-lounge-sofa",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.55,
+            0,
+            1.6
+          ],
+          "r": 1.571,
+          "params": {
+            "fabric": "#8ea47f",
+            "pillow": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel4-lounge-armchair-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            0.7
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "hotel4-lounge-armchair-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -2.6,
+            0,
+            2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "fabric": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel4-plant-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 9",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "hotel4-plant-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            4.3
+          ],
+          "params": {
+            "sy": 1.4
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/floor-lamp@1",
+          "name": "hotel4-floor-lamp",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -5.6,
+            0,
+            -1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-pendant-1",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            2.6,
+            0,
+            -1.5
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-pendant-2",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "lobby"
+          },
+          "p": [
+            -3.9,
+            0,
+            1.6
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-101-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-101-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-101-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-101-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-101-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-101-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-102-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-102-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-102-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-102-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: hotels 10",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-102-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-102-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-1-east"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-201-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            -1.85,
+            0,
+            -2.5
+          ],
+          "r": 1.571,
+          "params": {
+            "quilt": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-201-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-201-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-201-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-201-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-201-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-west"
+          },
+          "p": [
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/bed@1",
+          "name": "hotel4-202-bed",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            1.85,
+            0,
+            -2.5
+          ],
+          "r": -1.571,
+          "params": {
+            "quilt": "#c98a8a"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "hotel4-202-desk",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            4.4
+          ],
+          "r": 3.142,
+          "params": {
+            "top": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "hotel4-202-desk-chair",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            3.6
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#8ea47f"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wardrobe@1",
+          "name": "hotel4-202-wardrobe",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            -2,
+            0,
+            4.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#8a5a36"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "hotel4-202-rug",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0.6
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "hotel4-202-pendant",
+          "in": {
+            "parent": "seafront-hotel-4",
+            "slot": "guest-2-east"
+          },
+          "p": [
+            0,
+            0,
+            0
           ]
         }
       ]

@@ -157,3 +157,33 @@ export const SMALL_HOUSES = [['eden-house-1', 0], ['eden-house-2', 1]].flatMap((
     st('desk', 'desk', [0, -1.0], N, { params: { top: wood } }), st('chair', 'chair', [0, -0.25], S, { params: { wood, cushion: fab } }),
   ];
 });
+
+// Seafront hotels 1-4 (old eden-regions resort-lake + buildings.ts furnishBalconyRooms; 12.5 x 10 m, three floors, door
+// south): a lobby with a reception counter and a sitting corner; upstairs every guest room has a bed, a writing desk with
+// a chair, a wardrobe, a rug and a pendant, like old Eden's pictured hotel rooms. Stair openings (lobby north-west, whose head lands by the first-floor west room's north wall; the
+// first-floor west room's west wall) and the doorway between the two rooms (x 0, z 0) are left clear.
+const HOTEL_FABRIC = [[C.teal, C.ochre], [C.navy, C.cream], [C.rust, C.sage], [C.sage, C.rose]];
+export const HOTELS = [1, 2, 3, 4].flatMap(i => {
+  const h = `seafront-hotel-${i}`, [fab, quilt] = HOTEL_FABRIC[i - 1], P = (room, name, def, p, r, extra) => piece(room, h, `hotel${i}-${name}`, def, [p[0], 0, p[1]], r, extra);
+  // p in a guest room is in the room's own frame (origin at its centre, 6.25 x 10 m); s = +1 for the east room
+  const guest = (room, tag, side) => { const s = side === 'west' ? -1 : 1; return [
+    P(room, `${tag}-bed`, 'bed', [s * 1.85, -2.5], s < 0 ? W : E, { params: { quilt: (Number(tag[0]) + (s > 0 ? 1 : 0)) % 2 ? quilt : C.cream } }),
+    P(room, `${tag}-desk`, 'desk', [0, 4.4], S, { params: { top: C.oak } }),
+    P(room, `${tag}-desk-chair`, 'chair', [0, 3.6], N, { params: { wood: C.walnut, cushion: fab } }),
+    P(room, `${tag}-wardrobe`, 'wardrobe', [-s * 2.0, 4.45], S, { params: { wood: C.oak } }), // beside the desk: the north wall of the west rooms is the stair head
+    P(room, `${tag}-rug`, 'rug', [0, 0.6], N, { params: { border: fab, field: C.cream } }),
+    P(room, `${tag}-pendant`, 'eden-pendant@1', [0, 0], N),
+  ]; };
+  return [
+    P('lobby', 'reception', 'counter', [2.6, -4.45], N, { params: { cab: fab, top: C.ash } }),
+    P('lobby', 'reception-shelf', 'bookcase', [5.1, -4.5], N, { params: { sx: 0.9, sy: 0.9 } }),
+    P('lobby', 'lounge-rug', 'rug', [-3.9, 1.6], N, { params: { border: fab, field: C.cream } }),
+    P('lobby', 'lounge-sofa', 'sofa', [-5.55, 1.6], W, { params: { fabric: fab, pillow: quilt } }),
+    P('lobby', 'lounge-armchair-1', 'armchair', [-2.6, 0.7], E, { params: { fabric: quilt } }),
+    P('lobby', 'lounge-armchair-2', 'armchair', [-2.6, 2.5], E, { params: { fabric: quilt } }),
+    P('lobby', 'plant-1', 'potted-plant', [5.6, 4.3], N, { params: { sy: 1.4 } }), P('lobby', 'plant-2', 'potted-plant', [-5.6, 4.3], N, { params: { sy: 1.4 } }),
+    P('lobby', 'floor-lamp', 'floor-lamp', [-5.6, -1.0], N), P('lobby', 'pendant-1', 'eden-pendant@1', [2.6, -1.5], N), P('lobby', 'pendant-2', 'eden-pendant@1', [-3.9, 1.6], N),
+    ...guest('guest-1-west', '101', 'west'), ...guest('guest-1-east', '102', 'east'),
+    ...guest('guest-2-west', '201', 'west'), ...guest('guest-2-east', '202', 'east'),
+  ];
+});

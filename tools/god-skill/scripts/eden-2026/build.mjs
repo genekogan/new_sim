@@ -12,7 +12,7 @@ import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
 import {treeBatches} from './trees.mjs';
 import {lightOps,propOps} from './street-life.mjs';
-import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS,HOUSES,BARN,BARN_TOPS,SMALL_HOUSES} from './interiors.mjs';
+import {INTERIOR_DEFS,LIBRARY,LIBRARY_TOPS,CAFE,CAFE_TOPS,OFFICE,OFFICE_TOPS,HOUSES,BARN,BARN_TOPS,SMALL_HOUSES,HOTELS} from './interiors.mjs';
 const root=resolve(import.meta.dirname,'../../../..');
 const out=resolve(process.env.EDEN_BUILD_OUT??`${root}/.lane/eden-build`);mkdirSync(out,{recursive:true});
 const db=new Db(':memory:');
@@ -56,7 +56,7 @@ for(const b of BUILDING_BATCHES)apply(b.label,b.ops.map(op=>op.name==='region-ha
 for(const b of COMMONS_BATCHES)apply(b.label,b.ops);
 const furniture=[];
 for(const b of BUILDINGS){if(b.autoFurnished||!b.furnishStyle||b.circulation)continue;const f=furnishBatch(god.model,b.name,b.furnishStyle);const rootNames=new Map([...god.model.entities.values()].filter(e=>e.in?.parent==='world'||!e.in).map(e=>[e.id,e.name]));for(const op of f.ops){if(rootNames.has(op.in?.parent))op.in.parent=rootNames.get(op.in.parent);if(op.price){delete op.price;f.notes.push('Public service is free; this template does not enable an economy.');}}apply(`furnish ${b.name}`,f.ops,true);furniture.push({building:b.name,placed:f.ops.length,dropped:f.dropped,notes:f.notes});}
-for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES],['interiors: barn',BARN],['interiors: small houses',SMALL_HOUSES],['interiors: barn tops',BARN_TOPS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
+for(const [label,list] of [['interiors: library',LIBRARY],['interiors: library tops',LIBRARY_TOPS],['interiors: cafe',CAFE],['interiors: cafe tops',CAFE_TOPS],['interiors: office',OFFICE],['interiors: office tops',OFFICE_TOPS],['interiors: courtyard houses',HOUSES],['interiors: barn',BARN],['interiors: small houses',SMALL_HOUSES],['interiors: barn tops',BARN_TOPS],['interiors: hotels',HOTELS]])for(let i=0;i<list.length;i+=14)apply(`${label} ${i/14+1}`,list.slice(i,i+14),'any');
 // V3: old Eden's town roofs were gardens too: planters (and on bigger roofs a bench or a parasol table) on the flat roofs
 // of the canal, old-town, seaside and cliff houses; deterministic by name, optional (droppable)
 {const roofOps=[];let k=0;for(const b of BUILDING_BATCHES)for(const op of b.ops){const pr=op.params??{};if(op.op!=='place'||pr.roof!=='flat'||!/^(canal-|market-street-|old-town-|seafront-hotel-|cliff-house-)/.test(op.name??''))continue;
