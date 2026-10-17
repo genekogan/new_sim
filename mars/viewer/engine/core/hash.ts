@@ -18,22 +18,65 @@ function physicsText(v: Record<string, unknown>): { levels: string; byEntity: st
 }
 const isPhysics = (v: Record<string, unknown>) => v.version === 'entity-physics/1' && typeof v.hash === 'string' && (v.hash as string).length === 64;
 
-/** JSON with sorted object keys; undefined fields dropped; -0 normalised. */
-export function stableStringify(value: unknown, known?: ReadonlyMap<object, string>): string {
-  if (value !== null && typeof value === 'object' && known?.has(value)) return known.get(value)!;
+/** Where the stable text goes: appended to a string, or handed on in pieces (a streamed hash) once it passes `flushAt`.
+ *  Pieces are whole tokens (JSON.stringify output, punctuation, cached texts), so a piece never splits a surrogate pair. */
+class Sink {
+  s = '';
+  private readonly flush?: (piece: string) => void;
+  constructor(flush?: (piece: string) => void) { this.flush = flush; }
+  put(p: string) {
+    this.s += p;
+    if (this.flush && this.s.length >= 65536) { this.flush(this.s); this.s = ''; }
+  }
+  end() { if (this.flush && this.s) { this.flush(this.s); this.s = ''; } }
+}
+
+/** stableStringify's text, written piece by piece (one implementation for the string and the streamed hash). */
+function writeStable(value: unknown, out: Sink, known?: ReadonlyMap<object, string>): void {
+  if (value !== null && typeof value === 'object' && known?.has(value)) { out.put(known.get(value)!); return; }
   if (value === null || typeof value !== 'object') {
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) throw new Error(`non-finite number in hashed state: ${value}`);
-      return Object.is(value, -0) ? '0' : JSON.stringify(value);
+      out.put(Object.is(value, -0) ? '0' : JSON.stringify(value));
+      return;
     }
-    return JSON.stringify(value) ?? 'null';
+    out.put(JSON.stringify(value) ?? 'null');
+    return;
   }
-  if (Array.isArray(value)) return `[${value.map((v) => (v === undefined ? 'null' : stableStringify(v, known))).join(',')}]`;
+  if (Array.isArray(value)) {
+    // as `[${value.map((v) => (v === undefined ? 'null' : …)).join(',')}]`: a hole writes nothing, undefined writes null
+    out.put('[');
+    for (let i = 0; i < value.length; i++) {
+      if (i) out.put(',');
+      if (!(i in value)) continue;
+      const v = value[i];
+      if (v === undefined) out.put('null');
+      else writeStable(v, out, known);
+    }
+    out.put(']');
+    return;
+  }
   const keys = Object.keys(value as object)
     .filter((k) => (value as Record<string, unknown>)[k] !== undefined)
     .sort();
   const cached = isPhysics(value as Record<string, unknown>) ? physicsText(value as Record<string, unknown>) : null;
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${cached && (k === 'levels' || k === 'byEntity' || k === 'assets') ? cached[k] : stableStringify((value as Record<string, unknown>)[k], known)}`).join(',')}}`;
+  out.put('{');
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (i) out.put(',');
+    out.put(JSON.stringify(k));
+    out.put(':');
+    if (cached && (k === 'levels' || k === 'byEntity' || k === 'assets')) out.put(cached[k]);
+    else writeStable((value as Record<string, unknown>)[k], out, known);
+  }
+  out.put('}');
+}
+
+/** JSON with sorted object keys; undefined fields dropped; -0 normalised. */
+export function stableStringify(value: unknown, known?: ReadonlyMap<object, string>): string {
+  const out = new Sink();
+  writeStable(value, out, known);
+  return out.s;
 }
 
 const K = new Uint32Array([
@@ -50,8 +93,12 @@ const K = new Uint32Array([
 // Hosts may use an equivalent native digest. Browser/Worker defaults stay
 // dependency-free; the provider changes implementation, never hash semantics.
 let nativeSha256: ((text: string) => string) | undefined;
-export function setSha256Provider(provider?: (text: string) => string) {
+/** An incremental digest with the same semantics (UTF-8 of the whole text), for streamed hashes. */
+export type Sha256Stream = { update(piece: string): void; digest(): string };
+let nativeSha256Stream: (() => Sha256Stream) | undefined;
+export function setSha256Provider(provider?: (text: string) => string, stream?: () => Sha256Stream) {
   nativeSha256 = provider;
+  nativeSha256Stream = provider ? stream : undefined;
 }
 
 /** SHA-256 of a UTF-8 string, hex encoded. */
@@ -90,4 +137,15 @@ export function sha256(text: string): string {
   return Array.from(h, (x) => x.toString(16).padStart(8, '0')).join('');
 }
 
-export const hashOf = (value: unknown) => sha256(stableStringify(value));
+/** SHA-256 of stableStringify(value, known). With a streaming provider (the server's native digest) the text is hashed
+ *  as it is written (lane L1: no multi-megabyte world text built, joined and flattened per hash); same digest. */
+export function hashStable(value: unknown, known?: ReadonlyMap<object, string>): string {
+  if (!nativeSha256Stream) return sha256(stableStringify(value, known));
+  const h = nativeSha256Stream();
+  const out = new Sink((piece) => h.update(piece));
+  writeStable(value, out, known);
+  out.end();
+  return h.digest();
+}
+
+export const hashOf = (value: unknown) => hashStable(value);

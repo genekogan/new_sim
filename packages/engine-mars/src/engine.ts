@@ -267,8 +267,7 @@ export class MarsEngine implements Engine {
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
-      this.finishRecorder();
-      this.startRecorder();
+      this.startRecorder(this.finishRecorder());   // the next take's baseline is the state the last one ended in, this tick
     }
     if (this.leaving.length) this.leaving = this.leaving.filter((id) => !this.tryRemove(id));
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
@@ -1277,26 +1276,31 @@ export class MarsEngine implements Engine {
   // captured again under a new hash and every viewer reinstalled the scene behind the arrival card (viewers read only
   // dayTicks from the scene; the time itself travels in each take's env.datetime)
   private renderContextKeyV1(){return JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock?.dayTicks??null,this.rulesVersion]);}
-  private startRecorder() {
+  /** `stateHashNow`: rt.stateHash() at this tick when the caller has it (the take it just finished); used only when no
+   *  render base is captured in between (lane L1: one world serialisation per 20-tick take boundary, not two). */
+  private startRecorder(stateHashNow?:string) {
     if(this.readerRecordingDepth)return;
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in
     // the take and does not cause repeated hashing of a static render base.
     const key=this.renderContextKeyV1();
     if(key!==this.renderBaseKey) {
+      stateHashNow=undefined;
       this.recorderScene=captureRenderScene(this.rulesVersion,this.renderScene());this.renderBaseKey=key;
     }
     this.takeScenes.set(this.recorderScene.ref.hash,this.recorderScene);
-    this.recorder=new this.m.TakeRecorder(this.rt,{rulesVersion:this.rulesVersion,renderSceneRef:structuredClone(this.recorderScene.ref)});
+    this.recorder=new this.m.TakeRecorder(this.rt,{rulesVersion:this.rulesVersion,renderSceneRef:structuredClone(this.recorderScene.ref)},stateHashNow);
     const retained=new Set([this.recorderScene.ref.hash,...this.chunks.map(c=>(c.take as {renderSceneRef:{hash:string}}).renderSceneRef.hash)]);
     for(const hash of this.takeScenes.keys())if(!retained.has(hash))this.takeScenes.delete(hash);
   }
-  private finishRecorder() {
-    if(this.readerRecordingDepth)return;
+  /** Finishes the current take; returns its final state hash (= rt.stateHash() now), or undefined inside a reader setup. */
+  private finishRecorder():string|undefined {
+    if(this.readerRecordingDepth)return undefined;
     const take=this.recorder.finish();
-    if(this.rt.tick<=take.startTick)return;
+    if(this.rt.tick<=take.startTick)return take.finalStateHash;
     this.chunks.push({fromTick:take.startTick,toTick:this.rt.tick,take});
     if(this.chunks.length>12)this.chunks.shift();
+    return take.finalStateHash;
   }
   takeScene(hash:string) { const captured=this.takeScenes.get(hash);return captured?structuredClone(captured):undefined; }
   actorBorrowed(actor: string) {

@@ -7,7 +7,7 @@ import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
-import { entitiesById, entityList, withEntityList } from '../world/entity-list.ts';
+import { entitiesById, entityList, listEntities, withEntityList } from '../world/entity-list.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 
@@ -50,6 +50,16 @@ test('entity list: fresh outside a pass, one shared list (Object.values order) i
   });
   assert.notEqual(entityList(w), entityList(w), 'nothing is kept after the pass');
   assert.deepEqual(entitiesById(w).map((e) => e.id), Object.keys(w.entities).sort());
+});
+
+test('listEntities is Object.values: integer-like keys first (ascending), then insertion order, own keys only', () => {
+  const proto = { inherited: { id: 'x' } } as unknown as WorldState['entities'];
+  const ents = Object.assign(Object.create(proto), { b: { id: 'b' }, '10': { id: '10' }, a: { id: 'a' }, '2': { id: '2' }, '-1': { id: '-1' }, '01': { id: '01' } }) as WorldState['entities'];
+  delete (ents as Record<string, unknown>).a; (ents as Record<string, unknown>).a = { id: 'a2' };
+  assert.deepEqual(listEntities(ents), Object.values(ents));
+  assert.deepEqual(listEntities(ents).map((e) => e.id), ['2', '10', 'b', '-1', '01', 'a2']);
+  const w = world();
+  assert.deepEqual(listEntities(w.entities), Object.values(w.entities));
 });
 
 test('a runtime\'s violations and state are the same as with every invariant listing the world itself', () => {

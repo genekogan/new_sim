@@ -54,7 +54,8 @@ export async function loadMars(): Promise<Mars> {
   const pose = await at('social/pose.ts');
   // The server uses the identical UTF-8 SHA-256 digest in native code. The
   // browser/Worker engine retains its portable default and the same addresses.
-  hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'));
+  hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'),
+    () => { const h = createHash('sha256'); return { update: (piece: string) => { h.update(piece, 'utf8'); }, digest: () => h.digest('hex') }; });
   // Preserve the original proving-ground fixtures as a western annex during additive adoption.
   const campScene = structuredClone(camp.EDEN_CAMP_SCENE);
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
