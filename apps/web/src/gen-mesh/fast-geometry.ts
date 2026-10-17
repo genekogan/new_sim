@@ -17,18 +17,25 @@ function plain(attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute | 
   const a = inter ? (attr as THREE.InterleavedBufferAttribute).data.array : (attr as THREE.BufferAttribute).array, s = attr.itemSize;
   const st = inter ? (attr as THREE.InterleavedBufferAttribute).data.stride : s, o = inter ? (attr as THREE.InterleavedBufferAttribute).offset : 0;
   const lay = { a, st, o, s };
-  if (!attr.normalized) return a instanceof Float32Array || a instanceof Float64Array || a instanceof Int8Array || a instanceof Uint8Array || a instanceof Int16Array || a instanceof Uint16Array || a instanceof Int32Array || a instanceof Uint32Array ? { ...lay, d: 0, signed: false } : null;
-  if (a instanceof Float32Array) return { ...lay, d: 0, signed: false };
-  if (a instanceof Uint32Array) return { ...lay, d: 4294967295.0, signed: false };
-  if (a instanceof Uint16Array) return { ...lay, d: 65535.0, signed: false };
-  if (a instanceof Uint8Array) return { ...lay, d: 255.0, signed: false };
-  if (a instanceof Int32Array) return { ...lay, d: 2147483647.0, signed: true };
-  if (a instanceof Int16Array) return { ...lay, d: 32767.0, signed: true };
-  if (a instanceof Int8Array) return { ...lay, d: 127.0, signed: true };
-  return null;
+  let p: Plain | null = null;
+  if (!attr.normalized) p = a instanceof Float32Array || a instanceof Float64Array || a instanceof Int8Array || a instanceof Uint8Array || a instanceof Int16Array || a instanceof Uint16Array || a instanceof Int32Array || a instanceof Uint32Array ? { ...lay, d: 0, signed: false } : null;
+  else if (a instanceof Float32Array) p = { ...lay, d: 0, signed: false };
+  else if (a instanceof Uint32Array) p = { ...lay, d: 4294967295.0, signed: false };
+  else if (a instanceof Uint16Array) p = { ...lay, d: 65535.0, signed: false };
+  else if (a instanceof Uint8Array) p = { ...lay, d: 255.0, signed: false };
+  else if (a instanceof Int32Array) p = { ...lay, d: 2147483647.0, signed: true };
+  else if (a instanceof Int16Array) p = { ...lay, d: 32767.0, signed: true };
+  else if (a instanceof Int8Array) p = { ...lay, d: 127.0, signed: true };
+  if (!p || (a instanceof Float32Array && p.d === 0)) return p;
+  // Phone arrival round 2 (lane L3): any other layout (meshopt's quantised Int16/Uint16/Int8 attributes, normalised or
+  // not) is decoded once into doubles — the exact values getX..getW return — so the loops below read one or two array
+  // kinds instead of every kind through one accessor (a megamorphic element load per component).
+  const n = attr.count, out = new Float64Array(n * s), d = p.d, sg = p.signed;
+  for (let i = 0; i < n; i++) for (let c = 0; c < s; c++) { const v = a[i * st + o + c]; out[i * s + c] = d === 0 ? v : sg ? Math.max(v / d, -1.0) : v / d; }
+  return { a: out, st: s, o: 0, s, d: 0, signed: false };
 }
-/** Component c of vertex i, exactly as getX/getY/getZ/getW return it. */
-const comp = (p: Plain, i: number, c: number) => { const v = p.a[i * p.st + p.o + c]; return p.d === 0 ? v : p.signed ? Math.max(v / p.d, -1.0) : v / p.d; };
+/** Component c of vertex i, exactly as getX/getY/getZ/getW return it (plain() leaves only undenormalised doubles/floats). */
+const comp = (p: Plain, i: number, c: number) => p.a[i * p.st + p.o + c];
 
 /** dst[off + 3i ..] = position i transformed by `m` (Vector3.fromBufferAttribute(attr, i).applyMatrix4(m)). */
 export function transformPoints(attr: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, m: THREE.Matrix4, dst: Float32Array, off: number): boolean {
