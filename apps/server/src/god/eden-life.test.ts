@@ -228,3 +228,20 @@ test('B7: a god-built balloon is a native ride: a resident joins, flies its loop
   assert.ok(Math.hypot(w.body(ana).pose.p[0] - 20, w.body(ana).pose.p[2] - 20) < 5, 'back at the launch spot');
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
+
+test('P3: carrying a thing about re-derives no places (places follow god edits, not engine writebacks)', { timeout: 600000 }, async (t) => {
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('table'), tmp: '$t', name: 'table', p: [0, 6] }, { op: 'place', def: coreRef('bowl'), name: 'bowl', in: { parent: '$t', slot: 'top' }, p: [0, 0, 0] },
+    { op: 'place', def: coreRef('roundhouse'), name: 'hut', p: [20, 0] }]);
+  const ana = await w.soul('Ana');
+  const P: any = w.bridge.places, d0 = P.derive.bind(P); let derives = 0; P.derive = () => { derives++; return d0(); };
+  w.edge.capabilities(ana); derives = 0;
+  const bowl = w.byName('bowl');
+  const { r } = await w.act(ana, `pick-up:${bowl.id}`);
+  assert.equal(r.phase, 'completed', JSON.stringify(r));
+  for (let i = 0; i < 200; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
+  w.edge.capabilities(ana);
+  assert.equal(derives, 0, 'no place re-derive while a resident carries a bowl');
+  assert.equal((w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'new-bench', p: [-10, 0] }] }) as any).accepted, true);
+  await w.settle(2); w.edge.capabilities(ana);
+  assert.ok(derives >= 1, 'a god edit re-derives them');
+});

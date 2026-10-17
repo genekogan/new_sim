@@ -72,7 +72,7 @@ export type PlacesHost = {
   model: WorldModel;
   nav: GodNav;
   edge?: EdgeLedger;
-  version?: () => number;
+  version?: () => number | string;
   engineOwned(e: Entity): boolean;
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
