@@ -59,9 +59,9 @@
       "step": "V3-mars-engine",
       "id": "year build 2022 chiba, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned",
       "status": "todo",
-      "reason": "Bug candidate: the chiba first-bay rehearsal ends aborted on the re-seeded scene (kitchen and west-house with the same template complete).",
+      "reason": "Baseline-only (fixed on lane/d3c-yearbuild-20261017): W51 parked rv-6's slide-out 2.6 m off chiba's -u end, where s0208's end-holding givers stand (passup.giver-blocked); sequence-b D0 now checks the givers' own ground and holds that sheet by its sides; re-pinned 62867 / 5e4f4d42. The gate needs this entry while the baseline still has the todo.",
       "owner": "World / Core historical Mars construction owners (L3 reviewed 2026-10-17)",
-      "exit": "diagnose the abort (yard/piles vs the shifted neighbours first); fix or re-pin"
+      "exit": "drop this entry once the gate baseline contains the d3c fix"
     },
     {
       "step": "V3-mars-engine",
