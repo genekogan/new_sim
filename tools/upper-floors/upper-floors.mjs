@@ -34,7 +34,7 @@ const AUTHOR = 'operator:upper-floors', DIR = 'upper-floors';
  *  ground point a resident can walk to today (the plan's walker). The office's files stay byte-compatible with its first install. */
 export const BUILDINGS = {
   office: { key: 'office', ids: ['eden-office-1'], facts: () => [officeFact()], file: () => officeFact(), removeFile: () => removeFact(), spots: officeSpots, ownPlaces: false, probe: null },
-  hotels: { key: 'hotels', ids: ['eden-hotel-1', 'eden-hotel-2', 'eden-hotel-3'], facts: hotelsFacts, file: hotelsFacts, removeFile: hotelsRemoveFacts, spots: hotelsSpots, ownPlaces: true, probe: [104, 128] },
+  hotels: { key: 'hotels', ids: ['eden-hotel-1', 'eden-hotel-2', 'eden-hotel-3'], facts: hotelsFacts, file: hotelsFacts, removeFile: hotelsRemoveFacts, spots: hotelsSpots, ownPlaces: true, probe: [108.2, 110.8] },
 };
 const factsOf = (spec) => spec.facts();
 /** The descriptor's upper-floors fact files (a path or an array of them). */
@@ -164,8 +164,8 @@ export async function plan(L, { scratch, port, copy }) {
       for (let i = 0; i < 200 && !done; i++) { await new Promise((r) => setImmediate(r)); host.drainInputs(); }
       assert(done, 'fact not settled by the sequencer'); if (err) throw err; return val; };
     const office = { buildings: facts.map((f) => f.building.id), rooms: new Set(facts.flatMap((f) => f.building.regions.map((r) => r.id))), levels: new Set(facts.flatMap((f) => f.building.levels.map((l) => l.id))), openings: facts.flatMap((f) => f.building.openings ?? []) };
-    // a resident on the ground who can walk to the foot of the office stairs today (hotels: to the harbour strip's east end,
-    // where their walkway starts; their lobbies have no floor until installed)
+    // a resident on the ground who can walk to the foot of the office stairs today (hotels: to the road behind them,
+    // where hotel 1's side path starts; their lobbies have no floor until installed)
     const foot = L.spec.probe ?? facts[0].building.links.find((l) => l.from.level === 0).from.p;
     const walker = Object.keys(e.ents).sort().find((id) => e.ents[id].kind === 'human' && (e.ents[id].human?.level ?? 0) === 0 && e.routeEstimateV1(id, foot, 0).ok);
     const reach = () => spotList.map((s) => ({ spot: s.id, level: s.level, ...(walker ? e.routeEstimateV1(walker, s.at, s.level) : { ok: false, code: 'no-walker' }) }));

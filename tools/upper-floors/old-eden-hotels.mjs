@@ -1,8 +1,8 @@
 // Old Eden's seafront hotels 1-3 inside, as upper-floors/1 facts plus their activity spots (lane L4b, 2026-10-17; Gene's
 // decision #5). Geometry: the hotels resort-lake.ts draws (hotel-core.ts SEAFRONT_HOTELS; buildings.ts house({hotelCore})).
 // Each fact carries the building's ground-floor lobby (open front door: two authored front-wall bands opened, their
-// remainders as solids), the walkway strip in front of it (z 126.15..127.9, from the harbour strip's east end at x 106 for
-// hotel 1, from the previous hotel's crop for the others: the resort has no level-0 floor of its own), the stair core
+// remainders as solids), the walkway strip in front of it (z 126.15..127.9; hotel 1's starts at a side path down from the
+// road behind the hotels, the others' at the previous hotel's crop: the resort has no level-0 floor of its own), the stair core
 // (one dog-leg flight per storey in the east-most balcony column), every upper floor round the well, one balcony per column,
 // the guest rooms' beds and desks, and rooms as places. Hotel 4 keeps its drawn shell: the carousel stands across its door.
 // Pure and deterministic: node tools/upper-floors/old-eden-hotels.mjs <out-dir> writes hotels.fact.json (an array of three
@@ -13,12 +13,17 @@ import { SEAFRONT_HOTELS, HOTEL_Z, HOTEL_DEPTH, hotelColumns, hotelCoreLayout, h
 
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const ORD = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh'];
-/** Hotels 1-3 get insides; the walkway from the harbour strip (ends at x 106) runs along their fronts. */
+/** Hotels 1-3 get insides; the walkway (reached by a side path from the road behind them) runs along their fronts. */
 export const HOTELS = SEAFRONT_HOTELS.slice(0, 3).map((h, i) => ({ ...h, n: i + 1, id: `eden-hotel-${i + 1}`, label: `Seafront hotel ${i + 1}` }));
-const WALK = { x0: 105.8, z0: 126.15, z1: 127.9 }, THRESHOLD = [125.75, 126.2];
-export const hotelCrop = (h) => [h.n === 1 ? 105.5 : r3(h.cx - h.w / 2 - 0.5), 115.5, r3(h.cx + h.w / 2 + 0.5), 130.5];
-/** Engine levels: 21-25 (hotel 1), 31-33, 41-43; placeLevel = the floor number. */
-export const hotelLevels = (h) => hotelFloorYs(h.floors).map((y, f) => ({ id: (h.n + 1) * 10 + f + 1, y: r3(y), label: `${h.label}, ${ORD[f]} floor`, placeLevel: f + 1 }));
+const WALK = { z0: 126.15, z1: 127.9 }, THRESHOLD = [125.75, 126.2];
+/** The side path west of hotel 1 (between the sports-court fence at x 106 and the hotel's west wall at x 114): from the
+ *  road behind the hotels (level-0 floor at z 110-111) down to the walkway; the court fence closes the walkway's west end. */
+export const ALLEY = { x0: 107.2, x1: 109.2, z0: 110.6, z1: 126.3 };
+export const hotelCrop = (h) => [h.n === 1 ? 105.5 : r3(h.cx - h.w / 2 - 0.5), h.n === 1 ? ALLEY.z0 : 115.5, r3(h.cx + h.w / 2 + 0.5), 130.5];
+/** Engine levels: 13-17 (hotel 1), 18-20 (hotel 2), 8-10 (hotel 3): walk_to and every level-taking action address levels
+ *  0..20 only, and the office has 11-12; placeLevel = the floor number. */
+const LEVEL0 = { 1: 13, 2: 18, 3: 8 };
+export const hotelLevels = (h) => hotelFloorYs(h.floors).map((y, f) => ({ id: LEVEL0[h.n] + f, y: r3(y), label: `${h.label}, ${ORD[f]} floor`, placeLevel: f + 1 }));
 /** The authored ground-floor front-wall bands the door [-0.6, 0.6] cuts (resort-lake.ts house(): bands between the column
  *  door edges; y 0.35..3.12, z 125.82..126.0), with the wall's remainder either side of the doorway (local x). */
 export function hotelOpenings(h) {
@@ -40,11 +45,12 @@ export function hotelFact(h) {
   const surf = (id, level, y, x0, z0, x1, z1, label) => surfaces.push({ id, level, y, obb: obb(x0, z0, x1, z1), label });
   /** a solid from local building coordinates */
   const box = (id, x0, z0, x1, z1, y0, y1, label, kind = 'fixture') => solids.push({ id, obb: obb(X(x0), Z(z0), X(x1), Z(z1)), y0: r3(y0), y1: r3(y1), kind, label });
-  // ground floor: the lobby, the door threshold, the walkway along the front (to the previous crop, or the harbour strip)
+  // ground floor: the lobby, the door threshold, the walkway along the front (from the previous crop, or hotel 1's side path)
   surf('lobby', 0, 0, X(ix0), Z(iz0), X(ix1), Z(iz1), `${h.label} lobby`);
   surf('threshold', 0, 0, X(c.door[0]), THRESHOLD[0], X(c.door[1]), THRESHOLD[1], `${h.label} front door`);
   const prev = HOTELS[h.n - 2];
-  surf('walkway', 0, 0, prev ? hotelCrop(prev)[2] : WALK.x0, WALK.z0, crop[2], WALK.z1, `Walkway in front of ${h.label.toLowerCase()}`);
+  surf('walkway', 0, 0, prev ? hotelCrop(prev)[2] : ALLEY.x0, WALK.z0, crop[2], WALK.z1, `Walkway in front of ${h.label.toLowerCase()}`);
+  if (!prev) surf('side-path', 0, 0, ALLEY.x0, ALLEY.z0, ALLEY.x1, ALLEY.z1, `Path beside ${h.label.toLowerCase()}`);
   const open = hotelOpenings(h);
   for (const [k, [a, b]] of open.rest.entries()) box(`door-jamb-${k + 1}`, a, iz1, b, iz1 + 0.18, 0, 3.12, 'Front wall', 'solid');
   box('lobby-sofa', ix0, c.sofa.z0, ix0 + 0.22, c.sofa.z1, 0, 0.9, 'Lobby sofa');

@@ -47,7 +47,7 @@ export function previewUpperFloorsV1(fact: unknown, cx: UpperFloorsContext): Dia
   if (!Array.isArray(b.levels) || !b.levels.length || b.levels.length > 8) return { code: 'upper-floors.bad-levels', message: '1..8 levels' };
   const taken = new Set([0, ...cx.sceneLevels, ...Object.values(installed).flatMap((o) => o.levels.map((l) => l.id))]), mine = new Map<number, number>();
   for (const l of b.levels) {
-    if (!Number.isInteger(l?.id) || l.id < 2 || l.id > 99 || taken.has(l.id) || mine.has(l.id)) return { code: 'upper-floors.bad-level', message: `level ${l?.id}: a new engine level id 2..99` };
+    if (!Number.isInteger(l?.id) || l.id < 2 || l.id > 20 || taken.has(l.id) || mine.has(l.id)) return { code: 'upper-floors.bad-level', message: `level ${l?.id}: a new engine level id 2..20 (the most walk_to and the other level-taking actions address)` };
     if (!fin(l.y) || l.y < 0.5 || l.y > 60 || !label(l.label) || !Number.isInteger(l.placeLevel) || l.placeLevel < 1 || l.placeLevel > 20) return { code: 'upper-floors.bad-level', message: `level ${l.id}: y 0.5..60, label, placeLevel 1..20` };
     mine.set(l.id, l.y);
   }

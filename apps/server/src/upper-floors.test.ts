@@ -99,18 +99,18 @@ void test('upper-floors/1 hotels: lobby floors, door openings and stairs install
   for(const fact of facts)assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1(fact)),{installed:true});
   assert.equal(f.host.seq,seq0+3);
   assert.deepEqual(Object.keys(e.world.upperFloorsV1.buildings),['eden-hotel-1','eden-hotel-2','eden-hotel-3']);
-  const twin=structuredClone(facts[1]);twin.building.id='eden-hotel-9';twin.building.levels=twin.building.levels.map((l:any)=>({...l,id:l.id+60}));
-  twin.building.regions=twin.building.regions.map((r:any)=>({...r,id:r.id.replace('hotel-2','hotel-9'),level:r.level&&r.level+60}));
-  twin.building.surfaces=twin.building.surfaces.map((s:any)=>({...s,level:s.level&&s.level+60}));twin.building.links=twin.building.links.map((l:any)=>({...l,from:{...l.from,level:l.from.level&&l.from.level+60},to:{...l.to,level:l.to.level+60}}));
+  const twin=structuredClone(facts[1]);twin.building.id='eden-hotel-9';twin.building.levels=twin.building.levels.map((l:any)=>({...l,id:l.id-16}));
+  twin.building.regions=twin.building.regions.map((r:any)=>({...r,id:r.id.replace('hotel-2','hotel-9'),level:r.level&&r.level-16}));
+  twin.building.surfaces=twin.building.surfaces.map((s:any)=>({...s,level:s.level&&s.level-16}));twin.building.links=twin.building.links.map((l:any)=>({...l,from:{...l.from,level:l.from.level&&l.from.level-16},to:{...l.to,level:l.to.level-16}}));
   assert.throws(()=>f.host.installUpperFloorsV1(twin),/already opened by another building/);
   for(const fact of facts)for(const r of fact.building.regions){assert.equal(e.world.regions[r.id]?.kind,'place',r.id);assert.ok(f.host.kernel.things[r.id],r.id);}
   assert.equal(e.world.regions['eden-hotel-1-lobby'].level,0);assert.equal(e.world.regions['eden-hotel-1-room-101'].placeLevel,1);
-  assert.deepEqual(levelsOf(e).filter((l:number)=>l>=20).sort((a:number,b:number)=>a-b),[21,22,23,24,25,31,32,33,41,42,43]);
+  assert.deepEqual(levelsOf(e).filter((l:number)=>l>=2).sort((a:number,b:number)=>a-b),[8,9,10,13,14,15,16,17,18,19,20]);
   const base=obstaclesOf(e);
   for(const b of bands)assert.ok(!base.obstacles.some(o=>o.id==='authored-boundary:'+b.id),`door band ${b.id} opened`);
   assert.ok(base.obstacles.some(o=>o.id==='upper:eden-hotel-1:door-jamb-1'));
   for(const id of ['lobby','threshold','walkway'])assert.ok(base.surfaces.some(s=>s.id===`upper:eden-hotel-2:${id}`&&(s.level??0)===0),id);
-  assert.equal(e.placeLevelV1(23),3);
+  assert.equal(e.placeLevelV1(15),3);
 
   // the same facts again: no-op
   const seq1=f.host.seq,hash1=e.stateHash(),phys1=e.physicalHash(),kern1=kernelHash(f.host.kernel);
@@ -119,7 +119,7 @@ void test('upper-floors/1 hotels: lobby floors, door openings and stairs install
 
   // remove is refused while anyone is upstairs, or on the ground floor inside the hotel (its lobby or walkway)
   const body=e.ents[ada.entity_id],was=body.human.level,p=[...body.pose.p];
-  try{body.human.level=22;assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
+  try{body.human.level=14;assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
     body.human.level=0;body.pose.p=[121.2,0,120];assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
     body.pose.p=[110,0,127];assert.throws(()=>f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-1'}),/upper-floors\.occupied/);
     assert.equal(f.host.installUpperFloorsV1 && e.previewUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-2'}),null,'the next hotel is empty');}
@@ -144,7 +144,7 @@ void test('upper-floors/1 hotels: lobby floors, door openings and stairs install
   assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1({version:'upper-floors/1',remove:'eden-hotel-2'})),{installed:true});
   assert.deepEqual(Object.keys(e.world.upperFloorsV1.buildings),['eden-hotel-1','eden-hotel-3']);
   for(const r of facts[1].building.regions){assert.equal(e.world.regions[r.id],undefined,r.id);assert.equal(f.host.kernel.things[r.id],undefined,r.id);}
-  assert.ok(!levelsOf(e).includes(31)&&levelsOf(e).includes(21));
+  assert.ok(!levelsOf(e).includes(18)&&levelsOf(e).includes(13));
   for(const b of hotelOpenings(HOTELS[1]).bands)assert.ok(obstaclesOf(e).obstacles.some(o=>o.id==='authored-boundary:'+b.id),'closed again');
   for(const id of ['eden-hotel-1','eden-hotel-3'])assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1({version:'upper-floors/1',remove:id})),{installed:true});
   assert.equal(e.world.upperFloorsV1,undefined);
