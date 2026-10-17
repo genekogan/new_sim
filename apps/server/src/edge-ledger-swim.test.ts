@@ -38,3 +38,4 @@ test('four edge swims at once all complete; peak simultaneous swimmers >= 3',{ti
 test('captured connected-gate failure tuple completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_97bcc2b8d7','s_c0fd670f18','s_8eed8dee09','s_fe091e7358']));
 test('captured connected-water child failure tuple completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_15651a5250','s_deb97f53b3','s_7cfa396701','s_6bafe7feea']));
 test('captured dry-child current wait evidence',{timeout:300000},async t=>fourSwims(t,['s_cfab80d090','s_a4e2f51728','s_6997c43e88','s_fa16b5dfe1']));
+test('captured occupied-route failure tuple (Modal n2 5ac841e9) completes all four real swim receipts',{timeout:300000},async t=>fourSwims(t,['s_9a2b2272bf','s_52c1e0a87c','s_b659127058','s_2e5d8ae1bf']));
