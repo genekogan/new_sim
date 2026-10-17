@@ -137,7 +137,7 @@ named('eden-library-1', 'hall', { w: 10.4, d: 8.4, floorHeight: 3.3, material: '
 named('eden-office-1', 'hall', { w: 12, d: 8, floors: 3, floorHeight: 3, material: 'plaster', wall: '#d6d9d8', roof: 'flat', trim: '#52636a', plan: { floors: [
   { rooms: [room('reception', [0, 0, 12, 8])], exterior: [{ room: 'reception', wall: 's', kind: 'door', width: 1.6 }] },
   { rooms: [room('office', [0, 0, 12, 8])] }, { rooms: [room('meeting', [0, 0, 12, 8])] },
-], stairs: [{ from: 0, to: 1, room: 'reception', wall: 'n', at: 0 }, { from: 1, to: 2, room: 'office', wall: 'n', at: 1 }] } }, { furnishStyle: 'office-block' });
+], stairs: [{ from: 0, to: 1, room: 'reception', wall: 'n', at: 0 }, { from: 1, to: 2, room: 'office', wall: 'n', at: 1 }] } }, { furnishStyle: null }); // furnished like old Eden (interiors.mjs)
 named('eden-barn-1', 'barn', { w: 12.4, d: 8.4, floorHeight: 4.2, material: 'wood', wall: '#8b4735', trim: '#d8c7a0', roof: 'gable', roofColor: '#5a5650' }, { furnishStyle: 'barn' });
 named('eden-market-1', 'pavilion', { w: 12, d: 6, floorHeight: 3.5, material: 'wood', wall: '#b08a5f', trim: '#6b4a2b', roof: 'gable', roofColor: '#6d735e' }, { furnishStyle: null });
 named('eden-classroom-1', 'hall', { w: 16, d: 19, floorHeight: 4, wall: '#dfd6bf', trim: '#6a7770', roof: 'hip', roofColor: '#63736a', plan: openPlan(16, 19, 'classroom') }, { coords: [42, -8.5], furnishStyle: 'school' });

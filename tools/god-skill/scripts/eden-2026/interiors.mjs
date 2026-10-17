@@ -8,11 +8,11 @@ const C = { walnut: '#5e3d27', oak: '#8a5a36', rust: '#b0573a', ochre: '#d19c3c'
 export const INTERIOR_DEFS = [
   // A ceiling pendant (old F.pendant): cord from the ceiling, a dark conical shade with a warm bulb; glows at night.
   { op: 'define', def: { schema: 'def/1', name: 'eden-pendant', version: 1, description: 'A ceiling pendant lamp: a dark conical shade on a cord, warm light (old Eden library and café).', tags: ['furniture', 'light', 'lamp', 'eden'], form: 'point',
-    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffd99a', range: 5, on: true } }, size: { box: [0.6, 3.1, 0.6] },
+    state: { on: { type: 'bool', default: true } }, components: { light: { color: '#ffd99a', range: 5, on: true } }, size: { box: [0.6, 2.92, 0.6] },
     make: { kind: 'gen', gen: 'kit/2', args: { shapes: [
-      { kind: 'cyl', at: [0, 2.78, 0], r: 0.008, h: 0.64, segments: 4, color: '#2b2623', collide: false },
-      { kind: 'cone', at: [0, 2.33, 0], r: 0.3, h: 0.26, segments: 14, color: '#2f3332', collide: false },
-      { kind: 'sphere', at: [0, 2.2, 0], r: 0.07, color: '#ffe2a8', glow: 1, collide: false }] } } } },
+      { kind: 'cyl', at: [0, 2.62, 0], r: 0.008, h: 0.6, segments: 4, color: '#2b2623', collide: false },
+      { kind: 'cone', at: [0, 2.19, 0], r: 0.3, h: 0.26, segments: 14, color: '#2f3332', collide: false },
+      { kind: 'sphere', at: [0, 2.06, 0], r: 0.07, color: '#ffe2a8', glow: 1, collide: false }] } } } },
 ];
 const piece = (room, parent, name, def, p, r = 0, extra = {}) => ({ op: 'place', def: /[/@]/.test(def) ? def : `core/${def}@1`, name, in: { parent, slot: room }, p: p.map(r3), ...(r ? { r: r3(r) } : {}), ...extra });
 
@@ -65,3 +65,32 @@ export const CAFE_TOPS = [
 ];
 /** One-room plans (no back stockroom wall in either: old Eden's library and café were each a single room). */
 export const oneRoom = (w, d, id) => ({ floors: [{ rooms: [{ id, name: id[0].toUpperCase() + id.slice(1), rect: [0, 0, w, d] }], exterior: [{ room: id, wall: 's', kind: 'door', at: 0.5, width: 1.5 }] }], stairs: [] });
+
+// Office (old eden-office-1, 12 x 8 m, three floors; centre (92, 15)): every floor has two desks with chairs and lamps and
+// four pendants; the ground floor is the post room and lounge, the first the artists' studio, the second the meeting room.
+const O = (room, name, def, [x, z], r, extra) => piece(room, 'eden-office-1', `office-${name}`, def, [x - 92, 0, z - 15], r, extra);
+const officeFloor = (room, tag) => [
+  O(room, `${tag}-desk-1`, 'desk', [91.6, 15.1], N), O(room, `${tag}-desk-2`, 'office-desk', [94.9, 15.1], N),
+  O(room, `${tag}-desk-chair-1`, 'chair', [91.6, 15.95], S, { params: { wood: C.iron, cushion: '#5a6670' } }), O(room, `${tag}-desk-chair-2`, 'office-chair', [94.9, 16.0], S),
+  ...[[91.5, 13], [94.6, 13], [91.5, 16.9], [94.6, 16.9]].map(([x, z], i) => O(room, `${tag}-pendant-${i + 1}`, 'eden-pendant@1', [x, z], N)),
+];
+export const OFFICE = [
+  ...officeFloor('reception', 'f0'),
+  O('reception', 'f0-pigeonholes', 'shop-shelving', [92.4, 11.6], N, { params: { g0: '#c9a77a', g1: '#e8e2d6', g2: '#b0573a', g3: '#2f4a6b' } }),
+  O('reception', 'f0-parcels-1', 'crate', [95.2, 11.75], 0.2), O('reception', 'f0-parcels-2', 'crate', [95.9, 11.8], -0.15),
+  O('reception', 'f0-lounge-rug', 'rug', [96.0, 17.0], N, { params: { border: C.sage, field: C.cream } }),
+  O('reception', 'f0-lounge-sofa', 'sofa', [96.1, 18.0], S, { params: { fabric: C.teal, pillow: C.ochre } }),
+  O('reception', 'f0-notice-board', 'wall-board', [97.7, 13.3], E),
+  O('reception', 'f0-plant-1', 'potted-plant', [97.3, 11.7], N, { params: { sy: 1.5 } }),
+  ...officeFloor('office', 'f1'),
+  ...[90.4, 92.2, 94.0, 95.8].map((x, i) => O('office', `f1-easel-${i + 1}`, 'easel', [x, 17.9], N)),
+  O('office', 'f1-plan-chest', 'dresser', [97.4, 15.6], E), O('office', 'f1-sitter-stool', 'stool', [93.2, 13.7], N),
+  O('office', 'f1-drop-cloth', 'rug', [93.3, 13.0], N, { params: { border: '#cfc6b2', field: '#d9d2c2' } }),
+  O('office', 'f1-plant', 'potted-plant', [97.3, 18.3], N),
+  ...officeFloor('meeting', 'f2'),
+  O('meeting', 'f2-meeting-rug', 'round-carpet-pack', [93.4, 12.9], N),
+  O('meeting', 'f2-meeting-table', 'long-table', [93.4, 12.9], N),
+  ...[[92.6, 12.25, N], [94.2, 12.25, N], [92.6, 13.55, S], [94.2, 13.55, S]].map(([x, z, r], i) => O('meeting', `f2-meeting-chair-${i + 1}`, 'chair', [x, z], r, { params: { wood: C.walnut, cushion: C.navy } })),
+  O('meeting', 'f2-sofa', 'sofa', [96.4, 18.0], S, { params: { fabric: C.rust, pillow: C.cream } }), O('meeting', 'f2-armchair', 'armchair', [93.9, 18.1], S, { params: { fabric: C.ochre } }),
+];
+export const OFFICE_TOPS = ['f0', 'f1', 'f2'].flatMap(f => [on(`eden-office-1/office-${f}-desk-1`, `office-${f}-desk-lamp`, 'desk-lamp', [-0.4, -0.1]), on(`eden-office-1/office-${f}-desk-1`, `office-${f}-desk-books`, 'book-stack', [0.3, 0])]);

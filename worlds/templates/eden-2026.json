@@ -1053,7 +1053,7 @@
             "size": {
               "box": [
                 0.6,
-                3.1,
+                2.92,
                 0.6
               ]
             },
@@ -1066,11 +1066,11 @@
                     "kind": "cyl",
                     "at": [
                       0,
-                      2.78,
+                      2.62,
                       0
                     ],
                     "r": 0.008,
-                    "h": 0.64,
+                    "h": 0.6,
                     "segments": 4,
                     "color": "#2b2623",
                     "collide": false
@@ -1079,7 +1079,7 @@
                     "kind": "cone",
                     "at": [
                       0,
-                      2.33,
+                      2.19,
                       0
                     ],
                     "r": 0.3,
@@ -1092,7 +1092,7 @@
                     "kind": "sphere",
                     "at": [
                       0,
-                      2.2,
+                      2.06,
                       0
                     ],
                     "r": 0.07,
@@ -13735,335 +13735,6 @@
             0
           ],
           "r": 0
-        }
-      ]
-    },
-    {
-      "note": "furnish eden-office-1",
-      "group": "eden-2026",
-      "ops": [
-        {
-          "op": "place",
-          "tmp": "$f0",
-          "def": "core/shop-counter@1",
-          "name": "reception-desk",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "reception"
-          },
-          "p": [
-            0.942,
-            0,
-            -1.005
-          ],
-          "r": 0,
-          "params": {
-            "variant": "reception"
-          }
-        },
-        {
-          "op": "place",
-          "tmp": "$f1",
-          "def": "core/sofa@1",
-          "name": "reception-sofa",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "reception"
-          },
-          "p": [
-            5.3,
-            0,
-            0.538
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f2",
-          "def": "core/round-table@1",
-          "name": "reception-table",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "reception"
-          },
-          "p": [
-            3.703,
-            0,
-            0.658
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f3",
-          "def": "core/potted-plant@1",
-          "name": "reception-plant",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "reception"
-          },
-          "p": [
-            -5.419,
-            0,
-            3.436
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f4",
-          "def": "core/vending-machine@1",
-          "name": "reception-vending",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "reception"
-          },
-          "p": [
-            5.32,
-            0,
-            -3.342
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f5",
-          "def": "core/office-desk@1",
-          "name": "office-desk-1",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            -4.032,
-            0,
-            -2.179
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f6",
-          "def": "core/office-desk@1",
-          "name": "office-desk-2",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            0,
-            0,
-            -0.934
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f7",
-          "def": "core/office-desk@1",
-          "name": "office-desk-3",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            4.032,
-            0,
-            -2.179
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f8",
-          "def": "core/office-desk@1",
-          "name": "office-desk-4",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            -4.032,
-            0,
-            1.556
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f9",
-          "def": "core/office-desk@1",
-          "name": "office-desk-5",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            0,
-            0,
-            1.556
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f10",
-          "def": "core/office-desk@1",
-          "name": "office-desk-6",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            4.032,
-            0,
-            1.556
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f11",
-          "def": "core/filing-cabinet@1",
-          "name": "office-cabinet-1",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            5.435,
-            0,
-            0
-          ],
-          "r": -1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f12",
-          "def": "core/filing-cabinet@1",
-          "name": "office-cabinet-2",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "office"
-          },
-          "p": [
-            -5.435,
-            0,
-            0
-          ],
-          "r": 1.571
-        },
-        {
-          "op": "place",
-          "tmp": "$f13",
-          "def": "core/long-table@1",
-          "name": "meeting-table",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            0,
-            0,
-            0
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f14",
-          "def": "core/office-chair@1",
-          "name": "meeting-chair-n-1",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            -1.633,
-            0,
-            -1.721
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f15",
-          "def": "core/office-chair@1",
-          "name": "meeting-chair-n-2",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            1.633,
-            0,
-            -1.721
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f16",
-          "def": "core/office-chair@1",
-          "name": "meeting-chair-s-1",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            -1.633,
-            0,
-            1.721
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f17",
-          "def": "core/office-chair@1",
-          "name": "meeting-chair-s-2",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            1.633,
-            0,
-            1.721
-          ],
-          "r": 3.142
-        },
-        {
-          "op": "place",
-          "tmp": "$f18",
-          "def": "core/wall-board@1",
-          "name": "meeting-board",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            0,
-            0,
-            -3.685
-          ],
-          "r": 0
-        },
-        {
-          "op": "place",
-          "tmp": "$f19",
-          "def": "core/television@1",
-          "name": "meeting-screen",
-          "in": {
-            "parent": "eden-office-1",
-            "slot": "meeting"
-          },
-          "p": [
-            5.507,
-            0,
-            0
-          ],
-          "r": -1.571
         }
       ]
     },
@@ -50771,6 +50442,849 @@
           },
           "p": [
             0.35,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "note": "interiors: office 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "office-f0-desk-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/office-desk@1",
+          "name": "office-f0-desk-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            2.9,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f0-desk-chair-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.95
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#5a6670"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/office-chair@1",
+          "name": "office-f0-desk-chair-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            2.9,
+            0,
+            1
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f0-pendant-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            -0.5,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f0-pendant-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            2.6,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f0-pendant-3",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            -0.5,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f0-pendant-4",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            2.6,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/shop-shelving@1",
+          "name": "office-f0-pigeonholes",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            0.4,
+            0,
+            -3.4
+          ],
+          "params": {
+            "g0": "#c9a77a",
+            "g1": "#e8e2d6",
+            "g2": "#b0573a",
+            "g3": "#2f4a6b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "office-f0-parcels-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            3.2,
+            0,
+            -3.25
+          ],
+          "r": 0.2
+        },
+        {
+          "op": "place",
+          "def": "core/crate@1",
+          "name": "office-f0-parcels-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            3.9,
+            0,
+            -3.2
+          ],
+          "r": -0.15
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "office-f0-lounge-rug",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            4,
+            0,
+            2
+          ],
+          "params": {
+            "border": "#8ea47f",
+            "field": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "office-f0-lounge-sofa",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            4.1,
+            0,
+            3
+          ],
+          "r": 3.142,
+          "params": {
+            "fabric": "#2f6b6b",
+            "pillow": "#d19c3c"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/wall-board@1",
+          "name": "office-f0-notice-board",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            5.7,
+            0,
+            -1.7
+          ],
+          "r": -1.571
+        }
+      ]
+    },
+    {
+      "note": "interiors: office 2",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "office-f0-plant-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "reception"
+          },
+          "p": [
+            5.3,
+            0,
+            -3.3
+          ],
+          "params": {
+            "sy": 1.5
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "office-f1-desk-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/office-desk@1",
+          "name": "office-f1-desk-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            2.9,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f1-desk-chair-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.95
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#5a6670"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/office-chair@1",
+          "name": "office-f1-desk-chair-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            2.9,
+            0,
+            1
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f1-pendant-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            -0.5,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f1-pendant-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            2.6,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f1-pendant-3",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            -0.5,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f1-pendant-4",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            2.6,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "office-f1-easel-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            -1.6,
+            0,
+            2.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "office-f1-easel-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            0.2,
+            0,
+            2.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "office-f1-easel-3",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            2,
+            0,
+            2.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/easel@1",
+          "name": "office-f1-easel-4",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            3.8,
+            0,
+            2.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/dresser@1",
+          "name": "office-f1-plan-chest",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            5.4,
+            0,
+            0.6
+          ],
+          "r": -1.571
+        }
+      ]
+    },
+    {
+      "note": "interiors: office 3",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/stool@1",
+          "name": "office-f1-sitter-stool",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            1.2,
+            0,
+            -1.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/rug@1",
+          "name": "office-f1-drop-cloth",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            1.3,
+            0,
+            -2
+          ],
+          "params": {
+            "border": "#cfc6b2",
+            "field": "#d9d2c2"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/potted-plant@1",
+          "name": "office-f1-plant",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "office"
+          },
+          "p": [
+            5.3,
+            0,
+            3.3
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/desk@1",
+          "name": "office-f2-desk-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/office-desk@1",
+          "name": "office-f2-desk-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.9,
+            0,
+            0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f2-desk-chair-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            -0.4,
+            0,
+            0.95
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#3b3d40",
+            "cushion": "#5a6670"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/office-chair@1",
+          "name": "office-f2-desk-chair-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.9,
+            0,
+            1
+          ],
+          "r": 3.142
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f2-pendant-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            -0.5,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f2-pendant-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.6,
+            0,
+            -2
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f2-pendant-3",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            -0.5,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "eden-pendant@1",
+          "name": "office-f2-pendant-4",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.6,
+            0,
+            1.9
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/round-carpet-pack@1",
+          "name": "office-f2-meeting-rug",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            1.4,
+            0,
+            -2.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/long-table@1",
+          "name": "office-f2-meeting-table",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            1.4,
+            0,
+            -2.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f2-meeting-chair-1",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            0.6,
+            0,
+            -2.75
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: office 4",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f2-meeting-chair-2",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.2,
+            0,
+            -2.75
+          ],
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f2-meeting-chair-3",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            0.6,
+            0,
+            -1.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/chair@1",
+          "name": "office-f2-meeting-chair-4",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            2.2,
+            0,
+            -1.45
+          ],
+          "r": 3.142,
+          "params": {
+            "wood": "#5e3d27",
+            "cushion": "#34476b"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/sofa@1",
+          "name": "office-f2-sofa",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            4.4,
+            0,
+            3
+          ],
+          "r": 3.142,
+          "params": {
+            "fabric": "#b0573a",
+            "pillow": "#f2ead8"
+          }
+        },
+        {
+          "op": "place",
+          "def": "core/armchair@1",
+          "name": "office-f2-armchair",
+          "in": {
+            "parent": "eden-office-1",
+            "slot": "meeting"
+          },
+          "p": [
+            1.9,
+            0,
+            3.1
+          ],
+          "r": 3.142,
+          "params": {
+            "fabric": "#d19c3c"
+          }
+        }
+      ]
+    },
+    {
+      "note": "interiors: office tops 1",
+      "group": "eden-2026",
+      "ops": [
+        {
+          "op": "place",
+          "def": "core/desk-lamp@1",
+          "name": "office-f0-desk-lamp",
+          "in": {
+            "parent": "eden-office-1/office-f0-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            -0.4,
+            0,
+            -0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "office-f0-desk-books",
+          "in": {
+            "parent": "eden-office-1/office-f0-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            0.3,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/desk-lamp@1",
+          "name": "office-f1-desk-lamp",
+          "in": {
+            "parent": "eden-office-1/office-f1-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            -0.4,
+            0,
+            -0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "office-f1-desk-books",
+          "in": {
+            "parent": "eden-office-1/office-f1-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            0.3,
+            0,
+            0
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/desk-lamp@1",
+          "name": "office-f2-desk-lamp",
+          "in": {
+            "parent": "eden-office-1/office-f2-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            -0.4,
+            0,
+            -0.1
+          ]
+        },
+        {
+          "op": "place",
+          "def": "core/book-stack@1",
+          "name": "office-f2-desk-books",
+          "in": {
+            "parent": "eden-office-1/office-f2-desk-1",
+            "slot": "top"
+          },
+          "p": [
+            0.3,
             0,
             0
           ]
