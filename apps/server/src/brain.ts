@@ -499,6 +499,7 @@ export class Brain {
 
   private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number },voluntaryRetained=false) {
     if (this.skipMind?.(m) || this.nativeProgramAllowed && !this.nativeProgramAllowed(m,payload.steps)) return;
+    this.host.provisionalEval?.set(m.soulId, m.nextEvalTick); // a wake before this applies is kept (world.ts 'decision')
     const priorGuard=guard;
     if(this.skipMind||this.nativeProgramAllowed)guard=()=>{if(this.skipMind?.(m)||this.nativeProgramAllowed&&!this.nativeProgramAllowed(m,payload.steps))throw new StaleCompilation();return priorGuard?priorGuard():true;};
     if (!guard) { void this.host.enqueue('decision', author, payload); return; }
@@ -507,6 +508,7 @@ export class Brain {
     const queued = purpose ? this.host.enqueueIntentDecision(author,payload,purpose,guard)
       : this.host.enqueueChecked('decision', author, payload, guard);
     void queued.catch(error => {
+      this.host.provisionalEval?.delete(m.soulId); // this decision will not apply: nothing is waiting to keep a wake for
       if (error instanceof PersistedIntentAdmissionFault) {
         console.error('[brain] decision and admission persisted; physical application requires reconciliation');
         return; // The pair is already durable; never issue duplicate work.

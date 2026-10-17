@@ -123,6 +123,11 @@ export class WorldHost {
   recentPlays: PlayView[] = [];
   private kernelDirty = true;
   minds = new Map<string, Mind>();          // by soulId
+  /** The provisional next-think tick the brain set when it queued a Soul's decision (in memory, not snapshotted). A wake that
+   *  lands before the decision applies (someone answered, the plan moved on) pulls nextEvalTick below it, and applying the
+   *  decision keeps that wake instead of overwriting it: the decision was made without knowing (the DJ story: Wren's "wait"
+   *  applied a tick after Rob's yes and slept 200 ticks, and Rob ended the gathering first). */
+  readonly provisionalEval = new Map<string, number>();
   mindByEntity = new Map<string, Mind>();
   seq = 0;
   clockRate = 1;
@@ -892,12 +897,14 @@ export class WorldHost {
       case 'decision': {
         const p = e.payload as DecisionPayload; const m = this.minds.get(p.soulId);
         if (!m) break;
-        if (p.continue) { if (p.mood) m.mood = p.mood; m.nextEvalTick = tick + p.reevalTicks; m.evalTrigger = 'timer'; this.acc.dirty.add(m.soulId); break; }
+        const provisional = this.provisionalEval.get(p.soulId); this.provisionalEval.delete(p.soulId);
+        const woken = provisional !== undefined && m.nextEvalTick < provisional;
+        const thinkAt = (at: number, trigger: string) => { if (woken) m.nextEvalTick = Math.min(m.nextEvalTick, at); else { m.nextEvalTick = at; m.evalTrigger = trigger; } };
+        if (p.continue) { if (p.mood) m.mood = p.mood; thinkAt(tick + p.reevalTicks, 'timer'); this.acc.dirty.add(m.soulId); break; }
         if (r.programId === undefined) break;
         if (p.mood) m.mood = p.mood;
         m.doing = r.programOk ? p.label : 'standing around';
-        m.nextEvalTick = tick + (r.programOk ? p.reevalTicks : 40);
-        m.evalTrigger = r.programOk ? 'timer' : 'activity-failed';
+        thinkAt(tick + (r.programOk ? p.reevalTicks : 40), r.programOk ? 'timer' : 'activity-failed');
         if (!r.programOk) { m.recent = [...m.recent.slice(-3), `${shorten(p.label)} (could not: ${r.programCode})`]; m.pending = null; m.avoid = { id: p.option, untilTick: tick + 1200 }; if (m.agendaPos < m.agenda.length) m.planBlockedSince ??= tick; }
         else if (p.card) {
           const card = this.kernel.vocab.cards[p.card];
