@@ -48,7 +48,7 @@ import { TakePeople } from '../../../mars/viewer/app/engine-view/take-replay.ts'
 import { loadTemplates,PEOPLE } from '../../../mars/viewer/app/engine-view/people.ts';
 import {templateNameFor} from '../../../mars/viewer/app/engine-view/humans.ts';
 import {depictedWorldLocations,type WorldLocation} from './WorldLocations.ts';
-import {InitialWorldReadiness,successfulInitialLookup,initialAssetRoot,type InitialWorldProgress} from './InitialWorldReadiness.ts';
+import {InitialWorldReadiness,successfulInitialLookup,type InitialWorldProgress} from './InitialWorldReadiness.ts';
 import { FloaterView, KinScenery } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import { floaterBody } from '../../../mars/viewer/engine/bodies/index.ts';
 import { ThreeResources } from '../../../mars/viewer/lib/three-resources.ts';
@@ -517,7 +517,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const owner=geometry,assetBytes=(url:string,event:ProgressEvent)=>gate.download(url,event.loaded,event.lengthComputable?event.total:null);
       if(info.backdrop)gate.require('Campus',async()=>{if(!await owner.addBackdrop(info.backdrop!,loader,assetBytes))throw Error('The campus model could not be loaded.');});
       if(info.kin.length)gate.require('Local characters',()=>kin.readyInitial());
-      if(info.buildings.length){const buildingRoot=successfulInitialLookup(()=>info.assetRoot?Promise.resolve(info.assetRoot):fetch(apiPath('/v1/worldmeta'),{signal:abort.signal}).then(initialAssetRoot));
+      if(info.buildings.length){const buildingRoot=successfulInitialLookup(()=>Promise.resolve(info.assetRoot));  // the scene names its asset root; no server has a /v1/worldmeta (a 404 there meant the default root)
       for(const [index,building] of info.buildings.entries())gate.require('Building '+(index+1)+': '+building.file,async()=>{const assetRoot=await buildingRoot();if(assetRoot)owner.setAssetRoot(assetRoot);const failed=await owner.addBuildings([building],loader,assetBytes);if(failed.length)throw Error('Required building could not be loaded.');});}
     };
     let currentScene:Promise<ReturnType<typeof parseSceneInfo>>|null=null;

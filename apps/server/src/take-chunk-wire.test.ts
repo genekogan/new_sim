@@ -173,3 +173,32 @@ for(const world of WORLDS)test(`actual Hub, recorded ${world} session: every pee
  if(world==='eden')assert.ok(bytes[2]<bytes[1]*.05,'old Eden: the repeated 380 KB stop travelling');
  else assert.ok(bytes[2]<=bytes[1]);
 });
+
+test('actual Hub + client: a kernel view that only moved its tick travels as kernel-tick and is restored exactly',async t=>{
+ const ms=stream();const f=await local(t,()=>ms[0].chunks);
+ const offers=[{takeEntities:TAKE_ENTITIES_WIRE_V1},{takeEntities:TAKE_ENTITIES_WIRE_V1,takeChunks:TAKE_CHUNKS_WIRE_V1}],streams:{data:string;m:any}[][]=[],sockets:WebSocket[]=[];
+ for(const offer of offers){
+  const socket=new WebSocket('ws://127.0.0.1:'+f.port+'/ws'),messages:{data:string;m:any}[]=[];streams.push(messages);sockets.push(socket);
+  const ready=new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('finite WS takes deadline')),5000);socket.on('message',data=>{const m=JSON.parse(String(data));messages.push({data:String(data),m});if(TAKE_TYPES.has(m.t)){clearTimeout(timer);resolve();}});socket.once('error',reject);});
+  await once(socket,'open');socket.send(JSON.stringify({t:'hello',proto:PROTO,...offer}));await ready;
+ }
+ const view=f.host.kernelView() as any,later={...view,tick:view.tick+200},changed={...later,extra:1},noTick={...view,tick:'x'};
+ const views=[view,later,later,changed,{...changed,tick:later.tick+200},view,noTick,noTick];
+ const barriers=sockets.map((socket,i)=>new Promise<void>((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('barrier '+i)),3000);socket.on('message',d=>{const m=JSON.parse(String(d));if(m.t==='pong'&&m.n===5){clearTimeout(timer);resolve();}});}));
+ for(const v of views)f.hub.broadcast({t:'kernel',view:v});f.hub.broadcast({t:'pong',n:5,serverTime:0});await Promise.all(barriers);
+ const wire=streams[1].filter(x=>x.m.t==='kernel'||x.m.t==='kernel-tick').map(x=>x.m.t==='kernel-tick'?'tick':'full');
+ assert.deepEqual(wire,['full','tick','tick','tick','full','tick','full','full','full'],'join kernel, then only what changed besides the tick travels');
+ assert.ok(!streams[0].some(x=>x.m.t==='kernel-tick'),'v1 peers get every kernel whole');
+ // the real client decode chain restores every message exactly
+ const fake=new Socket(),seen:any[]=[],errors:string[]=[];
+ const connection=new Connection('ws://fixture',async()=>null,{onKernel:v=>seen.push(v),onError:c=>errors.push(c)},()=>fake,()=>1000,()=>100,undefined,true);
+ t.after(()=>connection.close());connection.connect();await fake.onopen();fake.receive(welcome(true));
+ for(const x of streams[1])if(x.m.t==='kernel'||x.m.t==='kernel-tick')fake.onmessage({data:x.data});
+ assert.deepEqual(errors,[]);
+ assert.deepEqual(seen.map(v=>JSON.stringify(v)),streams[0].filter(x=>x.m.t==='kernel').map(x=>JSON.stringify(x.m.view)));
+ assert.equal(JSON.stringify(seen.slice(1)),JSON.stringify(views));
+ // a kernel-tick before any kernel on a socket closes it
+ const fresh=new Socket(),errs:string[]=[];const c2=new Connection('ws://fixture',async()=>null,{onError:c=>errs.push(c)},()=>fresh,()=>1000,()=>100,undefined,true);
+ t.after(()=>c2.close());c2.connect();await fresh.onopen();fresh.receive(welcome(true));fresh.receive({t:'kernel-tick',tick:5});
+ assert.equal(errs.at(-1),'takes.transport-invalid');assert.equal(fresh.closed,true);
+});

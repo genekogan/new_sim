@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -28,8 +28,9 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
   authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1;
   /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet). */
   takeEntities?:{last:number|null};
-  /** take-chunk-ref/1 peers: the id of the last take this socket was sent (null: none yet). */
-  takeChunks?:{last:number|null};
+  /** take-chunk-ref/1 peers: the id of the last take this socket was sent (null: none yet) and the last kernel view sent
+   *  without its tick (kernelRestV1). */
+  takeChunks?:{last:number|null;kernel?:string};
   /** Set by a join until the first takes message with a chunk is written: that one is never dropped for backpressure. */
   awaitingTakes?:boolean;joinSend?:boolean };
 /** What anyone may see of the server's numbers: spend is for admins. */
@@ -240,6 +241,7 @@ export class Hub {
       // A broken fact must not become a different raw message or stop the host.
       c.ready=false;c.ws.send(JSON.stringify({t:'error',code:'takes.transport-invalid',message:'The take transport cannot be encoded exactly.'}));c.ws.close(1011,'invalid take transport');return false;
     }
+    s=this.kernelWire(c,current,s);
     c.sent += s.length; c.ws.send(s);
     if(nextTable!==undefined&&c.takeEntities)c.takeEntities.last=nextTable;
     if(nextTake!==undefined&&c.takeChunks)c.takeChunks.last=nextTake;
@@ -313,8 +315,18 @@ export class Hub {
       }
       return;
     }
-    const s = JSON.stringify(m);
-    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue; c.sent += s.length; c.ws.send(s); }
+    const s = JSON.stringify(m),rest=m.t==='kernel'?kernelRestV1(m.view):undefined;
+    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue;
+      const out=this.kernelWire(c,m,s,rest);c.sent += out.length; c.ws.send(out); }
+  }
+  /** take-chunk-ref/1 peers: a kernel view that differs from the last one this socket was sent only in its tick (the hub
+   *  re-broadcasts it every 200 ticks: old Eden ~208 KB each) travels as {t:'kernel-tick',tick}. Call only right before
+   *  ws.send(result): it records what the peer now has. */
+  private kernelWire(c:Client,m:ServerMsg,s:string,rest?:string|null):string{
+    if(m.t!=='kernel'||!c.takeChunks)return s;
+    const r=rest===undefined?kernelRestV1(m.view):rest;
+    if(r!==null&&r===c.takeChunks.kernel)return JSON.stringify({t:'kernel-tick',tick:m.view.tick});
+    c.takeChunks.kernel=r??undefined;return s;
   }
   /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
   brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }

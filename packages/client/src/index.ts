@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
+import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
@@ -203,7 +203,7 @@ export class Connection {
     // the last entity table this socket received (take-entities-ref/1): a new socket starts empty, as does the server's view of it
     const takeEntities:TakeEntitiesStateV1={last:null};
     // the last take this socket received (take-chunk-ref/1): repeated parts of later takes are restored from it
-    const takeChunks:TakeChunksStateV1={last:null};
+    const takeChunks:TakeChunksStateV1={last:null};let lastKernelJson:string|null=null;
     const mine = () => active && this.ws === ws && !this.closed;      // a socket that has been replaced or closed must not touch the replica
     ws.onopen = async () => {
       if (!mine()) return;
@@ -236,7 +236,13 @@ export class Connection {
         if((m as {t:string}).t==='take-chunks'){
           if(!this.takeBoundaryTransport||this.welcome?.takeChunks!==TAKE_CHUNKS_WIRE_V1)throw new Error('unnegotiated take transport');
           m=hydrateTakeChunksV1(m,takeChunks,entities) as ServerMsg;
-        }else m=entities(m) as ServerMsg;
+        }else if((m as {t:string}).t==='kernel-tick'){
+          if(!this.takeBoundaryTransport||this.welcome?.takeChunks!==TAKE_CHUNKS_WIRE_V1)throw new Error('unnegotiated take transport');
+          m=hydrateKernelTickV1(m,lastKernelJson) as ServerMsg;
+        }else{
+          if(m.t==='kernel')lastKernelJson=s;
+          m=entities(m) as ServerMsg;
+        }
       }catch{this.handlers.onError?.('takes.transport-invalid','The take transport cannot be restored exactly.');try{ws.close();}catch{/* closing */}return;}
       this.onMessage(m,receivedAtMs);
     };

@@ -14,6 +14,9 @@
 // take-boundary-wire), so the other transports compose unchanged inside it. The client restores the exact take (same
 // keys, same order, same values; JSON.stringify identical) before any other code reads it. Recordings, HTTP history
 // and peers that did not announce it never see it.
+// The same peers get a kernel view that differs from the last one they were sent only in its tick as {t:'kernel-tick',tick}
+// (the hub re-broadcasts the kernel view every 200 ticks: old Eden ~208 KB each, ~21 KB/s); the client restores the full
+// message by parsing the last kernel message it received and setting the tick (key order unchanged).
 export const TAKE_CHUNKS_WIRE_V1='take-chunk-ref/1' as const;
 type JsonObject=Record<string,unknown>;
 const record=(v:unknown):v is JsonObject=>!!v&&typeof v==='object'&&!Array.isArray(v)&&(Object.getPrototypeOf(v)===Object.prototype||Object.getPrototypeOf(v)===null);
@@ -132,4 +135,19 @@ export function hydrateTakeChunksV1(input:unknown,state:TakeChunksStateV1,inner:
  });
  state.last=last;
  return {...payload,chunks};
+}
+
+/** The kernel view's JSON with its tick blanked (null when the tick is not a finite number): two views with the same rest
+ *  differ only in the tick, so the second can travel as {t:'kernel-tick',tick}. */
+export function kernelRestV1(view:unknown):string|null{
+ if(!record(view)||typeof view.tick!=='number'||!Number.isFinite(view.tick))return null;
+ const s=JSON.stringify({...view,tick:null});return typeof s==='string'?s:null;
+}
+/** Client side: restore a kernel-tick message from the last kernel message's raw JSON on this socket. */
+export function hydrateKernelTickV1(input:unknown,lastKernelJson:string|null):unknown{
+ if(!record(input)||input.t!=='kernel-tick')return input;
+ if(Object.keys(input).sort().join(',')!=='t,tick'||typeof input.tick!=='number'||!Number.isFinite(input.tick)||lastKernelJson===null)fail('kernel tick');
+ const m=JSON.parse(lastKernelJson) as {t?:unknown;view?:unknown};
+ if(!record(m)||m.t!=='kernel'||!record(m.view)||kernelRestV1(m.view)===null)fail('kernel base');
+ m.view.tick=input.tick;return m;
 }
