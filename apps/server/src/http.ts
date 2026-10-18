@@ -179,9 +179,10 @@ export function buildApp(d: Deps) {
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
-  app.get('/v1/debug/nav', (c) => c.json({ stranded: strandedMetrics() }, 200, { 'Cache-Control': 'no-store' }));
-  // N1 diagnostics (only with SIM_STRANDED_AUDIT): plan one walk from (sx,sz) on level sl to (gx,gz) on gl for an r m-radius body, nothing moves.
-  if (process.env.SIM_STRANDED_AUDIT) app.get('/v1/debug/route', (c) => {
+  // N1 nav diagnostics, served only with SIM_NAV_DEBUG (the e2es set it): the failed-search memo's counts, and one probe
+  // walk from (sx,sz) on level sl to (gx,gz) on gl for an r m-radius body (nothing moves).
+  if (process.env.SIM_NAV_DEBUG) app.get('/v1/debug/nav', (c) => c.json({ stranded: strandedMetrics() }, 200, { 'Cache-Control': 'no-store' }));
+  if (process.env.SIM_NAV_DEBUG) app.get('/v1/debug/route', (c) => {
     const n = (k: string, v = 0) => { const x = Number(c.req.query(k)); return Number.isFinite(x) ? x : v; };
     const rt = (d.host.engine as unknown as { rt?: { world: unknown; services: { spatial?: { route: Function } } } }).rt, sp = rt?.services.spatial;
     if (!rt || !sp) return c.json({ error: 'no spatial service' }, 404);

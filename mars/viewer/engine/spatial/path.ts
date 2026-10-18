@@ -220,12 +220,8 @@ function search(grids: GridSet, prep: Prep, opts: RouteOpts, mask: { stamp: Uint
   };
   const ms = mask?.stamp, mg = mask?.gen ?? 0;
   const maxExpand = opts.maxExpand ?? 4_000_000;
-  const memo = !mask && !opts.nameObstacles && !auditBypass ? strandedKey(grids, prep) : null, side = memo ? stranded.get(memo) : undefined;
-  if (side && side.size <= maxExpand && !(side.cells[goalId >> 3] & (1 << (goalId & 7)))) {
-    strandedHits++;
-    if (AUDIT) { auditBypass = true; let real; try { real = search(grids, prep, opts, null); } finally { auditBypass = false; } if (real && !('ok' in real)) { strandedWrong++; console.error(`[stranded-audit] WRONG memo hit: key=${memo!.slice(0, 300)} goal=${goalId}`); } }
-    return null;
-  }
+  const memo = !mask && !opts.nameObstacles ? strandedKey(grids, prep) : null, side = memo ? stranded.get(memo) : undefined;
+  if (side && side.size <= maxExpand && !(side.cells[goalId >> 3] & (1 << (goalId & 7)))) { strandedHits++; return null; }
   stamp[startId] = gen;
   gScore[startId] = 0;
   came[startId] = -1;
@@ -311,10 +307,9 @@ let gridSerialNext = 0;
 const serialOf = (g: LevelGrid) => { const c = gridContentKeys.get(g); if (c) return c; let k = gridSerials.get(g); if (k === undefined) gridSerials.set(g, (k = ++gridSerialNext)); return `#${k}`; };
 const STRANDED_MAX = 8, STRANDED_BYTES = 48 * 1024 * 1024, STRANDED_CELLS = 64 * 1024 * 1024;
 const stranded = new Map<string, { cells: Uint8Array; size: number }>();
-let strandedBytes = 0, strandedHits = 0, strandedWrong = 0, auditBypass = false;
-const AUDIT = typeof process !== 'undefined' && !!process.env?.SIM_STRANDED_AUDIT;
+let strandedBytes = 0, strandedHits = 0;
 /** Numeric diagnostics of the failed-search memo (tests, status). */
-export function strandedMetrics() { return { entries: stranded.size, bytes: strandedBytes, hits: strandedHits, wrong: strandedWrong }; }
+export function strandedMetrics() { return { entries: stranded.size, bytes: strandedBytes, hits: strandedHits }; }
 function strandedKey(grids: GridSet, prep: Prep): string {
   let k = `${prep.r}|${prep.sLv}:${prep.s}|${prep.lvIds.map((id) => `${id}:${serialOf(grids.levels.get(id)!)}`).join(',')}|`;
   for (const [from, list] of prep.edges) for (const e of list) k += `${from}>${e.toLevel}:${e.toCell};`;
