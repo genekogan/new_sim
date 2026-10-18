@@ -8,12 +8,16 @@ import assert from 'node:assert/strict';
 import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 import { accept } from '../test/native-owner-fixture.ts';
 import { existsSync } from 'node:fs';
-import { bootEden, timed } from '../test/eden-capabilities-timing.ts';
+import { bootEden, timed, referenceMs } from '../test/eden-capabilities-timing.ts';
 
 // The Eden 2026 template is lane/engine content, not in every trunk; without it the budget cannot be measured here.
 const NO_EDEN = existsSync(new URL('../../../worlds/templates/eden-2026.json', import.meta.url)) ? false : 'needs worlds/templates/eden-2026.json (lane/engine content)';
 
-const FIRST_BUDGET_MS = 40_000, LATER_BUDGET_MS = 20_000;
+// L3 (suite trust): the wall-clock budgets are in units of the runner's own speed (referenceMs, ~32 ms on the laptop),
+// like eden-here-budget, so a slow shared runner is not judged by the laptop's clock; the counts below stay strict.
+// Laptop 2026-10-17: first 33 units (1.09 s), after a walk 17 units (0.56 s). The budgets are ~12x that and still far
+// under P4's failures (79-85 s first = ~2500 units; 45 s after a walk = ~1400 units). Was a fixed 40 s / 20 s.
+const FIRST_BUDGET_REFS = 400, LATER_BUDGET_REFS = 200;
 
 test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after a walk', { timeout: 600_000, skip: NO_EDEN }, async (t) => {
   const w = await bootEden();
@@ -22,11 +26,13 @@ test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after 
   // which fine tiles each sweep builds (a build of a tile an earlier sweep already built is a rebuild: LRU thrash)
   const built: string[] = [], fineTile = nav.fineTile.bind(nav);
   nav.fineTile = (tx, tz, rel, key = nav.keyOf(tx, tz, rel)) => { if (!nav.fine.has(key)) built.push(key); return fineTile(tx, tz, rel, key); };
+  const ref = referenceMs(), FIRST_BUDGET_MS = FIRST_BUDGET_REFS * ref, LATER_BUDGET_MS = LATER_BUDGET_REFS * ref;
   const s0 = { ...nav.stats }, h0 = strandedMetrics().hits;
   const first = timed(() => w.edge.capabilities(w.soul));
   assert.ok(first.value.length > 300, `a full list (${first.value.length})`);
   assert.ok(first.value.some((c) => c.verb === 'walk' && c.available), 'some walk is available');
-  assert.ok(first.ms < FIRST_BUDGET_MS, `first capabilities took ${Math.round(first.ms)} ms (budget ${FIRST_BUDGET_MS})`);
+  t.diagnostic(`first capabilities: ${Math.round(first.ms)} ms = ${(first.ms / ref).toFixed(0)} units of ${ref.toFixed(1)} ms (budget ${FIRST_BUDGET_REFS} units = ${Math.round(FIRST_BUDGET_MS)} ms)`);
+  assert.ok(first.ms < FIRST_BUDGET_MS, `first capabilities took ${Math.round(first.ms)} ms (budget ${FIRST_BUDGET_REFS} x ${ref.toFixed(1)} ms = ${Math.round(FIRST_BUDGET_MS)} ms)`);
   // E-life: the sweep now reads only nearby places' tiles (loops/strolls within reach; spots probed within reach), so the
   // far rooms' window floors are read about once each: bounded builds is the check (P4's failure mode was a build per
   // standing point, thousands), not more reuse than builds
@@ -48,6 +54,7 @@ test('Eden 2026: a new Soul\'s capabilities stay within budget, first and after 
   await w.settle(60);
   built.length = 0;
   const later = timed(() => w.edge.capabilities(w.soul));
-  assert.ok(later.ms < LATER_BUDGET_MS, `capabilities after walking took ${Math.round(later.ms)} ms (budget ${LATER_BUDGET_MS})`);
+  t.diagnostic(`capabilities after walking: ${Math.round(later.ms)} ms = ${(later.ms / ref).toFixed(0)} units (budget ${LATER_BUDGET_REFS} units = ${Math.round(LATER_BUDGET_MS)} ms)`);
+  assert.ok(later.ms < LATER_BUDGET_MS, `capabilities after walking took ${Math.round(later.ms)} ms (budget ${LATER_BUDGET_REFS} x ${ref.toFixed(1)} ms = ${Math.round(LATER_BUDGET_MS)} ms)`);
   assert.deepEqual(built.filter((k) => sweep1.has(k)), [], 'no fine tile rebuilt for a second sweep (new ground near where it walked is built once)');
 });

@@ -42,6 +42,28 @@ export async function bootEden(log: (m: string) => void = () => {}) {
 /** Wall time of one synchronous capabilities call (it runs on the event loop, so this is how long the server blocks). */
 export function timed<T>(fn: () => T): { ms: number; value: T } { const t = performance.now(); const value = fn(); return { ms: performance.now() - t, value }; }
 
+/** L3 (suite trust): the runner's speed, as the best of `runs` timings of one fixed reference workload made of what a
+ *  /here or a capability sweep spends its time on (object building, Map reads, float point-in-polygon tests, a sort and a
+ *  JSON round trip). Wall-clock budgets are written in these units, so a slower or shared runner (Modal: ~2-3x the
+ *  laptop) gets a proportionally larger budget, and a faster one a smaller one; the work counts stay strict. The best
+ *  of several runs reads the machine's speed, not one moment's neighbour noise. */
+export function referenceMs(runs = 7): number {
+  let best = Infinity, sink = 0;
+  for (let r = 0; r < runs; r++) { const t = performance.now(); sink += referenceWork(); best = Math.min(best, performance.now() - t); }
+  if (sink === 42) console.log('');   // keeps the work observable
+  return best;
+}
+function referenceWork(): number {
+  const poly: [number, number][] = Array.from({ length: 24 }, (_, k) => [40 + 30 * Math.cos(k * Math.PI / 12) * (k % 2 ? 0.7 : 1), 30 + 30 * Math.sin(k * Math.PI / 12)]);
+  const inside = (x: number, z: number) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+  const m = new Map<string, { id: string; p: number[]; tags: string[]; in: boolean }>();
+  for (let i = 0; i < 20_000; i++) { const p = [(i % 97) * 0.83, (i % 89) * 0.71, i % 13]; m.set(`o${i}`, { id: `o${i}`, p, tags: [`a${i % 7}`, `b${i % 5}`], in: inside(p[0], p[1]) }); }
+  let n = 0;
+  for (let i = 0; i < 20_000; i += 3) if (m.get(`o${i}`)!.in) n++;
+  const keys = [...m.keys()].sort();
+  return n + keys.length + (JSON.parse(JSON.stringify([...m.values()])) as unknown[]).length;
+}
+
 /** Stable view of a capability list for before/after comparison (ids, availability, targets, reasons). */
 export function capsDigest(caps: unknown[]): string { return JSON.stringify(caps); }
 

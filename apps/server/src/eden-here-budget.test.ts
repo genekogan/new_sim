@@ -3,20 +3,24 @@
 // every object capabilities listing, once in Perception.things), so a warm /here in the cafe still blocked the server
 // ~1.4 s. Now containing tests bounding boxes first and the listings read the place path once. This checks the answers
 // are the same as the plain inPoly scan (the old containing, kept here as the oracle), that a /here reads the place
-// path a bounded number of times, and a generous wall-time budget (measured ~0.4 s on the laptop; was ~1.4 s).
+// path a bounded number of times, and a wall-time budget in units of the runner's speed (measured ~0.4 s on the laptop; was ~1.4 s).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
 import {accept} from '../test/native-owner-fixture.ts';
 import {existsSync} from 'node:fs';
-import {bootEden} from '../test/eden-capabilities-timing.ts';
+import {bootEden, referenceMs} from '../test/eden-capabilities-timing.ts';
 
 // The Eden 2026 template is lane/engine content, not in every trunk; without it this cannot be measured here.
 const NO_EDEN = existsSync(new URL('../../../worlds/templates/eden-2026.json', import.meta.url)) ? false : 'needs worlds/templates/eden-2026.json (lane/engine content)';
 import {mountEdgeRoutes} from './edge/routes.ts';
 import {inOutline, inPoly, type Place} from './edge/ledger/places.ts';
 
-const WARM_HERE_BUDGET_MS = 1500, PLACE_PATH_READS_MAX = 20;
+// L3 (suite trust): the fixed 1500 ms budget failed once on Modal (1517 ms) with identical work (5 place-path reads, 3123
+// objects); Modal took 754-1517 ms, the laptop 420-600 ms. The wall-clock part is now in units of the runner's own speed
+// (referenceMs, ~32 ms on the laptop): 36 units is ~1.15 s on the laptop (2x the measured, under the old 1.4 s), and the
+// best of three warm calls is timed. The read count is the strict part (5 everywhere; it was ~3 per object).
+const WARM_HERE_BUDGET_REFS = 36, PLACE_PATH_READS_MAX = 8, WARM_RUNS = 3;
 type V2 = [number, number];
 const area = (p: V2[]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 /** The containing() this replaced: every place's outline walked, areas recomputed in the sort. */
@@ -52,11 +56,19 @@ test('Eden 2026: /here in the cafe gives the same frame and capabilities, reads 
   const own = L.placePathOf.bind(L); let reads = 0;
   (L as unknown as {placePathOf: typeof own}).placePathOf = (id: string) => {reads++; return own(id);};
   try {
-    L.invalidateBodies(); const t0 = performance.now(), res = await app.request('/v1/edge/here'), ms = performance.now() - t0;
-    assert.equal(res.status, 200);
-    t.diagnostic(`warm /here in the cafe: ${Math.round(ms)} ms, ${reads} place-path reads, ${objects} objects`);
+    const ref = referenceMs(), budget = WARM_HERE_BUDGET_REFS * ref, perRun: number[] = [];
+    let ms = Infinity;
+    for (let i = 0; i < WARM_RUNS; i++) {
+      reads = 0; L.invalidateBodies();
+      const t0 = performance.now(), res = await app.request('/v1/edge/here'), dt = performance.now() - t0;
+      assert.equal(res.status, 200);
+      perRun.push(reads); ms = Math.min(ms, dt);
+    }
+    reads = perRun[0];
+    t.diagnostic(`warm /here in the cafe: best ${Math.round(ms)} ms of ${WARM_RUNS} (${(ms / ref).toFixed(1)} units of ${ref.toFixed(1)} ms; budget ${Math.round(budget)} ms), ${reads} place-path reads, ${objects} objects`);
+    assert.ok(perRun.every(r => r === reads), `every warm /here reads the place path the same number of times (${perRun})`);
     assert.ok(reads <= PLACE_PATH_READS_MAX, `${reads} place-path reads for one /here (max ${PLACE_PATH_READS_MAX}; it was ~3 per object)`);
-    assert.ok(ms < WARM_HERE_BUDGET_MS, `warm /here took ${Math.round(ms)} ms (budget ${WARM_HERE_BUDGET_MS})`);
+    assert.ok(ms < budget, `warm /here took ${Math.round(ms)} ms at best of ${WARM_RUNS} (budget ${WARM_HERE_BUDGET_REFS} x ${ref.toFixed(1)} ms = ${Math.round(budget)} ms)`);
   } finally {delete (L as unknown as {placePathOf?: unknown}).placePathOf;}
 
   // containing() agrees with the oracle everywhere: a grid over the world on every level, and each outline's vertices,
