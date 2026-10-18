@@ -92,3 +92,32 @@ test('engine: two share the double bed, a third finds it full; a berth is not sa
   assert.ok(sit && ['slot.wrong-activity', 'slot.none-free'].includes(sit.code), JSON.stringify(sit));
   assert.deepEqual(e.runtime.violations, []);
 });
+
+// beds/3: an upstairs berth is lain on at its own floor's height + the mattress (seatHeight is the mattress above that floor,
+// never the floor height again), and the body stands up on that floor. (Hotel room 201 is the third storey, level y 6.27;
+// the suspected "drawn one floor too high" was a shot camera aimed into room 101.)
+test('engine: an upstairs bed is lain on at that floor + the mattress top, then stood up beside on that floor', async () => {
+  const f = await marsFactory(GREEN_FIELD_WORLD), e = f.create(f.genesis('berth-upstairs')) as unknown as MarsEngine;
+  const id = assetIdFor(double, '{}');
+  const edit: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [{ id: 1, y: 3, label: 'upstairs' }],
+    assets: { [id]: assetFromDef(id, double) }, set: {
+      upper: { surfaces: [{ id: 'upper-floor', level: 1, y: 3, obb: { c: [4, 0], half: [4, 4], yaw: 0 } }] },
+      stairs: { links: [{ id: 'upstairs-flight', kind: 'stairs', from: { level: 0, p: [7, 3], y: 0 }, to: { level: 1, p: [7, -2], y: 3 },
+        heading: -Math.PI / 2, width: 1.2, usable: true, path: Array.from({ length: 21 }, (_, i) => [7, 3 * i / 20, 3 - 5 * i / 20]) }] },
+      bed: { fixture: { def: id, kind: 'fixture', label: 'upstairs bed', p: [3, 3, 0], yaw: 0 } },
+    } };
+  edit.hash = nextEntityPhysics(undefined, edit).hash;
+  e.applyWorldEditV1(edit);
+  e.spawnHuman({ id: 'h_bed000000', label: 'Sleeper', soul: 's_bed000000' });
+  const h = () => e.world.entities.h_bed000000, hu = () => h().human as { berth?: string; seatHeight?: number; level?: number; activity?: string };
+  assert.equal(e.canPerform(lie('h_bed000000', 'lie', 3)), null);
+  assert.equal(e.perform(lie('h_bed000000', 'lie', 3)).ok, true);
+  assert.ok(until(e, () => hu().activity === 'lie' && hu().berth !== undefined), `lies down upstairs (activity ${hu().activity})`);
+  assert.equal(hu().level, 1);
+  assert.equal(hu().seatHeight, 0.5, 'seatHeight is the mattress above its own floor, not the floor height');
+  assert.ok(until(e, () => Math.abs(h().pose.p[1] - 3) < 1e-6), `the body's pose stands on the upper floor (y ${h().pose.p[1]})`);
+  assert.ok(until(e, () => hu().activity === 'idle' && !hu().berth), 'gets up after the rest');
+  assert.equal(hu().level, 1);
+  assert.ok(Math.abs(h().pose.p[1] - 3) < 1e-6, `stands on the upper floor (y ${h().pose.p[1]})`);
+  assert.deepEqual(e.runtime.violations, []);
+});
