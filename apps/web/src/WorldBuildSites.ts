@@ -68,6 +68,8 @@ type Member = { root: string; mask: number; boxes: OBB[] };
 type View = {
   data: PublicSite; roots: Set<string>; group: THREE.Group;
   marker: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
+  /** The site's ground outline: depth-tested, so a building in front of it hides it (G2). */
+  ground: THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>;
   faces: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; ranges: VertexRange[]; edgeRanges: VertexRange[];
   parts: number[]; coverage: number[]; members: Map<string, Member>; reindex: boolean;
   label: THREE.Sprite | null; canvas: HTMLCanvasElement | null; text: string; labelY: number;
@@ -76,18 +78,20 @@ type View = {
   deadline: number; receivedAt: number; silence: number; pausedAt: number; paused: boolean; nextLabelAt: number;
   sayUntil: number; noteUntil: number; reopenDeadline: number; designingActive: boolean;
   captionAlpha: { value: number }; captionTop: { value: number };
+  /** G2 build-chip gear: canvas-pixel centre x, y and radius (0 = none) and the canvas size, for the rotating sample. */
+  gear: boolean; chipGear: { value: THREE.Vector3 }; chipSize: { value: THREE.Vector2 };
   /** CE8 reticle: one sprite, created on the first hint; gazeUntil is the local-clock end of the fade. */
-  gaze: THREE.Sprite | null; gazeT: number; gazeUntil: number; gazePulse: number; gazeSize: number;
+  gaze: THREE.Sprite | null; gazeT: number; gazeUntil: number; gazePulse: number;
 };
 const ACTIVE = new THREE.Color('#ffc05c'), PAUSED = new THREE.Color('#999fa8');
 const MARKER_ALPHA = 0.95, FAINT_EDGE_ALPHA = 0.06, COVERAGE_GRID = 8; // 64 sampled columns per mass
 const MINUTE = 60_000, QUIET_MS = 3 * MINUTE, SAY_MS = 8 * MINUTE, NOTE_MS = 6000;
 const LABEL_FONT_PX = 28, LABEL_HEIGHT_PX = 44, LABEL_MIN_TEXT_PX = 14, LABEL_WORLD_HEIGHT = 1.2;
 export const SITE_REFINEMENT = { scale: 0.9, seconds: 1.2, removalDelaySeconds: 2.5 * 0.6 } as const;
-/** CE8: full for 14 s, faded out by 20 s after the god looked. The ring spans what the look framed at its target
- * (half-height = distance × tan(45°/2), the look camera's vertical fov), clamped to 2.4–60 m and ≥ 36 px across. */
-export const GAZE = { ttlMs: 20_000, fadeMs: 6000, alpha: 0.85, worldSize: 2.4, maxSize: 60, viewTan: Math.tan(Math.PI / 8), minPx: 36, pulse: 0.06 } as const;
-export const gazeSize = (a: Pick<Attention, 'at' | 'eye'>) => a.eye ? Math.min(GAZE.maxSize, Math.max(GAZE.worldSize, 2 * GAZE.viewTan * Math.hypot(a.eye[0] - a.at[0], a.eye[1] - a.at[1], a.eye[2] - a.at[2]))) : GAZE.worldSize;
+/** CE8: a small mark where the builder last looked (its `look`/`where` target): full for 14 s, faded out by 20 s.
+ * G2 (Gene, 2026-10-17): always a fixed `px` across on screen. It used to ring the whole framed area (up to 60 m),
+ * which read as a giant crosshair over the build. */
+export const GAZE = { ttlMs: 20_000, fadeMs: 6000, alpha: 0.7, px: 22, pulse: 0.06 } as const;
 const STYLES = ['ring', 'label', 'outline', 'sheen', 'wheel'] as const;
 type Style = typeof STYLES[number];
 
@@ -107,6 +111,8 @@ export class WorldBuildSites {
   private retryAt = 0;
   private time = { value: 0 };
   private pulse = { value: 1 };
+  /** G2: the build-chip gear angle, shared by every chip; frozen under reduced motion. */
+  private spin = { value: 0 };
   private worldMs = NaN;
   private worldAt = 0;
   private worldRate = 1;
@@ -262,6 +268,7 @@ export class WorldBuildSites {
     // No geometries, canvases, vectors or strings are allocated on ordinary frames.
     if (!this.styles.size) return;
     this.pulse.value = 0.8 + 0.2 * Math.sin(nowMs / 450);
+    this.spin.value = this.reducedMotion() ? 0 : (nowMs / 1000 * GEAR_TURNS_PER_SECOND % 1) * Math.PI * 2;
     if (this.styles.has('sheen')) this.time.value = nowMs / 1000;
     for (const v of this.views.values()) {
       v.captionAlpha.value = Math.max(0, Math.min(1, (v.noteUntil - nowMs) / 2000));
@@ -277,10 +284,8 @@ export class WorldBuildSites {
     v.gazeT = attention.t; v.data.attention = { at: [...attention.at], ...(attention.eye ? { eye: [...attention.eye] } : {}), t: attention.t };
     const receivedAt = this.clock(); v.gazeUntil = receivedAt + attention.t + GAZE.ttlMs - (now ?? Date.now());
     if (v.gazeUntil <= receivedAt) { if (v.gaze) v.gaze.visible = false; this.gazing.delete(v); return; }
-    // A close look is a small mark; a wide look rings the area it framed.
-    v.gazeSize = gazeSize(attention);
     const sprite = v.gaze ?? this.gazeSprite(v);
-    sprite.position.set(attention.at[0], attention.at[1] + 0.05, attention.at[2]); sprite.scale.set(v.gazeSize, v.gazeSize, 1);
+    sprite.position.set(attention.at[0], attention.at[1] + 0.05, attention.at[2]);
     this.gazing.add(v); this.gazeFrame(v, receivedAt, this.reducedMotion());
   }
   private gazeFrame(v: View, nowMs: number, still: boolean) {
@@ -303,13 +308,13 @@ export class WorldBuildSites {
       this.gazeTexture = new THREE.CanvasTexture(canvas); this.gazeTexture.colorSpace = THREE.SRGBColorSpace;
     }
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.gazeTexture, transparent: true, depthTest: false, depthWrite: false, toneMapped: false, opacity: 0 }));
-    sprite.name = 'build-gaze'; sprite.renderOrder = 999; sprite.frustumCulled = false; sprite.visible = false; sprite.scale.set(v.gazeSize, v.gazeSize, 1);
+    sprite.name = 'build-gaze'; sprite.renderOrder = 999; sprite.frustumCulled = false; sprite.visible = false;
     sprite.onBeforeRender = (renderer, _scene, camera) => {
       const m = sprite.matrixWorld.elements, view = camera.matrixWorldInverse.elements;
       const depth = Math.max(0.01, -(view[2] * m[12] + view[6] * m[13] + view[10] * m[14] + view[14]));
       const height = renderer.getSize(this.viewport).y;
       const unitsPerPixel = 2 * (camera instanceof THREE.PerspectiveCamera ? depth : 1) / (Math.max(1, height) * camera.projectionMatrix.elements[5]);
-      const size = Math.max(v.gazeSize, GAZE.minPx * unitsPerPixel) * v.gazePulse;
+      const size = GAZE.px * unitsPerPixel * v.gazePulse;
       sprite.scale.set(size, size, 1); sprite.updateMatrixWorld();
     };
     v.gaze = sprite; v.group.add(sprite); this.tag(v);
@@ -337,7 +342,7 @@ export class WorldBuildSites {
   }
   inspect() {
     return { maxRev: this.maxRev, style: [...this.styles].join(',') || 'off', ...this.stats, sites: [...this.views.values()].map(v => ({ id: v.data.id, paused: v.paused, text: v.text, parts: [...v.parts], coverage: [...v.coverage], draws: v.group.children.filter(o => o.visible && (!(o instanceof THREE.LineSegments) || o.geometry.getAttribute('position').count > 0)).length,
-      gaze: v.gaze?.visible ? { at: v.gaze.position.toArray(), size: v.gazeSize, opacity: v.gaze.material.opacity, t: v.gazeT } : null })) };
+      gaze: v.gaze?.visible ? { at: v.gaze.position.toArray(), px: GAZE.px, opacity: v.gaze.material.opacity, t: v.gazeT } : null })) };
   }
 
   private put(data: PublicSite, now?: number) {
@@ -356,8 +361,11 @@ export class WorldBuildSites {
     const mass = massGeometry(data, this.options.groundAt);
     const faces = new THREE.Mesh(mass.geometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: THREE.FrontSide, toneMapped: false }));
     installDesignPulse(faces.material, this.pulse);
-    faces.renderOrder = 995; group.add(marker, faces);
-    const v: View = { data, roots: new Set(data.roots), group, marker, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 }, gaze: null, gazeT: -Infinity, gazeUntil: 0, gazePulse: 1, gazeSize: GAZE.worldSize };
+    faces.renderOrder = 995;
+    const ground = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, toneMapped: false }));
+    installGroundLift(ground.material); ground.renderOrder = 994;
+    group.add(marker, faces, ground);
+    const v: View = { data, roots: new Set(data.roots), group, marker, ground, faces, ranges: mass.ranges, edgeRanges: [], parts: data.massing.map(() => 0), coverage: data.massing.map(() => 0), members: new Map(), reindex: true, label: null, canvas: null, text: '', labelY: 0, wheel: null, sheen: null, deadline: 0, receivedAt: 0, silence: 0, pausedAt: 0, paused: false, nextLabelAt: 0, sayUntil: 0, noteUntil: 0, reopenDeadline: Infinity, designingActive: false, captionAlpha: { value: 0 }, captionTop: { value: 0 }, gear: false, chipGear: { value: new THREE.Vector3() }, chipSize: { value: new THREE.Vector2(1, 1) }, gaze: null, gazeT: -Infinity, gazeUntil: 0, gazePulse: 1 };
     this.views.set(data.id, v); this.group.add(group);
     this.setClock(v, now); this.countParts(v); this.refit(v); this.refresh(v, this.clock());
     if (data.attention) this.attend(v, data.attention, now);
@@ -388,7 +396,9 @@ export class WorldBuildSites {
     const text = `${b.title} · ${b.step.label} ${b.step.n}/${b.step.of}${tail ? ` · ${tail}` : ''}${saying ? `\ndesigning: ${b.say!.text.replace(/[\u0000-\u001f\u007f]/g, ' ')}` : ''}${caption ? `\n${b.note!.text.replace(/[\u0000-\u001f\u007f]/g, ' ')}` : ''}`;
     const designingActive = !paused && (!b.say || now < v.sayUntil), pulseChanged = v.designingActive !== designingActive;
     v.designingActive = designingActive;
-    if (this.styles.has('label') && text !== v.text) this.label(v, text);
+    // G2: a turning gear in the chip while the build is open and working; none once it pauses or closes.
+    const gear = !paused && b.status === 'active';
+    if (this.styles.has('label') && (text !== v.text || gear !== v.gear)) this.label(v, text, gear);
     v.captionTop.value = caption && v.canvas ? LABEL_HEIGHT_PX / v.canvas.height : 0;
     if (v.label) v.label.visible = this.styles.has('label');
     // Wake only at a deadline or a visible minute boundary, never once per animation frame.
@@ -401,24 +411,31 @@ export class WorldBuildSites {
     if (changed && v.wheel && this.styles.has('wheel')) this.wheel(v);
     if (v.sheen) v.sheen.material = paused ? this.sheenMaterial(false) : this.sheenMaterial(true);
   }
-  private label(v: View, text: string) {
+  private label(v: View, text: string, gear: boolean) {
     const canvas = v.canvas ?? this.options.createCanvas?.() ?? document.createElement('canvas');
     const ctx = canvas.getContext('2d'); if (!ctx) return;
     const lines = text.split('\n');
-    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(Math.max(...lines.map(line => ctx.measureText(line).width))) + 28;
+    // The gear sits left of the first two lines and is as tall as they are (less a margin).
+    const gearRadius = gear ? (Math.min(2, lines.length) * LABEL_HEIGHT_PX - 24) / 2 : 0, inset = gear ? gearRadius * 2 + 12 : 0;
+    ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; const width = Math.ceil(Math.max(...lines.map(line => ctx.measureText(line).width))) + 28 + inset;
     const resized = canvas.width !== width || canvas.height !== LABEL_HEIGHT_PX * lines.length;
     canvas.width = width; canvas.height = LABEL_HEIGHT_PX * lines.length;
     ctx.font = `600 ${LABEL_FONT_PX}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(20,20,20,0.8)'; ctx.beginPath(); ctx.roundRect(0, 0, width, canvas.height, 10); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; lines.forEach((line, i) => ctx.fillText(line, 14, 23 + i * LABEL_HEIGHT_PX));
+    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; lines.forEach((line, i) => ctx.fillText(line, 14 + inset, 23 + i * LABEL_HEIGHT_PX));
+    const gx = 14 + gearRadius, gy = Math.min(2, lines.length) * LABEL_HEIGHT_PX / 2;
+    if (gear) { ctx.fillStyle = GEAR_COLOR; ctx.beginPath(); gearPath(ctx, gx, gy, gearRadius); ctx.fill('evenodd'); }
+    // The shader turns only the disc around the gear; the chip background there is flat, so nothing else moves.
+    v.chipGear.value.set(gx, gy, gear ? gearRadius + 1.5 : 0); v.chipSize.value.set(canvas.width, canvas.height); v.gear = gear;
     if (!v.label) {
       const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
       v.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, depthTest: false, depthWrite: false, transparent: true, toneMapped: false }));
       v.label.material.onBeforeCompile = shader => {
         shader.uniforms.uBuildCaptionAlpha = v.captionAlpha; shader.uniforms.uBuildCaptionTop = v.captionTop;
-        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uBuildCaptionAlpha;\nuniform float uBuildCaptionTop;')
-          .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n diffuseColor.a *= vMapUv.y < uBuildCaptionTop ? uBuildCaptionAlpha : 1.0;\n#endif');
+        shader.uniforms.uBuildGear = v.chipGear; shader.uniforms.uBuildChip = v.chipSize; shader.uniforms.uBuildSpin = this.spin;
+        shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uBuildCaptionAlpha;\nuniform float uBuildCaptionTop;\nuniform vec3 uBuildGear;\nuniform vec2 uBuildChip;\nuniform float uBuildSpin;')
+          .replace('#include <map_fragment>', CHIP_MAP_FRAGMENT + '\n#ifdef USE_MAP\n diffuseColor.a *= vMapUv.y < uBuildCaptionTop ? uBuildCaptionAlpha : 1.0;\n#endif');
       };
-      v.label.material.customProgramCacheKey = () => 'build-caption-v1';
+      v.label.material.customProgramCacheKey = () => 'build-caption-v2';
       // The bottom edge clears the tallest roof/root even when the screen-size floor enlarges the sprite.
       v.label.center.set(0.5, 0); v.label.frustumCulled = false;
       v.label.onBeforeRender = (renderer, _scene, camera) => {
@@ -474,6 +491,8 @@ export class WorldBuildSites {
   }
   private tint(v: View) {
     const c = v.paused ? PAUSED : ACTIVE;
+    const ground = v.ground.geometry.getAttribute('color');
+    if (ground) { for (let k = 0; k < ground.count; k++) ground.setXYZW(k, c.r, c.g, c.b, MARKER_ALPHA); ground.needsUpdate = true; }
     const lines = v.marker.geometry.getAttribute('color');
     if (lines) {
       for (let k = 0; k < lines.count; k++) lines.setXYZW(k, c.r, c.g, c.b, MARKER_ALPHA);
@@ -498,13 +517,16 @@ export class WorldBuildSites {
   }
 
   private refit(v: View) {
-    const b = v.data, lines: number[] = [];
+    const b = v.data, lines: number[] = [], ring: number[] = [];
     if (this.styles.has('ring')) {
-      for (let side = 0; side < 4; side++) for (let i = 0; i < 8; i++) {
+      // Samples about every 1.5 m follow the terrain closely enough for the depth-tested outline to stay above it.
+      for (let side = 0; side < 4; side++) {
+        const n = Math.max(8, Math.min(48, Math.ceil(b.site.size[side % 2] / 1.5)));
         const corner = (t: number) => { const u = side === 0 ? -0.5 + t : side === 1 ? 0.5 : side === 2 ? 0.5 - t : -0.5; const w = side === 0 ? -0.5 : side === 1 ? -0.5 + t : side === 2 ? 0.5 : 0.5 - t; const [x, z] = worldPoint(u * b.site.size[0], w * b.site.size[1], b.site.at, b.site.yaw); return [x, (this.options.groundAt(x, z) ?? 0) + 0.09, z]; };
-        lines.push(...corner(i / 8), ...corner((i + 1) / 8));
+        for (let i = 0; i < n; i++) ring.push(...corner(i / n), ...corner((i + 1) / n));
       }
     }
+    replaceGeometry(v.ground, lineGeometry(ring)); v.ground.visible = ring.length > 0;
     const masses = massVolumes(b, this.options.groundAt);
     v.edgeRanges = [];
     if (this.styles.size) for (const mass of masses) {
@@ -586,7 +608,7 @@ export class WorldBuildSites {
   }
   private release(v: View) {
     v.group.removeFromParent();
-    v.marker.geometry.dispose(); v.marker.material.dispose(); v.faces.geometry.dispose(); v.faces.material.dispose();
+    v.marker.geometry.dispose(); v.marker.material.dispose(); v.ground.geometry.dispose(); v.ground.material.dispose(); v.faces.geometry.dispose(); v.faces.material.dispose();
     if (v.label) { v.label.material.map?.dispose(); v.label.material.dispose(); }
     if (v.wheel) { v.wheel.geometry.dispose(); v.wheel.material.dispose(); }
     v.sheen?.geometry.dispose(); // sheen materials are layer-owned and shared among all sites
@@ -680,6 +702,38 @@ function massVolumes(site: PublicSite, groundAt: Options['groundAt'], pad = 0) {
   });
 }
 /** Patch existing face/edge materials; selected masses share the layer's one oscillating uniform. */
+const GEAR_TURNS_PER_SECOND = 0.2, GEAR_COLOR = '#ffc05c', GEAR_TEETH = 8;
+/** A cog outline with a hub hole (fill with 'evenodd'). */
+function gearPath(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  const inner = r * 0.74, pitch = Math.PI * 2 / GEAR_TEETH, at = (rr: number, a: number) => [x + Math.cos(a) * rr, y + Math.sin(a) * rr] as const;
+  ctx.moveTo(...at(inner, 0));
+  for (let t = 0; t < GEAR_TEETH; t++) {
+    // A tapered tooth over half the pitch, then the root circle to the next tooth.
+    const a = t * pitch;
+    ctx.lineTo(...at(r, a + 0.1 * pitch)); ctx.lineTo(...at(r, a + 0.4 * pitch)); ctx.lineTo(...at(inner, a + 0.5 * pitch));
+    ctx.arc(x, y, inner, a + 0.5 * pitch, a + pitch);
+  }
+  ctx.closePath(); ctx.moveTo(x + r * 0.34, y); ctx.arc(x, y, r * 0.34, 0, Math.PI * 2); ctx.closePath();
+}
+/** The chip's map lookup: inside the gear disc the sample turns by uBuildSpin; gradients from the unturned uv keep the mip level. */
+const CHIP_MAP_FRAGMENT = `#ifdef USE_MAP
+  vec2 buildUv = vMapUv;
+  vec2 buildPx = vec2(vMapUv.x * uBuildChip.x, (1.0 - vMapUv.y) * uBuildChip.y) - uBuildGear.xy;
+  if (uBuildGear.z > 0.0 && dot(buildPx, buildPx) < uBuildGear.z * uBuildGear.z) {
+    float c = cos(uBuildSpin), s = sin(uBuildSpin);
+    vec2 turned = vec2(c * buildPx.x - s * buildPx.y, s * buildPx.x + c * buildPx.y) + uBuildGear.xy;
+    buildUv = vec2(turned.x / uBuildChip.x, 1.0 - turned.y / uBuildChip.y);
+  }
+  diffuseColor *= textureGrad(map, buildUv, dFdx(vMapUv), dFdy(vMapUv));
+#endif`;
+/** Draw a ground line slightly toward the camera (along the view ray, so it does not move on screen): it stays above
+ * the terrain it follows, yet any building in front of it still hides it. */
+function installGroundLift(material: THREE.Material) {
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n{ float d = length(mvPosition.xyz); mvPosition.xyz *= max(0.0, d - (0.2 + 0.006 * d)) / max(d, 1e-4); gl_Position = projectionMatrix * mvPosition; }');
+  };
+  material.customProgramCacheKey = () => 'build-ground-lift-v1';
+}
 function installDesignPulse(material: THREE.Material, pulse: { value: number }) {
   material.onBeforeCompile = shader => {
     shader.uniforms.uBuildPulse = pulse;

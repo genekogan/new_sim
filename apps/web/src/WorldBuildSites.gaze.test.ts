@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { WorldBuildSites, parseBuildFeed, GAZE, gazeSize, type PublicSite, type Attention, type SiteModel } from './WorldBuildSites.ts';
+import { WorldBuildSites, parseBuildFeed, GAZE, type PublicSite, type Attention, type SiteModel } from './WorldBuildSites.ts';
 
 const SERVER_NOW = 1_800_000_000_000;
 function site(overrides: Partial<PublicSite> = {}): PublicSite {
@@ -14,7 +14,7 @@ function site(overrides: Partial<PublicSite> = {}): PublicSite {
 function model(): SiteModel { return { entities: new Map(), subtree: id => [id], worldPose: () => ({ x: 0, y: 0, z: 0, yaw: 0, s: 1 }), footprintsOf: () => [] }; }
 function canvas() {
   const noop = () => {};
-  const context = { font: '', fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath: noop, roundRect: noop, fill: noop, fillText: noop, arc: noop, moveTo: noop, lineTo: noop, stroke: noop };
+  const context = { font: '', fillStyle: '', strokeStyle: '', lineWidth: 0, lineCap: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath: noop, roundRect: noop, fill: noop, fillText: noop, arc: noop, moveTo: noop, closePath: noop, lineTo: noop, stroke: noop };
   return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
 }
 function harness(more: { reducedMotion?: () => boolean; style?: string } = {}) {
@@ -80,21 +80,22 @@ test('CE8: reduced motion keeps the reticle still; otherwise it breathes gently'
     h.sites.dispose(); return sizes;
   };
   const still = size(true), moving = size(false);
-  assert.ok(still.every(v => v === still[0]), `still: ${still}`); assert.ok(still[0] >= GAZE.worldSize);
+  assert.ok(still.every(v => v === still[0]), `still: ${still}`); assert.ok(still[0] > 0);
   assert.ok(new Set(moving.map(v => v.toFixed(6))).size > 1, `moving: ${moving}`); assert.ok(moving.every(v => Math.abs(v / still[0] - 1) <= GAZE.pulse + 1e-9));
 });
 
-test('CE8: a close look is a small mark; a wide look rings what it framed (clamped); where/free hints are small', () => {
-  assert.equal(gazeSize({ at: [0, 0, 0] }), GAZE.worldSize);
-  assert.equal(gazeSize({ at: [0, 0, 0], eye: [1, 1, 1] }), GAZE.worldSize, 'never smaller than the base mark');
-  const wide = gazeSize({ at: [-66, 0, 3], eye: [-43.7, 17.3, 25.3] }); // S1's 36 m look at the whole site
-  assert.ok(Math.abs(wide - 2 * Math.tan(Math.PI / 8) * 36) < 0.1, String(wide));
-  assert.equal(gazeSize({ at: [0, 0, 0], eye: [0, 400, 0] }), GAZE.maxSize);
+test('G2: every look is the same small screen mark (22 px), however wide the look framed', () => {
   const h = harness(); h.sites.apply(start());
-  h.sites.apply(look({ at: [-66, 0, 3], eye: [-43.7, 17.3, 25.3], t: SERVER_NOW }));
-  assert.equal(gazeOf(h)?.size, wide); assert.equal(sprite(h)!.scale.x, wide);
-  h.sites.apply(look({ at: [100, 0, 20], t: SERVER_NOW + 1 }));
-  assert.equal(gazeOf(h)?.size, GAZE.worldSize, 'a later where/free hint shrinks it again');
+  const renderer = { getSize: (v: THREE.Vector2) => v.set(812, 812) } as unknown as THREE.WebGLRenderer;
+  const px = (eye: [number, number, number]) => {
+    const s = sprite(h)!, camera = new THREE.PerspectiveCamera(50, 1, 0.1, 1000); camera.position.set(...eye); camera.lookAt(-66, 0, 3); camera.updateMatrixWorld(); s.updateMatrixWorld();
+    s.onBeforeRender(renderer, new THREE.Scene(), camera, s.geometry, s.material, null as never);
+    const depth = camera.position.distanceTo(s.position), unitsPerPixel = 2 * depth / (812 * camera.projectionMatrix.elements[5]);
+    return s.scale.x / unitsPerPixel / h.sites.inspect().sites[0].gaze!.px;
+  };
+  h.sites.apply(look({ at: [-66, 0, 3], eye: [-43.7, 17.3, 25.3], t: SERVER_NOW })); // S1's 36 m look at the whole site
+  assert.equal(gazeOf(h)?.px, GAZE.px); assert.ok(GAZE.px <= 24, 'small');
+  for (const eye of [[-60, 4, 10], [-20, 30, 60], [100, 200, 300]] as [number, number, number][]) { const r = px(eye); assert.ok(Math.abs(r - 1) <= GAZE.pulse + 1e-6, `${eye}: ${r}`); }
   h.sites.dispose();
 });
 
@@ -124,7 +125,7 @@ test('CE8 contract: the real server attention event and public site drive the re
     const h = harness(); for (const m of messages) h.sites.apply(m);
     now += 10; assert.equal(god.builds.attend('church', { at: [3, 0, -4], eye: [20, 12, 18] }, identity).ok, true);
     h.sites.apply(messages.at(-1));
-    assert.deepEqual(gazeOf(h)?.at, [3, 0.05, -4]); assert.ok(gazeOf(h)!.size > GAZE.worldSize);
+    assert.deepEqual(gazeOf(h)?.at, [3, 0.05, -4]); assert.equal(gazeOf(h)!.px, GAZE.px);
     // A viewer that joins later gets the same look from the public snapshot.
     const late = harness(); const list = god.builds.publicList(now); late.sites.reset(list.builds as PublicSite[], list.rev, list.now);
     assert.deepEqual(gazeOf(late)?.at, [3, 0.05, -4]);

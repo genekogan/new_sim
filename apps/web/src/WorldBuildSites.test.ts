@@ -19,7 +19,7 @@ function fakeModel(): SiteModel & { boxes: Map<string, OBB[]> } {
   return { entities, boxes, subtree(id) { const ids = [id]; for (let i = 0; i < ids.length; i++) for (const e of entities.values()) if (e.in.parent === ids[i]) ids.push(e.id); return ids; }, worldPose(e) { return { x: e.p?.[0] ?? 0, y: 0, z: e.p?.at(-1) ?? 0, yaw: 0, s: 1 }; }, footprintsOf(id) { return boxes.get(id) ?? []; } };
 }
 function fakeCanvas(paint = () => {}) {
-  const context = { font: '', fillStyle: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath() {}, roundRect() {}, fill() {}, fillText: paint };
+  const context = { font: '', fillStyle: '', textBaseline: '', measureText: (s: string) => ({ width: s.length * 14 }), beginPath() {}, roundRect() {}, fill() {}, moveTo() {}, lineTo() {}, arc() {}, closePath() {}, fillText: paint };
   return { width: 0, height: 0, getContext: () => context } as unknown as HTMLCanvasElement;
 }
 function harness(style = 'ring,label', more: { fetchBuilds?: () => Promise<unknown>; groundAt?: (x: number, z: number) => number | null } = {}) {
@@ -34,6 +34,7 @@ function start(b = site()) { return { type: 'edge', kind: 'world-build', rev: b.
 function diff(d: SiteDelta[], upserts: Entity[] = [], removes: string[] = []) { return { type: 'edge', kind: 'world-diff', seq: 1, now: SERVER_NOW, builds: d, diff: { upserts, removes, defs: [], tiles: [] } }; }
 function group(h: ReturnType<typeof harness>) { return h.sites.group.children[0] as THREE.Group; }
 function marker(h: ReturnType<typeof harness>) { return group(h).children[0] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>; }
+function ground(h: ReturnType<typeof harness>) { return group(h).children[2] as THREE.LineSegments<THREE.BufferGeometry, THREE.LineBasicMaterial>; }
 function faces(h: ReturnType<typeof harness>) { return group(h).children[1] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; }
 function label(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Sprite) as THREE.Sprite; }
 function wheel(h: ReturnType<typeof harness>) { return group(h).children.find(o => o instanceof THREE.Mesh && o !== faces(h) && o.material instanceof THREE.MeshBasicMaterial) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>; }
@@ -88,7 +89,7 @@ test('named mass faces and edges pulse through one shared uniform with no new dr
   const h = harness(); h.sites.apply(start(site({ say: { text: 'nave', at: SERVER_NOW }, designing: ['nave', 'unknown'] })));
   const mesh = faces(h), lines = marker(h), faceSelected = mesh.geometry.getAttribute('buildDesigning'), edgeSelected = lines.geometry.getAttribute('buildDesigning');
   assert.equal(faceSelected.getX(0), 1); assert.equal(faceSelected.getX(faceSelected.count - 1), 0);
-  assert.equal(edgeSelected.getX(0), 0); assert.equal(edgeSelected.getX(63), 0); assert.equal(edgeSelected.getX(64), 1); assert.equal(edgeSelected.getX(edgeSelected.count - 1), 0);
+  assert.equal(edgeSelected.getX(0), 1); assert.equal(edgeSelected.getX(edgeSelected.count - 1), 0);
   const a = compiled(mesh.material), b = compiled(lines.material);
   assert.equal(a.uniforms.uBuildPulse, b.uniforms.uBuildPulse); assert.match(a.fragmentShader, /diffuseColor.a \*= mix/);
   assert.match(a.vertexShader, /vBuildDesigning = buildDesigning/);
@@ -97,7 +98,7 @@ test('named mass faces and edges pulse through one shared uniform with no new dr
   for (let i = 0; i < 120; i++) h.advance(16);
   assert.notEqual(a.uniforms.uBuildPulse.value, initial); assert.ok(a.uniforms.uBuildPulse.value >= 0.6 && a.uniforms.uBuildPulse.value <= 1);
   assert.equal((faceSelected as THREE.BufferAttribute).version, version); assert.equal(colors.version, colorVersion);
-  assert.deepEqual(group(h).children, objects); assert.equal(mesh.geometry, geometry); assert.equal(mesh.material, material); assert.equal(h.sites.inspect().sites[0].draws, 3);
+  assert.deepEqual(group(h).children, objects); assert.equal(mesh.geometry, geometry); assert.equal(mesh.material, material); assert.equal(h.sites.inspect().sites[0].draws, 4);
   h.sites.apply(edge(delta(2, { designing: ['tower-b'] })));
   assert.equal(faceSelected.getX(0), 0); assert.equal(faceSelected.getX(faceSelected.count - 1), 1);
   h.sites.apply(edge(delta(3, { status: 'paused' })));
@@ -120,7 +121,7 @@ test('batch captions fade for six seconds inside the existing label draw without
   assert.equal(h.sites.stats.labelRedraws, redraws + 1); assert.notEqual(sprite.material.map, texture); assert.equal(sprite.material.map!.image, canvas); assert.equal(canvas.height, 88); assert.equal(h.canvases, 1);
   h.sites.apply(edge(delta(3, { note: { text: 'next batch', at: SERVER_NOW + 6000 } }), SERVER_NOW + 6000));
   assert.match(h.sites.inspect().sites[0].text, /next batch$/); assert.equal(shader.uniforms.uBuildCaptionAlpha.value, 1);
-  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
+  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 6);
   h.sites.reset([site({ rev: 10, note: { text: 'stale caption', at: SERVER_NOW } })], 10, SERVER_NOW + 6000);
   assert.doesNotMatch(h.sites.inspect().sites[0].text, /stale caption/); h.sites.dispose();
 });
@@ -406,7 +407,7 @@ test('massing is merged at start/snapshot; per-mass coverage fades faces and res
   const mesh = faces(h), geometry = mesh.geometry, colors = geometry.getAttribute('color');
   assert.equal(mesh.material.depthWrite, false); assert.equal(colors.itemSize, 4); assert.ok(Math.abs(colors.getW(0) - 0.35) < 1e-6);
   geometry.computeBoundingBox(); assert.ok(Math.abs(geometry.boundingBox!.max.y - 22.08) < 1e-4);
-  assert.equal(h.sites.inspect().sites[0].draws, 3);
+  assert.equal(h.sites.inspect().sites[0].draws, 4);
   for (let i = 1; i <= 4; i++) {
     const e = entity(`e_part${i}`, 'e_root'); h.model.entities.set(e.id, e); h.model.boxes.set(e.id, [{ c: [103, 11 + i * 4 - 2], half: [2, 4], yaw: -Math.PI / 2, y0: 0, y1: 14 }]);
     const d = diff([delta(i + 1)], [e]); h.sites.apply(d); h.sites.refitDiff(d);
@@ -451,14 +452,14 @@ test('one real 31 m tower fills its 28 m pyramid mass while an empty mass surviv
   assert.deepEqual(h.sites.inspect().sites[0].coverage, [1, 0]);
   const colors = faces(h).geometry.getAttribute('color'), lines = marker(h).geometry.getAttribute('color');
   assert.equal(colors.getW(0), 0); assert.ok(Math.abs(colors.getW(colors.count - 1) - 0.35) < 1e-6);
-  assert.equal(lines.itemSize, 4); assert.equal(marker(h).material.opacity, 1);
-  assert.ok(Math.abs(lines.getW(0) - 0.95) < 1e-6, 'plot marker stays bright');
-  assert.ok(Math.abs(lines.getW(64) - 0.06) < 1e-6, 'filled tower edges are faint in the same draw');
+  assert.equal(lines.itemSize, 4); assert.equal(ground(h).geometry.getAttribute('color').itemSize, 4); assert.equal(marker(h).material.opacity, 1);
+  assert.ok(Math.abs(ground(h).geometry.getAttribute('color').getW(0) - 0.95) < 1e-6, 'plot marker stays bright');
+  assert.ok(Math.abs(lines.getW(0) - 0.06) < 1e-6, 'filled tower edges are faint in the same draw');
   assert.ok(Math.abs(lines.getW(lines.count - 1) - 0.95) < 1e-6, 'empty plan stays bright');
   const alphas = Array.from({ length: lines.count }, (_, i) => lines.getW(i));
   h.sites.apply(edge(delta(3, { status: 'paused' })));
   assert.deepEqual(Array.from({ length: lines.count }, (_, i) => lines.getW(i)), alphas, 'pause only changes the tint');
-  assert.equal(h.sites.inspect().sites[0].draws, 3); h.sites.dispose();
+  assert.equal(h.sites.inspect().sites[0].draws, 4); h.sites.dispose();
 });
 
 test('a low nave in a taller gabled plan retains only faint faces and an outline', () => {
@@ -467,8 +468,8 @@ test('a low nave in a taller gabled plan retains only faint faces and an outline
   h.sites.apply(start(site({ roots: [root.id], massing: [{ at: [0, 0], size: [26, 12], h: 15, roof: 'gable' }] })));
   assert.deepEqual(h.sites.inspect().sites[0].coverage, [0.5], 'roof volume contributes to the denominator');
   assert.ok(Math.abs(faces(h).geometry.getAttribute('color').getW(0) - 0.05833333) < 1e-6);
-  assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(64) - 0.18515625) < 1e-6);
-  assert.equal(h.sites.inspect().sites[0].draws, 3); h.sites.dispose();
+  assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(0) - 0.18515625) < 1e-6);
+  assert.equal(h.sites.inspect().sites[0].draws, 4); h.sites.dispose();
 });
 
 test('face fade ends at 60% and edge fade reaches a 0.06 outline at 80%, independent of part count', () => {
@@ -481,8 +482,8 @@ test('face fade ends at 60% and edge fade reaches a 0.06 outline at 80%, indepen
     const d = diff([delta(i + 2)], [root]); h.sites.apply(d); h.sites.refitDiff(d);
     assert.ok(Math.abs(h.sites.inspect().sites[0].coverage[0] - coverage) < 1e-12);
     assert.ok(Math.abs(faces(h).geometry.getAttribute('color').getW(0) - faceAlpha) < 1e-6);
-    assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(64) - edgeAlpha) < 1e-6);
-    assert.equal(faces(h).visible, coverage < 0.6); assert.equal(h.sites.inspect().sites[0].draws, coverage < 0.6 ? 3 : 2);
+    assert.ok(Math.abs(marker(h).geometry.getAttribute('color').getW(0) - edgeAlpha) < 1e-6);
+    assert.equal(faces(h).visible, coverage < 0.6); assert.equal(h.sites.inspect().sites[0].draws, coverage < 0.6 ? 4 : 3);
   }
   h.sites.dispose();
 });
@@ -521,7 +522,7 @@ test('repeated coverage changes reuse faces/materials, dispose replaced marker g
     h.model.boxes.set(root.id, [{ c: [103, 19], half: [2, 2], yaw: 0, y0: 0, y1: i % 2 ? 10 : 2 }]);
     const d = diff([delta(i + 2)], [root]); h.sites.apply(d); h.sites.refitDiff(d);
     assert.equal(released, 1); assert.equal(faces(h).geometry, geometry); assert.equal(faces(h).material, material); assert.equal(marker(h).material, lineMaterial);
-    assert.ok(h.sites.inspect().sites[0].draws <= 3);
+    assert.ok(h.sites.inspect().sites[0].draws <= 4);
   }
   assert.equal(faces(h).visible, false); assert.deepEqual(counts, resources.map(() => 0));
   const last = marker(h).geometry; let lastReleased = 0; last.addEventListener('dispose', () => lastReleased++);
@@ -556,7 +557,7 @@ test('sheen fits padded mass/roof union at world coordinates and normalizes a si
     assert.ok(Math.abs(heights.getX(i) - (pos.getY(i) - bounds.min.y) / (bounds.max.y - bounds.min.y)) < 1e-6);
   }
   assert.equal(sweep.material.depthWrite, false); assert.equal(sweep.material.side, THREE.FrontSide);
-  assert.equal(h.sites.inspect().sites[0].draws, 4);
+  assert.equal(h.sites.inspect().sites[0].draws, 5);
   const geometry = sweep.geometry; h.advance(1000); assert.equal(sweep.geometry, geometry);
   h.sites.apply(edge(delta(2, { status: 'paused' }))); assert.equal(sweep.material.uniforms.uActive.value, 0);
   assert.match(sweep.material.fragmentShader, /0\.006\+uActive\*band\*0\.055/);
@@ -604,10 +605,10 @@ test('progress wheel is a draped ribbon with an exact n/of arc, including zero, 
   h.sites.dispose();
 });
 
-test('marker is 32 terrain-draped segments, with no depth writes; all overlays carry buildSite hover identity', () => {
+test('G2: the ground outline is terrain-draped about every 1.5 m and depth-tested (a building in front hides it), with no depth writes; all overlays carry buildSite hover identity', () => {
   const groundAt = (x: number, z: number) => x * 0.1 + z * 0.02;
   const h = harness('ring,label,sheen,wheel', { groundAt }); h.sites.apply(start(site({ massing: [] })));
-  const pos = marker(h).geometry.getAttribute('position'); assert.equal(pos.count, 64); assert.equal(marker(h).material.depthTest, false); assert.equal(marker(h).renderOrder, 997);
+  const pos = ground(h).geometry.getAttribute('position'); assert.equal(pos.count, 2 * 2 * (Math.ceil(26 / 1.5) + Math.ceil(14 / 1.5))); assert.equal(ground(h).material.depthTest, true); assert.equal(marker(h).material.depthTest, false); assert.equal(marker(h).geometry.getAttribute('position').count, 0, 'no massing, no edges');
   for (let i = 0; i < pos.count; i++) assert.ok(Math.abs(pos.getY(i) - groundAt(pos.getX(i), pos.getZ(i)) - 0.09) < 2e-6);
   group(h).traverse(o => { assert.equal(o.userData.buildSite, 'church'); assert.equal(o.userData.entity, 'build-site:church'); if ('material' in o) assert.equal((o as THREE.Mesh).material instanceof Array ? false : ((o as THREE.Mesh).material as THREE.Material).depthWrite, false); });
   const target = h.sites.hoverTarget('build-site:church'); assert.equal(target?.name, 'Under construction: Black stone church'); assert.equal(target?.detail, 'shell 2/6');
@@ -627,21 +628,21 @@ test('terrain refresh moves ghosts/marker/label together without a new canvas; w
 });
 
 test('one runtime switch: default <=3 draws; outline adds zero, sheen/wheel add one each; off is zero', () => {
-  const h = harness(); h.sites.apply(start()); assert.equal(h.sites.inspect().sites[0].draws, 3);
-  h.sites.siteStyle('ring,label,outline'); assert.equal(h.sites.inspect().sites[0].draws, 3);
-  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 5);
+  const h = harness(); h.sites.apply(start()); assert.equal(h.sites.inspect().sites[0].draws, 4);
+  h.sites.siteStyle('ring,label,outline'); assert.equal(h.sites.inspect().sites[0].draws, 4);
+  h.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(h.sites.inspect().sites[0].draws, 6);
   const sweep = sheen(h), ring = wheel(h), geometry = ring.geometry, sweepGeometry = sweep.geometry;
   assert.equal(ring.material.forceSinglePass, true, 'transparent double-sided ribbon is one draw');
   h.advance(16); assert.equal(ring.geometry, geometry); assert.equal(sweep.geometry, sweepGeometry); assert.equal(sweep.material.uniforms.uTime.value, h.now() / 1000);
   h.sites.apply(edge(delta(2, { status: 'paused' }))); assert.equal(sweep.material.uniforms.uActive.value, 0);
   h.sites.siteStyle('off'); assert.equal(h.sites.group.visible, false); assert.equal(h.sites.inspect().sites[0].draws, 0); assert.equal(h.sites.hoverTarget('build-site:church'), null);
-  h.sites.siteStyle('ring,label'); assert.equal(h.sites.group.visible, true); assert.equal(h.canvases, 1); assert.equal(h.sites.inspect().sites[0].draws, 3);
+  h.sites.siteStyle('ring,label'); assert.equal(h.sites.group.visible, true); assert.equal(h.canvases, 1); assert.equal(h.sites.inspect().sites[0].draws, 4);
   h.sites.dispose();
 });
 
 test('a client-side pause cannot revive a wheel candidate disabled at runtime', () => {
   const h = harness('ring,label,wheel'); h.sites.apply(start()); h.sites.siteStyle('ring,label');
-  h.advance(600_000); assert.equal(h.sites.inspect().sites[0].paused, true); assert.equal(h.sites.inspect().sites[0].draws, 3);
+  h.advance(600_000); assert.equal(h.sites.inspect().sites[0].paused, true); assert.equal(h.sites.inspect().sites[0].draws, 4);
   h.sites.dispose();
 });
 
@@ -723,10 +724,10 @@ test('real applyEdge draws root-subtree OBB outlines alongside declared massing,
   sweep.geometry.computeBoundingBox(); assert.ok(Math.abs(sweep.geometry.boundingBox!.max.y - Math.max(...boxes.map(b => b.y1)) - 0.35) < 1e-5);
   const sprite = view.children.find(o => o instanceof THREE.Sprite) as THREE.Sprite;
   assert.equal(sprite.position.y, Math.max(...boxes.map(b => b.y1)) + 0.75);
-  assert.equal(layer.sites.inspect().sites[0].draws, 4); assert.equal(layer.stats.lastError, null);
+  assert.equal(layer.sites.inspect().sites[0].draws, 5); assert.equal(layer.stats.lastError, null);
   layer.sites.siteStyle('ring,label'); assert.equal(marker.geometry.getAttribute('position').count, before);
-  assert.equal(layer.sites.inspect().sites[0].draws, 3);
-  layer.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(layer.sites.inspect().sites[0].draws, 5);
+  assert.equal(layer.sites.inspect().sites[0].draws, 4);
+  layer.sites.siteStyle('ring,label,outline,sheen,wheel'); assert.equal(layer.sites.inspect().sites[0].draws, 6);
   layer.dispose();
 });
 
