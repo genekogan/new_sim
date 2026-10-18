@@ -90,14 +90,23 @@ export const undo = () => god<UndoResult>('/v1/god/undo', { method: 'POST' });
 export const redo = () => god<UndoResult>('/v1/god/redo', { method: 'POST' });
 export const undoGroup = (group: string) => god<UndoResult>(`/v1/god/undo?group=${encodeURIComponent(group)}`, { method: 'POST' });
 
-/** Flags from the public snapshot (positions resolved for the camera). */
+export type FlagSource = { id: string; name?: string; def: string; p?: readonly number[]; state?: { label?: string } | unknown; in: { parent: string } };
+/** The flags among a world's entities (positions resolved for the camera): the public snapshot's, or the entity layer's
+ *  copy of it (GodPanel, lane L3h: no second snapshot download per edit). */
+export function flagRefsOf(entities: Iterable<FlagSource>): FlagRef[] {
+  const out: FlagRef[] = [];
+  for (const e of entities) {
+    if (!isFlagDef(e.def) || e.in.parent !== 'world' || !Array.isArray(e.p)) continue;
+    const p = e.p; const xyz: [number, number, number] = p.length === 3 ? [p[0], p[1], p[2]] : [p[0], 0, p[1]];
+    const label = (e.state as { label?: string } | undefined)?.label;
+    out.push({ id: e.id, name: e.name ?? e.id, label: label ?? e.name ?? e.id, p: xyz });
+  }
+  return out;
+}
+/** Flags from the public snapshot (a page without the entity layer's copy). */
 export async function flags(): Promise<FlagRef[]> {
   const r = await fetch(apiPath('/v1/world/snapshot')); if (!r.ok) return [];
-  const s = await r.json() as { entities: { id: string; name?: string; def: string; p?: number[]; state?: { label?: string }; in: { parent: string } }[] };
-  return s.entities.filter((e) => isFlagDef(e.def) && e.in.parent === 'world' && Array.isArray(e.p)).map((e) => {
-    const p = e.p!; const xyz: [number, number, number] = p.length === 3 ? [p[0], p[1], p[2]] : [p[0], 0, p[1]];
-    return { id: e.id, name: e.name ?? e.id, label: e.state?.label ?? e.name ?? e.id, p: xyz };
-  });
+  return flagRefsOf((await r.json() as { entities: FlagSource[] }).entities);
 }
 
 // ---- the launcher (only when this page is served by tools/world-launcher)

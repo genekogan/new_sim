@@ -29,7 +29,7 @@ const PHONE = () => typeof matchMedia === 'function' && matchMedia('(max-width:7
 const openKey = () => 'sim.godPanel.open' + (PHONE() ? '.phone' : '');
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 
-export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMode: (v: boolean) => void }) {
+export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boolean; onFlagMode: (v: boolean) => void; entitiesAt?: (seq: number) => Iterable<G.FlagSource> | null }) {
   const [status, setStatus] = useState<G.Status | null>(null);
   // #join (the link a god shares): open the panel on the Join section / the Souls tab
   const joinHash = landingHash === '#join';
@@ -63,7 +63,22 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   useEffect(() => { localStorage.setItem(openKey(), open ? '1' : '0'); }, [open]);
   useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
   // journal, flags: whenever the world's edit counter moves
-  useEffect(() => { if (seq === undefined) return; void G.flags().then(setFlags).catch(() => {}); if (owner) void G.edits(30).then(setEdits).catch(() => setEdits(null)); }, [seq, owner]);
+  useEffect(() => {
+    if (seq === undefined) return;
+    if (owner) void G.edits(30).then(setEdits).catch(() => setEdits(null));
+    // lane L3h: the entity layer already holds the public snapshot plus its diffs; read the flags there once it has reached
+    // this edit (a diff can land just after the status), and download the whole snapshot only when it never does
+    let live = true, tries = 0, timer: ReturnType<typeof setTimeout> | undefined;
+    const read = () => {
+      if (!live) return;
+      const here = entitiesAt?.(seq);
+      if (here) { setFlags(G.flagRefsOf(here)); return; }
+      if (entitiesAt && ++tries < 40) { timer = setTimeout(read, 250); return; }
+      void G.flags().then((f) => { if (live) setFlags(f); }).catch(() => {});
+    };
+    read();
+    return () => { live = false; clearTimeout(timer); };
+  }, [seq, owner, entitiesAt]);
   // what the launcher saw (looks, an agent's calls) and the god's previews: a slower poll
   useEffect(() => {
     const go = () => { void G.launcherWorld().then(setLauncher); if (owner) void G.previews().then(setPreviews); };

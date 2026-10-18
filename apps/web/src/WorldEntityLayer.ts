@@ -4,6 +4,7 @@
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
 import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
+import { takeSnapshotPrefetch } from './snapshot-prefetch.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
@@ -50,6 +51,9 @@ export class WorldEntityLayer {
   readonly instancer = new EntityInstancer();
   readonly sites: WorldBuildSites;
   get entityCount() { return this.model?.entities.size ?? 0; }
+  /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
+   *  instead of downloading the public snapshot again on every edit (lane L3h). */
+  entitiesAt(seq: number): Iterable<Entity> | null { return this.model && this.seq >= seq ? this.model.entities.values() : null; }
   private horizon: THREE.Mesh | null = null;
   /** MARSLAND-FAR: entities whose def is tagged `horizon` (core/far-land@1, core/panorama@1) replace the green ring. */
   private horizonBy = new Set<string>();
@@ -96,7 +100,9 @@ export class WorldEntityLayer {
   async start(signal: AbortSignal) {
     this.signal = signal;
     let snap: Snapshot;
-    try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json(); } catch { return; }
+    // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
+    const url = this.api('/v1/world/snapshot');
+    try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json(); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival

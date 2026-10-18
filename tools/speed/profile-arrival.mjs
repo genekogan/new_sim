@@ -7,6 +7,7 @@
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--interval 250]
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> --analyze [--from ms] [--to ms]   (re-analyse a window)
 //   --desktop: 1440x900 (or --size WxH) at --dpr (default 1), no touch, --cpu defaults to 1 and --mbps to 0 (unthrottled).
+//   --latency ms: added round trip with --mbps (default 40; ~150 is the laptop -> eden2 live path).
 //   --warm: HTTP cache on; one untimed arrival first in the same context, then the timed reload (the returning visitor).
 // Ports: lane ports only via SPEED_PORTS (the live 4930–4990 are always refused).
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
@@ -66,7 +67,7 @@ try {
   await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: !warm });
   if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0; }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
-  if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
+  if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(opt('latency', '40')), downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval });
   await cdp.send('Profiler.start');
   navAt = Date.now();
