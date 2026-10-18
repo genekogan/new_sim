@@ -117,14 +117,32 @@ class Obstacles {
     const k = `${this.model.entities.size}`;
     if (k === this.key && t - this.at < 8) return this.boxes;
     this.key = k; this.at = t; this.boxes = [];
-    for (const e of this.model.entities.values()) {
-      if (this.skip.has(e.id)) continue;
-      const d = this.model.resolvedDef(e.def); if (!d || d.layer !== 'solid' || d.make.kind === 'none') continue;
-      let fp: Box[]; try { fp = this.model.footprint(e, d); } catch { continue; }
+    for (const { id, fp } of solidFootprints(this.model)) {
+      if (this.skip.has(id)) continue;
       for (const b of fp) if (Math.hypot(b.c[0] - this.cx, b.c[1] - this.cz) < this.reach + Math.hypot(b.half[0], b.half[1]) && b.y1 - b.y0 > 0.12) this.boxes.push(b);
     }
     return this.boxes;
   }
+}
+/** Every solid's world footprint in entity order, scanned once per synchronous task and shared by all the creatures that
+ *  refresh in it (lane L3e: at arrival every creature refreshes in the same frame, which was creatures x entities
+ *  footprint calls, ~2.8 s of a 4x phone's arrival in Eden 2026). Nothing in one task changes the model between two
+ *  creatures, and the cache also drops on any entity/def/terrain change, so each creature gets exactly the boxes its own
+ *  scan would have built. The boxes are read-only. */
+let solidScan: { model: WorldModel; entities: object | undefined; defs: object | undefined; size: number; terrain: unknown; solids: { id: string; fp: Box[] }[] } | null = null;
+const revisionOf = (m: Map<string, unknown>) => (m as Map<string, unknown> & { revision?: object }).revision;
+export function solidFootprints(model: WorldModel): readonly { id: string; fp: readonly Box[] }[] {
+  const c = solidScan;
+  if (c && c.model === model && c.size === model.entities.size && c.entities === revisionOf(model.entities) && c.defs === revisionOf(model.defs) && c.terrain === model.terrain) return c.solids;
+  const solids: { id: string; fp: Box[] }[] = [];
+  model.readPass(() => { for (const e of model.entities.values()) {
+    const d = model.resolvedDef(e.def); if (!d || d.layer !== 'solid' || d.make.kind === 'none') continue;
+    let fp: Box[]; try { fp = model.footprint(e, d); } catch { continue; }
+    solids.push({ id: e.id, fp });
+  } });
+  solidScan = { model, entities: revisionOf(model.entities), defs: revisionOf(model.defs), size: model.entities.size, terrain: model.terrain, solids };
+  queueMicrotask(() => { if (solidScan?.solids === solids) solidScan = null; });
+  return solids;
 }
 export function surroundings(model: WorldModel, home: V2, reach: number, medium: 'land' | 'water', skip: Set<string>, area?: V2[]): Surroundings & { obstacles: Obstacles; t: number } {
   const obstacles = new Obstacles(model, home[0], home[1], reach + 4, skip);

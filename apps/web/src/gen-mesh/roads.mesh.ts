@@ -59,7 +59,12 @@ function junctions(L: Line, w: number, others: Other[]): Junction[] {
     let nx = -d[1], nz = d[0]; if ((inward[0] - x) * nx + (inward[1] - z) * nz < 0) { nx = -nx; nz = -nz; }
     return { x, z, r: wT / 2 + RF + 0.5, other: o, kind, side: [nx, nz], d, wEnd: wE, wThru: wT };
   };
+  let lx0 = Infinity, lz0 = Infinity, lx1 = -Infinity, lz1 = -Infinity; for (const [x, z] of L.c) { lx0 = Math.min(lx0, x); lz0 = Math.min(lz0, z); lx1 = Math.max(lx1, x); lz1 = Math.max(lz1, z); }
   for (const o of others) {
+    // skip a road too far away to meet this one: o.bb already pads o's centre line by o.w; a tee needs an end within the
+    // through road's half width + 2.5 m of its centre line, a crossing needs the centre lines to touch (L3e: same junctions)
+    const far = Math.max(w, o.w) / 2 + 3.5;
+    if (lx0 > o.bb[2] + far || lx1 < o.bb[0] - far || lz0 > o.bb[3] + far || lz1 < o.bb[1] - far) continue;
     const r = Math.max(w, o.w) / 2 + 1.4;
     const tees: Junction[] = [];
     for (const { q } of ends(L)) { const j = tee(L, q, o.L, w, o.w, 't-mine', o); if (j) tees.push(j); }
@@ -120,7 +125,7 @@ export function buildRoad(ctx: MeshCtx, kind: 'road' | 'path'): THREE.Object3D |
   const inSpan = (q: number) => spans.some((sp) => q >= sp.from - 0.01 && q <= sp.to + 0.01);
   const others = otherRoads(ctx.model, e), juncs = junctions(L, w, others);
   const inJunc = (x: number, z: number, pad = 0) => juncs.some((j) => kerbCut(j, x, z, pad));
-  const giveWay = (x: number, z: number) => juncs.some((j) => (j.kind === 'x' && inPatch(j, x, z, -0.3)) || (j.kind === 't-mine' && nearestOn(j.other.L, x, z).d < j.other.w / 2 + 0.05));
+  const giveWay = (x: number, z: number) => juncs.some((j) => (j.kind === 'x' && inPatch(j, x, z, -0.3)) || (j.kind === 't-mine' && inBB(j.other, x, z) && nearestOn(j.other.L, x, z).d < j.other.w / 2 + 0.05));
   const base = rgb(typeof p.color === 'string' && /^#/.test(p.color) ? p.color : BASE[mat] ?? BASE.cobble);
   const soup = new Soup();
   const G = (x: number, z: number, lift: number): V3 => [x, ground(x, z) + lift, z];

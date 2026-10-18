@@ -6,6 +6,8 @@
 // main-thread busy/idle split, the resource waterfall (start/end of each request) and the timing marks.
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--interval 250]
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> --analyze [--from ms] [--to ms]   (re-analyse a window)
+//   --desktop: 1440x900 (or --size WxH) at --dpr (default 1), no touch, --cpu defaults to 1 and --mbps to 0 (unthrottled).
+//   --warm: HTTP cache on; one untimed arrival first in the same context, then the timed reload (the returning visitor).
 // Ports: lane ports only via SPEED_PORTS (the live 4930–4990 are always refused).
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -20,9 +22,12 @@ const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i
 if (!url) { console.error('usage: profile-arrival.mjs <worldUrl> --out <dir>'); process.exit(2); }
 const target = new URL(url), port = Number(target.port);
 const lanePorts = (process.env.SPEED_PORTS ?? '').split(',').filter(Boolean).map(Number);
-if (!['localhost', '127.0.0.1'].includes(target.hostname) || (port >= 4930 && port <= 4990) || !(lanePorts.includes(port) || (port >= 5890 && port <= 5899))) throw new Error('lane ports only (SPEED_PORTS)');
+const live = args.includes('--live'); // read-only stranger load of the real site: https://sim.eden.art only, no dev flags
+if (live ? target.origin !== 'https://sim.eden.art' : (!['localhost', '127.0.0.1'].includes(target.hostname) || (port >= 4930 && port <= 4990) || !(lanePorts.includes(port) || (port >= 5890 && port <= 5899)))) throw new Error('lane ports only (SPEED_PORTS), or --live for https://sim.eden.art');
 const out = resolve(opt('out', '.lane/profile')); mkdirSync(out, { recursive: true });
-const cpu = Number(opt('cpu', '4')), mbps = Number(opt('mbps', '60')), interval = Number(opt('interval', '250'));
+const desktop = args.includes('--desktop'), warm = args.includes('--warm');
+const cpu = Number(opt('cpu', desktop ? '1' : '4')), mbps = Number(opt('mbps', desktop ? '0' : '60')), interval = Number(opt('interval', '250'));
+const [vw, vh] = (opt('size', desktop ? '1440x900' : '390x844')).split('x').map(Number), dpr = Number(opt('dpr', desktop ? '1' : '3'));
 const pw = findPlaywright(); if (!pw) throw new Error('no playwright');
 
 const INIT = `(() => {
@@ -37,10 +42,12 @@ const INIT = `(() => {
     const ag = window.__arrivalGate; if (ag && P.marks.gatePlanned === undefined && ag.left().length) P.marks.gatePlanned = performance.now(); if (ag && P.marks.gatePlanned !== undefined && P.marks.gateClear === undefined && !ag.pending()) P.marks.gateClear = performance.now(); if (ag && P.marks.gatePlanned !== undefined) { const L = ag.left(); const k = L.length + ':' + L.slice(0, 4).map((x) => x.slice(0, 8)).join(','); if (P.stages.at(-1)?.[1] !== 'gate ' + k) P.stages.push([Math.round(performance.now()), 'gate ' + k]); }
     const st = window.__assetStages; if (st) { const n = {}; for (const v of Object.values(st)) n[v] = (n[v] ?? 0) + 1; const key = JSON.stringify(n); if (P.stages.at(-1)?.[1] !== key) P.stages.push([Math.round(performance.now()), key]); }
     const card = document.querySelector('.viewer-arrival'); if (card && P.marks.cardSeen === undefined) P.marks.cardSeen = performance.now();
+    const ct = card ? (card.textContent || '').trim().slice(0, 48) : ''; if (ct && P.cardText !== ct) { P.cardText = ct; P.stages.push([Math.round(performance.now()), 'card ' + ct]); }
     if (P.marks.cardSeen !== undefined && P.marks.cardDone === undefined && (!card || card.getAttribute('data-done') === 'true')) { P.marks.cardDone = performance.now(); clearInterval(poll); }
   }, 25);
 })();`;
 
+let wsFrames = [];
 let profile, marks, resources, longtasks, navStart, glbs = [], navAt = 0, stages = [], assetTimes = {}, assetWorker = null;
 if (args.includes('--analyze')) { profile = JSON.parse(readFileSync(resolve(out, 'arrival.cpuprofile'), 'utf8')); ({ marks, resources, longtasks, navStart, glbs = [], stages = [] } = JSON.parse(readFileSync(resolve(out, 'meta.json'), 'utf8'))); }
 else {
@@ -48,14 +55,16 @@ console.log('Waiting for speed Chrome lease');
 const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinity });
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 try {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-  await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
+  const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: !desktop, hasTouch: !desktop });
+  if (!live) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
   // GLB timing from the browser context (Playwright follows worker requests too; Resource Timing only sees the page's)
   ctx.on('requestfinished', (r) => { if (!/\.glb(\?|$)/.test(r.url())) return; const t = r.timing(); glbs.push({ url: r.url().replace(/^https?:\/\/[^/]+/, ''), start: Math.round(t.startTime - navAt), end: Math.round(t.startTime + t.responseEnd - navAt), worker: (() => { try { r.frame(); return false; } catch { return true; } })() }); });
   const cdp = await ctx.newCDPSession(page);
-  await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
+  cdp.on('Network.webSocketFrameReceived', (e) => { if (navAt) wsFrames.push([Date.now() - navAt, (e.response?.payloadData ?? '').length]); });
+  await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: !warm });
+  if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0; }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval });
@@ -69,7 +78,7 @@ try {
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
 for (const g of glbs) if (!resources.some((r) => r.name === g.url && Math.abs(r.start - g.start) < 50)) resources.push({ name: g.url, start: g.start, end: g.end, kb: null, via: 'context' });
-writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes, assetWorker }));
+writeFileSync(resolve(out, 'meta.json'), JSON.stringify({ marks, resources, longtasks, navStart, glbs, stages, assetTimes, assetWorker, wsFrames }));
 }
 
 // ---- analysis: self time per node, mapped through source maps where the script has one
@@ -135,7 +144,7 @@ const timeline = [];
 const timelineRows = timeline.filter(Boolean).map((r) => ({ atMs: r.atMs, busyPct: Math.round(100 * r.busy / r.samples), top: Object.entries(r.hits).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => `${k.replace(/^.*\//, '')} ${Math.round(100 * v / r.samples)}%`) }));
 const top = (m, n) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => [k, Math.round(v / 1000)]);
 const ms = (v) => Math.round(v / 1000);
-const summary = { url, cpu, mbps, marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, Math.round(v)])), totalsMs: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, ms(v)])),
+const summary = { url, cpu, mbps, desktop, warm, viewport: `${vw}x${vh}@${dpr}`, marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, Math.round(v)])), totalsMs: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, ms(v)])),
   longtaskMs: longtasks.reduce((n, l) => n + l[1], 0), longtasks, byFile: top(byFile, 40), byFunction: top(byFn, 60), inclusive: top(inc, 80), timeline: timelineRows,
   resources: resources.filter((r) => r.start <= (marks.cardDone ?? Infinity)).sort((a, b) => a.start - b.start) };
 writeFileSync(resolve(out, 'summary.json'), JSON.stringify(summary, null, 1));

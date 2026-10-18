@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import * as THREE from 'three';
 import { kitArgs, kitPhysics, KIT_PRIMITIVES, type KitProgramArgs } from '@sim/generators';
-import { buildKit } from './kit.mesh.ts';
+import { buildKit, parseKitArgs } from './kit.mesh.ts';
 import { MaterialLib } from './materials.ts';
 import { animate, bindMotionModel, setClockNight } from './motion.ts';
 import { WorldModel, applyBatch, defSchema, type Entity, type StoredDef } from '@sim/world-compiler';
@@ -179,4 +179,16 @@ test('kit glow parts brighten at night from the world clock even when no motion 
     assert.ok(night > 5 * day, `night ${night} vs day ${day}`);
     assert.ok(Math.abs(night - (0.25 + 1.4 + 0.03 * Math.sin(1_000_000_000 * 3)) * 0.65) < 1e-9);
   } finally { setClockNight(null); }
+});
+
+test('L3e: parseKitArgs is kitArgs.safeParse, once per args object (valid, program and invalid args), and a build leaves it unchanged', () => {
+  const cases: Record<string, unknown>[] = [...examples.map((raw) => raw.make.args as Record<string, unknown>), { v: 2, shapes: [{ kind: 'sphere', at: [0, 0, 0], h: 2 }] }, { v: 2, shapes: [{ kind: 'box', at: [0, 0, 0], size: ['$w', 1, 1], repeat: { n: 3, step: [1, 0, 0] } }] }, { shapes: [] }];
+  for (const args of cases) {
+    const fresh = kitArgs.safeParse(args), memo = parseKitArgs(args);
+    assert.equal(memo.success, fresh.success);
+    assert.deepEqual(memo.success ? memo.data : memo.error.issues, fresh.success ? fresh.data : fresh.error.issues);
+    assert.equal(parseKitArgs(args), memo, 'second call reuses the first result');
+    assert.notEqual(parseKitArgs(structuredClone(args)), memo, 'keyed by object, not by content');
+    if (memo.success) { draw(memo.data, { w: 2 }); draw(memo.data, { w: 3 }); assert.deepEqual(memo.data, kitArgs.parse(args), 'building does not mutate the shared result'); }
+  }
 });

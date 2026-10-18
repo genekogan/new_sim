@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -17,13 +17,19 @@ import type {CandidateStationV2} from './station-v2.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
-    stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional() }),
+    stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional(),
+    // an unknown later contract is not an error: the peer simply gets the full table
+    takeEntities:z.string().max(40).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
 type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null;
-  authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1 };
+  authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1;
+  /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet). */
+  takeEntities?:{last:number|null};
+  /** Set by a join until the first takes message with a chunk is written: that one is never dropped for backpressure. */
+  awaitingTakes?:boolean;joinSend?:boolean };
 /** What anyone may see of the server's numbers: spend is for admins. */
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
@@ -39,6 +45,14 @@ export function viewerChunk<T>(chunk: T): T {
 }
 /** P2 (E-life): an HTTP take history reply (/v1/takes, /v1/take) as the live stream sends it, without each chunk's static
  *  physics; `full` (the `?physics=1` query) keeps the canonical chunks for tools that replay from them. */
+/** The join's display log (the `log` message; clients only show it, the replica comes from the snapshot or batches): a
+ *  world-edit event's payload is the commit's derived physics and assets (the Eden 2026 genesis batch: 4.1 MB). Its result
+ *  is already in the world the client receives; the row keeps its seq, tick, author and identity, GET /v1/log the rest. */
+export function joinLogEvent<T extends {kind:string;payload?:unknown}>(e:T):T{
+  if(e.kind!=='world-edit'||!e.payload||typeof e.payload!=='object')return e;
+  const p=e.payload as {contract?:unknown;seq?:unknown;hash?:unknown};
+  return {...e,payload:{contract:p.contract,seq:p.seq,hash:p.hash,omitted:'physics and assets (in the world state; GET /v1/log for the full event)'}};
+}
 export function publicTakes<T>(value: T, full = false): T {
   const v = value as { chunks?: unknown[] };
   return !full && Array.isArray(v?.chunks) ? { ...v, chunks: v.chunks.map((k) => viewerChunk(k)) } as T : value;
@@ -54,6 +68,8 @@ export class Hub {
   epoch = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   build = 'dev';
   private lastTakeTick = -1;
+  /** take-entities-ref/1: one table registry for every peer that announced it (see packages/protocol take-entities-wire). */
+  readonly takeEntities = new TakeEntitiesEncoderV1();
   /** Take recordings (take_chunks) are a pose-keyframe cache, off by default (TAKES_PERSIST=1 turns them on).
    * The engine's in-memory live buffer still feeds new viewers; the event log rebuilds a world. */
   persistTakes = process.env.TAKES_PERSIST === '1';
@@ -142,23 +158,27 @@ export class Hub {
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
       const generation=(c.helloGeneration??0)+1;c.helloGeneration=generation;
-      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;
+      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;c.takeEntities=undefined;c.awaitingTakes=false;
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       if(!this.clients.has(c)||c.helloGeneration!==generation||c.ws.readyState!==1||!this.host.clockAvailable)return;
       c.authUserId=u&&(!this.lifecycleSouls||this.db.user(u.id))?u.id:null;
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
       c.takeTransport=m.takeTransport===TAKE_BOUNDARY_WIRE_V1?TAKE_BOUNDARY_WIRE_V1:undefined;
+      c.takeEntities=m.takeEntities===TAKE_ENTITIES_WIRE_V1?{last:null}:undefined;
       c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
         [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
       const e = this.host.engine;
       if(!this.welcomeClient(c))return;
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
+      // the join set is bounded (one per hello, hellos at most every 3 s) and is never dropped for backpressure
+      c.joinSend=true;c.awaitingTakes=true;
+      try{
       const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
       if (canResume) for (const b of ring) { if (b.seq > m.since!) this.send(c, { t: 'batch', ...b, log: b.log.map(publicEvent) }); }
       else this.send(c, { t: 'snapshot', reason: typeof m.since === 'number' ? 'too far behind; full snapshot' : 'join', ...this.host.snapshotView() });
-      this.send(c, { t: 'log', events: this.db.tailEvents(this.host.worldId, 150).map(publicEvent) });
+      this.send(c, { t: 'log', events: this.db.tailEvents(this.host.worldId, 150).map(e=>joinLogEvent(publicEvent(e))) });
       this.send(c, { t: 'kernel', view: this.host.kernelView() });
       this.send(c, { t: 'plays', plays: this.host.recentPlays.slice(-60) });
       this.send(c, { t: 'talk', lines: this.db.recentTalk(40) });
@@ -170,6 +190,7 @@ export class Hub {
       this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: (e.takeChunks?.(e.world.tick - 40) ?? []).map(viewerChunk)});
       for (const extra of this.joinMessages) { try { for (const x of extra()) this.send(c, x as ServerMsg); } catch { /* optional standing state */ } }
       this.sendStation(c);
+      }finally{c.joinSend=false;}
       c.ready = c.ws.readyState===1&&c.helloGeneration===generation;
     }
   }
@@ -180,7 +201,7 @@ export class Hub {
     const sent=this.send(c,{t:'welcome',build:this.build,proto:PROTO,worldId:h.worldId,rulesVersion:e.rulesVersion,schema:e.schema,dt:e.dt,
       clockRate:h.clockRate,serverTick:e.world.tick,you:c.me,serverTime:Date.now(),epoch:this.epoch,paused:h.paused,
       ...(this.lifecycleSouls?{privateMe:{contract:'me-live/1' as const,connectionId:c.meScope!.connectionId,userId:c.meScope!.userId,revision:1 as const}}:{}),
-      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{})});
+      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{}),...(c.takeEntities?{takeEntities:TAKE_ENTITIES_WIRE_V1}:{})});
     if(sent)c.publishedMe=JSON.stringify(c.me);return sent;
   }
   private sendStation(c:Client){
@@ -188,22 +209,30 @@ export class Hub {
     else if(c.stationContract==='station-live/1'&&this.station)this.send(c,{t:'station',view:this.station.view()});
   }
 
-  private send(c: Client, m: ServerMsg, takeStrings?:Map<ServerMsg,{raw?:string;wire?:string}>) {
+  private send(c: Client, m: ServerMsg, takeStrings?:Map<ServerMsg,Record<string,string>>) {
     if(!this.host.clockAvailable){c.ready=false;c.ws.close(1013,'world unavailable');return;}
     if (c.ws.readyState !== 1) return false;
-    if (c.ws.bufferedAmount > MAX_BUFFERED){if(m.t==='me'||m.t==='welcome'&&m.privateMe){c.ready=false;c.ws.close(1013,'private view backpressure');}return false;}
+    // slow clients lose messages while over 1 MB is queued, but never their own join set nor the first take after it
+    if (c.ws.bufferedAmount > MAX_BUFFERED&&!c.joinSend&&!(m.t==='takes'&&c.awaitingTakes)){if(m.t==='me'||m.t==='welcome'&&m.privateMe){c.ready=false;c.ws.close(1013,'private view backpressure');}return false;}
     const current=this.privateMessage(c,m);if(!current)return false;
     // All existing public/private recipient projection runs before packing.
-    let s:string;
+    let s:string,nextTable:number|null|undefined;
     try{
-      const mode=current.t==='takes'&&c.takeTransport?'wire':'raw',cached=takeStrings?.get(current)??{};
-      s=cached[mode]??(mode==='wire'?stringifyTakeBoundaryWireV1(current):JSON.stringify(current));
-      if(takeStrings){cached[mode]=s;takeStrings.set(current,cached);}
+      const mode=current.t==='takes'&&c.takeTransport?'wire':'raw';
+      const entities=current.t==='takes'&&c.takeEntities?this.takeEntities.encode(current,c.takeEntities.last):null;
+      const key=entities?`${mode}|${c.takeEntities!.last}`:mode,cached=takeStrings?.get(current)??{};
+      const inner=(v:unknown)=>mode==='wire'?stringifyTakeBoundaryWireV1(v):JSON.stringify(v);
+      s=cached[key]??(entities?JSON.stringify({t:'take-entities',contract:TAKE_ENTITIES_WIRE_V1,ids:entities.envelope.ids}).slice(0,-1)+',"payload":'+inner(entities.envelope.payload)+'}':inner(current));
+      if(takeStrings){cached[key]=s;takeStrings.set(current,cached);}
+      if(entities)nextTable=entities.last;
     }catch{
       // A broken fact must not become a different raw message or stop the host.
       c.ready=false;c.ws.send(JSON.stringify({t:'error',code:'takes.transport-invalid',message:'The take transport cannot be encoded exactly.'}));c.ws.close(1011,'invalid take transport');return false;
     }
-    c.sent += s.length; c.ws.send(s);return true;
+    c.sent += s.length; c.ws.send(s);
+    if(nextTable!==undefined&&c.takeEntities)c.takeEntities.last=nextTable;
+    if(current.t==='takes'&&current.chunks.length)c.awaitingTakes=false;
+    return true;
   }
   /** No new private lifecycle fields are added to WS. Me retains its existing
    * shape but only usable identities; canonical public bodies/takes stay intact. */
@@ -261,7 +290,7 @@ export class Hub {
     if(m.t==='takes'){
       // Cache only serialized strings for this broadcast, after each recipient's
       // public/private projection. No mutable fact survives across messages.
-      const strings=new Map<ServerMsg,{raw?:string;wire?:string}>();
+      const strings=new Map<ServerMsg,Record<string,string>>();
       for(const c of this.clients){if(!c.ready||c.ws.readyState!==1||filter&&!filter(c))continue;this.send(c,m,strings);}
       return;
     }

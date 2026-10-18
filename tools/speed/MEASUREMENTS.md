@@ -35,3 +35,10 @@ LM Follow raises repeated `matrixWorld` errors. A targeted `loadqueue=0` phone r
 Mobile loading has substantial stalls: Mars max 2117 ms, LM max 867 ms; post-arrival-card stalls over 50 ms were 2 and 18 respectively. Phone emulation retains the M3 GPU and laptop RAM. The 1.46 GB LM scene-texture estimate remains a real-phone memory risk; it is not measured total VRAM. The probe does not qualify a physical phone.
 
 Evidence lives in `<team>/scratch/speed/`: `qualified/{before,after}/{mars,lm}/report.json`, `qualified/phone-complete/{mars,lm}/report.json`, `character-transfer.json`, and the Modal suite logs. Reports include CPU/GPU timers, asset completion, failed/aborted requests, renderer identity, memory estimates and screenshots. Startup remounts abort partial downloads; one missing humanoid-kit request is a known fixture limitation. Completed-download byte totals exclude partial aborted bodies and continuous WebSocket traffic. Invalid unbuilt/unpinned-camera runs are separately marked and excluded.
+
+## Eden 2026 arrival (lane L3e, 2026-10-17): target, written before measuring
+
+Eden 2026 (`worlds/templates/eden-2026.json`, 4748 entities) on the live 3.2 walk in real Chrome: cold 19.3 / 15.4 s, warm
+7.5–8.4 s to the arrival card; Mars ~5.7 s, Little Martians ~5.5 s. Target: Eden 2026 warm arrival no slower than Mars's on the
+same build and machine, cold at most 10 s on desktop (1440×900), and the phone number (390×844 DPR 3, 4× CPU, 60 Mbit) recorded.
+Changes must be output-identical (same entities, frames and shots).

@@ -88,7 +88,7 @@ export class WorldEntityLayer {
       if (JSON.stringify(snap.ground) !== prevGround) { this.rebuildTerrain(); this.rebuildWater(); this.buildHorizon(); }
       const keep = new Set(snap.entities.map((e) => e.id));
       for (const id of [...this.drawn.keys()]) if (!keep.has(id)) this.undraw(id);
-      for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id));
+      this.model.readPass(() => { for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id)); });
       this.stats.resyncs++;
     } catch { /* next check retries */ } finally { this.resyncing = false; }
   }
@@ -115,7 +115,7 @@ export class WorldEntityLayer {
     this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
     this.rebuildWater();
     this.buildHorizon();
-    for (const e of snap.entities) this.draw(e, false);
+    this.model.readPass(() => { for (const e of snap.entities) this.draw(e, false); });
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
@@ -498,6 +498,14 @@ function waterLevel(g: Ground, x: number, z: number): number | null {
   for (const w of g.waters) if (w.area && pointInPoly(x, z, w.area)) level = w.level; else if (w.path && w.w) { const lv = waterLevelAt(g, x, z); if (lv !== null) level = lv; }
   return level ?? g.seaLevel ?? null;
 }
-function pointInPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }
+// indexed reads, not array destructuring: the same arithmetic as @sim/ground's pointInPoly (L3e)
+function pointInPoly(px: number, pz: number, poly: [number, number][]) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j], zi = a[1], zj = b[1];
+    if ((zi > pz) !== (zj > pz)) { const xi = a[0]; if (px < ((b[0] - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; }
+  }
+  return inside;
+}
 export type { Def };
 export { TILE_N };

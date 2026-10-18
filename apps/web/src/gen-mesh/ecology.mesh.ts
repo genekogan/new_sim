@@ -20,7 +20,7 @@ export const BLOCK_CELL = 16;
 /** The blocked-ground cells of a model (solid footprints and paved / road surfaces), cached per model revision. */
 export function blockCellsOf(model: WorldModel, pad = 0.6): BlockCells {
   const key = model.safetyCacheKey(), hit = blockIndex.get(key);
-  const cells = hit && hit.pad === pad ? hit.cells : blockCells(model, pad, BLOCK_CELL);
+  const cells = hit && hit.pad === pad ? hit.cells : model.readPass(() => blockCells(model, pad, BLOCK_CELL));
   if (!hit || hit.pad !== pad) blockIndex.set(key, { pad, cells });
   return cells;
 }

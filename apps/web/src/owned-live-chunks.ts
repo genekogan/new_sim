@@ -6,7 +6,24 @@ const owned=new WeakSet<object>();
 // final state: Eden 2026 (3.5k entities, 244 furnished buildings) is ~290k nodes. The old 200k cap silently dropped
 // every live chunk there, so the viewer never drew a first frame. 2M keeps a bound against runaway data.
 export const LIVE_CHUNK_NODE_BUDGET=2_000_000;
-export function detachedData(value:unknown,ancestors=new Set<object>(),budget={nodes:0},depth=0):unknown{
+// take-entities-ref/1 (L3e): the socket decoder shares one deeply frozen entity table between chunks that carry the same
+// world, so each entity's owned copy is made once and reused (Eden 2026: ~4,900 entities, ~40 ms desktop / ~160 ms phone a
+// chunk otherwise). Only deeply frozen source values are cached: they cannot change, so their copy stays exact.
+const sharedEntity=new WeakMap<object,{value:unknown;nodes:number}>(),cachedOwned=new WeakSet<object>();
+const deeplyFrozen=(value:unknown):boolean=>{
+ if(!value||typeof value!=='object')return true;if(!Object.isFrozen(value))return false;
+ for(const key of Reflect.ownKeys(value)){const d=Object.getOwnPropertyDescriptor(value,key);if(!d||!Object.hasOwn(d,'value')||!deeplyFrozen(d.value))return false;}
+ return true;
+};
+function detachedEntity(value:unknown,ancestors:Set<object>,budget:{nodes:number},depth:number):unknown{
+ if(!value||typeof value!=='object')return detachedData(value,ancestors,budget,depth);
+ const hit=sharedEntity.get(value);
+ if(hit){if((budget.nodes+=hit.nodes)>LIVE_CHUNK_NODE_BUDGET)throw Error('Live chunk data budget');return hit.value;}
+ const before=budget.nodes,out=detachedData(value,ancestors,budget,depth);
+ if(out&&typeof out==='object'&&deeplyFrozen(value)){freeze(out);cachedOwned.add(out);sharedEntity.set(value,{value:out,nodes:budget.nodes-before});}
+ return out;
+}
+export function detachedData(value:unknown,ancestors=new Set<object>(),budget={nodes:0},depth=0,entities?:object):unknown{
  if(++budget.nodes>LIVE_CHUNK_NODE_BUDGET||depth>64)throw Error('Live chunk data budget');
  if(value===null||value===undefined||typeof value==='string'||typeof value==='boolean')return value;
  if(typeof value==='number'){if(!Number.isFinite(value))throw Error('Nonfinite live chunk');return value;}
@@ -17,11 +34,12 @@ export function detachedData(value:unknown,ancestors=new Set<object>(),budget={n
  try{for(const key of Reflect.ownKeys(value)){
   if(array&&key==='length')continue;if(typeof key!=='string')throw Error('Live chunk symbol');
   const property=Object.getOwnPropertyDescriptor(value,key);if(!property||!Object.hasOwn(property,'value'))throw Error('Live chunk accessor');
-  Object.defineProperty(out,key,{value:detachedData(property.value,ancestors,budget,depth+1),enumerable:property.enumerable,writable:true,configurable:true});
+  const child=value===entities?detachedEntity(property.value,ancestors,budget,depth+1):detachedData(property.value,ancestors,budget,depth+1,entities);
+  Object.defineProperty(out,key,{value:child,enumerable:property.enumerable,writable:true,configurable:true});
  }}finally{ancestors.delete(value);}
  return out;
 }
-function freeze(value:unknown){if(value&&typeof value==='object'){for(const key of Reflect.ownKeys(value)){const property=Object.getOwnPropertyDescriptor(value,key);if(property&&Object.hasOwn(property,'value'))freeze(property.value);}Object.freeze(value);}}
+function freeze(value:unknown){if(value&&typeof value==='object'&&!cachedOwned.has(value)){for(const key of Reflect.ownKeys(value)){const property=Object.getOwnPropertyDescriptor(value,key);if(property&&Object.hasOwn(property,'value'))freeze(property.value);}Object.freeze(value);}}
 // The viewer never reads a take's static physics (it draws geometry from /v1/scene); copying, validating and freezing
 // it per live chunk cost ~120 ms a chunk on Eden 2026. Drop it from the owned copy only when every hop is plain data.
 const dataOf=(value:unknown,key:string)=>{if(!value||typeof value!=='object'||Array.isArray(value))return undefined;const d=Object.getOwnPropertyDescriptor(value,key);return d&&Object.hasOwn(d,'value')?d.value as unknown:undefined;};
@@ -35,6 +53,7 @@ export function withoutStaticPhysics(raw:unknown):unknown{
 }
 export function ownLiveChunk(raw:unknown):RecordedTakeChunk|null{
  if(raw&&typeof raw==='object'&&owned.has(raw))return raw as RecordedTakeChunk;
- try{const result=recordedTakeChunkSchema.safeParse(detachedData(withoutStaticPhysics(raw)));if(!result.success)return null;freeze(result.data);owned.add(result.data);return result.data;}catch{return null;}
+ try{const chunk=withoutStaticPhysics(raw),table=dataOf(dataOf(dataOf(chunk,'take'),'finalState'),'entities');
+  const result=recordedTakeChunkSchema.safeParse(detachedData(chunk,undefined,undefined,0,table&&typeof table==='object'?table:undefined));if(!result.success)return null;freeze(result.data);owned.add(result.data);return result.data;}catch{return null;}
 }
 export function ownedLiveChunk(raw:unknown):RecordedTakeChunk|null{return raw&&typeof raw==='object'&&owned.has(raw)?raw as RecordedTakeChunk:null;}

@@ -109,11 +109,11 @@ function naturalAndCarve(g: Ground, forms: Landform[], x: number, z: number): nu
 
 /** Pads flatten fully inside and blend across `edge` metres OUTSIDE the footprint, so the terrace reaches the walls. */
 function padMask(x: number, z: number, area: Vec2[], edge: number): number {
-  return 1 - (1 - areaMask(x, z, area, 1e-9)) * (1 - outsideBand(x, z, area, edge));
-}
-function outsideBand(x: number, z: number, area: Vec2[], edge: number): number {
-  if (pointInPoly(x, z, area)) return 1;
-  return 1 - smooth(distPolyEdge(x, z, area) / edge);
+  // = 1 - (1 - areaMask(x, z, area, 1e-9)) * (1 - outsideBand), with the inside test made once instead of twice (L3e)
+  const inside = pointInPoly(x, z, area);
+  const mask = inside ? smooth(distPolyEdge(x, z, area) / 1e-9) : 0;
+  const band = inside ? 1 : 1 - smooth(distPolyEdge(x, z, area) / edge);
+  return 1 - (1 - mask) * (1 - band);
 }
 
 /** Bounds a landform influences, for tile invalidation (pads blend outside their area). */
