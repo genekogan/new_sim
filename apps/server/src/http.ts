@@ -180,6 +180,16 @@ export function buildApp(d: Deps) {
   app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
   app.get('/v1/debug/nav', (c) => c.json({ stranded: strandedMetrics() }, 200, { 'Cache-Control': 'no-store' }));
+  // N1 diagnostics (only with SIM_STRANDED_AUDIT): plan one walk from (sx,sz) on level sl to (gx,gz) on gl for an r m-radius body, nothing moves.
+  if (process.env.SIM_STRANDED_AUDIT) app.get('/v1/debug/route', (c) => {
+    const n = (k: string, v = 0) => { const x = Number(c.req.query(k)); return Number.isFinite(x) ? x : v; };
+    const rt = (d.host.engine as unknown as { rt?: { world: unknown; services: { spatial?: { route: Function } } } }).rt, sp = rt?.services.spatial;
+    if (!rt || !sp) return c.json({ error: 'no spatial service' }, 404);
+    const profile = { id: 'probe', radius: n('r', 0.35), height: 1.8, speed: 1.35, turnRate: 4, stepHeight: 0.22 };
+    const res = sp.route(rt.world, profile, { level: n('sl'), p: [n('sx'), n('sz')] }, { level: n('gl'), p: [n('gx'), n('gz')] }, {});
+    const levels = ((sp as { scene?: { levels?: { id: number; y: number; label?: string }[] } }).scene?.levels ?? []).map((l) => `${l.id}@${l.y}:${l.label ?? ''}`);
+    return c.json(res.ok ? { ok: true, length: res.route.length, legs: res.route.legs.length, levels } : { ok: false, diagnostic: res.diagnostic, levels }, 200, { 'Cache-Control': 'no-store' });
+  });
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
   // App owns the skill text (EDGE_SKILL_FILE / descriptor skillFile, read per request so edits apply live).
