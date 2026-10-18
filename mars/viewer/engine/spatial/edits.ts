@@ -68,7 +68,46 @@ export function immutableAuthoredBoundaryFact<T extends AuthoredBoundariesV1>(fa
  Object.freeze(fact.boxes);Object.freeze(fact);immutableAuthoredFacts.add(fact);return fact;
 }
 
+/**
+ * upper-floors/1 (logged rules fact `upperFloorsV1`, packages/engine-mars/src/upper-floors.ts): a building's upper floors
+ * on an existing world — cropped levels (Level.crop: their grids cover the building only), floor surfaces, solids at their
+ * own heights (walls, furniture), stairs (links) from the ground floor up, and the rooms as regions on those levels
+ * (Region.placeLevel: the authored floor number the place data uses). World-state data like nav/1.
+ */
+export type UpperFloorsBuildingV1 = {
+  id: string; label: string;
+  /** World rectangle [minX, minZ, maxX, maxZ] holding every floor of the building (each level's grid crop). */
+  crop: [number, number, number, number];
+  levels: { id: number; y: number; label: string; placeLevel: number }[];
+  surfaces: Surface[]; solids: Obstacle[]; links: Link[];
+  regions: { id: string; label: string; level: number; polygon: [number, number][] }[];
+  /** Authored-boundary box ids (world.authoredBoundariesV1) this building opens on its ground floor, e.g. a front-door
+   *  wall band: their collision is left out while the building is installed (its own solids stand in for the remains). */
+  openings?: string[];
+};
+export type UpperFloorsV1 = { version: 'upper-floors/1'; buildings: Record<string, UpperFloorsBuildingV1> };
+
+/** upper-floors/1 over a scene: each building's cropped levels, floors, solids (ids prefixed) and stairs. */
+export function withUpperFloors(scene: SpatialScene, world: WorldState): SpatialScene {
+  const uf = world.upperFloorsV1; if (!uf) return scene;
+  const open = new Set(Object.values(uf.buildings).flatMap((b) => (b.openings ?? []).map((o) => 'authored-boundary:' + o)));
+  const levels = [...scene.levels], surfaces = [...scene.surfaces], links = [...scene.links];
+  const obstacles = open.size ? scene.obstacles.filter((o) => !open.has(o.id)) : [...scene.obstacles];
+  for (const id of Object.keys(uf.buildings).sort()) {
+    const b = uf.buildings[id];
+    for (const l of b.levels) if (!levels.some((x) => x.id === l.id)) levels.push({ id: l.id, y: l.y, label: l.label, crop: [...b.crop] });
+    for (const f of b.surfaces) surfaces.push({ ...f, id: `upper:${id}:${f.id}` });
+    for (const o of b.solids) obstacles.push({ ...o, id: `upper:${id}:${o.id}` });
+    for (const l of b.links) links.push({ ...l, id: `upper:${id}:${l.id}` });
+  }
+  levels.sort((a, b) => a.id - b.id);
+  return { ...scene, levels, surfaces, obstacles, links };
+}
+
 export function sceneForWorld(base: SpatialScene, world: WorldState): SpatialScene {
+  return withUpperFloors(sceneForWorldBase(base, world), world);
+}
+function sceneForWorldBase(base: SpatialScene, world: WorldState): SpatialScene {
   const edits = world.obstacleEdits;
   let scene = base;
   if (edits) {
@@ -102,10 +141,11 @@ export function worldBaseId(sourceId: string, world: WorldState): string {
   const base=world.navV1 ? hashOf({ source: edited, navV1: world.navV1 }) : edited;
   const guarded0=world.officeStairGuardsV1 ? hashOf({source:base,officeStairGuardsV1:world.officeStairGuardsV1}) : base;
   const guarded=world.entityPhysicsV1 ? hashOf({source:guarded0,entityPhysicsV1:world.entityPhysicsV1.baseKey}) : guarded0;
-  if(!world.authoredBoundariesV1)return guarded;
+  const bounded=(()=>{if(!world.authoredBoundariesV1)return guarded;
   const fact=immutableAuthoredBoundaryFact(world.authoredBoundariesV1),memo=authoredIdentities.get(fact);
   if(memo?.source===guarded)return memo.identity;
-  const identity=hashOf({source:guarded,authoredBoundariesV1:fact});authoredIdentities.set(fact,{source:guarded,identity});return identity;
+  const identity=hashOf({source:guarded,authoredBoundariesV1:fact});authoredIdentities.set(fact,{source:guarded,identity});return identity;})();
+  return world.upperFloorsV1 ? hashOf({ source: bounded, upperFloorsV1: world.upperFloorsV1 }) : bounded;
 }
 
 /** Same height bands as the capture/camera. Registration never adds a surface,

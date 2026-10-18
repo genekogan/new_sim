@@ -2,7 +2,7 @@ import {GRADE_A} from './atmosphere/grade.ts';
 import * as THREE from 'three';
 import type {WorldLocation} from './WorldLocations.ts';
 import {worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
-const PREVIEW_OWNERS:Readonly<Record<string,string>>={gallery:'eden-library-1',library:'eden-library-1',libraryroom:'eden-library-1','int-library':'eden-library-1',roofseating:'eden-house-3','int-house-3-kitchen':'eden-house-3','int-house-3-living':'eden-house-3','int-house-2':'eden-house-2','int-office-studio':'eden-office-1','int-office-post-room':'eden-office-1',market:'eden-market-1','int-barn-workshop':'eden-barn-1'};
+const PREVIEW_OWNERS:Readonly<Record<string,string>>={gallery:'eden-library-1',library:'eden-library-1',libraryroom:'eden-library-1','int-library':'eden-library-1',roofseating:'eden-house-3','int-house-3-kitchen':'eden-house-3','int-house-3-living':'eden-house-3','int-house-2':'eden-house-2','int-office-studio':'eden-office-1','int-office-upper-lounge':'eden-office-1','int-office-post-room':'eden-office-1',market:'eden-market-1','int-barn-workshop':'eden-barn-1'};
 /** Fit the selected geometry in camera space, including its depth, rather than using a tour distance. */
 export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,aspect=160/112){
  const aim=box.getCenter(new THREE.Vector3()),camera=new THREE.PerspectiveCamera(38,aspect,.01,10000),view=direction.clone().normalize();

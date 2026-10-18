@@ -4,6 +4,8 @@ import {WorldVisibilityInstances} from './WorldVisibilityInstances.ts';
  * obstruction; the rendered camera may move nearer or around a blocking post. */
 /** VF6: Follow zoom bounds (metres from the Soul) and how long after the last drag/zoom the viewer's view is kept as is. */
 export const FOLLOW_MIN=2.4,FOLLOW_MAX=40;const USER_HOLD=.6;
+/** Nearest the camera comes to the Soul when walls (a narrow room, a stair) leave no clear view farther out. */
+const NEAR=1;
 export class WorldFollow {
   private requested:THREE.Vector3|null=null;
   private rendered:THREE.Vector3|null=null;
@@ -11,8 +13,7 @@ export class WorldFollow {
   private instances=new WorldVisibilityInstances();
   private objects:THREE.Object3D[]=[];
   private hits:THREE.Intersection[]=[];
-  private normal=new THREE.Vector3();
-  reset(){this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
+  reset(){this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.chosenClear=false;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
   /** Same candidates as recursive intersectObjects, minus objects whose hits
    * opaque() always rejects: hidden ancestry or own cameraTransparent. */
   private collect(roots:readonly THREE.Object3D[]){
@@ -34,31 +35,35 @@ export class WorldFollow {
     const materials=(object as THREE.Mesh).material;
     return !materials||[materials].flat().some(m=>!m.transparent||m.opacity>=.5);
   }
-  private limit(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){
+  /** How far out along `offset` the camera still sees the Soul (metres). Stops early once below `need` (a yes/no
+   * question); `torso` casts the torso line alone (a cheap estimate for the wide search). */
+  private limit(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[],need=-Infinity,torso=false){
     const distance=offset.length(),direction=offset.clone().normalize(),right=new THREE.Vector3(direction.z,0,-direction.x).normalize();let allowed=distance;
+    const reverse=direction.clone().negate(),far=distance+.25;
     // Torso, head and both shoulder edges. Ignore the selected body's own
     // render roots by supplying only architecture, components and fixtures.
-    for(const [height,side] of [[0,0],[.6,0],[-.45,0],[0,.24],[0,-.24]]){
+    for(const [height,side] of torso?[[0,0]]:[[0,0],[.6,0],[-.45,0],[0,.24],[0,-.24]]){
       const point=target.clone().add(new THREE.Vector3(0,height,0)).addScaledVector(right,side);
-      this.ray.set(point,direction);this.ray.near=.05;this.ray.far=distance+.25;
+      this.ray.set(point,direction);this.ray.near=.05;this.ray.far=far;
       // Nearest opaque hit, as intersectObjects(...).sort().find(opaque) would give.
       this.hits.length=0;for(let o=0;o<this.objects.length;o++)this.instances.intersect(this.objects[o],this.ray,this.hits,o);
       let nearest=Infinity;for(const h of this.hits)if(h.distance<nearest&&this.opaque(h.object))nearest=h.distance;this.hits.length=0;
+      // A ray from the body passes through the back of a one-sided wall (a hotel room wall, a tower) whose drawn
+      // face looks out at the camera: what the camera sees. Cast torso and head back from the far end too; a drawn
+      // face found there blocks every camera beyond it, however close to the body it is.
+      if(side===0&&height>=0){
+        this.ray.set(point.clone().addScaledVector(direction,far),reverse);this.ray.near=0;this.ray.far=far-.05;
+        for(let o=0;o<this.objects.length;o++)this.instances.intersect(this.objects[o],this.ray,this.hits,o);
+        for(const h of this.hits)if(far-h.distance<nearest&&this.opaque(h.object))nearest=far-h.distance;this.hits.length=0;
+      }
       if(nearest<Infinity)allowed=Math.min(allowed,Math.max(0,nearest-.25));
+      if(allowed<need)break;
     }
     return allowed;
   }
-  /** Distance from target to the drawn wall nearest it on the camera→target
-   * segment (faces toward the camera only); Infinity when none. */
-  private drawnShell(target:THREE.Vector3,offset:THREE.Vector3){
-    const distance=offset.length();if(!(distance>.1))return Infinity;
-    const eye=target.clone().add(offset);this.ray.set(eye,offset.clone().multiplyScalar(-1/distance));this.ray.near=0;this.ray.far=distance-.05;
-    this.hits.length=0;for(let o=0;o<this.objects.length;o++)this.instances.intersect(this.objects[o],this.ray,this.hits,o);
-    // Walls only (|normal.y| < .7): ground relief and floors under a Soul are
-    // not enclosing shells and keep the original pull-in rule.
-    let farthest=-Infinity;for(const h of this.hits)if(h.distance>farthest&&h.face&&Math.abs(this.normal.copy(h.face.normal).transformDirection(h.object.matrixWorld).y)<.7&&this.opaque(h.object))farthest=h.distance;this.hits.length=0;
-    return farthest>-Infinity?distance-farthest:Infinity;
-  }
+  /** Length for an offset whose sight reaches only `reach`: in to the nearest wall (the camera never sits behind
+   * one), not nearer than NEAR to the body; a Soul pressed into a solid keeps a readable FOLLOW_MIN instead. */
+  private fit(length:number,reach:number){return reach>=NEAR?Math.min(length,reach):Math.min(length,FOLLOW_MIN);}
   resolve(target:THREE.Vector3,actualOffset:THREE.Vector3,roots:readonly THREE.Object3D[],seconds:number):THREE.Vector3 {
     if(!actualOffset.toArray().every(Number.isFinite)||actualOffset.length()<.01)return actualOffset.clone();
     if(!this.requested||!this.rendered)this.requested=actualOffset.clone();
@@ -84,6 +89,7 @@ export class WorldFollow {
   // moves around obstacles, never through them. Only the first frame after a (re)start is placed directly.
   private chosen:THREE.Vector3|null=null;
   private lastSearch=-Infinity;
+  private chosenClear=false;
   private clock=0;
   private previousTarget:THREE.Vector3|null=null;
   private velocity=new THREE.Vector3();
@@ -91,7 +97,7 @@ export class WorldFollow {
   private userOrbited=false;
   /** True while the viewer is dragging/zooming (and a moment after): their view is shown as is. */
   get userActive(){return this.clock-this.userAt<USER_HOLD;}
-  private clear(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){return this.limit(target,offset,roots)>=offset.length()-.01;}
+  private clear(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){const need=offset.length()-.01;return this.limit(target,offset,roots,need)>=need;}
   private candidates(wanted:THREE.Vector3){
     const s=new THREE.Spherical().setFromVector3(wanted),out:THREE.Vector3[]=[wanted.clone()];
     const at=(dTheta:number,dPhi:number,scale=1)=>new THREE.Vector3().setFromSpherical(new THREE.Spherical(s.radius*scale,Math.max(.15,Math.min(Math.PI*.48,s.phi+dPhi)),s.theta+dTheta));
@@ -105,16 +111,19 @@ export class WorldFollow {
     const behind=speed>.6?new THREE.Vector3(-this.velocity.x,0,-this.velocity.z).normalize():null;
     const cost=(c:THREE.Vector3)=>{const d=c.clone().normalize();let k=from.angleTo(d)+.6*want.angleTo(d)+.5*Math.abs(c.length()-wanted.length())/Math.max(1,wanted.length());
       if(behind){const flat=new THREE.Vector3(d.x,0,d.z);if(flat.lengthSq()>1e-6)k+=.3*(1-behind.dot(flat.normalize()));}return k;};
+    // Hysteresis: the previous viewpoint, while it stays clear, is kept unless a clear candidate is clearly better.
     let best:THREE.Vector3|null=null,bestCost=Infinity;
+    if(this.chosen&&this.clear(target,this.chosen,roots)){best=this.chosen;bestCost=cost(this.chosen)-.25;}
     for(const c of this.candidates(wanted)){const k=cost(c);if(k>=bestCost)continue;if(this.clear(target,c,roots)){best=c;bestCost=k;}}
-    // Hysteresis: keep the previous viewpoint while it stays clear and is not clearly worse.
-    if(this.chosen&&this.clear(target,this.chosen,roots)&&cost(this.chosen)<=bestCost+.25)return this.chosen;
     if(best)return best;
-    // Nothing fully clear (a Soul pressed against walls): take the most open view, come in at most to a readable
-    // 2.4 m (never into the body); the glide still eases there.
-    let open:THREE.Vector3=wanted,openness=-1;
-    for(const c of this.candidates(wanted)){const r=this.limit(target,c,roots)/c.length();if(r>openness+1e-3){open=c;openness=r;}}
-    const reach=this.limit(target,open,roots);return open.clone().setLength(Math.max(Math.min(2.4,open.length()),Math.min(open.length(),reach)));
+    // Nothing near the asked-for view is clear (a narrow room, a stair well, a Soul against walls): look all round,
+    // low to high, for the view that sees farthest (to 5 m), the asked-for side preferred, and come in to its nearest
+    // wall (fit). Kept by the hysteresis above while it stays clear, so this wide look runs once per change.
+    const s=new THREE.Spherical().setFromVector3(wanted);let open:THREE.Vector3=wanted,score=-Infinity;
+    for(let i=0;i<12;i++)for(const phi of [s.phi,1.3,.85,.4]){
+      const c=new THREE.Vector3().setFromSpherical(new THREE.Spherical(s.radius,Math.max(.15,Math.min(Math.PI*.48,phi)),s.theta+i*Math.PI/6));
+      const v=Math.min(5,this.limit(target,c,roots,-Infinity,true))-.4*want.angleTo(c.clone().normalize());if(v>score){score=v;open=c;}}
+    return open.clone().setLength(this.fit(open.length(),this.limit(target,open,roots)));
   }
   private resolveCollected(target:THREE.Vector3,roots:readonly THREE.Object3D[],seconds:number):THREE.Vector3 {
     const dt=Number.isFinite(seconds)?Math.max(0,Math.min(.1,seconds)):0;this.clock+=dt;
@@ -131,10 +140,12 @@ export class WorldFollow {
     // (a collision camera). Their requested distance survives, and the search resumes from their angle after.
     if(this.userActive&&this.rendered){
       const reach=this.limit(target,this.rendered,roots);
-      this.rendered.setLength(Math.max(Math.min(FOLLOW_MIN,this.rendered.length()),Math.min(this.rendered.length(),reach)));
+      this.rendered.setLength(this.fit(this.rendered.length(),reach));
       return this.rendered.clone();
     }
-    if(!this.chosen||this.clock-this.lastSearch>=.2||!this.clear(target,this.chosen,roots)){this.chosen=this.choose(target,wanted,roots).clone();this.lastSearch=this.clock;}
+    // Search again every .2 s, or at once when a clear viewpoint is cut (one with no clear view waits for the next search).
+    if(!this.chosen||this.clock-this.lastSearch>=.2||this.chosenClear&&!this.clear(target,this.chosen,roots)){
+      this.chosen=this.choose(target,wanted,roots).clone();this.lastSearch=this.clock;this.chosenClear=this.clear(target,this.chosen,roots);}
     const goal=this.chosen;
     if(!this.rendered)this.rendered=goal.clone();
     else{
@@ -144,15 +155,12 @@ export class WorldFollow {
       let dTheta=b.theta-a.theta;dTheta=Math.atan2(Math.sin(dTheta),Math.cos(dTheta));
       a.theta+=dTheta*k(blocked?.35:.9);a.phi+=(b.phi-a.phi)*k(blocked?.35:.9);a.radius+=(b.radius-a.radius)*k(blocked?.3:1.2);
       this.rendered.setFromSpherical(a);
+      // A glide that would carry a clear camera out through a wall (growing the radius in a narrow room before it
+      // turns) stops at the wall instead. Only a small correction: a house that suddenly cuts the sight is left to
+      // the hurried glide above, never a jump.
+      if(!blocked){const length=this.rendered.length(),fitted=this.fit(length,this.limit(target,this.rendered,roots));
+        if(fitted<length&&length-fitted<=.2)this.rendered.setLength(fitted);}
     }
-    // limit() rays leave the body, so they pass through the back of a
-    // single-sided shell (tower, drum) whose drawn outside faces the camera.
-    // Cast once from the camera toward the torso; keep inside such a shell.
-    // (Only when the body-side rays see nothing: a wall they do see is handled by the glide above, not a pull-in.)
-    const shell=this.clear(target,this.rendered,roots)?this.drawnShell(target,this.rendered):Infinity;
-    // Only an enclosing shell (room-sized, >= 1.5 m away) is cleared by pulling
-    // in; a Soul in or against a solid (wall, canopy) cannot be.
-    if(shell<this.rendered.length()&&shell>=1.5)this.rendered.setLength(shell-.25);
     return this.rendered.clone();
   }
 }

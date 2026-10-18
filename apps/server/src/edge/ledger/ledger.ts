@@ -972,7 +972,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const navIds = new Set(((w as {navV1?: {solids: {id: string}[]}}).navV1?.solids ?? []).map(x => x.id));
     const enclosingBuilding = (place: string | undefined) => {let out: string | null = null; for (let p = place ? this.places.byId.get(place) : undefined; p; p = p.parent ? this.places.byId.get(p.parent) : undefined) if (p.enclosed && (p.level ?? 0) === 0) out = p.id; return out;};
     const level = me.human?.level ?? 0, h = me.human;
-    return {me: here, seated: !!h && (h.activity === 'sit' || h.baseActivity === 'sit'),
+    return {me: here, level, seated: !!h && (h.activity === 'sit' || h.baseActivity === 'sit'),
       // read only against standing-room thresholds (≤ 0.95 m): capped at 1 m, answered without building far nav tiles (L1)
       clearance: (x: number, z: number) => level === 0 && engine.clearanceAtV1 ? (engine.clearanceUpToV1 ? engine.clearanceUpToV1(x, z, 1) : engine.clearanceAtV1(x, z)) : 0,
       open: (at: [number, number], min: number, rings: number) => level === 0 && engine.nearestStandableV1 ? engine.nearestStandableV1(at, soul.entityId, min, rings) : null,
@@ -983,7 +983,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         const free = caps.filter(c => c.verb === 'sit' && c.available && c.target && c.id !== 'sit:here').map(c => {const e = w.entities[(this.host.kernel.things[c.target!.id]?.traits.entity as string | undefined) ?? c.target!.id]; return e ? {c, d: Math.hypot(e.pose.p[0] - here[0], e.pose.p[2] - here[1])} : null;}).filter((x): x is {c: EdgeCapability; d: number} => !!x && x.d <= radius).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
         const pick = free[0]; return pick && plans.get(pick.c.id) ? {cap: pick.c, plan: plans.get(pick.c.id)!, distance: pick.d} : null;
       },
-      placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? null : null,
+      // an installed upper-floor room/lobby is a world region the place data predates: name it by its label, never its id
+      placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? w.regions[id]?.label ?? null : null,
       ancestors: (id: string) => {const out: string[] = []; for (let p = this.places.byId.get(id); p?.parent; p = this.places.byId.get(p.parent)) {const q = this.places.byId.get(p.parent); if (q?.enclosed) out.push(q.id);} return out;},
       groupSize: (group: string) => Object.values(w.entities).filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
       clock: this.host.living ? (({hour, minute}) => ({hour, minute}))(clockAt(w.tick, this.host.living.origin, this.host.living.dayTicks)) : null,
@@ -1084,19 +1085,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
   placePathOf(soulId: string): PlaceRef[] {
     const m = this.host.minds.get(soulId); if (!m) return [];
     const b = this.body(m.entityId); if (!b) return [];
-    const path = this.places.containing(b.pose.p[0], b.pose.p[2], b.human?.level ?? 0).map(p => this.places.ref(p));
+    const path = this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level)).map(p => this.places.ref(p));
     const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
     if (basket) {const occ = this.places.occupierOf.get(ride!.id + '#' + ride!.slot); return [...(occ ? [{id: occ.occ.id, name: `${basket.name} (${ride!.slot})`, kind: 'occupier'}] : []), this.places.ref(basket), ...path];}
     const seat = this.seatOf(m.entityId), occ = seat ? this.places.occupierOf.get(seat) : undefined;
     return occ ? [{id: occ.occ.id, name: `${occ.place.name} seat`, kind: 'occupier'}, ...path] : path;
   }
-  private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], b.human?.level ?? 0)[0]?.id ?? null;}
+  private innermostPlace(m: Mind): string | null {const b = this.body(m.entityId); if (!b) return null; const ride = this.aboard(m.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined; if (basket) return basket.id; return this.places.containing(b.pose.p[0], b.pose.p[2], this.placeLevel(b.human?.level))[0]?.id ?? null;}
   enclosureOf(soulId: string): string | null {
     const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined; if (!b) return null;
     const ride = this.aboard(m!.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
     if (basket?.enclosed) return basket.id;
-    return this.enclosureAtPoint(b.pose.p[0],b.pose.p[2],b.human?.level??0);
+    return this.enclosureAtPoint(b.pose.p[0],b.pose.p[2],this.placeLevel(b.human?.level));
   }
+  /** The place-data floor number of an engine level (upper-floors/1: a building's upper floor reports its authored floor). */
+  placeLevel(level: number | undefined): number {const l = level ?? 0; return l < 2 ? l : (this.host.engine as unknown as {placeLevelV1?: (l: number) => number}).placeLevelV1?.(l) ?? l;}
   /** Logical property polygons can include balconies; privacy follows the validated actual room shell. */
   enclosureAtPoint(x:number,z:number,level=0):string|null{return this.places.containing(x,z,level).find(p=>p.enclosed&&inPoly(x,z,this.enclosurePolygon(p)))?.id??null;}
   private enclosurePolygon(p:Place){const interior=this.spots.interiors.find(i=>i.place===p.id);return interior?interiorShellPolygon(p,interior)??p.polygon:p.polygon;}
@@ -1162,7 +1165,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const here = new Set(this.placePathOf(soul.soulId).map(p => p.id)), souls = new Map<string, number>();
     for (const m of this.host.minds.values()) {
       if (m.soulId === soul.soulId || this.faded.has(m.soulId)) continue; const ob = this.body(m.entityId); if (!ob) continue;
-      for (const p of this.places.containing(ob.pose.p[0], ob.pose.p[2], ob.human?.level ?? 0)) souls.set(p.id, (souls.get(p.id) ?? 0) + 1);
+      for (const p of this.places.containing(ob.pose.p[0], ob.pose.p[2], this.placeLevel(ob.human?.level))) souls.set(p.id, (souls.get(p.id) ?? 0) + 1);
     }
     const marks = new Map<string, number>(), projects = new Map<string, string[]>();
     for (const o of this.comms?.objects.all() ?? []) {

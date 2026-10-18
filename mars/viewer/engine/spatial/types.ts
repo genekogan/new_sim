@@ -46,9 +46,21 @@ export type Link = {
   carry?: 'none' | 'small';
   /** Entities that form it (the upright; the beam and its partner beam). */
   members?: string[];
+  /**
+   * upper-floors/1: a flight that turns (a dog-leg stair with a landing): the body faces along its own step path while
+   * climbing, instead of keeping `heading` throughout. Absent: unchanged (straight flights face `heading`).
+   */
+  faceAlong?: boolean;
 };
 
-export type Level = { id: number; y: number; label: string };
+export type Level = {
+  id: number; y: number; label: string;
+  /**
+   * upper-floors/1: the world rectangle [minX, minZ, maxX, maxZ] this level's grid covers (a building's upper floors), on the
+   * shared lattice. Absent: the whole scene bounds (every other level). A cropped level costs its own area, not the campus's.
+   */
+  crop?: [number, number, number, number];
+};
 
 export type SpatialScene = {
   bounds: [minX: number, minZ: number, maxX: number, maxZ: number];

@@ -56,7 +56,7 @@ const office:RoomDraw={id:'eden-office-1',draw(b){
  b.label='office lounge rug';b.at(96.1,y0,16.9,0,()=>F.rug(b,2.6,2,C.sage,C.cream));
  b.label='office notice board';b.at(97.8,y0,12,E,()=>F.chalkboard(b,.9,.7,2.1));
  const y1=3.1;// first floor: artists' studio
- b.label='studio easels';for(const [x,r] of[[90.6,1],[92.4,2],[94.2,3],[96,4]] as const)b.at(x,y1,12.4,S,()=>F.easel(b,C.cream,r));
+ b.label='studio easels';for(const [x,r] of[[90.6,1],[92.4,2],[94.2,3],[96,4]] as const)b.at(x,y1,12.4,0,()=>F.easel(b,C.cream,r));// canvases face the room, where the painter stands (upper-floors/1 easel spots)
  b.label='studio plan chest';b.at(97.8-.32,y1,15,E,()=>F.cabinet(b,2.4,.78,.6,C.ash));
  b.label='studio sitter stool';b.at(93.2,y1,13.8,0,()=>F.stool(b,.7,C.pine,C.rust));
  b.label='studio paint trolley';b.at(95.8,y1,13.6,0,()=>{F.table(b,.6,.45,.8,C.pine,C.iron);for(let i=0;i<5;i++)b.cyl(-.2+i*.1,.8,0,.03,.03,.1,[C.rust,C.teal,C.ochre,C.plum,C.white][i],'furn',6);});

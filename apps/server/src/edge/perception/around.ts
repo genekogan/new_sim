@@ -17,7 +17,7 @@ const clip = (s: string, n: number) => s.length > n ? s.slice(0, n - 1).trimEnd(
 export function aroundFrame(ledger: EdgeLedger, soul: EdgeSoul) {
   const P = new Perception(ledger, soul), K = ledger.knowledge, tick = P.tick, pos = P.pos;
   if (!pos) return {tick, found: [], people: [], things: [], places: [], untrusted: true};
-  const level = (P.w.entities[soul.entityId]?.human?.level as number | undefined) ?? 0;
+  const level = ledger.placeLevel(P.w.entities[soul.entityId]?.human?.level as number | undefined);
   // finding: secret places close by become known to this Soul (before the listings, so they show)
   const found = P.enclosure ? [] : K.findable(soul.soulId, pos, level);
   for (const p of found) K.find(soul.soulId, p.id, tick);

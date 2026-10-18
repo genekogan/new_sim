@@ -1124,6 +1124,18 @@ export class WorldHost {
     const guard:AcceptanceGuard=()=>{if(this.engine.officeStairGuardsV1?.())throw Error('office-guards.already-installed');return true;};
     return this.enqueueChecked('rules','operator:office-stair-guards',{officeStairGuardsV1:declaration},guard).then(()=>({installed:true}));
   }
+  /** upper-floors/1: a building's upper floors (or their removal) as one logged prospective rules fact, previewed first and
+   *  again at acceptance. Resolves {installed:false} without logging when the same building is already installed. */
+  installUpperFloorsV1(fact:{version:'upper-floors/1';building:{id:string}}|{version:'upper-floors/1';remove:string}){
+    const engine=this.engine as unknown as {previewUpperFloorsV1?:(f:unknown)=>{code:string;message:string}|null;world:{upperFloorsV1?:{buildings:Record<string,unknown>}}};
+    if(!engine.previewUpperFloorsV1)return Promise.reject(Error('upper-floors.reader-required'));
+    const guard:AcceptanceGuard=()=>{const issue=engine.previewUpperFloorsV1!(fact);if(issue)throw Error(`${issue.code}: ${issue.message}`);return true;};
+    guard();
+    if('building' in fact&&engine.world.upperFloorsV1?.buildings[fact.building.id])return Promise.resolve({installed:false});
+    const why='remove' in fact?'upper-floors/1: the building\'s upper floors are taken out again (operator rollback); its rooms leave the map; prospective, earlier history replays unchanged'
+      :'upper-floors/1: the building\'s upper floors become walkable (floors, stairs, rooms as places) so residents can go upstairs; prospective, earlier history replays unchanged';
+    return this.enqueueChecked('rules','operator:upper-floors',{upperFloorsV1:structuredClone(fact),why},guard).then(()=>({installed:true}));
+  }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
   setCarrierRouteV1(spec:{id:string;route:string}){
     return this.enqueue('rules','operator:carrier-route',{carrierRouteV1:structuredClone(spec),why:'a ride flies another named route from its next flight (only while parked and empty); prospective, earlier history replays unchanged'});

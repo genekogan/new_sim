@@ -262,6 +262,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if(regionsV1){const install=(engine as unknown as {installPlaceRegionsV1?:(l:unknown)=>string[]}).installPlaceRegionsV1;if(!install)throw Error('place-regions.reader-required');
         const added=new Set(install.call(engine,regionsV1));
         for(const a of engine.anchors())if(added.has(a.id)&&!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:'place',name:a.name,at:a.in??null,traits:{...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');if(!r.ok)throw Error('place-regions.anchor:'+r.message);}}
+      // upper-floors/1: a building's upper floors (cropped levels, floors, stairs) and its rooms as places, or their removal;
+      // prospective; a fact that does not preview cleanly is a no-op on every replay alike.
+      const upperFloors=(e.payload as {upperFloorsV1?:unknown}|null)?.upperFloorsV1;
+      if(upperFloors){const install=(engine as unknown as {installUpperFloorsV1?:(f:unknown)=>{added:string[];removed:string[]}}).installUpperFloorsV1;
+        if(e.author!=='operator:upper-floors'||!install)throw Error('upper-floors.reader-required');
+        const out=install.call(engine,upperFloors),added=new Set(out.added);
+        for(const a of engine.anchors())if(added.has(a.id)&&!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:'place',name:a.name,at:a.in??null,traits:{...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');if(!r.ok)throw Error('upper-floors.anchor:'+r.message);}
+        for(const id of out.removed)if(k.things[id])applyAll(k,[{op:'vanish',id}],'world');}
       // carrier/1: a ride (balloon) installed at its home; prospective, idempotent by id; refused installs are no-ops.
       const carrierRoute=(e.payload as {carrierRouteV1?:{id:string;route:string}}|null)?.carrierRouteV1;
       if(carrierRoute){const set=(engine as unknown as {setCarrierRouteV1?:(s:unknown)=>boolean}).setCarrierRouteV1;if(!set)throw Error('carrier.reader-required');set.call(engine,carrierRoute);}

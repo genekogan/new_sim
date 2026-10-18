@@ -186,8 +186,21 @@ export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaste
   const lat = latticeOf(scene.bounds, cell);
   const levels = new Map<number, LevelGrid>();
   const pre = prefix?.fits(scene, cell) ? prefix : undefined;
-  for (const lv of scene.levels) levels.set(lv.id, buildLevel(scene, lv, cell, lat, pre, keepColumns));
+  for (const lv of scene.levels) levels.set(lv.id, buildLevel(scene, lv, cell, levelLattice(scene, lv, cell, lat), lv.crop ? undefined : pre, keepColumns));
   return { cell, levels };
+}
+
+/**
+ * The lattice extent of one level's grid: the scene's, or (upper-floors/1, Level.crop) the cells of its crop rectangle that
+ * lie inside the scene bounds. Same global lattice either way, so a cell has the same centre in every grid; outside a crop
+ * there is no floor (clearance reads 0 there, as off any grid). The static obstacle prefix covers the scene extent only, so
+ * a cropped level rasterises every obstacle itself (a building's few hundred cells).
+ */
+export function levelLattice(scene: SpatialScene, lv: Level, cell: number, lat = latticeOf(scene.bounds, cell)): Lattice {
+  if (!lv.crop) return lat;
+  const [a, b, c, d] = lv.crop, [x0, z0, x1, z1] = scene.bounds;
+  const crop = latticeOf([Math.max(a, x0), Math.max(b, z0), Math.min(c, x1), Math.min(d, z1)], cell);
+  return { ox: crop.ox, oz: crop.oz, nx: Math.max(1, crop.nx), nz: Math.max(1, crop.nz) };
 }
 
 /**
@@ -360,14 +373,13 @@ export function updateGrids(prev: GridSet, prevScene: SpatialScene, scene: Spati
   const obs = diffByKey(prevScene.obstacles.slice(p), scene.obstacles.slice(p), obstacleKey, true);
   const surf = diffByKey(prevScene.surfaces, scene.surfaces, surfaceKey, false);
   if (!obs || !surf) return null;
-  const lat = latticeOf(scene.bounds, cell);
-  const { ox, oz, nx, nz } = lat;
+  const sceneLat = latticeOf(scene.bounds, cell);
   const changedObs = [...obs.gone, ...obs.added], changedSurf = [...surf.gone, ...surf.added];
   const levels = new Map<number, LevelGrid>();
   for (const lv of scene.levels) {
-    const old = prev.levels.get(lv.id);
+    const old = prev.levels.get(lv.id), lat = levelLattice(scene, lv, cell, sceneLat), { ox, oz, nx, nz } = lat, lvPre = lv.crop ? undefined : pre;
     if (!old || old.y !== lv.y || old.nx !== nx || old.nz !== nz || old.ox !== ox || old.oz !== oz) {
-      levels.set(lv.id, buildLevel(scene, lv, cell, lat, pre, true));
+      levels.set(lv.id, buildLevel(scene, lv, cell, lat, lvPre, true));
       continue;
     }
     const rects: Rect[] = [];
@@ -378,7 +390,7 @@ export function updateGrids(prev: GridSet, prevScene: SpatialScene, scene: Spati
       continue;
     }
     const free = old.free.slice(), blockers = copyBlockers(old.blockers, nx * nz);
-    for (const r of rects) stampLevel(scene, lv, cell, lat, pre, free, blockers, r);
+    for (const r of rects) stampLevel(scene, lv, cell, lat, lvPre, free, blockers, r);
     let ci0 = nx, ci1 = -1, cj0 = nz, cj1 = -1; // bounding box of cells whose free bit flipped
     for (const [i0, i1, j0, j1] of rects)
       for (let j = j0; j <= j1; j++)

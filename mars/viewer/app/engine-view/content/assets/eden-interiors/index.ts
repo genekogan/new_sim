@@ -10,6 +10,7 @@ export const INTERIOR_EXPLORE:readonly {id:string;label:string;camera:[number,nu
  {id:'int-barn-workshop',label:'Barn workshop and crafts',camera:[83,2.6,54.5],target:[91.5,.6,48]},
  {id:'int-office-post-room',label:'Post room and reception',camera:[92,1.6,18.5],target:[93,.9,12]},
  {id:'int-office-studio',label:'Artists’ studio (office, first floor)',camera:[97.5,4.7,18.5],target:[91,3.6,12]},
+ {id:'int-office-upper-lounge',label:'Upper lounge (office, second floor)',camera:[92.2,7.7,13],target:[96.4,6.7,17.9]},
  {id:'int-house-3-kitchen',label:'House 3 kitchen and dining room',camera:[34,1.6,27.6],target:[29,.9,26]},
  {id:'int-house-3-living',label:'House 3 living room with piano',camera:[33.6,1.6,34.6],target:[37.5,.9,33]},
  {id:'int-house-2',label:'House 2 home interior',camera:[52,1.7,12.4],target:[53,.7,16]},
@@ -28,6 +29,11 @@ export const INTERIOR_EXPLORE:readonly {id:string;label:string;camera:[number,nu
  {id:'int-clinic',label:'Clinic',camera:[63.9,1.7,-6.4],target:[64.1,.9,-10.5]},
  {id:'int-bathhouse',label:'Bathhouse and laundry',camera:[83.5,1.7,-8.4],target:[83.5,.9,-12.5]},
  {id:'int-potting-shed',label:'Potting shed',camera:[43.4,1.7,80.9],target:[44.2,.9,84.3]},
+ // Seafront hotels (hotel-core.ts; z 121, door on the sea side at z 126): hotel 1's lobby from inside the door, hotel 2's
+ // lobby towards its stair core (east), and hotel 2's Room 101 on the first floor (y 3.12) from the balcony door to the desk.
+ {id:'int-hotel-1-lobby',label:'Seafront hotel 1 lobby',camera:[123.5,1.7,124.8],target:[117,.8,120.5]},
+ {id:'int-hotel-2-stair',label:'Seafront hotel 2 lobby and stair',camera:[137.5,1.7,124.6],target:[141.3,1.8,120.6]},
+ {id:'int-hotel-2-room-101',label:'Room 101, seafront hotel 2',camera:[133.1,4.7,124.6],target:[134.1,3.9,119.2]},
 ]);
 /** World Buildings & Interiors lane entry point (owned by that lane): new building
  * and object kinds, and furnished, enterable interiors. Scenery unless Core admits.

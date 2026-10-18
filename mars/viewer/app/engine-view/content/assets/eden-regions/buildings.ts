@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import {Builder,type MatKey,type Col,pick,PLASTER,ROOFS,TIMBER,STONE,TRIM} from './kit.ts';
+import {hotelCoreLayout,hotelFlight,type HotelCoreLayout} from './hotel-core.ts';
 /** Building archetypes in a LOCAL frame: origin = footprint centre at floor level,
  * front facade faces local +z. Callers b.push(x,y,z,yaw) first. */
 export type BalconyLayout={x:number;floorY:number;width:number;depth:number;index:string};
 export type RoofKind='gable'|'hip'|'flat'|'shed'|'cross'|'stepped'|'none';
 export type HouseSpec={w:number;d:number;floors:number;fh?:number;wall?:MatKey;wallC?:Col;roof?:RoofKind;roofC?:Col;roofH?:number;trim?:Col;
- chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean;balconyLayout?:readonly BalconyLayout[];furnishBalconies?:boolean};
+ chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean;balconyLayout?:readonly BalconyLayout[];
+ /** Seafront hotel inside (hotel-core.ts): an open lobby behind the front door and a stair core up every storey. */
+ hotelCore?:boolean;furnishBalconies?:boolean};
 const GLASS='#2d3c46',GLASS2='#3b4a52',DOOR=['#5b3a29','#2f4f5f','#7a2f2a','#355e3b','#3d3a35','#8a6a3a'];
 /** Window grid on one facade (local plane z=zf facing +z when face=1; use push for other facades). */
 function windows(b:Builder,w:number,y0:number,floors:number,fh:number,zf:number,trim:Col,o:{shutters?:boolean;box?:boolean;skipDoor?:boolean;openings?:readonly BalconyLayout[];r:()=>number}){
@@ -35,7 +38,16 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  // Plinth reaches below the pad so sloping ground never shows a gap.
  // E2 #9: plinth and floor bands stand only 2 cm proud at the sides: row houses sit 4 cm apart, and wider ones overlapped
  // their neighbours' in the same planes (different stone colours flickering along a terrace front).
- b.box('stone',0,-pl,0,s.w+.04,pl+.35,s.d+.25,pick(r,STONE));
+ const plinthC=pick(r,STONE),core=s.hotelCore&&s.balconyLayout?.length?hotelCoreLayout(s.w,s.d):null;
+ if(!core)b.box('stone',0,-pl,0,s.w+.04,pl+.35,s.d+.25,plinthC);
+ else{// the same plinth outside; inside, the lobby floor is level with the street and the doorway has no step
+  // E2 #9: the plinth under the lobby stops at the lobby slab's underside (-.1), not at the street plane (0), where its top
+  // fought the ground drawn under the hotel; the ring round the lobby comes down to meet it.
+  b.box('stone',0,-pl,0,s.w+.04,pl-.1,s.d+.25,plinthC);const [ix0,iz0,ix1,iz1]=core.inner,[d0,d1]=core.door;
+  b.box('stone',0,-.1,(-s.d/2-.125+iz0)/2,s.w+.04,.45,iz0+s.d/2+.125,plinthC);
+  for(const [a,c] of [[-s.w/2-.02,d0],[d1,s.w/2+.02]])b.box('stone',(a+c)/2,-.1,(iz1+s.d/2+.125)/2,c-a,.45,s.d/2+.125-iz1,plinthC);
+  for(const side of[-1,1])b.box('stone',side*(s.w/2+.02+ix1)/2,-.1,0,s.w/2+.02-ix1,.45,iz1-iz0,plinthC);
+  b.box('stone',0,-.1,0,ix1-ix0,.12,iz1-iz0,'#d8ccb4');b.box('stone',0,-.1,(iz1+s.d/2)/2,d1-d0,.12,s.d/2-iz1+.125,'#d8ccb4');}
  const balconies=s.balconyLayout??(s.balcony&&s.floors>1?[{x:0,floorY:fh+.04,width:Math.min(s.w-.8,3.2),depth:1.2,index:'first-floor'}]:[]);
  const buildingId='region-house:'+b.m.elements.slice(12,15).map(v=>v.toFixed(3)).join(':');
  const wallBox=(x:number,y:number,z:number,w:number,h:number,d:number,id:string)=>{b.box(wall,x,y,z,w,h,d,wc);b.boundary('wall',x,y,z,w,h,d,buildingId,id);};
@@ -43,11 +55,19 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
   // Actual hollow shell and rectangular cuts, rather than a doorway painted on a solid building volume.
   const thickness=.18;
   wallBox(0,.35,-s.d/2+thickness/2,s.w,H-.35,thickness,'back');
-  for(const floorY of new Set(balconies.map(v=>v.floorY)))b.box('stone',0,floorY-.12,0,s.w-2*thickness,.12,s.d-2*thickness,trim,true); // Rendered floor, no native support registration.
+  for(const floorY of new Set(balconies.map(v=>v.floorY))){if(!core){b.box('stone',0,floorY-.12,0,s.w-2*thickness,.12,s.d-2*thickness,trim,true);continue;} // Rendered floor, no native support registration.
+   const [ix0,iz0,ix1,iz1]=core.inner,[wx0,wz0,,wz1]=core.well; // round the stair well
+   b.box('stone',0,floorY-.12,(iz0+wz0)/2,ix1-ix0,.12,wz0-iz0,trim,true);b.box('stone',0,floorY-.12,(wz1+iz1)/2,ix1-ix0,.12,iz1-wz1,trim,true);b.box('stone',(ix0+wx0)/2,floorY-.12,(wz0+wz1)/2,wx0-ix0,.12,wz1-wz0,trim,true);}
   for(const side of[-1,1])wallBox(side*(s.w/2-thickness/2),.35,0,thickness,H-.35,s.d-2*thickness,'side:'+side);
   const xs=[...new Set([-s.w/2,s.w/2,...balconies.flatMap(v=>[v.x-.6,v.x+.6])])].sort((a,c)=>a-c);
   const ys=[...new Set([.35,H,...balconies.flatMap(v=>[v.floorY,v.floorY+2.3])])].filter(y=>y>=.35&&y<=H).sort((a,c)=>a-c);
-  for(let ix=0;ix<xs.length-1;ix++)for(let iy=0;iy<ys.length-1;iy++){const x=(xs[ix]+xs[ix+1])/2,y=(ys[iy]+ys[iy+1])/2;if(balconies.some(v=>Math.abs(x-v.x)<.6&&y>v.floorY&&y<v.floorY+2.3))continue;wallBox(x,ys[iy],s.d/2-thickness/2,xs[ix+1]-xs[ix],ys[iy+1]-ys[iy],thickness,'front:'+ix+':'+iy);}
+  for(let ix=0;ix<xs.length-1;ix++)for(let iy=0;iy<ys.length-1;iy++){const x=(xs[ix]+xs[ix+1])/2,y=(ys[iy]+ys[iy+1])/2;if(balconies.some(v=>Math.abs(x-v.x)<.6&&y>v.floorY&&y<v.floorY+2.3))continue;
+   const id='front:'+ix+':'+iy,z=s.d/2-thickness/2,ww=xs[ix+1]-xs[ix],hh=ys[iy+1]-ys[iy];
+   if(core&&iy===0&&xs[ix]<core.door[1]&&xs[ix+1]>core.door[0]){// the lobby's open doorway: the wall band keeps its native registration (the hotel's upper-floors fact opens it)
+    b.boundary('wall',x,ys[iy],z,ww,hh,thickness,buildingId,id);const a=Math.max(xs[ix],core.door[0]),c=Math.min(xs[ix+1],core.door[1]);
+    if(a>xs[ix])b.box(wall,(xs[ix]+a)/2,ys[iy],z,a-xs[ix],hh,thickness,wc);if(c<xs[ix+1])b.box(wall,(c+xs[ix+1])/2,ys[iy],z,xs[ix+1]-c,hh,thickness,wc);
+    b.box(wall,(a+c)/2,core.doorHead,z,c-a,ys[iy]+hh-core.doorHead,thickness,wc);continue;}
+   wallBox(x,ys[iy],z,ww,hh,thickness,id);}
  }else b.authoredBox(wall,0,.35,0,s.w,H-.35,s.d,wc,buildingId,'body');
  if(s.band)for(let f=1;f<s.floors;f++)b.box('stone',0,f*fh-.05,0,s.w+.04,.14,s.d+.1,trim);
  // Facades: front and back, then the sides.
@@ -56,7 +76,10 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  for(const side of [1,-1]){b.push(0,0,0,side*Math.PI/2);windows(b,s.d,0,s.floors,fh,s.w/2,trim,{shutters:s.shutters,r});b.pop();}}
  if(s.barnDoor){const dw=Math.min(s.w*.4,4.2),dh=Math.min(H*.6,4);b.panel('timber',0,.35+dh/2,s.d/2+.04,dw,dh,'#5b2a20');b.box('timber',0,.35+dh/2,s.d/2+.07,dw*1.05,.16,.06,trim);
   b.quad('timber',[-dw/2,.35,s.d/2+.07],[-dw/2+.16,.35,s.d/2+.07],[dw/2,.35+dh,s.d/2+.07],[dw/2-.16,.35+dh,s.d/2+.07],trim);b.panel('glass',0,H-.2,s.d/2+.04,1.2,1,'#2d3c46');}
- if(s.door!==false){b.panel('timber',0,1.05+.35,s.d/2+.035,1.05,2.1,pick(r,DOOR));b.box('stone',0,-.2,s.d/2+.45,1.6,.56,.7,pick(r,STONE));
+ if(s.door!==false&&core){// the same door, standing open into the lobby, and a flush threshold instead of the step
+  const doorC=pick(r,DOOR),stepC=pick(r,STONE);b.push(core.door[0]+.04,0,s.d/2-.16,-Math.PI/2);b.box('timber',.55,0,0,1.05,2.4,.05,doorC);b.pop();b.box('stone',0,-.2,s.d/2+.45,1.6,.26,.7,stepC);
+  b.box('stone',0,2.55,s.d/2+.08,1.35,.1,.16,trim);}
+ else if(s.door!==false){b.panel('timber',0,1.05+.35,s.d/2+.035,1.05,2.1,pick(r,DOOR));b.box('stone',0,-.2,s.d/2+.45,1.6,.56,.7,pick(r,STONE));
   b.box('stone',0,2.55,s.d/2+.08,1.35,.1,.16,trim);}
  if(s.awning){b.quad('cloth',[-s.w/2+.3,2.9,s.d/2+.02],[s.w/2-.3,2.9,s.d/2+.02],[s.w/2-.3,2.35,s.d/2+1.3],[-s.w/2+.3,2.35,s.d/2+1.3],s.awning);}
  const rh=s.roofH??Math.min(s.w,s.d)*.42;
@@ -73,10 +96,33 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  if(s.chimney){const cx=s.w*(r()-.5)*.6,cz=-s.d*.18;b.box('stone',cx,H+rh*.4,cz,.6,rh*.7+.6,.6,pick(r,['#8a4a36','#a59d8e','#7a6a5a']));const v=new THREE.Vector3(cx,H+rh*1.1+.65,cz).applyMatrix4(b.m);CHIMNEYS.push([v.x,v.y,v.z]);}
  if(s.dormer&&roof==='gable'&&s.w>=s.d){b.push(0,H+rh*.18,s.d*.2,0);b.box(wall,0,0,0,1.4,1.2,1.2,wc);b.panel('glass',0,.6,.62,.8,.8,GLASS);b.gable('roof',0,1.2,0,1.4,1.3,.6,rc,wall,wc,.15);b.pop();}
  for(const balcony of balconies)buildBalcony(b,balcony,s.d/2,trim,buildingId);
- if(s.furnishBalconies&&balconies.length)furnishBalconyRooms(b,balconies,s.d,trim);
+ if(s.furnishBalconies&&balconies.length)furnishBalconyRooms(b,core?balconies.filter(v=>Math.abs(v.x-core.stairColumn)>.01):balconies,s.d,trim);
+ if(core)hotelInside(b,core,s.floors,s.fh??2.9,trim,wall,wc);
  if(s.veranda){const vd=2.2;b.box('timber',0,-.1,s.d/2+vd/2,s.w+.4,.3,vd,pick(r,TIMBER));for(const x of [-s.w/2,-s.w/6,s.w/6,s.w/2])b.box('timber',x,.2,s.d/2+vd-.15,.16,2.5,.16,trim);
   b.shed('roof',0,2.6,s.d/2+vd/2,s.w+.4,vd,.45,rc,.15);b.box('timber',0,.2,s.d/2+vd-.15,s.w,.08,.06,trim);b.box('timber',0,.95,s.d/2+vd-.15,s.w,.06,.06,trim);}
  return H+rh;
+}
+/** The seafront hotel's lobby furniture and its stair core (hotel-core.ts): a dog-leg flight up every storey, landings, and a
+ * rail round the well on the upper floors. Decorative: the hotel's upper-floors/1 fact gives the native floors, stairs and solids. */
+function hotelInside(b:Builder,c:HotelCoreLayout,floors:number,fh:number,trim:Col,wall:MatKey,wc:Col){
+ const d=new Builder('decorative');d.m.copy(b.m);const [wx0,wz0,wx1,wz1]=c.well,tread='#b9a68a',rail='#3e4446',w=c.laneWidth+.1;
+ // lobby: a sofa against the west wall facing the room, a low table, the reception desk at the back
+ // E2 #9: seat, back and arms share no face plane (the seat tucks under the back, the arms stand 1-2 cm proud)
+ const {x0,z0,z1,depth}=c.sofa;d.box('cloth',x0+(.1+depth)/2,0,(z0+z1)/2,depth-.1,.42,z1-z0,'#3d5a80');d.box('cloth',x0+.14,0,(z0+z1)/2,.26,.9,z1-z0-.02,'#34506f');
+ for(const z of[z0+.09,z1-.09])d.box('cloth',x0+.02+depth/2,0,z,depth,.62,.22,'#34506f');
+ const [tx0,tz0,tx1,tz1]=c.table;d.box('timber',(tx0+tx1)/2,.38,(tz0+tz1)/2,tx1-tx0,.06,tz1-tz0,'#8a6545');for(const x of[tx0+.05,tx1-.05])for(const z of[tz0+.05,tz1-.05])d.box('timber',x,0,z,.05,.38,.05,trim);
+ const [rx0,rz0,rx1,rz1]=c.reception;d.box('timber',(rx0+rx1)/2,0,(rz0+rz1)/2,rx1-rx0,1.05,rz1-rz0,'#7a5236');d.box('stone',(rx0+rx1)/2,1.05,(rz0+rz1)/2,rx1-rx0+.08,.05,rz1-rz0+.08,'#efe9dc');
+ d.box('dressing',rx1-.35,1.1,(rz0+rz1)/2,.22,.04,.16,'#c9a227');
+ // the flights: every storey from the ground (lobby floor 0) to the top floor
+ for(let f=0;f<floors-1;f++){const base=f===0?0:f*fh+.02,top=(f+1)*fh+.02,pts=hotelFlight(c,base,top),rise=(top-base)/16;
+  for(const [k,[x,y,z]] of pts.entries()){if(k===8||k===9)continue;if(k===pts.length-1){d.box('stone',x,y-.12,(z+wz1)/2,w,.12,wz1-z,tread);continue;}
+   d.box('stone',x,y-rise-.06,z,w,rise+.06,.3,tread);}
+  d.box('stone',(wx0+wx1)/2,base+8*rise-.12,wz0+.3,wx1-wx0,.12,.6,tread); // turn landing
+  d.box(wall,(wx0+wx1)/2,base,(wz0+wz1)/2,.08,base+8*rise-base-.12,wz1-wz0-.3,wc); // spine wall between the flights, up to the landing
+ }
+ // the rail round the well on every upper floor: along its west side and its north end (the south end is the way on and off)
+ for(let f=1;f<floors;f++){const y=f*fh+.02;d.box('metal',wx0+.03,y,(wz0+wz1)/2,.05,1.0,wz1-wz0,rail);d.box('metal',(wx0+wx1)/2,y,wz0+.03,wx1-wx0,1.0,.05,rail);}
+ d.drain(()=>b);
 }
 /** Pictured seaside hotel rooms. Decorative contents leave the full door-to-rear centre lane clear.
  * No native floor, seat or furniture action is registered; existing walls and guards are unchanged. */

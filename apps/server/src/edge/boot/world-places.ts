@@ -16,7 +16,7 @@ export function nativeAliasesOf(L:EdgeLedger){return (L.worldProfile as typeof L
 /** With `soulId`, secret places that Soul does not know are left out (knowledge/1): a name never confirms one exists. */
 export function knownBootPlaces(L:EdgeLedger,soulId?:string):KnownBootPlace[]{
  const regions=L.host.engine.world.regions,aliases=new Map(nativeAliasesOf(L).map(a=>[a.place,a.nativeRegion])),names=bootAliases(L);
- return [...L.places.byId.values()].filter(p=>soulId===undefined||(L.knowledge?.knows(soulId,p.id)??true)).map(p=>{const id=aliases.get(p.id)??p.id,r=regions[id],admitted=!!r&&(r.level??0)===p.level,god=!r&&!p.carrier&&!!L.placeWalkable?.(p.id);
+ return [...L.places.byId.values()].filter(p=>soulId===undefined||(L.knowledge?.knows(soulId,p.id)??true)).map(p=>{const id=aliases.get(p.id)??p.id,r=regions[id] as (typeof regions)[string]&{placeLevel?:number}|undefined,admitted=!!r&&(r.placeLevel??r.level??0)===p.level,god=!r&&!p.carrier&&!!L.placeWalkable?.(p.id);
   return {id:p.id,name:p.name,aliases:names[p.id]??[],level:p.level,nativeRegion:admitted?id:null,access:p.carrier?'dynamic-carrier':admitted||god?'admitted':p.level!==0?'unsupported-floor':'scenery'};
  });
 }

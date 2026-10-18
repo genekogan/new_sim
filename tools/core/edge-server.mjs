@@ -1,6 +1,6 @@
 // Edge server entry (EDGE-CONTRACT-v1). Owners' agents drive Souls; the world runs no Soul mind.
 // Usage: node tools/core/edge-server.mjs <descriptor.json> [check]
-// Descriptor: {input, dataDir, worldId, port, build, webDir?, marsWebDir?, placeData?, inputManifestSHA256?, localSoulLimit?, flags?{...}, nav?{ground?:[{id,boundsXZ}]}, activitySpots?}
+// Descriptor: {input, dataDir, worldId, port, build, webDir?, marsWebDir?, placeData?, inputManifestSHA256?, localSoulLimit?, flags?{...}, nav?{ground?:[{id,boundsXZ}]}, activitySpots?, upperFloors?}
 import {createServer} from 'node:http';
 import {createRequire} from 'node:module';
 import {resolve,join} from 'node:path';
@@ -136,6 +136,16 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       const byId=new Map(JSON.parse(readFileSync(resolve(placeData),'utf8')).places.map(p=>[p.id,p]));
       const out=await drive(host.installPlaceRegionsV1(nativePlaces.filter(id=>byId.has(id)).map(id=>({id,label:byId.get(id).name,polygon:byId.get(id).polygon}))));
       if(out.admitted.length||out.refused.length)console.error('[edge] native places:',JSON.stringify({admitted:out.admitted,refused:out.refused.map(r=>r.id+' '+r.code),unknown:nativePlaces.filter(id=>!byId.has(id))}));}
+    // upper-floors/1 (descriptor `upperFloors`: a path, or an array of paths, to upper-floors/1 facts, tools/upper-floors; each
+    // file holds one fact or an array of facts, installed in order): a building's upper floors installed once as a logged rules
+    // fact, or removed again ({remove}). Already applied: no-op. Refused: reported, the world boots without that building
+    // (never half-installed). Read from the options object so the parameter list stays as the launcher's.
+    const upperFloorsFiles=[arguments[0]?.upperFloors??[]].flat().filter(Boolean);
+    if(upperFloorsFiles.length){if(!host.installUpperFloorsV1)throw Error('selected runtime has no upper-floors/1');
+      for(const file of upperFloorsFiles)for(const fact of [JSON.parse(readFileSync(resolve(file),'utf8'))].flat()){
+        const done='remove' in fact?!host.engine.world.upperFloorsV1?.buildings?.[fact.remove]:!!host.engine.world.upperFloorsV1?.buildings?.[fact.building?.id];
+        try{const out=done?{installed:false}:await drive(host.installUpperFloorsV1(fact));console.error('[edge] upper-floors/1:',JSON.stringify({building:fact.building?.id??fact.remove,remove:'remove' in fact,installed:out.installed,already:done}));}
+        catch(error){console.error('[edge] upper-floors/1 refused:',error instanceof Error?error.message:String(error));}}}
     // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
     // CN5: a ride whose descriptor route changed flies the new one from its next flight (logged; only while parked and empty)
     for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier?.route&&host.engine.world.entities[o.params?.carrier]?.carrier&&host.engine.carrierRouteV1?.(o.params.carrier)!==o.carrier.route&&host.setCarrierRouteV1){
@@ -179,7 +189,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   try {
     if(!descriptorPath)throw Error('usage: node tools/core/edge-server.mjs <descriptor.json> [check]');
     const d=JSON.parse(readFileSync(resolve(descriptorPath),'utf8')),flags=d.flags??{};
-    const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,instructionsFile:d.instructionsFile,accountAuth:flags.accountAuth===true,publicOrigin:d.publicOrigin,inputManifestSHA256:d.inputManifestSHA256,
+    const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,upperFloors:d.upperFloors,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,instructionsFile:d.instructionsFile,accountAuth:flags.accountAuth===true,publicOrigin:d.publicOrigin,inputManifestSHA256:d.inputManifestSHA256,
       authoredBoundariesFile:d.authoredBoundariesFile,authoredBoundariesSHA256:d.authoredBoundariesSHA256,officeStairGuards:flags.officeStairGuards??false,ambient:d.ambient!==false,localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[],nav:d.nav??null,activitySpots:d.activitySpots});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,mindDriver:app.cfg.mindDriver,edge:'/v1/edge',places:app.edge.places.byId.size,build:app.cfg.build}));
