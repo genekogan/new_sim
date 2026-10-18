@@ -75,3 +75,27 @@ test('WorldEntityLayer.start takes the entry response (no second request); a lat
     assert.deepEqual(fetched, ['/w/fixture/v1/world/snapshot'], 'a re-mount (new epoch) takes a fresh snapshot, as before');
   } finally { globalThis.fetch = realFetch; delete g[PREFETCH_GLOBAL]; if (!hadWindow) delete g.window; }
 });
+
+// The page's second snapshot request (GodPanel's flags, on every edit, for every viewer) now reads the layer's copy.
+test('GodPanel flags: flagRefsOf over the layer\'s entities = the old snapshot derivation; entitiesAt waits for the edit', async () => {
+  const g = globalThis as Record<string, unknown>; (g as { location?: unknown }).location ??= new URL('http://offline.invalid/w/fixture');
+  const { flagRefsOf } = await import('./god-ui/god-api.ts');
+  type E = { id: string; name?: string; def: string; p?: number[]; state?: { label?: string }; in: { parent: string } };
+  const before = (es: E[]) => es.filter((e) => /^core[-/]flag@/.test(e.def) && e.in.parent === 'world' && Array.isArray(e.p)).map((e) => {
+    const p = e.p!; return { id: e.id, name: e.name ?? e.id, label: e.state?.label ?? e.name ?? e.id, p: p.length === 3 ? [p[0], p[1], p[2]] : [p[0], 0, p[1]] };
+  });
+  const es: E[] = [
+    { id: 'e1', name: 'camp', def: 'core/flag@1', p: [1, 2, 3], state: { label: 'Camp' }, in: { parent: 'world' } },
+    { id: 'e2', def: 'core-flag@2', p: [4, 5], in: { parent: 'world' } },
+    { id: 'e3', name: 'held', def: 'core/flag@1', p: [0, 0, 0], in: { parent: 'e9' } },
+    { id: 'e4', name: 'bench', def: 'core/bench@1', p: [0, 0, 0], in: { parent: 'world' } },
+    { id: 'e5', name: 'nowhere', def: 'core/flag@1', in: { parent: 'world' } },
+  ];
+  assert.deepEqual(flagRefsOf(es), before(es));
+  assert.equal(flagRefsOf(es).length, 2);
+  const index = new URL('./gen-mesh/index.ts', import.meta.url).href;
+  const hooks = registerHooks({ load(url, context, next) { return url === index ? { format: 'module', shortCircuit: true, source: "export { meshFor } from './registry.ts';" } : next(url, context); } });
+  const { WorldEntityLayer } = await import('./WorldEntityLayer.ts').finally(() => hooks.deregister());
+  const layer = new WorldEntityLayer((p) => p);
+  assert.equal(layer.entitiesAt(0), null, 'no picture yet: GodPanel waits, then falls back to the snapshot');
+});

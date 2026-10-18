@@ -38,7 +38,7 @@ import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingTe
 import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -193,6 +193,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [problems, setProblems] = useState<string[]>([]);
   const [flagMode, setFlagMode] = useState(false); const flagModeRef = useRef(false); flagModeRef.current = flagMode;
   const [entityWorld, setEntityWorld] = useState(false);
+  // lane L3h: GodPanel reads its flags from this page's entity layer (no second snapshot download per edit)
+  const entityLayerRef = useRef<WorldEntityLayer | null>(null);
+  const entitiesAt = useCallback((seq: number) => entityLayerRef.current?.entitiesAt(seq) ?? null, []);
   /** Entity worlds: the person's camera across scene re-mounts of this page (framed once, on first arrival). */
   const entityView = useRef<{eye:[number,number,number];target:[number,number,number];pending?:boolean}|null>(null);
   const context = useRef({ placeCard, sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
@@ -299,7 +302,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
     (window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
-    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null;
+    const entityLayer=new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null;
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -1104,7 +1107,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const cards = cardsAt(sim.plays, s.tick);
   return (
     <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, ...(entityWorld ? { position: 'relative' as const } : {}) } : (entityWorld ? { position: 'relative' } : undefined)}>
-      {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} />}
+      {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} entitiesAt={entitiesAt} />}
       {entityWorld && <ConstitutionCard />}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>

@@ -51,6 +51,9 @@ export class WorldEntityLayer {
   readonly instancer = new EntityInstancer();
   readonly sites: WorldBuildSites;
   get entityCount() { return this.model?.entities.size ?? 0; }
+  /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
+   *  instead of downloading the public snapshot again on every edit (lane L3h). */
+  entitiesAt(seq: number): Iterable<Entity> | null { return this.model && this.seq >= seq ? this.model.entities.values() : null; }
   private horizon: THREE.Mesh | null = null;
   /** MARSLAND-FAR: entities whose def is tagged `horizon` (core/far-land@1, core/panorama@1) replace the green ring. */
   private horizonBy = new Set<string>();
