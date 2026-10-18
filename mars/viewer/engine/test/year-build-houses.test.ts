@@ -15,8 +15,6 @@ import { rehearse } from '../rehearsal/rehearse.ts';
 import { obbOverlap, rot2 } from '../core/math.ts';
 import { def } from '../world/catalog.ts';
 const W51_TODO = '2022 reconciliation W51; re-pin by W52';
-/** Chiba's first bay after the W51 re-seed: s0208 pass_up refused, passup.giver-blocked (m1 has no room to stand at the giver spot). */
-const CHIBA_BAY_RED = W51_TODO; // mars-2022 re-seeded (RECONCILIATION_2022 §a–§f): neighbours, stairs, solar and trailers moved in every crop
 
 const kinds = (xs: { kind: string }[]) => xs.reduce<Record<string, number>>((m, x) => ((m[x.kind] = (m[x.kind] ?? 0) + 1), m), {});
 const FILE = loadCampusFile(2022);
@@ -120,9 +118,11 @@ function runHouse(h: string, tranche: boolean, maxTicks?: number) {
 
 /** Pinned default-suite tranches: first bay (6 frames + 18 beams) + the first ground-floor deck strip (3 pieces). */
 /** First pins 2026-09-28 (W38). Kitchen and west-house re-pinned 2026-10-17 on the W51 re-seeded mars-2022 (was 55293 4862adfc…,
- *  54322 b4c42210…): 24/24 skeleton at the canonical pose, 3/3 deck pieces at target, 0 violations. Chiba stays red (pass_up). */
+ *  54322 b4c42210…): 24/24 skeleton at the canonical pose, 3/3 deck pieces at target, 0 violations. Chiba: see its line. */
 const PIN_TRANCHE: Record<string, { ticks: number; hash: string }> = {
-  chiba: { ticks: 60997, hash: '940e9f64fa5c4758baa1772b955e4299623e5a8c2d00b51b84c9fa2ad95cbecd' },
+  // chiba re-pinned 2026-10-17 (L3c, was 60997 940e9f64…): W51 parked rv-6's slide-out where s0208's end-holding givers stood
+  // (passup.giver-blocked); sequence-b now checks the givers' own ground and holds that sheet by its sides.
+  chiba: { ticks: 62867, hash: '5e4f4d42b88782a5ca1e679e4e1ef818537328e402dd59243ac7578a8ff6ba23' },
   kitchen: { ticks: 55308, hash: 'ec401253e61120fbdea504e223b13f9fff01ec4e6b1b26c7e30ac33be9f87f74' },
   'west-house': { ticks: 56793, hash: 'a59110c05a2a5b2741232de26500a36ec5d8651ef8c2f499094bfe52b731ff54' },
 };
@@ -143,7 +143,7 @@ const PIN_FULL: Record<string, { ticks: number; hash: string }> = {
 const FULL_RED_CAP: Record<string, number> = { kitchen: 340000 };
 
 for (const h of ['chiba', 'kitchen', 'west-house']) {
-  test(`year build 2022 ${h}, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned`, { todo: h === 'chiba' ? CHIBA_BAY_RED : undefined }, () => {
+  test(`year build 2022 ${h}, first bay + first ground-floor deck strip: 0 violations, 24 skeleton parts at the canonical pose, 3 deck pieces at target, pinned`, () => {
     const { s, reh, cmpA, cmpB } = runHouse(h, true);
     assert.equal(cmpA.length, 24);
     assert.equal(cmpB.length, 3);

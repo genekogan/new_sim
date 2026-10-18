@@ -23,6 +23,7 @@
 // the reason (e.g. panels whose neighbours leave install_panel no station).
 import { datan2, dot2, hypot, rot2, type Vec2 } from '../core/math.ts';
 import { def } from '../world/catalog.ts';
+import { HUMAN_PROFILE } from '../spatial/types.ts';
 import { cutPlan } from '../construction/cut.ts';
 import { localToWorld } from '../construction/setpart.ts';
 import { carrierSpots, formationFor } from '../carry/formation.ts';
@@ -203,7 +204,17 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const narrow = side < 0 && ctx.narrowMinusU(vc(p));
         // W38: going in from a +u side whose ground is narrow (a neighbour's stair), the givers hold it by its sides, set down closer
         const narrowP = side > 0 && !!ctx.narrowPlusU?.(vc(p));
-        const lw = W(Rc + side * (narrow || narrowP ? 0.3 : 0.6), vc(p)); // set down a little further out than where it goes up (room for the carry formation)
+        // The givers' own ground (L3c 2026-10-17): the strip-end bands above look 2.3 m out, but two givers holding a piece by its
+        // outer end stand 0.45 L + 0.3 m beyond its middle (pass_up outerGrips), up to ~2.7 m out for a 6 ft sheet — chiba 2022
+        // after W51: rv-6's slide-out 2.6 m off the −u end, so s0208 was refused (passup.giver-blocked). Where that ground is
+        // taken and the ground beside the piece is free, they hold it by its sides and set it down closer, as W38's +u rule.
+        const wd = def(p.def).size[2];
+        const free = (u: number, dv: number) => [-1, 1].every((sv) => ctx.standFree?.(W(u, vc(p) + sv * dv), HUMAN_PROFILE.radius - 0.03) ?? true);
+        const endFree = (out: number) => [Rc + side * out, Rc + side * out / 2, Rc].every((u) => free(u + side * (0.45 * L + 0.3), 0.4 * wd));
+        const sideFree = (out: number) => [Rc + side * out, Rc].every((u) => free(u + side * 0.25 * L, wd / 2 + 0.3));
+        const byEnds = !narrowP; // W38 already decides the +u narrow holds
+        const bySides = byEnds && !endFree(narrow ? 0.3 : 0.6) && sideFree(0.3);
+        const lw = W(Rc + side * (narrow || narrowP || bySides ? 0.3 : 0.6), vc(p)); // set down a little further out than where it goes up (room for the carry formation)
         // receiver: in the aisle within reach both of where the givers can push it to (up to the edge) and of its place
         const fin: [number, number] = [uc(p) - L / 2, uc(p) + L / 2];
         const pushed: [number, number] = side < 0 ? [uMin, uMin + L] : [uMax - L, uMax];
@@ -220,7 +231,7 @@ export function phaseB(ctx: PhaseBCtx): PhaseBResult {
         const who2 = f2nd.actor === C(G[0]) ? [] : [recv === a0 ? a1 : a0];
         const pu = step('pass_up', {
           part: p.id, to: { x: p.pose.p[0], z: p.pose.p[2], yaw: p.pose.yaw, height: r3(p.y) }, edge: r3(side < 0 ? -edge : edge), out: { x: W(side, 0)[0], z: W(side, 0)[1] },
-          givers: narrowGivers(p, narrowP), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd], ...(narrowP && !oneGiver(p) ? { side: true } : {}),
+          givers: narrowGivers(p, narrowP), receivers: [C(recv)], receiverAt: [{ x: qa[0], z: qa[1], level: 0 }], give: r3(p.y + 0.05), push: true, fasten: [f2nd], ...((narrowP && !oneGiver(p)) || bySides ? { side: true } : {}),
         }, [...G, recv, ...who2], [f], `push ${p.id} in over the edge beam; ${C(recv)} takes it in the aisle; screwed down`);
         mark(p, pu);
       }
