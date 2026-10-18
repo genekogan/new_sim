@@ -6,7 +6,7 @@ import {resolve} from 'node:path';
 import {Db} from '../../../../apps/server/src/db.ts';
 import {GodMode} from '../../../../apps/server/src/god/god.ts';
 import {furnishBatch} from '../../lib/furnish.mjs';
-import {LANDSCAPE_BATCHES,LANDMARKS,LANDSCAPE_NOTES} from './landscape.mjs';
+import {LANDSCAPE_BATCHES,LANDMARKS,LANDSCAPE_NOTES,ABBEY_COURT} from './landscape.mjs';
 import {BUILDING_BATCHES,BUILDINGS,COURTYARDS} from './buildings.mjs';
 import {COMMONS_DEFS,COMMONS_BATCHES} from './commons.mjs';
 import {SCENERY_BATCHES} from './scenery.mjs';
@@ -102,6 +102,8 @@ for(let i=0;i<zoneOps.length;i+=12)apply(`named outdoor places ${i/12+1}`,zoneOp
 // lane L4a: the rest of old Eden's band (stage guitar/keys/bass, bandstand viola, amphitheatre guitar) (worlds/patches/eden-music-20261017)
 {const mu=JSON.parse(readFileSync(`${root}/worlds/patches/eden-music-20261017/music.json`)).ops;apply('eden music defs',mu.filter(o=>o.op==='define'));apply('eden music',mu.filter(o=>o.op!=='define'),'any');}
 apply('eden life schedules',JSON.parse(readFileSync(`${root}/worlds/patches/eden-life-20261017/schedules.json`)).ops);
+// L4a/doors: last, so no other entity's id (and so no overlapping pad order) shifts; landscape.mjs ABBEY_COURT says why
+apply('abbey cloister court',[ABBEY_COURT]);
 const coverage=places.map(p=>({id:p.id,name:p.name,polygon:p.polygon,parent:p.parent,buildings:BUILDINGS.filter(b=>b.originalPlaceId===p.id).map(b=>b.name),zone:zoneOps.find(o=>o.name===`place-${p.id.replaceAll('.','-')}`.slice(0,48))?.name??null}));
 writeFileSync(`${root}/worlds/templates/eden-2026.json`,JSON.stringify(genesis,null,2)+'\n');
 writeFileSync(`${out}/inventory.json`,JSON.stringify({contract:'eden-2026-inventory/1',batches:stats,entities:god.model.entities.size,adjustments,buildings:BUILDINGS.map(b=>({...b,actualPose:god.model.get(b.name)?god.model.worldPose(god.model.get(b.name)):null})),courtyards:COURTYARDS,furniture,places:coverage,landmarks:LANDMARKS,landscapeNotes:LANDSCAPE_NOTES},null,2));

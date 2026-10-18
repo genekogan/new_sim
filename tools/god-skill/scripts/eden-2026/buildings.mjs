@@ -113,8 +113,10 @@ function courtyard(id, coords, w, d, palette, { floors = 1, r = 0, roofTerrace =
       roof: roofTerrace || side === 'study' ? 'flat' : 'shed', roofPitch: 20, windows: 0.45, plan: furnished ? clearNorthDoor(openPlan(ww, dd, kind, levels)) : openPlan(ww, dd, kind, levels) };
     // the side wings open onto the court only: their end walls face the next wing across a 0.4 m gap (a door there led nowhere,
     // and residents were sent to it: L1's door survey)
+    // the entry wing is a 3.2 m passage, front door facing court door: its recipe (recipes/furnish/courtyard-entry.json) keeps the
+    // living-room table off that axis (a centred table sealed the abbey cloister's and courtyard house-4's courts: L4a/doors)
     if (side === 'bedroom' || side === 'study') p.plan.floors[0].exterior = [{ room: kind, wall: side === 'bedroom' ? 'e' : 'w', kind: 'door', at: 0.5, width: 1.3 }];
-    const b = add(id, 'hall', turn(x, z), p, { name: side === 'entry' ? group.name : `${group.name}-${side}`.slice(0, 48), displayName: `${label} — ${side === 'entry' ? 'entry and living room' : side} wing`, originalPlaceId: id, r, furnishStyle: furnished,
+    const b = add(id, 'hall', turn(x, z), p, { name: side === 'entry' ? group.name : `${group.name}-${side}`.slice(0, 48), displayName: `${label} — ${side === 'entry' ? 'entry and living room' : side} wing`, originalPlaceId: id, r, furnishStyle: furnished && side === 'entry' ? 'courtyard-entry' : furnished,
       metadata: { courtyardGroup: group.name, courtyardCenter: coords, courtyard: group.court, entry: side === 'entry', roomPurpose: kind, ...(roofTerrace && side === 'bedroom' ? { roofTerrace: true, terraceHeight: 2.82 } : {}) } });
     group.wings.push(b.name);
   }
