@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { makeSpec, plan, batches, matchesOp, verifyApplied, rollbackGuard, verifyRolledBack, MAX_OPS } from './upgrade.mjs';
+import { makeSpec, plan, batches, matchesOp, verifyApplied, rollbackGuard, verifyRolledBack, restoreOps, canon, MAX_OPS } from './upgrade.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const drum = (h) => ({ schema: 'def/1', name: 'eden-drum', version: 1, form: 'point', make: { kind: 'gen', gen: 'kit/2', args: { h } } });
@@ -107,6 +107,25 @@ test('verify, rollback guard, rollback check', () => {
   const back = world(); back.entities[1].v = 3;
   const r = verifyRolledBack(back, pre, receipt); assert.ok(r.ok); assert.equal(r.sameButVersion, 1);
   back.entities.push(ent('e_s', 'stage-stand', 'eden-stand@1', [-31, 0, 0])); assert.deepEqual(verifyRolledBack(back, pre, receipt).problems, ['left behind e_s stage-stand']);
+});
+
+test('rollback restore: written-out defaults are the same meaning; re-seated poses get one strict move back', () => {
+  const pre = { entities: [ent('e_a', 'house', 'core-house@1', [1, 3.727, 2], { params: { w: 3 } }), { ...ent('e_b', 'bowl', 'core-bowl@1', undefined, { in: { parent: 'e_a', slot: 'top' } }) }, ent('e_c', 'hall', 'core-hall@1', [5, 0, 5], { params: { w: 1 } })] };
+  delete pre.entities[1].p;
+  const now = structuredClone(pre);
+  now.entities[0].p = [1, 3.165, 2]; now.entities[0].v = 3;                     // ground re-seated it
+  Object.assign(now.entities[1], { p: [-0.001, 0, 0], r: 0, s: 1, v: 3 });      // undo wrote a re-seat out
+  Object.assign(now.entities[2], { r: 0, s: 1, v: 3, params: { plan: null, w: 1 } }); // cleared param + defaults: same meaning
+  assert.equal(canon(now.entities[2]), canon(pre.entities[2]));
+  assert.notEqual(canon(now.entities[0]), canon(pre.entities[0]));
+  assert.deepEqual(restoreOps(now, pre), [
+    { op: 'move', id: 'e_a', in: { parent: 'world' }, p: [1, 3.727, 2], r: 0, s: 1, mode: 'strict' },
+    { op: 'move', id: 'e_b', in: { parent: 'e_a', slot: 'top' }, p: [0, 0, 0], r: 0, s: 1, mode: 'strict' }]);
+  const changed = structuredClone(now); changed.entities[2].params.w = 2;    // a real param change is never "restored" by a move
+  assert.equal(restoreOps(changed, pre).length, 2);
+  const v = verifyRolledBack(changed, pre, {}); assert.deepEqual(v.problems, ['differs e_a house', 'differs e_b bowl', 'differs e_c hall']);
+  now.entities[0].p = [1, 3.727, 2]; now.entities[1].p = [0, 0, 0];
+  const ok = verifyRolledBack(now, pre, {}); assert.ok(ok.ok, ok.problems.join('; ')); assert.equal(ok.sameButVersion, 1); assert.equal(ok.sameMeaning, 2);
 });
 
 test('the shipped Eden 2026 spec is the af01d75c -> current template diff', () => {

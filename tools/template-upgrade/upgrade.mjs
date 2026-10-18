@@ -10,6 +10,7 @@
 //   apply:    node upgrade.mjs apply    --spec <spec.json> --base <world URL> --receipt <abs.json> --token-file <path>
 //   verify:   node upgrade.mjs verify   --base <world URL> --receipt <abs.json>
 //   rollback: node upgrade.mjs rollback --base <world URL> --receipt <abs.json> --token-file <path> [--apply]
+//   restore:  node upgrade.mjs restore ... (re-runs rollback's second step, exact poses, after an interrupted or older rollback)
 //   recover:  node upgrade.mjs recover  --base <world URL> --receipt <abs.json> --token-file <path>  (an apply cut off mid-act)
 //
 // Match by name path (root/child/grandchild). A whole unit (one root entity and everything in it) is skipped when it is
@@ -235,22 +236,47 @@ export function rollbackGuard(now, receipt) {
   for (const b of W.bodies) for (const id of receipt.applied.roots) { const r = W.byId.get(id); if (r && occupied(r, [b])) bad.push(`${b.id} inside ${r.name}`); }
   return bad;
 }
+/** The stored meaning of an entity: no version counter, implicit pose defaults (p origin, r 0, s 1) and null params
+ *  (a cleared param) are the same as absent, object keys in any order. The engine's undo writes such defaults out. */
+const sortKeys = (x) => Array.isArray(x) ? x.map(sortKeys) : x && typeof x === 'object' ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, sortKeys(x[k])])) : x;
+export function canon(e) {
+  const { v: _v, ...r } = e;
+  if (r.s === 1) delete r.s; if (r.r === 0) delete r.r;
+  if (Array.isArray(r.p) && r.p.every((x) => x === 0)) delete r.p;
+  if (r.params) { r.params = Object.fromEntries(Object.entries(r.params).filter(([, x]) => x !== null)); if (!Object.keys(r.params).length) delete r.params; }
+  return J(sortKeys(r));
+}
+const POSE_KEYS = ['in', 'p', 'r', 's', 'shape'];
+const poseOf = (e) => canon(Object.fromEntries(Object.entries(e).filter(([k]) => !POSE_KEYS.includes(k))));
+/** After the group undo: things whose meaning differs from before only in pose (ground under them re-seated them, or the
+ *  undo wrote a re-seat out) get one strict move each back to their exact stored pose. Anything else is left to verify. */
+export function restoreOps(now, pre, also = new Set()) {
+  const W = indexWorld(now), ops = [];
+  for (const e of pre.entities) {
+    if (isBody(e)) continue;
+    const x = W.byId.get(e.id);
+    if (!x || poseOf(x) !== poseOf(e) || (canon(x) === canon(e) && !also.has(e.id))) continue;
+    ops.push({ op: 'move', id: e.id, in: e.in, p: e.p ?? [0, 0, 0], r: e.r ?? 0, s: e.s ?? 1, ...(e.shape ? { shape: e.shape } : {}), mode: 'strict' });
+  }
+  return ops;
+}
 /** After rollback: every touched thing is back as before, every placed thing is gone, nothing else differs (bodies aside). */
 export function verifyRolledBack(now, pre, receipt) {
   const W = indexWorld(now), problems = [], preIds = new Set(pre.entities.map((e) => e.id));
   const strip = (e) => { const { v: _v, ...r } = e; return J(r); };
-  let exact = 0, sameButVersion = 0;
+  let exact = 0, sameButVersion = 0, sameMeaning = 0;
   for (const e of pre.entities) {
     if (isBody(e)) continue;
     const x = W.byId.get(e.id);
     if (!x) problems.push(`missing ${e.id} ${e.name ?? ''}`);
     else if (J(x) === J(e)) exact++;
     else if (strip(x) === strip(e)) sameButVersion++;
+    else if (canon(x) === canon(e)) sameMeaning++;
     else problems.push(`differs ${e.id} ${e.name ?? ''}`);
   }
   for (const e of now.entities) if (!isBody(e) && !preIds.has(e.id)) problems.push(`left behind ${e.id} ${e.name ?? ''}`);
   const defs = (s) => J((s.defs ?? []).map((d) => [d.name, d.make]).sort());
-  return { ok: problems.length === 0, problems: problems.slice(0, 40), problemCount: problems.length, exact, sameButVersion, defsEqual: defs(now) === defs(pre) };
+  return { ok: problems.length === 0, problems: problems.slice(0, 40), problemCount: problems.length, exact, sameButVersion, sameMeaning, defsEqual: defs(now) === defs(pre) };
 }
 
 // ---------- CLI ----------
@@ -318,10 +344,35 @@ async function main(argv) {
     if (!args.includes('--apply')) { say({ mode: 'rollback-review', group: receipt.group, edits: receipt.results.length, touched: Object.keys(receipt.applied.versions).length }); return; }
     receipt.status = 'rolling-back'; save(receipt);
     const r = await request('/v1/god/undo?group=' + encodeURIComponent(receipt.group), {}); assert(r.accepted, 'undo refused: ' + J(r.failures ?? r));
-    const after = await snap(); const v = verifyRolledBack(after, pre, receipt); receipt.rollback = { reverted: r.reverted, verify: v }; receipt.status = v.ok ? 'rolled-back-verified' : 'rolled-back-with-problems'; save(receipt);
-    say({ mode, status: receipt.status, reverted: r.reverted?.length, verify: v }); return;
+    receipt.rollback = { reverted: r.reverted }; receipt.status = 'rolled-back'; save(receipt);
+    await restore(receipt); return;
   }
+  if (mode === 'restore') { assert(receipt.status.startsWith('rolled-back'), `receipt status ${receipt.status}: restore follows a rollback`); await restore(receipt); return; }
   throw new Error(`unknown mode ${mode}`);
+
+  /** Second rollback step: strict moves put re-seated things back to their exact stored pose, then the check. A move can
+   *  re-seat a neighbour on the changed ground (stacked cliff houses and their pads), so each round moves again everything
+   *  moved before in one edit (touched things are not re-seated by their own edit) until nothing is left (at most 6 rounds). */
+  async function restore(receipt) {
+    const group = receipt.group + '-restore', seqs = receipt.rollback?.restoreSeqs ?? []; let moved = receipt.rollback?.restored ?? 0;
+    const ever = new Set(receipt.rollback?.restoredIds ?? []);
+    for (let round = 0; round < 6; round++) {
+      const differing = restoreOps(await snap(), pre); if (!differing.length) break;
+      for (const o of differing) ever.add(o.id);
+      const ops = restoreOps(await snap(), pre, ever);
+      assert(ops.length <= MAX_OPS, `restore needs ${ops.length} moves in one edit (max ${MAX_OPS})`);
+      for (let i = 0; i < ops.length; i += MAX_OPS) {
+        const b = { group, clientRef: `${group}-${seqs.length + 1}`, note: `Template upgrade rollback: exact poses (${ops.length})`, ops: ops.slice(i, i + MAX_OPS) };
+        const pv = await request('/v1/god/preview', b); assert(pv.accepted, 'restore preview refused: ' + J(pv.failures ?? pv));
+        const res = await request('/v1/god/act', { ...b, preview: pv.id }); assert(res.accepted, 'restore refused: ' + J(res.failures ?? res)); seqs.push(res.seq);
+        receipt.rollback = { ...receipt.rollback, restored: moved + ops.length, restoredIds: [...ever], restoreSeqs: seqs }; save(receipt);
+      }
+      moved += ops.length;
+    }
+    const v = verifyRolledBack(await snap(), pre, receipt);
+    receipt.rollback = { ...receipt.rollback, restored: moved, restoredIds: [...ever], restoreSeqs: seqs, verify: v }; receipt.status = v.ok ? 'rolled-back-verified' : 'rolled-back-with-problems'; save(receipt);
+    say({ mode, status: receipt.status, reverted: receipt.rollback.reverted?.length, restored: moved, verify: v });
+  }
 }
 /** Versions of everything the apply touched or placed (the rollback guard compares against these). */
 function recordApplied(receipt, after) {
