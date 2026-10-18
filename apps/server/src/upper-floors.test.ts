@@ -6,7 +6,9 @@ import {fixture,accept,factory,invite} from '../test/native-owner-fixture.ts';im
 // @ts-expect-error plain .mjs operator spec (pure)
 import {officeFact} from '../../../tools/upper-floors/old-eden-office.mjs';
 // @ts-expect-error plain .mjs operator spec (pure)
-import {HOTELS,hotelsFacts,hotelOpenings} from '../../../tools/upper-floors/old-eden-hotels.mjs';
+import {HOTELS,hotelsFacts,hotelsRemoveFacts,hotelOpenings} from '../../../tools/upper-floors/old-eden-hotels.mjs';
+// @ts-expect-error plain .mjs operator tool
+import {upperFloorsState,planVerdict} from '../../../tools/upper-floors/upper-floors.mjs';
 import {authoredBoundaryDeclarationV1} from '@sim/engine-contract';
 
 const ROOMS=['eden-office-1-floor-1','eden-office-1-floor-2','int-office-studio','int-office-upper-lounge'];
@@ -154,4 +156,28 @@ void test('upper-floors/1 hotels: lobby floors, door openings and stairs install
   reboot('removed');
   assert.equal(factory.restore(before).stateHash(),initialHash);
   assert.equal(f.db.paidCost(),0);
+});
+
+void test('upper-floors/1 hotels after the office: removing the hotels leaves the office record exactly as before (the plan check compares with it)',async t=>{
+  const f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});
+  await invite(f,'ada');await accept(f.host,f.souls.create('dev:ada',{name:'Ada',description:'walker'}));
+  for(let i=0;i<6;i++)f.host.tickOnce();
+  const e=f.host.engine as any,facts=hotelsFacts() as any[];
+  const bands=HOTELS.flatMap((h:any)=>hotelOpenings(h).bands) as {id:string;x0:number;x1:number}[];
+  const decl=authoredBoundaryDeclarationV1('synthetic-supported-ground-prism/1',bands.map(b=>({id:b.id,buildingId:b.id.split(':front')[0],c:[(b.x0+b.x1)/2,1.735,125.91] as [number,number,number],half:[(b.x1-b.x0)/2,1.385,.09] as [number,number,number],yaw:0})));
+  assert.deepEqual(await accept(f.host,f.host.installAuthoredBoundariesV1(decl)),{installed:true});
+  assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1(officeFact())),{installed:true});
+  const office=structuredClone(e.world.upperFloorsV1),before=upperFloorsState(office),levels=levelsOf(e).sort(),phys=e.physicalHash();
+  assert.deepEqual(before.buildings,['eden-office-1']);assert.ok(before.sha);
+  for(const fact of facts)assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1(fact)),{installed:true});
+  assert.deepEqual(upperFloorsState(e.world.upperFloorsV1).buildings,['eden-hotel-1','eden-hotel-2','eden-hotel-3','eden-office-1']);
+  for(const fact of hotelsRemoveFacts() as any[])assert.deepEqual(await accept(f.host,f.host.installUpperFloorsV1(fact)),{installed:true});
+  assert.deepEqual(e.world.upperFloorsV1,office,'the office record is untouched by the hotels install and removal');
+  const after=upperFloorsState(e.world.upperFloorsV1);assert.deepEqual(after,before);
+  assert.deepEqual(levelsOf(e).sort(),levels);assert.equal(e.physicalHash(),phys,'door bands closed again, office solids unchanged');
+  for(const id of ROOMS)assert.equal(e.world.regions[id]?.kind,'place',id);
+  // the plan verdict: same record before and after = ok; the old "no record after removal" rule would have refused this
+  const r={install:{installed:true},rooms:[{region:true,place:true}],reach:[{ok:true}],outsideOffice:{same:true},remove:{installed:true},upperFloorsBefore:before,afterRemove:{same:true,rooms:[],upperFloorsV1:after}};
+  assert.equal(planVerdict(r),true);
+  assert.equal(planVerdict({...r,afterRemove:{...r.afterRemove,upperFloorsV1:upperFloorsState(undefined)}}),false,'removal that also dropped the office is refused');
 });

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { officeFact, officeSpots } from './old-eden-office.mjs';
-import { layout, mergeSpots, editDescriptor, diffCaptures, review, backup, apply, rollback, verify, removeFact } from './upper-floors.mjs';
+import { layout, mergeSpots, editDescriptor, diffCaptures, review, backup, apply, rollback, verify, removeFact, planVerdict, upperFloorsState } from './upper-floors.mjs';
 import { HOTELS, hotelsFacts, hotelsSpots, hotelOpenings } from './old-eden-hotels.mjs';
 
 const ROOMS = ['eden-office-1-floor-1', 'eden-office-1-floor-2', 'int-office-studio', 'int-office-upper-lounge'];
@@ -90,4 +90,20 @@ test('hotels: openings are real Builder door bands, apply after the office makes
   const rb = rollback(H, { backupDir: join(root, 'bk'), confirm: false, port: 1 });
   assert.equal(rb.dryRun, true); assert.equal(rb.activitySpots, officeSpotsFile, 'live minus the hotel spots is exactly the backed-up office file');
   assert.equal(rollback(O, { backupDir: join(root, 'bk'), confirm: false, port: 1 }).dryRun, true, 'the office can still roll back on its own');
+});
+
+test('plan verdict: removal must restore the pre-install upper-floors record (none first; the office when the hotels follow it)', () => {
+  const office = { version: 'upper-floors/1', buildings: { 'eden-office-1': officeFact().building } };
+  const both = { ...office, buildings: { ...office.buildings, 'eden-hotel-1': hotelsFacts()[0].building } };
+  const r = (before, after) => ({ install: { installed: true }, rooms: [{ region: true, place: true }], reach: [{ ok: true }], outsideOffice: { same: true },
+    remove: { installed: true }, upperFloorsBefore: upperFloorsState(before), afterRemove: { same: true, rooms: [], upperFloorsV1: upperFloorsState(after) } });
+  assert.equal(planVerdict(r(undefined, undefined)), true, 'office first: no record before or after');
+  assert.equal(planVerdict(r(office, structuredClone(office))), true, 'hotels after the office: the office record stays (the 3.6 false negative)');
+  assert.deepEqual(upperFloorsState(office).buildings, ['eden-office-1']);
+  assert.equal(planVerdict(r(undefined, office)), false, 'office first but a record is left behind');
+  assert.equal(planVerdict(r(office, undefined)), false, 'removing the hotels took the office with it');
+  assert.equal(planVerdict(r(office, both)), false, 'a hotel left installed');
+  const changed = structuredClone(office); changed.buildings['eden-office-1'].levels = changed.buildings['eden-office-1'].levels.slice(1);
+  assert.equal(planVerdict(r(office, changed)), false, 'same buildings but a changed office entry');
+  assert.equal(planVerdict({ ...r(office, office), afterRemove: { ...r(office, office).afterRemove, rooms: ['eden-hotel-1-lobby'] } }), false);
 });

@@ -143,6 +143,18 @@ export function diffCaptures(a, b) {
 const LOG_COUNTERS = new Set(['kernel:seq', 'kernel:lastSeq', 'kernel:events', 'kernel:eventCount']);
 const outside = (d) => ({ ...d, changed: d.changed.filter((k) => !LOG_COUNTERS.has(k)), same: !d.added.length && !d.removed.length && d.changed.every((k) => LOG_COUNTERS.has(k)) });
 
+/** The world's upper-floors/1 record as a comparable value: which buildings, and a hash of the whole record (null when none). */
+const canon = (v) => (Array.isArray(v) ? `[${v.map(canon).join(',')}]` : v && typeof v === 'object'
+  ? `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}` : JSON.stringify(v));
+export const upperFloorsState = (uf) => ({ buildings: Object.keys(uf?.buildings ?? {}).sort(), sha: uf ? sha(canon(uf)) : null });
+/** A plan passes only when install worked everywhere and removal put the world back exactly as it was before the install,
+ *  including the upper-floors record itself: none for the first building, the office's own entry when the hotels follow it. */
+export function planVerdict(r) {
+  return r.install?.installed === true && r.rooms.every((x) => x.region && x.place) && r.reach.every((x) => x.ok) && r.outsideOffice.same
+    && r.remove?.installed === true && r.afterRemove.same && !r.afterRemove.rooms.length
+    && r.afterRemove.upperFloorsV1?.sha === r.upperFloorsBefore?.sha && JSON.stringify(r.afterRemove.upperFloorsV1?.buildings) === JSON.stringify(r.upperFloorsBefore?.buildings);
+}
+
 /** Boot a compact copy in this process (no ticks between captures), install, check, remove, check. */
 export async function plan(L, { scratch, port, copy }) {
   assert(!existsSync(scratch), `${scratch} exists: pick a new scratch dir`); mkdirSync(scratch, { recursive: true });
@@ -171,6 +183,7 @@ export async function plan(L, { scratch, port, copy }) {
     const reach = () => spotList.map((s) => ({ spot: s.id, level: s.level, ...(walker ? e.routeEstimateV1(walker, s.at, s.level) : { ok: false, code: 'no-walker' }) }));
     const installAll = async (list) => { const outs = []; for (const f of list) outs.push(await drive(host.installUpperFloorsV1(f))); return { installed: outs.every((x) => x?.installed === true), each: outs }; };
     receipt.tick = e.world.tick; receipt.seqBefore = host.seq; receipt.walker = walker ?? null;
+    receipt.upperFloorsBefore = upperFloorsState(e.world.upperFloorsV1);   // the office's entry when it was installed first
     const A = capture(e, host.kernel, office); receipt.compared = Object.keys(A).length;
     receipt.reachBefore = reach().filter((r) => r.ok).map((r) => r.spot);
     receipt.install = await installAll(facts);
@@ -181,10 +194,9 @@ export async function plan(L, { scratch, port, copy }) {
     receipt.outsideOffice = outside(diffCaptures(A, B));
     receipt.remove = await installAll([L.spec.removeFile()].flat());
     const C = capture(e, host.kernel, office);
-    receipt.afterRemove = { ...outside(diffCaptures(A, C)), rooms: [...office.rooms].filter((id) => e.world.regions[id] || host.kernel.things[id]), upperFloorsV1: !!e.world.upperFloorsV1 };
+    receipt.afterRemove = { ...outside(diffCaptures(A, C)), rooms: [...office.rooms].filter((id) => e.world.regions[id] || host.kernel.things[id]), upperFloorsV1: upperFloorsState(e.world.upperFloorsV1) };
     receipt.seqAfter = host.seq;
-    receipt.ok = receipt.install?.installed === true && receipt.rooms.every((r) => r.region && r.place) && receipt.reach.every((r) => r.ok) && receipt.outsideOffice.same
-      && receipt.remove?.installed === true && receipt.afterRemove.same && !receipt.afterRemove.rooms.length && !receipt.afterRemove.upperFloorsV1;
+    receipt.ok = planVerdict(receipt);
   } finally { await app.close().catch((x) => { receipt.closeError = String(x?.message ?? x); }); }
   writeFileSync(join(scratch, 'plan.json'), pretty(receipt)); return receipt;
 }
