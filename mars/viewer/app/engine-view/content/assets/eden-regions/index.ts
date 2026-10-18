@@ -6,6 +6,7 @@ import {Builder,Materials,rng,pick} from './kit.ts';
 import {SEABED,Terrain,outside,fbm,WATER,INNER} from './terrain.ts';
 import {bakeShore,seaSurfPatch,tidePools} from './coast-surf.ts';
 import {Trees} from './trees.ts';
+import {inSeafrontHotel} from './hotel-core.ts';
 import {FOOTPRINTS,CHIMNEYS,LIGHTS} from './buildings.ts';
 export {FOOTPRINTS};
 import {buildCanalQuarter,buildOldTown,canalPads,CANAL_BOUNDS} from './canal-quarter.ts';
@@ -86,7 +87,9 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
  const dispose=()=>{if(closed)return;closed=true;group.removeFromParent();for(const g of geos)g.dispose();mats.dispose();for(const m of motionMaterials)m.dispose();group.clear();};
  try{
   const t=new Terrain(edge),trees=new Trees();// far forests + every district's distant trees
-  const farB=new Builder('legacy'),winB=new Builder('legacy'),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6;
+  // Distant parts never stop the camera (cheaper rays), except enterable buildings: Follow goes into the seafront hotels'
+  // lobbies, stairs and rooms, and walls it cannot see stop the camera only when they are in its rays.
+  const farB=new Builder('legacy'),winB=new Builder('legacy'),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6&&!inSeafrontHotel(x,z,.5);
   canalPads(t);countryPads(t);hillPads(t);southPads(t);northPads(t);resortPads(t);abbeyPads(t);suburbPads(t);botanicPads(t);riverPads(t);cliffPads(t);crossPads(t);golfPads(t);fairPads(t);alpinePads(t);
   // Districts are authored separately but drawn per SECTOR (north/south/east/west of the inhabited rectangle):
   // a few shared draws and ray objects instead of a dozen per district. Distant parts and window glass go to

@@ -29,6 +29,11 @@ export const INTERIOR_EXPLORE:readonly {id:string;label:string;camera:[number,nu
  {id:'int-clinic',label:'Clinic',camera:[63.9,1.7,-6.4],target:[64.1,.9,-10.5]},
  {id:'int-bathhouse',label:'Bathhouse and laundry',camera:[83.5,1.7,-8.4],target:[83.5,.9,-12.5]},
  {id:'int-potting-shed',label:'Potting shed',camera:[43.4,1.7,80.9],target:[44.2,.9,84.3]},
+ // Seafront hotels (hotel-core.ts; z 121, door on the sea side at z 126): hotel 1's lobby from inside the door, hotel 2's
+ // lobby towards its stair core (east), and hotel 2's Room 101 on the first floor (y 3.12) from the balcony door to the desk.
+ {id:'int-hotel-1-lobby',label:'Seafront hotel 1 lobby',camera:[123.5,1.7,124.8],target:[117,.8,120.5]},
+ {id:'int-hotel-2-stair',label:'Seafront hotel 2 lobby and stair',camera:[137.5,1.7,124.6],target:[141.3,1.8,120.6]},
+ {id:'int-hotel-2-room-101',label:'Room 101, seafront hotel 2',camera:[133.1,4.7,124.6],target:[134.1,3.9,119.2]},
 ]);
 /** World Buildings & Interiors lane entry point (owned by that lane): new building
  * and object kinds, and furnished, enterable interiors. Scenery unless Core admits.

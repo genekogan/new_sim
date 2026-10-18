@@ -13,7 +13,7 @@ export class WorldFollow {
   private instances=new WorldVisibilityInstances();
   private objects:THREE.Object3D[]=[];
   private hits:THREE.Intersection[]=[];
-  reset(){this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
+  reset(){this.requested=this.rendered=this.chosen=this.previousTarget=null;this.userOrbited=false;this.lastSearch=-Infinity;this.chosenClear=false;this.velocity.set(0,0,0);this.userAt=-Infinity;this.instances.reset();}
   /** Same candidates as recursive intersectObjects, minus objects whose hits
    * opaque() always rejects: hidden ancestry or own cameraTransparent. */
   private collect(roots:readonly THREE.Object3D[]){
@@ -35,12 +35,14 @@ export class WorldFollow {
     const materials=(object as THREE.Mesh).material;
     return !materials||[materials].flat().some(m=>!m.transparent||m.opacity>=.5);
   }
-  private limit(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){
+  /** How far out along `offset` the camera still sees the Soul (metres). Stops early once below `need` (a yes/no
+   * question); `torso` casts the torso line alone (a cheap estimate for the wide search). */
+  private limit(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[],need=-Infinity,torso=false){
     const distance=offset.length(),direction=offset.clone().normalize(),right=new THREE.Vector3(direction.z,0,-direction.x).normalize();let allowed=distance;
     const reverse=direction.clone().negate(),far=distance+.25;
     // Torso, head and both shoulder edges. Ignore the selected body's own
     // render roots by supplying only architecture, components and fixtures.
-    for(const [height,side] of [[0,0],[.6,0],[-.45,0],[0,.24],[0,-.24]]){
+    for(const [height,side] of torso?[[0,0]]:[[0,0],[.6,0],[-.45,0],[0,.24],[0,-.24]]){
       const point=target.clone().add(new THREE.Vector3(0,height,0)).addScaledVector(right,side);
       this.ray.set(point,direction);this.ray.near=.05;this.ray.far=far;
       // Nearest opaque hit, as intersectObjects(...).sort().find(opaque) would give.
@@ -55,6 +57,7 @@ export class WorldFollow {
         for(const h of this.hits)if(far-h.distance<nearest&&this.opaque(h.object))nearest=far-h.distance;this.hits.length=0;
       }
       if(nearest<Infinity)allowed=Math.min(allowed,Math.max(0,nearest-.25));
+      if(allowed<need)break;
     }
     return allowed;
   }
@@ -86,6 +89,7 @@ export class WorldFollow {
   // moves around obstacles, never through them. Only the first frame after a (re)start is placed directly.
   private chosen:THREE.Vector3|null=null;
   private lastSearch=-Infinity;
+  private chosenClear=false;
   private clock=0;
   private previousTarget:THREE.Vector3|null=null;
   private velocity=new THREE.Vector3();
@@ -93,7 +97,7 @@ export class WorldFollow {
   private userOrbited=false;
   /** True while the viewer is dragging/zooming (and a moment after): their view is shown as is. */
   get userActive(){return this.clock-this.userAt<USER_HOLD;}
-  private clear(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){return this.limit(target,offset,roots)>=offset.length()-.01;}
+  private clear(target:THREE.Vector3,offset:THREE.Vector3,roots:readonly THREE.Object3D[]){const need=offset.length()-.01;return this.limit(target,offset,roots,need)>=need;}
   private candidates(wanted:THREE.Vector3){
     const s=new THREE.Spherical().setFromVector3(wanted),out:THREE.Vector3[]=[wanted.clone()];
     const at=(dTheta:number,dPhi:number,scale=1)=>new THREE.Vector3().setFromSpherical(new THREE.Spherical(s.radius*scale,Math.max(.15,Math.min(Math.PI*.48,s.phi+dPhi)),s.theta+dTheta));
@@ -107,16 +111,19 @@ export class WorldFollow {
     const behind=speed>.6?new THREE.Vector3(-this.velocity.x,0,-this.velocity.z).normalize():null;
     const cost=(c:THREE.Vector3)=>{const d=c.clone().normalize();let k=from.angleTo(d)+.6*want.angleTo(d)+.5*Math.abs(c.length()-wanted.length())/Math.max(1,wanted.length());
       if(behind){const flat=new THREE.Vector3(d.x,0,d.z);if(flat.lengthSq()>1e-6)k+=.3*(1-behind.dot(flat.normalize()));}return k;};
+    // Hysteresis: the previous viewpoint, while it stays clear, is kept unless a clear candidate is clearly better.
     let best:THREE.Vector3|null=null,bestCost=Infinity;
+    if(this.chosen&&this.clear(target,this.chosen,roots)){best=this.chosen;bestCost=cost(this.chosen)-.25;}
     for(const c of this.candidates(wanted)){const k=cost(c);if(k>=bestCost)continue;if(this.clear(target,c,roots)){best=c;bestCost=k;}}
-    // Hysteresis: keep the previous viewpoint while it stays clear and is not clearly worse.
-    if(this.chosen&&this.clear(target,this.chosen,roots)&&cost(this.chosen)<=bestCost+.25)return this.chosen;
     if(best)return best;
-    // Nothing fully clear (a narrow room, a stair, a Soul against walls): take the view that sees farthest and come
-    // in to its nearest wall (fit); the glide still eases there.
-    let open:THREE.Vector3=wanted,reach=-1;
-    for(const c of this.candidates(wanted)){const r=this.limit(target,c,roots);if(r>reach+1e-3){open=c;reach=r;}}
-    return open.clone().setLength(this.fit(open.length(),reach));
+    // Nothing near the asked-for view is clear (a narrow room, a stair well, a Soul against walls): look all round,
+    // low to high, for the view that sees farthest (to 5 m), the asked-for side preferred, and come in to its nearest
+    // wall (fit). Kept by the hysteresis above while it stays clear, so this wide look runs once per change.
+    const s=new THREE.Spherical().setFromVector3(wanted);let open:THREE.Vector3=wanted,score=-Infinity;
+    for(let i=0;i<12;i++)for(const phi of [s.phi,1.3,.85,.4]){
+      const c=new THREE.Vector3().setFromSpherical(new THREE.Spherical(s.radius,Math.max(.15,Math.min(Math.PI*.48,phi)),s.theta+i*Math.PI/6));
+      const v=Math.min(5,this.limit(target,c,roots,-Infinity,true))-.4*want.angleTo(c.clone().normalize());if(v>score){score=v;open=c;}}
+    return open.clone().setLength(this.fit(open.length(),this.limit(target,open,roots)));
   }
   private resolveCollected(target:THREE.Vector3,roots:readonly THREE.Object3D[],seconds:number):THREE.Vector3 {
     const dt=Number.isFinite(seconds)?Math.max(0,Math.min(.1,seconds)):0;this.clock+=dt;
@@ -136,7 +143,9 @@ export class WorldFollow {
       this.rendered.setLength(this.fit(this.rendered.length(),reach));
       return this.rendered.clone();
     }
-    if(!this.chosen||this.clock-this.lastSearch>=.2||!this.clear(target,this.chosen,roots)){this.chosen=this.choose(target,wanted,roots).clone();this.lastSearch=this.clock;}
+    // Search again every .2 s, or at once when a clear viewpoint is cut (one with no clear view waits for the next search).
+    if(!this.chosen||this.clock-this.lastSearch>=.2||this.chosenClear&&!this.clear(target,this.chosen,roots)){
+      this.chosen=this.choose(target,wanted,roots).clone();this.lastSearch=this.clock;this.chosenClear=this.clear(target,this.chosen,roots);}
     const goal=this.chosen;
     if(!this.rendered)this.rendered=goal.clone();
     else{

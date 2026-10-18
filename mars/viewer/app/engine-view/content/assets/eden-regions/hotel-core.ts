@@ -11,6 +11,10 @@ export const SEAFRONT_HOTELS: readonly {cx: number; w: number; floors: number}[]
   {cx: 164.21800767316017, w: 10.197715762769803, floors: 6},
 ];
 export const HOTEL_Z = 121, HOTEL_DEPTH = 10, HOTEL_FH = 3.1, HOTEL_WALL = .18;
+/** Inside a seafront hotel's footprint (front balconies included; world x, z), with margin `m`. Their rooms are walked
+ *  into and followed into, so their drawing must stop the camera however far out the resort stands (index.ts isFar). */
+export const inSeafrontHotel = (x: number, z: number, m = 0) => z > HOTEL_Z - HOTEL_DEPTH / 2 - m && z < HOTEL_Z + HOTEL_DEPTH / 2 + 1.1 + m &&
+  SEAFRONT_HOTELS.some((h) => Math.abs(x - h.cx) < h.w / 2 + m);
 /** Balcony (room) column centres resort-lake.ts lays out: one per 3.3 m, first 1.7 m in from the west wall. */
 export const hotelColumns = (w: number) => Array.from({length: Math.floor(w / 3.3)}, (_, i) => -w / 2 + 1.7 + i * 3.3);
 /** Rendered upper-floor heights (top of the floor slab), first floor up. */
