@@ -4,8 +4,8 @@ import * as THREE from 'three';
 import { WorldFollow } from '../src/WorldFollow.ts';
 
 // Single-sided round shell (outward faces only), like a tower or drum, no doorway.
-function tower(radius=3){
-  const group=new THREE.Group(),shell=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,4,48,1,true),new THREE.MeshBasicMaterial());
+function tower(radius=3,roofed=false){
+  const group=new THREE.Group(),shell=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,4,48,1,!roofed),new THREE.MeshBasicMaterial());
   shell.position.y=2;group.add(shell);group.updateWorldMatrix(true,true);return group;
 }
 
@@ -13,14 +13,18 @@ function tower(radius=3){
 const seen=(root:THREE.Object3D,target:THREE.Vector3,offset:THREE.Vector3)=>{const eye=target.clone().add(offset);
   return new THREE.Raycaster(eye,offset.clone().negate().normalize(),0,offset.length()-.05).intersectObject(root,true).length===0;};
 
-test('Follow inside a single-sided shell never puts the camera behind its drawn wall', () => {
-  const root=tower(),follow=new WorldFollow(),target=new THREE.Vector3(0,1,0);
+// The guard since E2 (restored by name, lane L4b): below the shell's rim the camera never leaves its drawn wall. Over an
+// open top a camera above the rim looking down in is a clear view (bc2319cd), so only a roofed shell must hold it inside.
+test('Follow inside a single-sided shell keeps the camera inside its drawn wall', () => {
+  for(const roofed of [false,true]){
+  const root=tower(3,roofed),follow=new WorldFollow(),target=new THREE.Vector3(0,1,0);
   let offset=new THREE.Vector3(6,3,4);
   for(let i=0;i<120;i++){offset=follow.resolve(target,offset,[root],1/60);
-    const eye=target.clone().add(offset);
-    assert.ok(Math.hypot(eye.x,eye.z)<3||eye.y>4,`frame ${i}: camera ${eye.toArray()} is inside the shell or above its open top`);
-    assert.ok(seen(root,target,offset),`frame ${i}: no drawn wall between camera and Soul`);
+    const eye=target.clone().add(offset),inside=Math.hypot(eye.x,eye.z)<3&&eye.y<4;
+    assert.ok(inside||!roofed&&eye.y>4,`${roofed?'roofed':'open'} shell, frame ${i}: camera ${eye.toArray()} stays inside the shell${roofed?'':' or above its open top'}`);
+    assert.ok(seen(root,target,offset),`${roofed?'roofed':'open'} shell, frame ${i}: no drawn wall between camera and Soul`);
     assert.ok(offset.length()>=.6);}
+  }
 });
 
 // A narrow hotel room (3.2 m wide, 5 m deep, 3 m high) drawn like the old Eden hotel core: every wall and the

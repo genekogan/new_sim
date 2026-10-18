@@ -41,10 +41,12 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  const plinthC=pick(r,STONE),core=s.hotelCore&&s.balconyLayout?.length?hotelCoreLayout(s.w,s.d):null;
  if(!core)b.box('stone',0,-pl,0,s.w+.04,pl+.35,s.d+.25,plinthC);
  else{// the same plinth outside; inside, the lobby floor is level with the street and the doorway has no step
-  b.box('stone',0,-pl,0,s.w+.04,pl,s.d+.25,plinthC);const [ix0,iz0,ix1,iz1]=core.inner,[d0,d1]=core.door;
-  b.box('stone',0,0,(-s.d/2-.125+iz0)/2,s.w+.04,.35,iz0+s.d/2+.125,plinthC);
-  for(const [a,c] of [[-s.w/2-.02,d0],[d1,s.w/2+.02]])b.box('stone',(a+c)/2,0,(iz1+s.d/2+.125)/2,c-a,.35,s.d/2+.125-iz1,plinthC);
-  for(const side of[-1,1])b.box('stone',side*(s.w/2+.02+ix1)/2,0,0,s.w/2+.02-ix1,.35,iz1-iz0,plinthC);
+  // E2 #9: the plinth under the lobby stops at the lobby slab's underside (-.1), not at the street plane (0), where its top
+  // fought the ground drawn under the hotel; the ring round the lobby comes down to meet it.
+  b.box('stone',0,-pl,0,s.w+.04,pl-.1,s.d+.25,plinthC);const [ix0,iz0,ix1,iz1]=core.inner,[d0,d1]=core.door;
+  b.box('stone',0,-.1,(-s.d/2-.125+iz0)/2,s.w+.04,.45,iz0+s.d/2+.125,plinthC);
+  for(const [a,c] of [[-s.w/2-.02,d0],[d1,s.w/2+.02]])b.box('stone',(a+c)/2,-.1,(iz1+s.d/2+.125)/2,c-a,.45,s.d/2+.125-iz1,plinthC);
+  for(const side of[-1,1])b.box('stone',side*(s.w/2+.02+ix1)/2,-.1,0,s.w/2+.02-ix1,.45,iz1-iz0,plinthC);
   b.box('stone',0,-.1,0,ix1-ix0,.12,iz1-iz0,'#d8ccb4');b.box('stone',0,-.1,(iz1+s.d/2)/2,d1-d0,.12,s.d/2-iz1+.125,'#d8ccb4');}
  const balconies=s.balconyLayout??(s.balcony&&s.floors>1?[{x:0,floorY:fh+.04,width:Math.min(s.w-.8,3.2),depth:1.2,index:'first-floor'}]:[]);
  const buildingId='region-house:'+b.m.elements.slice(12,15).map(v=>v.toFixed(3)).join(':');
@@ -105,14 +107,15 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
 function hotelInside(b:Builder,c:HotelCoreLayout,floors:number,fh:number,trim:Col,wall:MatKey,wc:Col){
  const d=new Builder('decorative');d.m.copy(b.m);const [wx0,wz0,wx1,wz1]=c.well,tread='#b9a68a',rail='#3e4446',w=c.laneWidth+.1;
  // lobby: a sofa against the west wall facing the room, a low table, the reception desk at the back
- const {x0,z0,z1,depth}=c.sofa;d.box('cloth',x0+depth/2,0,(z0+z1)/2,depth,.42,z1-z0,'#3d5a80');d.box('cloth',x0+.13,0,(z0+z1)/2,.26,.9,z1-z0,'#34506f');
- for(const z of[z0+.1,z1-.1])d.box('cloth',x0+depth/2,0,z,depth,.62,.2,'#34506f');
+ // E2 #9: seat, back and arms share no face plane (the seat tucks under the back, the arms stand 1-2 cm proud)
+ const {x0,z0,z1,depth}=c.sofa;d.box('cloth',x0+(.1+depth)/2,0,(z0+z1)/2,depth-.1,.42,z1-z0,'#3d5a80');d.box('cloth',x0+.14,0,(z0+z1)/2,.26,.9,z1-z0-.02,'#34506f');
+ for(const z of[z0+.09,z1-.09])d.box('cloth',x0+.02+depth/2,0,z,depth,.62,.22,'#34506f');
  const [tx0,tz0,tx1,tz1]=c.table;d.box('timber',(tx0+tx1)/2,.38,(tz0+tz1)/2,tx1-tx0,.06,tz1-tz0,'#8a6545');for(const x of[tx0+.05,tx1-.05])for(const z of[tz0+.05,tz1-.05])d.box('timber',x,0,z,.05,.38,.05,trim);
  const [rx0,rz0,rx1,rz1]=c.reception;d.box('timber',(rx0+rx1)/2,0,(rz0+rz1)/2,rx1-rx0,1.05,rz1-rz0,'#7a5236');d.box('stone',(rx0+rx1)/2,1.05,(rz0+rz1)/2,rx1-rx0+.08,.05,rz1-rz0+.08,'#efe9dc');
  d.box('dressing',rx1-.35,1.1,(rz0+rz1)/2,.22,.04,.16,'#c9a227');
  // the flights: every storey from the ground (lobby floor 0) to the top floor
  for(let f=0;f<floors-1;f++){const base=f===0?0:f*fh+.02,top=(f+1)*fh+.02,pts=hotelFlight(c,base,top),rise=(top-base)/16;
-  for(const [k,[x,y,z]] of pts.entries()){if(k===8||k===9)continue;if(k===pts.length-1){d.box('stone',x,y-.12,(z+wz1)/2+.07,w,.12,wz1-z+.14,tread);continue;}
+  for(const [k,[x,y,z]] of pts.entries()){if(k===8||k===9)continue;if(k===pts.length-1){d.box('stone',x,y-.12,(z+wz1)/2,w,.12,wz1-z,tread);continue;}
    d.box('stone',x,y-rise-.06,z,w,rise+.06,.3,tread);}
   d.box('stone',(wx0+wx1)/2,base+8*rise-.12,wz0+.3,wx1-wx0,.12,.6,tread); // turn landing
   d.box(wall,(wx0+wx1)/2,base,(wz0+wz1)/2,.08,base+8*rise-base-.12,wz1-wz0-.3,wc); // spine wall between the flights, up to the landing
