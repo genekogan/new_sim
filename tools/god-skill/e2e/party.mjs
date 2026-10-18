@@ -35,7 +35,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- the world process (fake minds, dev auth, fresh data dir, local Mars assets)
 const marsWeb = resolve(root, '.lane/mars-web');
-const env = { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', SOUL_LIFECYCLE: '1', INVITE_REQUIRED: '0', MIND_DRIVER: 'edge', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` };
+const env = { ...process.env, SIM_NAV_DEBUG: process.env.SIM_NAV_DEBUG ?? '1', ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', SOUL_LIFECYCLE: '1', INVITE_REQUIRED: '0', MIND_DRIVER: 'edge', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` };
 let serverLog = '', server;
 const boot = async () => {
   server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
@@ -66,8 +66,23 @@ async function step(name, fn, expect) {
   const brief = summarize(result);
   report.steps.push({ name, ms: +ms.toFixed(0), ok: okay, result: brief, error });
   if (!okay) report.failures.push({ name, result: brief, error });
+  if (!okay && /route\.|unreachable/.test(JSON.stringify(result ?? '') + (error ?? ''))) await navDiag(name, result);
   log(`${okay ? '✔' : '✖'} ${name} — ${ms.toFixed(0)} ms${okay ? '' : ' — ' + (error ?? JSON.stringify(brief)).slice(0, 500)}`);
   return result;
+}
+// N1: a refused walk prints its refusal reason and the planner's failed-search memo counts.
+const reasonsIn = (v, out = []) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if ((k === 'reason' || k === 'message') && typeof x === 'string') out.push(x); else reasonsIn(x, out); } return out; };
+async function navDiag(name, result) {
+  const nav = await api('/v1/debug/nav', { as: 'none' }).then((r) => r.data).catch((e) => String(e));
+  log(`  ↳ ${name.split(' ')[0]} reason: ${JSON.stringify(reasonsIn(result).slice(0, 3)).slice(0, 600)} nav: ${JSON.stringify(nav)}`);
+}
+// N1 (off by default): N1_PROBE_RADII=0.28,0.29 re-plans a finished walk from its start to its end at each body radius
+// over /v1/debug/route (served only with SIM_NAV_DEBUG); nothing moves.
+async function probeRadii(tag, from, sl, to, gl) {
+  for (const r of (process.env.N1_PROBE_RADII ?? '').split(',').filter(Boolean)) {
+    const q = await api(`/v1/debug/route?sx=${from[0]}&sz=${from[2]}&sl=${sl}&gx=${to[0]}&gz=${to[2]}&gl=${gl}&r=${r}`, { as: 'none' }).then((x) => x.data).catch((e) => ({ error: String(e) }));
+    log(`  ↳ ${tag} probe r=${r} (${from.map((v) => v.toFixed(2))} L${sl} -> ${to.map((v) => v.toFixed(2))} L${gl}): ${q?.ok ? `ok len ${q.length?.toFixed?.(2)}` : `${q?.diagnostic?.code ?? q?.error} ${q?.diagnostic?.message ?? ''}`.slice(0, 200)}`);
+  }
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
@@ -272,10 +287,12 @@ try {
   // ---- 3. the cottage's living room (furnished + the god's extra chairs)
   const f6 = await step('S6 act walk:moss-cottage/living (furnished, two extra chairs, a hearth) → resolve and act agree; she ends inside the living room', async () => {
     const res = await cli('resolve', 'walk:moss-cottage/living');
+    const from = process.env.N1_PROBE_RADII ? (await observe()).self.position : null;
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:moss-cottage/living' } })).data;
     const r = await follow(a, { maxS: 200 });
+    if (from && r.end) await probeRadii('S6', from, 0, r.end.p, 0);
     const placePath = (await cli('here')).data?.me?.placePath;
-    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room, placePath };
+    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, reason: a.reason ?? r.reason, phase: r.phase, room: r.room, placePath };
   }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && (r.placePath ?? []).includes('moss-cottage/living'));
   { const p = f6?.end?.p ?? (await observe()).self.position; if (p) await shots([{ name: 's6-in-the-living-room-roof-hidden', eye: [p[0] + 3, p[1] + 7, p[2] + 4], at: [p[0], p[1] + 0.8, p[2]], wait: 7000, hideRoofs: true }]); }
 

@@ -170,7 +170,7 @@ test('versioned stand cannot transfer a foreign or stale seat; explicit take_slo
   assert.equal(w.host.engine.programOf(other.entityId),otherProgram,'owned seat release preserves the independent actor timer');
 });
 
-// A tall composed body (height 1.85: not HUMAN_PROFILE, radius 0.288). The skip this test carried ("upstairs route
+// A tall composed body (height 1.85: not HUMAN_PROFILE; radius 0.288 before the lane N1 cap, now 0.28). The skip this test carried ("upstairs route
 // unreachable", blamed on stairs reach) was its own build 1.08: radius 0.311 plans at 0.371 m, and building/1's 0.9 m
 // interior doors give only 0.35 m of raster clearance (the stairs themselves were fine; see L3 status, FOR GENE).
 test('elevated-floor exit uses its admitted height and a composed humanoid profile', async t => {

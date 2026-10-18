@@ -46,7 +46,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- the world process (fake minds, dev auth, fresh data dir, local Mars assets)
 const marsWeb = resolve(root, '.lane/mars-web');
-const env = { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}`, GENESIS_FILE: resolve(root, 'worlds/templates/mars-two.json') };
+const env = { ...process.env, SIM_NAV_DEBUG: process.env.SIM_NAV_DEBUG ?? '1', ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}`, GENESIS_FILE: resolve(root, 'worlds/templates/mars-two.json') };
 let serverLog = '', server;
 const boot = async () => {
   server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
@@ -77,8 +77,15 @@ async function step(name, fn, expect) {
   const brief = summarize(result);
   report.steps.push({ name, ms: +ms.toFixed(0), ok: okay, result: brief, error });
   if (!okay) report.failures.push({ name, result: brief, error });
+  if (!okay && /route\.|unreachable/.test(JSON.stringify(result ?? '') + (error ?? ''))) await navDiag(name, result);
   log(`${okay ? '✔' : '✖'} ${name} — ${ms.toFixed(0)} ms${okay ? '' : ' — ' + (error ?? JSON.stringify(brief)).slice(0, 500)}`);
   return result;
+}
+// N1: a refused walk prints its refusal reason and the planner's failed-search memo counts.
+const reasonsIn = (v, out = []) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if ((k === 'reason' || k === 'message') && typeof x === 'string') out.push(x); else reasonsIn(x, out); } return out; };
+async function navDiag(name, result) {
+  const nav = await api('/v1/debug/nav', { as: 'none' }).then((r) => r.data).catch((e) => String(e));
+  log(`  ↳ ${name.split(' ')[0]} reason: ${JSON.stringify(reasonsIn(result).slice(0, 3)).slice(0, 600)} nav: ${JSON.stringify(nav)}`);
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });

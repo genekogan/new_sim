@@ -44,6 +44,7 @@ import {Travel,TravelError,launcherSite,TRAVEL_CONTRACT} from './travel/travel.t
 import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
+import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode };
 
@@ -180,6 +181,18 @@ export function buildApp(d: Deps) {
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
+  // N1 nav diagnostics, served only with SIM_NAV_DEBUG (the e2es set it): the failed-search memo's counts, and one probe
+  // walk from (sx,sz) on level sl to (gx,gz) on gl for an r m-radius body (nothing moves).
+  if (process.env.SIM_NAV_DEBUG) app.get('/v1/debug/nav', (c) => c.json({ stranded: strandedMetrics() }, 200, { 'Cache-Control': 'no-store' }));
+  if (process.env.SIM_NAV_DEBUG) app.get('/v1/debug/route', (c) => {
+    const n = (k: string, v = 0) => { const x = Number(c.req.query(k)); return Number.isFinite(x) ? x : v; };
+    const rt = (d.host.engine as unknown as { rt?: { world: unknown; services: { spatial?: { route: Function } } } }).rt, sp = rt?.services.spatial;
+    if (!rt || !sp) return c.json({ error: 'no spatial service' }, 404);
+    const profile = { id: 'probe', radius: n('r', 0.35), height: 1.8, speed: 1.35, turnRate: 4, stepHeight: 0.22 };
+    const res = sp.route(rt.world, profile, { level: n('sl'), p: [n('sx'), n('sz')] }, { level: n('gl'), p: [n('gx'), n('gz')] }, {});
+    const levels = ((sp as { scene?: { levels?: { id: number; y: number; label?: string }[] } }).scene?.levels ?? []).map((l) => `${l.id}@${l.y}:${l.label ?? ''}`);
+    return c.json(res.ok ? { ok: true, length: res.route.length, legs: res.route.legs.length, end: res.route.legs.at(-1)?.points?.at(-1), endLevel: res.route.legs.at(-1)?.level, levels } : { ok: false, diagnostic: res.diagnostic, levels }, 200, { 'Cache-Control': 'no-store' });
+  });
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
   // App owns the skill text (EDGE_SKILL_FILE / descriptor skillFile, read per request so edits apply live).

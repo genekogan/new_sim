@@ -1,8 +1,10 @@
 // Humanoid body dims (core/humanoid@2 look params, eden4 humanoid lane L10). A humanoid body may carry a composed
 // look (`body.params`, `body.model` = the look key `humanoid2-<sha16>`). Four of its params are physical:
 //   height     m, 1.65–1.85 (default 1.75): the body scales uniformly by height / 1.75 — collision radius (half of
-//              the effect, so doorways sized for today's bodies still pass), eye height and seat fit;
-//   build      0.92–1.1 (default 1): girth — collision radius (and the drawn torso/hip/limb width);
+//              the effect, and never above today's 0.28 so doorways sized for today's bodies still pass), eye height
+//              and seat fit;
+//   build      0.92–1.1 (default 1): girth — collision radius (only below 1; capped at today's) and the drawn
+//              torso/hip/limb width;
 //   walkSpeed  m/s, 0.9–1.4 (default 1.35): the walking speed walk_to plans with, never above WALK_SPEED_CAP 1.4
 //              (so every tick stays inside MAX_HUMAN_STEP_PER_TICK and the published speed inside SPEED_CAPS.walk);
 //   headSize   0.94–1.08 (default 1): drawn only.
@@ -20,7 +22,7 @@ export const HUMANOID_DIM_RANGES = Object.freeze({
   build: [0.92, 1.1] as const,
   walkSpeed: [0.9, 1.4] as const,
   headSize: [0.94, 1.08] as const,
-  // looks v2 body shape: drawn proportions; the widest of them widens the collider (still clamped to HUMANOID_RADIUS_RANGE)
+  // looks v2 body shape: drawn proportions; the widest of them widens the drawn body (the collider is capped at today's, HUMANOID_RADIUS_RANGE)
   shoulders: [0.9, 1.12] as const,
   chest: [0.9, 1.15] as const,
   hips: [0.9, 1.15] as const,
@@ -32,8 +34,13 @@ export const HUMANOID_DEFAULT_DIMS: Readonly<Record<HumanoidDimKey, number>> = O
 /** Today's constants the dims scale (radius: world/catalog HUMAN_RADIUS; eyes: edge/eyes/view.ts; seat range:
  *  social/pose.ts seatHeight 0.2–1.2 and the renderer's accepted seat tops). */
 export const HUMANOID_BASE = Object.freeze({ radius: HUMAN_PROFILE.radius, height: HUMAN_PROFILE.height, eye: 1.62, seatedEye: 1.15, knee: 0.45, seatLo: 0.2, seatHi: 1.2 });
-/** Collision radius bounds: a 0.9 m doorway still passes the widest body (2 × (0.32 + PLAN_MARGIN 0.06) = 0.76 m). */
-export const HUMANOID_RADIUS_RANGE: readonly [number, number] = [0.24, 0.32];
+/** Collision radius bounds. The top is today's body (HUMAN_RADIUS 0.28): a taller or wider look is drawn wider but
+ *  collides, plans and seats as the standard body (lane N1, 2026-10-17). The planner raster is conservative (a cell
+ *  overlapping any obstacle blocks; clearance is centre-to-blocked-centre minus half a cell) and plans at radius +
+ *  PLAN_MARGIN 0.06, so a doorway loses ~0.1-0.2 m: the Mars shower bays' 0.84 m doors give 0.35 m of clearance and
+ *  building/1's 0.9 m interior doors about the same, which a 0.29 body (0.35 planned) cannot pass. Passing a 0.9 m door
+ *  with a 0.32 body would need ~0.96 m. Only narrower bodies (short, slight) shrink the collider. */
+export const HUMANOID_RADIUS_RANGE: readonly [number, number] = [0.24, 0.28];
 
 export type HumanoidDims = {
   height: number; build: number; walkSpeed: number; headSize: number;

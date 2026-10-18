@@ -37,7 +37,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- the world process (fake minds, dev auth, fresh data dir, local Mars assets)
 const marsWeb = resolve(root, '.lane/mars-web');
-const env = { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` };
+const env = { ...process.env, SIM_NAV_DEBUG: process.env.SIM_NAV_DEBUG ?? '1', ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` };
 let serverLog = '', server;
 const boot = async () => {
   server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
@@ -68,8 +68,23 @@ async function step(name, fn, expect) {
   const brief = summarize(result);
   report.steps.push({ name, ms: +ms.toFixed(0), ok: okay, result: brief, error });
   if (!okay) report.failures.push({ name, result: brief, error });
+  if (!okay && /route\.|unreachable/.test(JSON.stringify(result ?? '') + (error ?? ''))) await navDiag(name, result);
   log(`${okay ? '✔' : '✖'} ${name} — ${ms.toFixed(0)} ms${okay ? '' : ' — ' + (error ?? JSON.stringify(brief)).slice(0, 500)}`);
   return result;
+}
+// N1: a refused walk prints its refusal reason and the planner's failed-search memo counts.
+const reasonsIn = (v, out = []) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if ((k === 'reason' || k === 'message') && typeof x === 'string') out.push(x); else reasonsIn(x, out); } return out; };
+async function navDiag(name, result) {
+  const nav = await api('/v1/debug/nav', { as: 'none' }).then((r) => r.data).catch((e) => String(e));
+  log(`  ↳ ${name.split(' ')[0]} reason: ${JSON.stringify(reasonsIn(result).slice(0, 3)).slice(0, 600)} nav: ${JSON.stringify(nav)}`);
+}
+// N1 (off by default): N1_PROBE_RADII=0.28,0.29 re-plans a finished walk from its start to its end at each body radius
+// over /v1/debug/route (served only with SIM_NAV_DEBUG); nothing moves.
+async function probeRadii(tag, from, sl, to, gl) {
+  for (const r of (process.env.N1_PROBE_RADII ?? '').split(',').filter(Boolean)) {
+    const q = await api(`/v1/debug/route?sx=${from[0]}&sz=${from[2]}&sl=${sl}&gx=${to[0]}&gz=${to[2]}&gl=${gl}&r=${r}`, { as: 'none' }).then((x) => x.data).catch((e) => ({ error: String(e) }));
+    log(`  ↳ ${tag} probe r=${r} (${from.map((v) => v.toFixed(2))} L${sl} -> ${to.map((v) => v.toFixed(2))} L${gl}): ${q?.ok ? `ok len ${q.length?.toFixed?.(2)}` : `${q?.diagnostic?.code ?? q?.error} ${q?.diagnostic?.message ?? ''}`.slice(0, 200)}`);
+  }
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
@@ -293,12 +308,15 @@ try {
 
   // ---- the house: through the door, up the stairs, onto the chair
   const seat = await step('S7 she sits on the god\'s chair upstairs: in through the door, up the stairs, seated on floor 1', async () => {
+    const from = process.env.N1_PROBE_RADII ? (await observe()).self.position : null;
     const r = await shotDuring('s7-going-in', { eye: [out4[0] + 6, 4, out4[1] + 7], at: [doorXZ?.[0] ?? HOUSE[0], 1.2, doorXZ?.[1] ?? HOUSE[1]], afterMs: 30000, when: (me) => doorXZ && Math.hypot(me.position[0] - doorXZ[0], me.position[2] - doorXZ[1]) < 2.6 },
       () => soulDoes(`sit:${ids['house/chair']}`, { params: { seconds: 600 }, maxS: 300, until: (me) => me.activity === 'sit' }));
     report.samples.seat = r.samples;
+    // the probe's goal: her last upstairs spot at least 1 m short of the chair (the chair itself blocks standing)
+    { const c = r.end?.p, last = c && [...r.samples].reverse().find((x) => x.p[1] > 1 && Math.hypot(x.p[0] - c[0], x.p[2] - c[2]) > 1); if (from && last) await probeRadii('S7', from, 0, last.p, 1); }
     const throughDoor = doorXZ ? Math.min(...r.samples.map((s) => Math.hypot(s.p[0] - doorXZ[0], s.p[2] - doorXZ[1]))) : null;
     const climbing = r.samples.filter((s, i) => i && s.p[1] > r.samples[i - 1].p[1] + 0.05 && s.p[1] < floor1Y - 0.05 && Math.hypot(s.p[0] - HOUSE[0], s.p[2] - HOUSE[1]) < 6).length;
-    return { accepted: r.accepted, code: r.code, phase: r.phase, end: r.end, upstairs: !!r.end && upstairs(r.end.p), throughDoor, onGroundFirst: r.samples.some((s) => s.p[1] < 0.3), climbing, n: r.samples.length };
+    return { accepted: r.accepted, code: r.code, reason: r.reason, phase: r.phase, end: r.end, upstairs: !!r.end && upstairs(r.end.p), throughDoor, onGroundFirst: r.samples.some((s) => s.p[1] < 0.3), climbing, n: r.samples.length };
   }, (r) => r.accepted && r.end?.activity === 'sit' && r.upstairs && r.throughDoor !== null && r.throughDoor < 1.2 && r.onGroundFirst && r.climbing >= 3);
   await shots([{ name: 's7-seated-upstairs-roof-hidden', eye: [HOUSE[0] - 5, 13, HOUSE[1] + 8], at: [HOUSE[0] - 1, 2.8, HOUSE[1] - 1], wait: 8000, hideRoofs: true }]);
 
