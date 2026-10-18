@@ -50,7 +50,8 @@ export class Fading {
   private announce(c: FadeChange, text: string) {
     const tick = this.core.tick();
     this.core.streams.deliver(c.soulId, 'fade', tick, {colour: c.colour, change: c.change, idleSeconds: c.idleSeconds, text});
-    this.core.spectate({kind: 'fade', tick, soulId: c.soulId, colour: c.colour, change: c.change});
+    // travel (M3): a Soul gone to another world is marked `away`, so Explore drops it (it is not a resident here now)
+    this.core.spectate({kind: 'fade', tick, soulId: c.soulId, colour: c.colour, change: c.change, ...(c.colour === 'gone' && this.isAway(c.soulId) ? {away: true} : {})});
     for (const l of this.listeners) { try { l(c); } catch { /* ledger listener faults never block the rule */ } }
   }
 
@@ -124,9 +125,9 @@ export class Fading {
     return (this.core.db.prepare("SELECT soul_id FROM edge_comms_activity WHERE world_id = ? AND colour = 'gone'").all(this.core.worldId) as {soul_id: string}[]).map(r => r.soul_id).filter(id => live.has(id));
   }
   /** Spectator roster: every live Soul that is not green (yellow/red warn rings, gone hidden). Empty when off. */
-  roster(): {soulId: string; colour: FadeColour; idleSeconds: number}[] {
+  roster(): {soulId: string; colour: FadeColour; idleSeconds: number; away?: true}[] {
     if (!this.enabled) return [];
-    return this.core.liveSoulIds().flatMap(soulId => { const s = this.status(soulId); return s && s.colour !== 'green' ? [{soulId, ...s}] : []; });
+    return this.core.liveSoulIds().flatMap(soulId => { const s = this.status(soulId); return s && s.colour !== 'green' ? [{soulId, ...s, ...(s.colour === 'gone' && this.isAway(soulId) ? {away: true as const} : {})}] : []; });
   }
 
   status(soulId: string): {colour: FadeColour; idleSeconds: number; held?: string} | null {

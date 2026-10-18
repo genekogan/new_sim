@@ -1,15 +1,16 @@
 import type {PublicSoul} from '@sim/protocol';
-export type ExplorePresence='active'|'fading'|'departed'|'unknown';
+/** `travelled`: gone to another world (the fade roster's `away`); Explore leaves it out, it is not in this world now. */
+export type ExplorePresence='active'|'fading'|'departed'|'travelled'|'unknown';
 /** Public fade activity is authoritative; merely having a standing body does not imply an active agent. */
-export function explorePresence(messages:readonly{kind?:string;souls?:unknown;soulId?:unknown;colour?:unknown;change?:unknown}[],knownSoulIds:Iterable<string>=[]):Map<string,ExplorePresence>{
+export function explorePresence(messages:readonly{kind?:string;souls?:unknown;soulId?:unknown;colour?:unknown;change?:unknown;away?:unknown}[],knownSoulIds:Iterable<string>=[]):Map<string,ExplorePresence>{
  const knownIds=[...knownSoulIds];let map=new Map<string,ExplorePresence>();const phase=(c:unknown):ExplorePresence=>c==='green'?'active':c==='yellow'||c==='red'?'fading':c==='gone'?'departed':'unknown';
  for(const m of messages){if(m.kind==='fade.roster'&&Array.isArray(m.souls)){if(!m.souls.every(r=>r&&typeof r==='object'&&typeof r.soulId==='string'&&['green','yellow','red','gone'].includes(r.colour)))continue;
  // Server fade.roster lists only non-green current Souls; an observed valid snapshot
  // makes omitted known roster IDs green. No snapshot means activity remains unknown.
- map=new Map(knownIds.map(id=>[id,'active' as const]));for(const r of m.souls){if(r&&typeof r==='object'&&typeof r.soulId==='string')map.set(r.soulId,phase(r.colour));}}else if(m.kind==='fade'&&typeof m.soulId==='string')map.set(m.soulId,m.change==='reclaimed'?'active':m.change==='removed'?'departed':phase(m.colour));}return map;
+ map=new Map(knownIds.map(id=>[id,'active' as const]));for(const r of m.souls){if(r&&typeof r==='object'&&typeof r.soulId==='string')map.set(r.soulId,r.colour==='gone'&&r.away===true?'travelled':phase(r.colour));}}else if(m.kind==='fade'&&typeof m.soulId==='string')map.set(m.soulId,m.change==='reclaimed'?'active':m.away===true?'travelled':m.change==='removed'?'departed':phase(m.colour));}return map;
 }
 export function orderedExploreSouls(souls:ReadonlyMap<string,PublicSoul>,presence:ReadonlyMap<string,ExplorePresence>,query=''){
- const q=query.trim().toLocaleLowerCase(),rank=(id:string)=>({active:0,fading:1,unknown:2,departed:3}[presence.get(id)??'unknown']);return [...souls.values()].filter(s=>!q||`${s.name} ${s.description}`.toLocaleLowerCase().includes(q)).sort((a,b)=>rank(a.id)-rank(b.id)||a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
+ const q=query.trim().toLocaleLowerCase(),rank=(id:string)=>({active:0,fading:1,unknown:2,departed:3,travelled:4}[presence.get(id)??'unknown']);return [...souls.values()].filter(s=>presence.get(s.id)!=='travelled'&&(!q||`${s.name} ${s.description}`.toLocaleLowerCase().includes(q))).sort((a,b)=>rank(a.id)-rank(b.id)||a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
 }
 /** Camera-room context annotates a world search; an empty room never erases known Souls. */
 export function exploreSoulRoster(souls:ReadonlyMap<string,PublicSoul>,presence:ReadonlyMap<string,ExplorePresence>,query='',room?:{soulIds:readonly string[]}|null){
