@@ -1,10 +1,26 @@
 // Stable hashing for defs and bake keys. Node and browsers both have SubtleCrypto,
 // but defs must hash synchronously at define time, so this is a pure-JS SHA-256.
+// Same output as the map/filter/sort/join form ('[' + v.map(f).join(',') + ']', '{' + sorted defined keys k:f(v) + '}'),
+// built in one pass with a small memo of quoted keys: bake keys stringify a building's params once per child (L3e).
+const quotedKeys = new Map<string, string>();
 export function stableStringify(v: unknown): string {
   if (v === null || typeof v !== 'object') return JSON.stringify(v);
-  if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
-  const o = v as Record<string, unknown>;
-  return '{' + Object.keys(o).filter((k) => o[k] !== undefined).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(o[k])).join(',') + '}';
+  if (Array.isArray(v)) {
+    let s = '[';
+    for (let i = 0; i < v.length; i++) { if (i) s += ','; const x = stableStringify(v[i]); if (x !== undefined) s += x; } // join() writes undefined as ''
+    return s + ']';
+  }
+  const o = v as Record<string, unknown>, keys: string[] = [];
+  for (const k of Object.keys(o)) if (o[k] !== undefined) keys.push(k);
+  keys.sort();
+  let s = '{';
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i]; let q = quotedKeys.get(k);
+    if (q === undefined) { q = JSON.stringify(k) + ':'; if (quotedKeys.size < 4096) quotedKeys.set(k, q); }
+    if (i) s += ',';
+    s += q + stableStringify(o[k]);
+  }
+  return s + '}';
 }
 
 const K = new Uint32Array([
