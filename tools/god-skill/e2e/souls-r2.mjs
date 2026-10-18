@@ -68,8 +68,16 @@ async function step(name, fn, expect) {
   const brief = summarize(result);
   report.steps.push({ name, ms: +ms.toFixed(0), ok: okay, result: brief, error });
   if (!okay) report.failures.push({ name, result: brief, error });
+  if (!okay && /route\.|unreachable/.test(JSON.stringify(result ?? '') + (error ?? ''))) await navDiag(name, result);
   log(`${okay ? '✔' : '✖'} ${name} — ${ms.toFixed(0)} ms${okay ? '' : ' — ' + (error ?? JSON.stringify(brief)).slice(0, 500)}`);
   return result;
+}
+// N1: a refused walk prints its refusal reason, the planner's failed-search memo and any memo audit lines.
+const reasonsIn = (v, out = []) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if ((k === 'reason' || k === 'message') && typeof x === 'string') out.push(x); else reasonsIn(x, out); } return out; };
+async function navDiag(name, result) {
+  const nav = await api('/v1/debug/nav', { as: 'none' }).then((r) => r.data).catch((e) => String(e));
+  const audit = (serverLog.match(/\[stranded-audit\][^\n]*/g) ?? []).slice(-3);
+  log(`  ↳ ${name.split(' ')[0]} reason: ${JSON.stringify(reasonsIn(result).slice(0, 3)).slice(0, 600)} nav: ${JSON.stringify(nav)}${audit.length ? ' audit: ' + audit.join(' | ').slice(0, 900) : ''}`);
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
@@ -298,7 +306,7 @@ try {
     report.samples.seat = r.samples;
     const throughDoor = doorXZ ? Math.min(...r.samples.map((s) => Math.hypot(s.p[0] - doorXZ[0], s.p[2] - doorXZ[1]))) : null;
     const climbing = r.samples.filter((s, i) => i && s.p[1] > r.samples[i - 1].p[1] + 0.05 && s.p[1] < floor1Y - 0.05 && Math.hypot(s.p[0] - HOUSE[0], s.p[2] - HOUSE[1]) < 6).length;
-    return { accepted: r.accepted, code: r.code, phase: r.phase, end: r.end, upstairs: !!r.end && upstairs(r.end.p), throughDoor, onGroundFirst: r.samples.some((s) => s.p[1] < 0.3), climbing, n: r.samples.length };
+    return { accepted: r.accepted, code: r.code, reason: r.reason, phase: r.phase, end: r.end, upstairs: !!r.end && upstairs(r.end.p), throughDoor, onGroundFirst: r.samples.some((s) => s.p[1] < 0.3), climbing, n: r.samples.length };
   }, (r) => r.accepted && r.end?.activity === 'sit' && r.upstairs && r.throughDoor !== null && r.throughDoor < 1.2 && r.onGroundFirst && r.climbing >= 3);
   await shots([{ name: 's7-seated-upstairs-roof-hidden', eye: [HOUSE[0] - 5, 13, HOUSE[1] + 8], at: [HOUSE[0] - 1, 2.8, HOUSE[1] - 1], wait: 8000, hideRoofs: true }]);
 

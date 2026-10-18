@@ -66,8 +66,16 @@ async function step(name, fn, expect) {
   const brief = summarize(result);
   report.steps.push({ name, ms: +ms.toFixed(0), ok: okay, result: brief, error });
   if (!okay) report.failures.push({ name, result: brief, error });
+  if (!okay && /route\.|unreachable/.test(JSON.stringify(result ?? '') + (error ?? ''))) await navDiag(name, result);
   log(`${okay ? '✔' : '✖'} ${name} — ${ms.toFixed(0)} ms${okay ? '' : ' — ' + (error ?? JSON.stringify(brief)).slice(0, 500)}`);
   return result;
+}
+// N1: a refused walk prints its refusal reason, the planner's failed-search memo and any memo audit lines.
+const reasonsIn = (v, out = []) => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if ((k === 'reason' || k === 'message') && typeof x === 'string') out.push(x); else reasonsIn(x, out); } return out; };
+async function navDiag(name, result) {
+  const nav = await api('/v1/debug/nav', { as: 'none' }).then((r) => r.data).catch((e) => String(e));
+  const audit = (serverLog.match(/\[stranded-audit\][^\n]*/g) ?? []).slice(-3);
+  log(`  ↳ ${name.split(' ')[0]} reason: ${JSON.stringify(reasonsIn(result).slice(0, 3)).slice(0, 600)} nav: ${JSON.stringify(nav)}${audit.length ? ' audit: ' + audit.join(' | ').slice(0, 900) : ''}`);
 }
 async function until(fn, ms = 120000, every = 500) { const t0 = Date.now(); let last; while (Date.now() - t0 < ms) { last = await fn(); if (last?.ok) return last; await sleep(every); } return last; }
 const act = (ops, note) => api('/v1/god/act', { body: { ops, note } });
@@ -275,7 +283,7 @@ try {
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:moss-cottage/living' } })).data;
     const r = await follow(a, { maxS: 200 });
     const placePath = (await cli('here')).data?.me?.placePath;
-    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room, placePath };
+    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, reason: a.reason ?? r.reason, phase: r.phase, room: r.room, placePath };
   }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && (r.placePath ?? []).includes('moss-cottage/living'));
   { const p = f6?.end?.p ?? (await observe()).self.position; if (p) await shots([{ name: 's6-in-the-living-room-roof-hidden', eye: [p[0] + 3, p[1] + 7, p[2] + 4], at: [p[0], p[1] + 0.8, p[2]], wait: 7000, hideRoofs: true }]); }
 

@@ -44,6 +44,7 @@ import {Travel,TravelError,launcherSite,TRAVEL_CONTRACT} from './travel/travel.t
 import {mountTravelRoutes} from './travel/routes.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 import {mountAgentInbox} from './inbox-routes.ts';
+import { strandedMetrics } from '../../../mars/viewer/engine/spatial/path.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2; edge?:EdgeLedger; god?: GodMode };
 
@@ -178,6 +179,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/v1/talk', (c) => c.json({ lines: d.db.recentTalk(intQ(c, 'limit', 60, 1, 200)) }));
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
+  app.get('/v1/debug/nav', (c) => c.json({ stranded: strandedMetrics() }, 200, { 'Cache-Control': 'no-store' }));
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
   // App owns the skill text (EDGE_SKILL_FILE / descriptor skillFile, read per request so edits apply live).
