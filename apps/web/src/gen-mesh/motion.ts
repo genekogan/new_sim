@@ -135,11 +135,11 @@ export function solidFootprints(model: WorldModel): readonly { id: string; fp: r
   const c = solidScan;
   if (c && c.model === model && c.size === model.entities.size && c.entities === revisionOf(model.entities) && c.defs === revisionOf(model.defs) && c.terrain === model.terrain) return c.solids;
   const solids: { id: string; fp: Box[] }[] = [];
-  for (const e of model.entities.values()) {
+  model.readPass(() => { for (const e of model.entities.values()) {
     const d = model.resolvedDef(e.def); if (!d || d.layer !== 'solid' || d.make.kind === 'none') continue;
     let fp: Box[]; try { fp = model.footprint(e, d); } catch { continue; }
     solids.push({ id: e.id, fp });
-  }
+  } });
   solidScan = { model, entities: revisionOf(model.entities), defs: revisionOf(model.defs), size: model.entities.size, terrain: model.terrain, solids };
   queueMicrotask(() => { if (solidScan?.solids === solids) solidScan = null; });
   return solids;

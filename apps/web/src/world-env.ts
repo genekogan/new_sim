@@ -80,6 +80,7 @@ type ModelLike = {
   entities: Map<string, { id: string; def: string; state?: Record<string, unknown> }>;
   resolvedDef(ref: string): { components?: { light?: AuthoredLight; lights?: AuthoredLight[] }; tags?: string[] } | undefined;
   worldPose(e: unknown): { x: number; y: number; z: number; yaw?: number; s?: number };
+  readPass?<T>(fn: () => T): T;
   constants?: { extent?: number };
   ground?(): { extent?: readonly number[] };
   editSeq?: number;
@@ -119,7 +120,7 @@ export class GodWorldLiving {
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
     const sources: NightSource[] = [], marks: HaloSource[] = [];
-    for (const e of m.entities.values()) {
+    const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
       const components = m.resolvedDef(e.def)?.components, lights = defLights(components);
       if (!lights.length) continue;
@@ -134,7 +135,8 @@ export class GodWorldLiving {
         sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42), intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25, pattern: light.pattern, phase });
         marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, light.pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
-    }
+    } };
+    if (m.readPass) m.readPass(scan); else scan();
     const bounds = worldNightBounds(m.constants?.extent, m.ground?.().extent);
     const sig = JSON.stringify([sources, marks, bounds]);
     if (sig === this.signature) return;

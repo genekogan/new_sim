@@ -82,6 +82,8 @@ export class WorldModel {
   private cells = new Map<string, Set<string>>(); // spatial hash of solid footprints
   private footprints = new Map<string, OBB[]>();
   private safetyKey?: { parts: unknown[]; key: object };
+  /** slotsOf per entity object, kept only inside readPass (lane L3g); any model mutation through its methods drops it. */
+  private slotMemo?: Map<Entity, Baked['slots']> | null;
 
   private safetyParts(): unknown[] | undefined {
     if (this.entities instanceof ModelMap && this.defs instanceof ModelMap)
@@ -115,6 +117,7 @@ export class WorldModel {
 
   /** Normalise, hash and store a def. Idempotent by hash. Returns the stored record. */
   defineDef(input: DefInput, by: string, born: number): StoredDef {
+    this.slotMemo?.clear();
     const def: Def = defSchema.parse(input);
     const { budget: _b, ...hashable } = def;
     const hash = hashOf(hashable);
@@ -142,6 +145,7 @@ export class WorldModel {
   }
   /** Copy a library def into the world's own store (pinned by hash). Returns it when it was newly adopted. */
   adopt(ref: string): StoredDef | undefined {
+    this.slotMemo?.clear();
     const k = aliasRef(ref);
     if (this.defs.has(k)) return undefined;
     const d = this.library?.get(k); if (!d) return undefined;
@@ -154,6 +158,7 @@ export class WorldModel {
   }
   /** Rebind a ref to content already retained by hash (trusted definition undo/redo). */
   restoreDef(ref: string, hash: string): StoredDef | undefined {
+    this.slotMemo?.clear();
     const d = this.def('sha:' + hash);
     if (!d || d.ref !== ref) return undefined;
     return this.store(d, true);
@@ -255,12 +260,14 @@ export class WorldModel {
     return parts.join('/');
   }
   insert(e: Entity) {
+    this.slotMemo?.clear();
     this.entities.set(e.id, e);
     const set = this.children.get(e.in.parent) ?? new Set();
     set.add(e.id); this.children.set(e.in.parent, set);
     if (e.name) this.names.set(`${e.in.parent}/${e.name}`, e.id);
   }
   delete(id: string) {
+    this.slotMemo?.clear();
     const e = this.entities.get(id); if (!e) return;
     this.entities.delete(id);
     this.children.get(e.in.parent)?.delete(id);
@@ -300,9 +307,20 @@ export class WorldModel {
     const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
     return { x: p[0], y: p.length === 3 ? p[1] : 0, z: p.length === 3 ? p[2] : p[1], yaw, s: e.s ?? 1 };
   }
-  slotsOf(e: Entity) {
-    const def = this.resolvedDef(e.def); if (!def) return [];
-    return this.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).slots;
+  slotsOf(e: Entity): Baked['slots'] {
+    const memo = this.slotMemo, hit = memo?.get(e); if (hit) return hit;
+    const def = this.resolvedDef(e.def);
+    const slots = def ? this.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).slots : [];
+    memo?.set(e, slots);
+    return slots;
+  }
+  /** Runs `fn` with slotsOf remembered per entity object (a slotted child's pose otherwise re-keys its parent's whole bake,
+   *  ~456 chars of params, once per child). For passes that only read the model: a bake is a pure function of the def,
+   *  params, seed and shape, so the answer is the same; insert/delete/def changes drop the memo. Nested passes share it. */
+  readPass<T>(fn: () => T): T {
+    if (this.slotMemo) return fn();
+    this.slotMemo = new Map();
+    try { return fn(); } finally { this.slotMemo = null; }
   }
   /** World-frame footprint boxes of an entity (its def's colliders transformed by its world pose). */
   footprint(e: Entity, def = this.resolvedDef(e.def)): OBB[] {
@@ -412,7 +430,7 @@ export class WorldModel {
     for (const [ref, hash] of Object.entries(s.defRefs ?? {})) { const d = w.def('sha:' + hash); if (d) w.defs.set(ref, d); }
     w.terrain = new Terrain(s.ground);
     for (const e of s.entities) w.insert(e);
-    for (const e of s.entities) { const def = w.resolvedDef(e.def); if (def && def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
+    w.readPass(() => { for (const e of s.entities) { const def = w.resolvedDef(e.def); if (def && def.layer === 'solid') w.index(e.id, w.footprint(e, def)); } });
     return w;
   }
 }

@@ -88,7 +88,7 @@ export class WorldEntityLayer {
       if (JSON.stringify(snap.ground) !== prevGround) { this.rebuildTerrain(); this.rebuildWater(); this.buildHorizon(); }
       const keep = new Set(snap.entities.map((e) => e.id));
       for (const id of [...this.drawn.keys()]) if (!keep.has(id)) this.undraw(id);
-      for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id));
+      this.model.readPass(() => { for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id)); });
       this.stats.resyncs++;
     } catch { /* next check retries */ } finally { this.resyncing = false; }
   }
@@ -115,7 +115,7 @@ export class WorldEntityLayer {
     this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
     this.rebuildWater();
     this.buildHorizon();
-    for (const e of snap.entities) this.draw(e, false);
+    this.model.readPass(() => { for (const e of snap.entities) this.draw(e, false); });
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
