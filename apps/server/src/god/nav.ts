@@ -361,23 +361,41 @@ export class GodNav {
       const inside = d <= UPPER_ROOMS_WITHIN || myLevel !== 0 || rooms.some((r) => r.level === 0 && !!r.poly && inPoly(here[0], here[1], r.poly));
       for (const rt of rooms) if (rt.level === 0 || (rt.rise ?? 0) < LOW_RISE_M || inside) pick.push({ t: rt, d: this.distance(rt, here) });
     }
-    for (const { t, d } of pick) {
-      const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
-      const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
-      const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
-        ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
-      caps.push(cap);
-      if (!goal) continue;
-      const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
-      // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
-      const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
-      // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
-      // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
-      const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
-      plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
-      if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
-    }
+    for (const { t, d } of pick) this.offerWalk(soul, t, d, { here, myLevel, seated, exit }, caps, plans);
   }
+
+  /** A walk to one named place the listing leaves out for distance (the far big top, asked for by name): the same
+   *  capability the listing would give it from here. Ground-floor things and rooms only (an upper floor's rooms need a
+   *  multi-floor reach check; walk to the building first). True when a capability was added. */
+  walkOnDemand(soul: EdgeSoul, placeId: string, caps: EdgeCapability[], plans: Plans): boolean {
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.h.placeOf) return false;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
+    const all = this.things(), mine = all.filter((t) => this.h.placeOf!(t.ref) === placeId && (t.kind !== 'room' || t.level === 0));
+    const t = mine.find((x) => x.kind !== 'room') ?? mine[0]; if (!t) return false;
+    const exit = myLevel === 0 ? null : all.find((r) => r.kind === 'room' && r.level === myLevel && r.poly && inPoly(here[0], here[1], r.poly) && r.entry && r.entry.level === 0)?.entry ?? null;
+    const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit', n = caps.length;
+    this.offerWalk(soul, t, this.distance(t, here), { here, myLevel, seated, exit }, caps, plans);
+    return caps.length > n;
+  }
+
+  private offerWalk(soul: EdgeSoul, t: Thing, d: number, at: { here: Vec2; myLevel: number; seated: boolean; exit: { p: Vec2; level: number } | null }, caps: EdgeCapability[], plans: Plans) {
+    const { here, myLevel, seated, exit } = at;
+    const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) return;
+    const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+    const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
+      ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
+    caps.push(cap);
+    if (!goal) return;
+    const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];
+    // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
+    const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
+    // from a raised floor to somewhere far on the ground, first walk out of the building (the engine plans long walks
+    // on the ground only: "too far to plan from an upper floor; walk down first" — Mars: kitchen dining hall -> Freeside)
+    const down: Step[] = exit && goal.level === 0 && Math.hypot(goal.p[0] - here[0], goal.p[1] - here[1]) > DOWN_FIRST_M ? [{ verb: 'mars:walk_to', params: { x: exit.p[0], z: exit.p[1], level: exit.level } }] : [];
+    plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, ...down, go] });
+    if (place) this.placeCapabilities(t, place, here, d, [...stand, ...down, go], myLevel, caps, plans);
+  }
+
   /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend
    *  a while), and for an open area big enough, a stroll through it (a loop of clear stops inside it). */
   private placeCapabilities(t: Thing, place: string, here: Vec2, d: number, go: Step[], myLevel: number, caps: EdgeCapability[], plans: Plans) {
@@ -425,12 +443,38 @@ export class GodNav {
   }
   /** Named things within 15 m of a thing (its "by the X"), nearest first. */
   landmarks(t: Thing, n = 2): Thing[] {
-    return this.byVersion(`l|${t.ref}|${n}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
+    return this.byVersion(`l|${t.ref}|${n}`, () => this.within(t.at, 15).filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o));
   }
   /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
   namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
-    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.things().filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
+    return this.byVersion(`n|${at[0]},${at[1]}|${except}|${n}|${within}`, () => this.within(at, within).filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref));
   }
+  /** L1: the things (rooms included) that can lie within `r` m of a point by `distance`, in things() order — a superset
+   *  (callers filter by distance as before), so "by the X" answers are unchanged. A grid of each thing's box (a path's
+   *  grown by half its width), rebuilt with the things list; was a scan of all ~3,000 Eden 2026 things per label
+   *  (~1.2 s of a new Soul's first listing). */
+  private within(at: Vec2, r: number): Thing[] {
+    const all = this.things();
+    if (this.grid?.of !== all) {
+      const cells = new Map<number, number[]>(), always: number[] = [];
+      all.forEach((t, i) => {
+        const pts = t.area ?? t.path ?? t.poly ?? [t.at], pad = !t.area && t.path ? Math.max(0, (t.width ?? 3) / 2) : 0;
+        let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+        for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+        if (!(x0 <= x1 && z0 <= z1) || !Number.isFinite(x0 + x1 + z0 + z1 + pad)) return;  // no outline: never within r
+        const i0 = Math.floor((x0 - pad) / NEAR_CELL), i1 = Math.floor((x1 + pad) / NEAR_CELL), j0 = Math.floor((z0 - pad) / NEAR_CELL), j1 = Math.floor((z1 + pad) / NEAR_CELL);
+        if ((i1 - i0 + 1) * (j1 - j0 + 1) > 4096) { always.push(i); return; }
+        for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) { const k = cellKey(ci, cj), l = cells.get(k); if (l) l.push(i); else cells.set(k, [i]); }
+      });
+      this.grid = { of: all, cells, always };
+    }
+    const g = this.grid, m = r + 1, seen = new Set<number>(g.always);   // (+1 m: float slack; the caller's distance test decides)
+    const i0 = Math.floor((at[0] - m) / NEAR_CELL), i1 = Math.floor((at[0] + m) / NEAR_CELL), j0 = Math.floor((at[1] - m) / NEAR_CELL), j1 = Math.floor((at[1] + m) / NEAR_CELL);
+    if (!((i1 - i0 + 1) * (j1 - j0 + 1) <= 4096)) return all;
+    for (let ci = i0; ci <= i1; ci++) for (let cj = j0; cj <= j1; cj++) for (const i of g.cells.get(cellKey(ci, cj)) ?? []) seen.add(i);
+    return [...seen].sort((a, b) => a - b).map((i) => all[i]);
+  }
+  private grid: { of: Thing[]; cells: Map<number, number[]>; always: number[] } | null = null;
   /** "by the X" answers depend only on the named things (index version): remembered until the world changes (each
    *  label scanned every thing: ~0.25 s of every capabilities sweep in the Eden 2026 cafe). */
   private nearMemo = new Map<string, unknown>();
@@ -442,6 +486,8 @@ export class GodNav {
   }
 }
 
+const NEAR_CELL = 16;
+const cellKey = (i: number, j: number) => (i + 0x8000) * 0x10000 + (j + 0x8000);
 function polyDist(poly: Vec2[], p: Vec2) { return inPoly(p[0], p[1], poly) ? 0 : nearestOn(poly, p, true).d; }
 
 function roomSamples(poly: Vec2[], at: Vec2, step = 0.6): Vec2[] {

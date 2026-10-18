@@ -767,6 +767,8 @@ export class EngineBridge {
     L.nativeUseRefusal = capability => priorUseRefusal?.(capability) ?? this.bedUseRefusal(capability);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);
+    // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
+    L.walkOnDemand = (soul, id, caps, plans) => { let added = false; try { const go = () => { added = this.nav.walkOnDemand(soul, id, caps, plans); }, eng = this.engine as unknown as { readPassV1?: (f: () => void) => void }; if (eng.readPassV1) eng.readPassV1(go); else go(); } catch (e) { this.log(`walk on demand: ${(e as Error).message}`); } releaseBigScratch(); return added; };
     L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };

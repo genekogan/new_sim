@@ -1692,10 +1692,11 @@ export class MarsEngine implements Engine {
       .map(slot=>{const approach=seatApproach(this.rt,slot);return {id:slot.id,p:[...slot.p] as [number,number],level:slot.level,...(Array.isArray(approach)?{approach:[...approach] as [number,number]}:{})};}));
   }
   /** world-edit/1 read: whether a body of the default human profile can walk from one standing point to another
-   *  (levels included, stairs and doors as the planner sees them), and how far. Pure read. */
+   *  (levels included, stairs and doors as the planner sees them), and how far. Pure read. A failing search is proved early
+   *  (identical results; path.ts proveUnreachable): a Soul's look into a house tries up to 14 points per closed-off room. */
   reachV1(from:{p:[number,number];level?:number},to:{p:[number,number];level?:number}):{ok:true;length:number;legs:number;levels:number[]}|{ok:false;code:string;message:string}{
     const spatial=this.rt.services.spatial as Spatial;
-    const r=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:from.level??0,p:from.p},{level:to.level??0,p:to.p});
+    const r=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:from.level??0,p:from.p},{level:to.level??0,p:to.p},{proveUnreachable:true});
     if(!r.ok)return {ok:false,code:r.diagnostic.code,message:r.diagnostic.message};
     const levels=[...new Set(r.route.legs.map((l:any)=>l.kind==='walk'?l.level:l.link.to.level))] as number[];
     return {ok:true,length:Math.round(r.route.length*100)/100,legs:r.route.legs.length,levels};
