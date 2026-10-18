@@ -40,6 +40,8 @@ async function setup(t: TestContext, names = ['Rowan', 'Mina']) {
   return { ...f, god, edge, bridge, souls, settle, until, body, bed, crib, chair };
 }
 type W = Awaited<ReturnType<typeof setup>>;
+// the engine body state lane beds/1 adds (berth, mattress seatHeight)
+const hs = (e: { human?: unknown }) => e.human as { activity: string; berth?: string; seatHeight?: number };
 const berthPoints = (w: W) => {
   const e = w.host.engine.world.entities[w.bed], c = Math.cos(e.pose.yaw), s = Math.sin(e.pose.yaw);
   // the engine asset's berths (local x, z → world), from catalog-adapter berthSlots
@@ -52,7 +54,7 @@ const lie = async (w: W, s: W['souls'][number], verb: 'lie' | 'sleep', seconds: 
   assert.equal(out.accepted, true, JSON.stringify(out));
   return (out as { receipt: { id: string } }).receipt.id;
 };
-const lying = (w: W, s: W['souls'][number]) => { const h = w.body(s).human!; return (h.activity === 'lie' || h.activity === 'nap') && !!h.berth; };
+const lying = (w: W, s: W['souls'][number]) => { const h = hs(w.body(s)); return (h.activity === 'lie' || h.activity === 'nap') && !!h.berth; };
 
 test('a resident lies down on a god-built double bed, rests on the mattress and gets up again', async t => {
   const w = await setup(t), [soul] = w.souls;
@@ -65,7 +67,7 @@ test('a resident lies down on a god-built double bed, rests on the mattress and 
   }
   const receipt = await lie(w, soul, 'lie', 3);
   assert.ok(await w.until(() => lying(w, soul)), 'the body reaches the berth');
-  const h = w.body(soul).human!, at = [w.body(soul).pose.p[0], w.body(soul).pose.p[2]];
+  const h = hs(w.body(soul)), at = [w.body(soul).pose.p[0], w.body(soul).pose.p[2]];
   assert.equal(h.activity, 'lie');
   assert.equal(h.seatHeight, 0.5);
   const on = berths.find((b) => near(at, b.p))!;
@@ -73,7 +75,7 @@ test('a resident lies down on a god-built double bed, rests on the mattress and 
   assert.equal(h.berth, `${w.bed}#${on.id}`);
   assert.equal(w.edge.capabilities(soul).find((q) => q.id === `lie:${w.bed}`)?.blocked?.code, 'bed.yours');
   assert.ok(await w.until(() => w.edge.receipt(soul.soulId, receipt)?.phase === 'completed'), JSON.stringify(w.edge.receipt(soul.soulId, receipt)));
-  const after = w.body(soul).human!, there = [w.body(soul).pose.p[0], w.body(soul).pose.p[2]];
+  const after = hs(w.body(soul)), there = [w.body(soul).pose.p[0], w.body(soul).pose.p[2]];
   assert.equal(after.activity, 'idle');
   assert.equal(after.berth, undefined);
   assert.equal(after.seatHeight, undefined);
@@ -86,10 +88,10 @@ test('two residents share a double bed; a third finds it taken; a crib is never 
   const w = await setup(t, ['Rowan', 'Mina', 'Ines']), [a, b, c] = w.souls;
   await lie(w, a, 'sleep', 60);
   assert.ok(await w.until(() => lying(w, a)));
-  assert.equal(w.body(a).human!.activity, 'nap');
+  assert.equal(hs(w.body(a)).activity, 'nap');
   await lie(w, b, 'lie', 60);
   assert.ok(await w.until(() => lying(w, b)));
-  assert.notEqual(w.body(a).human!.berth, w.body(b).human!.berth, 'each on their own berth');
+  assert.notEqual(hs(w.body(a)).berth, hs(w.body(b)).berth, 'each on their own berth');
   const third = w.edge.capabilities(c).find((q) => q.id === `lie:${w.bed}`)!;
   assert.equal(third.available, false);
   assert.equal(third.blocked?.code, 'bed.taken', JSON.stringify(third));
@@ -108,7 +110,7 @@ test('a resident asleep on the bed is interrupted by a new act: gets up first, t
   assert.ok(await w.until(() => lying(w, soul)));
   const out = await accept(w.host, w.edge.act(soul, { capability: 'wander:here', params: { seconds: 5 } }));
   assert.equal(out.accepted, true, JSON.stringify(out));
-  assert.ok(await w.until(() => !w.body(soul).human!.berth && w.body(soul).human!.activity !== 'stand-up', 400), 'stood up off the bed');
+  assert.ok(await w.until(() => !hs(w.body(soul)).berth && hs(w.body(soul)).activity !== 'stand-up', 400), 'stood up off the bed');
   assert.notEqual(w.edge.receipt(soul.soulId, receipt)?.phase, 'started');
   assert.deepEqual((w.host.engine as unknown as { seatOccupantsV1: (id: string, kind: string) => unknown[] }).seatOccupantsV1(w.bed, 'berth'), [], 'berth released');
   assert.deepEqual(w.host.engine.runtime.violations, []);
