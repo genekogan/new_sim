@@ -28,6 +28,8 @@ const POSE_OVERLAY_SET: ReadonlySet<string> = new Set(['read', 'browse', 'write'
   'use-computer', 'sing', 'listen', 'lift-weights', 'swing', 'seesaw', 'picnic', 'tell-story']);
 export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
+/** beds/1: a body lying on a bed's berth, while its own active take_slot holds that berth (social/actions.ts). */
+const onOwnBerth = (rt: Runtime, e: import('../world/types.ts').Entity) => !!e.human?.berth && !!e.human.task && rt.holder(`slot:${e.human.berth}`).includes(e.human.task);
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
@@ -35,7 +37,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
   for (const e of entityList(rt.world)) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
     // activities/1 overlays on a seat (read, play-piano…) keep the seated exemption (baseActivity 'sit'; social/pose.ts)
-    if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
+    if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || onOwnBerth(rt, e) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
     const g = sp.levelAt(e.human.level, [e.pose.p[0], e.pose.p[2]]);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);

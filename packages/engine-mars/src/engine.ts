@@ -1677,10 +1677,10 @@ export class MarsEngine implements Engine {
     for(const slot of fixtureSlots(this.rt,e)){const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)return {body:actor,how:'occupied'};}
     return null;
   }
-  /** world-edit/1 read (F1): who sits on which seat slot of a fixture now (`seat-1` → the body's id). */
-  seatOccupantsV1(id:string):{slot:string;body:string}[]{
+  /** world-edit/1 read (F1): who sits on which seat slot of a fixture now (`seat-1` → the body's id); beds/1: kind 'berth' → who lies on which berth. */
+  seatOccupantsV1(id:string,kind:'seat'|'berth'='seat'):{slot:string;body:string}[]{
     const e=this.ents[id];if(!e)return [];const out:{slot:string;body:string}[]=[];
-    for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat')continue;const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)out.push({slot:slot.id.slice(id.length+1),body:actor});}
+    for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!==kind)continue;const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)out.push({slot:slot.id.slice(id.length+1),body:actor});}
     return out;
   }
   /** Pure world-edit read: actual free native seat slots and their controller's

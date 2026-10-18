@@ -103,6 +103,8 @@ export type HumanState = {
   prop?: string;
   /** activities/1: seat top (m above the feet) while seated at a scenery spot with no native seat fixture (piano bench, armchair). */
   seatHeight?: number;
+  /** beds/1 (social/actions.ts take_slot): the berth slot (`<bed>#<slot>`) this body lies on; `seatHeight` is its mattress top. */
+  berth?: string;
   /** together/1 (social/pose.ts): the small item carried in the hand between activities (book, flower, cup…); shown as `prop`. */
   holding?: string;
   /** together/1: the body this one is doing a paired gesture with (hug, handshake, high-five, give/take, dance together). */

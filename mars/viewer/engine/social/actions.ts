@@ -34,9 +34,11 @@ import { ambientWander } from './ambient.ts';
 
 const id80 = z.string().min(1).max(80);
 const xz = z.tuple([z.number().min(-500).max(500), z.number().min(-500).max(500)]);
-export const ACTIVITIES = ['sit', 'watch', 'warm', 'talk', 'listen', 'idle'] as const;
+export const ACTIVITIES = ['sit', 'watch', 'warm', 'talk', 'listen', 'idle', 'lie', 'nap'] as const;
+/** beds/1: the activities a berth is held in (lying awake, asleep); only a berth takes them. */
+const BERTH_ACTIVITIES: ReadonlySet<string> = new Set(['lie', 'nap']);
 const activity = z.enum(ACTIVITIES);
-const DEFAULT_ACTIVITY: Record<SlotKind, (typeof ACTIVITIES)[number]> = { seat: 'sit', audience: 'watch', 'fire-circle': 'warm', stand: 'idle' };
+const DEFAULT_ACTIVITY: Record<SlotKind, (typeof ACTIVITIES)[number]> = { seat: 'sit', audience: 'watch', 'fire-circle': 'warm', stand: 'idle', berth: 'lie' };
 
 // ---------- shared helpers ----------
 
@@ -75,7 +77,7 @@ function setActivity(rt: Runtime, actors: string[], task: string, act: string) {
 function idle(rt: Runtime, actors: string[], task: string) {
   for (const a of actors) {
     const h = rt.world.entities[a]?.human;
-    if (h && h.task === task) { h.task = undefined; h.activity = 'idle'; }
+    if (h && h.task === task) { h.task = undefined; h.activity = 'idle'; if (h.berth) { delete h.berth; delete h.seatHeight; } }
   }
 }
 
@@ -162,7 +164,10 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
         const owner = p.owner!;
         const all = slotsOf(rt, owner);
         if (!Array.isArray(all)) return { ok: false, diagnostic: all };
-        const ok = all.filter((s) => !kinds || kinds.includes(s.kind));
+        const kindOk = all.filter((s) => !kinds || kinds.includes(s.kind));
+        // beds/1: "lie on the caravan" takes one of its berths, "sit in the caravan" one of its seats (a mismatch is refused below)
+        const fits = kindOk.filter((s) => !p.activity || (s.kind === 'berth') === BERTH_ACTIVITIES.has(p.activity));
+        const ok = fits.length ? fits : kindOk;
         const free = ok.filter((s) => isFree(rt.world, s, new Set([p.actor])));
         if (!free.length) {
           return { ok: false, diagnostic: { code: 'slot.none-free', message: `${p.actor} has no free ${kinds ? `${kinds.join('/')} ` : ''}slot at ${owner}: all ${ok.length} are taken (${whyTaken(rt.world, ok, new Set([p.actor]))})`, subjects: [p.actor, owner] } };
@@ -174,6 +179,9 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
       }
       if (kinds && !kinds.includes(slot.kind))
         return { ok: false, diagnostic: { code: 'slot.wrong-kind', message: `${slot.id} is a ${slot.kind} slot; ${verb} needs ${kinds.join('/')}`, subjects: [p.actor, slot.id] } };
+      // beds/1: a berth is lain on (awake or asleep), and only a berth is
+      if (p.activity && (slot.kind === 'berth') !== BERTH_ACTIVITIES.has(p.activity))
+        return { ok: false, diagnostic: { code: 'slot.wrong-activity', message: slot.kind === 'berth' ? `${slot.id} is a berth: lie or nap on it, not ${p.activity}` : `${p.activity} needs a berth (a bed); ${slot.id} is a ${slot.kind} slot`, subjects: [p.actor, slot.id] } };
       const approachFor = (slot: Slot): { approach?: Vec2; routeChecked: boolean } | Diagnostic => {
         const onSeat = dist2(pos2(a), slot.p) < 0.05 && a.human!.level === slot.level;
         let approach: Vec2 | undefined, routeChecked = false, routeIssue: Diagnostic | undefined;
@@ -239,8 +247,8 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
     },
     start(rt, p, { slot, approach }, id) {
       const a = rt.world.entities[p.actor];
-      // a fixture seat is always occupied sitting (and 'sit' is the seated invariant exemption)
-      const act = approach ? 'sit' : p.activity ?? DEFAULT_ACTIVITY[slot.kind];
+      // a fixture seat is always occupied sitting (and 'sit' is the seated invariant exemption); a berth lying or asleep
+      const act = slot.kind === 'berth' ? (p.activity === 'nap' ? 'nap' : 'lie') : approach ? 'sit' : p.activity ?? DEFAULT_ACTIVITY[slot.kind];
       const ex: SlotExec = { id, actor: p.actor, slot, approach, activity: act, phase: 'approach', t: 0, dur: 0 };
       const here = pos2(a), level = a.human!.level === slot.level;
       if (level && dist2(here, slot.p) < 0.05) { ex.phase = 'turn'; ex.approach = undefined; } // already on the seat
@@ -276,10 +284,12 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
           return { status: 'running', phase: 'turn' };
         }
         if (ex.approach) { ex.phase = 'sit-down'; ex.from = pos2(a); ex.t = 0; ex.dur = sitDuration(dist2(ex.from, ex.slot.p)); }
-        else ex.phase = 'occupied';
+        else { ex.phase = 'occupied'; if (ex.slot.kind === 'berth') { a.human!.berth = ex.slot.id; a.human!.seatHeight = ex.slot.height ?? 0.5; } }
       }
       if (ex.phase === 'sit-down') {
         setActivity(rt, [ex.actor], ex.id, 'sit-down');
+        // beds/1: the body is on the berth (its mattress height; invariants.ts exempts it while this task holds the berth)
+        if (ex.slot.kind === 'berth') { a.human!.berth = ex.slot.id; a.human!.seatHeight = ex.slot.height ?? 0.5; }
         if (!transition(rt, ex, ex.slot.p, dt)) return { status: 'running', phase: 'sit-down' };
         ex.phase = 'occupied';
       }
@@ -313,7 +323,7 @@ const oneOf = <T extends Record<string, unknown>>(keys: (keyof T)[]) => (p: T) =
 
 export const takeSlot = slotAction(
   'take_slot',
-  'Walk a person to an interaction slot (explicit `slot` id "<owner>#<slot>", or the nearest free slot of fixture/region `owner`), face its heading and hold `activity` (default by slot kind: seat→sit, audience→watch, fire-circle→warm) until cancelled or `stand`. Fails slot.none-free when every slot is taken.',
+  'Walk a person to an interaction slot (explicit `slot` id "<owner>#<slot>", or the nearest free slot of fixture/region `owner`), face its heading and hold `activity` (default by slot kind: seat→sit, audience→watch, fire-circle→warm, berth→lie; a berth also takes nap) until cancelled or `stand`. Fails slot.none-free when every slot is taken.',
   null,
   z.strictObject({ actor: id80, slot: id80.optional(), owner: id80.optional(), activity: activity.optional() }).refine(oneOf(['slot', 'owner']), 'give exactly one of slot, owner'),
 );

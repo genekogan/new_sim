@@ -63,7 +63,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
   /** A world target whose physical use is unsupported must refuse, even during quiet renewal.
    * Checked on admission/dispatch/completion, never by a per-tick world scan. Historical terminal receipts stay immutable. */
-  nativeUseRefusal?: (capability: string) => {code: string; reason: string} | null;
+  /** `steps`, when known, is the body plan about to run for the capability (beds/1: a bed is used only by its native berth). */
+  nativeUseRefusal?: (capability: string, steps?: Program['steps']) => {code: string; reason: string} | null;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
   placeWalkable?: (placeId: string) => boolean;
@@ -373,7 +374,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({label: p.label, steps: p.steps}), this.host.worldId, p.receipt);
   }
   private async decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
-    const unsupported = this.nativeUseRefusal?.(capability);
+    const unsupported = this.nativeUseRefusal?.(capability, steps);
     if (unsupported) { this.update(receipt, {phase: 'failed', code: unsupported.code, reason: unsupported.reason}); return; }
     return this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: capability, label, steps, reevalTicks: 1e9, fallback: false, trigger: `edge-act:${receipt}`});
   }
@@ -787,12 +788,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** CN5 (acceptance: reservation.conflict on the Soul's own seat): a seated body that is going somewhere or doing
    *  something with its whole body gets up first; overlays done on the seat (read, eat, wave…) keep it. */
   private standIfSeated(soul: EdgeSoul, steps: Program['steps']): Program['steps'] {
-    const first = steps[0]?.verb; if (!first || ['stand', 'mars:pose_v1', 'wave', 'face', 'rest'].includes(first) || !this.seatOf(soul.entityId)) return steps;
+    const first = steps[0]?.verb; if (!first || ['stand', 'mars:pose_v1', 'wave', 'face', 'rest'].includes(first) || (!this.seatOf(soul.entityId) && !this.lyingOnBerth(soul.entityId))) return steps;
     return [{verb: 'stand', params: {}}, ...steps];
   }
   /** Start a body plan as the Soul's act: queued through a quiet renewal or a safe stop, else decided now. */
   private async launch(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}, commit?: (receipt: string) => void,contentParams:Record<string,unknown>={}) {
-    const nativeUse = this.nativeUseRefusal?.(capability);
+    const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return {...refuse(nativeUse.code, nativeUse.reason), ...resolved};
     const unsupported=bodyCapabilityProblem(this.body(soul.entityId),{id:capability,verb:capability.split(':')[0]!,label,available:true},steps);if(unsupported)return refuse(unsupported.code,unsupported.reason);
     if (this.host.quietBarrier) {
@@ -862,7 +863,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
     const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code); return {accepted: false as const, code, reason};};
-    const nativeUse = this.nativeUseRefusal?.(capability);
+    const nativeUse = this.nativeUseRefusal?.(capability, steps);
     if (nativeUse) return refuse(nativeUse.code, nativeUse.reason);
     if(admission)return this.performAtomicObjectBodies(soul,capability,label,steps,clientRef,admission);
     if (this.faded.has(soul.soulId)) return refuse('soul.faded', 'This Soul has faded; act once (e.g. stand:here) to come back first.');
@@ -1069,6 +1070,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
   // ---------------------------------------------------------------- perception
   private mind(soul: EdgeSoul): Mind {const m = this.host.minds.get(soul.soulId); if (!m) throw new EdgeError(404, 'not-found', 'this Soul has no body in the world'); return m;}
   private body(entityId: string) {return (this.host.engine.world as NativeWorld).entities[entityId];}
+  /** beds/1: the body lies on a bed's berth (a live take_slot held lying or asleep). */
+  private lyingOnBerth(entityId: string): boolean {
+    const live = new Set(this.host.engine.runtime.liveIds());
+    for (const r of this.host.engine.runtime.records.values()) {const p = r.params as Record<string, unknown>; if (live.has(r.id) && r.verb === 'take_slot' && p.actor === entityId && (p.activity === 'lie' || p.activity === 'nap')) return true;}
+    return false;
+  }
   private seatOf(entityId: string): string | null {
     const live = new Set(this.host.engine.runtime.liveIds());
     for (const r of this.host.engine.runtime.records.values()) {const p = r.params as Record<string, unknown>; if (live.has(r.id) && r.verb === 'sit' && p.actor === entityId && typeof p.slot === 'string') return p.slot;}

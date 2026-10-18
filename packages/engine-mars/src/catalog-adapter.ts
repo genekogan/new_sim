@@ -39,9 +39,10 @@ const r4 = (v: number) => Math.round(v * 10000) / 10000;
 const short = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex').slice(0, 10);
 
 /** Engine asset id for a def at given params/scale: stable, namespaced, ≤ 80 chars. */
-export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'> & Partial<Pick<DefFacts, 'slots'>>, paramsKey: string): string {
+export function assetIdFor(d: Pick<DefFacts, 'ref' | 'hash' | 'box'> & Partial<Pick<DefFacts, 'slots' | 'components'>>, paramsKey: string): string {
   // A policy change gets a new asset identity. Old logged assets/active slots keep their original approach semantics.
-  const policy = (d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '') + (isFireCircleDef(d) ? '|fire-circle/1' : '') + (d.slots && crossSeated(d as Pick<DefFacts, 'slots' | 'box'>) ? '|seat-approach:slot' : '');
+  const policy = (d.slots?.some((s) => s.kind === 'seat') ? '|seat-approach:reachable/1' : '') + (isFireCircleDef(d) ? '|fire-circle/1' : '') + (d.slots && crossSeated(d as Pick<DefFacts, 'slots' | 'box'>) ? '|seat-approach:slot' : '')
+    + (d.slots && berthSlots(d as Pick<DefFacts, 'slots' | 'box'> & Partial<Pick<DefFacts, 'components'>>).length ? '|berth/1' : '');
   return `ew:${d.ref.replace(/[^a-z0-9/@._-]/gi, '').slice(0, 48)}:${short(`${d.hash}|${paramsKey}|${d.box.map(r4).join(',')}${policy}`)}`;
 }
 
@@ -81,6 +82,28 @@ export function fireCircleSlots(ring: number, seats: { p: [number, number, numbe
   return out;
 }
 
+/** beds/1: the smallest berth an adult lies on (along the body, m) and the mattress tops a body can get onto from its feet. */
+export const BERTH_MIN_LENGTH = 1.8, BERTH_MIN_HEIGHT = 0.1, BERTH_MAX_HEIGHT = 1.0;
+/** beds/1: the farthest a berth lies from a long side of its piece (m): a body gets on from beside the mattress. A bed
+ *  inside a shell (a caravan's, a tent's: 1.2 m and 1.0 m in) would be got onto through the wall, so it is no berth. */
+export const BERTH_MAX_EDGE = 0.6;
+/** beds/1: a def's bed slots that an adult can lie on, as engine berths (local frame, Mars yaw: head → feet, like a seat's
+ *  facing). A berth qualifies only when the def's box runs at least BERTH_MIN_LENGTH along it, its mattress top is
+ *  BERTH_MIN_HEIGHT–BERTH_MAX_HEIGHT up and it lies within BERTH_MAX_EDGE of a long side; a crib, a pram, a bathtub,
+ *  a bunk's upper berth or the bed inside a caravan stay unusable (and unoffered). */
+export function berthSlots(d: Pick<DefFacts, 'slots' | 'box'> & Partial<Pick<DefFacts, 'components'>>): SlotDef[] {
+  if (d.components?.carryable || d.components?.hover) return [];
+  return d.slots.filter((s) => s.kind === 'bed').flatMap((s) => {
+    const yaw = Math.PI / 2 - s.yaw, height = s.height ?? s.p[1];
+    const length = Math.abs(Math.cos(yaw)) * d.box[0] + Math.abs(Math.sin(yaw)) * d.box[2];
+    if (!(length >= BERTH_MIN_LENGTH - 1e-6) || !(height >= BERTH_MIN_HEIGHT && height <= BERTH_MAX_HEIGHT)) return [];
+    // the across-axis offset of the berth from the nearer long side of the box (bed-l of a double bed: 0.375 m)
+    const across = Math.abs(Math.sin(yaw)) * (d.box[0] / 2 - Math.abs(s.p[0])) + Math.abs(Math.cos(yaw)) * (d.box[2] / 2 - Math.abs(s.p[2]));
+    if (!(across <= BERTH_MAX_EDGE + 1e-6)) return [];
+    return [{ id: s.id, kind: 'berth' as const, local: [r4(s.p[0]), r4(s.p[2])] as [number, number], yaw: r4(yaw), height: r4(height), approachPolicy: 'reachable/1' as const }];
+  });
+}
+
 /** A thing that floats or hovers (a canoe, a rowing boat): it lies in the water beside a jetty or a bank, so its box is
  *  no walking obstacle there (party F1: a moored canoe's box closed the jetty); it is boarded from its side. */
 export const isFloatingDef = (d: Pick<DefFacts, 'components'>) => !!d.components.hover;
@@ -111,7 +134,8 @@ export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}
   // B6: the stone ring is the def's description's size when it says so ("a ring of stones (1.6 m)"), else 1 m
   const ring = Number(/ring of stones \((\d+(?:\.\d+)?) m\)/.exec(d.description ?? '')?.[1] ?? 1);
   const fire = isFireCircleDef(d) ? fireCircleSlots(Math.min(ring, Math.min(w, dd)), d.slots.filter((s) => s.kind === 'seat')) : [];
-  if (seats.length || stands.length || fire.length) out.slots = [...seats, ...stands, ...fire];
+  const berths = berthSlots(d);
+  if (seats.length || stands.length || fire.length || berths.length) out.slots = [...seats, ...stands, ...fire, ...berths];
   if (seats.length && crossSeated(d)) out.seatApproach = 'slot';
   const tops = d.slots.filter((s) => s.kind === 'surface' || s.kind === 'shelf');
   if (tops.length) out.surfaceSlots = tops.flatMap((s) => surfaceLattice(s.id, tops.length === 1 ? w : Math.min(w, 1.2), tops.length === 1 ? dd : Math.min(dd, 0.8), s.height ?? s.p[1] ?? c.surface?.height ?? h, tops.length === 1 ? 0 : s.p[0], tops.length === 1 ? 0 : s.p[2]));
