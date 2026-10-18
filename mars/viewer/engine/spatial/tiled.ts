@@ -177,7 +177,10 @@ export class GroundNav {
   /** Floor slabs at most this far above the ground there raise the standing height to the slab (m). */
   static FLOOR_RISE = 0.5;
   private deckKey = '';
+  /** N1 audit (SIM_STRANDED_AUDIT): the last floors given, so a fresh nav can be built over the same static world. */
+  lastFloors: Surface[] = [];
   setFloors(surfaces: Surface[]) {
+    this.lastFloors = surfaces;
     // decks first (they change the field the floors below are measured on)
     const b = this.base, decks = surfaces.filter((s) => [s.obb.c as Vec2, ...obbCorners(s.obb)].some(([x, z]) => s.y > b.height(x, z) + GroundNav.FLOOR_RISE));
     const key = decks.length ? fnv(decks.map((s) => `${s.id}:${s.y}:${s.obb.c}:${s.obb.half}:${s.obb.yaw}`).join('|')).toString(16) : '';
@@ -698,7 +701,12 @@ export const PAGED_DIRECT_M = 72;
 export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts): RouteResult {
   const f = nav.field, direct = hypot(goal.p[0] - start.p[0], goal.p[1] - start.p[1]) <= PAGED_DIRECT_M;
   if (start.level !== 0 || goal.level !== 0) {
-    if (direct) { const r = rectOf([start.p, goal.p]); return findRoute(nav.gridsOver(r, scene), { ...scene, bounds: rectBounds(r) }, profile, start, goal, opts); }
+    if (direct) {
+      const r = rectOf([start.p, goal.p]), gs = nav.gridsOver(r, scene);
+      const res = findRoute(gs, { ...scene, bounds: rectBounds(r) }, profile, start, goal, opts);
+      if (NAV_AUDIT && !res.ok && res.diagnostic.code === 'route.unreachable') try { navAudit(nav, r, gs, scene, profile, start, goal, opts); } catch (e) { console.error(`[nav-audit] threw ${String(e).slice(0, 200)}`); }
+      return res;
+    }
     if (start.level !== 0) return failR('ground.too-far', `(${fmt(goal.p)}) is too far to plan from an upper floor; walk down first`, goal);
   } else {
     const goalIssue = groundGoalIssue(f, goal.p);
@@ -728,6 +736,25 @@ export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentPr
   let more = 0;
   for (let j = Math.min(k, path.length - 1) + 1; j < path.length; j++) more += hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]);
   return { ok: true, route: { ...res.route, length: res.route.length + more, rest: goal } };
+}
+
+// N1 audit: a refused direct (upper-floor) paged route is planned again over grids a brand-new nav builds from the same
+// static world and scene (no fine / composed / floorsOver memo) and with the exact planner, and the verdicts are logged.
+const NAV_AUDIT = typeof process !== 'undefined' && !!process.env?.SIM_STRANDED_AUDIT;
+function navAudit(nav: GroundNav, r: TileRect, gs: GridSet, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts) {
+  const lv = (g: GridSet) => [...g.levels].map(([id, x]) => `${id}:${x.nx}x${x.nz}@${x.ox},${x.oz}:${(gridContentKeys.get(x) ?? '?').slice(0, 24)}:${fnv(String(x.clearance.reduce((a, c, i) => (c >= profile.radius ? a + i : a), 0))).toString(16)}`).join(' ');
+  let fresh = 'n/a', exact = 'n/a', flv = '';
+  try {
+    const f = new GroundNav(nav.base, nav.cell, { paged: true });
+    f.setFloors(nav.lastFloors); f.setSolids(scene.obstacles);
+    const fg = f.gridsOver(r, scene); flv = lv(fg);
+    const fr = findRoute(fg, { ...scene, bounds: rectBounds(r) }, profile, start, goal, { ...opts, planner: 'exact' });
+    fresh = fr.ok ? 'ok' : fr.diagnostic.code;
+    const er = findRoute(gs, { ...scene, bounds: rectBounds(r) }, profile, start, goal, { ...opts, planner: 'exact', proveUnreachable: false });
+    exact = er.ok ? 'ok' : er.diagnostic.code;
+  } catch (e) { fresh = `threw ${String(e).slice(0, 120)}`; }
+  const sk = fnv(JSON.stringify([scene.levels, scene.surfaces.map((x) => [x.id, x.level, x.y, x.obb]), scene.links.map((l) => [l.id, l.usable, (l as { a?: unknown }).a, (l as { b?: unknown }).b])])).toString(16);
+  console.error(`[nav-audit] unreachable ${JSON.stringify(start)}->${JSON.stringify(goal)} r=${profile.radius} rect=${r.join(',')} planner=${opts.planner ?? 'exact'} fresh=${fresh} exactNoProve=${exact} scene=${sk} obst=${scene.obstacles.length} links=${scene.links.length} | memo: ${lv(gs)} | fresh: ${flv}`);
 }
 
 function appendLeg(legs: Leg[], leg: Leg) {
