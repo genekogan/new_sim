@@ -196,7 +196,7 @@ A humanoid may carry a `core/humanoid@2` look (`body.params`, `body.model` = its
 | param | range (default) | engine | renderer |
 |---|---|---|---|
 | `height` | 1.55–1.95 m (1.75) | scale s = h / 1.75: radius × (0.5 + 0.5 s), profile height 1.8 s, eye 1.62 s (seated 1.15 s), seat fit 0.2 s – 1.2 s m (`pose.seat-too-high/-low`; god-built seats blocked in the sit capability) | the whole rig × s: shoulders 1.34 s, arms 0.62 s (`fitArms`), walk stride × s (no foot slide), sit pelvis × s |
-| `build` | 0.85–1.2 (1) | radius × build, clamped 0.24–0.32 m (a 0.9 m door still passes) | trunk and limbs widened by skin weight in bind space (hands, feet, head unchanged) |
+| `build` | 0.85–1.2 (1) | radius × build, clamped 0.24–0.28 m: a wider look is drawn wider but collides as today's body (lane N1 2026-10-17: with the conservative raster and the 0.06 m plan margin a 0.29 m body was refused 0.84–0.9 m doors) | trunk and limbs widened by skin weight in bind space (hands, feet, head unchanged) |
 | `walkSpeed` | 0.9–1.4 m/s (1.35) | `walk_to`'s profile speed; ≤ `WALK_SPEED_CAP`, so the per-tick step (≤ 0.07 m) and the published speed stay inside `MAX_HUMAN_STEP_PER_TICK` / `SPEED_CAPS.walk` | the Walk clip plays at speed / stride speed |
 | `headSize` | 0.85–1.2 (1) | none | head (and hat/glasses) scaled about the Head joint |
 
