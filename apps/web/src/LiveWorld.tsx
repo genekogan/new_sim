@@ -90,7 +90,7 @@ import {WorldPlatforms} from './WorldPlatforms.ts';
 import {cameraGround,cameraGroundSampler} from './WorldCameraGround.ts';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
 import {WorldFollowMotion} from './WorldFollowMotion.ts';
-import { WorldBroadcast, type WorldCameraMode } from './WorldBroadcast.ts';
+import { WorldBroadcast, type WorldCameraMode, type CarrierPose } from './WorldBroadcast.ts';
 import {createPublishedRestMarkers} from './WorldPublishedRestMarkers.mjs';
 import {publishedRestSelection} from './WorldRestSourceSelection.ts';
 import {createPublishedNewcomerMarkers} from './WorldPublishedNewcomerMarkers.ts';
@@ -299,7 +299,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
     (window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
-    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null;
+    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -355,7 +355,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const dressForkLand=(camp:THREE.Object3D)=>{if(!marsFork)return;forkLandLoad??=import('./WorldMarsForkLand.ts').then(m=>{if(abort.signal.aborted)return;forkLand=m.createForkLand(0);scene.add(forkLand.group);(window as unknown as {__simForkLand?:unknown}).__simForkLand=forkLand.stats;},e=>console.warn('mars fork land could not be drawn',e));void forkLandLoad.then(()=>forkLand?.dress(camp));};let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
     const light = new Daylight(scene);if(quality.shadowMapSize!==light.sun.shadow.mapSize.x)light.sun.shadow.mapSize.set(quality.shadowMapSize,quality.shadowMapSize);
     const broadcast = new WorldBroadcast();
-    broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
+    broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,carriers:rideCarriers,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
     const followView=new WorldFollow();
     const followMotion=new WorldFollowMotion();
     let followTick:number|null=null,followEpoch:string|null=null;
@@ -749,7 +749,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Riders stand in the basket for labels, speech, camera and drawing (presentation only; the recording is untouched).
       const at = balloonRide.update(shown.current,{dt,seconds:atmosphereSeconds,eden:!!expansion,history:!!past.current,soulEntity:id=>s.conn.replica.souls.get(id)?.entityId??null,preview:ridePreview});
       // E-life B7: a god's balloon flies with its native ride (the recorded carrier entity of the same name)
-      if(entityLayer.active&&!expansion){if(refresh||!rideNames)rideNames=entityLayer.rideNames();for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number]}|undefined;entityLayer.poseOverride(n,e?.p??null);}}
+      rideCarriers=expansion?[{p:balloonRide.basket.p,yaw:balloonRide.basket.yaw}]:[];  // V1: Broadcast frames a rider with its carrier
+      if(entityLayer.active&&!expansion){if(refresh||!rideNames)rideNames=entityLayer.rideNames();for(const n of rideNames){const e=at.entities[n] as {p?:readonly[number,number,number];yaw?:number}|undefined;entityLayer.poseOverride(n,e?.p??null);if(e?.p)rideCarriers.push({p:e.p,yaw:e.yaw??0});}}
       const cards = refresh ? cardsAt(s.plays, at.tick) : null;
       const alive = new Set<string>();
       let focus: THREE.Vector3 | null = null;

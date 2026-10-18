@@ -1,3 +1,4 @@
+import {worldTitle} from './world-title.ts';
 import {approvalFromHash} from './account-approval.ts';
 import {soulFromFragment,soulFragment} from './soul-link.ts';
 /** Sign-in is part of the shared world chrome; public viewing remains unsigned. */
@@ -13,7 +14,7 @@ export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privy
 export function agentOnboarding(worldUrl:string,worldName?:string){
  // The world slug is the path's first `/w/<slug>` (a launcher base such as `/worlds` may precede it).
  const base=worldUrl.replace(/\/+$/,''),key=new URL(base).pathname.match(/\/w\/([a-z][a-z0-9-]{0,31})(?:\/|$)/)?.[1];
- const world=worldName??(key==='littlemartians'?'Little Martians':key?key[0].toUpperCase()+key.slice(1):'Eden');
+ const world=worldTitle(worldName,key);
  const instructionsUrl=base+'/instructions.md';
  return {world,instructionsUrl,text:`Read the instructions at ${instructionsUrl} to create a new soul in the world ${world}.`};
 }
