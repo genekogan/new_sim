@@ -19,7 +19,17 @@ function prim(key: string, make: () => THREE.BufferGeometry) {
   return g;
 }
 
-type Buf = { p: number[]; n: number[]; c: number[] };
+/** A growable float32 array: the values land rounded to float32 exactly as Float32BufferAttribute(number[]) rounds them. */
+class F32 {
+  a = new Float32Array(768); n = 0;
+  push3(x: number, y: number, z: number) {
+    if (this.n + 3 > this.a.length) { const b = new Float32Array(this.a.length * 2); b.set(this.a); this.a = b; }
+    const a = this.a, n = this.n; a[n] = x; a[n + 1] = y; a[n + 2] = z; this.n = n + 3;
+  }
+  get length() { return this.n; }
+  view() { return this.a.subarray(0, this.n); }
+}
+type Buf = { p: F32; n: F32; c: F32 };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
@@ -31,14 +41,28 @@ export class Builder {
   push(x: number, y: number, z: number, yaw = 0) { this.stack.push(this.m.clone()); this.m.multiply(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z)); return this; }
   pop() { this.m = this.stack.pop() ?? new THREE.Matrix4(); return this; }
   at(x: number, y: number, z: number, yaw: number, f: () => void) { this.push(x, y, z, yaw); try { f(); } finally { this.pop(); } return this; }
-  private bufOf(layer: Layer) { const k = `${this.group}|${layer}`; let b = this.buf.get(k); if (!b) { b = { p: [], n: [], c: [] }; this.buf.set(k, b); } return b; }
+  private bufOf(layer: Layer) { const k = `${this.group}|${layer}`; let b = this.buf.get(k); if (!b) { b = { p: new F32(), n: new F32(), c: new F32() }; this.buf.set(k, b); } return b; }
   private add(g: THREE.BufferGeometry, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, col: Col, layer: Layer, rx = 0, ry = 0, rz = 0) {
     if (!this.enabled) return;
     this.q.setFromEuler(this.e.set(rx, ry, rz, 'YXZ')); this.l.compose(this.t.set(cx, cy, cz), this.q, this.s.set(sx, sy, sz)); this.l.premultiply(this.m); this.nm.getNormalMatrix(this.l);
-    const b = this.bufOf(layer), P = g.attributes.position, N = g.attributes.normal; tmpC.set(col);
-    for (let i = 0; i < P.count; i++) {
-      this.v.fromBufferAttribute(P, i).applyMatrix4(this.l); b.p.push(this.v.x, this.v.y, this.v.z);
-      this.v.fromBufferAttribute(N, i).applyMatrix3(this.nm).normalize(); b.n.push(this.v.x, this.v.y, this.v.z); b.c.push(tmpC.r, tmpC.g, tmpC.b);
+    const b = this.bufOf(layer), P = g.attributes.position as THREE.BufferAttribute, N = g.attributes.normal as THREE.BufferAttribute; tmpC.set(col);
+    const cr = tmpC.r, cg = tmpC.g, cb = tmpC.b;
+    if (P.normalized || N.normalized || P.itemSize !== 3 || N.itemSize !== 3 || (P as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute || (N as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute) {
+      for (let i = 0; i < P.count; i++) {
+        this.v.fromBufferAttribute(P, i).applyMatrix4(this.l); b.p.push3(this.v.x, this.v.y, this.v.z);
+        this.v.fromBufferAttribute(N, i).applyMatrix3(this.nm).normalize(); b.n.push3(this.v.x, this.v.y, this.v.z); b.c.push3(cr, cg, cb);
+      }
+      return;
+    }
+    // Vector3.fromBufferAttribute + applyMatrix4 / applyMatrix3 + normalize, inlined term for term (same operations, same order)
+    const pa = P.array, na = N.array, e = this.l.elements, m = this.nm.elements;
+    for (let i = 0, o = 0; i < P.count; i++, o += 3) {
+      const x = pa[o], y = pa[o + 1], z = pa[o + 2], w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+      b.p.push3((e[0] * x + e[4] * y + e[8] * z + e[12]) * w, (e[1] * x + e[5] * y + e[9] * z + e[13]) * w, (e[2] * x + e[6] * y + e[10] * z + e[14]) * w);
+      const u = na[o], v = na[o + 1], t = na[o + 2];
+      const nx = m[0] * u + m[3] * v + m[6] * t, ny = m[1] * u + m[4] * v + m[7] * t, nz = m[2] * u + m[5] * v + m[8] * t;
+      const k = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+      b.n.push3(nx * k, ny * k, nz * k); b.c.push3(cr, cg, cb);
     }
   }
   /** Box by its bottom-centre (x, y = bottom, z), size and yaw. */
@@ -51,9 +75,16 @@ export class Builder {
   face(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'wall') {
     if (!this.enabled) return this;
     const buf = this.bufOf(layer); tmpC.set(col);
-    const P = [a, b, c, d].map((p) => new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(this.m));
-    const n = new THREE.Vector3().subVectors(P[1], P[0]).cross(new THREE.Vector3().subVectors(P[2], P[0])).normalize();
-    for (const i of [0, 1, 2, 0, 2, 3]) { buf.p.push(P[i].x, P[i].y, P[i].z); buf.n.push(n.x, n.y, n.z); buf.c.push(tmpC.r, tmpC.g, tmpC.b); }
+    // Vector3.applyMatrix4 on each corner, then subVectors/cross/normalize for the normal, inlined term for term
+    const e = this.m.elements, X: number[] = [], Y: number[] = [], Z: number[] = [];
+    for (const p of [a, b, c, d]) {
+      const x = p[0], y = p[1], z = p[2], w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+      X.push((e[0] * x + e[4] * y + e[8] * z + e[12]) * w); Y.push((e[1] * x + e[5] * y + e[9] * z + e[13]) * w); Z.push((e[2] * x + e[6] * y + e[10] * z + e[14]) * w);
+    }
+    const ax = X[1] - X[0], ay = Y[1] - Y[0], az = Z[1] - Z[0], bx = X[2] - X[0], by = Y[2] - Y[0], bz = Z[2] - Z[0];
+    const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx, k = 1 / (Math.sqrt(cx * cx + cy * cy + cz * cz) || 1);
+    const nx = cx * k, ny = cy * k, nz = cz * k, cr = tmpC.r, cg = tmpC.g, cb = tmpC.b;
+    for (const i of [0, 1, 2, 0, 2, 3]) { buf.p.push3(X[i], Y[i], Z[i]); buf.n.push3(nx, ny, nz); buf.c.push3(cr, cg, cb); }
     return this;
   }
   /**
@@ -113,7 +144,7 @@ export class Builder {
       if (!b.p.length) continue;
       const [gname, layer] = k.split('|') as [string, Layer];
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c, 3));
+      g.setAttribute('position', new THREE.Float32BufferAttribute(b.p.view(), 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n.view(), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c.view(), 3));
       g.computeBoundingBox(); g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, materialFor(materials, layer)); mesh.name = `${gname} ${layer}`;
       mesh.castShadow = layer !== 'glow' && layer !== 'glass'; mesh.receiveShadow = layer !== 'glow';
