@@ -128,8 +128,10 @@ export function plan(snapshot, spec) {
       if (why.length) { report.skipped.push({ unit, why: why.slice(0, 6).join('; ') + (why.length > 6 ? ` (+${why.length - 6})` : '') }); continue; }
     }
     const tmpOf = new Map(); let t = 0;
-    const order = { remove: 0, change: 1, add: 2 };
-    for (const it of [...items].sort((a, b) => order[a.kind] - order[b.kind])) {
+    // removes, then changes deepest first (furniture moves under the old plan, then the plan; the journal's inverse then
+    // restores the old plan before it moves furniture back, so a group undo never crosses the new rooms), then adds
+    const order = { remove: 0, change: 1, add: 2 }, depth = (it) => it.path.split('/').length;
+    for (const it of [...items].sort((a, b) => order[a.kind] - order[b.kind] || (a.kind === 'change' ? depth(b) - depth(a) : 0))) {
       const e = W.resolve(it.path);
       if (it.kind === 'remove') {
         if (!e) { report.done.push(`${it.path} (already gone)`); continue; }
@@ -141,6 +143,8 @@ export function plan(snapshot, spec) {
         if (!matchesOp(e, it.old)) { report.kept.push(`${it.path}: changed since genesis`); continue; }
         const mv = { op: 'move', id: e.id }, n = it.new, o = it.old;
         for (const k of ['p', 'r', 's', 'shape']) if (!same(n[k], o[k])) mv[k] = structuredClone(n[k] ?? (k === 'r' ? 0 : k === 's' ? 1 : undefined));
+        // a root that rests on the ground ([x, z]) and turns settles again with its new footprint, as genesis seats it
+        if (Object.keys(mv).length > 2 && !mv.p && !it.parent && n.p?.length === 2) mv.p = [...n.p];
         if (Object.keys(mv).length > 2) { ops.push(mv); meta.push(it.path); }
         const pk = Object.keys(n.params ?? {}).filter((k) => !same(n.params[k], o.params?.[k]));
         const gone = Object.keys(o.params ?? {}).filter((k) => !(k in (n.params ?? {})));
@@ -203,7 +207,7 @@ export function verifyApplied(after, pre, receipt) {
     } else if (o.op === 'move' || o.op === 'set') { const path = b.meta[b.ops.indexOf(o)]; if (!matchesOp(W.byId.get(o.id), receipt.newOps[path])) problems.push(`not as template: ${path}`); }
   }
   const touched = new Set(touchedIds(receipt)), redefined = new Set(receipt.batches.flatMap((b) => b.ops.filter((o) => o.op === 'define').map((o) => o.def.name)));
-  let same = 0;
+  let same = 0; const resettled = [];
   for (const e of pre.entities) {
     if (isBody(e) || touched.has(e.id)) continue;
     const now = W.byId.get(e.id);
@@ -211,11 +215,15 @@ export function verifyApplied(after, pre, receipt) {
     if (J(now) === J(e)) { same++; continue; }
     const base = normDef(e.def).replace(/@\d+$/, '');
     if (redefined.has(base) && J({ ...now, def: e.def, v: e.v }) === J(e)) { same++; continue; }
+    // new ground (a terrace, a rail bed) lets things that rest on it settle: only the height may differ
+    // (a child re-seated with its building writes its implicit origin out: no p = [0, 0, 0], no r = 0; x/z to the centimetre)
+    const cm = (v) => Math.round((v ?? 0) * 100) / 100 || 0, seat = (x) => { const p = x.p ?? [0, 0, 0]; return J({ ...x, p: [cm(p[0]), 0, cm(p[p.length - 1])], r: x.r ?? 0, v: 0 }); };
+    if (seat(now) === seat(e)) { resettled.push(`${W.pathOf(now) ?? e.id} y ${(e.p?.[1] ?? 0).toFixed(2)}->${(now.p?.[1] ?? 0).toFixed(2)}`); continue; }
     problems.push(`changed ${e.id} ${W.pathOf(now) ?? ''}`);
   }
   const preIds = new Set(pre.entities.map((e) => e.id)), extra = after.entities.filter((e) => !preIds.has(e.id) && !isBody(e) && !placed[e.id] && !Object.keys(placed).includes(e.in?.parent));
   for (const e of extra) problems.push(`new thing not in the plan ${e.id} ${e.name ?? ''}`);
-  return { ok: problems.length === 0, problems: problems.slice(0, 40), problemCount: problems.length, untouchedIdentical: same, placed: Object.keys(placed).length };
+  return { ok: problems.length === 0, problems: problems.slice(0, 40), problemCount: problems.length, untouchedIdentical: same, resettled, placed: Object.keys(placed).length };
 }
 /** Rollback guard: everything the apply touched or placed is still exactly as the apply left it, and nobody put anything into a placed thing. */
 export function rollbackGuard(now, receipt) {
@@ -298,7 +306,7 @@ async function main(argv) {
   }
   assert(out && existsSync(out), '--receipt required'); const receipt = load(), pre = JSON.parse(readFileSync(preFile(), 'utf8'));
   const now = await snap(); assert.equal(now.worldId, receipt.worldId, 'receipt world identity');
-  if (mode === 'verify') { const v = receipt.status.startsWith('rolled') ? verifyRolledBack(now, pre, receipt) : verifyApplied(now, pre, receipt); say({ mode, status: receipt.status, verify: v }); process.exitCode = v.ok ? 0 : 1; return; }
+  if (mode === 'verify') { const v = receipt.status.startsWith('rolled') ? verifyRolledBack(now, pre, receipt) : verifyApplied(now, pre, receipt); if (v.ok && receipt.status.startsWith('applied')) { receipt.status = 'verified'; receipt.verify = v; save(receipt); } say({ mode, status: receipt.status, verify: v }); process.exitCode = v.ok ? 0 : 1; return; }
   assert(token, 'credential path required');
   if (mode === 'recover') {
     for (const b of receipt.batches.slice(receipt.results.length)) { const r = await request('/v1/god/requests/' + encodeURIComponent(b.clientRef)).catch(() => null); if (!r?.result?.accepted) break; receipt.results.push({ clientRef: b.clientRef, seq: r.result.seq }); }

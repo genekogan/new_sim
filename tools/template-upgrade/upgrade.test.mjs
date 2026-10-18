@@ -57,7 +57,7 @@ test('plan: pristine units get exact ops; changed, foreign-filled and occupied b
   assert.deepEqual(hotel.ops[1], { op: 'set', id: 'e_h', params: { plan: { v: 2 } } });
   assert.deepEqual([hotel.ops[2].in, hotel.ops[2].tmp, hotel.ops[3].in], [{ parent: 'e_h', slot: 'guest-1' }, '$u0', { parent: '$u0', slot: 'top' }]);
   assert.deepEqual(hotel.meta, ['hotel/hall-bench', 'hotel', 'hotel/guest-bed', 'hotel/guest-bed/bed-lamp']);
-  assert.deepEqual(p.units.find((u) => u.unit === 'chalet').ops, [{ op: 'move', id: 'e_c', r: 1.571 }]);
+  assert.deepEqual(p.units.find((u) => u.unit === 'chalet').ops, [{ op: 'move', id: 'e_c', r: 1.571, p: [50, 50] }], 'a turned root resettles');
   assert.deepEqual(p.defOps.map((o) => o.def.name), ['eden-drum', 'eden-stand']);
 
   const w = world(); w.entities.push(ent('e_mug', 'mug', 'core-mug@1', [0, 0, 0], { in: { parent: 'e_b', slot: 'top' } })); // a visitor's mug on the bench
