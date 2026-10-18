@@ -25,7 +25,9 @@ export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat'
  * body stands/sits, in the fixture's local ground frame (x, z), and the local yaw they face.
  * Runtime claims live in engine/social/slots.ts (`slot:<entity>#<id>` reservations).
  */
-export type SlotDef = { id: string; kind: 'seat' | 'stand' | 'audience' | 'fire-circle'; local: [x: number, z: number]; yaw: number;
+export type SlotDef = { id: string; kind: 'seat' | 'stand' | 'audience' | 'fire-circle' | 'berth'; local: [x: number, z: number]; yaw: number;
+  /** berth only (beds/1): the mattress top (m above the fixture's base) a lying body rests on; `yaw` points head → feet. */
+  height?: number;
   /** Logged entity-world seat policy; absent retains the original approach selection for historical assets. */
   approachPolicy?: 'reachable/1' };
 

@@ -12,7 +12,7 @@ import { CATALOG, HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { cellOf, clearanceAt, type LevelGrid } from '../spatial/grid.ts';
 
-export type SlotKind = 'seat' | 'stand' | 'audience' | 'fire-circle';
+export type SlotKind = 'seat' | 'stand' | 'audience' | 'fire-circle' | 'berth';
 
 export type Slot = {
   /** `<owner>#<local id>`, stable for a given world. */
@@ -29,6 +29,8 @@ export type Slot = {
   claimedBy?: string;
   /** Versioned in the asset fact, retained in planned slots and snapshots. */
   approachPolicy?: 'reachable/1';
+  /** berth only (beds/1): mattress top above the fixture's base; the body lies there along `yaw` (head → feet). */
+  height?: number;
 };
 
 /**
@@ -64,7 +66,7 @@ export function fixtureSlots(rt: Runtime, e: Entity): Slot[] {
   const defs = CATALOG[e.def]?.slots ?? [];
   const level = levelOf(rt, e);
   const c: Vec2 = [e.pose.p[0], e.pose.p[2]];
-  return defs.map((d) => claimed(rt, { id: `${e.id}#${d.id}`, owner: e.id, kind: d.kind, p: add2(c, rot2(d.local, e.pose.yaw)), yaw: wrapAngle(e.pose.yaw + d.yaw), level, ...(d.approachPolicy ? { approachPolicy: d.approachPolicy } : {}) }));
+  return defs.map((d) => claimed(rt, { id: `${e.id}#${d.id}`, owner: e.id, kind: d.kind, p: add2(c, rot2(d.local, e.pose.yaw)), yaw: wrapAngle(e.pose.yaw + d.yaw), level, ...(d.approachPolicy ? { approachPolicy: d.approachPolicy } : {}), ...(d.height !== undefined ? { height: d.height } : {}) }));
 }
 
 export function pointInPolygon(p: Vec2, poly: [number, number][]): boolean {
@@ -231,8 +233,8 @@ export function blockerNear(g: LevelGrid, p: Vec2, except: string, radius = 1.5)
   return best;
 }
 
-/** Whether a slot is sat on through an approach point (a `seat` of a fixture entity). */
-export const needsApproach = (w: WorldState, s: Slot) => s.kind === 'seat' && !!w.entities[s.owner];
+/** Whether a slot is sat on (lain on) through an approach point (a `seat` or `berth` of a fixture entity). */
+export const needsApproach = (w: WorldState, s: Slot) => (s.kind === 'seat' || s.kind === 'berth') && !!w.entities[s.owner];
 
 /**
  * Approach point of a fixture seat (see APPROACH_GAPS), or `slot.unreachable` naming what blocks
@@ -250,6 +252,7 @@ export function seatApproach(rt: Runtime, s: Slot, opts: { minClearance?: number
   const gaps = d.seatApproach === 'slot' ? SLOT_APPROACH_GAPS : APPROACH_GAPS; // XP5 opt-in hook; older fixtures retain their exact path.
   const tried: { p: Vec2; cl: number }[] = [];
   const required = Math.max(APPROACH_CLEARANCE, opts.minClearance ?? 0);
+  if (s.kind === 'berth') return berthApproach(rt, s, e, local, half, required, opts.accept);
   for (const side of [1, -1]) {
     const yawL = s.yaw - e.pose.yaw + (side < 0 ? Math.PI : 0);
     const u: Vec2 = [dcos(yawL), dsin(yawL)];
@@ -297,5 +300,30 @@ export function seatApproach(rt: Runtime, s: Slot, opts: { minClearance?: number
     message: `${s.id} cannot be sat on: no standing room ${gaps[0]}–${gaps[gaps.length - 1]} m in front of it (${fmt(front.p)}, ${front.cl.toFixed(2)} m clear, blocked by ${name(bf)}) or behind it (${fmt(back.p)}, ${back.cl.toFixed(2)} m clear, blocked by ${name(bb)}); a sitter needs ${required.toFixed(2)} m`,
     subjects: [s.id, s.owner, ...new Set([bf, bb].filter((x): x is string => !!x))],
     at: [front.p[0], 0, front.p[1]],
+  };
+}
+
+/** beds/1: a body gets onto a berth from a long side of the bed (the side nearer the berth first: the left half of a
+ *  double bed from its left), else from its foot, else from its head; `slot.unreachable` when all four are blocked. */
+function berthApproach(rt: Runtime, s: Slot, e: Entity, local: Vec2, half: Vec2, required: number, accept?: (p: Vec2) => boolean): Vec2 | Diagnostic {
+  const sp = rt.services.spatial as Spatial | undefined;
+  const c: Vec2 = [e.pose.p[0], e.pose.p[2]], g = sp?.levelAt(s.level, c);
+  const along = s.yaw - e.pose.yaw;
+  const dir = (k: number) => { const u: Vec2 = [dcos(along + k), dsin(along + k)]; return { u, edge: edgeDistance(local, u, half) }; };
+  const sides = [dir(Math.PI / 2), dir(-Math.PI / 2)].sort((a, b) => a.edge - b.edge);
+  const tried: { p: Vec2; cl: number }[] = [];
+  for (const { u, edge } of [...sides, dir(0), dir(Math.PI)])
+    for (const gap of APPROACH_GAPS) {
+      const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
+      const cl = g ? clearanceAt(g, p) : Infinity;
+      if (cl >= required && (!accept || accept(p))) return p;
+      tried.push({ p, cl });
+    }
+  const side = tried[0], blocker = g ? blockerNear(g, side.p, e.id) : undefined;
+  return {
+    code: 'slot.unreachable',
+    message: `${s.id} cannot be lain on: no standing room ${APPROACH_GAPS[0]}–${APPROACH_GAPS[APPROACH_GAPS.length - 1]} m beside the bed, at its foot or at its head (nearest side (${side.p[0].toFixed(2)}, ${side.p[1].toFixed(2)}), ${side.cl.toFixed(2)} m clear${blocker ? `, blocked by ${blocker}` : ''}); a body needs ${required.toFixed(2)} m`,
+    subjects: [s.id, s.owner, ...(blocker ? [blocker] : [])],
+    at: [side.p[0], 0, side.p[1]],
   };
 }

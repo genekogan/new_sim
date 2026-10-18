@@ -764,7 +764,7 @@ export class EngineBridge {
     };
     L.intents.planRefusal = (soul, steps, target) => this.layers.constructionRefusal(soul, steps, target);
     const priorUseRefusal = L.nativeUseRefusal;
-    L.nativeUseRefusal = capability => priorUseRefusal?.(capability) ?? this.bedUseRefusal(capability);
+    L.nativeUseRefusal = (capability, steps) => priorUseRefusal?.(capability, steps) ?? this.bedUseRefusal(capability, steps);
     // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
     L.placeWalkable = (id) => this.places.walkable(id);
     // a far named place asked for by name ("go to the big top" from across town): its walk, offered for that act only
@@ -787,14 +787,30 @@ export class EngineBridge {
       return res;
     };
   }
-  /** Bed slots describe an intended use point; they do not yet provide native support/contact or ownership.
-   * Never substitute a generic floor pose for use of a named bed. Classification uses slot/component semantics. */
-  private bedUseRefusal(capability: string): {code: string; reason: string} | null {
+  /** beds/1: a bed is lain on through its engine asset's native berths (catalog-adapter berthSlots: an adult fits on it).
+   * A bed without one (a crib, a pram, a bathtub, a bunk's upper berth only) is refused by name and never offered;
+   * a generic floor pose is never substituted for use of a named bed. */
+  private bedUseRefusal(capability: string, steps?: { verb: string; params: Record<string, unknown> }[]): {code: string; reason: string} | null {
     const target = /^(?:lie|sleep):(.+)$/.exec(capability)?.[1];
     if (!target) return null;
     const e = this.model.entities.get(target);
-    if (!e || (!this.model.resolvedDef(e.def)?.components.bed && !this.model.slotsOf(e).some(s => s.kind === 'bed'))) return null;
-    return {code: 'bed.attachment-unavailable', reason: `${this.model.pathOf(target)} has no qualified native berth support; your body cannot lie or sleep on it yet.`};
+    if (!e || !this.isBed(target)) return null;
+    if (this.berthsOf(target)) {
+      // a plan for this bed (an older server's queued bedside floor pose included) must lie on the bed's own berth
+      if (!steps || steps.some((s) => s.verb === 'mars:take_slot' && (s.params.owner === target || String(s.params.slot ?? '').startsWith(`${target}#`)))) return null;
+      return {code: 'bed.native-berth-required', reason: `${this.model.pathOf(target)} is used by lying on its berth (${capability}), not by a pose beside it.`};
+    }
+    return {code: 'bed.attachment-unavailable', reason: `${this.model.pathOf(target)} has no berth an adult can lie on (it is too short, or its mattress too high or too low); your body cannot lie or sleep on it.`};
+  }
+  private isBed(id: string): boolean {
+    const e = this.model.entities.get(id);
+    return !!e && (!!this.model.resolvedDef(e.def)?.components.bed || this.model.slotsOf(e).some(s => s.kind === 'bed'));
+  }
+  /** beds/1: how many native berths the engine asset of god-built thing `id` has (0 when none qualified). */
+  private berthsOf(id: string): number {
+    const x = this.engine.world.entities[id];
+    const asset = (x ? this.physics?.assets[x.def] : undefined) as { slots?: { kind: string }[] } | undefined;
+    return asset?.slots?.filter((s) => s.kind === 'berth').length ?? 0;
   }
   private pray(L: EdgeLedger, soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
     const params = (input.params ?? {}) as { text?: unknown };
@@ -837,7 +853,7 @@ export class EngineBridge {
       const at = this.engine.standableNearV1([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
       return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
     };
-    const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' ? [{ verb: 'stand', params: {} }] : [];
+    const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' || me.human.berth ? [{ verb: 'stand', params: {} }] : [];
     for (const x of near) {
       const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
@@ -858,14 +874,18 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
-      // Bed use remains discoverable but unsupported until a native berth owns support, contact and the body.
-      // No approach/pose plan is emitted: a nearby floor pose cannot fulfil use of the named bed.
-      const bedEnt = this.model.entities.get(x.id), bed = bedEnt ? this.model.slotsOf(bedEnt).find((q) => q.kind === 'bed') : undefined;
-      if (bed && x.support?.kind !== 'in-hand') {
-        for (const [verb, sec] of [['lie', 120], ['sleep', 600]] as const) {
+      // beds/1: a bed with native berths is lain on through the engine's take_slot (walk to its side, lie down on the
+      // mattress, rest, get up); a bed no adult fits on is not offered at all (bedUseRefusal names it if asked by id)
+      const berths = x.support?.kind !== 'in-hand' && this.isBed(x.id) ? this.berthsOf(x.id) : 0;
+      if (berths) {
+        const occ = (this.engine as unknown as { seatOccupantsV1?: (id: string, kind?: string) => { body: string }[] }).seatOccupantsV1?.call(this.engine, x.id, 'berth') ?? [];
+        const mine = occ.some((o) => o.body === soul.entityId), others = occ.filter((o) => o.body !== soul.entityId).map((o) => o.body);
+        const block = mine ? { code: 'bed.yours', reason: `You are lying on ${name(x.id)} already; stand:here to get up.` }
+          : others.length >= berths ? { code: 'bed.taken', reason: `${others.map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} lying there.` } : null;
+        for (const [verb, activity, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
           const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
-          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: false, blocked: this.bedUseRefusal(id)!, params: { seconds: { type: 'integer', min: 1, max: 3600, default: sec } } });
-          plans.delete(id);
+          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: sec } } });
+          plans.set(id, { label, steps: [...stand, { verb: 'mars:take_slot', params: { owner: x.id, activity } }, { verb: 'rest', params: { seconds: sec } }, { verb: 'stand', params: {} }], seconds: true });
         }
       }
       if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
