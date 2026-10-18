@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -19,7 +19,7 @@ const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
     stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional(),
     // an unknown later contract is not an error: the peer simply gets the full table
-    takeEntities:z.string().max(40).optional() }),
+    takeEntities:z.string().max(40).optional(),takeChunks:z.string().max(40).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
@@ -28,6 +28,9 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
   authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1;
   /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet). */
   takeEntities?:{last:number|null};
+  /** take-chunk-ref/1 peers: the id of the last take this socket was sent (null: none yet) and the last kernel view sent
+   *  without its tick (kernelRestV1). */
+  takeChunks?:{last:number|null;kernel?:string};
   /** Set by a join until the first takes message with a chunk is written: that one is never dropped for backpressure. */
   awaitingTakes?:boolean;joinSend?:boolean };
 /** What anyone may see of the server's numbers: spend is for admins. */
@@ -70,6 +73,7 @@ export class Hub {
   private lastTakeTick = -1;
   /** take-entities-ref/1: one table registry for every peer that announced it (see packages/protocol take-entities-wire). */
   readonly takeEntities = new TakeEntitiesEncoderV1();
+  readonly takeChunks = new TakeChunksEncoderV1();
   /** Take recordings (take_chunks) are a pose-keyframe cache, off by default (TAKES_PERSIST=1 turns them on).
    * The engine's in-memory live buffer still feeds new viewers; the event log rebuilds a world. */
   persistTakes = process.env.TAKES_PERSIST === '1';
@@ -158,7 +162,7 @@ export class Hub {
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
       const generation=(c.helloGeneration??0)+1;c.helloGeneration=generation;
-      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;c.takeEntities=undefined;c.awaitingTakes=false;
+      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;c.takeEntities=undefined;c.takeChunks=undefined;c.awaitingTakes=false;
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       if(!this.clients.has(c)||c.helloGeneration!==generation||c.ws.readyState!==1||!this.host.clockAvailable)return;
@@ -166,6 +170,7 @@ export class Hub {
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
       c.takeTransport=m.takeTransport===TAKE_BOUNDARY_WIRE_V1?TAKE_BOUNDARY_WIRE_V1:undefined;
       c.takeEntities=m.takeEntities===TAKE_ENTITIES_WIRE_V1?{last:null}:undefined;
+      c.takeChunks=m.takeChunks===TAKE_CHUNKS_WIRE_V1?{last:null}:undefined;
       c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
         [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
       const e = this.host.engine;
@@ -201,7 +206,7 @@ export class Hub {
     const sent=this.send(c,{t:'welcome',build:this.build,proto:PROTO,worldId:h.worldId,rulesVersion:e.rulesVersion,schema:e.schema,dt:e.dt,
       clockRate:h.clockRate,serverTick:e.world.tick,you:c.me,serverTime:Date.now(),epoch:this.epoch,paused:h.paused,
       ...(this.lifecycleSouls?{privateMe:{contract:'me-live/1' as const,connectionId:c.meScope!.connectionId,userId:c.meScope!.userId,revision:1 as const}}:{}),
-      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{}),...(c.takeEntities?{takeEntities:TAKE_ENTITIES_WIRE_V1}:{})});
+      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{}),...(c.takeEntities?{takeEntities:TAKE_ENTITIES_WIRE_V1}:{}),...(c.takeChunks?{takeChunks:TAKE_CHUNKS_WIRE_V1}:{})});
     if(sent)c.publishedMe=JSON.stringify(c.me);return sent;
   }
   private sendStation(c:Client){
@@ -216,21 +221,30 @@ export class Hub {
     if (c.ws.bufferedAmount > MAX_BUFFERED&&!c.joinSend&&!(m.t==='takes'&&c.awaitingTakes)){if(m.t==='me'||m.t==='welcome'&&m.privateMe){c.ready=false;c.ws.close(1013,'private view backpressure');}return false;}
     const current=this.privateMessage(c,m);if(!current)return false;
     // All existing public/private recipient projection runs before packing.
-    let s:string,nextTable:number|null|undefined;
+    let s:string,nextTable:number|null|undefined,nextTake:number|null|undefined;
     try{
       const mode=current.t==='takes'&&c.takeTransport?'wire':'raw';
-      const entities=current.t==='takes'&&c.takeEntities?this.takeEntities.encode(current,c.takeEntities.last):null;
-      const key=entities?`${mode}|${c.takeEntities!.last}`:mode,cached=takeStrings?.get(current)??{};
+      // take-chunk-ref/1 first leaves out what repeats the peer's last take; the other transports then pack what is left
+      const chunks=current.t==='takes'&&c.takeChunks?this.takeChunks.encode(current,c.takeChunks.last):null;
+      const stream=(chunks?chunks.stream:current) as ServerMsg;
+      const entities=stream.t==='takes'&&c.takeEntities?this.takeEntities.encode(stream,c.takeEntities.last):null;
+      const key=(entities?`${mode}|${c.takeEntities!.last}`:mode)+(chunks?`|c${c.takeChunks!.last}`:''),cached=takeStrings?.get(current)??{};
       const inner=(v:unknown)=>mode==='wire'?stringifyTakeBoundaryWireV1(v):JSON.stringify(v);
-      s=cached[key]??(entities?JSON.stringify({t:'take-entities',contract:TAKE_ENTITIES_WIRE_V1,ids:entities.envelope.ids}).slice(0,-1)+',"payload":'+inner(entities.envelope.payload)+'}':inner(current));
+      s=cached[key]??(()=>{
+        const packed=entities?JSON.stringify({t:'take-entities',contract:TAKE_ENTITIES_WIRE_V1,ids:entities.envelope.ids}).slice(0,-1)+',"payload":'+inner(entities.envelope.payload)+'}':inner(stream);
+        return chunks?JSON.stringify({t:'take-chunks',contract:TAKE_CHUNKS_WIRE_V1,ids:chunks.ids,same:chunks.same}).slice(0,-1)+',"payload":'+packed+'}':packed;
+      })();
       if(takeStrings){cached[key]=s;takeStrings.set(current,cached);}
       if(entities)nextTable=entities.last;
+      if(chunks)nextTake=chunks.last;
     }catch{
       // A broken fact must not become a different raw message or stop the host.
       c.ready=false;c.ws.send(JSON.stringify({t:'error',code:'takes.transport-invalid',message:'The take transport cannot be encoded exactly.'}));c.ws.close(1011,'invalid take transport');return false;
     }
+    s=this.kernelWire(c,current,s);
     c.sent += s.length; c.ws.send(s);
     if(nextTable!==undefined&&c.takeEntities)c.takeEntities.last=nextTable;
+    if(nextTake!==undefined&&c.takeChunks)c.takeChunks.last=nextTake;
     if(current.t==='takes'&&current.chunks.length)c.awaitingTakes=false;
     return true;
   }
@@ -301,8 +315,18 @@ export class Hub {
       }
       return;
     }
-    const s = JSON.stringify(m);
-    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue; c.sent += s.length; c.ws.send(s); }
+    const s = JSON.stringify(m),rest=m.t==='kernel'?kernelRestV1(m.view):undefined;
+    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue;
+      const out=this.kernelWire(c,m,s,rest);c.sent += out.length; c.ws.send(out); }
+  }
+  /** take-chunk-ref/1 peers: a kernel view that differs from the last one this socket was sent only in its tick (the hub
+   *  re-broadcasts it every 200 ticks: old Eden ~208 KB each) travels as {t:'kernel-tick',tick}. Call only right before
+   *  ws.send(result): it records what the peer now has. */
+  private kernelWire(c:Client,m:ServerMsg,s:string,rest?:string|null):string{
+    if(m.t!=='kernel'||!c.takeChunks)return s;
+    const r=rest===undefined?kernelRestV1(m.view):rest;
+    if(r!==null&&r===c.takeChunks.kernel)return JSON.stringify({t:'kernel-tick',tick:m.view.tick});
+    c.takeChunks.kernel=r??undefined;return s;
   }
   /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
   brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }
