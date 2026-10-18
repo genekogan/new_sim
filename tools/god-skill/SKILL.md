@@ -31,14 +31,14 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 `look --remote` (or `EDEN_GOD_LOOK=remote`) uses the world’s renderer; otherwise local Chrome goes first and the world’s renderer is the fallback when Chrome is missing or cannot start. `look.unavailable` means the world’s host cannot render: use Google Chrome where your agent runs; never change the world’s clock or sky to see night.
 
 The owner's in-world message box reaches this folder's authenticated agent. Run
-`node eden-god.mjs listen --json` in a Claude Code background Monitor; it waits with
-long polls, then returns the received `inbox.latest` message as JSON. Handle it and
+`node eden-god.mjs listen --json` as a Claude Code background Bash command (`run_in_background: true`;
+not a Monitor, which expires and wakes you); it waits with long polls through network errors and world restarts, then returns the received `inbox.latest` message as JSON. Handle it and
 run `node eden-god.mjs ack <id> "Short reply"` (optional reply, at most 140 characters),
-then start listening again. `/loop` can use `listen --once --json`; `--after <id>`
+then start listening again. If it ever exits without a message, start it again without saying anything. `/loop` can use `listen --once --json`; `--after <id>`
 waits for a newer message. Other authenticated commands also print pending owner
 messages on stderr, without another request. Delivery means received; acknowledge
 only after reading, and do not claim the requested work is complete before verifying it.
-`node eden-god.mjs listen --follow` never exits: one JSON line per new message, so the Monitor needs no re-arming.
+`node eden-god.mjs listen --follow` never exits (one JSON line per message): for scripts reading a stream, not for a background Bash command.
 
 ## The world in one page (the ontology)
 
@@ -369,8 +369,9 @@ day is a Saturday.
   `--at` frames that thing. The viewer draws the land in detail only within a few hundred metres of
   where it looks, so look at parts (`--at village`, `--at bridge`), never the whole world at once; `map` is
   the whole-world view; `--inside`
-  hides roofs to show a building's top storey, `--floor 0` its ground floor. Each look opens Chrome
-  and waits for the world to settle: about 5–10 s on a free machine, longer on a busy one, so give the
+  hides roofs to show a building's top storey, `--floor 0` its ground floor. From `pair` on, a background
+  browser keeps the world loaded (while `listen` runs too), so a look takes about 1–3 s; otherwise each look opens
+  Chrome and waits for the world to settle: about 5–10 s, longer on a busy machine, so give the
   shell call a generous timeout rather than giving up. Check that the picture shows what you asked for
   before judging the build. `look --keep` reuses a browser; `look --stop` closes it.
   While you lead a build, `look`, `where` and `free` also show the owner a soft reticle where you are

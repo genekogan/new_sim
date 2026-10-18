@@ -13,6 +13,8 @@ import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper, drawableCount, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
+import { autoWarm, listenerBeat, lookRoute } from './lib/warm.mjs';
+import { remoteLook } from './lib/remote-look.mjs';
 import { kitDefinition } from './lib/kit.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +44,7 @@ export async function register(url, identity) {
 export async function pair(agent = 'eden-god ' + SKILL_VERSION) {
   const start = ok(await call('/v1/god/pair/start', { as: 'none', body: { agent } }), 'pair');
   console.error(start.tell_your_human);
+  autoWarm(SELF, { force: true, pairing: true }); // G1: Playwright + a headless Chrome on the world, while the owner approves
   for (let i = 0; i < 300; i++) {
     const p = ok(await call('/v1/god/pair/poll', { as: 'none', body: { poll_token: start.poll_token } }), 'pair');
     if (p.status === 'approved') { save({ token: p.token }); return { paired: true, world: p.world }; }
@@ -1158,8 +1161,16 @@ async function lookInner(flags = {}, runtime = {}, signal) {
   const args = { timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), remote: !!flags.remote, worldUrl: load().world, ...cam, out, expect: drawableCount(m.snapshot) /* r2.1: bodies are never in layer.drawn */, cliPath: SELF, keep: !!flags.keep, ...overrides,
     ...(flags.views || flags.site ? { views } : {}), frames: count, every,
     ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
-  let shot;
-  if (!flags.keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
+  let shot, keep = !!flags.keep;
+  if (!keep && !flags.remote && !runtime.shoot) {
+    // G1: a warm keeper takes the look; while it is still starting, a single view goes to the world's own renderer
+    // (when it has one) or waits for it. Folders that do not warm up keep the one-shot Chrome.
+    const route = await lookRoute({ world: args.worldUrl, cliPath: SELF, single: !args.views && count === 1, deadlineAt: runtime.deadlineAt, signal, remote: () => remoteLook({ ...args, timeoutMs: Math.max(1, runtime.deadlineAt - Date.now() - 15_000) }, { deadlineAt: runtime.deadlineAt, signal }) });
+    if (route?.shot) shot = route.shot;
+    else if (route === 'keeper') { keep = true; args.keep = true; args.timeoutMs = Math.max(1, runtime.deadlineAt - Date.now()); }
+  }
+  if (shot) { /* rendered by the world */ }
+  else if (!keep) shot = await (runtime.shoot ?? ((a) => shoot(a, runtime)))(args);
   else {
     // a kept browser: the shot runs in a child process so its browser connection does not keep this one alive
     const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, timeout: Math.max(1, runtime.deadlineAt - Date.now()), killSignal: 'SIGKILL', maxBuffer: 1 << 24 });
@@ -1319,7 +1330,7 @@ export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f),
   kit: (r, f) => { if (r[0] !== 'look' || !r[1]) throw Error('usage: kit look <kit.json> [--hour 21] [--beside core/church@1] [--out file]'); return kitLook(readArg(r.slice(1)), f); },
-  listen: (r, f) => listen(f), ack: (r) => ack(r[0], r[1]),
+  listen: (r, f) => listen(f, { beat: () => { listenerBeat(); autoWarm(SELF); } }), ack: (r) => ack(r[0], r[1]),
   build: (r, f) => build(r[0], r.slice(1), f),
   'verify-use': (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
@@ -1328,7 +1339,7 @@ export const COMMANDS = { doctor: (r, f) => doctor(f), trace: (r, f) => trace(f)
   place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)), commit: (r) => commit(r[0]), request: (r) => request(r[0]),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
-  look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
+  look: (r, f) => look(f), 'look-keeper': (r, f) => keeper(r[0], Number(r[1]), { warm: f.warm !== undefined }), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
   catalog: (r, f) => catalog(f), find: (r, f) => find(r.join(' ') || undefined, f), parts: (r, f) => parts(r.join(' '), f), recommend: (r, f) => recommend(r.join(' '), f), taxonomy: (r, f) => taxonomy(f),
   sky: (r, f) => sky(f), weather: (r, f) => envWeather(f), time: (r, f) => envTime(r, f), strike: (r, f) => envStrike(f), land: (r, f) => envLand(r, f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
@@ -1366,6 +1377,7 @@ ${SECRET_HELP}
 ${GOV_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
+const NO_WARM = new Set(['help', 'register', 'mint', 'pair', 'doctor', 'look', 'look-shot', 'look-keeper']);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {
   const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
   const fn = COMMANDS[cmd ?? 'help'];
@@ -1379,6 +1391,8 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: redact([cmd, ...argv].join(' ')), argv: [cmd ?? 'help', ...argv].map(redact), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
   if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
+  // G1: start (or restart) the warm look keeper in the background; status and listen also after a `look --stop`
+  if (!NO_WARM.has(cmd ?? 'help')) autoWarm(SELF, { force: ['status', 'listen'].includes(cmd) });
   Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else { console.log(JSON.stringify(out, null, 2)); if (!f.json && out?.[OUTPUT_SUFFIX]) console.error(out[OUTPUT_SUFFIX]); } if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
 }
 export { mirror, view, solve, refPoint, compassKey, COMPASS, mkdirSync };
