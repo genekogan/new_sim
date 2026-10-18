@@ -36,12 +36,14 @@ test('unset or default dims are today\'s body exactly (same profile object, radi
 
 test('height and build change radius, height, eyes and seat fit; walk speed changes the profile speed', () => {
   const tall = humanoidDims(look({ height: 1.85, build: 1.1 })), small = humanoidDims(look({ height: 1.65, build: 0.92 }));
-  assert.ok(tall.radius > HUMAN_RADIUS && tall.radius <= HUMANOID_RADIUS_RANGE[1], `tall radius ${tall.radius}`);
+  assert.equal(HUMANOID_RADIUS_RANGE[1], HUMAN_RADIUS, 'the collider never exceeds today\'s body (lane N1: wider bodies were refused 0.84-0.9 m doors)');
+  assert.equal(tall.radius, HUMAN_RADIUS, `tall radius ${tall.radius} is capped at today's`); assert.equal(tall.standard, false, 'but the tall body is not today\'s');
   assert.ok(small.radius < HUMAN_RADIUS && small.radius >= HUMANOID_RADIUS_RANGE[0], `small radius ${small.radius}`);
-  assert.equal(dimsOf({ build: 1.1 }).radius, 0.308); assert.equal(dimsOf({ height: 1.85 }).radius, 0.288);
+  assert.equal(dimsOf({ build: 1.1 }).radius, HUMAN_RADIUS); assert.equal(dimsOf({ height: 1.85 }).radius, HUMAN_RADIUS);
+  assert.equal(dimsOf({ build: 0.92 }).radius, 0.258); assert.equal(dimsOf({ height: 1.65 }).radius, 0.272);
   assert.equal(tall.eyeHeight, 1.713); assert.equal(small.eyeHeight, 1.527);
   const p = humanoidProfile(look({ height: 1.85, walkSpeed: 1.0 }));
-  assert.notEqual(p, HUMAN_PROFILE); assert.equal(p.speed, 1.0); assert.equal(p.height, 1.903); assert.equal(p.radius, 0.288);
+  assert.notEqual(p, HUMAN_PROFILE); assert.equal(p.speed, 1.0); assert.equal(p.height, 1.903); assert.equal(p.radius, HUMAN_RADIUS);
   assert.equal(humanoidProfile(look({ height: 1.85, walkSpeed: 1.0 })), p, 'profiles are shared per dims');
   assert.equal(humanoidProfile(look({ headSize: 1.08 })), HUMAN_PROFILE, 'head size is drawn only');
   // seat fit scales today's 0.2–1.2 m range: a 1.15 m stool is too high for the shortest body (≤ 1.131), fine for today's
@@ -90,17 +92,16 @@ test('walking speed: a slow body takes longer, a fast one stays under the per-ti
   assert.ok(slow.maxStep <= 0.9 * DT + 1e-6, `slow max step ${slow.maxStep}`);
 });
 
-test('looks v2 body shape: the widest of shoulders/chest/hips/weight widens the collider, clamped so every body fits a 0.9 m door; narrower never shrinks it', () => {
+test('looks v2 body shape: the widest of shoulders/chest/hips/weight widens the drawn body, never the collider (capped at today\'s); narrower never shrinks it', () => {
   for (const k of ['shoulders', 'chest', 'hips', 'weight'] as const) {
     const [lo, hi] = HUMANOID_DIM_RANGES[k];
     const wide = humanoidDims(look({ [k]: hi })), narrow = humanoidDims(look({ [k]: lo }));
-    assert.ok(wide.radius > HUMAN_RADIUS && !wide.standard, `${k} ${hi} widens (${wide.radius})`);
+    assert.ok(wide.radius === HUMAN_RADIUS && !wide.standard && wide.width === hi, `${k} ${hi} is drawn wider, collides as today's (${wide.radius})`);
     assert.equal(narrow.radius, HUMAN_RADIUS, `${k} ${lo} keeps today's radius`); assert.equal(narrow.standard, true, 'and is today\'s body');
     assert.deepEqual(wide.seat, [0.2, 1.2], 'shape never changes seat fit'); assert.equal(wide.eyeHeight, 1.62, 'nor eye height');
   }
   const widest = humanoidDims(look({ height: 1.85, build: 1.1, shoulders: 1.12, chest: 1.15, hips: 1.15, weight: 1.25 }));
-  assert.equal(widest.radius, HUMANOID_RADIUS_RANGE[1], 'the widest body is clamped');
-  assert.ok(2 * (widest.radius + 0.06) < 0.9, 'and still passes a 0.9 m door with the plan margin');
+  assert.equal(widest.radius, HUMAN_RADIUS, 'the widest body collides as today\'s (its door test: humanoid-door.test.ts)');
   assert.equal(humanoidProfile(look({ weight: 1.2 })).speed, HUMAN_PROFILE.speed, 'shape is not speed');
   assert.match(String(bodyProblem(look({ weight: 1.6 }))), /weight/, 'out-of-range shape is refused');
   assert.equal(bodyProblem(look({ weight: 1.2, shoulders: 1.1 })), null);

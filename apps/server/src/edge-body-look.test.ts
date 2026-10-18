@@ -25,10 +25,10 @@ test('LOOK: edit over today\'s look, seeded random, preset, refusals, schema, ot
  const r2=await put(w,a,{random:true,seed:42});assert.equal(r2.status,200);assert.deepEqual((await r2.json()).body,{family:'humanoid',model:lookKey(appearanceFromSeed(42)),params:compactLook(appearanceFromSeed(42))});
  const r3=await put(w,a,{random:true});assert.equal(r3.status,200);assert.match((await r3.json()).body.model,/^humanoid2-[0-9a-f]{16}$/);
  const r4=await put(w,a,{preset:'woman'});assert.equal(r4.status,200);assert.deepEqual((await r4.json()).body.params,{preset:'woman'});
- // sizes: a taller, broader, slower body is a different engine body (radius, profile speed); the preset stays
+ // sizes: a taller, broader, slower body is a different engine body (profile speed; the collider is capped at today's); the preset stays
  const r6=await put(w,a,{height:1.85,build:1.08,walkSpeed:1.0});assert.equal(r6.status,200,await r6.clone().text());const b6=(await r6.json()).body;
  assert.deepEqual(b6.params,{preset:'woman',height:1.85,build:1.08,walkSpeed:1});assert.deepEqual(ent(a).body,b6);
- const prof=bodyProfile(ent(a) as never);assert.equal(prof.speed,1);assert.ok(prof.radius>0.3&&prof.radius<=0.32,String(prof.radius));assert.equal(bodyProfile(ent(b) as never).speed,1.35,'the other Soul walks as before');
+ const prof=bodyProfile(ent(a) as never);assert.equal(prof.speed,1);assert.equal(prof.radius,0.28,'a taller, broader look collides as today\'s body (lane N1 cap)');assert.equal(bodyProfile(ent(b) as never).speed,1.35,'the other Soul walks as before');
  // refusals: unknown key, bad value, mixed random, two assignment kinds; nothing changes
  const before=structuredClone(ent(a).body),seq=w.f.host.seq;
  for(const [look,code] of [[{wings:'big'},'body.look'],[{hair:'purple'},'body.look'],[{headSize:2},'body.look'],[{walkSpeed:1.5},'body.look'],[{height:2.3},'body.look'],[{random:true,hat:'cap'},'body.look'],['cap','body.look']] as const){
