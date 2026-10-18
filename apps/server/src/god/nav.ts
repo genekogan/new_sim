@@ -272,8 +272,11 @@ export class GodNav {
     } else if (t.kind === 'room') {
       // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
       // into the tea room do not queue for one spot)
+      // ... and still reached from the front door: the spot beside it can be in a pocket furniture closes off (V6-party S6,
+      // the furnished moss-cottage living room: refused route.unreachable), so it is reach-checked as roomGoal's own goal is
       const base = this.roomGoal(t, near), free = base ? near(base.p, base.level, 6) : null;
-      goal = free && (!t.poly || inPoly(free.p[0], free.p[1], t.poly)) ? free : base;
+      const moved = !!free && !!base && (free.p[0] !== base.p[0] || free.p[1] !== base.p[1]);
+      goal = free && (!t.poly || inPoly(free.p[0], free.p[1], t.poly)) && (!moved || this.entryReaches(t, free.p)) ? free : base;
     } else if (t.kind === 'building' && t.inside && t.doorOpen) {
       // in at the front door: standing room just inside it (the room it opens into); else its approach outside
       goal = near(t.inside, 0, 4);
@@ -297,7 +300,7 @@ export class GodNav {
     if (!t.entry || !E.reachV1) return centre;
     this.index(); const rv = `${this.h.staticVersion?.() ?? this.cache?.key}`;
     const key = `${rv}|${t.ref}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
-    const reach = (p: Vec2) => { const r = E.reachV1!({ p: t.entry!.p, level: t.entry!.level }, { p, level: t.level }); return r.ok; };
+    const reach = (p: Vec2) => this.entryReaches(t, p);
     let goal: { p: Vec2; level: number } | null = null;
     if (centre && inPoly(centre.p[0], centre.p[1], t.poly ?? []) && reach(centre.p)) goal = centre;
     else if (t.poly?.length) {
@@ -323,6 +326,11 @@ export class GodNav {
     this.rooms.set(key, goal); if (this.rooms.size > 20_000) this.rooms.clear();
     if (!goal) this.blocked.set(t.ref, `Nothing inside ${t.ref} can be reached from its front door right now: furniture closes the way in.`); else this.blocked.delete(t.ref);
     return goal;
+  }
+  /** Does the room's front door reach p (on the room's level)? True when there is no door or no reach check to ask. */
+  private entryReaches(t: Thing, p: Vec2): boolean {
+    const E = this.h.engine;
+    return !t.entry || !E.reachV1 || E.reachV1({ p: t.entry.p, level: t.entry.level }, { p, level: t.level }).ok;
   }
   private rooms = new Map<string, { p: Vec2; level: number } | null>();
   private roomsOf: string | undefined;
