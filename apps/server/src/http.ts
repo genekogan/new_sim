@@ -188,7 +188,7 @@ export function buildApp(d: Deps) {
     const profile = { id: 'probe', radius: n('r', 0.35), height: 1.8, speed: 1.35, turnRate: 4, stepHeight: 0.22 };
     const res = sp.route(rt.world, profile, { level: n('sl'), p: [n('sx'), n('sz')] }, { level: n('gl'), p: [n('gx'), n('gz')] }, {});
     const levels = ((sp as { scene?: { levels?: { id: number; y: number; label?: string }[] } }).scene?.levels ?? []).map((l) => `${l.id}@${l.y}:${l.label ?? ''}`);
-    return c.json(res.ok ? { ok: true, length: res.route.length, legs: res.route.legs.length, levels } : { ok: false, diagnostic: res.diagnostic, levels }, 200, { 'Cache-Control': 'no-store' });
+    return c.json(res.ok ? { ok: true, length: res.route.length, legs: res.route.legs.length, end: res.route.legs.at(-1)?.points?.at(-1), endLevel: res.route.legs.at(-1)?.level, levels } : { ok: false, diagnostic: res.diagnostic, levels }, 200, { 'Cache-Control': 'no-store' });
   });
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
