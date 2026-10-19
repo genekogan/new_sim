@@ -21,7 +21,7 @@ import type { Runtime, Invariant } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { angleDelta, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
 import { CATALOG } from '../world/catalog.ts';
-import { entityList, stableIndices } from '../world/entity-list.ts';
+import { entityList, stableIndices, type EntityTable } from '../world/entity-list.ts';
 import { relevantEntities } from '../world/relevant.ts';
 
 export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 };
@@ -299,12 +299,14 @@ function landingClear(rt: Runtime, e: Entity, c: CarrierState, d: CarrierDef): b
   }
   return true;
 }
-/** Advance every carrier one tick (call before the runtime steps). No carriers → no effect. */
-export function stepCarriers(rt: Runtime): void {
+/** Advance every carrier one tick (call before the runtime steps). No carriers → no effect. `table`: the caller's
+ *  current listing of the world's entity table (S1 r2: the engine lists once and hands the same listing to the runtime
+ *  step; this function changes entities' fields, never the table's entries). */
+export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
   // a snapshot, as Object.values was (0.46 -> 0.17 ms a tick on Eden 2026). S1 r2: only the entities with a ride state
   // (fixed for an entity's life), found again without reading every entity while the table holds the same objects
   // (world/entity-list.ts stableIndices); only a ride looks its def up in the catalogue.
-  const list = entityList(rt.world);
+  const list = table && table.entities === rt.world.entities ? table.list : entityList(rt.world);
   for (const i of stableIndices(rt.world.entities, 'carrier/1 rides', list, null, (e) => !!state(e)).idx) {
     const e = list[i], c = state(e)!;
     const d = carrierDef(e); if (!d) continue;

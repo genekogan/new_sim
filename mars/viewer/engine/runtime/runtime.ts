@@ -5,7 +5,7 @@ import {admitFloaters} from '../bodies/policy.ts';
 import type { ActionDef, ActionRecord, ActionStatus, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
 import type { WorldState } from '../world/types.ts';
 import { hashOf } from '../core/hash.ts';
-import { withEntityList } from '../world/entity-list.ts';
+import { listTable, withEntityList, type EntityTable } from '../world/entity-list.ts';
 import { Profiler } from './profile.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
 import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
@@ -64,6 +64,10 @@ export class Runtime {
   /** A quiet renewal derives its generated-id namespace from durable world time. */
   beginActionEpoch() { this.idPrefix = `a${this.world.tick}-`; this.nextId = 1; }
   observers: RuntimeObserver[] = [];
+  /** S1 r2 (tranche 2026-10-19): the entity table listing the last step's invariant pass used (world/entity-list.ts;
+   *  shared arrays, never mutate them). The engine reuses it after the step while it can show nothing has added,
+   *  removed or replaced an entity since. */
+  passTable: EntityTable | null = null;
   /** Opt-in profiler (see `profile`); null when off. Measurement only, never read by the simulation. */
   prof: Profiler | null = null;
 
@@ -271,8 +275,13 @@ export class Runtime {
     if (sp?.focusOn && typeof actor === 'string') sp.focusOn(this.world, actor);
   }
 
-  /** Advance one fixed tick: step live actions in submission order, then check invariants. */
-  step() {
+  /** Advance one fixed tick: step live actions in submission order, then check invariants. `table` (optional): a listing
+   *  of the world's entity table the caller took after the last change to the table (S1 r2: the engine lists once a
+   *  tick, before the rides step, which changes no entry). The pass reuses it when this step runs no action code before
+   *  the pass (none live, none waiting, no social return queued): then nothing can have added, removed or replaced an
+   *  entity in between, and the pass sees the same entities in the same order as a listing of its own. */
+  step(table?: EntityTable | null) {
+    const noActionCode = this.live.size === 0 && this.waiting.size === 0 && !(this.services.socialReturns as unknown[] | undefined)?.length;
     this.world.tick++;
     const deferred = new Map<Live, StepResult>();
     for (const l of Array.from(this.live.values())) {
@@ -330,6 +339,8 @@ export class Runtime {
     // one entity list for the whole pass (world/entity-list.ts: ~24 Object.values over every entity were most of a tick)
     // S1 (tranche 2026-10-19): observers (take recorder, metrics, chapter cutter) only read the world, so they share the
     // pass's entity list too (the recorder listed and sorted every id of a 4,900-entity world every tick)
+    const passTable = noActionCode && table && table.entities === this.world.entities ? table : listTable(this.world.entities);
+    this.passTable = passTable;
     withEntityList(this.world, () => {
       for (const inv of this.invariants)
         for (const d of inv(this)) {
@@ -338,7 +349,7 @@ export class Runtime {
         }
       if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
       for (const o of this.observers) o.onTick?.(this);
-    });
+    }, passTable);
   }
 
   /** Conservative early-stop proof: all live roots, children and ambient actions must certify every internal mover. */

@@ -7,7 +7,9 @@ import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
 import { emptyWorld, human, addAll, component } from '../world/factory.ts';
 import { createRegistry, ENGINE_INVARIANTS } from '../api/registry.ts';
-import { entitiesById, entityList, listEntities, withEntityList } from '../world/entity-list.ts';
+import { entitiesById, entityList, entityKeys, listEntities, listTable, withEntityList } from '../world/entity-list.ts';
+import { z } from 'zod';
+import type { ActionDef } from '../actions/types.ts';
 import type { SpatialScene } from '../spatial/types.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 
@@ -76,4 +78,41 @@ test('a runtime\'s violations and state are the same as with every invariant lis
   assert.deepEqual(new Set(shared.violations.map((v) => v.code)), new Set(['collision.human-human', 'support.unsupported', 'support.holder-missing', 'motion.teleport']));
   assert.deepEqual(shared.violations, own.violations);
   assert.deepEqual(shared.events, own.events);
+});
+
+// S1 r2 (tranche 2026-10-19): the engine lists the table once a tick and hands that listing to Runtime.step, which reuses
+// it for its invariant pass only when the step runs no action code first; an action that adds an entity gets a fresh one.
+const spawn: ActionDef<{ id: string }, null, { id: string }> = {
+  verb: 'spawn_test', description: 'adds an entity on its first step (test only)', schema: z.object({ id: z.string() }),
+  reservations: () => [], plan: () => ({ ok: true, program: null }), start: (_rt, p) => ({ id: p.id }),
+  step: (rt, x) => { rt.world.entities[x.id] = component(x.id, 'beam-12ft', [20, 0, 20], 0, { phase: 'stored' }); return { status: 'completed', outputs: {} }; },
+  cancel: () => ({ ok: true }),
+};
+test('a step reuses the caller\'s table listing only when it runs no action code before its pass', () => {
+  const reg = createRegistry([spawn as ActionDef]);
+  const rt = new Runtime(world(), reg, { spatial: new Spatial(open(30)) }, ENGINE_INVARIANTS);
+  let seen: { list: Entity[]; keys: string[] } | null = null;
+  rt.observers.push({ onTick: (r) => { seen = { list: entityList(r.world), keys: entityKeys(r.world) }; } });
+  const fresh = () => ({ list: Object.values(rt.world.entities), keys: Object.keys(rt.world.entities) });
+  // idle: the given listing is the pass's
+  let t = listTable(rt.world.entities);
+  rt.step(t);
+  assert.equal(rt.passTable, t);
+  assert.equal(seen!.list, t.list);
+  assert.deepEqual(seen, fresh());
+  // a live action that adds an entity: the pass lists the table afresh and sees it
+  rt.submit('spawn_test', { id: 'spawned' });
+  t = listTable(rt.world.entities);
+  rt.step(t);
+  assert.notEqual(rt.passTable, t);
+  assert.ok(seen!.list.some((e) => e.id === 'spawned'));
+  assert.deepEqual(seen, fresh());
+  // a listing of another table object is ignored
+  const other = listTable({ ...rt.world.entities });
+  rt.step(other);
+  assert.notEqual(rt.passTable, other);
+  assert.deepEqual(seen, fresh());
+  // no listing given: the pass lists the table itself, as before
+  rt.step();
+  assert.deepEqual(seen, fresh());
 });

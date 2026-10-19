@@ -16,11 +16,19 @@ let scope: Scope | null = null;
 
 const byIdOrder = (a: Entity, b: Entity) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 /** Object.values(entities), same entities in the same order (own enumerable keys: integer-like ascending, then insertion
- *  order; for-in follows it on an ordinary object), ~2.7x cheaper on a dictionary-mode object (0.17 vs 0.46 ms, Eden 2026). */
+ *  order), ~3x cheaper on a dictionary-mode object: Object.keys, then each key's value (S1 r2: Object.keys and indexed
+ *  reads beat for-in + hasOwn by ~30% on Eden 2026's 4,500-entity table; the same keys in the same order). */
 export function listEntities(entities: WorldState['entities']): Entity[] {
-  const out: Entity[] = [];
-  for (const k in entities) if (Object.hasOwn(entities, k)) out.push(entities[k]);
-  return out;
+  return listTable(entities).list;
+}
+
+/** One listing of an entity table: its keys in Object.keys order, the value under each, and the table it was taken of. */
+export type EntityTable = { readonly entities: WorldState['entities']; readonly keys: string[]; readonly list: Entity[] };
+/** List `entities` (shared arrays: never mutate them). */
+export function listTable(entities: WorldState['entities']): EntityTable {
+  const keys = Object.keys(entities), list: Entity[] = new Array(keys.length);
+  for (let i = 0; i < keys.length; i++) list[i] = entities[keys[i]];
+  return { entities, keys, list };
 }
 const live = (w: WorldState) => (scope !== null && scope.world === w && scope.entities === w.entities ? scope : null);
 
@@ -92,10 +100,12 @@ export function stableIndices<D = never>(entities: object, purpose: string, list
   return next as { idx: number[]; derived: D };
 }
 
-/** Run `fn` (read-only over `w`) with one entity list for the whole call. */
-export function withEntityList<T>(w: WorldState, fn: () => T): T {
-  const prev = scope, entities = w.entities, list: Entity[] = [], keys: string[] = [];
-  for (const k in entities) if (Object.hasOwn(entities, k)) { keys.push(k); list.push(entities[k]); }
+/** Run `fn` (read-only over `w`'s table: it adds, removes and replaces no entity) with one entity list for the whole
+ *  call. `table`: a listing the caller knows is still the table's (S1 r2: nothing added, removed or replaced an entity
+ *  since it was taken); a listing of another table object is ignored and the table listed afresh. Memos start empty. */
+export function withEntityList<T>(w: WorldState, fn: () => T, table?: EntityTable | null): T {
+  const prev = scope, entities = w.entities;
+  const { list, keys } = table && table.entities === entities ? table : listTable(entities);
   scope = { world: w, entities, list, keys };
   try {
     return fn();
