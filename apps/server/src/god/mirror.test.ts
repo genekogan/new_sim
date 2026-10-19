@@ -82,10 +82,12 @@ test('mirror/1 (G3): the ground recipe goes by hash; the patched mirror is the s
   assert.equal(old.groundRef, undefined); assert.deepEqual(old.top.ground, full.top.ground);
   const m1 = applyMirror(m0, d, W)!, m1old = applyMirror(m0, old, W)!;
   assert.ok(m1 && m1old);
-  assert.equal(JSON.stringify(m1.snapshot), JSON.stringify(m1old.snapshot), 'byte-identical snapshot, key order included');
+  // `now` is the clock at each answer: pinned in place (same key position) before comparing bytes
+  const bytes = (m: { snapshot: Record<string, unknown> }) => JSON.stringify({ ...m.snapshot, now: 0, tick: 0 });
+  assert.equal(bytes(m1), bytes(m1old), 'byte-identical snapshot, key order included');
   // a server before G3 (no groundHash): the CLI sends nothing next time and reads the recipe as sent
   const { groundHash: _g, ...pre } = old;
-  const m1pre = applyMirror(m0, pre, W)!; assert.equal(m1pre.groundHash, undefined); assert.equal(JSON.stringify(m1pre.snapshot), JSON.stringify(m1.snapshot));
+  const m1pre = applyMirror(m0, pre, W)!; assert.equal(m1pre.groundHash, undefined); assert.equal(bytes(m1pre), bytes(m1));
   // a ground reference the client cannot honour (its copy is another recipe): refused, so the CLI refetches whole
   assert.equal(applyMirror({ ...m0, groundHash: 'other' }, d, W), null);
   // the whole mirror for a client whose state the server forgot still keeps the recipe by hash
