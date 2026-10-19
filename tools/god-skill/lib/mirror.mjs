@@ -11,12 +11,12 @@
 // A server without /v1/god/mirror gets the old snapshot + layout refresh.
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { atomicWrite, call, load, ok } from './state.mjs';
+import { atomicWrite, call, load, ok, writesSent } from './state.mjs';
 import { isFlagDef } from './solver.mjs';
 import { noticeInboxHeader } from './inbox-notice.mjs';
 
 export const CACHE = '.eden-god.cache.json';
-let memo = null, synced = null, oldServer = false, speaks = false, trustedRead = false;
+let memo = null, synced = null, syncedAt = 0, syncedWrites = -1, oldServer = false, speaks = false, trustedRead = false;
 /** Was the last mirror() a trusted cache read (no request)? */
 export const wasTrusted = () => trustedRead;
 /** Did this world answer mirror/1 in this process (so it also takes act `repair`, G2 C)? */
@@ -83,7 +83,8 @@ export async function mirror({ fresh = false, trust = false } = {}) {
     if (c?.world === world && c.guard) { memo = c; speaks = true; trustedRead = true; return c; }
   }
   trustedRead = false;
-  if (!fresh && synced && synced === memo && memo.world === world) { synced = null; return memo; } // patched by this process's own edit just now
+  // checked (or patched by this process's own edit) a moment ago in this command: no second request
+  if (!fresh && synced && synced === memo && memo.world === world && Date.now() - syncedAt < 2000 && syncedWrites === writesSent()) return memo;
   const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
   if (!oldServer) {
     const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
@@ -91,11 +92,11 @@ export async function mirror({ fresh = false, trust = false } = {}) {
     else if (r.data?.contract !== 'mirror/1' && (r.status === 404 || (r.status >= 200 && r.status < 300))) oldServer = true; // a server before mirror/1
     else {
       const p = ok(r, 'mirror'); speaks = true;
-      if (p.same && base) { memo = base; return base; }
+      if (p.same && base) { memo = base; synced = base; syncedAt = Date.now(); syncedWrites = writesSent(); return base; }
       let m = applyMirror(base, p, world);
       if (!m) m = applyMirror(null, ok(await fetchMirror({}), 'mirror'), world); // drift or a lost library: the whole mirror once
       if (!m) throw new Error('mirror: the server sent a mirror this CLI cannot read; run `mirror --fresh`');
-      memo = m; writeCache(m); return m;
+      memo = m; synced = m; syncedAt = Date.now(); syncedWrites = writesSent(); writeCache(m); return m;
     }
   }
   if (memo && memo.world === world && !fresh) {
@@ -121,7 +122,7 @@ export function adoptMirror(p) {
   const world = load().world, base = memo?.world === world ? memo : readCache();
   const m = applyMirror(base?.world === world ? base : null, p, world);
   if (!m) return false;
-  memo = m; synced = m; writeCache(m); return true;
+  memo = m; synced = m; syncedAt = Date.now(); syncedWrites = writesSent(); writeCache(m); return true;
 }
 export function invalidate() { memo = null; synced = null; }
 

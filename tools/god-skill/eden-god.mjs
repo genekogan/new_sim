@@ -581,6 +581,9 @@ function decorate(s, pathname, verb, body, { as = "god", noBuild = false } = {})
   } else if (batchPath && !sealed && body?.group === void 0 && s.group && !s.build) body = { ...body, group: s.group };
   return body;
 }
+var READ_POSTS = /* @__PURE__ */ new Set(["/v1/god/query", "/v1/god/dryrun", "/v1/god/preview", "/v1/god/verify-use"]);
+var writes = 0;
+var writesSent = () => writes;
 async function call(path, { body, method, as = "god", noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
   const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
   if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
@@ -589,6 +592,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   const verb = method ?? (body ? "POST" : "GET"), pathname = path.split("?")[0];
   const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
   body = decorate(s, pathname, verb, body, { as, noBuild });
+  if (verb !== "GET" && !READ_POSTS.has(pathname)) writes++;
   const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID2() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
@@ -1716,6 +1720,8 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
 var CACHE = ".eden-god.cache.json";
 var memo = null;
 var synced = null;
+var syncedAt = 0;
+var syncedWrites = -1;
 var oldServer = false;
 var speaks = false;
 var trustedRead = false;
@@ -1797,10 +1803,7 @@ async function mirror({ fresh = false, trust = false } = {}) {
     }
   }
   trustedRead = false;
-  if (!fresh && synced && synced === memo && memo.world === world) {
-    synced = null;
-    return memo;
-  }
+  if (!fresh && synced && synced === memo && memo.world === world && Date.now() - syncedAt < 2e3 && syncedWrites === writesSent()) return memo;
   const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
   if (!oldServer) {
     const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
@@ -1811,12 +1814,18 @@ async function mirror({ fresh = false, trust = false } = {}) {
       speaks = true;
       if (p.same && base) {
         memo = base;
+        synced = base;
+        syncedAt = Date.now();
+        syncedWrites = writesSent();
         return base;
       }
       let m = applyMirror(base, p, world);
       if (!m) m = applyMirror(null, ok(await fetchMirror({}), "mirror"), world);
       if (!m) throw new Error("mirror: the server sent a mirror this CLI cannot read; run `mirror --fresh`");
       memo = m;
+      synced = m;
+      syncedAt = Date.now();
+      syncedWrites = writesSent();
       writeCache(m);
       return m;
     }
@@ -1851,6 +1860,8 @@ function adoptMirror(p) {
   if (!m) return false;
   memo = m;
   synced = m;
+  syncedAt = Date.now();
+  syncedWrites = writesSent();
   writeCache(m);
   return true;
 }
