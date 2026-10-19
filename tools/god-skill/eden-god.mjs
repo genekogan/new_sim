@@ -213,8 +213,13 @@ import { randomUUID as randomUUID2 } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 // lib/retry.mjs
+var RETRY_LIMITS = Object.freeze({ retries: 4, waitMs: 6e4 });
+var idempotent = (method) => !method || method === "GET" || method === "HEAD";
+var refused = (e) => [e?.code, e?.cause?.code, ...(e?.cause?.errors ?? []).map((x) => x?.code)].includes("ECONNREFUSED");
+var retryDefaults = {};
 async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, retries: 0 }) {
-  const send = runtime.fetch ?? fetch, clock = runtime.now ?? Date.now;
+  runtime = { ...retryDefaults, ...runtime };
+  const send = runtime.fetch ?? fetch, clock = runtime.now ?? Date.now, random = runtime.random ?? Math.random;
   const { timeoutMs, deadlineAt, signal, ...init } = options ?? {};
   const wait = runtime.sleep ?? ((ms) => new Promise((resolve6, reject) => {
     if (signal?.aborted) return reject(signal.reason);
@@ -231,26 +236,46 @@ async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, 
   }));
   const plain = timeoutMs === void 0 && deadlineAt === void 0 && signal === void 0;
   const deadline = Math.min(timeoutMs === void 0 ? Infinity : clock() + timeoutMs, deadlineAt ?? Infinity);
+  const backoff = () => {
+    const cap = 500 * 2 ** budget.retries;
+    return cap / 2 + random() * cap / 2;
+  };
+  const room = (delay) => budget.retries < RETRY_LIMITS.retries && budget.waited + delay <= RETRY_LIMITS.waitMs && clock() + delay < deadline;
+  const pause = async (delay) => {
+    budget.waited += delay;
+    budget.retries++;
+    await wait(delay);
+  };
   for (; ; ) {
     signal?.throwIfAborted();
     const attemptMs = Math.min(timeoutMs ?? Infinity, deadlineAt === void 0 ? Infinity : deadlineAt - clock());
     const signals = [...Number.isFinite(attemptMs) ? [AbortSignal.timeout(Math.max(1, attemptMs))] : [], ...signal ? [signal] : []];
-    const response = await send(url, plain ? options : { ...init, ...signals.length ? { signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals) } : {} });
-    if (response.status !== 429 || budget.retries >= 4) return response;
+    let response;
+    try {
+      response = await send(url, plain ? options : { ...init, ...signals.length ? { signal: signals.length === 1 ? signals[0] : AbortSignal.any(signals) } : {} });
+    } catch (e) {
+      if (signal?.aborted || /abort|timeout/i.test(`${e?.name} ${e?.message}`) || !(idempotent(init.method) || refused(e))) throw e;
+      const delay2 = backoff();
+      if (!room(delay2)) throw e;
+      await pause(delay2);
+      continue;
+    }
+    const status2 = response.status;
+    if (!(status2 === 429 || status2 === 503 || (status2 === 502 || status2 === 504) && idempotent(init.method))) return response;
     const data = await response.clone().json().catch(() => ({}));
     const header = response.headers.get("retry-after"), now = clock();
     const numeric = header === null ? NaN : Number(header);
-    const delays = [
-      data.retryAfterMs,
-      data.retry_after == null ? NaN : Number(data.retry_after) * 1e3,
+    const hints = [
+      data?.retryAfterMs,
+      data?.retry_after == null ? NaN : Number(data.retry_after) * 1e3,
       Number.isFinite(numeric) ? numeric * 1e3 : header ? Date.parse(header) - now : NaN
     ].filter((v) => v !== null && v !== void 0 && Number.isFinite(Number(v)) && Number(v) >= 0).map(Number);
-    const delay = Math.max(1, delays.length ? Math.max(...delays) : 250 * 2 ** budget.retries);
-    if (budget.waited + delay > 6e4 || now + delay >= deadline) return response;
+    const hint = hints.length ? Math.max(...hints) : null;
+    if (status2 === 503 && hint === null) return response;
+    const delay = Math.max(1, Math.round(hint === null ? backoff() : hint * (1 + 0.2 * random())));
+    if (!room(delay)) return response;
     await response.body?.cancel();
-    budget.waited += delay;
-    budget.retries++;
-    await wait(delay);
+    await pause(delay);
   }
 }
 
@@ -433,8 +458,8 @@ async function wireFetch(url, init = {}) {
     r = await fetch(`http://127.0.0.1:${w.port}/`, { ...init, headers });
   } catch (e) {
     if (init.signal?.aborted) throw e;
-    const refused = /ECONNREFUSED|ECONNRESET|EPIPE|ENOTFOUND/.test(String(e?.cause?.code ?? e?.code ?? ""));
-    if (refused || !init.method || init.method === "GET") {
+    const refused2 = /ECONNREFUSED|ECONNRESET|EPIPE|ENOTFOUND/.test(String(e?.cause?.code ?? e?.code ?? ""));
+    if (refused2 || !init.method || init.method === "GET") {
       known = null;
       return fetch(url, init);
     }
@@ -620,7 +645,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
     } catch {
       data = { raw: text.slice(0, 400) };
     }
-    return { status: r.status, data };
+    return { status: r.status, data, ...(r.status === 429 || r.status === 503) && retryBudget.retries ? { retried: { retries: retryBudget.retries, waitedMs: retryBudget.waited } } : {} };
   }
   const finish = (r) => {
     const b = body?.build, data = r.data;
@@ -704,8 +729,14 @@ function attention(at, eye) {
 }
 var ok = (r, what) => {
   if (r.status >= 200 && r.status < 300) return r.data;
-  throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
+  throw new Error(refusal(r, what) ?? `${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
 };
+function refusal(r, what) {
+  if (r.status !== 429 && r.status !== 503) return null;
+  const d = r.data ?? {}, message = typeof d.message === "string" && d.message ? d.message : r.status === 429 ? "too many requests" : "the world is not available right now";
+  const waited = r.retried ? ` The CLI waited ${Math.round(r.retried.waitedMs / 1e3)} s over ${r.retried.retries} ${r.retried.retries === 1 ? "retry" : "retries"} first.` : "";
+  return `${what}: refused (HTTP ${r.status}${typeof d.code === "string" ? ` ${d.code}` : ""}): ${message}.${waited} Wait before sending more; do not retry in a loop.`;
+}
 var num = (v) => {
   const n = Number(v);
   if (!Number.isFinite(n)) throw new Error(`not a number: ${v}`);
@@ -2996,6 +3027,7 @@ function schemaMarkdown(s) {
 }
 
 // lib/inbox.mjs
+var idleWait = (quick) => Math.min(5e3, 50 * 2 ** Math.max(0, quick - 1));
 var transient = (status2) => status2 === 0 || status2 === 408 || status2 === 429 || status2 >= 500;
 async function listen(flags2 = {}, { poll: pollFn, beat = () => {
 }, wait = sleep } = {}) {
@@ -3006,10 +3038,10 @@ async function listen(flags2 = {}, { poll: pollFn, beat = () => {
   if (flags2.follow && flags2.once) throw new Error("listen takes --follow or --once, not both");
   const poll = pollFn ?? ((after) => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1e3)), ...after ? { after } : {} })}`, { timeoutMs: Math.round(seconds * 1e3) + 1e4 }));
   if (flags2.follow) return followInbox({ poll, after: flags2.after, beat, wait });
-  let delay = 0;
+  let delay = 0, quick = 0;
   for (; ; ) {
     beat();
-    const r = await poll(flags2.after);
+    const t0 = Date.now(), r = await poll(flags2.after);
     if (!flags2.once && transient(r.status)) {
       delay = Math.min(3e4, delay ? delay * 2 : 1e3);
       await wait(delay);
@@ -3020,7 +3052,8 @@ async function listen(flags2 = {}, { poll: pollFn, beat = () => {
     if (!data?.inbox) throw new Error("listen: this world does not serve the owner inbox yet");
     const message = data.inbox.latest;
     if (flags2.once || message && message.state !== "acknowledged" && message.id !== flags2.after) return data;
-    await wait(50);
+    quick = Date.now() - t0 < 1e3 ? quick + 1 : 0;
+    await wait(idleWait(quick));
   }
 }
 async function ack(id, reply) {
@@ -3030,10 +3063,10 @@ async function ack(id, reply) {
 }
 async function followInbox({ poll, after, write = (line2) => process.stdout.write(line2 + "\n"), wait = sleep, stop = () => false, beat = () => {
 } }) {
-  let last = after, delay = 0;
+  let last = after, delay = 0, quick = 0;
   while (!stop()) {
     beat();
-    const r = await poll(last);
+    const t0 = Date.now(), r = await poll(last);
     if (transient(r.status)) {
       delay = Math.min(3e4, delay ? delay * 2 : 1e3);
       await wait(delay);
@@ -3046,7 +3079,10 @@ async function followInbox({ poll, after, write = (line2) => process.stdout.writ
     if (m && m.state !== "acknowledged" && m.id !== last) {
       write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt }));
       last = m.id;
-    } else await wait(50);
+    } else {
+      quick = Date.now() - t0 < 1e3 ? quick + 1 : 0;
+      await wait(idleWait(quick));
+    }
   }
 }
 

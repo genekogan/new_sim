@@ -12,22 +12,50 @@ test('429 retry honours milliseconds, seconds, numeric/date headers and preserve
   for (const [body, headers, delay] of cases) {
     const waits = [], calls = [], options = { method: 'POST', body: '{"clientRef":"fixed","ops":[]}' };
     const result = await fetchWithRetry('http://127.0.0.1:5368/v1/god/dryrun', options, {
-      now: () => 1000, sleep: async ms => waits.push(ms), fetch: async (url, opts) => { calls.push(opts); return calls.length === 1 ? Response.json(body, { status: 429, headers }) : Response.json({ accepted: true }); },
+      now: () => 1000, random: () => 0, sleep: async ms => waits.push(ms), fetch: async (url, opts) => { calls.push(opts); return calls.length === 1 ? Response.json(body, { status: 429, headers }) : Response.json({ accepted: true }); },
     });
     assert.equal(result.status, 200); assert.deepEqual(waits, [delay]); assert.equal(calls[0], options); assert.equal(calls[1], options);
   }
 });
 
-test('429 retries stop after four waits or a 60-second wait budget and never retry transport/other errors', async () => {
-  for (const [delay, expectedCalls, expectedWaits] of [[0, 5, 4], [30_000, 3, 2], [60_001, 1, 0]]) {
+test('429/503 retries stop after four waits or a 60-second wait budget; other refusals are single requests', async () => {
+  for (const status of [429, 503]) for (const [delay, expectedCalls, expectedWaits] of [[0, 5, 4], [30_000, 3, 2], [60_001, 1, 0]]) {
     let calls = 0; const waits = [];
-    const response = await fetchWithRetry('http://127.0.0.1:5368', {}, { sleep: async ms => waits.push(ms), fetch: async () => { calls++; return Response.json({ retryAfterMs: delay }, { status: 429 }); } });
-    assert.equal(response.status, 429); assert.equal(calls, expectedCalls); assert.equal(waits.length, expectedWaits); assert.ok(waits.reduce((a, b) => a + b, 0) <= 60_000);
+    const response = await fetchWithRetry('http://127.0.0.1:5368', {}, { random: () => 0, sleep: async ms => waits.push(ms), fetch: async () => { calls++; return Response.json({ retryAfterMs: delay }, { status }); } });
+    assert.equal(response.status, status); assert.equal(calls, expectedCalls); assert.equal(waits.length, expectedWaits); assert.ok(waits.reduce((a, b) => a + b, 0) <= 60_000);
   }
-  for (const status of [400, 401, 503]) {
+  let once = 0; assert.equal((await fetchWithRetry('http://127.0.0.1:5368', {}, { fetch: async () => { once++; return Response.json({ code: 'look.unavailable' }, { status: 503 }); } })).status, 503); assert.equal(once, 1, 'a 503 with no retry hint is not temporary');
+  for (const status of [400, 401, 404, 500]) {
     let calls = 0; assert.equal((await fetchWithRetry('http://127.0.0.1:5368', {}, { fetch: async () => { calls++; return new Response('', { status }); } })).status, status); assert.equal(calls, 1);
   }
-  let calls = 0; await assert.rejects(fetchWithRetry('http://127.0.0.1:5368', {}, { fetch: async () => { calls++; throw Error('lost'); } }), /lost/); assert.equal(calls, 1);
+  for (const status of [502, 504]) {
+    let calls = 0; assert.equal((await fetchWithRetry('http://127.0.0.1:5368', { method: 'POST', body: 'x' }, { fetch: async () => { calls++; return new Response('', { status }); } })).status, status); assert.equal(calls, 1, `a ${status} POST is not resent`);
+    calls = 0; const waits = [];
+    assert.equal((await fetchWithRetry('http://127.0.0.1:5368', {}, { sleep: async ms => waits.push(ms), fetch: async () => (++calls < 3 ? new Response('', { status }) : Response.json({ ok: true })) })).status, 200); assert.equal(calls, 3);
+  }
+});
+
+test('waits back off exponentially with jitter, honour the server with up to 20% jitter, and never form a tight loop', async () => {
+  for (const r of [0, 0.5, 0.999]) {
+    const waits = [];
+    await fetchWithRetry('http://127.0.0.1:5368', {}, { random: () => r, sleep: async ms => waits.push(ms), fetch: async () => new Response('', { status: 502 }) });
+    assert.equal(waits.length, 4);
+    waits.forEach((w, n) => { const cap = 500 * 2 ** n; assert.ok(w >= cap / 2 && w <= cap, `wait ${n} = ${w}`); });
+    const hinted = [];
+    await fetchWithRetry('http://127.0.0.1:5368', {}, { random: () => r, sleep: async ms => hinted.push(ms), fetch: async () => Response.json({}, { status: 429, headers: { 'retry-after': '2' } }) });
+    assert.ok(hinted.every(w => w >= 2000 && w <= 2400), String(hinted));
+  }
+});
+
+test('a lost connection is retried for reads and for a refused connection, never for a write that may have been sent', async () => {
+  const lost = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
+  const refused = () => Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } });
+  let calls = 0; const sleep = async () => {};
+  assert.equal((await fetchWithRetry('http://127.0.0.1:5368', {}, { sleep, fetch: async () => { if (++calls < 3) throw lost(); return Response.json({ ok: true }); } })).status, 200); assert.equal(calls, 3);
+  calls = 0; await assert.rejects(fetchWithRetry('http://127.0.0.1:5368', { method: 'POST', body: 'x' }, { sleep, fetch: async () => { calls++; throw lost(); } }), /fetch failed/); assert.equal(calls, 1);
+  calls = 0; assert.equal((await fetchWithRetry('http://127.0.0.1:5368', { method: 'POST', body: 'x' }, { sleep, fetch: async () => { if (++calls < 2) throw refused(); return Response.json({ ok: true }); } })).status, 200); assert.equal(calls, 2);
+  calls = 0; await assert.rejects(fetchWithRetry('http://127.0.0.1:5368', {}, { sleep, fetch: async () => { calls++; throw lost(); } }), /fetch failed/); assert.equal(calls, 5, 'gives up after four retries');
+  calls = 0; await assert.rejects(fetchWithRetry('http://127.0.0.1:5368', {}, { sleep, fetch: async () => { calls++; throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' }); } }), /timeout/); assert.equal(calls, 1, 'a timeout is the caller\'s');
 });
 
 test('each 429 retry gets its own per-attempt timeout, so a retry outlives the first attempt\'s signal', async t => {
@@ -46,7 +74,7 @@ test('each 429 retry gets its own per-attempt timeout, so a retry outlives the f
 
 test('per-attempt signals are fresh and a wait that cannot end before the deadline returns the 429', async () => {
   const signals = [], waits = []; let clock = 1000;
-  const runtime = { now: () => clock, sleep: async ms => { waits.push(ms); clock += ms; }, fetch: async (url, opts) => { signals.push(opts.signal); return signals.length === 1 ? Response.json({ retryAfterMs: 100 }, { status: 429 }) : Response.json({ ok: true }); } };
+  const runtime = { now: () => clock, random: () => 0, sleep: async ms => { waits.push(ms); clock += ms; }, fetch: async (url, opts) => { signals.push(opts.signal); return signals.length === 1 ? Response.json({ retryAfterMs: 100 }, { status: 429 }) : Response.json({ ok: true }); } };
   const ok = await fetchWithRetry('http://127.0.0.1:5368', { method: 'POST', body: 'x', timeoutMs: 1000 }, runtime);
   assert.equal(ok.status, 200); assert.equal(signals.length, 2); assert.notEqual(signals[0], signals[1]); assert.ok(signals.every(s => s instanceof AbortSignal && !s.aborted));
   let calls = 0; clock = 1000;

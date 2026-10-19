@@ -140,7 +140,8 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     const text = await r.text(); let data;
     if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${requestMethod} ${requestPath} ${r.status} ${Date.now() - t0} ms ${requestBody?.slice(0, 160) ?? ''}`);
     try { data = JSON.parse(text); } catch { data = { raw: text.slice(0, 400) }; }
-    return { status: r.status, data };
+    // P2: a refusal the CLI already waited out says so, and ok() prints it as a sentence
+    return { status: r.status, data, ...((r.status === 429 || r.status === 503) && retryBudget.retries ? { retried: { retries: retryBudget.retries, waitedMs: retryBudget.waited } } : {}) };
   }
   const finish = (r) => {
     const b = body?.build, data = r.data;
@@ -215,6 +216,13 @@ export function attention(at, eye) {
       .then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
   } catch { return Promise.resolve(false); }
 }
-export const ok = (r, what) => { if (r.status >= 200 && r.status < 300) return r.data; throw new Error(`${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`); };
+export const ok = (r, what) => { if (r.status >= 200 && r.status < 300) return r.data; throw new Error(refusal(r, what) ?? `${what}: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`); };
+/** P2: a rate limit or an unavailable world, as one sentence: what the world said and how long the CLI already waited. */
+export function refusal(r, what) {
+  if (r.status !== 429 && r.status !== 503) return null;
+  const d = r.data ?? {}, message = typeof d.message === 'string' && d.message ? d.message : r.status === 429 ? 'too many requests' : 'the world is not available right now';
+  const waited = r.retried ? ` The CLI waited ${Math.round(r.retried.waitedMs / 1000)} s over ${r.retried.retries} ${r.retried.retries === 1 ? 'retry' : 'retries'} first.` : '';
+  return `${what}: refused (HTTP ${r.status}${typeof d.code === 'string' ? ` ${d.code}` : ''}): ${message}.${waited} Wait before sending more; do not retry in a loop.`;
+}
 export const num = (v) => { const n = Number(v); if (!Number.isFinite(n)) throw new Error(`not a number: ${v}`); return n; };
 export const r2 = (v) => Math.round(v * 100) / 100;

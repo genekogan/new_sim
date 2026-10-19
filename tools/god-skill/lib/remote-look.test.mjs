@@ -193,5 +193,5 @@ test('local and remote failure reasons both survive fallback', async t => {
 test('remote look retries 429 before writing the returned PNG', async t => {
   const f = fixture(t); let calls = 0; const waits = [];
   const result = await shoot({ ...f.args, remote: true }, { ...f.runtime, sleep: async ms => waits.push(ms), fetch: async (...args) => ++calls === 1 ? Response.json({ retryAfterMs: 30 }, { status: 429 }) : f.runtime.fetch(...args) });
-  assert.equal(result.via, 'remote'); assert.equal(calls, 2); assert.deepEqual(waits, [30]); assert.deepEqual(readFileSync(f.args.out), png);
+  assert.equal(result.via, 'remote'); assert.equal(calls, 2); assert.equal(waits.length, 1); assert.ok(waits[0] >= 30 && waits[0] <= 36, 'the hint plus up to 20% jitter (P2)'); assert.deepEqual(readFileSync(f.args.out), png);
 });
