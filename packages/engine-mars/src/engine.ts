@@ -1724,12 +1724,17 @@ export class MarsEngine implements Engine {
     return {hash:physics.hash,relocated,trapped,kept};
   }
   /** A read of this world that moves nothing (a Soul's walk listing): the planner syncs once for all of it (Spatial.readPass). */
-  readPassV1<T>(fn:()=>T):T{return (this.rt.services.spatial as Spatial).readPass(this.rt.world,fn);}
+  readPassV1<T>(fn:()=>T):T{if(this.inPass++===0)this.passHumans=null;try{return (this.rt.services.spatial as Spatial).readPass(this.rt.world,fn);}finally{if(--this.inPass===0)this.passHumans=null;}}
+  /** S2: inside readPassV1 (nothing moves), the world's bodies listed once for every standableNearV1 of the pass (each
+   *  listed all ~4,900 entities of Eden 2026 to find the few bodies; ~4% of a busy world). Positions are read live. */
+  private passHumans:any[]|null=null;
+  private inPass=0;
   /** world-edit/1 read: the nearest clear standing point to `at` on a level (rings of 0.25 m out to `maxRing`), away from
    *  other bodies; null when none. Used to plan a Soul's approach to a god-placed thing on another floor. */
   standableNearV1(at:[number,number],level=0,except?:string,minClear=HUMAN_RADIUS+.12,maxRing=24):[number,number]|null{
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const clear=spatial.clearTester(level,at,minClear);if(!clear)return null;
-    const people=listEntities(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===level).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    const bodies=this.inPass?(this.passHumans??=listEntities(this.ents).filter((o:any)=>o.kind==='human')):listEntities(this.ents);
+    const people=bodies.filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===level).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.25),z=r3(at[1]+dsin(ang)*ring*.25);
       if(!clear([x,z])||people.some(([px,pz])=>hypot(px-x,pz-z)<.7))continue;return [x,z];}}

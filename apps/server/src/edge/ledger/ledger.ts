@@ -451,7 +451,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // activities/1: sit/lie/nap/read anywhere, plus World's activity spots (play-piano:<spot>, paint:<spot>…).
     if (me) try {
-      const act = activityCapabilities(this.spots, this.activityWorld(soul, me, caps, plans));
+      // S2: the listing only reads the world; its clearance reads (clear spots, shelves, courts) share one planner sync
+      // (engine readPassV1) instead of each walking every static to ask "did anything change" (~15% of a busy world)
+      const spots = this.spots, aw = this.activityWorld(soul, me, caps, plans), list = () => activityCapabilities(spots, aw);
+      const eng = this.host.engine as unknown as {readPassV1?: <T>(f: () => T) => T};
+      const act = eng.readPassV1 ? eng.readPassV1(list) : list();
       // Activities lead the list (agents and the CLI read the first entries first).
       for (const c of [...act.caps].reverse()) {const i = caps.findIndex(x => x.id === c.id); if (i >= 0) caps.splice(i, 1); caps.unshift(c); plans.set(c.id, act.plans.get(c.id)!);}
     } catch (e) {if (this.activityErrors++ < 20) console.error('[edge] activity capabilities', soul.soulId, e instanceof Error ? e.stack?.split('\n').slice(0, 3).join(' | ') : e);/* activities never hide the rest */}

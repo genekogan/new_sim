@@ -1,6 +1,6 @@
 // Engine P4 (Eden 2026 capabilities freeze): a Soul's capabilities read standing room and reachability at every far
 // place, each through a window of its own. The memos that make that cheap must not change a single answer:
-// - GroundNav.gridsOver keeps each upper floor per (rect, level) until the static world is set again, bit-identical to
+// - GroundNav.gridsOver keeps each upper floor per (rect, level) until its inputs change (S2), bit-identical to
 //   the old full build (compose + buildGrids over the window); levelOver builds only the level asked for;
 // - a failed exhaustive search remembers its start's side, so another goal outside it fails the same way, unsearched,
 //   while a reachable goal still routes exactly as without the memo.
@@ -78,10 +78,18 @@ test('gridsOver keeps floors per window, bit-identical to the full build; levelO
   const far = rectOf([[150, 150]]), before = nav.stats.floorBuilds;
   sameGrid(nav.levelOver(far, 0, s), reference(nav, s, far).levels.get(0), 'far ground');
   assert.equal(nav.stats.floorBuilds, before, 'reading the ground builds no floor');
-  // a static edit: floors rebuilt from the new world
-  nav.setSolids(s.obstacles);
-  nav.gridsOver(r, s);
-  assert.equal(nav.stats.floorBuilds, built + 2, 'setSolids forgets the floors');
+  // S2: (the test keeps its gate id; "forgets" now means: forgets only what changed) a static edit rebuilds only the floors it reaches (the rock is below both floors' body bands; the partition is on
+  // house A's floor), each equal to a fresh build from the new world
+  const moved: SpatialScene = { ...s, obstacles: [s.obstacles[0], { ...s.obstacles[1], obb: { ...s.obstacles[1].obb, c: [-4, 6] } }] };
+  nav.setSolids(moved.obstacles);
+  nav.gridsOver(r, moved);
+  assert.equal(nav.stats.floorBuilds, built, 'a rock moved on the ground keeps both floors');
+  const wall: SpatialScene = { ...moved, obstacles: [{ ...moved.obstacles[0], obb: { ...moved.obstacles[0].obb, c: [11, 11] } }, moved.obstacles[1]] };
+  nav.setSolids(wall.obstacles);
+  const b = nav.gridsOver(r, wall), fresh = navFor(wall).gridsOver(r, wall);
+  assert.equal(nav.stats.floorBuilds, built + 1, 'the partition moved: house A\'s floor only');
+  assert.equal(b.levels.get(2), a.levels.get(2), 'house B kept');
+  for (const id of [0, 1, 2]) sameGrid(b.levels.get(id), fresh.levels.get(id), `after the edit, level ${id}`);
 });
 
 test('a failed search remembers its side: other goals there fail the same way, reachable ones route as before', () => {

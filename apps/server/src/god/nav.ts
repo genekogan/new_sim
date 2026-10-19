@@ -323,13 +323,15 @@ export class GodNav {
 
   /** F1: a room's goal is standing room inside it that the front door reaches (furniture can close off its middle):
    *  its centre if reachable, else the reachable spot inside nearest the centre; null (and `blocked`) when furniture
-   *  closes the whole room off. Cached per world version (furniture moves only with edits). */
+   *  closes the whole room off. Cached per navigation epoch and room (furniture moves the epoch). */
   private roomGoal(t: Thing, near: (at: Vec2, level: number, ring?: number) => { p: Vec2; level: number } | null): { p: Vec2; level: number } | null {
     const E = this.h.engine;
     const centre = near(t.at, t.level, 40);
     if (!t.entry || !E.reachV1) return centre;
-    this.index(); const rv = `${this.h.staticVersion?.() ?? this.cache?.key}`;
-    const key = `${rv}|${t.ref}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
+    // S2: kept per navigation epoch (the static world the reach checks route over) and the room's own outline, door and
+    // frame, not per god edit: a calendar entry or opening hours (half a busy god's edits) re-reached every room in 80 m
+    this.index(); const ep = this.navEpoch(), rv = ep === undefined ? `${this.h.staticVersion?.() ?? this.cache?.key}` : `ep${ep}`;
+    const key = `${rv}|${t.ref}|${JSON.stringify([t.at, t.level, t.entry, t.poly, t.roomFrame])}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
     const reach = (p: Vec2) => this.entryReaches(t, p);
     let goal: { p: Vec2; level: number } | null = null;
     if (centre && inPoly(centre.p[0], centre.p[1], t.poly ?? []) && reach(centre.p)) goal = centre;
