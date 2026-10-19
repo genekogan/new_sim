@@ -108,6 +108,8 @@ export class Objects {
   }
   /** Every object with its time-driven transitions applied (also the sweep timer). */
   fresh(): ObjectRecord[] { return this.all().map(o => tx(this.core.db, () => { const cur = this.row(o.id); return cur ? this.advanced(cur) : o; })); }
+  /** fresh() for just these objects (their kind's wanted state changed): no read of every object. */
+  refresh(ids: Iterable<string>): void { for (const id of ids) tx(this.core.db, () => { const cur = this.row(id); if (cur) this.advanced(cur); }); }
   sweep() { this.fresh(); }
 
   private emit(o: ObjectRecord, events: ObjectEvent[]) {

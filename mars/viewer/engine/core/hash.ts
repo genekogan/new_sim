@@ -9,11 +9,15 @@
  *  a physics-shaped copy whose text differs under the same `hash` (a snapshot's encoded data writes -0 as {"~n":"-0"})
  *  must never seed the cache, or the world's state hash would read that text and a restart refuses the snapshot. */
 const PHYSICS_TEXT = new Map<string, { levels: string; byEntity: string; assets: string }>();
+/** G1 (tranche 2026-10-19): the stable text of entity-physics parts, by identity. A part is never mutated (a changed
+ *  entity gets a new part), so nextEntityPhysics fills this once per part and a new physics value re-serialises only
+ *  its changed parts (was the whole ~3 MB, three times per god edit on Eden 2026). Output is byte-identical. */
+export const PART_TEXT = new WeakMap<object, string>();
 function physicsText(v: Record<string, unknown>): { levels: string; byEntity: string; assets: string } {
   const key = v.hash as string;
   let hit = PHYSICS_TEXT.get(key);
   if (!hit) {
-    hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity), assets: stableStringify(v.assets) };
+    hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity, PART_TEXT as unknown as ReadonlyMap<object, string>), assets: stableStringify(v.assets) };
     if (sha256(`{"assets":${hit.assets},"byEntity":${hit.byEntity},"levels":${hit.levels}}`) !== key) return hit;
     if (PHYSICS_TEXT.size >= 4) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
     PHYSICS_TEXT.set(key, hit);

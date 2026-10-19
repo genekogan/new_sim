@@ -3,7 +3,7 @@
 // solids (wall segments, closed doors), stairs (links) — and the fixtures/items it registers with the same ids.
 // The fold applies it to plain world state (`world.entityPhysicsV1` + `world.entities`), so live, restored and
 // replayed engines agree without ever reading the entity model.
-import { hashOf } from '../../../mars/viewer/engine/core/hash.ts';
+import { hashOf, hashStable, PART_TEXT, stableStringify } from '../../../mars/viewer/engine/core/hash.ts';
 import { pointInObb, type Vec2 } from '../../../mars/viewer/engine/core/math.ts';
 import type { EntityPhysicsV1 } from '../../../mars/viewer/engine/spatial/edits.ts';
 import type { Level, Link, Obstacle, Surface } from '../../../mars/viewer/engine/spatial/types.ts';
@@ -51,7 +51,9 @@ function floorBounds(ep: EntityPhysicsV1): [number, number, number, number] | nu
 
 /** The physics state a world-edit produces from `prev` (pure). */
 export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEditV1): EntityPhysicsV1 {
-  const cur = prev ? structuredClone(prev) : emptyEntityPhysics();
+  // G1: a physics value is replaced, never mutated (hash.ts), and so are its parts and assets: the new value carries
+  // the unchanged ones over (was a structuredClone of the whole ~3 MB physics per edit) and hashes with their cached text
+  const cur: EntityPhysicsV1 = prev ? { ...prev, levels: prev.levels, byEntity: { ...prev.byEntity }, assets: { ...prev.assets } } : emptyEntityPhysics();
   for (const id of Object.keys(e.set).sort()) {
     const v = e.set[id];
     if (!v) { delete cur.byEntity[id]; continue; }
@@ -66,7 +68,8 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   cur.seq = Math.max(cur.seq, e.seq);
   cur.byEntity = sortKeys(cur.byEntity); cur.assets = sortKeys(cur.assets);
   cur.bounds = floorBounds(cur);
-  cur.hash = entityPhysicsHash(cur);
+  for (const p of Object.values(cur.byEntity)) if (!PART_TEXT.has(p)) PART_TEXT.set(p, stableStringify(p));
+  cur.hash = hashStable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>);
   cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
   return cur;
 }

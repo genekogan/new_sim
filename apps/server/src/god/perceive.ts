@@ -24,6 +24,21 @@ import { supportY } from './nav.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
+type Want = { name: string; kind: string; description: string; params: BuiltState };
+type SignRow = { id: string; at: Vec2; front: Vec2; name: string; text: string };
+/** x0, z0, x1, z1 */
+type Box = [number, number, number, number];
+type Run = { queue: string[]; i: number; changed: string[]; made: number; root: string; layersOn: boolean; full: boolean; ms: number };
+const CELL = 16;
+const NEAR = 13;               // m: `near` names the named things within 12 m (nav namesNear), plus slack
+const cellKey = (i: number, j: number) => (i + 0x8000) * 0x10000 + (j + 0x8000);
+/** The box of a named thing's outline (its area, path grown by half its width, room polygon, or its point). */
+function boxOf(t: { at: Vec2; area?: Vec2[]; path?: Vec2[]; poly?: Vec2[]; width?: number }): Box | null {
+  const pts = t.area ?? t.path ?? t.poly ?? [t.at], pad = !t.area && t.path ? Math.max(0, (t.width ?? 3) / 2) : 0;
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const [x, z] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+  return x0 <= x1 && z0 <= z1 && Number.isFinite(x0 + x1 + z0 + z1 + pad) ? [x0 - pad, z0 - pad, x1 + pad, z1 + pad] : null;
+}
 export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 | null; def: string; removed?: boolean; key?: string; /** VOCAB-MECH: actuator state (open, on, locked, lit, level …) */ state?: Record<string, unknown>; front?: Vec2 | null };
 
 export const BUILT_KIND = 'built';
@@ -67,6 +82,9 @@ export type PerceiveHost = {
   engine: { world: { entities: Record<string, any> } };
   engineOwned(e: Entity): boolean;
   namesNear(at: Vec2, except: string): string[];
+  /** The named things (nav.ts): an edit re-derives the objects within 12 m of the ones it touched. Without it every
+   *  catch-up re-derives every thing. */
+  things?(): { id: string; at: Vec2; area?: Vec2[]; path?: Vec2[]; poly?: Vec2[]; width?: number }[];
   /** R4-INFO: the god-built places layer (places.ts): synced first, then each object's place is the innermost one
    *  holding it. */
   places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null; ofEntity(id: string): { id: string } | undefined };
@@ -86,12 +104,10 @@ export const GOD_PLACES = process.env.GOD_PLACES !== '0';
 
 export class GodPerceive {
   private h: PerceiveHost;
-  private synced = -1;
-  private placesSynced = -1;
   private sigs = new Map<string, string>();
   /** What each `built` object's state should be now (its kind's advance reads this). */
   private desired = new Map<string, BuiltState>();
-  private signs: { id: string; at: Vec2; front: Vec2; name: string; text: string }[] = [];
+  private signs = new Map<string, SignRow>();
   constructor(h: PerceiveHost) { this.h = h; }
 
   private objects() {
@@ -167,71 +183,158 @@ export class GodPerceive {
     return null;
   }
 
-  /** What each named god thing (and each sign) is, as `built` object params; keyed by entity id. */
-  private wanted(): Map<string, { name: string; kind: string; description: string; params: BuiltState }> {
-    const m = this.h.model, out = new Map<string, { name: string; kind: string; description: string; params: BuiltState }>();
-    const signs: typeof this.signs = [];
-    const placed = new Map<string, { place: string | null; level: number }>();
-    this.placed = placed;
-    const layersOn = !!this.h.layers?.active();
-    for (const e of m.entities.values()) {
-      const def = m.resolvedDef(e.def); if (!def) continue;
-      const c = def.components as Record<string, unknown>;
-      if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
-      const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
-      // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
-      const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
-      if (!e.name && text === null && !acts && !lay) continue;
-      // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
-      if ((c.seat || c.carryable) && !acts && !lay) continue;
-      // R4-INFO: ground the god laid out (a plaza, a lawn, a pond, a road) is a place to be in (places.ts), not a thing
-      { const sh = e.shape as { area?: unknown; path?: unknown } | undefined; if (GOD_PLACES && this.h.places && def.form !== 'point' && e.in.parent === 'world' && sh && text === null) continue; }
-      const at = this.at(e, def); if (!at) continue;
-      const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
-      const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
-      const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
-      const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], supportY(this.h.model, e)) : 0;
-      placed.set(e.id, { place: this.h.places?.ofEntity(e.id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level });
-      const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
-      const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
-      out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } });
-      // read from in front of its face (entity frame: the front is +z, turned by the yaw)
-      if (text !== null) { const wp = m.worldPose(e), d = 1.4; signs.push({ id: e.id, at, front: [at[0] + Math.sin(wp.yaw) * d, at[1] + Math.cos(wp.yaw) * d], name, text }); }
-    }
-    this.signs = signs;
-    return out;
+  /** What one entity is as a `built` object (params keyed by its id), or null when it is not one: a named god thing, a
+   *  sign, a thing with actuators or layers. Depends on the entity, its def, its ancestors' names, the named things
+   *  within 12 m of it (`near`) and the layers; never on the places (an object's place is looked up when seen). */
+  private wantOne(e: Entity, layersOn: boolean): { w: Want; sign?: SignRow } | null {
+    const m = this.h.model, def = m.resolvedDef(e.def); if (!def) return null;
+    const c = def.components as Record<string, unknown>;
+    if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) return null;
+    const text = signText(e, def), acts = this.h.commit ? actionsOf(def).length > 0 : false;
+    // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
+    const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
+    if (!e.name && text === null && !acts && !lay) return null;
+    // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
+    if ((c.seat || c.carryable) && !acts && !lay) return null;
+    // R4-INFO: ground the god laid out (a plaza, a lawn, a pond, a road) is a place to be in (places.ts), not a thing
+    { const sh = e.shape as { area?: unknown; path?: unknown } | undefined; if (GOD_PLACES && this.h.places && def.form !== 'point' && e.in.parent === 'world' && sh && text === null) return null; }
+    const at = this.at(e, def); if (!at) return null;
+    const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
+    const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
+    const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
+    const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
+    const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
+    const w: Want = { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } };
+    if (text === null) return { w };
+    // read from in front of its face (entity frame: the front is +z, turned by the yaw)
+    const d = 1.4; return { w, sign: { id: e.id, at, front: [at[0] + Math.sin(wp0.yaw) * d, at[1] + Math.cos(wp0.yaw) * d], name, text } };
   }
   private at(e: Entity, def: StoredDef): Vec2 | null {
     const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
     if (def.form !== 'point' && e.in.parent === 'world' && sh) return sh.area?.length ? centroid(sh.area) : sh.path?.length ? sh.path[Math.floor(sh.path.length / 2)] : null;
     const wp = this.h.model.worldPose(e); return [wp.x, wp.z];
   }
-
-  /** Bring the `built` objects in line with the entity world (cheap when nothing was edited since the last call). */
-  sync(force = false) {
-    const seq = this.h.version?.() ?? this.h.model.editSeq; if (!force && seq === this.synced) return;
-    // the places first (an object's place is the innermost one holding it); a world without objects has places too
-    if (GOD_PLACES && seq !== this.placesSynced) { this.placesSynced = seq; try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); } }
-    const objs = this.objects(); if (!objs) return;
-    const root = this.rootPlace(); if (!root) return;
-    this.synced = seq;
-    const want = this.wanted();
-    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
-    let made = 0, changed = 0;
-    // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
-    for (const [id, sig] of this.sigs) if (!want.has(id)) { const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }; const n = JSON.stringify(st); if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); changed++; } }
-    for (const [id, w] of want) {
-      const state = builtKind.initial({ ...w.params, key: id } as never), sig = JSON.stringify(state);
-      if (this.sigs.get(id) === sig) continue;
-      this.desired.set(id, state);
-      try {
-        if (!this.sigs.has(id)) { objs.create({ id, kind: w.kind, name: w.name, description: w.description, placeId: root, params: { ...w.params, key: id } }); made++; } else changed++;
-        this.sigs.set(id, sig);
-      } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
-    }
-    if (changed) objs.fresh();
-    if (made + changed > 8) this.h.log(`built objects: ${made} made, ${changed} changed (${this.sigs.size} in all)`);
+  /** R4-INFO: a built object's place (the innermost god-built or world place holding it) and standing level, looked up
+   *  when a Soul sees it and remembered until the next catch-up. */
+  private placeOf(id: string, at: Vec2): { place: string | null; level: number } {
+    const hit = this.placed.get(id); if (hit) return hit;
+    const e = this.h.model.entities.get(id);
+    const level = e && this.h.levelAt ? this.h.levelAt(at[0], at[1], supportY(this.h.model, e)) : 0;
+    const v = { place: this.h.places?.ofEntity(id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level };
+    this.placed.set(id, v); return v;
   }
+
+  // ------------------------------------------------------------------ catching up with the god's edits
+  // G1 (tranche 2026-10-19): at 4,900 entities a whole pass (places, then every named thing with its `near`) took
+  // ~0.7 s and ran inside a tick after every edit, so the god's next request queued behind it. Now an edit only notes
+  // what changed (`note`); the host runs the catch-up coalesced (at most every ~2 s while a god edits, and a second
+  // after the last edit) in slices of a few ms (`step`), over the edited things and the ones within reach of their
+  // names (12 m), not every thing. Souls may see an edit up to ~2 s late. `sync()` still catches up at once.
+  private entries = new Map<string, { w: Want; sign?: SignRow; at: Vec2 }>();
+  private cells = new Map<number, Set<string>>();
+  private roots = new Set<string>();
+  private needFull = true;
+  private layersOn = false;
+  private regions = new Map<string, Box>();
+  private run: Run | null = null;
+  /** For the host's log and tests: runs done, ids recomputed in the last one, whether it was a whole pass, its ms. */
+  readonly stats = { runs: 0, lastIds: 0, lastFull: false, lastMs: 0 };
+
+  /** An edit (any commit): these entities changed or went; `all` re-derives every thing (terrain moved, a build began
+   *  or ended). Cheap: the work happens in `step`. */
+  note(ids: Iterable<string>, all = false) { if (all) this.needFull = true; else for (const id of ids) this.roots.add(id); }
+  /** Anything noted and not caught up yet (or a catch-up under way)? */
+  pending(): boolean { return this.needFull || this.roots.size > 0 || this.run !== null; }
+
+  private cellAdd(id: string, at: Vec2) { const k = cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)); let s = this.cells.get(k); if (!s) this.cells.set(k, s = new Set()); s.add(id); }
+  private cellDel(id: string, at: Vec2) { this.cells.get(cellKey(Math.floor(at[0] / CELL), Math.floor(at[1] / CELL)))?.delete(id); }
+  /** The objects whose point lies in a box. */
+  private inBox(b: Box, out: Set<string>) {
+    const i0 = Math.floor(b[0] / CELL), i1 = Math.floor(b[2] / CELL), j0 = Math.floor(b[1] / CELL), j1 = Math.floor(b[3] / CELL);
+    const hit = (id: string, x: Vec2) => { if (x[0] >= b[0] && x[0] <= b[2] && x[1] >= b[1] && x[1] <= b[3]) out.add(id); };
+    if (!((i1 - i0 + 1) * (j1 - j0 + 1) <= 4096)) { for (const [id, x] of this.entries) hit(id, x.at); return; }
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (const id of this.cells.get(cellKey(i, j)) ?? []) hit(id, this.entries.get(id)!.at);
+  }
+
+  /** Start a catch-up: which ids to recompute (all, or the noted ones, what they hold and what holds them, and the
+   *  objects within 12 m of every named thing among them, before and after the edit). */
+  private begin(): Run | null {
+    const objs = this.objects(); if (!objs) return null;
+    const root = this.rootPlace(); if (!root) return null;
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
+    const layersOn = !!this.h.layers?.active();
+    if (layersOn !== this.layersOn) { this.layersOn = layersOn; this.needFull = true; }
+    const full = this.needFull || !this.h.things, roots = this.roots; this.needFull = false; this.roots = new Set();
+    // the named things now (their outlines: what `near` measures to), against the last catch-up's
+    const now = new Map<string, Box>();
+    for (const t of this.h.things?.() ?? []) { const b = boxOf(t); if (!b) continue; const o = now.get(t.id); now.set(t.id, o ? [Math.min(o[0], b[0]), Math.min(o[1], b[1]), Math.max(o[2], b[2]), Math.max(o[3], b[3])] : b); }
+    let ids: Set<string>;
+    if (full) ids = new Set([...this.h.model.entities.keys(), ...this.entries.keys(), ...this.sigs.keys()]);
+    else {
+      const m = this.h.model, touched = new Set<string>();
+      ids = new Set();
+      for (const id of roots) {
+        for (const x of m.entities.has(id) ? m.subtree(id) : [id]) touched.add(x);
+        for (let p = m.entities.get(id)?.in.parent; p && p !== 'world'; p = m.entities.get(p)?.in.parent) touched.add(p);
+      }
+      for (const id of touched) {
+        ids.add(id);
+        for (const b of [this.regions.get(id), now.get(id)]) if (b) this.inBox([b[0] - NEAR, b[1] - NEAR, b[2] + NEAR, b[3] + NEAR], ids);
+      }
+    }
+    this.regions = now;
+    this.placed.clear();
+    return { queue: [...ids], i: 0, changed: [], made: 0, root, layersOn, full, ms: 0 };
+  }
+  /** Recompute one id and bring its object in line. */
+  private apply(r: Run, id: string, objs: { create(i: unknown): unknown }) {
+    const e = this.h.model.entities.get(id), x = e ? this.wantOne(e, r.layersOn) : null;
+    const old = this.entries.get(id);
+    if (old) { this.cellDel(id, old.at); this.entries.delete(id); this.signs.delete(id); }
+    if (!x) {
+      // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
+      const sig = this.sigs.get(id); if (sig === undefined) return;
+      const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }, n = JSON.stringify(st);
+      if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); r.changed.push(id); }
+      return;
+    }
+    const at = x.w.params.at as Vec2;
+    this.entries.set(id, { ...x, at }); this.cellAdd(id, at); if (x.sign) this.signs.set(id, x.sign);
+    const state = builtKind.initial({ ...x.w.params, key: id } as never), sig = JSON.stringify(state);
+    if (this.sigs.get(id) === sig) return;
+    this.desired.set(id, state);
+    try {
+      if (!this.sigs.has(id)) { objs.create({ id, kind: x.w.kind, name: x.w.name, description: x.w.description, placeId: r.root, params: { ...x.w.params, key: id } }); r.made++; } else r.changed.push(id);
+      this.sigs.set(id, sig);
+    } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
+  }
+  /** Do up to `budgetMs` of a catch-up (starting one when something is noted). True when it is done (or none was due). */
+  step(budgetMs = Infinity): boolean {
+    const t0 = performance.now();
+    if (!this.run) {
+      if (!this.pending()) return true;
+      // the places first (an object's place is the innermost one holding it); a world without objects has places too
+      if (GOD_PLACES) { try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); } }
+      this.run = this.begin();
+      if (!this.run) { this.needFull = false; this.roots.clear(); return true; }
+      if (performance.now() - t0 >= budgetMs) { this.run.ms += performance.now() - t0; return false; }
+    }
+    const r = this.run, objs = this.objs as unknown as { create(i: unknown): unknown; fresh(): unknown; refresh?(ids: string[]): void };
+    while (r.i < r.queue.length) {
+      this.apply(r, r.queue[r.i++], objs);
+      if ((r.i & 7) === 0 && performance.now() - t0 >= budgetMs) { r.ms += performance.now() - t0; return false; }
+    }
+    if (r.changed.length) { if (objs.refresh) objs.refresh(r.changed); else objs.fresh(); }
+    r.ms += performance.now() - t0;
+    this.run = null;
+    Object.assign(this.stats, { runs: this.stats.runs + 1, lastIds: r.queue.length, lastFull: r.full, lastMs: Math.round(r.ms * 10) / 10 });
+    if (r.made + r.changed.length > 8) this.h.log(`built objects: ${r.made} made, ${r.changed.length} changed (${this.sigs.size} in all)`);
+    return true;
+  }
+  /** Bring the `built` objects in line with the entity world now (tests; `force` re-derives every thing). */
+  sync(force = false) { if (force) this.needFull = true; for (let n = 0; n < 100 && this.pending(); n++) this.step(); }
+  /** What a Soul's read sees: the objects as they are (an edit shows within ~2 s), caught up once at the start. */
+  ensure() { if (!this.stats.runs) this.sync(); }
 
   /** R4-INFO: `observe` → here.objects lists what a Soul sees of god-built things as Eden lists things: those within
    *  sight (30 m) in the same enclosure (a room's walls hide the plaza; the plaza does not see into the cottage), nearest
@@ -243,7 +346,7 @@ export class GodPerceive {
     o.visibleTo = (soul: EdgeSoul) => {
       const list = orig(soul), me = this.h.engine.world.entities[soul.entityId];
       if (!me) return list;
-      this.sync();
+      this.ensure();
       const pos: Vec2 = [me.pose.p[0], me.pose.p[2]], path = L.placePathOf(soul.soulId), root = path.find((p) => p.kind !== 'occupier' && L.places.byId.get(p.id)?.parent === null)?.id;
       const inside = new Set(path.map((p) => p.id)), myEnc = L.enclosureOf(soul.soulId), lay = !!this.h.layers?.active();
       const built: any[] = [], rest: any[] = [];
@@ -251,9 +354,9 @@ export class GodPerceive {
         if (!this.kinds.has(v.kind)) { rest.push(v); continue; }
         const at = v.public?.at as Vec2 | null | undefined; if (!Array.isArray(at)) continue;
         const d = Math.hypot(at[0] - pos[0], at[1] - pos[1]); if (d > SIGHT) continue;
-        const pl = this.placed.get(v.id), lvl = pl?.level ?? 0;
+        const pl = this.placeOf(v.id, at), lvl = pl.level;
         if (L.enclosureAtPoint(at[0], at[1], lvl) !== myEnc) continue;
-        const placeId = pl?.place ?? v.placeId;
+        const placeId = pl.place ?? v.placeId;
         // LAYERS: whose it is, to this viewer ("yours" / "Ana's, private" / "public"), its price and hours now
         const ent = lay ? this.h.model.entities.get(v.id) : undefined, word = ent ? this.h.layers!.ownerWord(v.id, soul) : null;
         const extra = ent ? { ...(word ? { owner: word } : {}), ...(ent.price && economyOn() ? { price: ent.price } : {}), ...(ent.schedule ? { hours: this.h.layers!.hoursOf(ent.schedule) } : {}) } : {};
@@ -266,11 +369,11 @@ export class GodPerceive {
 
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans) {
-    this.sync();
-    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.signs.length) return;
+    this.ensure();
+    const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human || !this.signs.size) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
-    for (const s of this.signs) {
+    for (const s of this.signs.values()) {
       const d = Math.hypot(s.at[0] - here[0], s.at[1] - here[1]); if (d > SIGN_READ_RADIUS) continue;
       const id = `read:${s.id}`; if (caps.some((c) => c.id === id)) continue;
       const words = s.text.replace(/\s*\n\s*/g, ' / ');

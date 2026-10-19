@@ -89,6 +89,9 @@ export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; 
 
 export const engineBridges = new WeakMap<WorldModel, EngineBridge>();
 
+/** G1: the most a tick spends catching Souls' perception up with god edits (perceive.ts `step`). */
+const PERCEIVE_SLICE_MS = Number(process.env.PERCEIVE_SLICE_MS ?? 8);
+
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
   /** What the engine was last told, per entity (JSON of its part), and the physics state that produced. */
@@ -140,11 +143,13 @@ export class EngineBridge {
         bodies: [...this.host.minds.values()].flatMap(m => { const b = this.engine.world.entities[m.entityId]; return b && !isVerificationProbe(m.soulId) ? [{ name: m.name, soulId: m.soulId, at: [b.pose.p[0], b.pose.p[2]] as Vec2 }] : []; }),
       };
     };
-    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
-    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
+    this.god.onCommit((c) => { this.version++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
+    // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
+    this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) { this.rescueTrapped(); this.evacuateSites(); } } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); this.perceiveStep(tick); if (tick % 40 === 7) this.layersStep(); if (tick % 20 === 13) this.flushMapNotices(); if (this.evacuatedEdit !== this.editTick && tick - this.editTick >= 10) { this.evacuatedEdit = this.editTick; this.evacuateSites(); } if (this.rescued !== this.editTick && tick - this.editTick >= 10 && (tick - this.editTick >= 20 || tick - this.rescuedAt >= 40)) { this.rescuedAt = tick; this.rescueTrapped(); } } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -495,7 +500,31 @@ export class EngineBridge {
     }
   }
 
-  private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+  private perceiveSync() { try { this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+  /** G1 (tranche 2026-10-19): what Souls perceive of god edits (built objects, the places layer) catches up off the
+   *  request path. An edit only notes what changed; the catch-up starts a second after the last edit, or ~2 s after the
+   *  first one not yet seen while a god keeps editing, and then runs a slice of at most PERCEIVE_SLICE_MS per tick
+   *  (was: a whole pass, ~0.7 s at 4,900 entities, inside the tick after every edit). Souls see an edit ≤ ~2 s late. */
+  private perceiveFirst = 0;
+  private perceiveLast = 0;
+  private perceiveRunning = false;
+  /** G1: a trapped-Soul check (it lists every named thing) runs a second after the last edit, or every ~2 s while a
+   *  god keeps editing; a closing site's walk-out still follows each edit within 10 ticks. */
+  private rescuedAt = -1;
+  private evacuatedEdit = -1;
+  private notePerceive(ids: string[], all: boolean) {
+    const tick = this.host.engine.world.tick;
+    this.perceive.note(ids, all);
+    if (this.perceiveFirst < 0) this.perceiveFirst = tick; this.perceiveLast = tick;
+  }
+  private perceiveStep(tick: number) {
+    if (!this.perceiveRunning) {
+      if (!this.perceive.pending() || (tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40)) return;
+      this.perceiveRunning = true; this.perceiveFirst = -1;
+    }
+    try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
+    catch (e) { this.log(`perceive: ${(e as Error).message}`); }
+  }
   /** Construction closure (C1): residents inside a closing zone get the same polite walk-out as an edit, seated,
    *  asleep or busy included (verification probes may enter closures and are left alone). Runs after each god edit
    *  and on the 40-tick cadence. */
