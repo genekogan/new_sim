@@ -335,7 +335,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
       if(entityLayer.active&&typeof renderer.compileAsync==='function'){programsPending=true;const done=()=>{programsPending=false;arrivalMark('programs-linked');};void Promise.race([renderer.compileAsync(scene,camera),new Promise(r=>setTimeout(r,3000))]).then(done,done);}
       // r2.1: and after the first world clock reaches the lights (all views/frames of `look --hour` honour the hour)
-      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});await new Promise<void>(r=>{afterNextDraw=r;});requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
         (window as unknown as {__shotReady?:boolean}).__shotReady=true;window.dispatchEvent(new Event('sim-shot-ready'));
       }));}
@@ -492,7 +492,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
     // soon as an initial body needs one; old worlds load them at once, as before
     let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});};
-    if(!newWorld)startTemplates();
+    if(!newWorld||shotMode)startTemplates();
     const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
@@ -629,7 +629,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const pacer = new FramePacer();
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
-    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false;  // lane W1: the built world's shaders are still linking in parallel: no frame yet
+    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
@@ -863,7 +863,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const arrivalStage=newWorld&&(entityLayer.active||entityLayer.building)&&!arrivedOnce?(entityLayer.building?'building':initialGate?.snapshot().stage??'waiting'):undefined;
       if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
       if(newWorld&&!templatesStarted&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
-      const holdDraw=programsPending||(arrivalStage!==undefined&&!arrivedOnce);
+      // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
+      const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce));
       entityLayer.applyEdge(context.current.sim.edge??[]);if(!holdDraw)entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
       rts.update(step);
@@ -919,7 +920,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
       if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
-      if(holdDraw){/* nothing to show yet */}else if(batchEnabled)staticBatches.withRender(draw);else draw();
+      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}}
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
