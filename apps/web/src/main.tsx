@@ -37,13 +37,16 @@ const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL
 type Cfg = { authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
 
-/** A Clerk world page: the Shell renders at once with a "Signing in…" placeholder; ClerkBridge (its own chunk, with
- *  clerk-js and Clerk's API calls behind it) mounts beside it once the arrival card has gone, or at once when the
- *  page came for a sign-in step (a Clerk redirect, an approval, a pairing, a join). The Shell is never remounted. */
+/** A Clerk world page: the Shell renders at once; ClerkBridge (its own chunk, with clerk-js and Clerk's API calls behind
+ *  it) mounts beside it once the arrival card has gone, or at once when the page came for a sign-in step (a Clerk
+ *  redirect, an approval, a pairing, a join) or the browser is probably signed in. Until then a visitor sees the
+ *  signed-out controls (Sign in loads Clerk and opens once it has), a probably-signed-in person "Signing in…".
+ *  The Shell is never remounted. */
 function ClerkWorld({cfg,publishableKey}:{cfg:Cfg;publishableKey:string}){
  const pending=useRef(false);
- const [load,setLoad]=useState(()=>clerkNow(location.href,location.hash));
- const [auth,setAuth]=useState<AuthCtx>(()=>({mode:'clerk',ready:false,authed:false,label:null,
+ const [now]=useState(()=>clerkNow(location.href,location.hash,document.cookie));
+ const [load,setLoad]=useState(now);
+ const [auth,setAuth]=useState<AuthCtx>(()=>({mode:'clerk',ready:!now,authed:false,label:null,
   login:()=>{pending.current=true;setLoad(true);},logout:()=>{},getToken:async()=>null,
   debug:{privyUserId:null,accountIdentity:null,wallet:null,linked:[]}}));
  useEffect(()=>{if(load)return;let live=true;void whenArrivalCardGone({timeoutMs:20_000,fadeMs:0}).then(()=>{if(live)setLoad(true);});return()=>{live=false;};},[load]);
@@ -53,6 +56,7 @@ function ClerkWorld({cfg,publishableKey}:{cfg:Cfg;publishableKey:string}){
   {load&&<Suspense fallback={null}><ClerkBridge publishableKey={publishableKey} issuer={cfg.clerkIssuer} onAuth={setAuth} takePendingLogin={takePendingLogin}/></Suspense>}
  </>;
 }
+
 function WithDev({ cfg }: { cfg: Cfg }) {
   const [name, setName] = useState<string | null>(() => localStorage.getItem('sim.dev'));
   const auth: AuthCtx = {

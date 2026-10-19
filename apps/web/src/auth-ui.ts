@@ -41,11 +41,14 @@ export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOr
  return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+path.replace(/\/$/,'')+fragment};
 }
 /** P1 phones: whether a Clerk world page loads its sign-in before the arrival (else once the card has gone): Clerk's
- *  own redirect parameters, or a fragment that is a sign-in step (approval, pairing, join, a tab) rather than watching
- *  or a Soul link. */
-export function clerkNow(href:string,hash:string):boolean{
- return /[?&#]__clerk|__session=|__dev_session/.test(href)||!(hash===''||hash==='#'||hash==='#watch'||!!soulFromFragment(hash));
+ *  own redirect parameters, a fragment that is a sign-in step (approval, pairing, join, a tab) rather than watching
+ *  or a Soul link, or a browser that is probably signed in. */
+export function clerkNow(href:string,hash:string,cookie=''):boolean{
+ return /[?&#]__clerk|__session=|__dev_session/.test(href)||!(hash===''||hash==='#'||hash==='#watch'||!!soulFromFragment(hash))||clerkSignedInHint(cookie);
 }
+/** Clerk's own "client updated at" cookie on the app's domain (`__client_uat`, or `__client_uat_<suffix>`): non-zero
+ *  when this browser holds a signed-in session. Only a hint for when to load Clerk; Clerk itself decides. */
+export function clerkSignedInHint(cookie:string):boolean{return /(?:^|;\s*)__client_uat(?:_[^=;]*)?=[1-9]/.test(cookie);}
 /** The launcher homepage (`<base>/`) mounts Clerk only on the configured origin too. */
 export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string,base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}

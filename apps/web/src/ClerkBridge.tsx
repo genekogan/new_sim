@@ -1,7 +1,7 @@
 // P1 phones: Clerk for a world page, loaded on its own after the arrival (main.tsx ClerkWorld). It renders nothing on
 // screen: it mounts ClerkProvider beside the world's Shell (a sibling, so the Shell never remounts when it arrives) and
-// hands the signed-in state up through onAuth. Until then the Shell shows "Signing in…" exactly as it did while
-// clerk-js loaded inside the provider; the world's socket never waited for it (useSim re-hellos when the session lands).
+// hands the signed-in state up through onAuth once Clerk has loaded. The world's socket never waited for Clerk (useSim
+// re-hellos when a session lands).
 import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { apiPath } from './world-path.ts';
@@ -38,7 +38,8 @@ function Bridge({ issuer, onAuth, takePendingLogin }: ClerkBridgeProps) {
     logout: (returnUrl) => live.current.clerk.signOut({ redirectUrl: returnUrl ?? location.href }),
     getToken: async () => { const s = live.current.session; return s.isLoaded && s.isSignedIn ? s.getToken() : null; },
     debug: { privyUserId: null, accountIdentity: accountId, wallet: null, linked: [] } }), [ready, authed, label, avatarUrl, accountId]);
-  useEffect(() => { onAuth(auth); }, [auth, onAuth]);
+  // Published once Clerk has loaded: the placeholder before it (signed-out controls, or "Signing in…") stays until then.
+  useEffect(() => { if (auth.ready) onAuth(auth); }, [auth, onAuth]);
   // A sign-in asked for before Clerk had loaded (the Shell's placeholder login) opens once it has.
   useEffect(() => { if (ready && takePendingLogin()) auth.login(); }, [ready, auth, takePendingLogin]);
   return null;
