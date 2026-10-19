@@ -15,6 +15,9 @@ import { actWithRepair, parseRepair } from './repair.ts';
 import { mountAssetRoutes } from './assets.ts';
 import { godBodyLimit } from './ingestion.ts';
 import { godVersions } from './versions.ts';
+import { SnapshotCache, SNAPSHOT_FILTERED_HEADER } from './snapshot-cache.ts';
+import { moderationFor } from '../moderation/store.ts';
+import { withoutHidden } from '../moderation/routes.ts';
 import { mountLandRoutes } from './land.ts';
 import { mountLightningRoutes } from './lightning.ts';
 import { mountLayerRoutes, type GodLayers } from './layers.ts';
@@ -148,7 +151,16 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   mountGovernanceRoutes(app, { god: d.god, requireGod, soulFromBearer: d.soulFromBearer });   // GOVERN: constitution versions, amendments, prayer states
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
-  app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));
+  // lane W1: built once per state of the world and served precompressed (snapshot-cache.ts), hidden entities already out
+  const moderation = moderationFor(d.god.db.db, d.god.opts.worldId);
+  const snapshots = new SnapshotCache({ build: () => d.god.publicSnapshot(),
+    key: () => `${d.god.model.editSeq}.${d.god.model.seq}.${d.god.store.buildsRev()}.${moderation.version()}`,
+    filter: (snap) => { const hidden = moderation.hidden(); return hidden.length ? withoutHidden(snap as Parameters<typeof withoutHidden>[0], new Set(hidden)) : snap; } });
+  app.get('/v1/world/snapshot', async (c) => {
+    const r = await snapshots.respond(c.req.header('accept-encoding'));
+    return c.body(new Uint8Array(r.body), 200, { 'content-type': 'application/json; charset=UTF-8', ...noStore, vary: 'Accept-Encoding', [SNAPSHOT_FILTERED_HEADER]: '1',
+      ...(r.encoding ? { 'content-encoding': r.encoding } : {}), ...(r.ageSeconds > 0 ? { age: String(r.ageSeconds) } : {}) });
+  });
   app.get('/v1/world/seq', (c) => { const b = d.god.builds.publicList(); return c.json({ seq: d.god.model.editSeq, entities: d.god.model.entities.size, builds: b.rev }, 200, noStore); });
   app.get('/v1/world/builds', (c) => c.json(d.god.builds.publicList(), 200, noStore));
   app.get('/v1/world/ground', (c) => c.json({ contract: 'ground/1', ground: d.god.model.ground(), tiles: d.god.tileHashes() }, 200, noStore));

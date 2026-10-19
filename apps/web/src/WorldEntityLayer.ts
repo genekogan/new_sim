@@ -84,6 +84,7 @@ export class WorldEntityLayer {
     try {
       const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version'));
       const snap: Snapshot = await r.json(); if (this.signal.aborted || snap.contract !== 'world/1') return;
+      ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
       this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
       this.seq = snap.seq;
@@ -104,7 +105,7 @@ export class WorldEntityLayer {
     // lane W1/O2: the page's edge-cacheable snapshot URL when the server named one (its `now` is then as old as the copy)
     const url = entrySnapshotUrl(this.api('/v1/world/snapshot'));
     try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json();
-      const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; } catch { return; }
+      ageNow(snap, r); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
@@ -481,6 +482,8 @@ export class WorldEntityLayer {
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 
+/** A cached snapshot (the server's snapshot cache or an edge copy, lanes W1/O2) says how old it is: its `now` is moved on by that. */
+function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
