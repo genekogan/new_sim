@@ -39,10 +39,10 @@ const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {earlyArrival,earlyArrivalWanted} from './early-arrival.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as THREE from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -200,6 +200,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [, refreshPlayback] = useState(0);
   const [draft, setDraft] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const earlyShown=useSyncExternalStore(earlyArrival.subscribe,earlyArrival.shown);
   const [initialProgress,setInitialProgress]=useState<InitialWorldProgress>({generation:0,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
   const retryInitial=useRef<(()=>void)|null>(null);
   useEffect(()=>{onInitialProgress?.(initialProgress);},[initialProgress,onInitialProgress]);
@@ -274,6 +275,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // ~8 s of a 1.6 Mbps link) wait until the arrival is over. Before, they shared the link with the world's own build (its
     // building worker's code waited behind them) and held the card ~12 s; until they land, a simple figure stands in.
     // Desktop, old worlds and pictures load them at once and wait for them as before. `?people=wait|later` overrides.
+    const earlyWanted=earlyArrivalWanted(quality.tier,newWorld,location.search,shotMode);
     const peopleLater=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(new URLSearchParams(location.search).get('people'))&&newWorld;
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
@@ -663,7 +665,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
     let shadowFrame=0;  // P1 phones
-    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
+    let programsPending=false,arrivedOnce=false,earlyPending=false,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
@@ -903,6 +905,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // initial gate). Only the page's first arrival: once a frame has been shown, later scene changes draw as before.
       const arrivalStage=newWorld&&(entityLayer.active||entityLayer.building)&&!arrivedOnce?(entityLayer.building?'building':initialGate?.snapshot().stage??'waiting'):undefined;
       if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
+      // P7 lever D (phone, new world): the near world is built and its programs linked: draw it now and lift the card after
+      // that frame, without the socket's first data (the take's scene, people and the initial gate follow when it comes)
+      if(earlyWanted&&!arrivedOnce&&layerStarted&&entityLayer.active&&!entityLayer.building&&!programsPending){arrivedOnce=true;earlyPending=true;}
       if(bodyModels.held&&arrivalOver()){bodyModels.held=false;startTemplates();}  // P1 phones: the people stream in now
       if(newWorld&&!templatesStarted&&!bodyModels.held&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
       // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
@@ -921,7 +926,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
       const area = visibleViewport(host.clientWidth, host.clientHeight, context.current.viewportInsets);
-      if (context.current.cameraMode === 'broadcast') {
+      // P7 lever D: an early arrival stays on the near world it drew until the rest is built (a cut to a Soul before that
+      // showed hollow ground)
+      if (context.current.cameraMode === 'broadcast' && !(earlyWanted && entityLayer.filling)) {
         const shot = broadcast.sample(at.entities, records, base, at.tick, dt, area?.aspect ?? camera.aspect, now / 1000, step,visualObstructionRoots());
         if (shot?.pose) {
           camera.position.fromArray(shot.pose.position);
@@ -965,7 +972,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
       if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
       if(quality.shadowEvery>1&&!eyes){renderer.shadowMap.autoUpdate=false;if(shadowFrame++%quality.shadowEvery===0)renderer.shadowMap.needsUpdate=true;}  // P1 phones: the shadow map every n-th frame
-      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}}
+      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}if(earlyPending){earlyPending=false;earlyArrival.mark();}}
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
@@ -1225,7 +1232,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         </>}
       </div>}
       <div className="world-viewport" style={{ position: 'relative', height: embedded ? undefined : 540, flex: embedded ? 1 : undefined, minHeight: 0, width: '100%', overflow: 'hidden', borderRadius: 4 }}>
-        <div className="world-canvas-host" data-initial-revealed={initialProgress.stage==='ready'} data-initial-generation={initialProgress.generation} ref={mount} style={{ position: 'absolute', inset: 0, touchAction: 'none',visibility:initialProgress.stage==='ready'?'visible':'hidden' }} />
+        <div className="world-canvas-host" data-initial-revealed={initialProgress.stage==='ready'} data-initial-generation={initialProgress.generation} ref={mount} style={{ position: 'absolute', inset: 0, touchAction: 'none',visibility:initialProgress.stage==='ready'||earlyShown?'visible':'hidden' }} />
         {initialProgress.stage!=='ready'&&<div role={initialProgress.stage==='failed'?'alert':progressInCard?undefined:'status'} aria-live={progressInCard?undefined:'polite'} data-initial-stage={initialProgress.stage} data-initial-generation={initialProgress.generation} className="world-initial-loading" style={{position:'absolute',inset:0,display:'grid',placeContent:'center',gap:12,background:'var(--bg, #d3c4aa)',textAlign:'center',padding:24}}>{!progressInCard&&<><strong>{initialProgress.stage==='failed'?'The world could not be prepared':initialProgress.stage==='preparing'||initialProgress.stage==='first-frame'?'Preparing the world…':'Arriving in '+'your world'+'…'}</strong>{initialProgress.stage==='failed'?<><span>{initialProgress.failed.join(', ')} could not be prepared.</span><button onClick={()=>retryInitial.current?.()}>Retry</button></>:<><progress aria-label={initialProgress.bytesTotal!==null?"Initial assets downloaded":"Initial assets prepared"} max={initialProgress.bytesTotal??(initialProgress.required||1)} value={initialProgress.stage==='downloading'?(initialProgress.bytesTotal!==null?initialProgress.bytesLoaded:initialProgress.required?initialProgress.completed:undefined):undefined} style={{width:240}}/><span>{initialProgress.bytesLoaded>0?(initialProgress.bytesLoaded/1048576).toFixed(1)+' MB downloaded · ':''}{initialProgress.completed} of {initialProgress.required||'…'} world parts prepared</span></>}</>}</div>}
 
         {placeCard&&<article className="world-place-card" aria-label="Selected place"><button className="panel-close" aria-label="Close place" onClick={()=>setPlaceCard(null)}>×</button><h2>{placeCard.name}</h2>{placeCard.detail&&<p>{placeCard.detail}</p>}<p>{[...sim.conn.replica.souls.values()].filter(soul=>{const e=shown.current.entities[soul.entityId];return e&&Math.hypot(e.p[0]-placeCard.point.x,e.p[2]-placeCard.point.z)<placeCard.radius;}).map(soul=>soul.name).join(', ')||'No Souls nearby in the current frame.'}</p><button onClick={()=>{controlsApi.current?.framePoint(placeCard.point,placeCard.radius);setPlaceCard(null);}}>Go to</button></article>}

@@ -157,7 +157,7 @@ export class WorldEntityLayer {
       // P1 phones: nearest the arrival first; start() returns once everything within `near` metres of its eye or target is
       // drawn (the card then goes), and the rest follows between frames (fill). Elsewhere: everything, in snapshot order.
       const near = progressiveNearM();
-      const all: readonly Entity[] & { dist?: number[] } = near === null ? snap.entities : byDistance(snap.entities, (e) => { try { const p = m.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
+      const all: readonly Entity[] & { dist?: number[] } = near === null ? snap.entities : byDistance(snap.entities, nearKeyOf(new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][]))), [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);  // P7: shapes by their nearest point; furniture with its building
       const far = near === null ? -1 : all.dist!.findIndex((d) => d > near), nearCount = far < 0 ? all.length : far;
       for (let i = 0; i < all.length;) {
         if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal); return; }
@@ -643,11 +643,39 @@ const BUILD_SLICE_MS = 50;
 /** P1 phones: the fill's slices run between frames, so they are short. */
 const FILL_SLICE_MS = 25;
 /** Entities sorted by distance (xz) from the nearer of two points; things without a pose (world-wide: terrain kits, ...) first.
+ *  `at` gives a point, or (P7) a shape's points: a path (polyline) or an area (polygon, distance 0 inside), measured to its
+ *  nearest point, so a long footpath or a woodland that crosses the arrival is near even when its pose is far away.
  *  The result carries the sorted distances in `dist`. */
-export function byDistance<T>(list: readonly T[], at: (e: T) => [number, number] | null, a: readonly [number, number], b: readonly [number, number]): T[] & { dist?: number[] } {
-  const d = list.map((e, k) => { const p = at(e); return [p ? Math.min(Math.hypot(p[0] - a[0], p[1] - a[1]), Math.hypot(p[0] - b[0], p[1] - b[1])) : 0, k] as [number, number]; });
+export type NearKey = [number, number] | { path: readonly (readonly number[])[] } | { area: readonly (readonly number[])[] } | null;
+export function byDistance<T>(list: readonly T[], at: (e: T) => NearKey, a: readonly [number, number], b: readonly [number, number]): T[] & { dist?: number[] } {
+  const d = list.map((e, k) => { const p = at(e); return [p === null ? 0 : Array.isArray(p) ? Math.min(Math.hypot(p[0] - a[0], p[1] - a[1]), Math.hypot(p[0] - b[0], p[1] - b[1])) : Math.min(shapeDistance(p, a), shapeDistance(p, b)), k] as [number, number]; });
   d.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
   const out = d.map(([, k]) => list[k]) as T[] & { dist?: number[] }; out.dist = d.map(([x]) => x); return out;
+}
+function shapeDistance(s: { path: readonly (readonly number[])[] } | { area: readonly (readonly number[])[] }, q: readonly [number, number]): number {
+  const pts = 'path' in s ? s.path : s.area, closed = !('path' in s);
+  if (!pts.length) return Infinity;
+  let best = Infinity, inside = false;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], n = pts[i + 1] ?? (closed ? pts[0] : null);
+    if (!n) { best = Math.min(best, Math.hypot(q[0] - p[0], q[1] - p[1])); continue; }
+    const dx = n[0] - p[0], dz = n[1] - p[1], L = dx * dx + dz * dz, t = L > 0 ? Math.max(0, Math.min(1, ((q[0] - p[0]) * dx + (q[1] - p[1]) * dz) / L)) : 0;
+    best = Math.min(best, Math.hypot(q[0] - p[0] - t * dx, q[1] - p[1] - t * dz));
+    if (closed && (p[1] > q[1]) !== (n[1] > q[1]) && q[0] < p[0] + ((q[1] - p[1]) / (n[1] - p[1])) * dx) inside = !inside;
+  }
+  return inside ? 0 : best;
+}
+/** P7: the near-first sort key of a snapshot's things: a shaped thing's own shape, else its root ancestor's stored pose
+ *  (no slot bakes: a building's furniture sorts with its building); things with neither come first. */
+export function nearKeyOf(byId: ReadonlyMap<string, Entity>): (e: Entity) => NearKey {
+  const rootOf = (e: Entity): Entity => { let r = e; for (let depth = 0; r.in.parent !== 'world' && depth < 8; depth++) { const up = byId.get(r.in.parent); if (!up) break; r = up; } return r; };
+  return (e) => {
+    const r = rootOf(e), shape = (r as { shape?: { path?: unknown; area?: unknown } }).shape;
+    if (shape && Array.isArray(shape.path) && shape.path.length) return { path: shape.path as number[][] };
+    if (shape && Array.isArray(shape.area) && shape.area.length) return { area: shape.area as number[][] };
+    const p = (r as { p?: unknown }).p;
+    return Array.isArray(p) && p.length >= 3 && Number.isFinite(p[0]) && Number.isFinite(p[2]) ? [p[0] as number, p[2] as number] : null;
+  };
 }
 /** An entity's mesh params: its generator's and def's defaults under its own params. */
 function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
