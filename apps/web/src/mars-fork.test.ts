@@ -8,7 +8,7 @@ const { backdropCandidates, forkInitialAssets, MARS_FORK_BACKDROP, MARS_2026_NOR
 const { FRAME, toForkXZ, forkLandOps, forkLandModel, createForkLand } = await import('./WorldMarsForkLand.ts');
 import { sunDirectionVector } from '../../../mars/viewer/engine/env/sun.ts';
 
-const CAMPUS = '/browser/campus.glb?v=20260922b', BLOB64 = '/blobs/assets/64/64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034.glb';
+const CAMPUS = '/browser/campus.glb?v=20260922b', BLOB64 = '/blobs/assets/0d/0d4736829e1db5c7e05b31c8286b28e99a727eb7f2b0d1bc80d0f482aa7fcf08.glb';
 
 test('fork: the root build (no base) is never the fork, even at /w/mars', () => { assert.equal(marsFork, false); });
 

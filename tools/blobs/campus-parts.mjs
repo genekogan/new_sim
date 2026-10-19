@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 // Lane W3: the Mars campus as shared parts + placements, with the same look.
-//   node tools/blobs/campus-parts.mjs <in.glb> <out.glb> [--report <json>] [--err 0.00025] [--texels 2048] [--cell 24]
+//   node tools/blobs/campus-parts.mjs <in.glb> <out.glb> [--report <json>] [--err 0.00025] [--step 0.00025] [--texels 1300]
+//     [--cell 24] [--psnr 34]   (debug: --skip tex,flat,fold,join --noposq --nouvq)
 // Input: the served campus (/blobs/assets/64/64b8838c….glb, tools/blobs/shrink-campus.mjs output) or the raw
 // /browser/campus.glb. Why the old file is 41.8 MB: the CAD export gives every component instance its own baked copy,
 // every face its own normal and its own UV island (3.26 M vertices for 1.2 M triangles), 3D-Warehouse fittings carry
 // micro-textures repeated every few millimetres, and 6,457 nodes carry provenance extras. Steps, each look-preserving:
 //  1. Drop what the mars-2026-map scene always hides (people, context groups, reference objects): never drawn.
 //  2. Mip levels the GPU never samples are dropped. Per use (primitive as placed), the finest sampled mip follows
-//     from its least dense triangle (texels per metre); --texels (default 2048) is finer than a dpr-2 pixel at the
-//     orbit camera's 2 m minimum distance. A use whose next-coarser mip is uniform (sd <= 4/255, opaque) gets a
+//     from its least dense triangle (texels per metre); --texels (default 1300) is one dpr-2 pixel at the orbit
+//     camera's 2 m minimum distance on a 1080-css-pixel-tall view (45° fov). A use whose next-coarser mip is uniform (sd <= 4/255, opaque) gets a
 //     solid twin of its material in the texture's mean linear colour (its grain is sub-pixel from every reachable
 //     camera); a texture is then downscaled to the finest level any remaining use can sample.
 //  3. UVs go where no texture reads them; triangles whose normals all equal the face normal lose NORMAL (glTF: no
 //     normals = flat normals; three's GLTFLoader sets flatShading), so faces share their corners; exact weld.
-//  4. Congruent meshes become one definition: same topology and UVs, positions related by an affine map (det > 0)
-//     within 0.2 mm => one mesh, placements carry the map in their node matrix.
+//  4. Congruent meshes become one definition: same topology and every UV set, positions related within 0.2 mm by a
+//     similarity (one TRS placement) or an affine map (det > 0; a stretched part: an SVD node pair U·Σ then V^T).
 //  5. Simplify every definition with an absolute world-space error bound (--err metres, default 0.25 mm).
 //  6. Meshes used once are joined per (parent group, material, vertex layout, --cell metre cell): the irregular
 //     custom pieces stay meshes, but as a few hundred streams instead of thousands.
-//  7. Node extras keep only what the viewer reads (kind, assembly_id, layer); then quantize + meshopt as shrink-campus.
+//  7. Leaf extras keep `kind`, groups kind/assembly_id/layer; positions as integer --step metre steps (uint16, step
+//     and origin in the placement); UV islands moved by whole tiles under REPEAT and stored uint16 with the range in
+//     KHR_texture_transform; textures AVIF where the worst 16x16 block keeps --psnr dB; meshopt; node TRS to 7 digits.
+// Look check: team/scratch/t4/w3/tools/{shots,compare}.mjs (paired renders, dpr 1+2). Tools: the worktree's pnpm store.
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { readdirSync } from 'node:fs';
@@ -34,8 +38,9 @@ const sharp = (await import(`${pkg('sharp@0.35', 'sharp')}/dist/index.mjs`)).def
 
 const argv = process.argv.slice(2); const [inPath, outPath] = argv;
 const opt = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1]; };
+const SKIP = new Set((opt('--skip', '') ?? '').split(',').filter(Boolean)); // debugging: tex, flat, fold, join
 if (!inPath || !outPath) { console.error('usage: campus-parts.mjs <in.glb> <out.glb> [--report json] [--err m] [--texels n] [--cell m]'); process.exit(2); }
-const STEP = +opt('--step', 0.00025), ERR = +opt('--err', 0.00025), TEXELS = +opt('--texels', 2048), CELL = +opt('--cell', 24), COS = 0.9994, SAME = 0.0002, SOLID_SD = 4;
+const STEP = +opt('--step', 0.00025), ERR = +opt('--err', 0.00025), TEXELS = +opt('--texels', 1300), CELL = +opt('--cell', 24), COS = 0.9994, SAME = 0.0002, SOLID_SD = 4;
 /** packages/engine-mars/src/mars-2026-map.ts: the scene's render-only exclusions (pinned by campus-parts.test.mjs). */
 export const HIDE = { kind: ['context_person', 'context_group', 'reference'], assembly: ['people', 'reference-ground'], layer: ['Aerial reference'] };
 const KEEP_EXTRAS = ['kind', 'assembly_id', 'layer'];
@@ -111,7 +116,7 @@ const tex = { capped: 0, solidUses: 0, solidMaterials: 0, bytesBefore: root.list
 const baseOnly = (t) => t.listParents().filter((p) => p.propertyType === 'Material').every((mat) => textureSlots(mat).every(([slot, x]) => x !== t || slot === 'baseColor'));
 const solidOf = new Map(); // material -> its solid-colour twin
 const keepDensity = new Map(); // texture -> min density over the uses that keep it
-for (const m of root.listMeshes()) for (const p of m.listPrimitives()) {
+for (const m of SKIP.has('tex') ? [] : root.listMeshes()) for (const p of m.listPrimitives()) {
   const mat = p.getMaterial(); const slots = textureSlots(mat); if (!slots.length) continue;
   const users = usersOf(m); const dens = slots.map(([slot, t, info]) => [slot, t, Math.min(...users.map((n) => primDensity(n, p, t, info)))]);
   if (slots.length === 1 && slots[0][0] === 'baseColor' && baseOnly(slots[0][1])) {
@@ -124,7 +129,7 @@ for (const m of root.listMeshes()) for (const p of m.listPrimitives()) {
   }
   for (const [, t, d] of dens) keepDensity.set(t, Math.min(keepDensity.get(t) ?? Infinity, d));
 }
-for (const t of root.listTextures()) {
+for (const t of SKIP.has('tex') ? [] : root.listTextures()) {
   const d = keepDensity.get(t); if (d === undefined) continue; const L = finestLevel(d); if (L < 1) continue;
   const [w, h] = t.getSize(), nw = Math.max(1, Math.round(w / 2 ** L)), nh = Math.max(1, Math.round(h / 2 ** L)), before = t.getImage().byteLength;
   const out = await sharp(Buffer.from(t.getImage())).resize(nw, nh, { fit: 'fill', kernel: 'lanczos3' }).webp({ quality: 88 }).toBuffer();
@@ -150,7 +155,7 @@ for (const m of root.listMeshes()) for (const p of [...m.listPrimitives()]) {
     let ok = l > 1e-24; if (ok) { nx /= l; ny /= l; nz /= l; for (const v of [a, b, c]) { const ln = Math.hypot(nrm[3 * v], nrm[3 * v + 1], nrm[3 * v + 2]) || 1; if ((nx * nrm[3 * v] + ny * nrm[3 * v + 1] + nz * nrm[3 * v + 2]) / ln < COS) { ok = false; break; } } }
     (ok ? flat : smooth).push(a, b, c);
   }
-  if (!flat.length) continue;
+  if (!flat.length || SKIP.has("flat")) continue;
   if (!smooth.length) { p.setAttribute('NORMAL', null); flatPrims++; continue; }
   const q = p.clone(); q.setAttribute('NORMAL', null);
   const I = (arr) => doc.createAccessor().setType('SCALAR').setArray(pos.length / 3 < 65536 ? new Uint16Array(arr) : new Uint32Array(arr)).setBuffer(p.getIndices().getBuffer());
@@ -217,9 +222,9 @@ function quat(R) { // rotation matrix (rows) -> [x,y,z,w]
   const l = Math.hypot(x, y, z, w); return [x / l, y / l, z / l, w / l];
 }
 const groups = new Map();
-for (const m of root.listMeshes()) { if (!usersOf(m).length) continue; const k = m.listPrimitives().map((p) => [hashArr(p.getIndices().getArray()), p.listSemantics().sort().join(','), p.getAttribute('POSITION').getCount(), uvKey(p.getAttribute('TEXCOORD_0')?.getArray()), p.getMaterial() ? root.listMaterials().indexOf(p.getMaterial()) : -1].join(':')).join('|'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(m); }
+for (const m of root.listMeshes()) { if (!usersOf(m).length) continue; const k = m.listPrimitives().map((p) => [hashArr(p.getIndices().getArray()), p.listSemantics().sort().join(','), p.getAttribute('POSITION').getCount(), p.listSemantics().filter((x) => x !== 'POSITION' && x !== 'NORMAL').sort().map((x) => x + '=' + uvKey(p.getAttribute(x).getArray())).join(';'), p.getMaterial() ? root.listMaterials().indexOf(p.getMaterial()) : -1].join(':')).join('|'); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(m); }
 let shared = 0;
-for (const list of groups.values()) {
+for (const list of SKIP.has('fold') ? [] : groups.values()) {
   const reps = [];
   for (const m of list) {
     const users = usersOf(m); let placed = false; const s = Math.max(...users.map(worldScale));
@@ -283,7 +288,7 @@ for (const n of root.listNodes()) {
 }
 let joinedNodes = 0, joinedMeshes = 0;
 const doneNodes = new Set();
-for (const { parent, items } of buckets.values()) {
+for (const { parent, items } of SKIP.has('join') ? [] : buckets.values()) {
   if (items.length < 2) continue;
   const local = (n) => mul(invert(parent.getWorldMatrix()), n.getWorldMatrix());
   const prims = items.map(({ node, prim }) => { const q = prim.clone(); F.transformPrimitive(q, local(node)); return q; });
@@ -329,7 +334,7 @@ stage('reordered');
 // positions: integer steps of --step metres (as placed), uint16, the step and origin folded into each placement's matrix
 const quant = doc.createExtension(EXT.KHRMeshQuantization).setRequired(true); void quant;
 let qMeshes = 0, qCoarse = 0;
-for (const m of root.listMeshes()) {
+for (const m of argv.includes('--noposq') ? [] : root.listMeshes()) {
   const users = usersOf(m); if (!users.length) continue; const accs = [...new Set(m.listPrimitives().map((p) => p.getAttribute('POSITION')))];
   if (accs.some((a) => a.listParents().some((p) => p.propertyType === 'Primitive' && !m.listPrimitives().includes(p)))) continue;
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
@@ -343,7 +348,7 @@ for (const m of root.listMeshes()) {
 // KHR_texture_transform (precision kept at 1/8 texel of the largest texture the material samples)
 const xform = doc.createExtension(EXT.KHRTextureTransform).setRequired(true);
 let uvMats = 0, uvShifted = 0; const uvSkip = { none: 0, ext: 0, texcoord: 0, type: 0, precision: 0 };
-for (const mat of root.listMaterials()) {
+for (const mat of argv.includes('--nouvq') ? [] : root.listMaterials()) {
   const slots = textureSlots(mat); if (!slots.length) { uvSkip.none++; continue; } if (mat.listExtensions().some((e) => e.extensionName === 'KHR_materials_specular' && (e.getSpecularTexture() || e.getSpecularColorTexture()))) { uvSkip.ext++; continue; }
   if (slots.some(([, , info]) => info.getTexCoord() !== 0 || info.getExtension('KHR_texture_transform'))) { uvSkip.texcoord++; continue; }
   const prims = mat.listParents().filter((p) => p.propertyType === 'Primitive'); if (!prims.length) continue;
@@ -363,15 +368,18 @@ for (const mat of root.listMaterials()) {
   for (const [, , info] of slots) info.setExtension('KHR_texture_transform', xform.createTransform().setOffset([lo, lo]).setScale([R, R]));
   uvMats++;
 }
-await doc.transform(F.quantize({ pattern: /^NORMAL$/, quantizeNormal: 10, cleanup: false }));
+await doc.transform(F.quantize({ pattern: argv.includes('--noposq') ? /^(POSITION|NORMAL)$/ : /^NORMAL$/, quantizePosition: 16, quantizeNormal: 10, quantizationVolume: 'mesh', cleanup: false }));
 report.quantization = { step: STEP, meshes: qMeshes, coarseMeshes: qCoarse, uvMaterials: uvMats, uvShiftedAccessors: uvShifted, uvSkip };
-// textures: AVIF at the lowest quality that keeps PSNR >= --psnr dB against the current pixels, if smaller
-const PSNR = +opt('--psnr', 45); let avif = 0;
+// textures: AVIF at the lowest quality whose worst 16x16 block keeps PSNR >= --psnr dB against the current pixels, if smaller
+const PSNR = +opt('--psnr', 34); let avif = 0;
 if (PSNR > 0) {
   const ext = doc.createExtension(EXT.EXTTextureAVIF).setRequired(true); void ext;
   for (const t of root.listTextures()) {
-    const src = Buffer.from(t.getImage()), ref = await sharp(src).ensureAlpha().raw().toBuffer();
-    const score = async (b) => { const d = await sharp(b).ensureAlpha().raw().toBuffer(); if (d.length !== ref.length) return 0; let se = 0; for (let i = 0; i < d.length; i++) se += (d[i] - ref[i]) ** 2; return se ? 10 * Math.log10(255 * 255 * d.length / se) : 99; };
+    const src = Buffer.from(t.getImage()), { data: ref, info } = await sharp(src).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    // score = the worst 16x16 block's PSNR (a global PSNR hides a smeared detail region in an otherwise smooth image)
+    const score = async (b) => { const d = await sharp(b).ensureAlpha().raw().toBuffer(); if (d.length !== ref.length) return 0; let worst = 99;
+      for (let by = 0; by < info.height; by += 16) for (let bx = 0; bx < info.width; bx += 16) { let se = 0, n = 0; for (let y = by; y < Math.min(by + 16, info.height); y++) for (let x = bx; x < Math.min(bx + 16, info.width); x++) { const i = 4 * (y * info.width + x); for (let c = 0; c < 4; c++) { se += (d[i + c] - ref[i + c]) ** 2; n++; } } if (se) worst = Math.min(worst, 10 * Math.log10(255 * 255 * n / se)); }
+      return worst; };
     let best = null, lo = 20, hi = 90;
     while (lo <= hi) { const q = (lo + hi) >> 1; const b = await sharp(src).avif({ quality: q, effort: 6 }).toBuffer(); if (await score(b) >= PSNR) { best = b; hi = q - 1; } else lo = q + 1; }
     if (best && best.length < src.length) { t.setImage(new Uint8Array(best)).setMimeType('image/avif'); avif++; }

@@ -36,7 +36,7 @@ export function backdropCandidates(url: string, alias: string | undefined, fork 
 export function forkInitialAssets(rows: Readonly<Record<string, number>>, fork = marsFork): Record<string, number> {
   if (!fork) return { ...rows };
   const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(rows)) if (!/\/blobs\/assets\/64\/64b8838c/.test(k)) out[k] = v;
+  for (const [k, v] of Object.entries(rows)) if (!/\/blobs\/assets\/0d\/0d473682/.test(k)) out[k] = v;
   out[MARS_FORK_BACKDROP.blob] = MARS_FORK_BACKDROP.bytes;
   return out;
 }

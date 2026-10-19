@@ -23,11 +23,11 @@ import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {StaticRootRegistry} from './rendering/StaticRootRegistry.ts';
 import {dequantizeBackdrop} from './WorldBackdropDequantize.ts';
 import {backdropCandidates} from './mars-fork.ts';
-/** Lane BLOBS: legacy backdrop URL (pinned in the server's scene) -> the same campus re-encoded smaller (quantized +
- * WebP + meshopt filters; tools/blobs/shrink-campus.mjs, checked by tools/blobs/compare-campus.mjs), content-addressed
- * and immutable at /blobs/assets/<sha[0:2]>/<sha>.glb on sim.eden.art. */
+/** Legacy backdrop URL (pinned in the server's scene) -> the same campus, content-addressed and immutable at
+ * /blobs/assets/<sha[0:2]>/<sha>.glb on sim.eden.art. Lane W3 (2026-10-19): shared parts + placements, sub-pixel detail
+ * dropped, AVIF (tools/blobs/campus-parts.mjs on the BLOBS copy 64b8838c…: 41.8 -> 7.5 MB, br 18.5 -> 3.6 MB). */
 export const BACKDROP_BLOBS:Readonly<Record<string,string>>=Object.freeze({
-  '/browser/campus.glb?v=20260922b':'/blobs/assets/64/64b8838cdc76a048843ab293f3d74ad985293ad621ea7587e092098117bd1034.glb',
+  '/browser/campus.glb?v=20260922b':'/blobs/assets/0d/0d4736829e1db5c7e05b31c8286b28e99a727eb7f2b0d1bc80d0f482aa7fcf08.glb',
 });
 import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
