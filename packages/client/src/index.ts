@@ -238,7 +238,9 @@ export class Connection {
       this.pingTimer = setInterval(() => {
         if (!mine()) return;
         // the server speaks every two seconds; long silence means the socket is dead even if the browser has not noticed
-        if (this.now() - this.lastMessageAt > 12_000) { try { ws.close(); } catch { /* already closed */ } return; }
+        // P1 phones: until the join snapshot has arrived, one message can take far longer than 12 s on a slow link (1.4 MB
+        // decoded for Eden 2026 on Slow 4G: ~16 s); closing then threw the join away and started it again
+        if (this.now() - this.lastMessageAt > (this.replica.ready ? 12_000 : 60_000)) { try { ws.close(); } catch { /* already closed */ } return; }
         if (ws.readyState === 1) {const at=this.monotonicSample();if(at!==null)this.sendProbe({t:'ping',n:--this.automaticProbeN},at,true);}
       }, 5000);
       this.handlers.onChange?.();
