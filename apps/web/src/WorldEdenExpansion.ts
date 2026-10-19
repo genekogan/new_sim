@@ -16,6 +16,7 @@ import {createWorldGroundDetails} from './WorldGroundDetails.ts';
 import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {applyWorldRealism,applySceneryRealism,releaseWorldRealism,disposeBuildingIdentity,setRealismTime} from './WorldEdenRealism.ts';
 import * as THREE from 'three';
+import {arrivalMark} from './arrival-marks.ts';
 import {createAcademicVenueScenery,academicVenuePlan} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/venue.ts';
 import {createEdenNeighborhood} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/neighborhood.ts';
 import {createEdenExpansionLandscape} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/landscape.mjs';
@@ -44,6 +45,8 @@ import {setDepthFitGround} from '../../../mars/viewer/lib/depth-fit.ts';
 import {currentClassroomPresentation,type LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 /** One connected visual assembly. New places never manufacture native actors,
  * support, claims or participation. Existing published fixture draws win. */
+/** The longest the expansion stays hidden waiting for its programs (P1: was 4 s, under a 4x phone's link time). */
+const WARM_CAP_MS=10_000;
 export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[],groundPublication?:Pick<SceneInfo,'scene'|'shore'>){
  const group=new THREE.Group(),owners:{group:THREE.Group;dispose():void}[]=[],hidden:THREE.Object3D[]=[];
  group.name='Eden — connected growing world';
@@ -91,13 +94,20 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  setHumanGround(proposedGround);setDepthFitGround(proposedGround);
  applyWorldRealism(group,{buildings:true});let realismAt=-Infinity;
  /** Shader pre-warm: borrow the renderer from one backdrop draw, then (after that frame) compile the whole
-  * expansion with KHR_parallel_shader_compile via compileAsync. The scenery is shown once its programs are
-  * ready (or after 4 s), so no frame blocks on dozens of synchronous compiles. */
- let warm=false;const bornAt=performance.now();
+  * scene, the expansion shown, with KHR_parallel_shader_compile via compileAsync. The scenery is shown once its
+  * programs are ready (or after WARM_CAP_MS), so no frame blocks on dozens of synchronous compiles. P1 phones: the
+  * whole scene, not the expansion alone: the expansion brings a point light, and a light count is part of every lit
+  * program, so showing it used to relink every other material in the scene synchronously (live /w/eden on a 4x phone:
+  * 57 programs, ~0.75 s of frame stalls ~2 s after the arrival); and the cap was 4 s, under a phone's compile time. */
+ let warm=false;const bornAt=performance.now();arrivalMark('expansion-born');
  const prewarm=(base:THREE.Object3D)=>{let host:THREE.Object3D|null=null;base.traverse(o=>{if(!host&&(o as THREE.Mesh).isMesh&&o.visible&&!Object.hasOwn(o,'onBeforeRender'))host=o;});
   if(!host){warm=true;return;}const h:THREE.Object3D=host;
-  h.onBeforeRender=function(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){delete (h as any).onBeforeRender;setTimeout(()=>{if(closed||warm)return;
-   try{const shown=group.visible;group.visible=true;const pending=renderer.compileAsync(group,camera,scene);group.visible=shown;pending.then(()=>{warm=true;},()=>{warm=true;});}catch{warm=true;}},0);};};
+  h.onBeforeRender=function(renderer:THREE.WebGLRenderer,scene:THREE.Scene,camera:THREE.Camera){delete (h as any).onBeforeRender;startWarm(renderer,scene,camera);};};
+ // P1: the host draw above never came when the host was out of view (live /w/eden: the 4 s cap showed the town instead,
+ // after the card), so the owner also starts it directly (warmUp)
+ let warmStarted=false;
+ const startWarm=(renderer:THREE.WebGLRenderer,scene:THREE.Object3D,camera:THREE.Camera)=>{if(warmStarted||closed||warm)return;warmStarted=true;setTimeout(()=>{if(closed||warm)return;
+   try{const shown=group.visible;group.visible=true;const pending=renderer.compileAsync(scene,camera);group.visible=shown;pending.then(()=>{warm=true;arrivalMark('expansion-warm');},()=>{warm=true;});}catch{warm=true;}},0);};
  /** Lazily drawn fixtures, commons dressing and native fixtures bring new materials; finish them at most once a second (skinned actors excluded). */
  let backdrop:THREE.Group|null=null;
  const refreshRealism=()=>{const now=performance.now();if(now-realismAt<1000)return;realismAt=now;applyWorldRealism(group,{buildings:true});if(backdrop){applyWorldRealism(backdrop);if(backdrop.parent)applySceneryRealism(backdrop.parent,[group,backdrop]);}};
@@ -105,8 +115,10 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  const loader=new THREE.TextureLoader(),staticPreviewImage=classroomSlide(0).imageUrl;
  function clearSlide(){generation++;slideKey='';venue!.setProjection(null);for(const texture of textures)texture.dispose();textures.clear();}
  return {group,officeGuards,wallFrames,authoredBoundaries,venue:venue!,sampleVisualGround:(x:number,z:number)=>closed?null:proposedGround(x,z),places:[{id:'commons',label:'Inhabited commons',p:[9,5]},{id:'classroom',label:'Classroom · 20 seats',p:[42,-8]},{id:'homes',label:'Furnished neighborhood',p:[44,23]},{id:'forest',label:'Northern woodland',p:[7,-44]},{id:'gardens',label:'Gardens and cultivated plots',p:[52,50]},{id:'dome-quarter',label:'Dome quarter',p:[99.2,36.5]},{id:'amphitheatre',label:'Amphitheatre and observatory',p:[76,82]},{id:'library',label:'Library, office and market',p:[74,5]},{id:'lake',label:'Lake, river and wetlands',p:[-81,1]}],
+  /** Link the scene's programs with the expansion shown (in parallel), then show it; `scene` is the scene it is drawn in. */
+  warmUp(renderer:THREE.WebGLRenderer,camera:THREE.Camera,scene:THREE.Scene){startWarm(renderer,scene,camera);},
   replaceCosmeticBackdrop(base:THREE.Group){backdrop=base;realismAt=-Infinity;refreshRealism();prewarm(base);base.traverse(o=>{if(isFlatBackdrop(o)&&o.visible){hidden.push(o);o.visible=false;}});},
-  sync(nativeEntities:Record<string,unknown>,history=false,seconds=0){if(closed)return;setRealismTime(seconds);stepSurfaceKit(3);if(!warm&&performance.now()-bornAt>4000)warm=true;lastNative=nativeEntities;group.visible=!history&&warm;for(const o of hidden)o.visible=history;if(history){clearSlide();return;}extraPlaces?.sync(nativeEntities,seconds);const missing=fixtures.filter(f=>!Object.hasOwn(nativeEntities,f.id));scenery.onTick({entities:Object.fromEntries(missing.map(f=>[f.id,f]))} as any);scenery.render(0,1);refreshRealism();},
+  sync(nativeEntities:Record<string,unknown>,history=false,seconds=0){if(closed)return;setRealismTime(seconds);stepSurfaceKit(3);if(!warm&&performance.now()-bornAt>WARM_CAP_MS){warm=true;arrivalMark('expansion-warm-cap');}lastNative=nativeEntities;group.visible=!history&&warm;for(const o of hidden)o.visible=history;if(history){clearSlide();return;}extraPlaces?.sync(nativeEntities,seconds);const missing=fixtures.filter(f=>!Object.hasOwn(nativeEntities,f.id));scenery.onTick({entities:Object.fromEntries(missing.map(f=>[f.id,f]))} as any);scenery.render(0,1);refreshRealism();},
   setSurfaceQuality(quality:'Simple'|'Rich'){if(closed)return false;if(!surfaceStudy&&quality==='Simple')return true;if(!surfaceStudy&&surfaceGroup)try{const own=surfaceGroup;releaseWorldRealism(own.children.flatMap(o=>o instanceof THREE.Mesh&&!(o instanceof THREE.InstancedMesh)&&(o.name.startsWith('NEW expansion cosmetic ground')||o.name.startsWith('Connected countryside and forest path')||o.name.startsWith('Cultivated garden plot'))?[o.material as THREE.Material]:[]));surfaceStudy=createWorldEdenSurfaceStudy(own);}catch{return false;}return surfaceStudy?.setQuality(quality)??false;},
   surfaceInspection(){return surfaceStudy?.inspection()??{quality:'Simple',ownTextures:0,ownMaterials:0,extraMeshes:0,extraGeometry:0,HWFrameQualified:false};},
   setWind(enabled:boolean){windWanted=enabled;},

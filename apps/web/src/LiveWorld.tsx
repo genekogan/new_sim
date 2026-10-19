@@ -402,7 +402,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let followTick:number|null=null,followEpoch:string|null=null;
     let previousCameraMode: WorldCameraMode = 'broadcast';
     let logicalFov = 45;
-    let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false;
+    let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false,expansionWantedNow:boolean|null=null;
     if(context.current.edenExpansion)void loadOldEden().catch(()=>{});  // P1: start fetching the old Eden chunk with the scene
     let expansionSceneInfo:ReturnType<typeof parseSceneInfo>|null=null;
     let cameraGroundInfo:ReturnType<typeof parseSceneInfo>|null|undefined,cameraGroundOwner:ReturnType<typeof createWorldEdenExpansion>|null|undefined;
@@ -749,10 +749,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);
           geometry?.setRecordedFixtures(sampled.entities,records);
           geometry?.setViewTime(depictedTick*take.dt);
-          const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);
+          const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);expansionWantedNow=expansionWanted;
           if(!expansionWanted&&expansion)clearExpansion();
           if(expansionWanted&&!expansion&&!expansionFailed&&!oldEden)void loadOldEden().catch(()=>{expansionFailed=true;problem('Some new Eden scenery could not be shown.');});
-          if(expansionWanted&&!expansion&&!expansionFailed&&oldEden)try{expansion=oldEden.createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=oldEden.createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
+          if(expansionWanted&&!expansion&&!expansionFailed&&oldEden)try{expansion=oldEden.createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=oldEden.createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);expansion.warmUp(renderer,camera,scene);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
           expansion?.sync(sampled.entities,!!past.current,depictedTick*take.dt);
           expansion?.setLocalPresentation(context.current.localClassroomPresentation,s.conn.welcome?.worldId??'',Object.hasOwn(sampled.entities,'eden-classroom-screen-1')&&records['eden-classroom-screen-1']?.kind==='fixture'&&records['eden-classroom-screen-1']?.def==='standing-display',!!past.current);
           floaters.update(sampled.entities, take.startTick + sampled.tick, take.dt); // absolute tick: the bob is replay-stable
@@ -968,7 +968,12 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }
       // P1: a new world prepares its first frame once its layer is built (layerStarted): before, a gate whose takes and
       // assets were in hand finished while the layer still loaded its snapshot, so the card went, showed bare ground, and came back
-      if(initialGate?.attached&&!entityLayer.building&&(!newWorld||layerStarted)&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{if(!peopleLater)await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
+      if(initialGate?.attached&&!entityLayer.building&&(!newWorld||layerStarted)&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{if(!peopleLater)await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;
+        // P1 phones: an old Eden world's town (the expansion, its own lazy chunk) is part of the first frame: wait until it
+        // is built, its programs linked and shown (at most 15 s), so the card never goes over the bare hills (live /w/eden
+        // on a 4x phone: the town appeared ~1.5 s after the card) and the compile below covers its lights
+        if(context.current.edenExpansion){const until=performance.now()+15_000;while(expansionWantedNow!==false&&!expansionFailed&&!past.current&&!expansion?.group.visible&&performance.now()<until){await new Promise(r=>setTimeout(r,100));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;}}
+        await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
       if (!renderer.getContext().isContextLost()) {if(at.take&&!holdDraw&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;if(drawnTick.current!==null)arrivalMark('first-live-frame');}
       // A paused seek is a discrete displayed moment. Publish its first drawn
       // frame immediately; moving playback retains the existing 250ms cadence.
