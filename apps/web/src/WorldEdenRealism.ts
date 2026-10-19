@@ -21,6 +21,10 @@ attribute vec4 edenSurf;
 varying vec3 vEdenL;
 varying vec2 vEdenKS;
 #endif
+#ifdef EDEN_FACADE
+attribute float edenFace;
+varying float vEdenFace;
+#endif
 `;
 const VERTEX_BODY=/* glsl */`
 {
@@ -33,6 +37,9 @@ const VERTEX_BODY=/* glsl */`
  #endif
  vEdenW=(modelMatrix*edenP).xyz;vEdenO=(modelMatrix*edenOrigin).xyz;vEdenN=normalize(mat3(modelMatrix)*edenNrm);
  vEdenH=clamp(transformed.y/max(edenRealism.w,1e-3),0.,1.);
+ #ifdef EDEN_FACADE
+  vEdenFace=edenFace;
+ #endif
  #ifdef EDEN_GOD_SURFACE
   // Kit geometry has no per-shape height here: foliage keeps its full tone instead of a base fade.
   {float k=floor(edenSurf.w+1e-3);vEdenL=edenSurf.xyz;vEdenKS=vec2(k,edenSurf.w-k);vEdenH=.8;}
@@ -66,6 +73,9 @@ vec2 edenPlane(vec3 w,vec3 n){vec3 a=abs(n);return a.y>max(a.x,a.z)?w.xz:(a.x>a.
 varying vec3 vEdenL;
 varying vec2 vEdenKS;
 uniform float edenPattern;
+#endif
+#ifdef EDEN_FACADE
+varying float vEdenFace;
 #endif
 `;
 /** Y1 / XP7: explicit god kit patterns in shape-local metres (1 marble, 2 ashlar, 3 planks, 4 shingles, 5 stripes).
@@ -153,7 +163,8 @@ ${GOD_PATTERNS}
    det=mix(d,det,far);edenBump=G.r*.02;edenBumpAmt=near;
    tint=mix(tint,tint*vec3(.8,.9,.78),smoothstep(.68,.88,edenNoise(w.xz*.9+17.))*.7*near);}
   tint*=(.8+.36*mid)*det;
-  if(edenStyle.x>4.5&&edenStyle.x<5.5)tint*=.93+.14*step(.5,fract(dot(w.xz,vec2(.92,.38))/3.2));
+  // mown lawn bands (role 5): old Eden's commons runs them along (.92,.38); a lawn may give its own axis in edenStyle.yz
+  if(edenStyle.x>4.5&&edenStyle.x<5.5){vec2 ax=dot(edenStyle.yz,edenStyle.yz)>.25?edenStyle.yz:vec2(.92,.38);tint*=.93+.14*step(.5,fract(dot(w.xz,ax)/3.2));}
   // Banks and slopes read thinner and earthier than level turf.
   tint=mix(tint,tint*vec3(1.02,.94,.8),smoothstep(.97,.82,n.y)*.8);
  }else if(cls<2.5){ // trodden path: gravel texture over broad damp/dry tone
@@ -255,6 +266,36 @@ ${GOD_PATTERNS}
    else diffuseColor.rgb=mix(diffuseColor.rgb,edenPaint,.5);
   }else if(role<3.5){
    if(up<.45){float v=detail?mix(texture2D(edenPatA,q/2.6).b,.65,far):.65,m=smoothstep(.18,.28,v);diffuseColor.rgb*=mix(.55,.65+.5*v,m);}
+  }else if(role>6.5){
+   // W2b: entity building kit (building/1). The vertex colour is the paint; the building's finish is the material's
+   // (edenStyle.y wall 0 running brick, 1 Flemish, 2 ashlar, 3 clapboard, 4 limewash; edenStyle.z roof 0 clay tile,
+   // 1 slate, 2 shingle). Patterns go on the outer face only (edenFace): rooms inside keep their painted plaster.
+   vec3 paint=diffuseColor.rgb;
+   if(cls>9.5&&cls<10.5){
+    if(up>.2&&up<.97){float pat=edenStyle.z,v=.6;
+     if(detail){vec2 sd=normalize(n.xz+vec2(1e-5));vec2 r=vec2(dot(w.xz,vec2(-sd.y,sd.x)),w.y*1.6);vec4 B=texture2D(edenPatB,r/(pat<.5?2.:pat<1.5?1.6:2.4));v=mix(pat<.5?B.r:B.g,.6,far);edenBump=v*.03;edenBumpAmt=near;}
+     diffuseColor.rgb=paint*(.5+.7*v);edenRough=mix(1.,.82,v);}
+   }else{
+    float face=0.;
+    #ifdef EDEN_FACADE
+     face=vEdenFace;
+    #endif
+    if(face>.5&&up<.45){
+     float pat=edenStyle.y,tile=pat<1.5?2.:pat<2.5?3.:pat<3.5?2.4:6.;
+     vec2 h=normalize(vec2(-n.z,n.x)+vec2(1e-5)),q=vec2(dot(w.xz,h),w.y);
+     vec3 mortar=mix(paint,vec3(.82,.79,.73),.65),mean=pat<1.5?mix(mortar,paint,.8):pat<2.5?mix(mortar*.85,paint*.95,.92):pat<3.5?paint*.885:paint*.97,col=mean;
+     if(detail){vec3 c;
+      if(pat<3.5){vec4 A=texture2D(edenPatA,q/tile);
+       // gentler than the old district finish: kit walls are large and often seen at a grazing angle, so tone only (a
+       // derivative bump sparkles there) and a low per-brick tone
+       if(pat<1.5){float v=pat<.5?A.r:A.g,m=smoothstep(.18,.28,v);c=mix(mortar,paint*(.8+.3*v),m);}
+       else if(pat<2.5){float v=A.b,m=smoothstep(.18,.28,v);c=mix(mortar*.9,paint*(.74+.36*v),m);}
+       else c=paint*(.66+.42*A.a);}
+      else c=paint*(.82+.3*texture2D(edenPatB,q/tile).b);
+      col=mix(c,mean,far);}
+     diffuseColor.rgb=col;
+    }
+   }
   }else if(role>5.5){ // vertex-painted districts (Regions): the vertex colour is the paint; pattern picked per building tone
    vec3 paint=diffuseColor.rgb;float pick=edenHash(floor(paint.rg*24.)+floor(paint.b*24.)*.37),lum=dot(paint,vec3(.3,.59,.11));
    if(cls>9.5&&cls<10.5){
@@ -286,7 +327,7 @@ ${GOD_PATTERNS}
 }
 `;
 
-export type BuildingStyle={role:1|2|3|4|5|6;wall:number;roof:number;baseY:number;paint:THREE.Color;trim:THREE.Color;mural?:{centre:THREE.Vector3;right:THREE.Vector2;width:number;height:number}};
+export type BuildingStyle={role:1|2|3|4|5|6|7;wall:number;roof:number;baseY:number;paint:THREE.Color;trim:THREE.Color;mural?:{centre:THREE.Vector3;right:THREE.Vector2;width:number;height:number}};
 const realismTime={value:0};
 /** Scene seconds for animated finishes (water ripples). Wraps to keep float precision. */
 export function setRealismTime(seconds:number){if(Number.isFinite(seconds))realismTime.value=seconds%3600;}
@@ -294,8 +335,8 @@ export function setRealismTime(seconds:number){if(Number.isFinite(seconds))reali
 const BUMP=/* glsl */`if(edenBumpAmt>0.){vec3 sx=dFdx(-vViewPosition),sy=dFdy(-vViewPosition),r1=cross(sy,normal),r2=cross(normal,sx);float det=dot(sx,r1);
  vec3 grad=sign(det)*(dFdx(edenBump)*r1+dFdy(edenBump)*r2);normal=normalize(abs(det)*normal-grad*edenBumpAmt);}`;
 type CompileShader=Parameters<THREE.Material['onBeforeCompile']>[0];
-function patchShader(shader:CompileShader,uniforms:Record<string,THREE.IUniform>,god=false){
- Object.assign(shader.uniforms,uniforms);shader.uniforms.edenTime=realismTime;const head=god?'#define EDEN_GOD_SURFACE\n':'';
+function patchShader(shader:CompileShader,uniforms:Record<string,THREE.IUniform>,god=false,facade=false){
+ Object.assign(shader.uniforms,uniforms);shader.uniforms.edenTime=realismTime;const head=(god?'#define EDEN_GOD_SURFACE\n':'')+(facade?'#define EDEN_FACADE\n':'');
  shader.vertexShader=head+VERTEX_HEAD+shader.vertexShader.replace('#include <project_vertex>','#include <project_vertex>\n'+VERTEX_BODY);
  shader.fragmentShader=head+FRAGMENT_HEAD+shader.fragmentShader
   .replace('#include <color_fragment>','#include <color_fragment>\n'+FRAGMENT_BODY)
@@ -311,7 +352,7 @@ export function patchGodSurface(shader:CompileShader,surface:GodSurface){
   edenPatA:{value:null},edenPatB:{value:null},edenPatC:{value:null},edenMuralMap:{value:null},edenStyle:{value:new THREE.Vector4()},
   edenPaint:{value:new THREE.Color(1,1,1)},edenTrim:{value:new THREE.Color(1,1,1)},edenMuralA:{value:new THREE.Vector4()},edenMuralB:{value:new THREE.Vector4(1,0,1,0)}},true);
 }
-function install(material:THREE.MeshStandardMaterial,cls:RealismClass,height:number,strength:number,context:string,style?:BuildingStyle){
+function install(material:THREE.MeshStandardMaterial,cls:RealismClass,height:number,strength:number,context:string,style?:BuildingStyle,facade=false){
  let h=2166136261;for(let i=0;i<context.length;i++)h=Math.imul(h^context.charCodeAt(i),16777619);
  const previous=material.onBeforeCompile,previousKey=material.customProgramCacheKey;
  const uniform={value:new THREE.Vector4(CLASS_ID[cls],strength,((h>>>0)%997)*.0137,height)};
@@ -321,9 +362,9 @@ function install(material:THREE.MeshStandardMaterial,cls:RealismClass,height:num
   edenMuralA:{value:mural?new THREE.Vector4(mural.centre.x,mural.centre.y,mural.centre.z,mural.width):new THREE.Vector4()},edenMuralB:{value:mural?new THREE.Vector4(mural.right.x,mural.right.y,mural.height,0):new THREE.Vector4(1,0,1,0)}};
  material.onBeforeCompile=function(shader,renderer){
   previous.call(this,shader,renderer);
-  patchShader(shader,{edenRealism:uniform,...styleUniforms});
+  patchShader(shader,{edenRealism:uniform,...styleUniforms},false,facade);
  };
- material.customProgramCacheKey=function(){return previousKey.call(this)+'|'+KEY;};
+ material.customProgramCacheKey=function(){return previousKey.call(this)+'|'+KEY+(facade?'|facade':'');};
  material.needsUpdate=true;
  patched.set(material,{cls,onBeforeCompile:previous,key:previousKey,names:context.split('|')});
 }
@@ -481,12 +522,22 @@ export function applySceneryRealism(scene:THREE.Object3D,skip:readonly THREE.Obj
  return added;
 }
 
-/** W2b: one shared material takes a realism class directly (entity worlds' building walls, roofs and floors). Idempotent;
- *  every class shares the one program (the class is a uniform). Phones keep their plain materials. */
-export function applyRealismClass(material:THREE.Material,cls:RealismClass,context:string=cls){
+/** W2b: an entity building kit material takes old Eden's building identity (role 7): the wall material patterns the outer
+ *  faces its geometry marks with an `edenFace` attribute (brick/ashlar/clapboard/limewash by `wall`), the roof material
+ *  its sloped faces (clay tile/slate/shingle by `roof`); floors keep the timber class. The paint stays the vertex colour.
+ *  Idempotent; phones keep their plain materials. */
+export function applyBuildingFinish(material:THREE.Material,layer:'wall'|'roof'|'floor',finish:{wall:number;roof:number}={wall:4,roof:0}){
  if(patched.has(material)||!(material instanceof THREE.MeshStandardMaterial))return false;
  if((globalThis as {__simQuality?:{tier?:string}}).__simQuality?.tier==='phone'){patched.set(material,{cls:'generic',onBeforeCompile:material.onBeforeCompile,key:material.customProgramCacheKey});return false;}
- install(material,cls,1,STRENGTH[cls],context);return true;
+ if(layer==='floor'){install(material,'wood',1,STRENGTH.wood,'building floor');return true;}
+ const style:BuildingStyle={role:7,wall:finish.wall,roof:finish.roof,baseY:0,paint:new THREE.Color(1,1,1),trim:new THREE.Color(1,1,1)};
+ install(material,layer==='wall'?'plaster':'roof',1,1,`building ${layer} ${layer==='wall'?finish.wall:finish.roof}`,style,layer==='wall');return true;
+}
+/** W2b: a lawn turf material (vertex-coloured) takes the meadow ground class with old Eden's mown bands along `axis`
+ *  (a unit xz direction; the lawn's long side). One material per axis; same program as every ground. */
+export function applyMownTurf(material:THREE.Material,axis:[number,number]){
+ if(patched.has(material)||!(material instanceof THREE.MeshStandardMaterial))return false;
+ install(material,'ground',1,STRENGTH.ground,'mown lawn',{role:5,wall:axis[0],roof:axis[1],baseY:0,paint:new THREE.Color(1,1,1),trim:new THREE.Color(1,1,1)});return true;
 }
 /** Class actually installed on a material (null when untouched). */
 export function realismNamesOf(material:THREE.Material){return patched.get(material)?.names??null;}

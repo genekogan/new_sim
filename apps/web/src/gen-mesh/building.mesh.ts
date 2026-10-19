@@ -10,7 +10,8 @@
 import * as THREE from 'three';
 import { GENERATORS, type Value } from '@sim/generators';
 import { buildingFacadeSlots, type BuildingLayout } from '../../../../packages/generators/src/building.ts';
-import { Builder, hashStr, mix, rng, type Col, type RawSoup } from './building-kit.ts';
+import { Builder, hashStr, mix, rng, type Col, type Finish, type RawSoup } from './building-kit.ts';
+import { groundRealismFor } from './ground-palette.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { decalGroups } from './faces.ts'; // XP8 hook
 
@@ -50,7 +51,10 @@ registerMesh({
       // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
       // must leave the shutters, flower boxes and chimney where they were).
       // lane W1: the geometry may already have been made in a worker (prefetchBuilding, at the world's first build)
-      const built = emitBuilding(L, takeBuilt(key) ?? buildingBuffers(buildingJob(ctx, L, paint)), ctx.materials);
+      const job = buildingJob(ctx, L, paint), mat = L.material in FACADE ? L.material : 'plaster';
+      // W2b: old Eden's per-building finish; Eden's own look (the meadow ground) varies painted render
+      const finish = buildingFinish(mat, paint, col(ctx.params.roofColor, '#8a3b2a'), job.seed, groundRealismFor((ctx.model.state as { ground?: { palette?: string } }).ground?.palette));
+      const built = emitBuilding(L, takeBuilt(key) ?? buildingBuffers(job), ctx.materials, finish);
       tpl = built.group;
       for (const group of decalGroups(ctx.params.decals, ctx.baked?.slots, L.yaw)) tpl.children[0].add(group); // XP8 hook: wall decals
       tpl.userData.tris = built!.tris;
@@ -117,6 +121,24 @@ function disposeGroup(g: THREE.Object3D) { g.traverse((o) => { const m = o as TH
 
 // ---------------------------------------------------------------- the drawing
 
+/** W2b: old Eden's per-building finish. The facade material decides the wall (brick: running or Flemish bond; stone:
+ *  ashlar; wood: clapboard; plaster: limewash); in Eden's own look (the meadow ground) painted render varies as old
+ *  Eden's districts did: some brick, dressed stone or clapboard. The roof colour picks clay tile, slate or shingle.
+ *  Glass and metal buildings keep the plain kit. */
+export function buildingFinish(mat: string, paint: string, roofCol: string, seed: number, eden: boolean): Finish | null {
+  if (mat === 'glass' || mat === 'metal') return null;
+  const pick = (Math.imul(seed ^ 0x9e3779b9, 2654435761) >>> 0) / 4294967296;
+  const hsl = { h: 0, s: 0, l: 0 }, hueOf = (c: string) => { new THREE.Color(c).getHSL(hsl, THREE.SRGBColorSpace); return hsl.h * 360; };
+  let wall = mat === 'brick' ? (pick < 0.65 ? 0 : 1) : mat === 'stone' ? 2 : mat === 'wood' ? 3 : 4;
+  if (mat === 'plaster' && eden) {
+    // earthy paints read as brick or stone; pastels as clapboard or limewash; whites as clapboard or limewash
+    const hue = hueOf(paint), warm = (hue < 50 || hue > 340) && hsl.l < 0.72 && hsl.s > 0.18;
+    wall = warm ? (pick < 0.45 ? 0 : pick < 0.6 ? 1 : pick < 0.75 ? 2 : 4) : hsl.l > 0.82 ? (pick < 0.5 ? 3 : 4) : pick < 0.45 ? 3 : pick < 0.6 ? 2 : 4;
+  }
+  const hue = hueOf(roofCol), roof = hsl.s < 0.22 || hsl.l < 0.2 ? 1 : hue < 40 || hue > 330 ? 0 : 2;
+  return { wall, roof };
+}
+
 /** Lane W1: everything a building's geometry depends on, as plain data (it crosses to building.worker.ts). */
 export type BuildingJob = { L: BuildingLayout; params: Record<string, Value>; presetTrim: unknown; paint: string; seed: number };
 export type BuildingBuffers = { raw: RawSoup[]; tris: number; anchors: [number, number, number][] };
@@ -135,8 +157,9 @@ export function buildingBuffers(job: BuildingJob): BuildingBuffers {
   for (const detail of [2, 1, 0]) { b = drawBuilding(job.L, job.params, job.presetTrim, job.paint, job.seed, detail); if (b.tris() <= 6000 || detail === 0) break; }
   return { raw: b!.raw(), tris: b!.tris(), anchors: b!.anchors };
 }
-function emitBuilding(L: BuildingLayout, made: BuildingBuffers, materials: MeshCtx['materials']): { group: THREE.Group; tris: number } {
-  const { groups, tris } = Builder.fromRaw(made.raw).emit(materials);
+function emitBuilding(L: BuildingLayout, made: BuildingBuffers, materials: MeshCtx['materials'], finish: Finish | null): { group: THREE.Group; tris: number } {
+  const b = Builder.fromRaw(made.raw); b.finish = finish; // W2b: the building's surface finish (materials only)
+  const { groups, tris } = b.emit(materials);
   const root = new THREE.Group(); root.name = 'building';
   const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
   if (made.anchors.length) inner.userData.edenSmokeSources = made.anchors.map((p) => [...p, 1.4]); // W2: atmosphere smoke
@@ -263,7 +286,7 @@ function drawWall(b: Builder, L: BuildingLayout, w: Wall, ops: Opening[], o: Wal
   const seg = (s0: number, s1: number, y0: number, y1: number) => {
     if (s1 - s0 < 1e-3 || y1 - y0 < 1e-3) return;
     if (o.glassWalls && w.exterior) { b.face([s0, y0, 0], [s1, y0, 0], [s1, y1, 0], [s0, y1, 0], '#dff0ec', 'glass'); return; }
-    b.wallSlab(s0, s1, y0, y1, -T / 2, T / 2, plusCol, minusCol, { top: y1 < H - 1e-3 || w.floor === L.floors - 1 ? reveal : undefined, bottom: y0 > 1e-3 ? reveal : undefined, ends: reveal, endL: s0 > 1e-3, endR: s1 < len - 1e-3 });
+    b.wallSlab(s0, s1, y0, y1, -T / 2, T / 2, plusCol, minusCol, { outer: w.exterior ? outSign : 0, top: y1 < H - 1e-3 || w.floor === L.floors - 1 ? reveal : undefined, bottom: y0 > 1e-3 ? reveal : undefined, ends: reveal, endL: s0 > 1e-3, endR: s1 < len - 1e-3 });
   };
   const sorted = [...ops].sort((a, c) => a.s - c.s);
   let x = 0;
@@ -471,7 +494,7 @@ function drawRoof(b: Builder, L: BuildingLayout, o: { roofCol: string; trim: str
     const run = Lz + 2 * ov, ang = Math.atan2(rise, run), slope = Math.hypot(run, rise);
     b.tilt(0, top + rise / 2 + 0.07, 0, Lx + 2 * ov, 0.14, slope, -ang, 0, rc, layer);
     // side walls fill the slope
-    for (const sx of [-1, 1]) b.tri([sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall'), b.tri([sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall');
+    for (const sx of [-1, 1]) b.outer(() => { b.tri([sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall'); b.tri([sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall'); });
     b.box(0, top - 0.02, Lz / 2 + ov - 0.05, Lx + 2 * ov, 0.12, 0.08, o.trim);
     b.pop(); return;
   }
@@ -489,7 +512,7 @@ function drawRoof(b: Builder, L: BuildingLayout, o: { roofCol: string; trim: str
     b.cylX(0, top + rise + 0.08, 0, 0.1, len + 0.06, dark, 'roof', 8);
     // gable-end walls
     const rw = rise * (Lz / 2) / half;
-    if (!L.open) for (const sx of [-1, 1]) b.at(sx * (Lx / 2 - L.t / 2), top, 0, Math.PI / 2, () => b.prism(0, 0, 0, Lz, rw, L.t, o.ext, 'wall'));
+    if (!L.open) for (const sx of [-1, 1]) b.at(sx * (Lx / 2 - L.t / 2), top, 0, Math.PI / 2, () => b.outer(() => b.prism(0, 0, 0, Lz, rw, L.t, o.ext, 'wall')));
   } else {
     // hip: two trapezoids and two triangles over the eaves rectangle
     const ex = Lx / 2 + ov, ez = Lz / 2 + ov, rx = Math.max(0, ex - ez), y0 = top - 0.02, y1 = top + rise;

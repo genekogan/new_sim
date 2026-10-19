@@ -36,10 +36,10 @@ class VertexGlowMaterial extends THREE.MeshStandardMaterial {
 export class MaterialLib {
   private cache = new Map<string, THREE.Material>();
   /** A material for a kind and colour. `vertexColors` materials ignore `color` (the geometry carries it). */
-  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side; finish?: 'kit-metal'; vertexGlow?: boolean; surface?: KitSurface | null } = {}): THREE.Material {
+  get(kind: Material | undefined, color?: string, opts: { vertexColors?: boolean; glow?: number; side?: THREE.Side; finish?: 'kit-metal'; vertexGlow?: boolean; surface?: KitSurface | null; /** W2b: a building kit finish (its own cached material) */ buildingFinish?: string } = {}): THREE.Material {
     const look = MATERIAL_LOOKS[kind ?? 'paint'] ?? MATERIAL_LOOKS.paint;
     const c = color ?? look.color;
-    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}${opts.finish ? '|' + opts.finish : ''}${opts.vertexGlow ? '|vertex-glow' : ''}${opts.surface ? `|surface:${opts.surface.cls}:${opts.surface.pattern}` : ''}`;
+    const key = `${kind ?? 'paint'}|${opts.vertexColors ? 'vc' : c}|${opts.glow ?? 0}|${opts.side ?? 0}${opts.finish ? '|' + opts.finish : ''}${opts.vertexGlow ? '|vertex-glow' : ''}${opts.surface ? `|surface:${opts.surface.cls}:${opts.surface.pattern}` : ''}${opts.buildingFinish ? '|building:' + opts.buildingFinish : ''}`;
     let m = this.cache.get(key);
     if (!m) {
       const glow = opts.glow ?? (look.emissive ? 1 : 0);
