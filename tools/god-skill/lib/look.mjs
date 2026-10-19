@@ -27,6 +27,7 @@ import { acquireLock, holder, liveness, lockStatus, parseHolder } from './locks.
 import { atomicWrite } from './state.mjs';
 import { listenerAt, readWarm, treeRssMb, warmStatus, writeWarm } from './warm.mjs';
 import { chromeLease as lease } from './chrome-lease.mjs';
+import { startWire } from './wire.mjs';
 /** A few headless Chromes at a time on a shared machine (the lanes' lease slots); EDEN_GOD_NO_LEASE=1 skips it. */
 export const chromeLease = (holder = 'eden-god', o) => (process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {}) : lease(holder, o));
 const KEEPER = '.eden-god.look.json';
@@ -81,7 +82,10 @@ export async function keeper(worldUrl, port, { warm = false } = {}) {
   try { release = acquireLock(`${KEEPER}.lock`, { label: 'look keeper' }); }
   catch (e) { if (warm) process.exit(0); throw e; }
   const me = holder('look keeper'), phase = (p, extra = {}) => writeWarm({ world: worldUrl, pid: process.pid, holder: me, phase: p, ...extra });
-  let browser;
+  let browser, wire = null;
+  // G2: the folder's warm connection to the world (wire.mjs), up before Chrome so the CLI gains from it at once
+  try { wire = await startWire(worldUrl); } catch { /* the CLI goes direct */ }
+  process.once('exit', () => wire?.close());
   try {
   if (!port) port = await freePort();
   phase('fetch');
@@ -105,7 +109,7 @@ export async function keeper(worldUrl, port, { warm = false } = {}) {
     await new Promise((r) => setTimeout(r, 5000));
     let last = 0; try { last = statSync(KEEPER).mtimeMs; } catch { break; }
     if (last !== lastUse) lastUse = last;
-    if (Date.now() - Math.max(lastUse, listenerAt()) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
+    if (Date.now() - Math.max(lastUse, listenerAt(), wire?.usedAt() ?? 0) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
     if (Date.now() >= nextMem) {
       nextMem = Date.now() + MEM_EVERY_MS;
       const ps = spawnSync('ps', ['-A', '-o', 'pid=,ppid=,rss=,command='], { encoding: 'utf8', timeout: 5000, maxBuffer: 1 << 24 });
@@ -119,7 +123,7 @@ export async function keeper(worldUrl, port, { warm = false } = {}) {
     write(); utimesSync(KEEPER, new Date(lastUse), new Date(lastUse));
   }
   } catch (e) { phase('failed', { error: String(e?.message ?? e).split('\n')[0].slice(0, 200) }); if (!warm) throw e; }
-  finally { if (browser) await browser.close().catch(() => {}); release(); }
+  finally { wire?.close(); if (browser) await browser.close().catch(() => {}); release(); }
   process.exit(0);
 }
 

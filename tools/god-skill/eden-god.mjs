@@ -169,7 +169,7 @@ function acquireLock(path, { label = "eden-god", ttlMs = LOCK_TTL_MS, reentrant 
 }
 
 // lib/doctor.mjs
-import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3, unlinkSync as unlinkSync2, statSync as statSync2 } from "node:fs";
+import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync4, unlinkSync as unlinkSync2, statSync as statSync2 } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
 // lib/chrome-lease.mjs
@@ -208,7 +208,7 @@ async function chromeLease(label = "unknown", { waitMs = 11e4, staleMs = LOCK_TT
 }
 
 // lib/state.mjs
-import { existsSync, readFileSync as readFileSync2, writeFileSync as writeFileSync2, renameSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync as readFileSync3, writeFileSync as writeFileSync2, renameSync, unlinkSync } from "node:fs";
 import { randomUUID as randomUUID2 } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 
@@ -254,6 +254,195 @@ async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, 
   }
 }
 
+// lib/wire.mjs
+import { createServer } from "node:http";
+import http from "node:http";
+import https from "node:https";
+import http2 from "node:http2";
+import { randomBytes } from "node:crypto";
+import { readFileSync as readFileSync2, rmSync as rmSync2 } from "node:fs";
+var WIRE = ".eden-god.wire.json";
+var HOP = /* @__PURE__ */ new Set(["connection", "keep-alive", "transfer-encoding", "upgrade", "proxy-connection", "host", "http2-settings", "te"]);
+var pidAlive = (pid) => {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+};
+async function startWire(world, { file = WIRE } = {}) {
+  const origin = new URL(world).origin, secret2 = randomBytes(18).toString("base64url");
+  let used = 0, closed = false, mode = origin.startsWith("https:") ? "h2" : "h1", session = null;
+  const agent = new (origin.startsWith("https:") ? https : http).Agent({ keepAlive: true, maxSockets: 8, keepAliveMsecs: 3e4 });
+  const h2 = () => {
+    if (session && !session.closed && !session.destroyed) return session;
+    const s = http2.connect(origin);
+    let up = false;
+    s.on("connect", () => {
+      up = true;
+      if (s.alpnProtocol && s.alpnProtocol !== "h2") {
+        mode = "h1";
+        s.close();
+      }
+    });
+    s.on("error", () => {
+      if (!up) mode = "h1";
+    });
+    s.on("close", () => {
+      if (session === s) session = null;
+      if (up && !closed && mode === "h2") setTimeout(() => {
+        if (!closed && !session) {
+          try {
+            h2();
+          } catch {
+          }
+        }
+      }, 1e3).unref();
+    });
+    s.unref();
+    session = s;
+    return s;
+  };
+  const fail = (res, phase) => {
+    if (!res.headersSent) {
+      res.writeHead(502, { "content-type": "application/json", "x-eden-god-wire-error": phase });
+      res.end(JSON.stringify({ ok: false, code: "wire", phase }));
+    } else res.destroy();
+  };
+  const server = createServer((req, res) => {
+    if (req.headers["x-eden-god-wire"] !== secret2) {
+      res.writeHead(403, { "x-eden-god-wire-error": "unsent" });
+      return res.end();
+    }
+    const target = String(req.headers["x-eden-god-target"] ?? "");
+    if (!target.startsWith(world + "/") && target !== world) {
+      res.writeHead(400, { "x-eden-god-wire-error": "unsent" });
+      return res.end();
+    }
+    used = Date.now();
+    const u = new URL(target), headers = {};
+    for (const [k, v] of Object.entries(req.headers)) if (!HOP.has(k) && !k.startsWith("x-eden-god-wire") && k !== "x-eden-god-target") headers[k] = v;
+    const pipeBack = (status2, h, body) => {
+      const out = {};
+      for (const [k, v] of Object.entries(h)) if (!k.startsWith(":") && !HOP.has(k)) out[k] = v;
+      res.writeHead(status2, out);
+      body.pipe(res);
+    };
+    if (mode === "h2") {
+      let s;
+      try {
+        s = h2();
+      } catch {
+        return fail(res, "unsent");
+      }
+      const go = () => {
+        let stream2;
+        try {
+          stream2 = s.request({ ...headers, ":method": req.method, ":path": u.pathname + u.search, ":authority": u.host });
+        } catch {
+          return fail(res, "unsent");
+        }
+        stream2.on("response", (h) => pipeBack(h[":status"], h, stream2));
+        stream2.on("error", () => fail(res, "sent"));
+        res.on("close", () => {
+          if (!res.writableFinished) stream2.close(http2.constants.NGHTTP2_CANCEL);
+        });
+        req.pipe(stream2);
+      };
+      if (s.connecting) {
+        s.once("connect", () => mode === "h2" ? go() : relayH1());
+        s.once("error", () => relayH1());
+      } else go();
+      return;
+    }
+    relayH1();
+    function relayH1() {
+      if (res.headersSent) return;
+      const up = (u.protocol === "https:" ? https : http).request(u, { method: req.method, headers, agent }, (r) => pipeBack(r.statusCode, r.headers, r));
+      up.on("error", () => fail(res, up.reusedSocket || up.writableEnded ? "sent" : "unsent"));
+      res.on("close", () => {
+        if (!res.writableFinished) up.destroy();
+      });
+      req.pipe(up);
+    }
+  });
+  server.keepAliveTimeout = 5e3;
+  await new Promise((resolve6, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve6);
+  });
+  server.unref();
+  const port = server.address().port;
+  atomicWrite(file, JSON.stringify({ world, port, pid: process.pid, secret: secret2, at: Date.now() }));
+  if (mode === "h2") try {
+    h2();
+  } catch {
+  }
+  else {
+    const r = http.request(origin + "/", { method: "HEAD", agent });
+    r.on("error", () => {
+    });
+    r.on("response", (x) => x.resume());
+    r.end();
+  }
+  return {
+    port,
+    usedAt: () => used,
+    close() {
+      closed = true;
+      server.close();
+      session?.close();
+      agent.destroy();
+      try {
+        if (JSON.parse(readFileSync2(file, "utf8")).pid === process.pid) rmSync2(file, { force: true });
+      } catch {
+      }
+    }
+  };
+}
+var known;
+function relayFor(url) {
+  if (known === void 0) {
+    known = null;
+    if (!/^(0|off|false|no)$/i.test(process.env.EDEN_GOD_WIRE ?? "")) try {
+      const w = JSON.parse(readFileSync2(WIRE, "utf8"));
+      if (w?.port && w.secret && w.world && pidAlive(w.pid)) known = w;
+    } catch {
+    }
+  }
+  return known && (url.startsWith(known.world + "/") || url === known.world) ? known : null;
+}
+async function wireFetch(url, init = {}) {
+  const w = relayFor(String(url));
+  if (!w) return fetch(url, init);
+  const headers = { ...init.headers ?? {}, "x-eden-god-wire": w.secret, "x-eden-god-target": String(url) };
+  let r;
+  try {
+    r = await fetch(`http://127.0.0.1:${w.port}/`, { ...init, headers });
+  } catch (e) {
+    if (init.signal?.aborted) throw e;
+    const refused = /ECONNREFUSED|ECONNRESET|EPIPE|ENOTFOUND/.test(String(e?.cause?.code ?? e?.code ?? ""));
+    if (refused || !init.method || init.method === "GET") {
+      known = null;
+      return fetch(url, init);
+    }
+    throw e;
+  }
+  const failed = r.headers.get("x-eden-god-wire-error");
+  if (failed === "unsent" || failed && (!init.method || init.method === "GET")) {
+    await r.body?.cancel();
+    known = null;
+    return fetch(url, init);
+  }
+  if (failed) {
+    await r.body?.cancel();
+    throw new TypeError("fetch failed (the folder relay lost the connection to the world)");
+  }
+  return r;
+}
+
 // lib/inbox-notice.mjs
 var noticed = /* @__PURE__ */ new Set();
 function noticeOwnerInbox(data) {
@@ -276,7 +465,7 @@ function noticeInboxHeader(headers) {
 
 // lib/state.mjs
 var STATE = ".eden-god.json";
-var read = (file) => existsSync(file) ? JSON.parse(readFileSync2(file, "utf8")) : {};
+var read = (file) => existsSync(file) ? JSON.parse(readFileSync3(file, "utf8")) : {};
 var claimFile = (id) => {
   if (!/^c_[0-9a-f]{8}$/.test(id)) throw new Error("EDEN_GOD_CLAIM must be c_ followed by eight hexadecimal digits");
   return `.eden-god.claim-${id}.json`;
@@ -402,7 +591,7 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
   async function send(requestPath, requestMethod, requestBody, attemptMs = timeoutMs) {
     const t0 = Date.now();
     const store = context.getStore();
-    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, {}, retryBudget);
+    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget);
     if (headers.authorization && !requestPath.startsWith("/v1/god/inbox/")) noticeInboxHeader(r.headers);
     const text = await r.text();
     let data;
@@ -489,7 +678,7 @@ function attention(at, eye) {
     const s = load(), b = s.build, point = (p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite);
     if (!s.world || !s.token || !b?.id || !b.lease || context.getStore()?.noBuild || /^(0|off|false|no)$/i.test(process.env.EDEN_GOD_ATTENTION ?? "") || !point(at)) return Promise.resolve(false);
     const body = JSON.stringify({ lease: b.lease, at: at.map(r2), ...point(eye) ? { eye: eye.map(r2) } : {} });
-    return fetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) }).then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
+    return wireFetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) }).then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
   } catch {
     return Promise.resolve(false);
   }
@@ -518,13 +707,13 @@ function localDoctor({ fix = false, cwd = process.cwd(), chrome = CHROME_LOCK } 
   if (existsSync2(path)) {
     let raw, k;
     try {
-      raw = readFileSync3(path, "utf8");
+      raw = readFileSync4(path, "utf8");
       k = JSON.parse(raw);
     } catch {
     }
     const status2 = lockStatus(parseHolder(k?.holder), k?.heartbeatAt ?? statSync2(path).mtimeMs, k?.ttlMs ?? 3e4);
     const row = { kind: "look-keeper", path, present: true, ...status2 };
-    if (fix && row.stale && readFileSync3(path, "utf8") === raw) {
+    if (fix && row.stale && readFileSync4(path, "utf8") === raw) {
       unlinkSync2(path);
       row.fixed = true;
     }
@@ -532,7 +721,7 @@ function localDoctor({ fix = false, cwd = process.cwd(), chrome = CHROME_LOCK } 
   } else locks.push({ kind: "look-keeper", path, present: false, stale: false, holder: null });
   for (const name of readdirSync(cwd).filter((n) => /^\.eden-god(?:\.claim-c_[0-9a-f]{8})?\.json$/.test(n))) {
     try {
-      const b = JSON.parse(readFileSync3(resolve2(cwd, name), "utf8")).build;
+      const b = JSON.parse(readFileSync4(resolve2(cwd, name), "utf8")).build;
       if (b) locks.push({ kind: b.claim ? "claim/step-file" : "build/step-file", path: resolve2(cwd, name), present: true, stale: false, durable: true, build: b.id, step: b.n, claim: b.claim, note: "durable workflow state; server lease below is authoritative" });
     } catch {
     }
@@ -597,11 +786,11 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync5, existsSync as existsSync8, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync5, existsSync as existsSync8, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve5 } from "node:path";
 
 // lib/mirror.mjs
-import { existsSync as existsSync3, readFileSync as readFileSync4 } from "node:fs";
+import { existsSync as existsSync3, readFileSync as readFileSync5 } from "node:fs";
 
 // lib/solver.mjs
 var COMPASS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
@@ -1522,7 +1711,7 @@ var CACHE = ".eden-god.cache.json";
 var memo = null;
 function readCache() {
   try {
-    return existsSync3(CACHE) ? JSON.parse(readFileSync4(CACHE, "utf8")) : null;
+    return existsSync3(CACHE) ? JSON.parse(readFileSync5(CACHE, "utf8")) : null;
   } catch {
     return null;
   }
@@ -1839,9 +2028,9 @@ function exportGenesis(snapshot3, { name } = {}) {
 
 // lib/look.mjs
 import { spawn as spawn2, spawnSync as spawnSync2 } from "node:child_process";
-import { existsSync as existsSync6, mkdirSync as mkdirSync2, readFileSync as readFileSync6, writeFileSync as writeFileSync4, rmSync as rmSync3, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
+import { existsSync as existsSync6, mkdirSync as mkdirSync2, readFileSync as readFileSync7, writeFileSync as writeFileSync4, rmSync as rmSync4, statSync as statSync3, utimesSync as utimesSync2 } from "node:fs";
 import { createRequire } from "node:module";
-import { createServer } from "node:net";
+import { createServer as createServer2 } from "node:net";
 import { dirname, resolve as resolve4 } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -1912,7 +2101,7 @@ async function withRemoteLook(args, runtime, local) {
 
 // lib/warm.mjs
 import { spawn } from "node:child_process";
-import { existsSync as existsSync5, readFileSync as readFileSync5, rmSync as rmSync2 } from "node:fs";
+import { existsSync as existsSync5, readFileSync as readFileSync6, rmSync as rmSync3 } from "node:fs";
 var WARM = ".eden-god.warm.json";
 var LISTENER = ".eden-god.listen.json";
 var KEEPER = ".eden-god.look.json";
@@ -1921,12 +2110,12 @@ var FAILED_RETRY_MS = 10 * 6e4;
 var REMOTE_RETRY_MS = 60 * 6e4;
 var read2 = (f) => {
   try {
-    return JSON.parse(readFileSync5(f, "utf8"));
+    return JSON.parse(readFileSync6(f, "utf8"));
   } catch {
     return null;
   }
 };
-var pidAlive = (pid) => {
+var pidAlive2 = (pid) => {
   if (!Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
@@ -1966,7 +2155,7 @@ function warmStatus(world, now = Date.now()) {
   if (w.phase === "stopped") return "stopped";
   if (w.phase === "failed") return now - (w.at ?? 0) < FAILED_RETRY_MS ? "failed" : "none";
   if (w.phase === "ready") return "none";
-  const h = parseHolder(w.holder), live = h ? liveness(h) === "alive" : pidAlive(w.pid);
+  const h = parseHolder(w.holder), live = h ? liveness(h) === "alive" : pidAlive2(w.pid);
   return live && now - (w.at ?? 0) < STARTING_MS ? "warming" : "none";
 }
 function startWarm(world, cliPath, { force = false, spawnFn = spawn } = {}) {
@@ -2113,7 +2302,7 @@ function camera({ target, span, from = "s", dist, inside = false, height, tight 
   return { eye: eye.map((v) => Math.round(v * precision) / precision), at, from: key };
 }
 var freePort = () => new Promise((res, rej) => {
-  const s = createServer();
+  const s = createServer2();
   s.unref();
   s.on("error", rej);
   s.listen(Number(process.env.EDEN_GOD_LOOK_PORT ?? 0), "127.0.0.1", () => {
@@ -2131,7 +2320,7 @@ var alive = async (port) => {
 };
 var readKeeper = () => {
   try {
-    return JSON.parse(readFileSync6(KEEPER2, "utf8"));
+    return JSON.parse(readFileSync7(KEEPER2, "utf8"));
   } catch {
     return null;
   }
@@ -2145,7 +2334,12 @@ async function keeper(worldUrl, port, { warm = false } = {}) {
     throw e;
   }
   const me = holder("look keeper"), phase = (p, extra = {}) => writeWarm({ world: worldUrl, pid: process.pid, holder: me, phase: p, ...extra });
-  let browser;
+  let browser, wire = null;
+  try {
+    wire = await startWire(worldUrl);
+  } catch {
+  }
+  process.once("exit", () => wire?.close());
   try {
     if (!port) port = await freePort();
     phase("fetch");
@@ -2165,7 +2359,7 @@ async function keeper(worldUrl, port, { warm = false } = {}) {
     let lastUse = statSync3(KEEPER2).mtimeMs, nextMem = Date.now() + MEM_EVERY_MS, over = false;
     process.once("exit", () => {
       try {
-        if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync3(KEEPER2, { force: true });
+        if (readKeeper()?.holder?.start === identity.start && readKeeper()?.pid === identity.pid) rmSync4(KEEPER2, { force: true });
       } finally {
         release();
       }
@@ -2179,7 +2373,7 @@ async function keeper(worldUrl, port, { warm = false } = {}) {
         break;
       }
       if (last !== lastUse) lastUse = last;
-      if (Date.now() - Math.max(lastUse, listenerAt()) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
+      if (Date.now() - Math.max(lastUse, listenerAt(), wire?.usedAt() ?? 0) > IDLE_MS || readKeeper()?.pid !== process.pid || !browser.isConnected() || page.isClosed()) break;
       if (Date.now() >= nextMem) {
         nextMem = Date.now() + MEM_EVERY_MS;
         const ps = spawnSync2("ps", ["-A", "-o", "pid=,ppid=,rss=,command="], { encoding: "utf8", timeout: 5e3, maxBuffer: 1 << 24 });
@@ -2201,6 +2395,7 @@ async function keeper(worldUrl, port, { warm = false } = {}) {
     phase("failed", { error: String(e?.message ?? e).split("\n")[0].slice(0, 200) });
     if (!warm) throw e;
   } finally {
+    wire?.close();
     if (browser) await browser.close().catch(() => {
     });
     release();
@@ -2226,7 +2421,7 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
     process.kill(k.pid);
   } catch {
   }
-  rmSync3(KEEPER2, { force: true });
+  rmSync4(KEEPER2, { force: true });
   const port = await freePort();
   const child = spawn2(process.execPath, [cliPath, "look-keeper", worldUrl, String(port)], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
   let failure;
@@ -2255,7 +2450,7 @@ async function ensureKeeper(worldUrl, cliPath, runtime = {}) {
       process.kill(process.platform === "win32" ? child.pid : -child.pid);
     } catch {
     }
-    if (readKeeper()?.pid === child.pid) rmSync3(KEEPER2, { force: true });
+    if (readKeeper()?.pid === child.pid) rmSync4(KEEPER2, { force: true });
     runtime.keeperChild = null;
     throw e;
   }
@@ -2271,7 +2466,7 @@ function stopKeeper() {
     process.kill(w.pid);
   } catch {
   }
-  rmSync3(KEEPER2, { force: true });
+  rmSync4(KEEPER2, { force: true });
   writeWarm({ ...w ?? {}, holder: void 0, phase: "stopped" });
   return k ? `stopped the look keeper (pid ${k.pid})` : starting ? `stopped the look keeper warm-up (pid ${w.pid})` : "no look keeper running";
 }
@@ -3030,7 +3225,7 @@ var LAYERS_POS = { hours: 1, event: 2, own: 2, access: 2, price: 2, currency: 1,
 var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00 (or 07:00-15:00@sat,sun) [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] (replaces the whole schedule) \xB7 event <ref> "market 09:00 240 sat" [--set market|concert] [--piece def@x,z[@yawdeg]] [--shift dx,dz] [--label "\u2026"] (adds one event; its set appears while it is on) \xB7 event <ref> <name> --remove \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // lib/governance.mjs
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync8 } from "node:fs";
 var clip = (s, n) => {
   const t = String(s ?? "").replace(/\s+/g, " ").trim();
   return t.length > n ? t.slice(0, n - 1) + "\u2026" : t;
@@ -3075,7 +3270,7 @@ function decideBody(id, decision, f = {}) {
   let text;
   if (f.text !== void 0) {
     if (typeof f.text !== "string" || !f.text.trim()) throw new Error("--text needs the new constitution (markdown, or a file holding it)");
-    text = existsSync7(f.text) && !f.text.includes("\n") ? readFileSync7(f.text, "utf8") : f.text;
+    text = existsSync7(f.text) && !f.text.includes("\n") ? readFileSync8(f.text, "utf8") : f.text;
   }
   return { decision, ...reason ? { reason } : {}, ...text !== void 0 ? { text } : {} };
 }
@@ -4186,7 +4381,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
       if (typeof f.file !== "string") throw new Error("--file needs a plan file or inline JSON");
       let plan;
       try {
-        plan = JSON.parse(f.file.trim().startsWith("{") ? f.file : readFileSync8(f.file, "utf8"));
+        plan = JSON.parse(f.file.trim().startsWith("{") ? f.file : readFileSync9(f.file, "utf8"));
       } catch (e) {
         throw new Error(`--file: cannot read the plan (${e.message})`);
       }
@@ -4246,7 +4441,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
     for (const k of ["at", "offset", "size", "yaw", "mass", "root"]) if (f[k] !== void 0) throw new Error(`--${k} does not apply to a district chapter: the plan holds each plot's rectangle and massing`);
     const plots = buildValues(f.plots, ",", "plots", 8, 8), steps2 = f.steps === void 0 ? void 0 : buildValues(f.steps, ",", "steps", 24, 60);
     if (f.title !== void 0 && (typeof f.title !== "string" || !f.title.trim() || f.title.length > 80)) throw new Error("--title is 1..80 characters");
-    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync8(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync9(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     const asks = buildValues(f.asks, ";", "asks", 64, 500), include = buildValues(f.include, ",", "include", 512, 300);
     body = { id: arg, district: { id: f.district, ...plots ? { plots } : {} }, ...f.title ? { title: f.title } : {}, ...steps2 ? { steps: steps2 } : {}, ...asks ? { asks } : {}, ...include ? { include } : {}, ...brief !== void 0 ? { brief } : {} };
@@ -4257,7 +4452,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
     const steps2 = f.steps.split(",").map((x) => x.trim());
     if (steps2.length > 24 || steps2.some((x) => !x || x.length > 60)) throw new Error("--steps needs 1..24 labels, each 1..60 characters");
     const massing = inheritedMassing ?? parseMassing(f.mass), site = await buildSite(f);
-    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync8(f.brief, "utf8") : f.brief;
+    const brief = f.brief === void 0 ? void 0 : existsSync8(f.brief) ? readFileSync9(f.brief, "utf8") : f.brief;
     if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
     const asks = buildValues(f.asks, ";", "asks", 64, 500), include = buildValues(f.include, ",", "include", 512, 300);
     body = { id: arg, title: f.title, steps: steps2, site, massing, ...asks ? { asks } : {}, ...include ? { include } : {}, ...brief !== void 0 ? { brief } : {}, ...f.root ? { root: f.root } : {} };
@@ -4309,7 +4504,7 @@ async function build2(sub = "show", args = [], f = {}, inheritedMassing) {
   if (sub === "claim") {
     const file = claimFile(r.claim.id), release = acquireLock(`${file}.lock`, { label: "claim state creation" });
     try {
-      const previous = existsSync8(file) ? JSON.parse(readFileSync8(file, "utf8")) : null;
+      const previous = existsSync8(file) ? JSON.parse(readFileSync9(file, "utf8")) : null;
       if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + "\n");
     } finally {
       release();
@@ -4611,7 +4806,7 @@ async function exportWorld(file, flags2 = {}) {
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
 var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
-  const g = JSON.parse(readFileSync8(file, "utf8"));
+  const g = JSON.parse(readFileSync9(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
   const out = [];
   const s = await snapshot2();
@@ -4631,7 +4826,7 @@ var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   return out.join("\n");
 });
 async function define(json2, ignored = []) {
-  const def = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
+  const def = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync9(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -4647,7 +4842,7 @@ function correctedLine(warnings = [], ignored = []) {
   return shown.length ? `corrected${refs.length === 1 ? ` ${refs[0]}` : ""}: ${shown.join("; ")}` : "";
 }
 async function defineKit(json2, flags2 = {}) {
-  const k = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
+  const k = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync9(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
   const picks = [...matches.filter((d) => usedIn(d).length), ...matches.filter((d) => !usedIn(d).length)].slice(0, 5);
@@ -4818,7 +5013,7 @@ function helpFor(cmd) {
   return [...lines.length ? lines : [`${cmd}: see help`], `${cmd} options: ${opts.map((x) => "--" + x).join(" ")}`].join("\n");
 }
 var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
-var readArg = (r) => r[0] !== void 0 ? existsSync8(r[0]) && !r[0].trim().startsWith("{") ? readFileSync8(r[0], "utf8") : r[0] : readFileSync8(0, "utf8");
+var readArg = (r) => r[0] !== void 0 ? existsSync8(r[0]) && !r[0].trim().startsWith("{") ? readFileSync9(r[0], "utf8") : r[0] : readFileSync9(0, "utf8");
 var COMMANDS = {
   doctor: (r, f) => doctor(f),
   trace: (r, f) => trace(f),

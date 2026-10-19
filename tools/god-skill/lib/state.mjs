@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { acquireLock, holder } from './locks.mjs';
 import { fetchWithRetry } from './retry.mjs';
+import { wireFetch } from './wire.mjs';
 import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
 
 export const STATE = '.eden-god.json';
@@ -121,7 +122,7 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     // Each 429 retry gets its own attemptMs signal (as release 1's recursive send did), capped by the
     // command's one deadline and cancelled with it (the look deadline runs through withDeadline).
     const store = context.getStore();
-    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, {}, retryBudget);
+    const r = await fetchWithRetry(world + requestPath, { method: requestMethod, headers, body: requestBody, timeoutMs: attemptMs, deadlineAt: store?.deadlineAt, signal: store?.signal }, { fetch: wireFetch }, retryBudget);
     if (headers.authorization && !requestPath.startsWith('/v1/god/inbox/')) noticeInboxHeader(r.headers);
     // Reading a response can also lose the connection after the edit committed.
     const text = await r.text(); let data;
@@ -198,7 +199,7 @@ export function attention(at, eye) {
     const s = load(), b = s.build, point = (p) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite);
     if (!s.world || !s.token || !b?.id || !b.lease || context.getStore()?.noBuild || /^(0|off|false|no)$/i.test(process.env.EDEN_GOD_ATTENTION ?? '') || !point(at)) return Promise.resolve(false);
     const body = JSON.stringify({ lease: b.lease, at: at.map(r2), ...(point(eye) ? { eye: eye.map(r2) } : {}) });
-    return fetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) })
+    return wireFetch(`${s.world}/v1/god/builds/${encodeURIComponent(b.id)}/attention`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${s.token}` }, body, signal: AbortSignal.timeout(ATTENTION_TIMEOUT_MS) })
       .then(async (r) => r.ok && (await r.json().catch(() => null))?.ok === true, () => false);
   } catch { return Promise.resolve(false); }
 }

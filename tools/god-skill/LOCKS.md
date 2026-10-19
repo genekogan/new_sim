@@ -8,6 +8,7 @@ Local exclusive directories contain a private JSON `holder` record, acquisition 
 | --- | --- | --- |
 | `/tmp/eden-chrome-lease`, `.1`, `.2` (Chrome slots: `CHROME_LEASE_SLOTS`, default 3; slot 0 is the old single lease, taken last; a slot failing other than busy is skipped) | process identity; 30 s unknown-holder TTL; a team-lease text holder keeps live-PID protection; the heartbeat also touches the directory (the team lease's 15 min mtime check) | next look or `doctor --fix` (every slot) |
 | `.eden-god.look.json.lock` / keeper record | process identity, 5 s heartbeat, 30 s unknown-holder TTL | `look --stop` for a verified live keeper; doctor removes a stale record |
+| `.eden-god.wire.json` (G2: the keeper's localhost relay to the world: port, per-start secret, mode 0600) | the keeper's pid; removed when the keeper exits | none needed: a CLI that finds no live relay goes direct |
 | `.eden-god.json.lock`, claim-file `.lock` | process identity; held only over read/modify/atomic rename | next save or `doctor --fix` |
 | build lease / claims | caller identity, persisted server activity, world build pause TTL for unknown/remote holders | resume/take, pause/release, or doctor stale repair |
 | verify probe | server process identity; 180 s operation deadline; pending physical retirement | server retirement; restart sweeps crashed probes before admitting another |
