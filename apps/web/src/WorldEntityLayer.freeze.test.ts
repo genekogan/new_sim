@@ -1,0 +1,128 @@
+// Offline: node --test --test-concurrency=1 apps/web/src/WorldEntityLayer.freeze.test.ts
+// P1 phones: settled still things freeze (their subtree leaves scene.updateMatrixWorld), thaw when anything in them changes,
+// and are culled at render time when off screen (not on shadow-map frames) or under `cullPx`. Desktop (freezeSettled off)
+// keeps three.js' own behaviour exactly.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import * as THREE from 'three';
+import { registerHooks } from 'node:module';
+
+type Drawn = { settled?: boolean; frozen?: THREE.Object3D[]; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; defHash: string };
+type Inner = { drawn: Map<string, Drawn>; thingsGroup: THREE.Group };
+
+async function layerFor(phone: boolean) {
+  (globalThis as { location?: unknown }).location ??= new URL('http://offline.invalid/w/fixture');
+  const index = new URL('./gen-mesh/index.ts', import.meta.url).href;
+  const hooks = registerHooks({ load(url, context, next) { return url === index ? { format: 'module', shortCircuit: true, source: "export { meshFor } from './registry.ts';" } : next(url, context); } });
+  const { WorldEntityLayer } = await import('./WorldEntityLayer.ts').finally(() => hooks.deregister());
+  const layer = new WorldEntityLayer((p) => p);
+  layer.active = true; layer.freezeSettled = phone;
+  const inner = layer as unknown as Inner;
+  const scene = new THREE.Scene(); scene.add(layer.group);
+  const put = (id: string, at: [number, number, number], size = 1, child?: THREE.Object3D) => {
+    const obj = new THREE.Group(); obj.position.set(...at);
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size)); mesh.position.set(0, size / 2, 0); obj.add(mesh);
+    if (child) mesh.add(child);
+    inner.thingsGroup.add(obj);
+    const p = new THREE.Vector3(...at);
+    inner.drawn.set(id, { settled: true, obj, from: { p, s: 1 }, to: { p: p.clone(), s: 1 }, t0: 0, dur: 0.001, defHash: id });
+    return { obj, mesh, d: () => inner.drawn.get(id)! };
+  };
+  let now = 1000;
+  const frame = () => { now += 16; layer.update(0.016, now); scene.updateMatrixWorld(); };
+  return { layer, inner, scene, put, frame };
+}
+const worldPos = (o: THREE.Object3D) => new THREE.Vector3().setFromMatrixPosition(o.matrixWorld);
+
+test('phone: a settled still thing freezes; its subtree leaves the matrix walk with current matrices', async () => {
+  const { put, frame } = await layerFor(true);
+  const a = put('a', [5, 0, 0]);
+  frame();
+  const d = a.d();
+  assert.ok(d.frozen && d.frozen.length === 2, 'the thing and its mesh are frozen');
+  assert.equal(a.mesh.matrixAutoUpdate, false);
+  assert.notEqual(a.obj.updateMatrixWorld, THREE.Object3D.prototype.updateMatrixWorld, 'the subtree is skipped by scene.updateMatrixWorld');
+  assert.deepEqual(worldPos(a.mesh).toArray(), [5, 0.5, 0], 'matrices were brought up to date at freeze');
+  assert.ok(d.sphere && d.sphere.center.distanceTo(new THREE.Vector3(5, 0.5, 0)) < 1e-6, 'bounding sphere for render-time cull');
+});
+
+test('phone: a child added anywhere in a frozen thing (a lazy GLB arriving) thaws it; the next frame refreezes with the child current', async () => {
+  const { put, frame } = await layerFor(true);
+  const a = put('a', [5, 0, 0]);
+  frame();
+  const glb = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2)); glb.position.set(0, 2, 0);
+  a.mesh.add(glb);
+  frame();
+  assert.ok(a.d().frozen?.includes(glb), 'refrozen with the new child');
+  assert.deepEqual(worldPos(glb).toArray(), [5, 2.5, 0], 'the new child has its world matrix');
+  assert.ok(a.d().sphere!.radius > Math.sqrt(3) - 1e-6, 'sphere recomputed around the new geometry');
+});
+
+test('phone: a thing that starts moving thaws: matrices recompose again and follow it', async () => {
+  const { put, frame } = await layerFor(true);
+  const a = put('a', [5, 0, 0]);
+  frame();
+  const d = a.d();
+  d.settled = false; d.from = { p: new THREE.Vector3(5, 0, 0), s: 1 }; d.to = { p: new THREE.Vector3(9, 0, 0), s: 1 }; d.t0 = 0;
+  frame();
+  assert.equal(d.frozen, undefined);
+  assert.equal(a.mesh.matrixAutoUpdate, true);
+  assert.equal(a.obj.updateMatrixWorld, THREE.Object3D.prototype.updateMatrixWorld, 'the prototype method is back');
+  assert.deepEqual(worldPos(a.mesh).toArray(), [9, 0.5, 0]);
+});
+
+test('phone: if what frozen things hang from moves, all of them thaw', async () => {
+  const { put, frame, inner } = await layerFor(true);
+  const a = put('a', [5, 0, 0]), b = put('b', [-5, 0, 0]);
+  frame();
+  inner.thingsGroup.position.set(0, 1, 0); inner.thingsGroup.updateMatrixWorld();
+  frame();
+  // thawed in the walk then (still settled) frozen again against the new parent matrix
+  assert.deepEqual(worldPos(a.mesh).toArray(), [5, 1.5, 0]);
+  assert.deepEqual(worldPos(b.mesh).toArray(), [-5, 1.5, 0]);
+});
+
+test('phone: skinned or clip-animated things never freeze', async () => {
+  const { put, frame } = await layerFor(true);
+  const hook = new THREE.Object3D(); hook.userData.animates = true;
+  const a = put('a', [0, 0, 0], 1, hook);
+  const skin = new THREE.SkinnedMesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+  const b = put('b', [2, 0, 0], 1, skin);
+  frame(); frame();
+  for (const t of [a, b]) { assert.equal(t.d().frozen, undefined); assert.equal(t.d().noFreeze, true); assert.equal(t.mesh.matrixAutoUpdate, true); }
+});
+
+test('phone: render-time cull - off screen (except shadow-map frames) and sub-pixel frozen things are hidden, then restored', async () => {
+  const { layer, put, frame } = await layerFor(true);
+  const ahead = put('ahead', [0, 0, -10]), behind = put('behind', [0, 0, 10]), speck = put('speck', [0, 0, -900], 0.01);
+  frame();
+  const cam = new THREE.PerspectiveCamera(60, 390 / 844, 0.1, 2000); cam.position.set(0, 0.5, 0); cam.lookAt(0, 0.5, -1);
+  layer.cull(cam, 844, false);
+  assert.equal(ahead.obj.visible, true);
+  assert.equal(behind.obj.visible, false, 'off screen: not drawn');
+  assert.equal(speck.obj.visible, false, 'under cullPx: not drawn');
+  assert.equal(layer.cullStats.culled, 2);
+  assert.equal(behind.d().offscreen, true);
+  layer.uncull();
+  assert.deepEqual([ahead, behind, speck].map((t) => t.obj.visible), [true, true, true], 'uncull restores');
+  layer.cull(cam, 844, true);
+  assert.equal(behind.obj.visible, true, 'a shadow-map frame keeps off-screen casters');
+  assert.equal(speck.obj.visible, false);
+  layer.uncull();
+  // a thing already hidden (an interior storey) is left alone and not restored to visible
+  behind.obj.visible = false; layer.cull(cam, 844, false); layer.uncull();
+  assert.equal(behind.obj.visible, false);
+});
+
+test('desktop (freezeSettled off): nothing freezes and cull is a no-op', async () => {
+  const { layer, put, frame } = await layerFor(false);
+  const behind = put('behind', [0, 0, 10]);
+  frame(); frame();
+  assert.equal(behind.d().frozen, undefined);
+  assert.equal(behind.mesh.matrixAutoUpdate, true);
+  assert.equal(behind.obj.updateMatrixWorld, THREE.Object3D.prototype.updateMatrixWorld);
+  const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 2000); cam.lookAt(0, 0, -1);
+  layer.cull(cam, 900, false);
+  assert.equal(behind.obj.visible, true);
+  assert.equal(layer.cullStats.culled, 0);
+});
