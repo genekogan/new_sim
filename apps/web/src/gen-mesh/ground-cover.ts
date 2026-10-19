@@ -26,8 +26,10 @@ const keepAt = (k: (typeof KINDS)[number], d: number) => { const l = LOD[k]; if 
 const MAX_D = Math.max(...Object.values(LOD).map((l) => l.dmax));
 const MOVE = 2.5, DEAL_MS = 1, KEEP_CELLS = 1400;
 
+/** The page's quality tier; a page without a screen (tests, workers) counts as desktop. */
+function pageQuality(): { tier: string; reason: string } { try { return browserQuality(); } catch { return { tier: 'full', reason: 'no screen' }; } }
 /** On or off for this page: off on the phone tier (P1's browserQuality), `?cover=0|1` overrides either way. */
-export function coverSetting(search = typeof location === 'undefined' ? '' : location.search, tier: { tier: string; reason: string } = browserQuality()): { enabled: boolean; reason: string } {
+export function coverSetting(search = typeof location === 'undefined' ? '' : location.search, tier: { tier: string; reason: string } = pageQuality()): { enabled: boolean; reason: string } {
   const q = new URLSearchParams(search).get('cover');
   if (q === '0' || q === '1') return { enabled: q === '1', reason: `?cover=${q}` };
   return tier.tier === 'phone' ? { enabled: false, reason: `phone tier (${tier.reason})` } : { enabled: true, reason: tier.reason };
