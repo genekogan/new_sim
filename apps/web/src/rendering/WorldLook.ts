@@ -15,9 +15,11 @@ import * as THREE from 'three';
  *  `?look=flat` turns all of it off, `?post=0` only the occlusion pass, `?detail=0` only the material detail. The
  *  phone tier keeps the old direct draw (no extra targets) and no material detail; the tone curve applies everywhere. */
 export type LookSettings = { enabled: boolean; ao: boolean; detail: number; follow: boolean; nightExposure: number; poolGain: number };
+/** Tuning dials for shots (`?nightx=`, `?poolgain=`); a bad value keeps the default. */
+const num = (v: string | null, d: number) => { const n = v === null ? NaN : Number(v); return Number.isFinite(n) && n > 0 && n < 8 ? n : d; };
 export function lookSettings(search: string, tier: 'phone' | 'full', entityWorld: boolean): LookSettings {
   const q = new URLSearchParams(search), on = entityWorld && q.get('look') !== 'flat';
-  return { enabled: on, ao: on && tier === 'full' && q.get('post') !== '0', detail: on && tier === 'full' && q.get('detail') !== '0' ? 1 : 0, follow: on, nightExposure: on ? 1.85 : 1, poolGain: on ? 1.7 : 1 };
+  return { enabled: on, ao: on && tier === 'full' && q.get('post') !== '0', detail: on && tier === 'full' && q.get('detail') !== '0' ? 1 : 0, follow: on, nightExposure: on ? num(q.get('nightx'), 1.4) : 1, poolGain: on ? num(q.get('poolgain'), 1.4) : 1 }; // W2 darker night (were 1.85 / 1.7)
 }
 /** Exposure for daylight 0 (night) .. 1 (day); null (no clock yet) is day. */
 export function lookExposure(daylight: number | null, night: number): number {

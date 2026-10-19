@@ -89,6 +89,10 @@ type LayerLike = { active: boolean; groundAt(x: number, z: number): number | nul
 
 /** God worlds get Eden's living presentation: lamps that light at dusk with warm pools and halos, the sky, weather
  *  (scheduled, or the god's), and rain that stays out of god-built rooms. One per live view. */
+/** W2 darker night: a pool's radius and its soft outer halo, per metre of light range (were 0.42 / 1.25: Eden 2026's 800
+ *  lamps' halos summed into a wash that lit whole lawns; fires were 0.55). `?poolr=` / `?poolhalo=` are shot dials. */
+const POOL_HALO = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poolhalo')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.4; })();
+const POOL_RADIUS = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poolr')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.3; })();
 export class GodWorldLiving {
   /** Carries the god's lamps as `edenLightSources` for the atmosphere's halos and fireflies (found by its scene scan). */
   readonly group = new THREE.Group();
@@ -136,7 +140,7 @@ export class GodWorldLiving {
         const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
-        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25 * this.pools.radius, pattern, phase });
+        sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
         marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
     } };
