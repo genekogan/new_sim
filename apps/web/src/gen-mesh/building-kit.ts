@@ -30,6 +30,8 @@ class F32 {
   view() { return this.a.subarray(0, this.n); }
 }
 type Buf = { p: F32; n: F32; c: F32 };
+/** One (group|layer) soup: positions, normals, colours. */
+export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
@@ -140,6 +142,14 @@ export class Builder {
   }
   quad(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'roof') { this.tri(a, b, c, col, layer); this.tri(a, c, d, col, layer); return this; }
   tris(): number { let n = 0; for (const b of this.buf.values()) n += b.p.length / 9; return n; }
+  /** Lane W1: the accumulated soups as plain arrays (to cross to or from a worker), in the order emit takes them. */
+  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice() })); }
+  /** A builder holding soups made elsewhere (raw()), ready to emit exactly as the builder that made them would. */
+  static fromRaw(raw: readonly RawSoup[]): Builder {
+    const b = new Builder(), f = (a: Float32Array) => { const x = new F32(); x.a = a as Float32Array<ArrayBuffer>; x.n = a.length; return x; };
+    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c) });
+    return b;
+  }
   /** One mesh per (group, layer) under one THREE.Group per group. */
   emit(materials: MaterialLib): { groups: Map<string, THREE.Group>; draws: number; tris: number } {
     const groups = new Map<string, THREE.Group>(); let draws = 0, tris = 0;

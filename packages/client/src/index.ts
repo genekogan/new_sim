@@ -7,6 +7,13 @@ import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/e
 import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
+import { helloMessage } from './hello.ts';
+export { helloMessage, anonymousHello } from './hello.ts';
+
+/** A socket opened before the Connection existed (the web page's entry script), with the hello it already sent (if
+ *  open) and every message received since, in order. */
+export type AdoptedSocket = { ws: WSLike; queue: unknown[]; hello: string; sent: boolean };
+
 export class Replica {
   tick = 0;            // latest tick we have data through
   seq = -1;            // last batch seq applied
@@ -113,6 +120,7 @@ export class Connection {
   /** Wall-clock anchor for smooth local tick estimation between batches. */
   anchor = { tick: 0, at: 0 };
   private ws: WSLike | null = null;
+  private boot: AdoptedSocket | null = null;
   private closed = false;
   private retry = 0;
   private pendingHb: Heartbeat | null = null;
@@ -188,6 +196,10 @@ export class Connection {
     try{this.ws.send(JSON.stringify({t:'ping',n:message.n}));return structuredClone(p);}catch{this.pendingPings.delete(message.n);return null;}
   }
 
+  /** Use this already-opened socket for the first connection (lane W1: the page opened it at entry). It is kept only
+   *  if the hello it sent is exactly the one this Connection would send now (signed out, no replica); otherwise it is
+   *  closed and a fresh socket says the right hello. */
+  adopt(boot: AdoptedSocket) { this.boot = boot; }
   connect() {
     this.closed = false; this.open();
   }
@@ -198,7 +210,10 @@ export class Connection {
     const replaced=this.ws;this.ws=null;try{replaced?.close();}catch{/* obsolete socket is already ignored */}
     clearTimeout(this.reconnectTimer);
     this.stats.state = 'connecting'; this.handlers.onChange?.();
-    const ws = (this.ws = this.make(this.url));
+    const boot=this.boot;this.boot=null;
+    const adopted=!!boot&&boot.ws.readyState<=1;
+    if(boot&&!adopted)try{boot.ws.close();}catch{/* already closed */}
+    const ws = (this.ws = adopted?boot!.ws:this.make(this.url));
     let active=true;
     // the last entity table this socket received (take-entities-ref/1): a new socket starts empty, as does the server's view of it
     const takeEntities:TakeEntitiesStateV1={last:null};
@@ -211,9 +226,14 @@ export class Connection {
       const token = await this.getToken().catch(() => null);
       if (!mine() || ws.readyState !== 1) return;
       // resume only from the same server process: batch numbers start again after a restart
-      const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}),
-        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}),...(this.takeBoundaryTransport?{takeTransport:TAKE_BOUNDARY_WIRE_V1,takeEntities:TAKE_ENTITIES_WIRE_V1,takeChunks:TAKE_CHUNKS_WIRE_V1}:{}) };
-      ws.send(JSON.stringify(hello));
+      const hello = JSON.stringify(helloMessage({ token, ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}),
+        stationContracts: this.stationOffer, takeBoundaryTransport: this.takeBoundaryTransport }));
+      // an adopted socket that already said this hello goes on as it is; one that said another (a signed-in page) is
+      // replaced at once (the server ignores a second hello within 3 s), resuming from what it already received
+      // (compared without since/epoch: the entry socket spoke for a page with no replica yet; its queued snapshot, replayed
+      // below before the token is known, must not make that look like a different hello)
+      if (adopted && boot!.sent) { if (boot!.hello !== JSON.stringify(helloMessage({ token, stationContracts: this.stationOffer, takeBoundaryTransport: this.takeBoundaryTransport }))) { this.open(); return; } }
+      else ws.send(hello);
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
         if (!mine()) return;
@@ -257,6 +277,11 @@ export class Connection {
       this.reconnectTimer = setTimeout(() => this.open(), Math.min(15_000, 500 * 2 ** this.retry++) * (0.5 + Math.random()));
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
+    if (adopted) {
+      // what arrived before the Connection existed, in order; then the open handshake if it already happened
+      if (ws.readyState === 1) void ws.onopen();
+      for (const data of boot!.queue.splice(0)) { if (!mine()) break; ws.onmessage({ data }); }
+    }
   }
   close() { this.closed = true;this.clearTransport(); clearInterval(this.pingTimer); clearTimeout(this.reconnectTimer); this.ws?.close(); }
   /** Re-send hello (for example after signing in or out) on the same socket. */

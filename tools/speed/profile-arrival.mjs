@@ -7,8 +7,10 @@
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--interval 250]
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> --analyze [--from ms] [--to ms]   (re-analyse a window)
 //   --desktop: 1440x900 (or --size WxH) at --dpr (default 1), no touch, --cpu defaults to 1 and --mbps to 0 (unthrottled).
+//   --stranger: no local dev sign-in (default signs in as dev:admin on lane ports).
 //   --latency ms: added round trip with --mbps (default 40; ~150 is the laptop -> eden2 live path).
-//   --warm: HTTP cache on; one untimed arrival first in the same context, then the timed reload (the returning visitor).
+//   --warm: HTTP cache on; one untimed arrival first in the same context, then about:blank, then the timed load (the
+//          returning visitor; a fresh document even for #hash URLs).
 // Ports: lane ports only via SPEED_PORTS (the live 4930–4990 are always refused).
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -57,7 +59,7 @@ const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinit
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 try {
   const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: !desktop, hasTouch: !desktop });
-  if (!live) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
+  if (!live && !args.includes('--stranger')) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
   // GLB timing from the browser context (Playwright follows worker requests too; Resource Timing only sees the page's)
@@ -65,7 +67,10 @@ try {
   const cdp = await ctx.newCDPSession(page);
   cdp.on('Network.webSocketFrameReceived', (e) => { if (navAt) wsFrames.push([Date.now() - navAt, (e.response?.payloadData ?? '').length]); });
   await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: !warm });
-  if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0; }
+  if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0;
+    // leave the document first: a second goto to a #hash URL is only a hash change in the same page (no reload), so the
+    // timed marks would be the untimed first load's (research B, 2026-10-19)
+    await page.goto('about:blank'); }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(opt('latency', '40')), downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval });
@@ -74,7 +79,7 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });
   await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 });
   ({ profile } = await cdp.send('Profiler.stop'));
-  ({ marks, resources, longtasks, stages, assetTimes, assetWorker, navStart } = await page.evaluate(() => ({ marks: window.__arr.marks, longtasks: window.__arr.longtasks, stages: window.__arr.stages, assetTimes: window.__assetTimes ?? {}, assetWorker: window.__assetWorker ?? null, navStart: performance.timeOrigin,
+  ({ marks, resources, longtasks, stages, assetTimes, assetWorker, navStart } = await page.evaluate(() => ({ marks: { ...window.__arr.marks, ...Object.fromEntries(performance.getEntriesByType('mark').filter((m) => m.name.startsWith('sim:')).map((m) => [m.name, m.startTime])) }, longtasks: window.__arr.longtasks, stages: window.__arr.stages, assetTimes: window.__assetTimes ?? {}, assetWorker: window.__assetWorker ?? null, navStart: performance.timeOrigin,
     resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name.replace(location.origin, ''), start: Math.round(e.startTime), end: Math.round(e.responseEnd), kb: Math.round((e.encodedBodySize || 0) / 1024) })) })));
 } finally { await browser.close(); release(); }
 writeFileSync(resolve(out, 'arrival.cpuprofile'), JSON.stringify(profile));
@@ -135,10 +140,10 @@ for (const k of [...inc.keys()]) if (/^\(native\) \((root|program|idle|garbage c
 // timeline: per 500 ms of navigation time, the share of samples under each of the heaviest app functions
 const parentOf = new Map(); for (const n of profile.nodes) for (const c of n.children ?? []) parentOf.set(c, n.id);
 const appKeys = [...inc].filter(([k]) => /^(\.\.\/\.\.\/src|apps|packages|mars)\//.test(k)).sort((a, b) => b[1] - a[1]).slice(0, 24).map(([k]) => k);
-const timeline = [];
+const timeline = [], bucketMs = Number(opt('bucket', '500'));  // --bucket <ms>: timeline resolution
 { let t = profile.startTime; const navUs = navStart !== undefined ? 0 : 0; void navUs;
   for (let i = 0; i < ids.length; i++) {
-    t += deltas[i]; const b = Math.floor((t - profile.startTime) / 500e3); const row = timeline[b] ??= { atMs: b * 500, busy: 0, samples: 0, hits: {} }; row.samples++;
+    t += deltas[i]; const b = Math.floor((t - profile.startTime) / (bucketMs * 1e3)); const row = timeline[b] ??= { atMs: b * bucketMs, busy: 0, samples: 0, hits: {} }; row.samples++;
     let id = ids[i]; const fn = byId.get(id).callFrame.functionName; if (fn === '(idle)' || fn === '(program)') continue; row.busy++;
     const seen = new Set(); while (id !== undefined) { const k = keyOf.get(id); if (k && appKeys.includes(k) && !seen.has(k)) { seen.add(k); row.hits[k] = (row.hits[k] ?? 0) + 1; } id = parentOf.get(id); }
   } }

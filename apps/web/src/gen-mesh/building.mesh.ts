@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { GENERATORS, type Value } from '@sim/generators';
 import { buildingFacadeSlots, type BuildingLayout } from '../../../../packages/generators/src/building.ts';
-import { Builder, hashStr, mix, rng, type Col } from './building-kit.ts';
+import { Builder, hashStr, mix, rng, type Col, type RawSoup } from './building-kit.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { decalGroups } from './faces.ts'; // XP8 hook
 
@@ -44,20 +44,14 @@ registerMesh({
   build(ctx) {
     const gen = GENERATORS['building/1'] as unknown as { layout(p: Record<string, unknown>, a: Record<string, unknown>): BuildingLayout };
     const L = gen.layout(ctx.params as Record<string, unknown>, ctx.args);
-    // state.paint repaints the walls; while it still holds the def's default, the `wall` param decides
-    const paintDefault = (ctx.def.state?.paint as { default?: string } | undefined)?.default;
-    const painted = ctx.entity.state?.paint !== undefined && ctx.entity.state.paint !== paintDefault;
-    const paint = painted ? col(ctx.entity.state!.paint, '#f1e7d2') : col(ctx.params.wall, col(paintDefault, '#f1e7d2'));
-    const key = `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
+    const paint = paintOf(ctx), key = templateKey(ctx, paint);
     let tpl = templates.get(key);
     if (!tpl) {
       // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
       // must leave the shutters, flower boxes and chimney where they were).
-      const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k) && k !== 'decals'));
-      const seed = hashStr(`${ctx.def.hash}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
-      let built: { group: THREE.Group; tris: number } | null = null;
-      for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }
-      tpl = built!.group;
+      // lane W1: the geometry may already have been made in a worker (prefetchBuilding, at the world's first build)
+      const built = emitBuilding(L, takeBuilt(key) ?? buildingBuffers(buildingJob(ctx, L, paint)), ctx.materials);
+      tpl = built.group;
       for (const group of decalGroups(ctx.params.decals, ctx.baked?.slots, L.yaw)) tpl.children[0].add(group); // XP8 hook: wall decals
       tpl.userData.tris = built!.tris;
       if (templates.size > 64) { for (const g of templates.values()) disposeGroup(g); templates.clear(); }
@@ -72,18 +66,91 @@ registerMesh({
   // the geometry is still shared (one template per def/params/paint, cloned).
 });
 
+// ---------------------------------------------------------------- lane W1: building geometry in workers
+// A world's first build hands every building to building.worker.ts (two workers) before it starts, so the ~0.3 s of
+// facade geometry (0.6 s at 2x CPU) is made beside the main thread's terrain and other things; build() then takes the
+// finished soups (takeBuilt). Same code, same data, same floats. No Worker (tests), a failed worker or
+// `?buildingWorker=0`: built in place, as before.
+const made = new Map<string, BuildingBuffers>(), waiting = new Map<string, Promise<void>>();
+let workers: Worker[] | null | undefined, nextJob = 0;
+const replies = new Map<number, (m: BuildingBuffers | null) => void>();
+function buildingWorkers(): Worker[] | null {
+  if (workers !== undefined) return workers;
+  try {
+    const off = typeof location !== 'undefined' && new URLSearchParams(location.search).get('buildingWorker') === '0';
+    workers = off || typeof Worker === 'undefined' ? null : [0, 1].map(() => new Worker(new URL('./building.worker.ts', import.meta.url), { type: 'module' }));
+  } catch { workers = null; }
+  for (const w of workers ?? []) {
+    w.onmessage = (ev: MessageEvent<{ id: number; out: BuildingBuffers | null }>) => { const f = replies.get(ev.data.id); replies.delete(ev.data.id); f?.(ev.data.out); };
+    w.onerror = () => { for (const f of replies.values()) f(null); replies.clear(); for (const x of workers ?? []) x.terminate(); workers = null; };
+  }
+  return workers;
+}
+function takeBuilt(key: string): BuildingBuffers | null { const m = made.get(key) ?? null; if (m) made.delete(key); return m; }
+/** Start this building's geometry in a worker; the promise settles when build() can take it (or must make it itself).
+ *  null: nothing to wait for (already built, not a worker page, or the same building is already on its way). */
+export function prefetchBuilding(ctx: Pick<MeshCtx, 'def' | 'entity' | 'params' | 'args'>): Promise<void> | null {
+  const ws = buildingWorkers(); if (!ws) return null;
+  const gen = GENERATORS['building/1'] as unknown as { layout(p: Record<string, unknown>, a: Record<string, unknown>): BuildingLayout };
+  const L = gen.layout(ctx.params as Record<string, unknown>, ctx.args), paint = paintOf(ctx), key = templateKey(ctx, paint);
+  if (templates.has(key) || made.has(key)) return null;
+  const pending = waiting.get(key); if (pending) return pending;
+  const id = ++nextJob, job = buildingJob(ctx, L, paint);
+  const p = new Promise<void>((done) => {
+    replies.set(id, (out) => { if (out) made.set(key, out); waiting.delete(key); done(); });
+    try { ws[id % ws.length].postMessage({ id, job }); } catch { replies.delete(id); waiting.delete(key); done(); }
+  });
+  waiting.set(key, p);
+  return p;
+}
+/** Drop geometry that was made but never taken (a world's first build is over). */
+export function clearBuildingPrefetch() { made.clear(); }
+// state.paint repaints the walls; while it still holds the def's default, the `wall` param decides
+function paintOf(ctx: Pick<MeshCtx, 'def' | 'entity' | 'params'>): string {
+  const paintDefault = (ctx.def.state?.paint as { default?: string } | undefined)?.default;
+  const painted = ctx.entity.state?.paint !== undefined && ctx.entity.state.paint !== paintDefault;
+  return painted ? col(ctx.entity.state!.paint, '#f1e7d2') : col(ctx.params.wall, col(paintDefault, '#f1e7d2'));
+}
+const templateKey = (ctx: Pick<MeshCtx, 'def' | 'params' | 'args'>, paint: string) => `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
+
 function disposeGroup(g: THREE.Object3D) { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); }
 
 // ---------------------------------------------------------------- the drawing
 
-function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: number, detail: number): { group: THREE.Group; tris: number } {
+/** Lane W1: everything a building's geometry depends on, as plain data (it crosses to building.worker.ts). */
+export type BuildingJob = { L: BuildingLayout; params: Record<string, Value>; presetTrim: unknown; paint: string; seed: number };
+export type BuildingBuffers = { raw: RawSoup[]; tris: number; anchors: [number, number, number][] };
+export function buildingJob(ctx: Pick<MeshCtx, 'def' | 'params' | 'args'>, L: BuildingLayout, paint: string): BuildingJob {
+  // New switch defaults must not reshuffle the legacy random facade details; nor may decals (XP8 hook: a sign edit
+  // must leave the shutters, flower boxes and chimney where they were).
+  const legacyParams = Object.fromEntries(Object.entries(ctx.params).filter(([k]) => !ORNAMENTS.has(k) && k !== 'decals'));
+  const seed = hashStr(`${ctx.def.hash}|${JSON.stringify(legacyParams)}|${paint}|${JSON.stringify(ctx.args)}`);
+  // Keep the library's original sill palette at its preset trim (drawBuilding)
+  const presetTrim = (ctx.def.params.trim as { default?: unknown } | undefined)?.default ?? '#6b4a2b';
+  return { L, params: ctx.params as Record<string, Value>, presetTrim, paint, seed };
+}
+/** The geometry half of a building: the finest detail level within 6000 triangles. Pure; runs here or in a worker. */
+export function buildingBuffers(job: BuildingJob): BuildingBuffers {
+  let b: Builder | null = null;
+  for (const detail of [2, 1, 0]) { b = drawBuilding(job.L, job.params, job.presetTrim, job.paint, job.seed, detail); if (b.tris() <= 6000 || detail === 0) break; }
+  return { raw: b!.raw(), tris: b!.tris(), anchors: b!.anchors };
+}
+function emitBuilding(L: BuildingLayout, made: BuildingBuffers, materials: MeshCtx['materials']): { group: THREE.Group; tris: number } {
+  const { groups, tris } = Builder.fromRaw(made.raw).emit(materials);
+  const root = new THREE.Group(); root.name = 'building';
+  const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
+  if (made.anchors.length) inner.userData.edenSmokeSources = made.anchors.map((p) => [...p, 1.4]); // W2: atmosphere smoke
+  for (const g of groups.values()) inner.add(g);
+  root.add(inner);
+  return { group: root, tris };
+}
+
+function drawBuilding(L: BuildingLayout, p: Record<string, Value>, presetTrim: unknown, paint: string, seed: number, detail: number): Builder {
   const b = new Builder(), r = rng(seed);
-  const p = ctx.params as Record<string, Value>;
   const mat = L.material in FACADE ? L.material : 'plaster', F = FACADE[mat];
   const trim = col(p.trim, F.trim === '#f4eee2' ? '#6b4a2b' : F.trim), roofCol = col(p.roofColor, '#8a3b2a');
   // Keep the library's original sill palette at its preset trim; an authored trim change dresses
   // sills and lintels too, instead of leaving cream stone on Gothic/Japanese facades.
-  const presetTrim = (ctx.def.params.trim as { default?: unknown } | undefined)?.default ?? '#6b4a2b';
   const sillTrim = p.trim !== undefined && p.trim !== presetTrim ? trim : F.quoin;
   const glassWalls = mat === 'glass';
   const lighthouse = !!L.args.lantern;
@@ -172,13 +239,7 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
     b.cone(cx, top - 0.72, cz, 0.2, 0.22, '#ffd99a', 'glow', 8);
   }
 
-  const { groups, tris } = b.emit(ctx.materials);
-  const root = new THREE.Group(); root.name = 'building';
-  const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
-  if (b.anchors.length) inner.userData.edenSmokeSources = b.anchors.map((p) => [...p, 1.4]); // W2: atmosphere smoke
-  for (const g of groups.values()) inner.add(g);
-  root.add(inner);
-  return { group: root, tris };
+  return b;
 }
 
 type WallOpts = { ext: string; trim: string; sillTrim: string; quoin: string; roomPaint: (id: string | null) => string; glassWalls: boolean; shutter: string; r: () => number; detail: number; mat: string; F: (typeof FACADE)[string]; fy: (k: number) => number };

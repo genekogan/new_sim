@@ -165,9 +165,20 @@ function pointed(s: Delta, path: (string | number)[]): Delta {
   return { ...out, kind: 'extrude', polygon, h: s.h ?? d };
 }
 
+/** kitArgs.parse of a def's `make.args` is a pure function of that object, and every instance of a def passes the same one
+ *  (lane W1: re-validating it per instance was ~0.1 s of Eden 2026's arrival at 2x CPU). Defs are content-addressed and
+ *  never edited in place; the parsed program is only read below. Refusals are not remembered (they throw again). */
+const parsedPrograms = new WeakMap<object, KitProgramArgs>();
+function parsedProgram(input: unknown): KitProgramArgs {
+  if (!input || typeof input !== 'object') return kitArgs.parse(input);
+  let r = parsedPrograms.get(input);
+  if (!r) { r = kitArgs.parse(input); parsedPrograms.set(input, r); }
+  return r;
+}
+
 /** Authored entries → ordinary primitives. Deterministic, bounded and shared by bake and mesh. */
 export function expandKitProgram(input: unknown, params: Record<string, unknown> = {}): KitArgs {
-  const args = kitArgs.parse(input), shapes: Delta[] = [], sources: number[] = [];
+  const args = parsedProgram(input), shapes: Delta[] = [], sources: number[] = [];
   for (const [index, authored] of args.shapes.entries()) {
     const path = ['shapes', index]; let s: Delta = { ...authored };
     for (const key of numeric) if (s[key] !== undefined) s[key] = numbers(s[key], params, [...path, key]);

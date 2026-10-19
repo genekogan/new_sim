@@ -36,7 +36,7 @@ import {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/conte
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
@@ -322,16 +322,20 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
         const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1,entityLayer.arrivalAt());controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
-      camera.lookAt(controls.target);context.current.setCameraMode('manual');};
+      camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');};  // lane W1: at once, not at React's next render: the socket's takes now arrive during the build, and a broadcast frame in between moved a ?shot's eye/at camera
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
+      layerStarted=true;arrivalMark('entity-built');
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
+      // lane W1: link the built world's shaders in parallel (KHR_parallel_shader_compile) before its first frame, instead
+      // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
+      if(entityLayer.active&&typeof renderer.compileAsync==='function'){programsPending=true;const done=()=>{programsPending=false;arrivalMark('programs-linked');};void Promise.race([renderer.compileAsync(scene,camera),new Promise(r=>setTimeout(r,3000))]).then(done,done);}
       // r2.1: and after the first world clock reaches the lights (all views/frames of `look --hour` honour the hour)
-      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});await new Promise<void>(r=>{afterNextDraw=r;});requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
         (window as unknown as {__shotReady?:boolean}).__shotReady=true;window.dispatchEvent(new Event('sim-shot-ready'));
       }));}
@@ -485,8 +489,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const beginTemplate=(name:string)=>{let resolve!:()=>void,reject!:(error:Error)=>void;const promise=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});void promise.catch(()=>{});templateLoads.set(name,{promise,resolve,reject,failed:false});};
     PEOPLE.forEach(beginTemplate);
     const templateOptions={appearances:humanPresets,onTemplate:(template:typeof templates[number])=>{const i=templates.findIndex(t=>t.name===template.name);if(i>=0)templates[i]=template;else templates.push(template);people?.setTemplates(templates);},onAsset:(name:string,phase:'start'|'loaded'|'failed')=>{if(phase==='start')downloads.start('person:'+name);else{downloads.finish('person:'+name,phase==='failed');const entry=templateLoads.get(name)!;if(phase==='loaded')entry.resolve();else{entry.failed=true;entry.reject(Error('Required person model '+name+' could not be loaded.'));}}}};
-    void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});
-    const requireTemplate=async(name:string)=>{if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
+    // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
+    // soon as an initial body needs one; old worlds load them at once, as before
+    let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});};
+    if(!newWorld||shotMode)startTemplates();
+    const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
     // bound segments load their verified base; old unbound history uses neutral ground.
@@ -507,7 +514,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let locationRegions:unknown=null,depictedLocations:readonly WorldLocation[]=[];
     let sceneKey:string|null=null,sceneRequest=0,sceneRetryAt=0,sceneReason:string|null=null;
     let initialGeneration=0,initialGate:InitialWorldReadiness|null=null,initialSnapshot=false,preparingGeneration=0,initialBodyIds:readonly string[]=[];
-    const newInitialGate=()=>{initialGate?.cancel();const generation=++initialGeneration;initialSnapshot=false;preparingGeneration=0;initialBodyIds=[];const gate=new InitialWorldReadiness(generation,progress=>{if(!abort.signal.aborted&&initialGate===gate)setInitialProgress(progress);});initialGate=gate;setInitialProgress(gate.snapshot());retryInitial.current=()=>{if(initialGate===gate){preparingGeneration=0;gate.retry();}};return gate;};
+    const newInitialGate=()=>{initialGate?.cancel();const generation=++initialGeneration;initialSnapshot=false;preparingGeneration=0;initialBodyIds=[];const gate=new InitialWorldReadiness(generation,progress=>{if(!abort.signal.aborted&&initialGate===gate){arrivalMark('initial-'+progress.stage);setInitialProgress(progress);}});initialGate=gate;setInitialProgress(gate.snapshot());retryInitial.current=()=>{if(initialGate===gate){preparingGeneration=0;gate.retry();}};return gate;};
 
     const sceneryStatus=(reason:string|null)=>{sceneReason=reason;setSceneryNotice(reason);};
     const sceneHistory=new WorldSceneHistory(context.current.sim.conn.welcome?.worldId??'',async(hash,signal)=>{
@@ -622,10 +629,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const pacer = new FramePacer();
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
+    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
       frame = pacer.next(animate);
+      // lane W1: while a new world's first build runs in slices nothing is drawn: look at the takes 4 times a second, no more
+      if(entityLayer.building){const t=performance.now();if(t-buildingFrameAt<250)return;buildingFrameAt=t;}
       if(eyes&&!eyes.wake(performance.now()))return;  // VF1b: a slow frame leaves room for socket messages
       const now = performance.now(), step = Math.min(0.1, (now - last) / 1000);
       last = now;
@@ -846,7 +856,16 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }
       if(viewing==='follow' && at.take && !focus&&initialGate?.snapshot().stage==='ready'){navigation?.release();context.current.setCameraMode('manual');followed=null;}
       if(arrivalPending&&s.conn.welcome&&(s.conn.replica.souls.size||(arrivalWelcome??=now)<now-4000)){const framed=arrivalPending;arrivalPending=null;if(!s.conn.replica.souls.size&&context.current.cameraMode==='broadcast'){controls.target.fromArray(framed.target);camera.position.fromArray(framed.eye);camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');}}
-      entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
+      // lane W1: a new world's arrival card covers the view until its first complete frame: no full frames before that,
+      // nor the per-frame work only a drawn frame needs (motion, atmosphere, labels): each costs the page 50-150 ms while
+      // the socket's join set and the preparation wait for the main thread (also before the first take has opened the
+      // initial gate). Only the page's first arrival: once a frame has been shown, later scene changes draw as before.
+      const arrivalStage=newWorld&&(entityLayer.active||entityLayer.building)&&!arrivedOnce?(entityLayer.building?'building':initialGate?.snapshot().stage??'waiting'):undefined;
+      if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
+      if(newWorld&&!templatesStarted&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
+      // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
+      const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce));
+      entityLayer.applyEdge(context.current.sim.edge??[]);if(!holdDraw)entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
       rts.update(step);
       hover.update(now);
@@ -854,7 +873,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
       atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)
-      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
+      if(!holdDraw)try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
@@ -901,12 +920,12 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
       if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
-      if(batchEnabled)staticBatches.withRender(draw);else draw();
+      if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}}
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
       balloonRide.restore();
-      if(!eyes)labels2d.render(scene,camera);
+      if(!eyes&&!holdDraw)labels2d.render(scene,camera);
       // CSS2D owns each projected transform. Read all boxes before writing our
       // separate CSS translation, so packing never changes a body's anchor.
       const hostBox = labels2d.domElement.getBoundingClientRect(), boxes: LabelBox[] = [];
@@ -924,13 +943,15 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         l.leader.style.height=`${Math.hypot(offset.dx,offset.dy)}px`;
         l.leader.style.transform=`rotate(${Math.atan2(offset.dx,-offset.dy)}rad)`;
       }
-      if(initialGate?.attached&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
-      if (!renderer.getContext().isContextLost()) {if(at.take&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;}
+      if(initialGate?.attached&&!entityLayer.building&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
+      if (!renderer.getContext().isContextLost()) {if(at.take&&!holdDraw&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;if(drawnTick.current!==null)arrivalMark('first-live-frame');}
       // A paused seek is a discrete displayed moment. Publish its first drawn
       // frame immediately; moving playback retains the existing 250ms cadence.
       const pausedFrameChanged = !!past.current && !past.current.playing &&
         latestViewerState.current?.shownTick !== drawnTick.current;
-      if (refresh || pausedFrameChanged) {
+      // lane W1: the first drawn frame is published at once (the arrival card waits for it), not at the next 250 ms tick
+      const firstShown = drawnTick.current !== null && latestViewerState.current?.shownTick == null;
+      if (refresh || pausedFrameChanged || firstShown) {
         const points:SpeechAnchorPoint[]=context.current.publishSpeechAnchors?souls.flatMap(soul=>{
           const label=labels.get(soul.id),rec=records[soul.entityId];
           if(!at.take||!at.entities[soul.entityId]||!label?.obj.visible||rec?.kind!=='human')return [];

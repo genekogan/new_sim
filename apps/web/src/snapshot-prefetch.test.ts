@@ -26,7 +26,7 @@ test('entry script: one plain GET of this new world\'s snapshot URL (the layer\'
     assert.equal(key, keyBefore(pathname, base), `${base} ${pathname}: same world key as before`);
     const { calls, left } = runEntry(base, pathname);
     if (OLD_WORLD_KEYS.includes(key)) { assert.equal(calls.length, 0, `${base} ${pathname}: old world, no prefetch`); assert.equal(left, undefined); continue; }
-    assert.deepEqual(calls, [[apiUrl]], `${base} ${pathname}: exactly one GET, no init (fetch defaults = the layer's request)`);
+    assert.deepEqual(calls, [[apiUrl], [`${base}/w/${key}/v1/config`]], `${base} ${pathname}: the snapshot and config GETs, no init (fetch defaults = the page's requests)`);
     assert.equal(left?.url, apiUrl);
   }
 });
@@ -98,4 +98,79 @@ test('GodPanel flags: flagRefsOf over the layer\'s entities = the old snapshot d
   const { WorldEntityLayer } = await import('./WorldEntityLayer.ts').finally(() => hooks.deregister());
   const layer = new WorldEntityLayer((p) => p);
   assert.equal(layer.entitiesAt(0), null, 'no picture yet: GodPanel waits, then falls back to the snapshot');
+});
+
+// Lane W1: the socket at page entry, adopted by useSim's Connection.
+import { CONFIG_GLOBAL, SOCKET_GLOBAL, takeBootSocket, takeConfigPrefetch, entrySnapshotUrl } from './snapshot-prefetch.ts';
+import { anonymousHello, Connection } from '@sim/client';
+
+class FakeWS { static made: FakeWS[] = []; readyState = 0; sent: string[] = []; closed = false; onopen: any; onmessage: any; onclose: any; onerror: any; url: string;
+  constructor(url: string) { this.url = url; FakeWS.made.push(this); }
+  send(s: string) { this.sent.push(s); } close() { this.closed = true; this.readyState = 3; }
+  open() { this.readyState = 1; this.onopen?.(); } recv(m: unknown) { this.onmessage?.({ data: JSON.stringify(m) }); } }
+
+function runEntryWithSocket(pathname: string, hello: string, extra: Record<string, unknown> = {}) {
+  FakeWS.made = []; const timers: (() => void)[] = [];
+  const ctx: Record<string, unknown> = { location: { pathname, protocol: 'https:', host: 'sim.test' }, fetch: () => Promise.resolve(new Response('{}')), WebSocket: FakeWS, setTimeout: (f: () => void) => { timers.push(f); }, ...extra };
+  ctx.window = ctx;
+  vm.runInNewContext(entryPrefetchScript('/worlds', OLD_WORLD_KEYS, hello), ctx);
+  return { ctx, timers };
+}
+
+test('entry socket: opened at entry for new worlds only, says the given hello on open, queues what arrives, closes unadopted after 20 s', () => {
+  const hello = anonymousHello(true);
+  const { ctx, timers } = runEntryWithSocket('/worlds/w/eden-2026/', hello);
+  const boot = ctx[SOCKET_GLOBAL] as { url: string; queue: unknown[]; sent: boolean; ws: FakeWS };
+  assert.equal(FakeWS.made.length, 1); assert.equal(boot.url, 'wss://sim.test/worlds/w/eden-2026/ws');
+  boot.ws.open(); assert.deepEqual(boot.ws.sent, [hello]); assert.equal(boot.sent, true);
+  boot.ws.recv({ t: 'welcome' }); assert.equal(boot.queue.length, 1);
+  timers.forEach((f) => f()); assert.equal(boot.ws.closed, true);
+  runEntryWithSocket('/worlds/w/mars/', hello); assert.equal(FakeWS.made.length, 0, 'old worlds open nothing');
+  const plain = runEntry('/worlds', '/worlds/w/eden-2026/'); assert.equal(plain.calls.length, 2, 'no hello given: no socket (and no throw without WebSocket)');
+});
+
+test('entry socket: adopted socket keeps the identical anonymous hello and replays the queue; a different hello reopens at once', async () => {
+  const g = globalThis as Record<string, unknown>; const hadWindow = 'window' in g; g.window ??= g;
+  try {
+    for (const token of [null, 'dev:someone']) {
+      const { ctx } = runEntryWithSocket('/worlds/w/eden-2026/', anonymousHello(true));
+      const boot = ctx[SOCKET_GLOBAL] as { ws: FakeWS }; boot.ws.open();
+      boot.ws.recv({ t: 'welcome', proto: 1, worldId: 'w', epoch: 'e1', dt: 0.05, clockRate: 1, serverTick: 1, you: null, serverTime: 0, build: 'dev', takeTransport: 'take-boundary-facts/1', takeEntities: 'take-entities-ref/1', takeChunks: 'take-chunk-ref/1' });
+      boot.ws.recv({ t: 'snapshot', reason: 'join', tick: 1, seq: 5, viewHash: '', entities: {}, regions: {}, env: null, paths: [], souls: [] });
+      boot.ws.recv({ t: 'log', events: [] });
+      g[SOCKET_GLOBAL] = ctx[SOCKET_GLOBAL];
+      const seen: string[] = []; const fresh: FakeWS[] = [];
+      const conn = new Connection('wss://sim.test/worlds/w/eden-2026/ws', async () => token, { onLog: () => seen.push('log') }, (u) => { const w = new FakeWS(u); fresh.push(w); return w as never; }, undefined, undefined, undefined, true);
+      const taken = takeBootSocket('wss://sim.test/worlds/w/eden-2026/ws'); assert.ok(taken); conn.adopt(taken as never);
+      assert.equal(takeBootSocket('wss://sim.test/worlds/w/eden-2026/ws'), null, 'taken once');
+      conn.connect();
+      assert.deepEqual(seen, ['log'], 'the queued message reached the handlers');
+      await new Promise((r) => setTimeout(r, 5));
+      assert.equal(conn.replica.seq, 5, 'the queued snapshot reached the replica');
+      if (token === null) { assert.equal(fresh.length, 0, 'same hello (its queued snapshot does not count as a replica it said hello with): the entry socket is kept'); assert.deepEqual(boot.ws.sent, [anonymousHello(true)], 'no second hello'); }
+      else { assert.equal(fresh.length, 1, 'signed in: a fresh socket at once'); assert.equal(boot.ws.closed, true); fresh[0].open(); await new Promise((r) => setTimeout(r, 5)); assert.match(fresh[0].sent[0], /"token":"dev:someone"/); }
+      conn.close();
+    }
+  } finally { delete g[SOCKET_GLOBAL]; if (!hadWindow) delete g.window; }
+});
+
+test('config prefetch is taken once for its URL; entrySnapshotUrl keys the URL with the page\'s snapshot key', () => {
+  const g = globalThis as Record<string, unknown>; const hadWindow = 'window' in g; g.window ??= g;
+  try {
+    const response = Promise.resolve(new Response('{}'));
+    g[CONFIG_GLOBAL] = { url: '/w/a/v1/config', response };
+    assert.equal(takeConfigPrefetch('/w/b/v1/config'), null); assert.equal(takeConfigPrefetch('/w/a/v1/config'), null, 'gone after a mismatch');
+    g[CONFIG_GLOBAL] = { url: '/w/a/v1/config', response }; assert.equal(takeConfigPrefetch('/w/a/v1/config'), response);
+    assert.equal(entrySnapshotUrl('/w/a/v1/world/snapshot'), '/w/a/v1/world/snapshot');
+    g.__simSnapshotKey = '3.0.0.0'; assert.equal(entrySnapshotUrl('/w/a/v1/world/snapshot'), '/w/a/v1/world/snapshot?v=3.0.0.0');
+  } finally { delete g[CONFIG_GLOBAL]; delete g.__simSnapshotKey; if (!hadWindow) delete g.window; }
+});
+
+test('entry script: with the server-named snapshot key it prefetches the keyed URL (the one start takes)', () => {
+  const calls: unknown[][] = [];
+  const ctx: Record<string, unknown> = { location: { pathname: '/worlds/w/eden-2026/' }, fetch: (...a: unknown[]) => { calls.push(a); return Promise.resolve(new Response('{}')); }, __simSnapshotKey: '9.1.0.0' };
+  ctx.window = ctx; vm.runInNewContext(entryPrefetchScript('/worlds'), ctx);
+  assert.deepEqual(calls[0], ['/worlds/w/eden-2026/v1/world/snapshot?v=9.1.0.0']);
+  const g = globalThis as Record<string, unknown>; const hadWindow = 'window' in g; g.window ??= g;
+  try { g.__simSnapshotKey = '9.1.0.0'; assert.equal(entrySnapshotUrl('/worlds/w/eden-2026/v1/world/snapshot'), calls[0][0]); } finally { delete g.__simSnapshotKey; if (!hadWindow) delete g.window; }
 });

@@ -316,7 +316,9 @@ export class Hub {
       return;
     }
     const s = JSON.stringify(m),rest=m.t==='kernel'?kernelRestV1(m.view):undefined;
-    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue;
+    // a batch is never dropped for backpressure (lane W1, research D6): a missing one is a seq gap, and the gap costs the
+    // viewer a whole new snapshot (1.4 MB for Eden 2026); right after a join the join set alone is over 1 MB queued
+    for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED && m.t !== 'batch') continue;
       const out=this.kernelWire(c,m,s,rest);c.sent += out.length; c.ws.send(out); }
   }
   /** take-chunk-ref/1 peers: a kernel view that differs from the last one this socket was sent only in its tick (the hub

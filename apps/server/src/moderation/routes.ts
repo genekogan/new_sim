@@ -110,7 +110,7 @@ export function mountModeration(app: Hono, d: ModerationDeps): ModerationStore {
     await next();
     c.res.headers.set('x-moderation-version', store.version());
     const hidden = store.hidden();
-    if (!hidden.length || c.res.status !== 200) return;
+    if (!hidden.length || c.res.status !== 200 || c.res.headers.has('x-snapshot-filtered')) return;  // lane W1: the snapshot cache filtered it
     // the catalog's compress() sits between this middleware and the route: decode, filter, encode again
     const enc = c.res.headers.get('content-encoding');
     if (enc && enc !== 'gzip' && enc !== 'deflate') return;

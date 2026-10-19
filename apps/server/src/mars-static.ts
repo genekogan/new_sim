@@ -21,7 +21,8 @@ export function mountMarsStatic(app: Hono, root: string) {
   for (const pattern of ['/engine/*', '/modular/*', '/models/*', '/history/*', '/2020/*', '/browser/*', '/data/manifest.json']) {
     app.get(pattern, compressGlb, async (c, next) => {
       if (!publicMarsAsset(c.req.path)) return c.notFound();
-      if (existsSync(join(root, c.req.path))) return serveStatic({ root })(c, next);
+      // lane W1: published files on disk had no Cache-Control (the 1.8 MB character GLBs were cached by heuristics only)
+      if (existsSync(join(root, c.req.path))) { const r = await serveStatic({ root })(c, next); const out = r ?? c.res; if (out.status === 200 && !out.headers.has('cache-control')) out.headers.set('cache-control', 'public, max-age=86400, stale-while-revalidate=604800'); return r; }
       const headers = new Headers();
       for (const name of ['range', 'if-none-match', 'if-modified-since']) {
         const value = c.req.header(name); if (value) headers.set(name, value);

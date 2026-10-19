@@ -4,12 +4,13 @@
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
 import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
-import { takeSnapshotPrefetch } from './snapshot-prefetch.ts';
+import { entrySnapshotUrl, takeSnapshotPrefetch } from './snapshot-prefetch.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
+import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
@@ -39,6 +40,8 @@ type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Obj
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
   active = false;
+  /** The first build is under way (start): nothing to draw or diff yet. */
+  building = false;
   private model: WorldModel | null = null;
   private seq = -1;
   private readonly terrainGroup = new THREE.Group();
@@ -84,8 +87,9 @@ export class WorldEntityLayer {
     try {
       const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version'));
       const snap: Snapshot = await r.json(); if (this.signal.aborted || snap.contract !== 'world/1') return;
+      ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
-      this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
+      this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
       this.seq = snap.seq;
       this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
       this.sites.refreshAll(JSON.stringify(snap.ground) !== prevGround);
@@ -101,10 +105,12 @@ export class WorldEntityLayer {
     this.signal = signal;
     let snap: Snapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
-    const url = this.api('/v1/world/snapshot');
-    try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json(); } catch { return; }
+    // lane W1/O2: the page's edge-cacheable snapshot URL when the server named one (its `now` is then as old as the copy)
+    const url = entrySnapshotUrl(this.api('/v1/world/snapshot'));
+    try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json();
+      ageNow(snap, r); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
-    this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
+    this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
     // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
     const m0 = this.model, q = new URLSearchParams(location.search), at = q.get('at')?.split(',').map(Number), eyeQ = q.get('eye')?.split(',').map(Number);
@@ -117,17 +123,40 @@ export class WorldEntityLayer {
     for (const sha of eagerShas()) void loadAsset(sha).catch(() => {});
     this.seq = snap.seq;
     this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
-    this.active = true;
-    this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
-    this.rebuildWater();
-    this.buildHorizon();
-    this.model.readPass(() => { for (const e of snap.entities) this.draw(e, false); });
+    // lane W1: the first build runs in slices of ~50 ms with the main thread free in between, so the socket's join set,
+    // the first takes and the initial downloads proceed while it builds (the arrival card covers it; LiveWorld draws
+    // nothing while `building`). Same draws in the same order; edge diffs wait until it is done (applyEdge).
+    this.building = true;
+    try {
+      const m = this.model;
+      // lane W1: every building's geometry starts in the building workers now; the slices below wait for one only when
+      // they reach it before it is done (building.mesh.ts prefetchBuilding)
+      const pending = new Map<string, Promise<void>>();
+      for (const e of snap.entities) {
+        const def = m.resolvedDef(e.def); if (!def || def.make.kind !== 'gen' || meshFor(def)?.gen !== 'building/1') continue;
+        try { const p = prefetchBuilding({ def, entity: e, params: paramsOf(e, def), args: (def.make.args ?? {}) as Record<string, unknown> }); if (p) { pending.set(e.id, p); void p.then(() => pending.delete(e.id)); } } catch { /* built in place */ }
+      }
+      this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
+      await nextTask(); if (signal.aborted || this.model !== m) return;
+      this.rebuildWater();
+      this.buildHorizon();
+      const all = snap.entities;
+      for (let i = 0; i < all.length;) {
+        const until = performance.now() + BUILD_SLICE_MS;
+        m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
+        const wait = i < all.length ? pending.get(all[i].id) : undefined;
+        if (wait) await Promise.race([wait, new Promise((r) => setTimeout(r, 3000))]).then(() => pending.delete(all[i].id));
+        else if (i < all.length) await nextTask();
+        if (signal.aborted || this.model !== m) return;
+      }
+      this.active = true;
+    } finally { this.building = false; clearBuildingPrefetch(); }
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
-    if (!this.model) return;
+    if (!this.model || this.building) return;
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
@@ -464,10 +493,7 @@ export class WorldEntityLayer {
     if (def.make.kind === 'none' || def.make.kind === 'parts') return null;
     const builder = meshFor(def);
     if (!builder) return null;
-    const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
-    const defaults: Record<string, unknown> = {};
-    for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: unknown }).default !== undefined) defaults[k] = (f as { default?: unknown }).default;
-    const params = { ...defaults, ...(e.params ?? {}) } as MeshCtx['params'];
+    const params = paramsOf(e, def);
     const ctx: MeshCtx = {
       def, entity: e, params, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {},
       baked: m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), model: m, materials: this.lib,
@@ -479,6 +505,24 @@ export class WorldEntityLayer {
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 
+const BUILD_SLICE_MS = 50;
+/** An entity's mesh params: its generator's and def's defaults under its own params. */
+function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
+  const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
+  const defaults: Record<string, unknown> = {};
+  for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: unknown }).default !== undefined) defaults[k] = (f as { default?: unknown }).default;
+  return { ...defaults, ...(e.params ?? {}) } as MeshCtx['params'];
+}
+/** Continue after every other queued task: at background priority where the browser has a task scheduler (Chrome: the
+ *  socket's large join messages are read in many small tasks, each needing a turn), else after one message task. */
+function nextTask(): Promise<void> {
+  const sched = (globalThis as { scheduler?: { postTask?: (f: () => void, o: { priority: string }) => Promise<void> } }).scheduler;
+  if (sched?.postTask) return sched.postTask(() => {}, { priority: 'background' });
+  if (typeof MessageChannel === 'undefined') return new Promise((r) => setTimeout(r, 0));
+  return new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => { ch.port1.close(); r(); }; ch.port2.postMessage(0); });
+}
+/** A cached snapshot (the server's snapshot cache or an edge copy, lanes W1/O2) says how old it is: its `now` is moved on by that. */
+function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }

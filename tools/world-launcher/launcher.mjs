@@ -68,6 +68,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { createServer, request } from 'node:http';
 import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:zlib';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
@@ -382,11 +383,28 @@ export async function openLauncher(cfg = {}) {
   }
 
   // ---------- static (the web app itself; everything else comes from a world)
-  function serveFile(res, file, cache) {
+  // Lane W1: with the request, a static file also gets a validator (ETag/Last-Modified, 304 on a match) and, for models and
+  // JSON (GLBs went uncompressed: the humanoid kit's rig is 530 KB), a brotli or gzip body made once per file version.
+  const packed = new Map();
+  function serveFile(res, file, cache, req) {
     let st; try { st = statSync(file); } catch { return false; }
     if (!st.isFile()) return false;
-    res.writeHead(200, { 'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'content-length': st.size, 'cache-control': cache });
-    createReadStream(file).pipe(res);
+    const headers = { 'content-type': TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream', 'cache-control': cache };
+    if (!req) { res.writeHead(200, { ...headers, 'content-length': st.size }); createReadStream(file).pipe(res); return true; }
+    const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
+    Object.assign(headers, { etag, 'last-modified': st.mtime.toUTCString() });
+    if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return true; }
+    const accept = String(req.headers['accept-encoding'] ?? ''), enc = /\.(glb|json|bin)$/i.test(file) && st.size >= 1024 && st.size <= 32 << 20
+      ? (/\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null) : null;
+    if (!enc) { res.writeHead(200, { ...headers, 'content-length': st.size }); if (req.method === 'HEAD') res.end(); else createReadStream(file).pipe(res); return true; }
+    const key = `${file}|${enc}`; let hit = packed.get(key);
+    if (!hit || hit.etag !== etag) {
+      const raw = readFileSync(file);
+      hit = { etag, body: enc === 'br' ? brotliCompressSync(raw, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 9, [zlibConstants.BROTLI_PARAM_SIZE_HINT]: raw.length } }) : gzipSync(raw, { level: 9 }) };
+      packed.set(key, hit); if (packed.size > 256) packed.delete(packed.keys().next().value);
+    }
+    res.writeHead(200, { ...headers, 'content-encoding': enc, vary: 'Accept-Encoding', 'content-length': hit.body.length });
+    res.end(req.method === 'HEAD' ? undefined : hit.body);
     return true;
   }
   const inside = (base, rel) => { const p = normalize(join(base, rel)); return p === base || p.startsWith(base + sep) ? p : null; };
@@ -584,8 +602,8 @@ export async function openLauncher(cfg = {}) {
         if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
         // this release's humanoid kit (the server's own /modular/humanoid, release.sh links it into mars-web): served here, so
         // composed bodies never depend on which world happens to be awake (an old-world fork has no such kit)
-        if (path.startsWith('/modular/humanoid/') && marsWebDir && !/[\\%]|\.\./.test(path)) { const f = inside(join(marsWebDir, 'modular', 'humanoid'), path.slice('/modular/humanoid'.length)); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
-        if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
+        if (path.startsWith('/modular/humanoid/') && marsWebDir && !/[\\%]|\.\./.test(path)) { const f = inside(join(marsWebDir, 'modular', 'humanoid'), path.slice('/modular/humanoid'.length)); if (f && serveFile(res, f, 'public, max-age=86400, stale-while-revalidate=604800', req)) return; }
+        if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600', req)) return; }
       }
       // Anything else a world page asks for (Mars assets, engine files, …): any running world serves it (base stripped).
       // Original worlds at the root: the world the laptop proxy sent that path to (woken if asleep), as before the move.

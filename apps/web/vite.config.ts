@@ -1,9 +1,12 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { entryPrefetchScript } from './src/snapshot-prefetch.ts';
+import { anonymousHello } from '../../packages/client/src/hello.ts';
 
 // Lane L3h: a new world's /v1/world/snapshot GET leaves from index.html's head, before any chunk downloads
 // (src/snapshot-prefetch.ts); WorldEntityLayer.start takes that response. The workbench page has no world.
+// Lane W1: the same script GETs /v1/config and opens the world's socket with the anonymous hello useSim's Connection sends
+// (packages/client/src/hello.ts, one definition); the Connection adopts that socket.
 function snapshotPrefetch(): Plugin {
   let base = '';
   return {
@@ -14,7 +17,7 @@ function snapshotPrefetch(): Plugin {
     transformIndexHtml(html, ctx) {
       if (!/(^|\/)index\.html$/.test(ctx.path)) return;
       if (!html.includes('</title>')) throw Error('index.html: no </title> to place the snapshot prefetch after');
-      return html.replace('</title>', `</title>\n    <script>${entryPrefetchScript(base)}</script>`);
+      return html.replace('</title>', `</title>\n    <script>${entryPrefetchScript(base, undefined, anonymousHello(true))}</script>`);
     },
   };
 }
