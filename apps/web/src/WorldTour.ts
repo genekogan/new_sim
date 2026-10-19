@@ -22,6 +22,9 @@ export type TourContext = {
   sight?: (from: readonly number[], to: readonly number[]) => boolean;
   /** Open sky above (never inside a tent, a hall or under a roof). */
   open?: (p: readonly number[]) => boolean;
+  /** Lane W1: the page is still arriving: a new move is the authored view's gentle push (its sightline is clear by
+   *  authoring), chosen without the ray checks (~0.25 s of a 2x-CPU Eden 2026 arrival); later moves are checked. */
+  quick?: boolean;
 };
 
 const ease = (k: number) => .5 - .5 * Math.cos(Math.PI * Math.min(1, Math.max(0, k)));
@@ -128,6 +131,7 @@ export class WorldTour {
   }
   private choose(ctx: TourContext): TourMove {
     const prefer = ctx.prefer && (this.count === 0 || this.count % 3 === 2) && this.recentViews.at(-1) !== ctx.prefer.id ? ctx.prefer : null;
+    if (ctx.quick) return makeMove(prefer ?? this.pick(this.views, v => this.weight(v, ctx.daylight)), 'push', 14, 1);
     for (let attempt = 0; attempt < 6; attempt++) {
       const view = prefer && attempt === 0 ? prefer : this.pick(this.views, v => this.weight(v, ctx.daylight));
       const options = this.types(view, ctx.daylight);
