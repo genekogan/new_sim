@@ -40,6 +40,9 @@ export type NavHost = {
   engineOwned(e: Entity): boolean;
   /** R4-INFO: the place (places.ts) a thing is, if it is one: its walk then targets that place (exits, map, `via`). */
   placeOf?(ref: string): string | undefined;
+  /** G1: changes when what every thing's description reads beyond the thing and what holds it changed (terrain, defs,
+   *  the engine's levels); unset: descriptions are never reused across rebuilds. */
+  describeStamp?: () => string;
 };
 
 export type ThingKind = 'building' | 'room' | 'seat' | 'water' | 'area' | 'path' | 'thing';
@@ -146,17 +149,39 @@ export class GodNav {
   private index() {
     const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`;
     if (this.cache?.key === key) return this.cache;
-    const things: Thing[] = [], waters = new Map(m.ground().waters.map((w: any) => [w.id, w]));
+    const things: Thing[] = [], waters = new Map(m.ground().waters.map((w: any) => [w.id, w])), stamp = this.h.describeStamp?.();
+    if (stamp === undefined || stamp !== this.memoStamp) { this.memo.clear(); this.memoStamp = stamp; }
+    const seen = new Set<string>();
     for (const e of m.entities.values()) {
       if (!e.name) continue;
       const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
-      try { things.push(...this.describe(e, def, waters.get(e.id))); } catch { /* one odd thing never hides the rest */ }
+      seen.add(e.id);
+      try { things.push(...this.described(e, def, waters.get(e.id), stamp)); } catch { /* one odd thing never hides the rest */ }
     }
+    for (const id of this.memo.keys()) if (!seen.has(id)) this.memo.delete(id);
     const byRef = new Map<string, Thing>();
     for (const t of things) if (!byRef.has(t.ref)) byRef.set(t.ref, t);
     this.cache = { key, things: [...byRef.values()], byRef };
     this.goals.clear();
     return this.cache;
+  }
+  /** G1 (tranche 2026-10-19): a thing's description is a function of the entity, what holds it (pose, names, slots), its
+   *  def, its water and the stamp (terrain, defs, levels); the model replaces an entity object when it changes, so an
+   *  unchanged thing keeps its description across rebuilds (every edit rebuilt all ~3,000 on Eden 2026: ~50 ms). */
+  private memo = new Map<string, { e: Entity; chain: Entity[]; def: StoredDef; water: unknown; things: Thing[]; kids?: string }>();
+  /** A building's rooms yield to a child named like a room: its named children are part of its description's inputs. */
+  private kidsOf(e: Entity): string { const m = this.h.model; return [...(m.children.get(e.id) ?? [])].map((id) => m.entities.get(id)?.name ?? '').filter(Boolean).sort().join('|'); }
+  private memoStamp: string | undefined;
+  private described(e: Entity, def: StoredDef, water: any, stamp: string | undefined): Thing[] {
+    const m = this.h.model, chain: Entity[] = [];
+    for (let p = e.in.parent; p !== 'world' && chain.length < 64; ) { const x = m.entities.get(p); if (!x) break; chain.push(x); p = x.in.parent; }
+    if (stamp !== undefined) {
+      const hit = this.memo.get(e.id);
+      if (hit && hit.e === e && hit.def === def && hit.water === water && hit.chain.length === chain.length && hit.chain.every((x, i) => x === chain[i]) && (hit.kids === undefined || hit.kids === this.kidsOf(e))) return hit.things;
+    }
+    const things = this.describe(e, def, water);
+    if (stamp !== undefined) this.memo.set(e.id, { e, chain, def, water, things, ...(things.some((t) => t.kind === 'room') ? { kids: this.kidsOf(e) } : {}) });
+    return things;
   }
   private describe(e: Entity, def: StoredDef, water: any): Thing[] {
     const m = this.h.model, baked = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), wp = m.worldPose(e), ref = m.pathOf(e.id);

@@ -125,11 +125,13 @@ export class EngineBridge {
   /** E-life B7: god balloons as native rides (rides.ts). */
   rides?: ReturnType<typeof installGodRides>;
   private godEdits = 0;
+  /** G1: terrain or defs changed (nav's per-thing descriptions are re-derived). */
+  private describeEpoch = 0;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     engineBridges.set(this.god.model, this);
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
+    this.nav = new GodNav({ model: this.god.model, version: () => this.version, staticVersion: () => this.godEdits, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined), describeStamp: () => `${this.describeEpoch}:${this.levels.length}` });
     this.layers = new GodLayers({ model: this.god.model, edge: this.edge, get engine() { return o.host.engine as never; }, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), building: id => this.god.builds.closing(id, this.model), buildingActive: () => this.god.builds.hasClosure(), closingSites: () => this.god.builds.closingSites(), log: (m) => this.log(m) });
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
@@ -144,7 +146,7 @@ export class EngineBridge {
       };
     };
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
-    this.god.onCommit((c) => { this.version++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
+    this.god.onCommit((c) => { this.version++; if (c.diff.tiles.length || c.diff.defs.length) this.describeEpoch++; this.notePerceive([...c.diff.upserts.map((e) => e.id), ...c.diff.removes], c.diff.tiles.length > 0); if (c.by !== 'engine') { this.godEdits++; this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.god.onBuild(e => { if (e.kind === 'started' || e.kind === 'resumed') this.editTick = this.host.engine.world.tick; });
     // LAYERS: "under construction (step)" is part of what an owned or scheduled thing is seen as
     this.god.onBuild(() => { if (this.layers.active()) this.notePerceive([], true); });
@@ -522,11 +524,17 @@ export class EngineBridge {
   private perceiveStep(tick: number) {
     if (!this.perceiveRunning) {
       if (!this.perceive.pending() || (tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40)) return;
-      this.perceiveRunning = true; this.perceiveFirst = -1;
+      this.perceiveRunning = true; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
+    const t0 = performance.now();
     try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
     catch (e) { this.log(`perceive: ${(e as Error).message}`); }
+    const c = this.catchUp, ms = performance.now() - t0; c.slices++; if (ms > c.maxMs) c.maxMs = ms;
+    // a slice that ran long (one place or the named things re-derived at once) is worth a line in the world's log
+    if (!this.perceiveRunning && c.maxMs > 40) this.log(`perceive catch-up: ${this.perceive.stats.lastIds} things${this.perceive.stats.lastFull ? ' (whole pass)' : ''}, ${c.slices} slices, longest ${Math.round(c.maxMs)} ms, ${Math.round(performance.now() - c.t0)} ms in all`);
   }
+  /** The current catch-up: slices run, the longest (ms), when it began. */
+  catchUp = { slices: 0, maxMs: 0, t0: 0 };
   /** Construction closure (C1): residents inside a closing zone get the same polite walk-out as an edit, seated,
    *  asleep or busy included (verification probes may enter closures and are left alone). Runs after each god edit
    *  and on the 40-tick cadence. */

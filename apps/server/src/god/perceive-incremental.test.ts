@@ -1,7 +1,8 @@
 // G1 (tranche 2026-10-19): what Souls perceive of god edits catches up off the request path — coalesced, in slices, over
 // the edited things and the objects within 12 m of the named ones among them. The catch-up must end where a whole pass
 // ends: after each kind of edit (a named thing placed by others, moved away, renamed, a sign's words, a house moved with
-// its things, a thing removed, an undo) the `built` objects' wanted states equal those of a forced whole pass.
+// its things, a thing removed, an undo) the `built` objects' wanted states equal those of a forced whole pass, and the
+// named things (nav.ts, descriptions reused per entity) equal a fresh derive.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
@@ -50,6 +51,9 @@ test('G1: perception catches up incrementally, off the request path, and ends wh
     for (let i = 0; i < 120 && (P.pending() || P.stats.runs === runs); i++) await settle(1);
     assert.equal(P.pending(), false, `${label}: caught up within 120 ticks`);
     assert.equal(P.stats.lastFull, false, `${label}: an incremental catch-up`);
+    // the named things (nav.ts), re-derived with each description reused where nothing it reads changed, equal a fresh derive
+    const N = bridge.nav as any, kept = JSON.stringify(N.things()); N.memo.clear(); N.cache = null;
+    assert.equal(kept, JSON.stringify(N.things()), `${label}: reused descriptions equal fresh ones`);
     const inc = wanted(), ids = P.stats.lastIds;
     P.sync(true);
     assert.equal(inc, wanted(), `${label}: the incremental catch-up equals a whole pass`);
