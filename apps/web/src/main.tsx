@@ -2,10 +2,9 @@ import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-dis
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
 import {BASE} from './base-path.ts';
-import {installCdnAssets} from './cdn-assets.ts';
+import {installAssetTransport} from './boot-assets.ts';
 import {takeConfigPrefetch} from './snapshot-prefetch.ts';
 import {takeInlineConfig} from './inline-config.ts';
-import cdnManifestUrl from './cdn-manifest.json?url';
 import { StrictMode, Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
@@ -22,7 +21,7 @@ const ClerkBridge=lazy(()=>import('./ClerkBridge.tsx'));
 // The arrival card's bar counts bytes: meter every asset fetch from the start; old worlds know their total up front.
 // (old worlds: initial-assets.json, made at release time by apps/web/scripts/initial-assets.mjs; a world without an
 // entry still counts in bytes, its total growing from each Content-Length; new worlds: the snapshot's assetBytes)
-import {assetBytes,installAssetMeter} from './asset-bytes.ts';
+import {assetBytes} from './asset-bytes.ts';
 import initialAssets from './initial-assets.json';
 import {newWorld} from './world-kind.ts';
 import {forkInitialAssets,marsFork} from './mars-fork.ts';
@@ -92,8 +91,8 @@ function WorldRoot() {
 // A large CDN file is buffered for its hash check: report its bytes to the arrival bar while they stream in.
 // Lane W1: render at once; the CDN transport is in place before the first asset fetch (asset fetches wait for the
 // manifest, nothing else does), so the manifest GET is no longer a round trip before the page starts.
-installCdnAssets(cdnManifestUrl,(url,loaded)=>assetBytes.progress(url,loaded));
-installAssetMeter(); // meter the original asset URL, including its CDN attempt and origin fallback
+// (boot-assets.ts: installed once, here or earlier by P7b's early-entry.ts)
+installAssetTransport(); // the CDN transport, then the meter of the original asset URL, including its CDN attempt and origin fallback
 if(!newWorld&&worldKey==='mars'&&!marsFork&&!(location.pathname===BASE+'/'&&!location.hash))prefetchBackdrop(BACKDROP_BLOBS[MARS_CAMPUS_URL]!); // W3: campus starts with the page
 createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
 

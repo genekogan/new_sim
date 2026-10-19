@@ -115,14 +115,16 @@ export class WorldEntityLayer {
     } catch { /* next check retries */ } finally { this.resyncing = false; }
   }
 
-  async start(signal: AbortSignal) {
+  /** `onSnapshot`: P7b, called once the snapshot (and its parts) are in, or the attempt failed (early-layer.ts lets the
+   *  page's second loading phase start then). */
+  async start(signal: AbortSignal, onSnapshot?: () => void) {
     this.signal = signal;
     let snap: Snapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
     // lane W1/O2: the page's edge-cacheable snapshot URL when the server named one (its `now` is then as old as the copy)
     // lane W3: in its wire form (snapshot-wire.ts: defs and ground as cached content-addressed parts)
-    try { const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as Snapshot;
-      ageNow(snap, r); } catch { return; }
+    try { const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); onSnapshot?.(); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as Snapshot;
+      ageNow(snap, r); } catch { onSnapshot?.(); return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
@@ -145,11 +147,12 @@ export class WorldEntityLayer {
       const m = this.model;
       // lane W1: every building's geometry starts in the building workers now; the slices below wait for one only when
       // they reach it before it is done (building.mesh.ts prefetchBuilding)
+      // P7b (phones): not before the card. The worker's own script (~128 KB br, fetched once per worker) would cross the
+      // phone's link before the card; the near ring's buildings are built in place instead, and the fill hands the rest
+      // to the workers (fillRest)
       const pending = new Map<string, Promise<void>>();
-      for (const e of snap.entities) {
-        const def = m.resolvedDef(e.def); if (!def || def.make.kind !== 'gen' || meshFor(def)?.gen !== 'building/1') continue;
-        try { const p = prefetchBuilding({ def, entity: e, params: paramsOf(e, def), args: (def.make.args ?? {}) as Record<string, unknown> }); if (p) { pending.set(e.id, p); void p.then(() => pending.delete(e.id)); } } catch { /* built in place */ }
-      }
+      const workersLater = progressiveNearM() !== null && new URLSearchParams(location.search).get('nearWorkers') !== '1';
+      if (!workersLater) this.prefetchBuildings(m, snap.entities, pending);
       // P7 (phone): only the sectors near the arrival are baked at full detail before the card; the rest are drawn from a
       // coarse direct sample (no tile bakes, ~1/16 of the height samples) and refined during the fill
       this.rebuildTerrain(undefined, true, progressiveNearM() === null ? undefined : { at: [[pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]], r: COARSE_BEYOND_M });   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
@@ -162,7 +165,7 @@ export class WorldEntityLayer {
       const all: readonly Entity[] & { dist?: number[] } = near === null ? snap.entities : byDistance(snap.entities, nearKeyOf(new Map(snap.entities.flatMap((e) => e.name ? [[e.name, e], [e.id, e]] as [string, Entity][] : [[e.id, e]] as [string, Entity][]))), [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);  // P7: shapes by their nearest point; furniture with its building
       const far = near === null ? -1 : all.dist!.findIndex((d) => d > near), nearCount = far < 0 ? all.length : far;
       for (let i = 0; i < all.length;) {
-        if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal); return; }
+        if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal, workersLater); return; }
         const until = performance.now() + BUILD_SLICE_MS;
         m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
         const wait = i < all.length ? pending.get(all[i].id) : undefined;
@@ -171,15 +174,22 @@ export class WorldEntityLayer {
         if (signal.aborted || this.model !== m) return;
       }
       this.active = true;
-      if (this.coarse.size && !this.filling) { this.filling = true; this.fill = this.fillRest(m, all, all.length, pending, signal); }   // P7: refine the coarse terrain
+      if (this.coarse.size && !this.filling) { this.filling = true; this.fill = this.fillRest(m, all, all.length, pending, signal, false); }   // P7: refine the coarse terrain
     } finally { this.building = false; if (!this.filling) clearBuildingPrefetch(); }
+  }
+  private prefetchBuildings(m: WorldModel, entities: readonly Entity[], pending: Map<string, Promise<void>>) {
+    for (const e of entities) {
+      const def = m.resolvedDef(e.def); if (!def || def.make.kind !== 'gen' || meshFor(def)?.gen !== 'building/1') continue;
+      try { const p = prefetchBuilding({ def, entity: e, params: paramsOf(e, def), args: (def.make.args ?? {}) as Record<string, unknown> }); if (p) { pending.set(e.id, p); void p.then(() => pending.delete(e.id)); } } catch { /* built in place */ }
+    }
   }
   /** The fill after a progressive first build (resolves when it is done or given up). */
   fill: Promise<void> = Promise.resolve();
-  private async fillRest(m: WorldModel, all: readonly Entity[], from: number, pending: Map<string, Promise<void>>, signal: AbortSignal) {
+  private async fillRest(m: WorldModel, all: readonly Entity[], from: number, pending: Map<string, Promise<void>>, signal: AbortSignal, workersNow: boolean) {
     try {
       // the arrival's own last steps (first frame, shaders, the card) go first: the fill starts once it is over
       while (!arrivalOver()) { await new Promise((r) => setTimeout(r, 100)); if (signal.aborted || this.model !== m) return; }
+      if (workersNow) this.prefetchBuildings(m, all.slice(from), pending);   // P7b: phones start the building workers now
       const arrival = this.coarse.size ? this.arrivalAt() : null;
       for (let i = from; i < all.length || this.coarse.size;) {
         await nextTask('user-visible'); if (signal.aborted || this.model !== m) return;  // background tasks starve between busy phone frames

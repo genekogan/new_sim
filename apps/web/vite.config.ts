@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { entryPrefetchScript } from './src/snapshot-prefetch.ts';
+import { rewritePhasedHtml } from './src/phased-entry.ts';
 import { anonymousHello } from '../../packages/client/src/hello.ts';
 import { PWA_MANIFEST, pwaHeadTags, pwaManifest, type PwaIcons } from './src/pwa-manifest.ts';
 import { createHash } from 'node:crypto';
@@ -23,6 +24,26 @@ function snapshotPrefetch(): Plugin {
       if (!html.includes('</title>')) throw Error('index.html: no </title> to place the snapshot prefetch after');
       return html.replace('</title>', `</title>\n    <script>${entryPrefetchScript(base, undefined, anonymousHello(true))}</script>`);
     },
+  };
+}
+
+// P7b: index.html loads a world page in two phases where that helps (src/phased-entry.ts): early-entry.ts is its own entry
+// (rollupOptions.input `early`); this replaces Vite's module script and modulepreload tags with the loader. Build only.
+function phasedEntry(): Plugin {
+  return {
+    name: 'sim-phased-entry',
+    apply: 'build',
+    transformIndexHtml: { order: 'post', handler(html, ctx) {
+      if (!/(^|\/)index\.html$/.test(ctx.path)) return;
+      const chunks = Object.values(ctx.bundle ?? {}).flatMap((c) => (c.type === 'chunk' ? [c] : []));
+      const byFile = new Map(chunks.map((c) => [c.fileName, c]));
+      const early = chunks.find((c) => c.isEntry && (c.facadeModuleId ?? '').replace(/\\/g, '/').endsWith('/src/early-entry.ts'));
+      if (!ctx.chunk || !early) throw Error('index.html: the main or the early entry chunk is missing');
+      const imports: string[] = [], seen = new Set<string>();
+      const walk = (f: string) => { for (const i of byFile.get(f)?.imports ?? []) if (!seen.has(i)) { seen.add(i); walk(i); imports.push(i); } };
+      walk(early.fileName);
+      return rewritePhasedHtml(html, ctx.chunk.fileName, early.fileName, imports);
+    } },
   };
 }
 
@@ -55,11 +76,11 @@ function pwa(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [snapshotPrefetch(), pwa(), react()],
+  plugins: [snapshotPrefetch(), pwa(), phasedEntry(), react()],
   define: { __BUILD__: JSON.stringify(process.env.BUILD_ID ?? 'dev'), __SIM_ARRIVAL_ENABLED__: process.env.SIM_ARRIVAL_UI_ENABLED==='1',
     __SIM_ASSETS_CDN_ENABLED__: process.env.SIM_ASSETS_CDN_ENABLED==='1',
     __SIM_ASSETS_CDN_ORIGIN__: JSON.stringify(process.env.SIM_ASSETS_CDN_ORIGIN ?? 'https://assets.eden.art') },
   server: { port: 5173, proxy: { '/v1': 'http://127.0.0.1:4500', '/skill.md': 'http://127.0.0.1:4500', '/cards.md': 'http://127.0.0.1:4500', '/mcp': 'http://127.0.0.1:4500', '/healthz': 'http://127.0.0.1:4500', '/ws': { target: 'ws://127.0.0.1:4500', ws: true } } },
   // W1: standalone world-free studio, served by /god/workbench.
-  build: { chunkSizeWarningLimit: 4000, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html' } } },
+  build: { chunkSizeWarningLimit: 4000, rollupOptions: { input: { main: 'index.html', workbench: 'workbench.html', early: 'src/early-entry.ts' } } },
 });

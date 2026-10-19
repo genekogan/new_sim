@@ -76,6 +76,7 @@ import { sceneOwner, type SceneOwnerMemory } from './scene-owner.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { takeEarlyLayer } from './early-layer.ts';
 import { WorldWaterDetail, markHeight } from './WorldWaterDetail.ts';
 import { findSeats, surveySeats } from './WorldSeatSurvey.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
@@ -336,7 +337,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const waterDetail=new WorldWaterDetail(()=>!!reducedMotionQuery?.matches),waterDetailOff=new URLSearchParams(location.search).get('water')==='0';  // ?water=0: before/after comparisons
     (window as unknown as {__simWater?:unknown}).__simWater=waterDetail.stats;    const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
-    const entityLayer=new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
+    const early=newWorld?takeEarlyLayer():null;if(early)abort.signal.addEventListener('abort',()=>early.abort.abort());const entityLayer=early?.layer??new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;  // P7b: a phone's layer may have started before this page's code was in (early-layer.ts)
+    scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
     const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer,{radius:look.enabled?1.45:1,gain:look.poolGain}):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
@@ -355,7 +357,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const shotHour=parseShotHour(location.search);
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
-    void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
+    void (newWorld ? early?.started ?? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
       layerStarted=true;arrivalMark('entity-built');
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
       // lane W1: link the built world's shaders in parallel (KHR_parallel_shader_compile) before its first frame, instead

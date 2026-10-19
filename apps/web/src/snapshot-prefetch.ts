@@ -15,6 +15,23 @@ export function worldKeyFrom(pathname: string, base: string): string {
   return m ? m[1] : 'toy';
 }
 
+/** P7b (phased-entry.ts): whether this page loads in two phases, the early layer's code and the snapshot first, then the
+ *  rest of the page and the socket. The early layer's gate (early-layer.ts: a new world on a phone-tier page with lever D's
+ *  early arrival, not a picture) as the page's tier picks it (quality-tier.ts), unless `?phased=0` or `?earlyLayer=0`.
+ *  Self-contained: also serialised into index.html (no free identifiers, plain JS once its types are stripped). */
+export function phasedEntryWanted(search: string, coarsePointer: boolean, screenW: number, screenH: number, deviceMemory?: number): boolean {
+  const q = new URLSearchParams(search), early = q.get('early'), forced = q.get('quality'), short = Math.min(screenW, screenH);
+  if (q.has('shot') || early === '0' || q.get('earlyLayer') === '0' || q.get('phased') === '0') return false;
+  if (early === '1') return true;
+  if (forced === 'phone' || forced === 'full') return forced === 'phone';
+  return coarsePointer && (short > 0 && short <= 820 || deviceMemory !== undefined && deviceMemory <= 2);
+}
+/** The window property the inline script leaves its decision on (true: two phases). */
+export const PHASED_GLOBAL = '__simPhased';
+/** On a two-phase page, the entry socket opens with the second phase (phased-entry.ts calls this), so its join does not
+ *  cross the link between the two phases. */
+export const OPEN_SOCKET_GLOBAL = '__simOpenSocket';
+
 /** The window properties the inline script leaves its requests on. */
 export const PREFETCH_GLOBAL = '__simSnapshotPrefetch';
 export const CONFIG_GLOBAL = '__simConfigPrefetch';
@@ -39,9 +56,12 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     + `sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){pf(r.headers.get(h));});},function(){});`
     // P7: the hello rides in the socket's URL (the server says it at the upgrade), not from the open event: that waited
     // for the page's main thread, busy building the world, and the join with it (~1 s on a phone)
-    + (hello ? `if(typeof WebSocket!=='function')return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
+    // P7b: a two-phase page (phasedEntryWanted) opens it with its second phase
+    + `var ph=false;try{ph=(${phasedEntryWanted.toString()})(location.search||'',typeof matchMedia==='function'&&matchMedia('(pointer: coarse)').matches,screen.width,screen.height,navigator.deviceMemory)===true;}catch(e){}window[${JSON.stringify(PHASED_GLOBAL)}]=ph;`
+    + (hello ? `if(typeof WebSocket!=='function')return;var os=function(){var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
       + `s.onmessage=function(e){o.queue.push(e.data);};`
-      + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;` : '')
+      + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;};`
+      + `if(ph)window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}]=function(){delete window[${JSON.stringify(OPEN_SOCKET_GLOBAL)}];os();};else os();` : '')
     + `}catch(e){}})();`;
 }
 
