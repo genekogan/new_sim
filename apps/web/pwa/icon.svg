@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Sim app icon (lane P4, 2026-10-19): a small world, dusk sky over green hills, on the dark page colour.
+       The world sits inside the central 68% so the maskable variant survives any launcher mask. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9fb7cf"/><stop offset=".55" stop-color="#f1cdb4"/><stop offset="1" stop-color="#f6e2cf"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6c9a4f"/><stop offset="1" stop-color="#3f6e34"/>
+    </linearGradient>
+    <clipPath id="world"><circle cx="256" cy="256" r="150"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="#101110"/>
+  <g transform="translate(256 256) scale(1.15) translate(-256 -256)">
+  <g clip-path="url(#world)">
+    <rect x="96" y="96" width="320" height="320" fill="url(#sky)"/>
+    <path d="M96 268 C 170 236 214 250 262 262 C 318 276 360 240 416 252 V 416 H 96 Z" fill="#7aa560"/>
+    <path d="M96 300 C 180 280 250 296 300 292 C 350 288 380 276 416 282 V 416 H 96 Z" fill="url(#hill)"/>
+    <ellipse cx="300" cy="352" rx="62" ry="20" fill="#5b86a8"/>
+  </g>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#e4e4dc" stroke-opacity=".18" stroke-width="4"/>
+  </g>
+</svg>

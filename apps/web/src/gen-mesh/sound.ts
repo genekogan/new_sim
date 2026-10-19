@@ -267,7 +267,7 @@ function renderUi() {
 function mountUi() {
   if (ui || typeof document === 'undefined' || !document.body) return;
   ui = document.createElement('div'); ui.className = 'eden-sound-toggle';
-  ui.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:30;display:flex;gap:6px;';
+  ui.style.cssText = 'position:fixed;right:calc(12px + env(safe-area-inset-right, 0px));bottom:calc(12px + env(safe-area-inset-bottom, 0px));z-index:30;display:flex;gap:6px;';
   const btn = () => { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'width:34px;height:34px;border-radius:17px;border:1px solid rgba(255,255,255,.35);background:rgba(20,22,26,.55);color:#f4efe2;display:grid;place-items:center;cursor:pointer;padding:0;backdrop-filter:blur(4px);'; return b; };
   const mute = btn(), music = btn(); mute.dataset.sound = 'mute'; music.dataset.sound = 'music';
   mute.addEventListener('click', (e) => { e.stopPropagation(); unlock(); setSettings({ muted: !settings.muted }); });

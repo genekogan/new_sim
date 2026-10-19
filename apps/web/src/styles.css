@@ -1,4 +1,4 @@
-:root { color-scheme: light dark; --bg: #fafaf7; --fg: #1b1b18; --dim: #77776f; --line: #d8d8cf; --panel: #ffffff; --accent: #0b6e4f; --warn: #a14a00; --bad: #b3261e; --ok: #1a7f37; }
+:root { color-scheme: light dark; --sa-t: env(safe-area-inset-top, 0px); --sa-r: env(safe-area-inset-right, 0px); --sa-b: env(safe-area-inset-bottom, 0px); --sa-l: env(safe-area-inset-left, 0px); --bg: #fafaf7; --fg: #1b1b18; --dim: #77776f; --line: #d8d8cf; --panel: #ffffff; --accent: #0b6e4f; --warn: #a14a00; --bad: #b3261e; --ok: #1a7f37; }
 @media (prefers-color-scheme: dark) { :root { --bg: #101110; --fg: #e4e4dc; --dim: #8b8b82; --line: #2b2c29; --panel: #171816; --accent: #6fd6a8; --warn: #e2a155; --bad: #ff7b72; --ok: #6fd67f; } }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--fg); font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
@@ -36,7 +36,7 @@ input, textarea { width: 100%; } .row { display: flex; gap: 6px; align-items: ce
 .sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 tr.click { cursor: pointer; }
 
-.world-list {max-width:1100px;margin:8vh auto;padding:24px}.world-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin:32px 0}.world-cards>a,.world-cards>article{border:1px solid var(--line);border-radius:12px;padding:24px;color:inherit;min-height:190px;background:var(--panel)}.world-cards>a:hover{border-color:#6bf2b9}.world-home{font-weight:700;font-size:24px;color:inherit;text-decoration:none}
+.world-list {max-width:1100px;margin:8vh auto;padding:max(24px, var(--sa-t)) max(24px, var(--sa-r)) max(24px, var(--sa-b)) max(24px, var(--sa-l))}.world-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin:32px 0}.world-cards>a,.world-cards>article{border:1px solid var(--line);border-radius:12px;padding:24px;color:inherit;min-height:190px;background:var(--panel)}.world-cards>a:hover{border-color:#6bf2b9}.world-home{font-weight:700;font-size:24px;color:inherit;text-decoration:none}
 
 /* Game's outer frame; LiveWorld and camera mechanics remain World's. */
 .human-world { height: 100dvh; overflow: hidden; font: 15px/1.5 system-ui, sans-serif; }
@@ -46,14 +46,14 @@ tr.click { cursor: pointer; }
 .world-scene > section > .row { flex: 0 0 auto; }
 .world-scene > section > .row:first-child { max-width: calc(100% - 390px); }
 .world-scene > section > p { margin: 4px 0; font-size: 12px; max-width: calc(100% - 390px); }
-.world-hud { position: absolute; top: 12px; left: 16px; right: 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 92%, transparent); align-items: center; gap: 10px; z-index: 10; }
+.world-hud { position: absolute; top: calc(12px + var(--sa-t)); left: calc(16px + var(--sa-l)); right: calc(16px + var(--sa-r)); padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 92%, transparent); align-items: center; gap: 10px; z-index: 10; }
 .world-hud .world-home { font-size: 19px; letter-spacing: .1em; }
 .world-name { font-weight: 600; }
 .hud-actions { display: flex; gap: 6px; margin-left: auto; }
 .human-world button { min-height: 38px; border-radius: 8px; padding: 7px 12px; }
 .human-world button:focus-visible, .human-world a:focus-visible, .human-world textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .panel-toggle { margin-left: auto; }
-.human-panel { position: absolute; right: 24px; top: 142px; bottom: 100px; width: 340px; max-width: calc(100vw - 32px); overflow: auto; padding: 24px; background: color-mix(in srgb, var(--panel) 96%, transparent); border: 1px solid var(--line); border-radius: 16px; z-index: 7; box-shadow: 0 8px 40px #0002; }
+.human-panel { position: absolute; right: calc(24px + var(--sa-r)); top: calc(142px + var(--sa-t)); bottom: calc(100px + var(--sa-b)); width: 340px; max-width: calc(100vw - 32px); overflow: auto; padding: 24px; background: color-mix(in srgb, var(--panel) 96%, transparent); border: 1px solid var(--line); border-radius: 16px; z-index: 7; box-shadow: 0 8px 40px #0002; }
 .human-panel h1 { margin: 8px 0; font-size: 28px; line-height: 1.15; }
 .human-panel h2 { margin: 24px 0 12px; font-size: 15px; }
 .human-panel p { overflow-wrap: anywhere; }
@@ -69,31 +69,31 @@ tr.click { cursor: pointer; }
 .human-receipt { margin-top: 16px; border-left: 3px solid var(--accent); padding-left: 12px; }
 .account-panel { width: min(740px, calc(100vw - 48px)); }
 .viewer-tools { display: contents; }
-.viewer-camera { position: absolute; top: max(82px, calc(var(--app-hud-bottom, 74px) + 8px)); left: 16px; right: 16px; z-index: 6; }
-.viewer-navigation { position: absolute; top: max(136px, calc(var(--app-camera-bottom, 128px) + 8px)); left: 16px; z-index: 7; width: min(310px, calc(100% - 32px)); padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+.viewer-camera { position: absolute; top: max(82px, calc(var(--app-hud-bottom, 74px) + 8px)); left: calc(16px + var(--sa-l)); right: calc(16px + var(--sa-r)); z-index: 6; }
+.viewer-navigation { position: absolute; top: max(136px, calc(var(--app-camera-bottom, 128px) + 8px)); left: calc(16px + var(--sa-l)); z-index: 7; width: min(310px, calc(100% - 32px)); padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
 .viewer-navigation summary { cursor: pointer; }
 .viewer-navigation p { margin: 8px 0; }
 .viewer-navigation button { min-height: 36px; }
-.viewer-history { position: absolute; bottom: 8px; left: 16px; right: 16px; z-index: 6; font-size: 12px; }
+.viewer-history { position: absolute; bottom: calc(8px + var(--sa-b)); left: calc(16px + var(--sa-l)); right: calc(16px + var(--sa-r)); z-index: 6; font-size: 12px; }
 .viewer-history .row { margin: 0; }
-.advanced-surface { position: absolute; top: max(84px, calc(var(--app-hud-bottom, 76px) + 8px)); bottom: 12px; left: 16px; right: 16px; overflow: auto; z-index: 9; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; font: 12.5px/1.45 ui-monospace, monospace; }
+.advanced-surface { position: absolute; top: max(84px, calc(var(--app-hud-bottom, 76px) + 8px)); bottom: calc(12px + var(--sa-b)); left: calc(16px + var(--sa-l)); right: calc(16px + var(--sa-r)); overflow: auto; z-index: 9; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; font: 12.5px/1.45 ui-monospace, monospace; }
 .advanced-surface nav { position: sticky; top: 0; background: var(--bg); z-index: 2; }
 @media (max-width: 700px) {
-  .world-hud { top: 8px; left: 8px; right: 8px; gap: 6px; padding: 8px; font-size: 12px; }
+  .world-hud { top: calc(8px + var(--sa-t)); left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); gap: 6px; padding: 8px; font-size: 12px; }
   .hud-actions { width: 100%; margin-left: 0; }
   .hud-actions button { flex: 1; padding: 6px; }
   .world-scene > .world-viewer { padding: 170px 8px 80px; }
-  .viewer-tools { display: block; position: absolute; top: max(116px, calc(var(--app-hud-bottom, 108px) + 8px)); left: 8px; right: 8px; z-index: 7; pointer-events: none; }
+  .viewer-tools { display: block; position: absolute; top: max(116px, calc(var(--app-hud-bottom, 108px) + 8px)); left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); z-index: 7; pointer-events: none; }
   .viewer-tools .viewer-camera, .viewer-tools .viewer-navigation { position: static; pointer-events: auto; }
   .viewer-camera { gap: 5px; font-size: 12px; }
   .viewer-camera button { padding: 6px; }
   .viewer-navigation { margin-top: 8px; width: min(310px, 100%); }
-  .viewer-history { left: 8px; right: 8px; }
+  .viewer-history { left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); }
   .world-scene > section > .row:first-child, .world-scene > section > p { max-width: 100%; }
   .panel-toggle { padding: 6px 8px; }
-  .human-panel { top: auto; left: 8px; right: 8px; bottom: 88px; width: auto; max-width: none; max-height: 43dvh; padding: 16px; }
+  .human-panel { top: auto; left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); bottom: calc(88px + var(--sa-b)); width: auto; max-width: none; max-height: 43dvh; padding: 16px; }
   .human-panel h1 { font-size: 24px; }
-  .advanced-surface { top: max(110px, calc(var(--app-hud-bottom, 102px) + 8px)); left: 8px; right: 8px; }
+  .advanced-surface { top: max(110px, calc(var(--app-hud-bottom, 102px) + 8px)); left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); }
   .human-world .grid { grid-template-columns: minmax(0, 1fr); }
   .human-world input, .human-world textarea { font-size: 16px; }
 }
