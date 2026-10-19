@@ -641,9 +641,12 @@ export async function openLauncher(cfg = {}) {
         // lane P4: the installable-app manifest beside the world list (apps/web/src/pwa-manifest.ts)
         if (path === '/manifest.webmanifest' && serveFile(res, join(webDir, 'manifest.webmanifest'), 'public, max-age=3600', req)) return;
         if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
-        // this release's humanoid kit (the server's own /modular/humanoid, release.sh links it into mars-web): served here, so
-        // composed bodies never depend on which world happens to be awake (an old-world fork has no such kit)
-        if (path.startsWith('/modular/humanoid/') && marsWebDir && !/[\\%]|\.\./.test(path)) { const f = inside(join(marsWebDir, 'modular', 'humanoid'), path.slice('/modular/humanoid'.length)); if (f && serveFile(res, f, 'public, max-age=86400, stale-while-revalidate=604800', req)) return; }
+        // this release's /modular (the humanoid kit and the environment GLBs; release.sh links the commit's own copy into
+        // mars-web): served here, so composed bodies and characters never depend on which world happens to be awake. An
+        // old-world fork has no humanoid kit, and its descriptor's mars-web is the copy sealed at cutover (legacy: the
+        // 3.19 character wire files *.mesh.glb + clips-*.glb were a 404 there and /w/eden never drew). A file this release
+        // lacks still goes to a world below.
+        if (path.startsWith('/modular/') && marsWebDir && !/[\\%]|\.\./.test(path) && /\.(glb|json|bin|webp|png|jpe?g|svg)$/i.test(path)) { const f = inside(join(marsWebDir, 'modular'), path.slice('/modular'.length)); if (f && serveFile(res, f, 'public, max-age=86400, stale-while-revalidate=604800', req)) return; }
         if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600', req)) return; }
       }
       // Anything else a world page asks for (Mars assets, engine files, …): any running world serves it (base stripped).

@@ -92,16 +92,24 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
       const report=(phase:'start'|'loaded'|'failed')=>{try{options?.onAsset?.(name,phase);}catch{/* Optional download reporting cannot prevent a model load. */}};
       report('start');
       try{
-      let appearance:TemplateAppearance|undefined;
-      const wire=wireOf(name),clips=wire?loadClips(wire.clips,signal,resources):null;
-      const gltf = await loadGltf(wire?wireUrl(wire.mesh,wire.meshSHA256):characterUrl(name), signal, resources,options?.appearances?async(bytes,gltf)=>{
+      let appearance:TemplateAppearance|undefined,gltf:GLTF|undefined;
+      const wire=wireOf(name),observe=options?.appearances?async(bytes:ArrayBuffer,gltf:GLTF)=>{
         const digest=await globalThis.crypto.subtle.digest('SHA-256',bytes);
         const sha=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
         // W3: the mesh file is pinned by its own hash and stands for its source GLB (same node/mesh/material indices)
         if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,wire&&sha===wire.meshSHA256?wire.sourceSHA256:sha);
-      }:undefined);
-      // own copies: templateFromGltf's fitArms scales this body's arm translation tracks in place
-      if(clips)gltf.animations=(await clips).map(c=>c.clone());
+      }:undefined;
+      if(wire)try{
+        const clips=loadClips(wire.clips,signal,resources);
+        gltf=await loadGltf(wireUrl(wire.mesh,wire.meshSHA256),signal,resources,observe);
+        // own copies: templateFromGltf's fitArms scales this body's arm translation tracks in place
+        gltf.animations=(await clips).map(c=>c.clone());
+      }catch(error){
+        // a server without the wire files (3.19 legacy: a sealed older copy of /modular) still draws people: the source GLB
+        if(signal.aborted)throw error;
+        console.warn(`character ${name}: wire files unavailable, loading the source GLB`,error);gltf=undefined;appearance=undefined;
+      }
+      gltf??=await loadGltf(characterUrl(name),signal,resources,observe);
       const template=templateFromGltf(name,gltf,appearance);options?.onTemplate?.(template);report('loaded');return template;
       }catch(error){report('failed');throw error;}
     }),
