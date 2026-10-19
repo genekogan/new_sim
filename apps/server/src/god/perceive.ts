@@ -87,7 +87,7 @@ export type PerceiveHost = {
   things?(): { id: string; at: Vec2; area?: Vec2[]; path?: Vec2[]; poly?: Vec2[]; width?: number }[];
   /** R4-INFO: the god-built places layer (places.ts): synced first, then each object's place is the innermost one
    *  holding it. */
-  places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null; ofEntity(id: string): { id: string } | undefined };
+  places?: { sync(): void; syncStep?(budgetMs: number): boolean; placeAt(at: Vec2, level?: number): string | null; ofEntity(id: string): { id: string } | undefined };
   /** Engine level of a standing height (the bridge's levelAt). */
   levelAt?(x: number, z: number, y: number): number;
   /** VOCAB-MECH: commit a Soul's actuator action on a god thing (engine edit). Without it, things offer no actions. */
@@ -237,6 +237,7 @@ export class GodPerceive {
   private layersOn = false;
   private regions = new Map<string, Box>();
   private run: Run | null = null;
+  private placesDone = false;
   /** For the host's log and tests: runs done, ids recomputed in the last one, whether it was a whole pass, its ms. */
   readonly stats = { runs: 0, lastIds: 0, lastFull: false, lastMs: 0 };
 
@@ -314,7 +315,12 @@ export class GodPerceive {
     if (!this.run) {
       if (!this.pending()) return true;
       // the places first (an object's place is the innermost one holding it); a world without objects has places too
-      if (GOD_PLACES) { try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); } }
+      if (GOD_PLACES && this.h.places && !this.placesDone) {
+        try { const P = this.h.places; if (!(P.syncStep ? P.syncStep(budgetMs) : (P.sync(), true))) return false; } catch (err) { this.h.log(`god places: ${(err as Error).message}`); }
+        this.placesDone = true;
+        if (performance.now() - t0 >= budgetMs) return false;
+      }
+      this.placesDone = false;
       this.run = this.begin();
       if (!this.run) { this.needFull = false; this.roots.clear(); return true; }
       if (performance.now() - t0 >= budgetMs) { this.run.ms += performance.now() - t0; return false; }

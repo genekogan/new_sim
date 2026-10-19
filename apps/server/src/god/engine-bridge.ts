@@ -134,9 +134,9 @@ export class EngineBridge {
     (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
     // P3 (E-life): places follow the god's edits, not the engine's (a carried cup, a duck, a lamp switched on move no place);
     // descriptions that list the things in a place catch up once a minute (1200 ticks)
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => `${this.godEdits}:${Math.floor(this.host.engine.world.tick / 1200)}` as never, deferred: () => this.perceiveRunning || !!this.perceive?.pending(), engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
     this.god.builds.inventoryContext = () => {
-      this.places.sync();
+      this.places.sync(true);
       return {
         occupied: id => this.seatTakers(id).length > 0,
         places: [...(this.edge?.places.byId.values() ?? [])].filter(p => p.parent !== null && !p.carrier).map(p => ({ id: p.id, name: p.name, polygon: p.polygon })),
@@ -174,7 +174,7 @@ export class EngineBridge {
     this.mapNotices = new MapNotices((soulId, text, place) => this.notices.notify(soulId, { text, tick: this.engine.world.tick, native: true, ...(place ? { place } : {}) }), () => this.god.now());
     this.god.onBuild(e => this.buildNotice(e));
     this.activitySpots = new GodActivitySpots({ model: this.god.model, engine: this.host.engine as never, version: () => `${this.godEdits}|${this.engine.world.entityPhysicsV1?.hash ?? ''}`, levelAt: (x, z, y) => this.levelAt(x, z, y),
-      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
+      placeAt: (at, level) => this.places.placeAt(at, level), placeLocator: () => this.places.placeLocator(), prepare: () => this.places.sync(true), placeName: (id) => this.edge?.places.byId.get(id)?.name ?? null });
     if (this.edge) this.edge.spotsProvider = () => { if (!this.reconciled) return null; this.flush(); const n = this.activitySpots.stats.derives, d = this.activitySpots.data(); if (this.activitySpots.stats.derives !== n) this.log(`activity spots: ${d.spots.length} spots, ${d.shelves.length} shelves in ${this.activitySpots.stats.ms} ms`); return d; };
     if (this.edge) {
       const edge = this.edge;
@@ -679,7 +679,7 @@ export class EngineBridge {
       this.god.builds.sweep();
       if (this.god.builds.hasClosure()) this.evacuateSites();
       if (!this.layers.active()) return;
-      const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(); }
+      const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(true); }
       this.layers.step();
     } catch (e) { this.log(`layers: ${(e as Error).message}`); }
   }

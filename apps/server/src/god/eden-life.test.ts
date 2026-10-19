@@ -244,17 +244,19 @@ test('P3: carrying a thing about re-derives no places (places follow god edits, 
   const w = await lifeWorld(t, [{ op: 'place', def: coreRef('table'), tmp: '$t', name: 'table', p: [0, 6] }, { op: 'place', def: coreRef('bowl'), name: 'bowl', in: { parent: '$t', slot: 'top' }, p: [0, 0, 0] },
     { op: 'place', def: coreRef('roundhouse'), name: 'hut', p: [20, 0] }]);
   const ana = await w.soul('Ana');
-  const P: any = w.bridge.places, d0 = P.derive.bind(P); let derives = 0; P.derive = () => { derives++; return d0(); };
-  w.edge.capabilities(ana); derives = 0;
+  // G1: an edit's places are re-derived off the request path (sliced, ≤ ~2 s after it), so count every derive
+  const P = w.bridge.places, n0 = { v: 0 }, derives = () => P.stats.derives - n0.v;
+  w.edge.capabilities(ana); for (let i = 0; i < 80; i++) w.host.tickOnce(); n0.v = P.stats.derives;
   const bowl = w.byName('bowl');
   const { r } = await w.act(ana, `pick-up:${bowl.id}`);
   assert.equal(r.phase, 'completed', JSON.stringify(r));
   for (let i = 0; i < 200; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
   w.edge.capabilities(ana);
-  assert.equal(derives, 0, 'no place re-derive while a resident carries a bowl');
+  assert.equal(derives(), 0, 'no place re-derive while a resident carries a bowl');
   assert.equal((w.god.act({ ops: [{ op: 'place', def: coreRef('bench'), name: 'new-bench', p: [-10, 0] }] }) as any).accepted, true);
+  for (let i = 0; i < 80; i++) w.host.tickOnce();
   await w.settle(2); w.edge.capabilities(ana);
-  assert.ok(derives >= 1, 'a god edit re-derives them');
+  assert.ok(derives() >= 1, 'a god edit re-derives them');
 });
 
 test('group life: a see-saw for two, a story by the campfire (listeners only while it is told), tending a garden bed', { timeout: 900000 }, async (t) => {

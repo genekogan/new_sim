@@ -68,7 +68,7 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   cur.seq = Math.max(cur.seq, e.seq);
   cur.byEntity = sortKeys(cur.byEntity); cur.assets = sortKeys(cur.assets);
   cur.bounds = floorBounds(cur);
-  for (const p of Object.values(cur.byEntity)) if (!PART_TEXT.has(p)) PART_TEXT.set(p, stableStringify(p));
+  for (const p of [...Object.values(cur.byEntity), ...Object.values(cur.assets)]) if (p && typeof p === 'object' && !PART_TEXT.has(p)) PART_TEXT.set(p, stableStringify(p));
   cur.hash = hashStable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>);
   cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
   return cur;

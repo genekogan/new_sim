@@ -17,7 +17,7 @@ function physicsText(v: Record<string, unknown>): { levels: string; byEntity: st
   const key = v.hash as string;
   let hit = PHYSICS_TEXT.get(key);
   if (!hit) {
-    hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity, PART_TEXT as unknown as ReadonlyMap<object, string>), assets: stableStringify(v.assets) };
+    hit = { levels: stableStringify(v.levels), byEntity: stableStringify(v.byEntity, PART_TEXT as unknown as ReadonlyMap<object, string>), assets: stableStringify(v.assets, PART_TEXT as unknown as ReadonlyMap<object, string>) };
     if (sha256(`{"assets":${hit.assets},"byEntity":${hit.byEntity},"levels":${hit.levels}}`) !== key) return hit;
     if (PHYSICS_TEXT.size >= 4) PHYSICS_TEXT.delete(PHYSICS_TEXT.keys().next().value!);
     PHYSICS_TEXT.set(key, hit);

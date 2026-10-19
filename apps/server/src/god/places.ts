@@ -91,6 +91,8 @@ export type PlacesHost = {
   nav: GodNav;
   edge?: EdgeLedger;
   version?: () => number | string;
+  /** G1: true while the host is catching up with god edits (reads may take the places as they were). */
+  deferred?: () => boolean;
   engineOwned(e: Entity): boolean;
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
@@ -110,28 +112,54 @@ export class GodPlaces {
   static idOf(ref: string) { return `g-${ref.toLowerCase().replace(/\//g, '.').replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')}`.slice(0, 100); }
   /** The place a nav thing is (its walk targets it), if it is one. */
   forRef(ref: string): GodPlace | undefined { return this.index().byRef.get(ref); }
-  list(): GodPlace[] { return this.index().list; }
+  list(fresh = false): GodPlace[] { return this.index(fresh).list; }
   /** The place a god thing itself is (a plaza, a house, a gazebo, a lone fountain): its objects stand in it. */
   ofEntity(id: string): GodPlace | undefined { return this.index().byEntity.get(id); }
   /** Walkable (the ledger's hook): every place this layer made. */
   walkable(id: string): boolean { return this.installed.has(id); }
 
-  private index() {
-    const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}${this.h.layers?.active() ? `:${this.h.layers.dayKey()}` : ''}`;
+  private key() { const m = this.h.model; return `${this.h.version?.() ?? m.editSeq}:${m.entities.size}${this.h.layers?.active() ? `:${this.h.layers.dayKey()}` : ''}`; }
+  /** G1 (tranche 2026-10-19): while the host is catching up with god edits (`deferred`), a read takes the places as they
+   *  were (≤ ~2 s old) and the host re-derives them in slices (`syncStep`); `fresh` (or no host deferral) derives now. */
+  private index(fresh = false) {
+    if (this.cache && !fresh && this.h.deferred?.()) return this.cache;
+    const key = this.key();
     if (this.cache?.key === key) return this.cache;
-    const list = this.derive(), byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
+    this.gen = null;
+    return this.install(key, this.derive());
+  }
+  /** Derives done (all at once or sliced): tests check edits re-derive and engine writebacks do not. */
+  readonly stats = { derives: 0 };
+  private derive(): GodPlace[] { this.stats.derives++; return drain(this.deriveGen()); }
+  private install(key: string, list: GodPlace[]) {
+    const byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
     // a thing's walk targets its place; a water's walk (to its shore) targets the shore
     for (const p of list) { if (p.of === 'water' && byRef.has(p.ref)) continue; byRef.set(p.ref, p); if (p.of !== 'room' && p.of !== 'shore') byEntity.set(p.entity, p); }
     this.cache = { key, list, byRef, byEntity };
     return this.cache;
   }
+  private gen: { key: string; it: Generator<void, GodPlace[], void> } | null = null;
+  /** Re-derive the places in slices of about `budgetMs`, then put them in the ledger's index. True when done. An edit
+   *  landing mid-way is picked up by the next call (the host notes every edit). */
+  syncStep(budgetMs: number): boolean {
+    if (!this.h.edge?.places) return true;
+    if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { this.sync(); return true; } this.gen = { key, it: this.deriveGen() }; this.stats.derives++; }
+    const t0 = performance.now();
+    for (;;) {
+      const r = this.gen.it.next();
+      if (r.done) { this.install(this.gen.key, r.value); this.gen = null; this.sync(); return true; }
+      if (performance.now() - t0 >= budgetMs) return false;
+    }
+  }
 
-  private derive(): GodPlace[] {
+  private *deriveGen(): Generator<void, GodPlace[], void> {
     const m = this.h.model, things = this.h.nav.things();
+    let n = 0;
     const out: GodPlace[] = [];
     const base = { parent: null as string | null, enclosed: false, capacity: null as number | null, starting: false };
     const firstByRef = new Map<string, GodPlace>(), push = (p: GodPlace) => { out.push(p); if (!firstByRef.has(p.ref)) firstByRef.set(p.ref, p); };
     for (const t of things) {
+      if (++n % 48 === 0) yield;
       if (t.kind === 'area' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'area', entity: t.id, name: t.ref, kind: placeKind(m, t.id) ?? 'outdoor', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
       else if (t.kind === 'water' && t.area && t.area.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
       else if (t.kind === 'room' && t.poly && t.poly.length >= 3) push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
@@ -139,6 +167,7 @@ export class GodPlaces {
     // GOD-ENV: the god's landforms are places Souls can name and climb: a mountain or hill (round its top), a range, a
     // valley, a ditch or a cliff (a band along it), a plateau or a terrace (its area: already an area place, renamed)
     for (const t of things) {
+      if (++n % 48 === 0) yield;
       const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
       const def = m.resolvedDef(e.def); if (!def) continue;
       let lf: any; try { lf = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).landform; } catch { continue; }
@@ -162,6 +191,7 @@ export class GodPlaces {
     for (const w of out.filter((p) => p.of === 'water')) push({ ...base, id: `${w.id}.shore-bank`.slice(0, 100), ref: w.ref, of: 'shore', entity: w.entity, name: `${w.ref} shore`, kind: 'shore', polygon: grow(w.polygon, SHORE), level: 0 });
     // buildings: round their ground-floor rooms (a little out, for the walls)
     for (const t of things) {
+      if (++n % 48 === 0) yield;
       if (t.kind !== 'building') continue;
       const rooms = out.filter((p) => p.of === 'room' && p.entity === t.id && p.level === t.level);
       const pts = rooms.flatMap((p) => p.polygon); if (pts.length < 3) continue;
@@ -170,6 +200,7 @@ export class GodPlaces {
     }
     // things whose def says they are a place (a gazebo, a pergola, a pavilion, a dome; a pier's deck): their footprint
     for (const t of things) {
+      if (++n % 48 === 0) yield;
       if ((t.kind !== 'thing' && t.kind !== 'seat' && t.kind !== 'path') || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id), def = e ? m.resolvedDef(e.def) : undefined, pc = (def?.components as Record<string, any> | undefined)?.place;
       if (!e || !def || !pc) continue;
@@ -185,6 +216,7 @@ export class GodPlaces {
     // landmarks: big named things standing on their own (not in an area, a building, a water or another place)
     const outer = out.filter((p) => p.of !== 'room' && p.of !== 'landmark').map((p) => ({ p, box: boxOf(p.polygon) }));
     for (const t of things) {
+      if (++n % 48 === 0) yield;
       if (t.kind !== 'thing' || t.level !== 0 || firstByRef.has(t.ref)) continue;
       const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
       const def = m.resolvedDef(e.def); if (!def || NOT_LANDMARKS.test(shortDef(def))) continue;
@@ -201,12 +233,17 @@ export class GodPlaces {
     // the smallest holder, the first of equals in candidate order (what a stable sort by area puts first)
     const held = candidates.map((q) => ({ q, ...g(q) }));
     for (const p of out) {
+      if (++n % 48 === 0) yield;
       const c = centroid(p.polygon), a = g(p).area; let best: (typeof held)[number] | null = null;
       for (const k of held) if (k.q !== p && k.area > a && (best === null || k.area < best.area) && inBoxPoly(c[0], c[1], k.box, k.q.polygon)) best = k;
       p.parent = p.of === 'room' ? (out.find((q) => q.of === 'building' && q.entity === p.entity)?.id ?? best?.q.id ?? root) : best?.q.id ?? root;
     }
-    this.facts = this.entityFacts(out);
-    try { for (const p of out) { p.description = this.describe(p, out, things); if (p.of === 'room') { const n = this.seatsIn(p); p.capacity = n || null; } } } finally { this.facts = null; }
+    const facts = yield* this.entityFactsGen(out);
+    for (const p of out) {
+      this.facts = facts;
+      try { p.description = this.describe(p, out, things); if (p.of === 'room') { const k = this.seatsIn(p); p.capacity = k || null; } } finally { this.facts = null; }
+      if (++n % 16 === 0) yield;
+    }
     if (this.h.layers?.active()) this.layer(out);
     return out.sort((a, b) => (a.id < b.id ? -1 : 1));
   }
@@ -247,10 +284,13 @@ export class GodPlaces {
   }
 
   /** What derive's descriptions and seat counts need from each entity, once (same order as the model's entities). */
-  private entityFacts(all: GodPlace[]): Fact[] {
+  private entityFacts(all: GodPlace[]): Fact[] { return drain(this.entityFactsGen(all)); }
+  private *entityFactsGen(all: GodPlace[]): Generator<void, Fact[], void> {
+    let n = 0;
     const m = this.h.model, buildings = new Set(all.filter((q) => q.of === 'building').map((q) => q.entity)), out: Fact[] = [];
     const inBuilding = (e: Entity) => { for (let cur: Entity | undefined = e; cur && cur.in.parent !== 'world'; ) { cur = m.entities.get(cur.in.parent); if (cur && buildings.has(cur.id)) return cur.id; } return null; };
     for (const e of m.entities.values()) {
+      if (++n % 256 === 0) yield;
       const def = m.resolvedDef(e.def), owned = this.h.engineOwned(e), wp = m.worldPose(e);
       const c = def?.components as Record<string, unknown> | undefined, sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
       out.push({ e, def, x: wp.x, z: wp.z, s: wp.s, seatSkip: !def || !!def.components.body || owned,
@@ -308,9 +348,9 @@ export class GodPlaces {
   }
 
   /** Put the places in the ledger's index; take out the ones the god removed. */
-  sync() {
+  sync(fresh = false) {
     const places = this.h.edge?.places; if (!places) return;
-    const want = new Map(this.list().map((p) => [p.id, p]));
+    const want = new Map(this.list(fresh).map((p) => [p.id, p]));
     for (const id of [...this.installed]) if (!want.has(id)) { places.byId.delete(id); this.installed.delete(id); }
     for (const [id, p] of want) {
       const cur = places.byId.get(id); if (cur && !this.installed.has(id)) continue;   // a boot place keeps its own
@@ -332,3 +372,6 @@ export class GodPlaces {
     return (at, level = 0) => find(at[0], at[1], level)?.id ?? null;
   }
 }
+
+/** Run a generator to its end (a sliced derive, all at once). */
+function drain<T>(it: Generator<void, T, void>): T { for (;;) { const r = it.next(); if (r.done) return r.value; } }
