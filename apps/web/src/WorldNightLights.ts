@@ -173,9 +173,9 @@ if(uEdenNight.x>0.0){
  installGroundOcclusion(NIGHT_MAP_BOUNDS);
 }
 /** 0 by day, rising through dusk to full at night. */
-export function setNightLightStrength(daylight:number|null){
+export function setNightLightStrength(daylight:number|null,gain=1){
  const d=daylight===null||!Number.isFinite(daylight)?1:Math.max(0,Math.min(1,daylight));
- NIGHT_PARAMS.x=1.0*Math.pow(1-d,1.5);
+ NIGHT_PARAMS.x=gain*Math.pow(1-d,1.5);
 }
 export function nightLightStrength(){return NIGHT_PARAMS.x;}
 /** Fraction of rooms with a light on by hour (local): people come home at dusk, the evening is busy, the late

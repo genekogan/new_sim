@@ -101,8 +101,10 @@ export class GodWorldLiving {
   // explicit fields (not parameter properties): lane bugs' tests load this file under Node's strip-only TypeScript
   private layer: LayerLike;
   private renderer?: THREE.WebGLRenderer;
-  constructor(layer: LayerLike, renderer?: THREE.WebGLRenderer) {
-    this.layer = layer; this.renderer = renderer;
+  /** Look pass: pool radius scale and pool brightness at night (1, 1 = the 3.2 look). */
+  private pools: { radius: number; gain: number };
+  constructor(layer: LayerLike, renderer?: THREE.WebGLRenderer, pools: { radius: number; gain: number } = { radius: 1, gain: 1 }) {
+    this.layer = layer; this.renderer = renderer; this.pools = pools;
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
     this.cover = new CoverProbe(() => (this.layer.active ? [this.layer.group] : []));
   }
@@ -111,7 +113,7 @@ export class GodWorldLiving {
   update(nowMs: number, daylight: number | null, reducedMotion = false) {
     if (!this.layer.active) { setClockNight(null); return; }
     setClockNight(daylight === null ? null : 1 - Math.max(0, Math.min(1, daylight)));
-    setNightLightStrength(daylight);
+    setNightLightStrength(daylight, this.pools.gain);
     if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     this.reduced = reducedMotion;
     if (nowMs - this.checkedAt < 500) return;
@@ -132,7 +134,7 @@ export class GodWorldLiving {
         const x = p.x + dx * cos + dz * sin, z = p.z - dx * sin + dz * cos;
         const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
         const phase = lightPhase(e.id, i, lights.length, light.pattern);
-        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42), intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25, pattern: light.pattern, phase });
+        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25 * this.pools.radius, pattern: light.pattern, phase });
         marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, light.pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
     } };

@@ -30,10 +30,12 @@ import {conversationAttention,WorldIdleLife,type IdleSoul} from './WorldIdleLife
 import {WorldBalloonRide,parseRideOverride,previewState} from './WorldBalloonRide.ts';
 import {WorldShadowDetail} from './WorldShadowDetail.ts';
 import {WorldPlaceActivity} from './WorldPlaceActivity.ts';
+import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,WorldPost} from './rendering/WorldLook.ts';
 import {installNightLighting,setNightLightStrength,nightLightStrength} from './WorldNightLights.ts';
 import {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
+installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
 import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
@@ -253,6 +255,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const shotMode=new URLSearchParams(location.search).has('shot');
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
+    // look pass for entity worlds: occlusion, highlight roll-off + night exposure, material detail (rendering/WorldLook.ts)
+    const look=lookSettings(location.search,quality.tier,newWorld),post=look.ao?new WorldPost():null;if(look.enabled)renderer.toneMapping=THREE.CustomToneMapping;setMaterialDetail(look.detail);(window as unknown as {__simLook?:unknown}).__simLook={settings:look,post:post?.params??null,get failed(){return post?.failed??null;}};
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-label', 'Live 3D view of the world');
     renderer.domElement.style.display = 'block';
@@ -308,7 +312,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const entityLayer=new WorldEntityLayer(apiPath);entityLayerRef.current=entityLayer;scene.add(entityLayer.group);let entityWorldFramed=false,rideNames:string[]|null=null,rideCarriers:CarrierPose[]=[];
     // E2 #3: shy animals in a god world run from where the Souls' figures are now
     if(newWorld)setFleeSources(()=>{const out:[number,number][]=[];for(const soul of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[soul.entityId];if(e?.p)out.push([e.p[0],e.p[2]]);}return out;});
-    const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
+    const godLiving=newWorld?new GodWorldLiving(entityLayer,renderer,{radius:look.enabled?1.45:1,gain:look.poolGain}):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length,lightning:()=>godLightning?.inspect()??null,holdLightning:(ms:number)=>{if(godLightning)godLightning.holdUntil=performance.now()+ms;}};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
     const godLightning=newWorld?new WorldLightning(entityLayer):null;if(godLightning)scene.add(godLightning.group);  // GOD-ENV: bolts, flash, thunder (new worlds only)
     // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
     // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
@@ -849,7 +853,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Orbit click-to-centre glide; any other mode or a new gesture cancels it.
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
-      atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;
+      atmosphereSeconds+=step;godLiving?.update(now,light.daylight,!!reducedMotionQuery?.matches||(look.enabled&&shotMode));const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;  // look pass: a still picture shows patterned lamps at their steady level (repeatable shots)
       try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shotClockAt(shown.current?.datetime??null,shotHour??visitorPreviewHour()),...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
@@ -895,7 +899,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       expansion?.wallFrames.update(camera,expansion.group.visible&&!past.current);
       // Initial required attachments are prepared together, never per GLB.
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
-      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render())renderer.render(scene,camera);}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
+      if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
       if(batchEnabled)staticBatches.withRender(draw);else draw();
       shadowDetail?.restore();
       idleLife.restore();
@@ -979,7 +984,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       portraits.dispose();
       orbitPivot.dispose();
       rts.dispose();
-      atmosphere.dispose();forkLand?.dispose();godLiving?.dispose();godLightning?.dispose();
+      atmosphere.dispose();forkLand?.dispose();godLiving?.dispose();post?.dispose();godLightning?.dispose();
       speechLayer.dispose();
       fading.dispose();
       balloonRide.dispose();

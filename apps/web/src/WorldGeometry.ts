@@ -35,6 +35,7 @@ import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
 import { siteNorthOffset } from './site-north.ts';
 import {createEdenDaylight} from './atmosphere/visual-transitions.ts';
+import {shadowFollowBox} from './rendering/WorldLook.ts';
 import { daylightFactors } from '../../../mars/viewer/engine/env/daylight.ts';
 import { fitNearPlane } from '../../../mars/viewer/lib/depth-fit.ts';
 import { isMarsCamp, MarsDesert } from './WorldMarsDesert.ts';
@@ -460,6 +461,7 @@ export class Daylight {
 
   /** Aim the sun's shadows at the ground rectangle being shown. */
   fit([x0, z0, x1, z1]: readonly [number, number, number, number]) {
+    this.followKey = '';
     const half = Math.max(20, Math.max(x1 - x0, z1 - z0) * 0.75);
     Object.assign(this.sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half, near: 1, far: 300 });
     this.sun.shadow.camera.updateProjectionMatrix();
@@ -471,6 +473,25 @@ export class Daylight {
     const key = this.key;
     this.key = '';
     this.update(key === 'none' || !key ? null : key);
+  }
+
+  private followKey = '';
+  /** Entity worlds (viewer look pass): keep the sun's shadow box on what the camera is looking at. A god builds
+   *  anywhere in a kilometre-wide world, but fit() is called once with the origin's rectangle, so builds more than
+   *  ~45 m from the origin had no shadows at all. Centre = the orbit target, half-size from the eye distance (rounded
+   *  to 8 m steps), centre snapped to whole shadow texels: a still camera gives the same shadow every frame, so shots
+   *  stay deterministic. Soft edges: the PCF disk radius is about 18 cm of ground (1.25..3.5 texels). */
+  follow(target: THREE.Vector3, eye: THREE.Vector3) {
+    const box = shadowFollowBox(target, eye, this.sun.shadow.mapSize.x);
+    if (!box || box.key === this.followKey) return;
+    this.followKey = box.key;
+    Object.assign(this.sun.shadow.camera, { left: -box.half, right: box.half, top: box.half, bottom: -box.half, near: 1, far: 400 });
+    this.sun.shadow.camera.updateProjectionMatrix();
+    const delta = new THREE.Vector3(box.cx, box.cy, box.cz).sub(this.sun.target.position);
+    this.sun.target.position.add(delta); this.sun.position.add(delta);
+    this.fill.target.position.add(delta); this.fill.position.add(delta);
+    this.sun.shadow.normalBias = box.normalBias;
+    this.sun.shadow.radius = box.radius;
   }
 
   /** Preserve renderer-derived millisecond precision; second bins freeze sunlight between samples. */
