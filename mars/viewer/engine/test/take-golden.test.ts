@@ -7,7 +7,8 @@
 // recorder seeded with that final state hash).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { stableStringify } from '../core/hash.ts';
+import { createHash } from 'node:crypto';
+import { hashStable, hashStableResumable, setSha256Provider, stableStringify, type ResumeMark, type Sha256Stream } from '../core/hash.ts';
 import { humanHumanSeparation, humanStaticClearance } from '../runtime/invariants.ts';
 import { Runtime } from '../runtime/runtime.ts';
 import { Spatial } from '../spatial/service.ts';
@@ -81,3 +82,33 @@ test('golden take ids: chunked takes over a world with entity-world fixtures sta
   assert.notEqual(at(1, 'f3'), at(0, 'f3'));
   assert.notEqual(at(4, 'f6'), at(3, 'f6'));
 });
+
+// the server hashes with a native stream whose state can be copied: final state hashes then resume after unchanged fields
+type S = Sha256Stream & { copy(): S };
+const streamOf = (h: ReturnType<typeof createHash>): S => ({ update: (p) => { h.update(p, 'utf8'); }, digest: () => h.digest('hex'), copy: () => streamOf(h.copy()) });
+function withNativeHash(fn: () => void) {
+  setSha256Provider((t) => createHash('sha256').update(t, 'utf8').digest('hex'), () => streamOf(createHash('sha256')));
+  try { fn(); } finally { setSha256Provider(); }
+}
+
+test('golden take ids with the native resumable digest (the server path)', () => withNativeHash(() => {
+  const takes = run();
+  assert.deepEqual(takes.map((t) => [t.id, t.finalStateHash.slice(0, 16)]), GOLDEN);
+}));
+
+test('hashStableResumable = hashStable as leading fields are kept, replaced, added and removed', () => withNativeHash(() => {
+  const a = { n: 1 }, b = { list: [1, 2, { x: -0 }] }, c = { s: 'é\u2028' };
+  const states: Record<string, unknown>[] = [
+    { a, b, c, t: 1 }, { a, b, c, t: 2 }, { a, b: { list: [3] }, c, t: 3 }, { a, b, c, t: 4 }, { a, b, c, t: 5 },
+    { a, aa: { z: 1 }, b, c, t: 6 }, { b, c, t: 7 }, { a, b, c }, { a, b, c, u: undefined, t: 8 }, {}, { a, b, c, t: 9 },
+  ];
+  let mark: ResumeMark | undefined;
+  for (const s of states) {
+    const r = hashStableResumable(s, undefined, mark);
+    assert.equal(r.hash, hashStable(s));
+    mark = r.mark;
+  }
+  // a known text inside a kept field is hashed as that text, as hashStable does
+  const known = new Map<object, string>([[b, stableStringify(b)]]);
+  assert.equal(hashStableResumable({ a, b, t: 1 }, known, mark).hash, hashStable({ a, b, t: 1 }));
+}));

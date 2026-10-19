@@ -8,7 +8,7 @@
 // (`thinChanges`): keyframes, linear in between, each recorded tick reproduced within the field's tolerance.
 // mars-take/4: tracks at TRACK_TOL (4 mm / 8 mrad, position holds exact at both ends), `entities0` + `removed`, and
 // `compactEvents` on finish.
-import { hashOf, hashStable, sha256, stableStringify } from '../core/hash.ts';
+import { hashOf, hashStable, hashStableResumable, sha256, stableStringify, type ResumeMark } from '../core/hash.ts';
 import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL, type ChangeEvent, type PoseSample, type Take, type TakeEntity0, type TakeEvent, type TakeHands } from './types.ts';
@@ -120,19 +120,22 @@ function sameKeys(live: Record<string, unknown>, copy: Record<string, unknown>):
 }
 
 type Kept = { copy: object; text: string };
-type WorldCopies = { fields: Map<string, Kept>; entities: Map<string, Kept> };
+/** Per world: the kept copies, the last entity table copy (reused whole while every entity is), the hash resume mark. */
+type WorldCopies = { fields: Map<string, Kept>; entities: Map<string, Kept>; table?: { ids: string[]; out: object; text: string }; mark?: ResumeMark };
 const COPIES = new WeakMap<object, WorldCopies>();
+const flat = (text: string) => { text.charCodeAt(0); return text; };   // flatten the rope once (G1: re-walking cached ropes per hash)
 const keep = (live: object, prev: Kept | undefined): Kept => {
   if (prev && sameCopy(live, prev.copy)) return prev;
-  const copy = structuredClone(live), text = stableStringify(copy);
-  text.charCodeAt(0);   // flatten the rope once (G1's finding: hashing thousands of cached ropes re-walks them every take)
-  return { copy, text };
+  const copy = structuredClone(live);
+  return { copy, text: flat(stableStringify(copy)) };
 };
 
 /** The take's final state: what `{ ...structuredClone(world without entityPhysicsV1), entityPhysicsV1 }` (or a plain
  *  structuredClone(world) without physics) was, same keys in the same order, with each unchanged entity and world field
- *  shared from the copy made for an earlier take; `known` holds every shared copy's stable text for the hash. */
-export function finalStateOf(world: Runtime['world']): { state: Runtime['world']; known: Map<object, string> } {
+ *  (and the whole entity table when every entity is unchanged) shared from the copy made for an earlier take; `known`
+ *  holds every shared copy's stable text, and `hash` is the final state hash (the digest resumes after the leading
+ *  unchanged fields: base, entities, entityPhysicsV1 on an idle god world). */
+export function finalStateOf(world: Runtime['world']): { state: Runtime['world']; known: Map<object, string>; hash: string } {
   const w = world as unknown as Record<string, unknown>;
   const physics = w.entityPhysicsV1;
   const prev = COPIES.get(world), next: WorldCopies = { fields: new Map(), entities: new Map() };
@@ -141,13 +144,19 @@ export function finalStateOf(world: Runtime['world']): { state: Runtime['world']
     if (k === 'entityPhysicsV1' && physics !== undefined) continue;
     const v = w[k];
     if (k === 'entities' && v !== null && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
-      const ents = v as Record<string, object>, out: Record<string, unknown> = {};
-      for (const id of Object.keys(ents)) {
-        const e = ents[id];
-        if (e === null || typeof e !== 'object') { out[id] = e; continue; }
-        const kept = keep(e, prev?.entities.get(id));
+      const ents = v as Record<string, object>, ids = Object.keys(ents), was = prev?.table;
+      let out: Record<string, unknown> = {}, same = !!was && was.ids.length === ids.length;
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i], e = ents[id];
+        if (e === null || typeof e !== 'object') { out[id] = e; same = false; continue; }
+        const before = prev?.entities.get(id), kept = keep(e, before);
+        if (kept !== before || !was || was.ids[i] !== id) same = false;
         next.entities.set(id, kept); known.set(kept.copy, kept.text); out[id] = kept.copy;
       }
+      if (same) next.table = was;
+      else { const text = flat(stableStringify(out, known)); next.table = { ids, out, text }; }
+      out = next.table!.out as Record<string, unknown>;
+      known.set(out, next.table!.text);
       state[k] = out;
       continue;
     }
@@ -156,8 +165,10 @@ export function finalStateOf(world: Runtime['world']): { state: Runtime['world']
     next.fields.set(k, kept); known.set(kept.copy, kept.text); state[k] = kept.copy;
   }
   if (physics !== undefined) state.entityPhysicsV1 = physics;
+  const { hash, mark } = hashStableResumable(state, known, prev?.mark);
+  next.mark = mark;
   COPIES.set(world, next);
-  return { state: state as unknown as Runtime['world'], known };
+  return { state: state as unknown as Runtime['world'], known, hash };
 }
 
 /** Recording needs state and events, not the engine scheduler or its services. */
@@ -313,9 +324,7 @@ export class TakeRecorder implements RuntimeObserver {
     // changes, so the take shares it instead of deep-copying it every take; everything else is copied as before
     // S1 V7b: the copy and its text come from finalStateOf, which shares every entity / world field that still equals its
     // copy in the take before (an idle Eden 2026 re-copied and re-serialised ~4,900 unchanged entities every second)
-    const { state: finalState, known } = finalStateOf(this.rt.world);
-    // E-life P1: the final state is serialised once for its hash and reused inside the take id (byte-identical)
-    const finalText = stableStringify(finalState, known);
+    const { state: finalState, known, hash: finalStateHash } = finalStateOf(this.rt.world);
     const changes = thinChanges(dedupeChanges(this.changes), { ...INTERP_FIELDS, ...this.opts.fieldTol });
     const entities0: Record<string, TakeEntity0> = {};
     for (const id of [...this.first.keys()].sort()) entities0[id] = this.first.get(id)!;
@@ -333,12 +342,12 @@ export class TakeRecorder implements RuntimeObserver {
       tracks,
       changes,
       events: this.opts.compactEvents === false ? this.events : compactEvents(this.events),
-      finalStateHash: sha256(finalText),
+      finalStateHash,
       finalState,
       entities0,
       removed: changes.filter((c) => c[2] === 'present' && c[3] === false).map((c) => ({ id: c[1], t: c[0] })),
     };
-    return { ...stripUndefined(body), id: takeIdOf(body, new Map([[finalState, finalText]])) } as Take;
+    return { ...stripUndefined(body), id: takeIdOf(body, known) } as Take;
   }
 }
 

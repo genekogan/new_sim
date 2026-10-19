@@ -98,7 +98,7 @@ const K = new Uint32Array([
 // dependency-free; the provider changes implementation, never hash semantics.
 let nativeSha256: ((text: string) => string) | undefined;
 /** An incremental digest with the same semantics (UTF-8 of the whole text), for streamed hashes. */
-export type Sha256Stream = { update(piece: string): void; digest(): string };
+export type Sha256Stream = { update(piece: string): void; digest(): string; /** an independent stream with this state (optional) */ copy?(): Sha256Stream };
 let nativeSha256Stream: (() => Sha256Stream) | undefined;
 export function setSha256Provider(provider?: (text: string) => string, stream?: () => Sha256Stream) {
   nativeSha256 = provider;
@@ -153,3 +153,35 @@ export function hashStable(value: unknown, known?: ReadonlyMap<object, string>):
 }
 
 export const hashOf = (value: unknown) => hashStable(value);
+
+/** Where hashStableResumable can pick up next time: the sorted keys and values it hashed, and the digest state after
+ *  the first `n` of them (inside the object's opening brace). The state is only ever copied, never updated. */
+export type ResumeMark = { keys: string[]; values: unknown[]; n: number; state: Sha256Stream };
+/**
+ * hashStable(value, known) of a plain object (S1 V7b, take final states), resuming the digest after the longest run of
+ * leading (sorted) keys whose values are the very objects the call that left `mark` hashed (an idle god world's base,
+ * entity table and entity physics: ~5 MB of its ~5 MB text). Same bytes in the same order, so the same digest; without
+ * a native stream that can copy its state it is plain hashStable.
+ */
+export function hashStableResumable(value: Record<string, unknown>, known: ReadonlyMap<object, string> | undefined, mark: ResumeMark | undefined): { hash: string; mark?: ResumeMark } {
+  const mk = nativeSha256Stream;
+  if (!mk || (known?.has(value)) || isPhysics(value)) return { hash: hashStable(value, known) };
+  const keys = Object.keys(value).filter((k) => value[k] !== undefined).sort();
+  let c = 0;   // leading keys that are the same objects as last time
+  if (mark) while (c < keys.length && c < mark.keys.length && mark.keys[c] === keys[c] && value[keys[c]] === mark.values[c] && value[keys[c]] !== null && typeof value[keys[c]] === 'object') c++;
+  let h: Sha256Stream, start: number, at: Sha256Stream | undefined;
+  if (mark && mark.n <= c && mark.state.copy) { h = mark.state.copy(); start = mark.n; if (start === c) at = mark.state; }
+  else { h = mk(); if (!h.copy) return { hash: hashStable(value, known) }; h.update('{'); start = 0; }
+  const out = new Sink((piece) => h.update(piece));
+  for (let i = start; ; i++) {
+    if (i === c && !at) { out.end(); at = h.copy!(); }
+    if (i === keys.length) break;
+    if (i) out.put(',');
+    out.put(JSON.stringify(keys[i]));
+    out.put(':');
+    writeStable(value[keys[i]], out, known);
+  }
+  out.put('}');
+  out.end();
+  return { hash: h.digest(), mark: { keys, values: keys.map((k) => value[k]), n: c, state: at! } };
+}

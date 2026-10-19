@@ -55,7 +55,7 @@ export async function loadMars(): Promise<Mars> {
   // The server uses the identical UTF-8 SHA-256 digest in native code. The
   // browser/Worker engine retains its portable default and the same addresses.
   hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'),
-    () => { const h = createHash('sha256'); return { update: (piece: string) => { h.update(piece, 'utf8'); }, digest: () => h.digest('hex') }; });
+    () => streamOf(createHash('sha256')));
   // Preserve the original proving-ground fixtures as a western annex during additive adoption.
   const campScene = structuredClone(camp.EDEN_CAMP_SCENE);
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
@@ -71,4 +71,10 @@ export async function loadMars(): Promise<Mars> {
  * contribution (empty in every authored world, so they are unchanged). */
 function entityPhysicsServices(servicesFor: Mars['servicesFor'], contribution: (world: any) => any): Mars['servicesFor'] {
   return (scenes) => { const make = servicesFor(scenes); return (world) => { const s = make(world); if (s.spatial) s.spatial.contributors = [...(s.spatial.contributors ?? []), contribution]; return s; }; };
+}
+
+/** The native digest as hash.ts's Sha256Stream; `copy` forks its state (S1 V7b: take final-state hashes resume). */
+type NativeStream = { update(piece: string): void; digest(): string; copy(): NativeStream };
+function streamOf(h: ReturnType<typeof createHash>): NativeStream {
+  return { update: (piece) => { h.update(piece, 'utf8'); }, digest: () => h.digest('hex'), copy: () => streamOf(h.copy()) };
 }

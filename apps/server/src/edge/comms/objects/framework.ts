@@ -43,6 +43,10 @@ export class Objects {
   all(): ObjectRecord[] {
     return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
   }
+  /** Whether an object with this id exists (one indexed row, no body parsed). */
+  has(id: string): boolean {
+    return !!this.core.db.prepare('SELECT 1 FROM edge_comms_objects WHERE world_id = ? AND id = ?').get(this.core.worldId, id);
+  }
   /** Every object id (`all()`'s ids, same order), no bodies parsed. */
   ids(): string[] {
     return (this.core.db.prepare('SELECT id FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {id: string}[]).map(r => r.id);
