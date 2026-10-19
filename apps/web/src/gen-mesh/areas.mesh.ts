@@ -89,8 +89,9 @@ registerMesh({
       return c;
     });
     const mesh = soupMesh(soup, `lawn ${ctx.entity.name ?? ctx.entity.id}`, { shadow: false });
-    // On Eden's meadow, unstriped turf lawns take the same realism ground shader as the terrain around them.
-    if (mesh && groundRealismFor(pal) && !stripes && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf();
+    // On Eden's meadow, turf lawns take the same realism ground shader as the terrain around them (W2b: mown ones too,
+    // so their stripes carry old Eden's blades and mottling).
+    if (mesh && groundRealismFor(pal) && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf();
     return mesh;
   },
 });

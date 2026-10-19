@@ -481,6 +481,13 @@ export function applySceneryRealism(scene:THREE.Object3D,skip:readonly THREE.Obj
  return added;
 }
 
+/** W2b: one shared material takes a realism class directly (entity worlds' building walls, roofs and floors). Idempotent;
+ *  every class shares the one program (the class is a uniform). Phones keep their plain materials. */
+export function applyRealismClass(material:THREE.Material,cls:RealismClass,context:string=cls){
+ if(patched.has(material)||!(material instanceof THREE.MeshStandardMaterial))return false;
+ if((globalThis as {__simQuality?:{tier?:string}}).__simQuality?.tier==='phone'){patched.set(material,{cls:'generic',onBeforeCompile:material.onBeforeCompile,key:material.customProgramCacheKey});return false;}
+ install(material,cls,1,STRENGTH[cls],context);return true;
+}
 /** Class actually installed on a material (null when untouched). */
 export function realismNamesOf(material:THREE.Material){return patched.get(material)?.names??null;}
 export function realismClassOf(material:THREE.Material):RealismClass|null{const p=patched.get(material);return p&&material.onBeforeCompile!==p.onBeforeCompile?p.cls:null;}

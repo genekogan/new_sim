@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { MaterialLib } from './materials.ts';
+import { applyRealismClass, type RealismClass } from '../WorldEdenRealism.ts';
 
 /** wall: walls, partitions · floor: slabs, boards, decks · roof · trim: frames, sills, rails, details · glass · glow (lamps, lit lantern). */
 export type Layer = 'wall' | 'floor' | 'roof' | 'trim' | 'glass' | 'glow';
@@ -171,11 +172,15 @@ export class Builder {
 }
 
 let glow: THREE.Material | null = null;
+const realismOff = typeof location !== 'undefined' && new URLSearchParams(location.search).get('realism') === '0';
+function realism(m: THREE.Material, cls: RealismClass) { if (!realismOff) applyRealismClass(m, cls, `building ${cls}`); return m; }
 function materialFor(lib: MaterialLib, layer: Layer): THREE.Material {
   switch (layer) {
-    case 'wall': return lib.get('plaster', undefined, { vertexColors: true });
-    case 'floor': return lib.get('wood', undefined, { vertexColors: true });
-    case 'roof': return lib.get('tile', undefined, { vertexColors: true });
+    // W2b: old Eden's surface realism (WorldEdenRealism): stained, rain-streaked render; weathered roof courses and moss;
+    // board-to-board timber tone. Shared materials, one program.
+    case 'wall': return realism(lib.get('plaster', undefined, { vertexColors: true }), 'plaster');
+    case 'floor': return realism(lib.get('wood', undefined, { vertexColors: true }), 'wood');
+    case 'roof': return realism(lib.get('tile', undefined, { vertexColors: true }), 'roof');
     case 'trim': return lib.get('paint', undefined, { vertexColors: true });
     case 'glass': return lib.get('glass', undefined, { vertexColors: true, side: THREE.DoubleSide });
     case 'glow': return (glow ??= new THREE.MeshBasicMaterial({ vertexColors: true }));
