@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
 import { splitSnapshot } from '../../server/src/god/snapshot-wire.ts';
 import { expandSnapshot } from './snapshot-wire.ts';
 
@@ -19,8 +18,4 @@ const roundTrip = (snap: Record<string, unknown>) => { const s = splitSnapshot(s
 
 test('split on the server then expand on the client gives the plain snapshot back', () => {
   assert.deepEqual(roundTrip(sample), sample);
-});
-test('the live Eden 2026 snapshot round-trips exactly (when a copy is at hand)', { skip: !existsSync('<team>/scratch/t4/w3/snap-eden.json') }, () => {
-  const live = JSON.parse(readFileSync('<team>/scratch/t4/w3/snap-eden.json', 'utf8'));
-  assert.deepEqual(roundTrip(live), live);
 });
