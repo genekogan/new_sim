@@ -10,7 +10,8 @@ import {collectTemplateAppearance,transferActorAppearance,type TemplateAppearanc
 import {BASE} from '../../../../apps/web/src/base-path.ts';
 import {CHARACTER_CLIPS,CHARACTER_WIRE} from './character-wire.ts';
 
-export const PEOPLE = ['casual', 'punk', 'woman'] as const;
+import { PEOPLE } from './people-light.ts';
+export { PEOPLE };
 export const PERSON_HEIGHT = 1.75;
 
 export type Template = {

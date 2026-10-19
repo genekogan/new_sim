@@ -22,6 +22,7 @@
 //   published, else the position delta), blended out within 0.2 s.
 // All of it is a pure function of (world history, entity id): no randomness.
 import * as THREE from 'three';
+import { hashId, humanGroundAt, humanGroundSampler, setHumanGround, templateNameFor } from './people-light.ts';
 import type { Entity, Pose, WorldState } from '../../engine/world/types.ts';
 import type { Vec3 } from '../../engine/core/math.ts';
 import type { Link } from '../../engine/spatial/types.ts';
@@ -227,14 +228,8 @@ const BEAM_WALK_W = 0.5; // Walk clip weight on a beam (short steps: half the le
 const BEAM_CADENCE = 1.8; // Walk clip rate multiplier on a beam (half-length steps at the same ground speed)
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
 
-function hashId(id: string) {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return h;
-}
-
-/** Exact legacy full-collection choice, also used while only required initial templates are loaded. */
-export function templateNameFor(id:string,order:readonly string[]){return order[hashId(id)%order.length];}
+// hashId, templateNameFor and the visual ground live in people-light.ts (a page loads them before this renderer)
+export { templateNameFor, setHumanGround, humanGroundAt };
 
 /** Stable template choice per actor id. */
 export function templateFor(id: string, ts: Template[]) {
@@ -1486,11 +1481,6 @@ function waterLegs(v:View,motion:WaterMotion){
 const _inv = new THREE.Matrix4();
 /** Lying on the back: each leg nearly straight from its hip along the body, a hand's width apart, the knee toward
  * the sky, the heel resting on the ground at `floor` (the foot keeps its clip angle, so the toes point up). */
-/** Visual ground under people lying down (the viewer sets it; the engine height is used where it is unset or far off). */
-let humanGround: ((x: number, z: number) => number | null) | null = null;
-export function setHumanGround(sample: ((x: number, z: number) => number | null) | null) { humanGround = sample; }
-/** The visual ground height at (x, z) where the viewer has set one (items lying around, edge items). */
-export function humanGroundAt(x: number, z: number): number | null { const g = humanGround?.(x, z); return g !== null && g !== undefined && Number.isFinite(g) ? g : null; }
 /** The ground a body lying along heading (c, s) from its hips at (x, z) rests on: the highest of the ground under
  * its head, back, hips and knees (so nothing sinks on a slope), never below the engine's own height. */
 const _tilt = new THREE.Quaternion(), _axis = new THREE.Vector3();
@@ -1498,6 +1488,7 @@ const _tilt = new THREE.Quaternion(), _axis = new THREE.Vector3();
  * ground under its head, back, hips and knees — height at the hips (never below the engine's own) and rise per metre
  * along the heading (0 on flat ground or without a ground sampler). */
 function lyingFloor(y: number, x: number, z: number, c: number, s: number) {
+  const humanGround = humanGroundSampler();
   if (!humanGround) return { y, k: 0 };
   const pts: [number, number][] = [];
   for (const d of [-1.45, -0.9, -0.4, 0, 0.5]) { const g = humanGround(x + c * d, z + s * d); if (g !== null && Number.isFinite(g) && Math.abs(g - y) < 0.8) pts.push([d, g]); }
@@ -1508,7 +1499,7 @@ function lyingFloor(y: number, x: number, z: number, c: number, s: number) {
   return { y: Math.max(y, mg - k * md), k: Math.abs(k) < 0.01 ? 0 : k };
 }
 /** Ground under a point (the viewer's visual ground where known, else the given floor). */
-const groundUnder = (x: number, z: number, floor: number) => { const g = humanGround?.(x, z); return g !== null && g !== undefined && Number.isFinite(g) && Math.abs(g - floor) < 0.8 ? g : floor; };
+const groundUnder = (x: number, z: number, floor: number) => { const g = humanGroundSampler()?.(x, z); return g !== null && g !== undefined && Number.isFinite(g) && Math.abs(g - floor) < 0.8 ? g : floor; };
 /** Lift (or lower) a body lying on its back so its torso / head rests just on the ground under each part of it. */
 function restOnGround(v: View, h: THREE.Object3D, floor: number, bench = 0) {
   h.updateMatrixWorld(true);

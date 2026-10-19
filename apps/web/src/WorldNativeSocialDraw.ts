@@ -12,6 +12,8 @@ function frozenCopy<T>(value:T):T {
   const freeze=(v:unknown)=>{if(v&&typeof v==='object'){for(const child of Object.values(v))freeze(child);Object.freeze(v);}};
   freeze(copy);return copy;
 }
+/** The one TakePeople method this draw uses (LiveWorld may hold a WorldLightPeople there on a phone's new world). */
+type FixtureDraw=Pick<TakePeople,'setFixtureDrawReplacement'>;
 /** Optional draw selection only. Unknown sources retain all original fixtures. */
 export class WorldNativeSocialDraw {
   private controller=createCachedLiveNativeSocial12Controller({fixtureViewsSHA256:'fb2b9a53d7672a59d3edcf69735f44d86339b0f9bf9917579a7788684bb13d1b',createViews:()=>new FixtureViews()});
@@ -21,12 +23,12 @@ export class WorldNativeSocialDraw {
   private records:Record<string,Entity>|null=null;
   private source: {publication:unknown;take:Take;records:Record<string,Entity>;epoch:object}|null=null;
   private closed=false;
-  reset(people:TakePeople|null){
+  reset(people:FixtureDraw|null){
     people?.setFixtureDrawReplacement(null);
     this.publication=undefined;this.publicationCopy=undefined;this.take=null;this.records=null;this.source=null;
     this.controller?.reset();
   }
-  update(people:TakePeople,publication:unknown,take:Take,records:Record<string,Entity>,frame:TakeFrame,enabled=true){
+  update(people:FixtureDraw,publication:unknown,take:Take,records:Record<string,Entity>,frame:TakeFrame,enabled=true){
     if(!enabled){if(this.publication!==undefined)this.reset(people);people.setFixtureDrawReplacement(null);return;}
     if(this.closed||!this.controller){people.setFixtureDrawReplacement(null);return;}
     try{
@@ -52,5 +54,5 @@ export class WorldNativeSocialDraw {
       try{this.controller.reset();}catch{/* Original fixture drawings are already restored. */}
     }
   }
-  dispose(people:TakePeople|null){if(this.closed)return;this.closed=true;try{this.reset(people);}finally{this.controller?.dispose();}}
+  dispose(people:FixtureDraw|null){if(this.closed)return;this.closed=true;try{this.reset(people);}finally{this.controller?.dispose();}}
 }

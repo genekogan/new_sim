@@ -10,16 +10,12 @@ import {classroomProjection,classroomScreenEntityId} from './classroom-projectio
 import {WorldSpeechOverlay} from './WorldSpeechOverlay.tsx';
 import { apiPath, worldPath } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import type { LogEvent } from '@sim/protocol';
 import { describeIntent } from '@sim/protocol';
 import { makeApi, useSim, type Sim } from './useSim.ts';
-import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
-import { AdminPanel } from './AdminPanel.tsx';
-import { SoulHome } from './SoulHome.tsx';
 import {WorldAccountControls} from './AccountMenu.tsx';
 import {SoulAccount} from './SoulAccount.tsx';
-import { ArchPanel } from './Arch.tsx';
 import {LocalIntegrationNotice,LocalConnectionHelp,DebugPanel} from './LocalIntegration.tsx';
 import './world-chrome.css';
 import {createApiRequest} from './api-request.ts';
@@ -41,14 +37,22 @@ import { worldKey } from './world-path.ts';
 // Soul, so the legacy Soul/account setup is hidden there. The old worlds (root build, these keys) keep main's (e8) Shell.
 import { newWorld as launcherWorld } from './world-kind.ts';
 import { joinLink } from './god-ui/join-api.ts';
-import { SpendPanel } from './Spend.tsx';
 import {soulFragment,soulFromFragment} from './soul-link.ts';
 import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
 import {publishSession,type SessionMode} from './auth-session.ts';
 import {getStatus as godStatus} from './god-ui/god-api.ts';
 import {worldTitle} from './world-title.ts';
 import { GodBolt } from './god-ui/GodBolt.tsx';
-import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
+// P1 phones: the advanced surface's panels are lazy chunks, fetched the first time the advanced surface shows them
+// (never on a world's arrival)
+const lazyNamed=<M,K extends keyof M>(load:()=>Promise<M>,name:K)=>lazy(()=>load().then(m=>({default:m[name] as ComponentType<any>})));
+const grammar=()=>import('./Grammar.tsx'),brainPanels=()=>import('./BrainPanels.tsx');
+const BrainPanel=lazyNamed(brainPanels,'BrainPanel'),BroadcastPanel=lazyNamed(brainPanels,'BroadcastPanel'),NarrativePanel=lazyNamed(brainPanels,'NarrativePanel');
+const AdminPanel=lazyNamed(()=>import('./AdminPanel.tsx'),'AdminPanel'),SoulHome=lazyNamed(()=>import('./SoulHome.tsx'),'SoulHome');
+const ArchPanel=lazyNamed(()=>import('./Arch.tsx'),'ArchPanel');
+const SpendPanel=lazyNamed(()=>import('./Spend.tsx'),'SpendPanel');
+const BacklogPanel=lazyNamed(grammar,'BacklogPanel'),HeardPanel=lazyNamed(grammar,'HeardPanel'),LibraryPanel=lazyNamed(grammar,'LibraryPanel'),NotebookPanel=lazyNamed(grammar,'NotebookPanel');
+const SentencesPanel=lazyNamed(grammar,'SentencesPanel'),ThingsPanel=lazyNamed(grammar,'ThingsPanel'),VocabularyPanel=lazyNamed(grammar,'VocabularyPanel');
 
 export type AuthCtx = {
   ready: boolean; authed: boolean; label: string | null; avatarUrl?:string|null; signInUrl?:string;
@@ -186,7 +190,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
       {advanced && <div className="advanced-surface">
       <nav aria-label="Advanced tools">{TABS.filter((t) => isAdmin || !ADMIN_TABS.has(t)).map((t) => <button key={t} className={t === tab ? 'on' : ''} onClick={() => { setPairCode(null); setTab(t); }}>{t}</button>)}{singleLocalPreview(location.hostname)?<span className="dim">World Lab · not connected locally</span>:<a href={`/l/${worldKey}`}>World Lab</a>}</nav>
       <main>
-        <div className="grid">
+        <Suspense fallback={null}><div className="grid">
           {tab === 'watch' && <Intro authed={auth.authed} login={auth.login} go={openAccount} souls={r.souls.size} />}
           {show('watch', 'world') && <WorldPanel sim={sim} mine={mine} selected={selected} onSelect={inspect} />}
           {show('watch', 'world', 'story') && <BroadcastPanel sim={sim} />}
@@ -207,7 +211,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
           {show('world', 'sync') && <LogPanel log={sim.log} sim={sim} />}
           {show('admin') && isAdmin && <AdminPanel key={privatePanelKey} sim={sim} api={api} />}
           {tab === 'architecture' && <ArchPanel sim={sim} cfg={cfg} />}
-        </div>
+        </div></Suspense>
       </main>
       </div>}
     </div>

@@ -1,5 +1,5 @@
 import { whenAssetsSettled } from './gen-mesh/gltf-assets.ts';
-import {ALL_OPTIONAL_APPEARANCE_PROFILES,optionalAppearanceProfilesForVerifiedCapture,type OptionalAppearanceProfiles} from './optional-appearance-profiles.ts';
+import {ALL_OPTIONAL_APPEARANCE_PROFILES,type OptionalAppearanceProfiles} from './optional-appearance-profiles-all.ts';
 import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
 import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
 import {exploreRoom} from './explore-data.ts';
@@ -40,22 +40,27 @@ const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
 import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
-import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CSS2DObject, CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { TakePeople } from '../../../mars/viewer/app/engine-view/take-replay.ts';
-import { loadTemplates,PEOPLE } from '../../../mars/viewer/app/engine-view/people.ts';
-import {templateNameFor} from '../../../mars/viewer/app/engine-view/humans.ts';
+import type { TakePeople } from '../../../mars/viewer/app/engine-view/take-replay.ts';
+import type { loadTemplates } from '../../../mars/viewer/app/engine-view/people.ts';
+import {PEOPLE,templateNameFor} from '../../../mars/viewer/app/engine-view/people-light.ts';
+import {WorldLightPeople} from './WorldLightPeople.ts';
+// P1 phones: the people renderer is a lazy chunk (people-kit.ts). Old worlds and desktops fetch it at once and wait for it
+// before their first frame; a phone's new world draws its first frames with WorldLightPeople and fetches it after arrival.
+let peopleKit:typeof import('./people-kit.ts')|null=null,peopleKitLoad:Promise<typeof import('./people-kit.ts')>|null=null;
+const loadPeopleKit=()=>peopleKitLoad??=import('./people-kit.ts').then(m=>peopleKit=m,e=>{peopleKitLoad=null;throw e;});
+if(!newWorld)void loadPeopleKit().catch(()=>{});
 import {depictedWorldLocations,type WorldLocation} from './WorldLocations.ts';
 import {InitialWorldReadiness,successfulInitialLookup,type InitialWorldProgress} from './InitialWorldReadiness.ts';
 import { FloaterView, KinScenery } from '../../../mars/viewer/app/engine-view/floaters.ts';
-import { floaterBody } from '../../../mars/viewer/engine/bodies/index.ts';
+import { floaterBody } from '../../../mars/viewer/engine/bodies/body.ts';
 import { ThreeResources } from '../../../mars/viewer/lib/three-resources.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 import type { SampledEntity } from '../../../mars/viewer/engine/take/replay.ts';
@@ -79,8 +84,11 @@ import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
-import { GodPanel } from './GodPanel.tsx';
-import { ConstitutionCard } from './god-ui/Constitution.tsx';
+// P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
+// at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
+const GodPanel=lazy(()=>import('./GodPanel.tsx').then(m=>({default:m.GodPanel})));
+const ConstitutionCard=lazy(()=>import('./god-ui/Constitution.tsx').then(m=>({default:m.ConstitutionCard})));
+const godUiAtOnce=typeof location!=='undefined'&&(!['','#','#watch'].includes(location.hash)||new URLSearchParams(location.search).has('preview'));
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
@@ -97,13 +105,12 @@ import {cameraGround,cameraGroundSampler,clearShotEye} from './WorldCameraGround
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
 import {WorldFollowMotion} from './WorldFollowMotion.ts';
 import { WorldBroadcast, type WorldCameraMode, type CarrierPose } from './WorldBroadcast.ts';
-import {createPublishedRestMarkers} from './WorldPublishedRestMarkers.mjs';
-import {publishedRestSelection} from './WorldRestSourceSelection.ts';
-import {createPublishedNewcomerMarkers} from './WorldPublishedNewcomerMarkers.ts';
-import {publishedNewcomerSelection} from './WorldPublishedNewcomerResources.ts';
-import {createCurrentSocialDressingOwner} from '../../../mars/viewer/app/engine-view/content/environment/current-social-dressing/dressing.ts';
-import {createNativeSocialPaths} from '../../../mars/viewer/app/engine-view/content/environment/native-social-paths/paths.ts';
-import {createCurrentProvisionsUnderstory,inspectCurrentProvisionsUnderstory,createLiveKitchenUnderstory,inspectLiveKitchenUnderstory,createLiveFoodShoreUnderstory,inspectLiveFoodShoreUnderstory,createLiveSocialUnderstory,inspectLiveSocialUnderstory,createLiveFoodBUnderstory,inspectLiveFoodBUnderstory} from '../../../mars/viewer/app/engine-view/content/environment/current-provisions-understory/current.mjs';
+// P1 phones: old worlds' captured-scene content is a lazy chunk (old-scene-kit.ts); an old world's page fetches it at once
+type OldSceneKit=typeof import('./old-scene-kit.ts');
+let oldKit:OldSceneKit|null=null,oldKitLoad:Promise<OldSceneKit>|null=null;
+const NO_OLD_PROFILES:OptionalAppearanceProfiles=Object.freeze({understory:false,nativeSocial:false});
+const loadOldKit=()=>oldKitLoad??=import('./old-scene-kit.ts').then(m=>oldKit=m,e=>{oldKitLoad=null;throw e;});
+if(!newWorld)void loadOldKit().catch(()=>{});
 import { cameraModeAfterGesture, createWorldViewerHandle, viewerPresentation, type WorldViewerHandle, type WorldViewerState } from './WorldViewer.ts';
 import {
   agoText, chunkAt, clockText, Daylight, mergeWindow, MAX_PAST_CHUNKS, parseSceneInfo, placeOf, plainWords, rewindWindow, recordingTick, shiftIso, validChunks, WorldGeometry,
@@ -205,6 +212,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [problems, setProblems] = useState<string[]>([]);
   const [flagMode, setFlagMode] = useState(false); const flagModeRef = useRef(false); flagModeRef.current = flagMode;
   const [entityWorld, setEntityWorld] = useState(false);
+  const [godUi, setGodUi] = useState(godUiAtOnce);
+  useEffect(() => { if (godUi) return; const abort = new AbortController(); void whenArrivalCardGone({ timeoutMs: 20_000, fadeMs: 0, signal: abort.signal }).then(() => { if (!abort.signal.aborted) setGodUi(true); }); return () => abort.abort(); }, [godUi]);
   // lane L3h: GodPanel reads its flags from this page's entity layer (no second snapshot download per edit)
   const entityLayerRef = useRef<WorldEntityLayer | null>(null);
   const entitiesAt = useCallback((seq: number) => entityLayerRef.current?.entitiesAt(seq) ?? null, []);
@@ -508,23 +517,26 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const templateOptions={appearances:humanPresets,onTemplate:(template:typeof templates[number])=>{const i=templates.findIndex(t=>t.name===template.name);if(i>=0)templates[i]=template;else templates.push(template);people?.setTemplates(templates);},onAsset:(name:string,phase:'start'|'loaded'|'failed')=>{if(phase==='start')downloads.start('person:'+name);else{downloads.finish('person:'+name,phase==='failed');const entry=templateLoads.get(name)!;if(phase==='loaded')entry.resolve();else{entry.failed=true;entry.reject(Error('Required person model '+name+' could not be loaded.'));}}}};
     // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
     // soon as an initial body needs one; old worlds load them at once, as before
-    let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});};
+    let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,templateOptions)).catch(()=>{});};
     if(!newWorld||shotMode)startTemplates();
-    const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
+    const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadPeopleKit().then(kit=>kit.loadTemplates(abort.signal,resources,{...templateOptions,names:[name]})).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
     // bound segments load their verified base; old unbound history uses neutral ground.
     let dayTicks: number | null = null;
-    let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | null = null;
+    let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | WorldLightPeople | null = null;
+    let peopleKitRetryAt=0;
     let appearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES;
-    let publication:unknown=null,restMarkers:ReturnType<typeof createPublishedRestMarkers>=null;
-    let newcomerMarkers:ReturnType<typeof createPublishedNewcomerMarkers>=null,newcomerMarkersFailed=false;
+    let publication:unknown=null,restMarkers:ReturnType<OldSceneKit['createPublishedRestMarkers']>=null;
+    let newcomerMarkers:ReturnType<OldSceneKit['createPublishedNewcomerMarkers']>=null,newcomerMarkersFailed=false;
     const clearNewcomerMarkers=()=>{const owner=newcomerMarkers;newcomerMarkers=null;newcomerMarkersFailed=false;try{owner?.dispose();}catch{if(!abort.signal.aborted)problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}};
-    const nativeSocialDraw=new WorldNativeSocialDraw();
-    let socialPaths:ReturnType<typeof createNativeSocialPaths>=null;
+    // made with the first verified capture (old worlds); without one, the original fixtures draw (what its update does then)
+    let nativeSocialDraw:InstanceType<OldSceneKit['WorldNativeSocialDraw']>|null=null;
+    const resetSocialDraw=()=>{if(nativeSocialDraw)nativeSocialDraw.reset(people);else people?.setFixtureDrawReplacement(null);};
+    let socialPaths:ReturnType<OldSceneKit['createNativeSocialPaths']>=null;
     const clearSocialPaths=()=>{const previous=socialPaths;socialPaths=null;try{previous?.dispose();}catch{problem('Some path scenery could not be shown; keeping the original ground.');}};
-    let planting:ReturnType<typeof createCurrentProvisionsUnderstory>=null,plantingFailed=false;
-    let connectedDressing:ReturnType<typeof createCurrentSocialDressingOwner>=null,connectedDressingFailed=false;
+    let planting:ReturnType<OldSceneKit['createCurrentProvisionsUnderstory']>=null,plantingFailed=false;
+    let connectedDressing:ReturnType<OldSceneKit['createCurrentSocialDressingOwner']>=null,connectedDressingFailed=false;
     const clearConnectedDressing=()=>{const owner=connectedDressing;connectedDressing=null;connectedDressingFailed=false;try{owner?.dispose();}catch{problem('Some greenery could not be shown; keeping the original scenery.');}};
     const visualObstructionRoots=()=>worldCameraRenderRoots(geometry.group,people?.obstructionRoots()??[],[planting?.group,connectedDressing?.group,expansion?.group,entityLayer.active?entityLayer.group:null]);  // new worlds: god-built terrain/things are what double-click and the camera hit (else the y=0 plane, inside hills)
     let nativeBoat:NonNullable<ConstructorParameters<typeof TakePeople>[1]>['nativeBoat'];
@@ -543,7 +555,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       speechVisibility.reset();
       const gate=newInitialGate();locationRegions=null;depictedLocations=[];placePreviews.invalidate();
       appearanceProfiles=profiles;
-      nativeSocialDraw.reset(people);
+      resetSocialDraw();
       clearExpansion();expansionFailed=false;
       clearConnectedDressing();
       planting?.dispose();planting=null;plantingFailed=false;
@@ -556,7 +568,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       geometry.dispose();geometry=new WorldGeometry(base,info.ground,info.commons,info.shore,info.assetRoot);scene.add(geometry.group);light.fit(geometry.bounds);light.setCommonsReadability(geometry.hasAuthoredCommons);dressForkLand(geometry.group);  // MARSLAND-FORK: layer 3 around the Mars fork
       // Cosmetic paths require the verified full public capture and exact Core
       // social layout. Unknown/legacy scenes retain their original appearance.
-      if((verifiedPublication as {body?:{scene?:{social?:{version?:unknown}}}}|undefined)?.body?.scene?.social?.version==='social-eden/1')try{socialPaths=createNativeSocialPaths(verifiedPublication,true);if(socialPaths)scene.add(socialPaths.group);}catch{}
+      if((verifiedPublication as {body?:{scene?:{social?:{version?:unknown}}}}|undefined)?.body?.scene?.social?.version==='social-eden/1'&&oldKit)try{socialPaths=oldKit.createNativeSocialPaths(verifiedPublication,true);if(socialPaths)scene.add(socialPaths.group);}catch{}
       if(base)framing.initial(()=>overview(geometry.bounds));
       kin.place(info.kin);sceneSettled=true;
       const owner=geometry,assetBytes=(url:string,event:ProgressEvent)=>gate.download(url,event.loaded,event.lengthComputable?event.total:null);
@@ -577,7 +589,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const request=++sceneRequest;sceneKey=key;sceneRetryAt=Infinity;sceneSettled=false;initialGate?.cancel();setInitialProgress({generation:initialGeneration,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
       staticBatches.reset();batchGeometry=null;batchRevision=-1;
       speechVisibility.reset();
-      nativeSocialDraw.reset(people);
+      resetSocialDraw();
       clearSocialPaths();
       clearConnectedDressing();
       sceneHistory.cancel();planting?.dispose();planting=null;plantingFailed=false;clearNewcomerMarkers();restMarkers?.dispose();restMarkers=null;publication=null;expansionSceneInfo=null;people?.dispose();people=null;applied=null;floaters.sync(new Map());kin.place([]);standIns.clear();
@@ -594,7 +606,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }else if(mismatch){failLayout('The scenery reference does not match this recording.');}
       else void sceneHistory.resolve(reference).then(result=>{
         if(!active())return;
-        if(result.status==='bound'){installScene(result.info,result.publication,optionalAppearanceProfilesForVerifiedCapture(result.publication,context.current.sim.conn.welcome?.worldId??'',result.ref));sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';}
+        if(result.status==='bound'){
+          const bind=(kit:OldSceneKit|null)=>{if(!active())return;installScene(result.info,result.publication,kit?kit.optionalAppearanceProfilesForVerifiedCapture(result.publication,context.current.sim.conn.welcome?.worldId??'',result.ref):NO_OLD_PROFILES);sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';};
+          // a new world's capture is never one of the old pinned captures the kit dresses: it binds at once, without the kit
+          if(newWorld)bind(null);else void loadOldKit().then(bind,()=>{if(active())failLayout('The scenery for this recording could not be loaded. Retry to try again.');});
+        }
         else if(result.status!=='stale'){failLayout(result.reason);}
       });
       return false;
@@ -694,32 +710,37 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }
 
       const candidate = chunkAt(chunks, tick);
-      const pick = candidate && ensureScene(candidate.chunk,!!past.current,now) ? candidate : null;
+      // the people renderer: at once on desktops and old worlds (no frame until it is here), after the arrival on a phone's
+      // new world (WorldLightPeople until then); a failed fetch is retried every 5 s
+      if(!peopleKit&&(!peopleLater||arrivalOver())&&now>=peopleKitRetryAt){peopleKitRetryAt=now+5000;void loadPeopleKit().catch(()=>{});}
+      const pick = candidate && ensureScene(candidate.chunk,!!past.current,now) && (peopleKit!==null||peopleLater) ? candidate : null;
       frameGap = !!pick && !pick.exact;
       if (pick) {
         const chunk = pick.chunk, take = chunk.take;
         const depictedTick = recordingTick(chunk, tick);
         try {
+          if(people instanceof WorldLightPeople&&peopleKit){scene.remove(people.group);people.dispose();people=null;applied=null;}  // the renderer has loaded: the same take, drawn
           if (!people) {
-            people = new TakePeople(take, { scene: base ?? undefined,nativeBoat,commonsContrast:geometry.hasAuthoredCommons,humanPresets:humanPresets&&geometry.hasAuthoredCommons });
+            people = peopleKit ? new peopleKit.TakePeople(take, { scene: base ?? undefined,nativeBoat,commonsContrast:geometry.hasAuthoredCommons,humanPresets:humanPresets&&geometry.hasAuthoredCommons }) : new WorldLightPeople(take);
             people.setTemplates(templates);
             people.setBodyTemplates(bodyModels.templates);
             scene.add(people.group);
           }
           if (chunk !== applied) {
-            if(!restMarkers&&publication){const choice=publishedRestSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice){restMarkers=createPublishedRestMarkers(publication,take,choice,{enabled:true});if(restMarkers)scene.add(restMarkers.group);}}
+            const kit=publication?oldKit:null;
+            if(!restMarkers&&kit){const choice=kit.publishedRestSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice){restMarkers=kit.createPublishedRestMarkers(publication,take,choice,{enabled:true});if(restMarkers)scene.add(restMarkers.group);}}
             restMarkers?.setTake(take);
-            if(!newcomerMarkers&&!newcomerMarkersFailed&&publication){const choice=publishedNewcomerSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice)try{newcomerMarkers=createPublishedNewcomerMarkers(publication,take,choice,{enabled:true});if(newcomerMarkers)scene.add(newcomerMarkers.group);}catch{newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}}
+            if(!newcomerMarkers&&!newcomerMarkersFailed&&kit){const choice=kit.publishedNewcomerSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice)try{newcomerMarkers=kit.createPublishedNewcomerMarkers(publication,take,choice,{enabled:true});if(newcomerMarkers)scene.add(newcomerMarkers.group);}catch{newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}}
             if(newcomerMarkers)try{newcomerMarkers.setTake(take);}catch{clearNewcomerMarkers();newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}
-            if(!planting&&!plantingFailed&&publication&&appearanceProfiles.understory){
-              let createPlanting:typeof createCurrentProvisionsUnderstory|undefined;
-              try{if(inspectCurrentProvisionsUnderstory(publication,take,{enabled:true}))createPlanting=createCurrentProvisionsUnderstory;else if(inspectLiveKitchenUnderstory(publication,take,{enabled:true}))createPlanting=createLiveKitchenUnderstory;else if(inspectLiveFoodShoreUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodShoreUnderstory;else if(inspectLiveSocialUnderstory(publication,take,{enabled:true}))createPlanting=createLiveSocialUnderstory;else if(inspectLiveFoodBUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodBUnderstory;}catch{}
+            if(!planting&&!plantingFailed&&kit&&appearanceProfiles.understory){
+              let createPlanting:OldSceneKit['createCurrentProvisionsUnderstory']|undefined;
+              try{if(kit.inspectCurrentProvisionsUnderstory(publication,take,{enabled:true}))createPlanting=kit.createCurrentProvisionsUnderstory;else if(kit.inspectLiveKitchenUnderstory(publication,take,{enabled:true}))createPlanting=kit.createLiveKitchenUnderstory;else if(kit.inspectLiveFoodShoreUnderstory(publication,take,{enabled:true}))createPlanting=kit.createLiveFoodShoreUnderstory;else if(kit.inspectLiveSocialUnderstory(publication,take,{enabled:true}))createPlanting=kit.createLiveSocialUnderstory;else if(kit.inspectLiveFoodBUnderstory(publication,take,{enabled:true}))createPlanting=kit.createLiveFoodBUnderstory;}catch{}
               if(createPlanting)try{planting=createPlanting(publication,take,{enabled:true});if(planting)scene.add(planting.group);}catch{plantingFailed=true;problem('Some planting could not be shown; keeping the original scenery.');}
             }
             if(planting)try{planting.setTake(take);}catch{const failed=planting;planting=null;plantingFailed=true;try{failed.dispose();}catch{}problem('Some planting could not be shown; keeping the original scenery.');}
             // Eligibility reserves the whole recorded chunk; never rehash it per display frame.
-            if(publication&&!connectedDressingFailed&&appearanceProfiles.understory){
-              if(!connectedDressing)try{connectedDressing=createCurrentSocialDressingOwner(publication,take,true);if(connectedDressing)scene.add(connectedDressing.group);}catch{connectedDressingFailed=true;}
+            if(kit&&!connectedDressingFailed&&appearanceProfiles.understory){
+              if(!connectedDressing)try{connectedDressing=kit.createCurrentSocialDressingOwner(publication,take,true);if(connectedDressing)scene.add(connectedDressing.group);}catch{connectedDressingFailed=true;}
               else try{connectedDressing.setTake(take);}catch{clearConnectedDressing();connectedDressingFailed=true;}
             }
             people.setTake(take,gaitContinuity.offsets(chunks,chunk));
@@ -746,7 +767,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           floaters.sync(sampledFloaters);
           if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
 
-          nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);
+          if(publication&&oldKit)nativeSocialDraw??=new oldKit.WorldNativeSocialDraw();
+          if(nativeSocialDraw)nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);else people.setFixtureDrawReplacement(null);
           geometry?.setRecordedFixtures(sampled.entities,records);
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);expansionWantedNow=expansionWanted;
@@ -1041,7 +1063,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       fading.dispose();
       balloonRide.dispose();
       placeActivity.dispose();
-      try{nativeSocialDraw.dispose(people);}catch{problem('Some fixture scenery could not be released.');}
+      try{nativeSocialDraw?.dispose(people);}catch{problem('Some fixture scenery could not be released.');}
       clearConnectedDressing();
       abort.abort();manager.abort();
       speechVisibility.reset();
@@ -1180,8 +1202,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const cards = cardsAt(sim.plays, s.tick);
   return (
     <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, ...(entityWorld ? { position: 'relative' as const } : {}) } : (entityWorld ? { position: 'relative' } : undefined)}>
-      {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} entitiesAt={entitiesAt} />}
-      {entityWorld && <ConstitutionCard />}
+      {entityWorld && godUi && <Suspense fallback={null}><GodPanel flagMode={flagMode} onFlagMode={setFlagMode} entitiesAt={entitiesAt} /><ConstitutionCard /></Suspense>}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}

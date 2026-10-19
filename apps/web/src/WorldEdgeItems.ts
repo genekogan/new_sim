@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {makeProp,PROPS,type PropKind} from '../../../mars/viewer/app/engine-view/activity-poses.ts';
-import {humanGroundAt} from '../../../mars/viewer/app/engine-view/humans.ts';
+import {humanGroundAt} from '../../../mars/viewer/app/engine-view/people-light.ts';
 /** Things lying around (together/1 items, EDGE-CONTRACT §7d): the public `GET /v1/edge/items` list drawn as small props
  * on the ground at their `at`. Read-only and cosmetic: polled every few seconds; nothing here can pick up or move an item. */
 export type EdgeItem={id:string;kind:string;name?:string;state:string;at:[number,number]|null;placeId?:string|null;holder?:string|null};

@@ -3,8 +3,8 @@ import {detachedData} from './owned-live-chunks.ts';
 import {CURRENT_UNDERSTORY_CAPTURE_HASHES,LIVE_NATIVE_SOCIAL_CAPTURE_HASHES} from '../../../mars/viewer/app/engine-view/content/environment/current-provisions-understory/current.mjs';
 const understoryHashes=new Set(CURRENT_UNDERSTORY_CAPTURE_HASHES);
 const socialHashes=new Set(LIVE_NATIVE_SOCIAL_CAPTURE_HASHES);
-export type OptionalAppearanceProfiles=Readonly<{understory:boolean;nativeSocial:boolean}>;
-export const ALL_OPTIONAL_APPEARANCE_PROFILES:OptionalAppearanceProfiles=Object.freeze({understory:true,nativeSocial:true});
+import {ALL_OPTIONAL_APPEARANCE_PROFILES,type OptionalAppearanceProfiles} from './optional-appearance-profiles-all.ts';
+export {ALL_OPTIONAL_APPEARANCE_PROFILES,type OptionalAppearanceProfiles};
 /** Only call after WorldSceneHistory's content-hash/world/ref verification.
  * Unknown or hostile reference shapes keep the complete original guard path.
  * An incompatible verified capture cannot qualify these pinned old profiles.

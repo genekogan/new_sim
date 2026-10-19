@@ -17,7 +17,11 @@ import * as THREE from 'three';
 import {admittedBodyUrl} from './recorded-body.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { creatureOf, floaterBody, floaterModel, floaterPose, idPhase, type FloaterBody } from '../../engine/bodies/index.ts';
+// direct modules, not the bodies index (its float.ts movement brings the spatial service onto a page's first frame)
+import { creatureOf } from '../../engine/bodies/creatures.ts';
+import { floaterBody, type FloaterBody } from '../../engine/bodies/body.ts';
+import { floaterModel } from '../../engine/bodies/models.ts';
+import { floaterPose, idPhase } from '../../engine/bodies/pose.ts';
 import { buildCreature, creatureMode, type CreatureRig } from './creatures.ts';
 import type { SampledEntity } from '../../engine/take/replay.ts';
 import type { Body } from '../../engine/world/types.ts';

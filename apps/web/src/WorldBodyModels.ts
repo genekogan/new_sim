@@ -1,11 +1,12 @@
 import type {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import type {SampledEntity} from '../../../mars/viewer/engine/take/replay.ts';
-import {templateFromGltf,type Template} from '../../../mars/viewer/app/engine-view/people.ts';
+import type {Template} from '../../../mars/viewer/app/engine-view/people.ts';
 import {recordedBody,admittedBodyUrl} from '../../../mars/viewer/app/engine-view/recorded-body.ts';
 import {worldPath} from './world-path.ts';
 import {validateBodyRig} from '../../../mars/viewer/app/engine-view/body-rig.ts';
-import {humanoidKit} from './humanoid/compose.ts';
 import {LOOK_MODEL} from './humanoid/look.ts';
+// P1 phones: the template builders (people.ts, humanoid/compose.ts) load with the first body that needs one, not on arrival
+const people=()=>import('../../../mars/viewer/app/engine-view/people.ts'),compose=()=>import('./humanoid/compose.ts');
 /** Validated owner bodies remain separate from the stable built-in template choice. */
 export class WorldBodyModels{
  readonly templates=new Map<string,Template>();private pending=new Set<string>();private tasks=new Map<string,Promise<void>>();private failed=new Set<string>();private disposed=false;
@@ -20,12 +21,12 @@ export class WorldBodyModels{
    // core/humanoid@2: a look composed from the shared kit, keyed by the record's model (the look key).
    const look=(b as {params?:unknown}).params;
    if(look&&typeof b.model==='string'&&LOOK_MODEL.test(b.model)){const key=b.model;if(this.templates.has(key))continue;this.unresolved.add(id);if(this.held||this.pending.has(key)||this.failed.has(key))continue;this.pending.add(key);
-    void humanoidKit(this.loader).template(look).then(t=>{if(!this.disposed)this.templates.set(key,t);},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s chosen look could not be composed; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));
+    void compose().then(m=>m.humanoidKit(this.loader).template(look)).then(t=>{if(!this.disposed)this.templates.set(key,t);},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s chosen look could not be composed; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));
     continue;}
    if(!b.modelUrl)continue;
    const key=admittedBodyUrl(b.modelUrl);if(!key){this.unresolved.add(id);continue;}if(this.templates.has(key))continue;this.unresolved.add(id);if(this.held||this.pending.has(key)||this.failed.has(key))continue;this.pending.add(key);
    const url=admittedBodyUrl(key,worldPath)!;
-   const task=this.loader.loadAsync(url).then(gltf=>{if(this.disposed){disposeModel(gltf.scene);return;}try{validateBodyRig(gltf);this.templates.set(key,templateFromGltf(b.model??key,gltf));}catch(error){disposeModel(gltf.scene);throw error;}},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded body could not be shown; a simple figure marks its position.');}).catch(()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded rig could not be shown; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));this.tasks.set(key,task);
+   const task=Promise.all([this.loader.loadAsync(url),people()]).then(([gltf,{templateFromGltf}])=>{if(this.disposed){disposeModel(gltf.scene);return;}try{validateBodyRig(gltf);this.templates.set(key,templateFromGltf(b.model??key,gltf));}catch(error){disposeModel(gltf.scene);throw error;}},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded body could not be shown; a simple figure marks its position.');}).catch(()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded rig could not be shown; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));this.tasks.set(key,task);
   }
  }
  async readyInitial(records:Readonly<Record<string,{kind:string;body?:unknown}>>,entities:Readonly<Record<string,SampledEntity>>){

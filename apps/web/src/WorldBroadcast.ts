@@ -6,7 +6,7 @@ import type { Observation } from '../../../mars/viewer/cinematography/types.ts';
 import type { SampledEntity } from '../../../mars/viewer/engine/take/replay.ts';
 import type { Entity } from '../../../mars/viewer/engine/world/types.ts';
 import type { SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
-import { floaterBody } from '../../../mars/viewer/engine/bodies/index.ts';
+import { floaterBody } from '../../../mars/viewer/engine/bodies/body.ts';
 import type { CameraPose, SubjectPose } from '../../../mars/viewer/engine/camera/shots.ts';
 import { WorldDirector, type DirectorChoice, type Landmark } from './WorldDirector.ts';
 import { WORLD_PLACE_VIEWS, REGION_PLACE_VIEWS } from './WorldPlaces.ts';
