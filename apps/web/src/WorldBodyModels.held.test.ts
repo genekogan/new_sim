@@ -18,7 +18,7 @@ test('held: unresolved, nothing fetched; released: the next sync fetches once', 
   assert.deepEqual(asked, []); assert.ok(m.unresolved.has('s1'));
   m.held = false;
   m.sync(records, entities); m.sync(records, entities);
-  assert.equal(asked.length, 1); assert.ok(asked[0].endsWith(url)); assert.ok(m.unresolved.has('s1'));
+  assert.equal(asked.length, 1); assert.ok(String(asked[0]).endsWith(url)); assert.ok(m.unresolved.has('s1'));
 });
 
 test('not held (desktop, old worlds): the first sync fetches', () => {
