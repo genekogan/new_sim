@@ -86470,11 +86470,13 @@
             "gates": [
               {
                 "at": 9,
-                "width": 2.2
+                "width": 2.2,
+                "state": "open"
               },
               {
                 "at": 57.75,
-                "width": 2.2
+                "width": 2.2,
+                "state": "open"
               }
             ]
           }

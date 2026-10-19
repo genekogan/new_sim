@@ -158,7 +158,7 @@ function landmarkOps() {
     place('core/string-lights@1', 'resort-ferris-lights', [184, 130.4]),
     // playground: a sandy yard in a red picket fence with gates on the avenue side and the west
     place('core/sand-patch@1', 'park-playground-sand', null, { shape: { area: [[10, 96.5], [26, 96.5], [26, 109], [10, 109]] }, params: { material: 'sand', edge: 0.6 } }),
-    place('core/fence@1', 'park-playground-fence', null, { shape: { path: [[9, 95.5], [27, 95.5], [27, 110], [9, 110], [9, 95.5]] }, params: { style: 'picket', color: '#c43a2a', height: 0.9, gates: [{ at: 9, width: 2.2 }, { at: 57.75, width: 2.2 }] } }),
+    place('core/fence@1', 'park-playground-fence', null, { shape: { path: [[9, 95.5], [27, 95.5], [27, 110], [9, 110], [9, 95.5]] }, params: { style: 'picket', color: '#c43a2a', height: 0.9, gates: [{ at: 9, width: 2.2, state: 'open' }, { at: 57.75, width: 2.2, state: 'open' }] } }),
     // amphitheatre: painted stage floor under the microphone, two speakers either side facing the steps
     place('eden-stage-floor@1', 'amphitheatre-stage-floor', [76, 80.6]),
     place('core/speaker@1', 'amphitheatre-speaker-1', [73.3, 79.4]),
