@@ -209,6 +209,8 @@ def merge_v5(out, shard_jobs, shard_logs, suite, problems):
     if [g[0] for g in got] != list(range(1, n + 1)):
         problems.append(f"V5 shards missing/duplicated: {[g[0] for g in got]}")
         return ["V5-server-full", "SHARDS-MISSING", "0", "-"]
+    if all(g[2] == "SKIP" for g in got):  # --skip V5: every shard skipped the step, like the serial run
+        return ["V5-server-full", "SKIP", "0", "-"]
     groups_dir = os.path.join(out, "out", "groups")
     alls, cover = set(), []
     for i, *_ in got:
@@ -227,7 +229,10 @@ def merge_v5(out, shard_jobs, shard_logs, suite, problems):
         exit_ = bad[0] if bad else str(max(int(e) for e in exits))
     with open(os.path.join(suite, "V5-server-full.log"), "wb") as w:
         for i, *_ in got:
-            with open(os.path.join(groups_dir, f"v5-{i}", "V5-server-full.log"), "rb") as r:
+            p = os.path.join(groups_dir, f"v5-{i}", "V5-server-full.log")
+            if not os.path.exists(p):
+                problems.append(f"V5 shard {i}: no log"); exit_ = "SHARD-LOG-MISSING"; continue
+            with open(p, "rb") as r:
                 shutil_copy(r, w)
     with open(os.path.join(suite, "V5-server-full-files.jsonl"), "wb") as w:
         for i, *_ in got:
