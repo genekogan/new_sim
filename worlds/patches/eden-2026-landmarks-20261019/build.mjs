@@ -9,7 +9,8 @@
 //
 // Added: the cable car (pylons, cables, two cabins) between the alpine stations; a sun terrace with parasol tables below
 // the mountain restaurant; the big top's canopy restyled (red and white stripes, a striped canvas skirt round the hall, open
-// at both doors) with bunting avenues to its doors (three flags and one festoon moved clear of the canvas); a ticket booth,
+// at both doors) with bunting avenues to its doors (three flags and one festoon moved clear of the canvas); two beached
+// marina sailboats moved onto the water; a ticket booth,
 // flags and festoon lights at the Ferris wheel; a sandy, picket-fenced playground yard; a painted stage floor and two
 // speakers at the amphitheatre. Heights along the cable car come from Eden 2026's own terrain (sampled once, below).
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -139,6 +140,7 @@ function stageFloorDef() {
 }
 
 // ---------- the batch ----------
+const TERRACE_Y = 35.4; // the mountain restaurant's floor level
 const place = (def, name, p, extra = {}) => ({ op: 'place', def, name, ...(p ? { p } : {}), ...extra });
 function landmarkOps() {
   const ops = [
@@ -146,9 +148,13 @@ function landmarkOps() {
     // cable car, at the valley station with its height given (anchor center: no settling, no pad)
     place('eden-cable-car@1', 'alpine-cable-car', [VALLEY.x, VALLEY.g, VALLEY.z], { anchor: 'center' }),
     // mountain restaurant sun terrace, level with the restaurant's pad, on its downhill side
-    place('core/terrace@1', 'land-alpine-restaurant-terrace', null, { shape: { area: [[6.5, -297.5], [16, -297.5], [16, -291.5], [6.5, -291.5]] }, params: { level: 35.4, edge: 3 } }),
-    ...[[8.6, -295.6], [12.8, -295.6], [8.6, -292.9], [12.8, -292.9]].map(([x, z], i) => place('core/parasol-table@1', `alpine-terrace-table-${i + 1}`, [x, z], { params: { canopy: i % 3 === 1 ? CREAM : '#c43a2a' } })),
-    place('core/string-lights@1', 'alpine-terrace-lights', [11.2, -291.9]),
+    // (flat to its edges, edge 1: with a wide blend the tables' pads settled at different heights, 2 m apart, and no chair
+    // had standing room; it stops short of the restaurant's footprint so the restaurant keeps its own level)
+    place('core/terrace@1', 'land-alpine-restaurant-terrace', null, { shape: { area: [[5, -297.5], [17, -297.5], [17, -290.5], [5, -290.5]] }, params: { level: TERRACE_Y, edge: 1 } }),
+    // tables and lights at the terrace's level (y given): settled in the same batch as the terrace, each table cut its own
+    // pad at the slope's height, a metre or two below the terrace
+    ...[[8.5, -295.5], [13.5, -295.5], [8.5, -292.5], [13.5, -292.5]].map(([x, z], i) => place('core/parasol-table@1', `alpine-terrace-table-${i + 1}`, [x, TERRACE_Y, z], { params: { canopy: i % 3 === 1 ? CREAM : '#c43a2a' } })),
+    place('core/string-lights@1', 'alpine-terrace-lights', [11, TERRACE_Y, -291.2]),
     // fair: bunting avenues to the big top's two doors
     ...[[272, 75], [282, 75], [272, 29], [282, 29]].map(([x, z], i) => place('eden-bunting@1', `fair-bunting-${i + 1}`, [x, z], { r: 1.5708 })),
     // Ferris wheel: ticket booth, two flags and festoon lights at its front (the wheel and its ride are unchanged)
@@ -166,8 +172,11 @@ function landmarkOps() {
   ];
   return ops;
 }
-// existing things moved clear of the big top's new canvas (they stood where the skirt now hangs)
-const MOVES = { 'festival-flag-1': [270.8, 34.5], 'festival-flag-2': [276, 34.5], 'festival-flag-3': [284, 34.5], 'festival-lights-2': [262.5, 69.5] };
+// existing things moved: clear of the big top's new canvas (they stood where the skirt now hangs), and the marina's two
+// inshore sailboats (their row at z 151 is dry beach): moored either side of the first pontoon's head (x 121.5-126.5,
+// z 167-172), in 5.5 m of water
+const MOVES = { 'festival-flag-1': [270.8, 34.5], 'festival-flag-2': [276, 34.5], 'festival-flag-3': [284, 34.5], 'festival-lights-2': [262.5, 69.5],
+  'marina-sailboat-3': [119.6, 169.5], 'marina-sailboat-4': [128.4, 169.5] };
 
 const tpl = JSON.parse(readFileSync(TPL, 'utf8'));
 tpl.batches = tpl.batches.filter((b) => b.note !== NOTE);
@@ -176,7 +185,15 @@ for (const b of tpl.batches) for (const o of b.ops) {
   if (o.op === 'define' && o.def.name === 'eden-big-top-canopy') { o.def = bigTopCanopyDef(); redefined++; }
   if (o.op === 'place' && MOVES[o.name] && (o.in?.parent ?? 'world') === 'world') { o.p = MOVES[o.name]; moved++; }
 }
-if (redefined !== 1 || moved !== Object.keys(MOVES).length) throw new Error(`template drifted: redefined ${redefined}, moved ${moved}`);
+// the alpine switchback: ungraded, its last two legs climbed the summit's slope at 32-35 % across ground steeper than a
+// resident can walk (30 degrees), so the summit (mountain station, restaurant, terrace) was an island nobody reached on
+// foot. Now graded (<= 25 %), with the last climb as five shorter zigzags (raw leg grades 5-20 %) ending at the
+// restaurant's front; grading the old legs as they were cut the summit down by 6-8 m.
+const SWITCHBACK = [[-20, -134], [-45, -177], [23, -201], [-31, -235], [26, -260], [-24, -266], [22, -273], [-22, -280], [20, -287], [-18, -293], [1, -297]];
+const PARAMS = { 'land-alpine-switchback': { width: 3, maxGrade: 0.25 } };
+let reparamed = 0;
+for (const b of tpl.batches) for (const o of b.ops) if (o.op === 'place' && PARAMS[o.name] && (o.in?.parent ?? 'world') === 'world') { o.params = { ...o.params, ...PARAMS[o.name] }; o.shape = { path: SWITCHBACK }; reparamed++; }
+if (redefined !== 1 || moved !== Object.keys(MOVES).length || reparamed !== Object.keys(PARAMS).length) throw new Error(`template drifted: redefined ${redefined}, moved ${moved}`);
 tpl.batches.push({ note: NOTE, group: 'eden-2026', ops: landmarkOps() });
 writeFileSync(TPL, JSON.stringify(tpl, null, 2) + '\n');
-console.log(JSON.stringify({ template: TPL, added: tpl.batches.at(-1).ops.length, redefined, moved }));
+console.log(JSON.stringify({ template: TPL, added: tpl.batches.at(-1).ops.length, redefined, moved, reparamed }));

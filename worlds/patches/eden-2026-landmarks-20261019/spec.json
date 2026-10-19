@@ -2,13 +2,13 @@
  "schema": "template-upgrade/1",
  "id": "eden-2026-landmarks-20261019",
  "world": "eden-2026",
- "from": "d12d90d5",
+ "from": "2dbd1790",
  "to": "e2-landmarks",
  "counts": {
   "define": 4,
   "add": 20,
   "remove": 0,
-  "change": 4
+  "change": 7
  },
  "items": [
   {
@@ -2893,6 +2893,173 @@
   },
   {
    "kind": "change",
+   "path": "land-alpine-switchback",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -18,
+       -284
+      ],
+      [
+       6,
+       -303
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.2,
+     "material": "gravel",
+     "maxGrade": 0,
+     "autoBridge": false,
+     "edging": false
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -24,
+       -266
+      ],
+      [
+       22,
+       -273
+      ],
+      [
+       -22,
+       -280
+      ],
+      [
+       20,
+       -287
+      ],
+      [
+       -18,
+       -293
+      ],
+      [
+       1,
+       -297
+      ]
+     ]
+    },
+    "params": {
+     "width": 3,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "marina-sailboat-3",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     121.4,
+     151
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     119.6,
+     169.5
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "marina-sailboat-4",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     126.6,
+     151
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     128.4,
+     169.5
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
+  {
+   "kind": "change",
    "path": "festival-lights-2",
    "parent": null,
    "old": {
@@ -3012,26 +3179,26 @@
     "shape": {
      "area": [
       [
-       6.5,
+       5,
        -297.5
       ],
       [
-       16,
+       17,
        -297.5
       ],
       [
-       16,
-       -291.5
+       17,
+       -290.5
       ],
       [
-       6.5,
-       -291.5
+       5,
+       -290.5
       ]
      ]
     },
     "params": {
      "level": 35.4,
-     "edge": 3
+     "edge": 1
     }
    }
   },
@@ -3045,8 +3212,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-1",
     "p": [
-     8.6,
-     -295.6
+     8.5,
+     35.4,
+     -295.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3063,8 +3231,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-2",
     "p": [
-     12.8,
-     -295.6
+     13.5,
+     35.4,
+     -295.5
     ],
     "params": {
      "canopy": "#f4efe4"
@@ -3081,8 +3250,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-3",
     "p": [
-     8.6,
-     -292.9
+     8.5,
+     35.4,
+     -292.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3099,8 +3269,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-4",
     "p": [
-     12.8,
-     -292.9
+     13.5,
+     35.4,
+     -292.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3117,8 +3288,9 @@
     "def": "core/string-lights@1",
     "name": "alpine-terrace-lights",
     "p": [
-     11.2,
-     -291.9
+     11,
+     35.4,
+     -291.2
     ]
    }
   },
@@ -3391,6 +3563,80 @@
   }
  ],
  "oldUnits": {
+  "land-alpine-switchback": {
+   "land-alpine-switchback": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -18,
+       -284
+      ],
+      [
+       6,
+       -303
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.2,
+     "material": "gravel",
+     "maxGrade": 0,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  "marina-sailboat-3": {
+   "marina-sailboat-3": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     121.4,
+     151
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  "marina-sailboat-4": {
+   "marina-sailboat-4": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     126.6,
+     151
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
   "festival-lights-2": {
    "festival-lights-2": {
     "op": "place",
@@ -3437,6 +3683,96 @@
   }
  },
  "newUnits": {
+  "land-alpine-switchback": {
+   "land-alpine-switchback": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -24,
+       -266
+      ],
+      [
+       22,
+       -273
+      ],
+      [
+       -22,
+       -280
+      ],
+      [
+       20,
+       -287
+      ],
+      [
+       -18,
+       -293
+      ],
+      [
+       1,
+       -297
+      ]
+     ]
+    },
+    "params": {
+     "width": 3,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  "marina-sailboat-3": {
+   "marina-sailboat-3": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     119.6,
+     169.5
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  "marina-sailboat-4": {
+   "marina-sailboat-4": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     128.4,
+     169.5
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
   "festival-lights-2": {
    "festival-lights-2": {
     "op": "place",
@@ -3502,26 +3838,26 @@
     "shape": {
      "area": [
       [
-       6.5,
+       5,
        -297.5
       ],
       [
-       16,
+       17,
        -297.5
       ],
       [
-       16,
-       -291.5
+       17,
+       -290.5
       ],
       [
-       6.5,
-       -291.5
+       5,
+       -290.5
       ]
      ]
     },
     "params": {
      "level": 35.4,
-     "edge": 3
+     "edge": 1
     }
    }
   },
@@ -3531,8 +3867,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-1",
     "p": [
-     8.6,
-     -295.6
+     8.5,
+     35.4,
+     -295.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3545,8 +3882,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-2",
     "p": [
-     12.8,
-     -295.6
+     13.5,
+     35.4,
+     -295.5
     ],
     "params": {
      "canopy": "#f4efe4"
@@ -3559,8 +3897,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-3",
     "p": [
-     8.6,
-     -292.9
+     8.5,
+     35.4,
+     -292.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3573,8 +3912,9 @@
     "def": "core/parasol-table@1",
     "name": "alpine-terrace-table-4",
     "p": [
-     12.8,
-     -292.9
+     13.5,
+     35.4,
+     -292.5
     ],
     "params": {
      "canopy": "#c43a2a"
@@ -3587,8 +3927,9 @@
     "def": "core/string-lights@1",
     "name": "alpine-terrace-lights",
     "p": [
-     11.2,
-     -291.9
+     11,
+     35.4,
+     -291.2
     ]
    }
   },

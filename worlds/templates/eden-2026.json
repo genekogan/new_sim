@@ -60040,19 +60040,35 @@
                 -260
               ],
               [
-                -18,
-                -284
+                -24,
+                -266
               ],
               [
-                6,
-                -303
+                22,
+                -273
+              ],
+              [
+                -22,
+                -280
+              ],
+              [
+                20,
+                -287
+              ],
+              [
+                -18,
+                -293
+              ],
+              [
+                1,
+                -297
               ]
             ]
           },
           "params": {
-            "width": 2.2,
+            "width": 3,
             "material": "gravel",
-            "maxGrade": 0,
+            "maxGrade": 0.25,
             "autoBridge": false,
             "edging": false
           }
@@ -63715,8 +63731,8 @@
           "def": "core/sailboat@1",
           "name": "marina-sailboat-3",
           "p": [
-            121.4,
-            151
+            119.6,
+            169.5
           ],
           "params": {
             "sail": "#fbf8f0"
@@ -63727,8 +63743,8 @@
           "def": "core/sailboat@1",
           "name": "marina-sailboat-4",
           "p": [
-            126.6,
-            151
+            128.4,
+            169.5
           ],
           "params": {
             "sail": "#7bb37a"
@@ -86240,26 +86256,26 @@
           "shape": {
             "area": [
               [
-                6.5,
+                5,
                 -297.5
               ],
               [
-                16,
+                17,
                 -297.5
               ],
               [
-                16,
-                -291.5
+                17,
+                -290.5
               ],
               [
-                6.5,
-                -291.5
+                5,
+                -290.5
               ]
             ]
           },
           "params": {
             "level": 35.4,
-            "edge": 3
+            "edge": 1
           }
         },
         {
@@ -86267,8 +86283,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-1",
           "p": [
-            8.6,
-            -295.6
+            8.5,
+            35.4,
+            -295.5
           ],
           "params": {
             "canopy": "#c43a2a"
@@ -86279,8 +86296,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-2",
           "p": [
-            12.8,
-            -295.6
+            13.5,
+            35.4,
+            -295.5
           ],
           "params": {
             "canopy": "#f4efe4"
@@ -86291,8 +86309,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-3",
           "p": [
-            8.6,
-            -292.9
+            8.5,
+            35.4,
+            -292.5
           ],
           "params": {
             "canopy": "#c43a2a"
@@ -86303,8 +86322,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-4",
           "p": [
-            12.8,
-            -292.9
+            13.5,
+            35.4,
+            -292.5
           ],
           "params": {
             "canopy": "#c43a2a"
@@ -86315,8 +86335,9 @@
           "def": "core/string-lights@1",
           "name": "alpine-terrace-lights",
           "p": [
-            11.2,
-            -291.9
+            11,
+            35.4,
+            -291.2
           ]
         },
         {

@@ -96,3 +96,19 @@ for (const boxIn of [false, true]) test(`sit on a two-seat bench: ${boxIn ? 'the
   assert.ok(boxIn ? x > 0.3 : x < -0.3, `she sits on the ${boxIn ? 'right' : 'left'} seat (x ${x.toFixed(2)} from the bench centre)`);
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('on ground, a seat on a hillside is on the ground (level 0), not the upper floor nearest its height', (t) => {
+  // E2 (2026-10-19): Eden 2026's alpine terrace tables stand 35.4 m up; their seats took the nearest registered floor
+  // (an upper storey elsewhere) and had no standing room round them. Flat worlds keep nearest-floor-by-height.
+  const id = assetIdFor(facts, '{"hill":1}');
+  registerAssets({ [id]: assetFromDef(id, facts) });
+  t.after(() => { delete CATALOG[id]; });
+  const levels = [{ id: 0, y: 0 }, { id: 1, y: 33.2 }, { id: 2, y: 38.2 }];
+  const at = (y: number) => ({ id: 'chair', def: id, pose: { p: [8, y, -295], yaw: 0 } }) as Entity;
+  const hill = { services: { spatial: { base: { levels }, ground: { standY: (x: number, z: number) => (x === 8 && z === -295 ? 35.4 : 0) } } }, holder: () => [] } as unknown as Runtime;
+  assert.equal(fixtureSlots(hill, at(35.4))[0].level, 0, 'on the hillside ground');
+  assert.equal(fixtureSlots(hill, at(38.2))[0].level, 2, 'an upstairs seat on the hill keeps its floor');
+  const flat = { services: { spatial: { base: { levels } } }, holder: () => [] } as unknown as Runtime;
+  assert.equal(fixtureSlots(flat, at(35.4))[0].level, 1, 'without ground: nearest floor by height, as before');
+  assert.equal(fixtureSlots(flat, at(0))[0].level, 0);
+});
