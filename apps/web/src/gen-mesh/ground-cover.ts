@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import type { WorldModel } from '@sim/world-compiler';
 import { blockCellsOf, BLOCK_CELL } from './ecology.mesh.ts';
+import { browserQuality } from '../quality-tier.ts';
 import { COVER_CELL, KINDS, REC, cellKind, cellSites, coverIndex, coverPalette, prefix, type CoverIndex, type Site } from './ground-cover-recipe.ts';
 
 /** Per kind: full density within d0 (m), thinning as (d0/d)^exp, gone by dmax; survivors grow by up to maxScale. */
@@ -24,6 +25,13 @@ const LOD: Record<(typeof KINDS)[number], { d0: number; dmax: number; exp: numbe
 const keepAt = (k: (typeof KINDS)[number], d: number) => { const l = LOD[k]; if (d >= l.dmax) return 0; const f = Math.pow(l.d0 / Math.max(d, l.d0), l.exp); const e = (d - l.dmax * 0.75) / (l.dmax * 0.25); return e > 0 ? f * (1 - e * e * (3 - 2 * e)) : f; };
 const MAX_D = Math.max(...Object.values(LOD).map((l) => l.dmax));
 const MOVE = 2.5, DEAL_MS = 3, KEEP_CELLS = 1400;
+
+/** On or off for this page: off on the phone tier (P1's browserQuality), `?cover=0|1` overrides either way. */
+export function coverSetting(search = typeof location === 'undefined' ? '' : location.search, tier: { tier: string; reason: string } = browserQuality()): { enabled: boolean; reason: string } {
+  const q = new URLSearchParams(search).get('cover');
+  if (q === '0' || q === '1') return { enabled: q === '1', reason: `?cover=${q}` };
+  return tier.tier === 'phone' ? { enabled: false, reason: `phone tier (${tier.reason})` } : { enabled: true, reason: tier.reason };
+}
 
 // ---------------------------------------------------------------- geometry (root at the origin, up = +y, normals up)
 function geo(p: number[], c: number[], petal?: number[]) {

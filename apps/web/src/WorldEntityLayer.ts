@@ -25,6 +25,7 @@ import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
 import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
+import { GroundCover, coverSetting } from './gen-mesh/ground-cover.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number>; builds?: PublicSite[]; buildsRev?: number; now?: number };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -54,6 +55,8 @@ export class WorldEntityLayer {
   readonly lib = new MaterialLib();
   readonly instancer = new EntityInstancer();
   readonly sites: WorldBuildSites;
+  /** W4: old Eden's tall grass, tufts and wildflowers, drawn around the camera from the ground recipe. */
+  readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting());
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
@@ -75,7 +78,7 @@ export class WorldEntityLayer {
       return r.json();
     } });
     this.group.name = 'entity-world';
-    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup, this.instancer.group, this.sites.group);
+    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup, this.instancer.group, this.sites.group, this.cover.group);
   }
 
   private signal: AbortSignal | null = null;
@@ -324,6 +327,7 @@ export class WorldEntityLayer {
   dispose() {
     this.sites.dispose();
     this.instancer.dispose();
+    this.cover.dispose();
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);

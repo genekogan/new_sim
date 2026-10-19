@@ -70,3 +70,12 @@ test('desert ground grows nothing unless an explicit meadow is placed', () => {
   assert.ok(deal(oasis, 2, 0, 0, 32, 32).length > 30);
   assert.equal(siteAt(oasis, 9999, 0, false), null, 'outside the world');
 });
+
+test('cover is on for desktop, ?cover=0|1 overrides', async () => {
+  const { coverSetting } = await import('./ground-cover.ts');
+  assert.equal(coverSetting('').enabled, true);
+  assert.deepEqual(coverSetting('?cover=0'), { enabled: false, reason: '?cover=0' });
+  const phone = { tier: 'phone', reason: 'touch screen' };
+  assert.equal(coverSetting('', phone).enabled, false);
+  assert.equal(coverSetting('?cover=1', phone).enabled, true);
+});
