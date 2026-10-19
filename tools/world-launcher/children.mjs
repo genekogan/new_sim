@@ -32,6 +32,7 @@ export class ChildPool {
    *           soulCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
+   * sleepMs (lane P3): freezeIdle() freezes a world nobody asked anything for that long (see there); 0/absent: never.
    */
   constructor(o) {
     this.o = o;
@@ -107,7 +108,7 @@ export class ChildPool {
   /** The next launcher's canary failed (keeper.mjs): this pool runs its worlds again. */
   unfence() { this.fenced = false; }
   /** The running children, for the next launcher to adopt. */
-  handoverList() { return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
+  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
 
   /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
   async reapOrphans() {
@@ -119,7 +120,7 @@ export class ChildPool {
       let cmdline = '';
       try { process.kill(pid, 0); cmdline = execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }); } catch { continue; }
       if (!script || !cmdline.includes(script)) continue;   // the pid was reused by something else: leave it alone
-      try { process.kill(pid, 'SIGTERM'); } catch { continue; }
+      try { process.kill(pid, 'SIGCONT'); process.kill(pid, 'SIGTERM'); } catch { continue; }   // (a frozen orphan saves only once thawed)
       for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); } catch { break; } await sleep(100); }
       try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
       reaped.push({ slug, pid });
@@ -143,11 +144,34 @@ export class ChildPool {
     victim.asleep = true;
     return victim.slug;
   }
+  /** Freeze idle worlds (lane P3, 2026-10-19): a running world nobody has asked anything for `sleepMs`, with no viewer
+   *  and nothing in flight (busy), is stopped in place (SIGSTOP): no CPU at all, its memory and port kept, its clock
+   *  stopped (world time does not pass while it sleeps, as across a restart). The next request thaws it at once
+   *  (ensure), so waking costs nothing like a boot (Eden 2026 boots in ~8 s). Memory still comes back the old way:
+   *  makeRoom() evicts the least recently used idle world, frozen or not, when a boot needs room. */
+  freezeIdle(now = Date.now()) {
+    const ms = this.o.sleepMs ?? 0;
+    if (!(ms > 0) || this.closing || this.fenced || this.gate) return [];
+    const frozen = [];
+    for (const k of this.kids.values()) {
+      if (k.frozen || k.status !== 'running' || !k.child || k.adopted || k.ready || k.stopped || now - (k.lastUsed ?? 0) < ms || this.o.busy?.(k.slug)) continue;
+      try { k.child.kill('SIGSTOP'); } catch { continue; }
+      k.frozen = true; k.frozenAt = now; frozen.push(k.slug); this.o.onChange?.(k.slug);
+    }
+    return frozen;
+  }
+  /** Wake a frozen world (SIGCONT); it counts as just used. */
+  thaw(k) {
+    if (!k?.frozen) return;
+    k.frozen = false; k.frozenAt = null; k.lastUsed = Date.now();
+    try { k.child?.kill('SIGCONT'); } catch { /* gone */ }
+    this.o.onChange?.(k.slug);
+  }
   state(slug) { return this.kids.get(slug) ?? null; }
   status(slug) {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
-    return { status: k.asleep && k.status === 'stopped' ? 'asleep' : k.status, port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
+    return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
   usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).map((k) => k.port).filter(Boolean)); }
@@ -164,6 +188,7 @@ export class ChildPool {
     let k = this.kids.get(world.slug);
     if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
     if (k) k.lastUsed = Date.now();
+    if (k?.frozen) this.thaw(k);
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
     // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here
@@ -246,7 +271,7 @@ export class ChildPool {
 
   onExit(k, child, code, signal) {
     if (k.child !== child) return;
-    k.child = null; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
+    k.child = null; k.frozen = false; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
     if (this.closing || k.stopped || this.fenced) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
     if (k.status === 'starting') return;  // boot() reports it (to ensure()'s caller, or to the restart loop)
     this.scheduleRestart(k);
@@ -269,6 +294,7 @@ export class ChildPool {
     if (k.adopted) return;   // the previous launcher's child: only it stops it (handover release)
     k.stopped = true; if (k.timer) clearTimeout(k.timer);
     const c = k.child; if (!c) { k.status = 'stopped'; return; }
+    this.thaw(k);   // a frozen world handles SIGTERM (saves its snapshot) only once it runs again
     c.kill('SIGTERM');
     await Promise.race([new Promise((r) => c.once('exit', r)), sleep(10_000)]);
     if (c.exitCode === null && c.signalCode === null) c.kill('SIGKILL');
