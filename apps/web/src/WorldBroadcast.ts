@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
+import { arrivalOver } from './arrival-marks.ts';
 import { Director } from '../../../mars/viewer/cinematography/director.ts';
 import type { Observation } from '../../../mars/viewer/cinematography/types.ts';
 import type { SampledEntity } from '../../../mars/viewer/engine/take/replay.ts';
@@ -222,7 +223,7 @@ export class WorldBroadcast {
   private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[], tour: WorldTour = this.tour) {
     let prepared = false;
     const ready = () => { if (!prepared) { this.rendered.prepare(renderRoots); prepared = true; } };
-    const pose = tour.pose(wallSeconds, { daylight, prefer,
+    const pose = tour.pose(wallSeconds, { daylight, prefer, quick: !arrivalOver(),
       clear: p => { ready(); return this.rendered.evaluate(() => this.rendered.clear(p, .8)); },
       sight: (a, b) => { ready(); const length = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); return this.rendered.evaluate(() => this.rendered.reach(a, b)) >= Math.min(length * .6, 25); },
       open: p => { ready(); return this.rendered.evaluate(() => this.rendered.reach(p, [p[0], p[1] + 40, p[2]])) >= 39; } });

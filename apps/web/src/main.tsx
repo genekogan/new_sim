@@ -4,6 +4,7 @@ import {singleLocalPreview} from './local-navigation.ts';
 import {BASE} from './base-path.ts';
 import {installCdnAssets} from './cdn-assets.ts';
 import {takeConfigPrefetch} from './snapshot-prefetch.ts';
+import {takeInlineConfig} from './inline-config.ts';
 import cdnManifestUrl from './cdn-manifest.json?url';
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -74,7 +75,7 @@ function WorldRoot() {
   useEffect(()=>{const changed=()=>setHash(location.hash);addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { let tries = 0; const go = () => { (takeConfigPrefetch(apiPath('/v1/config')) ?? fetch(apiPath('/v1/config'))).then(r=>readWorldBootstrap(r,worldKey,worldPath)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
+  useEffect(() => { let tries = 0; const go = () => { ((tries === 0 ? takeInlineConfig() ?? takeConfigPrefetch(apiPath('/v1/config')) : null) ?? fetch(apiPath('/v1/config'))).then(r=>readWorldBootstrap(r,worldKey,worldPath)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
   if (err) return <pre>cannot reach the server: {err}</pre>;
   if (!cfg) return <pre>connecting…</pre>;
   const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');

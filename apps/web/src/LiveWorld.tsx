@@ -36,7 +36,7 @@ import {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/conte
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {arrivalMark} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark,whenArrivalCardGone} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
@@ -335,7 +335,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
       if(entityLayer.active&&typeof renderer.compileAsync==='function'){programsPending=true;const done=()=>{programsPending=false;arrivalMark('programs-linked');};void Promise.race([renderer.compileAsync(scene,camera),new Promise(r=>setTimeout(r,3000))]).then(done,done);}
       // r2.1: and after the first world clock reaches the lights (all views/frames of `look --hour` honour the hour)
-      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});await new Promise<void>(r=>{afterNextDraw=r;});requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      if(shotMode){await whenAssetsSettled();await whenShotClock(()=>light.daylight!==null,{timeoutMs:shotHour!==null?15_000:4_000,signal:abort.signal});await whenArrivalCardGone({signal:abort.signal});await new Promise<void>(r=>{afterNextDraw=r;});requestAnimationFrame(()=>requestAnimationFrame(()=>{
         if(abort.signal.aborted)return;document.title=entityLayer.active?'ready':'no-entity-world';
         (window as unknown as {__shotReady?:boolean}).__shotReady=true;window.dispatchEvent(new Event('sim-shot-ready'));
       }));}

@@ -35,6 +35,7 @@ import { mountGodRoutes } from './god/routes.ts';
 import {VerifyUse} from './god/verify-use.ts';
 import { mountModeration } from './moderation/routes.ts';
 import { mountEdgeSnapshot, safeKey, snapshotKey, withSnapshotKey } from './edge-snapshot.ts';
+import { withInlineConfig } from './inline-config.ts';
 import { mountSharedLibraryRoutes } from './god/shared-library.ts';
 import { mountArtRoutes } from './art/routes.ts';
 import { defaultAssetDir } from './god/assets.ts';
@@ -147,7 +148,10 @@ export function buildApp(d: Deps) {
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>d.cfg.publicUrl:baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
-  app.get('/v1/config', (c) => c.json({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',resetPhoto:'DELETE /v1/souls/:id/photo',autoPortrait:portraits.enabled,photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldName: displayWorldName, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  // lane W1: the same config goes into the world page's <head> (inline-config.ts)
+  const configOf = (c: Context) => ({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',resetPhoto:'DELETE /v1/souls/:id/photo',autoPortrait:portraits.enabled,photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldName: displayWorldName, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build });
+  app.get('/v1/config', (c) => c.json(configOf(c)));
+  const safeConfig = (c: Context) => { try { return configOf(c); } catch { return null; } };  // the page never fails because of it
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => {
@@ -477,7 +481,7 @@ export function buildApp(d: Deps) {
     const currentIndex = () => { try { const m = statSync(indexPath).mtimeMs; if (m !== indexMtime) { index = readFileSync(indexPath, 'utf8'); indexMtime = m; } } catch { /* keep the last good index */ } return index; };
     app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); });
     app.use('/assets/*', serveStatic({ root: d.cfg.webDir }));
-    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(withSnapshotKey(currentIndex(), safeKey(currentSnapshotKey)), 200, { 'Cache-Control': 'no-cache' })));
+    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(withInlineConfig(withSnapshotKey(currentIndex(), safeKey(currentSnapshotKey)), safeConfig(c)), 200, { 'Cache-Control': 'no-cache' })));
   } else app.get('/', (c) => c.text('Sim server is running. The web app has not been built (pnpm build).'));
   return app;
 }
