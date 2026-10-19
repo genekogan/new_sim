@@ -41,7 +41,7 @@ function frozenMatrixWorld(this: THREE.Object3D) { /* nothing: thawed before any
 const _box = new THREE.Box3(), _projScreen = new THREE.Matrix4();
 
 type Figure = { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: [THREE.Object3D | null, THREE.Object3D | null] } | { missingAt: number };
-type Drawn = { inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; thaw?: boolean; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number; glowOnly: boolean } };
+type Drawn = { interior?: { key: number; host: Drawn | null; slot: string }; inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; thaw?: boolean; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number; glowOnly: boolean } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -234,7 +234,6 @@ export class WorldEntityLayer {
     // plane at y ≈ 0 would cover every pond, river and cut below it)
     if (baseGround) baseGround.traverse((o) => { if ((o.name === 'outside-ground' || o.name === 'commons-ground' || (o.parent === baseGround && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry?.type === 'PlaneGeometry')) && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
     this.interiorFar.clear();
-    if (this.interiorHosts.size > this.drawn.size * 2 + 64) this.interiorHosts.clear();
     const frame = ++this.frame;
     // P1 phones: frozen things skip the matrix walk on the promise that what they hang from does not move; if it ever does, thaw all
     if (this.freezeSettled && !this.thingsGroup.matrixWorld.equals(this.frozenUnder)) { this.frozenUnder.copy(this.thingsGroup.matrixWorld); for (const d of this.drawn.values()) if (d.frozen) this.thaw(d); }
@@ -248,7 +247,7 @@ export class WorldEntityLayer {
       const glowing = this.freezeSettled && !!d.motion?.glowOnly;
       if (d.settled && !d.inst && (!d.motion || glowing) && !d.removing && !this.overrides.has(id) && !this.held.has(id)) {
         // phone tier: visibility (interior storeys, far furniture) is checked every other frame
-        if (!this.freezeSettled || !d.frozen || ((k + frame) & 1) === 0) d.obj.visible = this.interiorVisible(id);
+        if (!this.freezeSettled || !d.frozen || ((k + frame) & 1) === 0) d.obj.visible = this.interiorVisible(id, d);
         if (glowing && d.obj.visible && ((k + frame) & (d.offscreen ? 15 : 3)) === 0) animate(d.obj, d.motion!.entity, d.motion!.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion!.yaw });
         if (this.freezeSettled && !d.frozen && !d.noFreeze) this.freeze(d);
         continue;
@@ -259,7 +258,7 @@ export class WorldEntityLayer {
       const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
-      const shown = this.interiorVisible(id);
+      const shown = this.interiorVisible(id, d);
       const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
@@ -364,29 +363,29 @@ export class WorldEntityLayer {
   freezeSettled = false;
   interiorRange = 30;
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
-  private interiorVisible(id: string): boolean {
+  private interiorVisible(id: string, d: Drawn): boolean {
     if (!this.model) return true;
     // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
-    // not by walking the parent chain of all ~4,800 things every frame; each building's answer is memoised per frame
-    const key = `${this.seq}:${this.drawn.size}`;
-    let c = this.interiorHosts.get(id);
-    if (!c || c.key !== key) {
+    // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
+    const key = this.seq * 1_048_576 + this.drawn.size;
+    let c = d.interior;
+    if (!c || c.key !== key || (c.host && !c.host.obj.parent)) {  // (a host redrawn since: find it again)
       c = { key, host: null, slot: '' };
       let e = this.model.entities.get(id), slot = e?.in.slot;
       for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
-        if (this.drawn.get(e.in.parent)?.obj.userData.interior) { c.host = e.in.parent; c.slot = slot ?? ''; break; }
+        const h = this.drawn.get(e.in.parent);
+        if (h?.obj.userData.interior) { c.host = h; c.slot = slot ?? ''; break; }
         e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
       }
-      this.interiorHosts.set(id, c);
+      d.interior = c;
     }
     if (c.host === null) return true;
-    const hostObj = this.drawn.get(c.host)?.obj, host = hostObj?.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
-    if (!hostObj || !host) return true;
+    const hostObj = c.host.obj, host = hostObj.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
+    if (!host) return true;
     let far = this.interiorFar.get(hostObj);
     if (far === undefined) { far = !!this.interiorFrom && hostObj.parent === this.thingsGroup && hostObj.position.distanceToSquared(this.interiorFrom) > this.interiorRange * this.interiorRange; this.interiorFar.set(hostObj, far); }
     return !far && (host.floorOf[c.slot] ?? 0) <= host.cut();
   }
-  private interiorHosts = new Map<string, { key: string; host: string | null; slot: string }>();
   private interiorFar = new Map<THREE.Object3D, boolean>();
 
   /** A box worth looking at first: the placed things if any, else the middle of the world. */

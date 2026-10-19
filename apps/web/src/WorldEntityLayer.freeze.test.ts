@@ -126,3 +126,23 @@ test('desktop (freezeSettled off): nothing freezes and cull is a no-op', async (
   assert.equal(behind.obj.visible, true);
   assert.equal(layer.cullStats.culled, 0);
 });
+
+test('interior storeys: a thing on a storey above the building\'s cut is hidden; the host is found again after a redraw', async () => {
+  const { layer, inner, put, frame } = await layerFor(true);
+  const host = put('house', [0, 0, 0]);
+  let cut = 0; host.obj.userData.interior = { cut: () => cut, floorOf: { up: 1, down: 0 } };
+  const up = put('lamp-up', [0, 3, 0]), down = put('lamp-down', [1, 0, 0]);
+  const ent = (id: string, parent: string, slot?: string) => [id, { id, def: 'x@1', in: { parent, ...(slot ? { slot } : {}) } }] as const;
+  (inner as unknown as { model: unknown }).model = { entities: new Map([ent('house', 'world'), ent('lamp-up', 'house', 'up'), ent('lamp-down', 'house', 'down')]), resolvedDef: () => null };
+  frame(); frame();
+  assert.equal(up.obj.visible, false, 'storey 1 above cut 0');
+  assert.equal(down.obj.visible, true);
+  cut = 1; frame(); frame();
+  assert.equal(up.obj.visible, true, 'the cut moved up');
+  // the building is redrawn (new object, same id): its things follow the new one's cut
+  const again = put('house', [0, 0, 0]); inner.thingsGroup.remove(host.obj);
+  again.obj.userData.interior = { cut: () => 0, floorOf: { up: 1, down: 0 } };
+  frame(); frame();
+  assert.equal(up.obj.visible, false);
+  void layer;
+});
