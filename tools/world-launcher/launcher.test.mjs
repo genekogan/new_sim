@@ -146,6 +146,47 @@ test('with every port taken, the least recently used idle world sleeps to make r
     assert.deepEqual(await kids(), { first: 'running', second: 'asleep' });
   } finally { await L2.close(); }
 });
+test('an idle world falls asleep (frozen in place) and wakes at once on its next visit; a watched or busy one stays awake', async () => {
+  const P = 6204, base = `http://127.0.0.1:${P}`;
+  const L4 = await openLauncher({ port: P, range: [6202, 6203], dataDir: join(dir, 'data-sleep'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {} });
+  const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
+  const { execFileSync } = await import('node:child_process');
+  const stateOf = (pid) => execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim()[0];
+  try {
+    for (const name of ['Idle', 'Held']) assert.equal((await fetch(`${base}/__sim/worlds`, { method: 'POST', body: JSON.stringify({ name }) })).status, 201);
+    // a viewer on Held keeps it awake
+    const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write('GET /w/held/ws HTTP/1.1\r\nHost: x\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n')); s.once('data', () => yes(s)); s.on('error', no); });
+    for (let i = 0; i < 40 && (await kids()).idle !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(await kids(), { idle: 'asleep', held: 'running' });
+    const k = L4.pool.state('idle'); assert.equal(k.frozen, true);
+    assert.equal(stateOf(k.child.pid), 'T', 'the process is stopped, not exited');
+    const pid = k.child.pid;
+    // a monitor's health read is answered (the world wakes for it) but is not a visit: the world goes back to sleep
+    assert.equal((await fetch(`${base}/w/idle/healthz`)).status, 200);
+    for (let i = 0; i < 40 && (await kids()).idle !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal((await kids()).idle, 'asleep', 'a passive read does not keep it awake');
+    const t0 = Date.now(); const r = await fetch(`${base}/w/idle/slow?ms=1`); const wakeMs = Date.now() - t0;
+    assert.equal(r.status, 200); assert.ok(wakeMs < 500, `woke in ${wakeMs} ms`);
+    assert.equal(L4.pool.state('idle').child.pid, pid, 'the same process, thawed');
+    assert.equal((await kids()).idle, 'running');
+    // a request in flight (a god's long-poll) keeps a world awake past the idle time
+    const slow = fetch(`${base}/w/idle/slow?ms=1200`);
+    await new Promise((r) => setTimeout(r, 1000));
+    assert.equal((await kids()).idle, 'running', 'busy with a long request');
+    assert.equal((await slow).status, 200);
+    ws.destroy();
+    for (let i = 0; i < 40 && Object.values(await kids()).some((s) => s !== 'asleep'); i++) await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(await kids(), { idle: 'asleep', held: 'asleep' }, 'with the viewer gone, Held sleeps too');
+    // a handover hands the next launcher running processes only: everything asleep is thawed first
+    const list = L4.pool.handoverList();
+    assert.deepEqual(list.map((x) => x.slug).sort(), ['held', 'idle']);
+    for (const x of list) assert.notEqual(stateOf(x.pid), 'T');
+    for (let i = 0; i < 40 && (await kids()).held !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100));
+    // a frozen world still stops cleanly (thawed first, so it handles SIGTERM)
+    const exited = new Promise((r) => L4.pool.state('held').child.once('exit', (code, signal) => r(signal ?? code)));
+    await L4.pool.stop('held'); assert.ok(['SIGTERM', 0].includes(await exited));
+  } finally { await L4.close(); }
+});
 test('children a hard-killed launcher left behind are stopped before their worlds start again', async () => {
   const { spawn } = await import('node:child_process');
   const orphan = spawn(process.execPath, [fake], { env: { ...process.env, WORLD_KEY: 'orphan', PORT: '6208' }, stdio: 'ignore' });

@@ -90,6 +90,10 @@ export const ROOT = resolve(here, '../..');
 /** The Soul CLI and guides every world serves unless overridden (tools/world-launcher/soul/SOURCES.json). */
 /** Keep-alive idle timeout of the public server: longer than Caddy's upstream idle timeout (2 min). */
 export const KEEP_ALIVE_MS = 130_000;
+/** Freeze a world nobody has asked anything for this long (children.mjs freezeIdle; --sleep-ms, 0 = never). Lane P3. */
+export const SLEEP_MS = 10 * 60_000;
+/** Reads that only report on a world (health, config, the homepage's numbers): answered, but not a visit. */
+const PASSIVE_READ = /\/w\/[a-z][a-z0-9-]{0,31}\/(?:healthz|v1\/config|v1\/god\/status|v1\/world\/souls)\/?$/;
 export const SOUL = { cli: join(here, 'soul/eden-agent.mjs'), skill: join(here, 'soul/skill.md'), instructions: join(here, 'soul/instructions.md') };
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.md': 'text/markdown; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers }).end(JSON.stringify(body)); };
@@ -102,7 +106,7 @@ const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', 
 
 /**
  * @param {{ port?: number, dataDir?: string, range?: [number, number], root?: string, webDir?: string,
- *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, command?: Function, log?: (s: string) => void,
+ *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, sleepMs?: number, command?: Function, log?: (s: string) => void,
  *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,
  *           minFreeMb?: number, worldHeapMb?: number, createLimit?: number, base?: string,
  *           soulCli?: string, soulSkill?: string, soulInstructions?: string, maxWorldsPerAccount?: number,
@@ -146,6 +150,8 @@ export async function openLauncher(cfg = {}) {
   const createLimit = cfg.createLimit ?? Infinity, made = new Map();
   /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
   const live = new Map();
+  /** HTTP requests in flight per world (a god's long-poll listen): such a world is not idle either. */
+  const httpLive = new Map();
   /** What the launcher sees go past, per world (not persisted beyond the registry's own fields). */
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
@@ -155,7 +161,7 @@ export async function openLauncher(cfg = {}) {
   const siteKey = randomBytes(32).toString('hex');
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
   const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
-    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) { d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; if (oldRoot) Object.assign(d.env, { SIM_FORK_ROOT: '1', INVITE_REQUIRED: '0', SEED_NATIVES: '0' }); } return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0 || (httpLive.get(slug) ?? 0) > 0, sleepMs: cfg.sleepMs ?? SLEEP_MS, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) { d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; if (oldRoot) Object.assign(d.env, { SIM_FORK_ROOT: '1', INVITE_REQUIRED: '0', SEED_NATIVES: '0' }); } return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? templateList({ all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -419,7 +425,12 @@ export async function openLauncher(cfg = {}) {
     if (!w) return anyRunning();
     try { return await pool.ensure(worldEnv(w)); } catch { return anyRunning(); }
   };
-  const anyRunning = () => { const up = registry.worlds.filter((w) => pool.status(w.slug).status === 'running'); const w = up.find((x) => !x.fork) ?? up[0]; return w ? pool.status(w.slug).port ?? null : null; };
+  const anyRunning = () => {
+    const up = registry.worlds.filter((w) => pool.status(w.slug).status === 'running');
+    let w = up.find((x) => !x.fork) ?? up[0];
+    if (!w) { const frozen = registry.worlds.filter((x) => pool.state(x.slug)?.frozen); w = frozen.find((x) => !x.fork) ?? frozen[0]; if (w) pool.thaw(pool.state(w.slug)); }   // all asleep: wake one
+    return w ? pool.status(w.slug).port ?? null : null;
+  };
   // P2: a public page GET must not rewrite worlds.json synchronously each time (a look loop would): one save per 2 s at most
   let saveTimer = null;
   const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; registry.save(); }, 2000); saveTimer.unref?.(); };
@@ -457,14 +468,20 @@ export async function openLauncher(cfg = {}) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
     }
+    // a monitor's or the homepage's read (health, config, status, no token) is answered, waking the world if it sleeps, but
+    // is not a visit: it neither keeps the world awake nor counts as its last use (lane P3; sim-watch polls every 5 min)
+    const passive = PASSIVE_READ.test(url.pathname) && (req.method === 'GET' || req.method === 'HEAD') && !req.headers.authorization;
     let p;
-    try { p = await pool.ensure(worldEnv(w)); }
+    try { p = await pool.ensure(worldEnv(w), { passive }); }
     catch (e) {
       if (e.code === 'handed-over' && retiredTo) { forward(req, res); return; }
       // our canary failed and the world is going back to the previous launcher: wait for the keeper to switch back
       if (await waitHandBack(slug, e)) { forward(req, res); return; }
       json(res, 503, { ok: false, code: 'world.unavailable', slug, message: e.message }, { 'retry-after': '3' }); return;
     }
+    // a request in flight (a god's long-poll listen, a slow upload) keeps the world awake (pool busy), and its end counts as use
+    httpLive.set(slug, (httpLive.get(slug) ?? 0) + 1);
+    res.once('close', () => { const n = (httpLive.get(slug) ?? 1) - 1; if (n > 0) httpLive.set(slug, n); else httpLive.delete(slug); const k = pool.state(slug); if (k && !passive) k.lastUsed = Date.now(); });
     const rest = retried ? url.pathname : observe(slug, req, url);
     if (req.method === 'POST' && CLAIM_PATHS.has(rest) && claimLocked(w)) { json(res, 403, { ok: false, code: 'not-claimable', message: 'this world is not open for claiming' }); return; }
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
@@ -575,6 +592,7 @@ export async function openLauncher(cfg = {}) {
         const s = seenOf(w.slug);
         if (one[2]) {
           // previews are the god's unpublished plans: only for a holder of this world's god token
+          if (pool.state(w.slug)?.frozen) pool.thaw(pool.state(w.slug));   // asleep: the token is checked by the world itself
           const st = pool.status(w.slug); const auth = req.headers.authorization;
           const okToken = st.status === 'running' && auth && await fetch(`http://127.0.0.1:${st.port}/w/${w.slug}/v1/god/edits?limit=1`, { headers: { authorization: auth }, signal: AbortSignal.timeout(2000) }).then((r) => r.ok, () => false);
           if (!okToken) { json(res, 401, { ok: false, code: 'unauthorized', message: 'a god token for this world is required' }); return; }
@@ -670,6 +688,10 @@ export async function openLauncher(cfg = {}) {
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
   const wakeRecent = () => { for (const w of [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).slice(0, cfg.eager ?? 4)) if (pool.status(w.slug).status !== 'running') pool.ensure(worldEnv(w)).then((p) => log(`woke ${w.slug} on :${p}`), (e) => log(`could not wake ${w.slug}: ${e.message}`)); };
   if (!adopting) wakeRecent();   // a handover wakes nothing until it has taken over (takeOverAll)
+  // idle worlds sleep (frozen in place) and wake on their next request; see ChildPool.freezeIdle
+  const sleepMs = cfg.sleepMs ?? SLEEP_MS;
+  const sweep = sleepMs > 0 ? setInterval(() => { for (const slug of pool.freezeIdle()) log(`${slug} is asleep (nobody for ${sleepMs / 1000} s)`); }, Math.min(15_000, Math.max(250, sleepMs / 4))) : null;
+  sweep?.unref();
 
   return {
     server, url: origin, registry, pool, dataDir, auth: auth?.public ?? { provider: 'dev' }, build: BUILD,
@@ -752,7 +774,7 @@ export async function openLauncher(cfg = {}) {
      *  a held port every moment here is refused connections, so it stops at once, as before. After a handover (`gentle`)
      *  the keeper's port is served by the next launcher, so that exit is gentle too. */
     close: async ({ drainMs = 3_000, idleMs = 1_500, gentle = process.env.SIM_PORT_HELD === '1' } = {}) => {
-      if (closed) return; closed = true;
+      if (closed) return; closed = true; clearInterval(sweep);
       const live = () => [...sockets].filter((s) => !s.simUpgraded);
       if (gentle) for (const t0 = Date.now(); live().length && Date.now() - t0 < drainMs && (Date.now() - t0 < idleMs || live().some((s) => s.simBusy));) await new Promise((r) => setTimeout(r, 20));
       const done = new Promise((r) => server.close(() => r()));   // (Node's close() also cuts idle connections: only now)
@@ -816,7 +838,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
-      maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
+      maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), sleepMs: num('sleep-ms'), createLimit: num('create-limit'),
       maxWorldsPerAccount: num('max-worlds-per-account'), newAccountHours: num('new-account-hours'), newAccountWorldLimit: num('new-account-world-limit'), newAccountCreateLimit: num('new-account-create-limit'), newAccountWindowMinutes: num('new-account-window-minutes'),
       marsWebDir: flag('mars-web'), cobuilders: argv.includes('--cobuilders') ? true : undefined, webDir: flag('web'), base: flag('base'), oldWorldsRoot: argv.includes('--old-worlds-root') ? true : undefined, soulCli: flag('soul-cli'), soulSkill: flag('soul-skill'), soulInstructions: flag('soul-instructions'),
       ...(underKeeper ? { listen: false, adopt: process.env.SIM_ADOPT ? JSON.parse(process.env.SIM_ADOPT) : null } : {}) });

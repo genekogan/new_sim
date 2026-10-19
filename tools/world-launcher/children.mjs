@@ -5,7 +5,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { memAvailableMb, prewarmBlocked, rotateLog } from './production.mjs';
+import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
 export const STANDBY_MARK = '[standby] ready';
@@ -32,6 +32,7 @@ export class ChildPool {
    *           soulCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
+   * sleepMs (lane P3): freezeIdle() freezes a world nobody asked anything for that long (see there); 0/absent: never.
    */
   constructor(o) {
     this.o = o;
@@ -107,7 +108,7 @@ export class ChildPool {
   /** The next launcher's canary failed (keeper.mjs): this pool runs its worlds again. */
   unfence() { this.fenced = false; }
   /** The running children, for the next launcher to adopt. */
-  handoverList() { return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
+  handoverList() { for (const k of this.kids.values()) this.thaw(k); return [...this.kids.values()].filter((k) => k.child && k.status === 'running').map((k) => ({ slug: k.slug, port: k.port, pid: k.child.pid, script: k.script })); }
 
   /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
   async reapOrphans() {
@@ -119,7 +120,7 @@ export class ChildPool {
       let cmdline = '';
       try { process.kill(pid, 0); cmdline = execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }); } catch { continue; }
       if (!script || !cmdline.includes(script)) continue;   // the pid was reused by something else: leave it alone
-      try { process.kill(pid, 'SIGTERM'); } catch { continue; }
+      try { process.kill(pid, 'SIGCONT'); process.kill(pid, 'SIGTERM'); } catch { continue; }   // (a frozen orphan saves only once thawed)
       for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); } catch { break; } await sleep(100); }
       try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
       reaped.push({ slug, pid });
@@ -143,11 +144,34 @@ export class ChildPool {
     victim.asleep = true;
     return victim.slug;
   }
+  /** Freeze idle worlds (lane P3, 2026-10-19): a running world nobody has asked anything for `sleepMs`, with no viewer
+   *  and nothing in flight (busy), is stopped in place (SIGSTOP): no CPU at all, its memory and port kept, its clock
+   *  stopped (world time does not pass while it sleeps, as across a restart). The next request thaws it at once
+   *  (ensure), so waking costs nothing like a boot (Eden 2026 boots in ~8 s). Memory still comes back the old way:
+   *  makeRoom() evicts the least recently used idle world, frozen or not, when a boot needs room. */
+  freezeIdle(now = Date.now()) {
+    const ms = this.o.sleepMs ?? 0;
+    if (!(ms > 0) || this.closing || this.fenced || this.gate) return [];
+    const frozen = [];
+    for (const k of this.kids.values()) {
+      if (k.frozen || k.status !== 'running' || !k.child || k.adopted || k.ready || k.stopped || now - (k.lastUsed ?? 0) < ms || this.o.busy?.(k.slug)) continue;
+      try { k.child.kill('SIGSTOP'); } catch { continue; }
+      k.frozen = true; k.frozenAt = now; frozen.push(k.slug); this.o.onChange?.(k.slug);
+    }
+    return frozen;
+  }
+  /** Wake a frozen world (SIGCONT); it counts as just used unless `use` is false (a passive read: it may sleep again soon). */
+  thaw(k, { use = true } = {}) {
+    if (!k?.frozen) return;
+    k.frozen = false; k.frozenAt = null; if (use) k.lastUsed = Date.now();
+    try { k.child?.kill('SIGCONT'); } catch { /* gone */ }
+    this.o.onChange?.(k.slug);
+  }
   state(slug) { return this.kids.get(slug) ?? null; }
   status(slug) {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
-    return { status: k.asleep && k.status === 'stopped' ? 'asleep' : k.status, port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
+    return { status: k.frozen || (k.asleep && k.status === 'stopped') ? 'asleep' : k.status, ...(k.frozen ? { frozen: true } : {}), port: k.port, pid: k.child?.pid ?? k.adopted?.pid ?? null, ...(k.adopted ? { adopted: true } : {}), restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
   }
   /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
   usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.adopted || k.status === 'starting' || k.status === 'restarting' || k.status === 'handover')).map((k) => k.port).filter(Boolean)); }
@@ -159,11 +183,12 @@ export class ChildPool {
   }
 
   /** Start (or join the start of) a world; resolves with its port once /healthz answers. */
-  ensure(world, { timeoutMs = 90_000 } = {}) {
+  ensure(world, { timeoutMs = 90_000, passive = false } = {}) {
     if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
     if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
-    if (k) k.lastUsed = Date.now();
+    if (k && !passive) k.lastUsed = Date.now();
+    if (k?.frozen) this.thaw(k, { use: !passive });
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
     // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here
@@ -182,10 +207,13 @@ export class ChildPool {
   async makeRoom(slug) {
     const { maxRunning = Infinity, minFreeMb = 0 } = this.o;
     for (;;) {
-      const full = this.running(slug) >= maxRunning, low = minFreeMb > 0 && memAvailableMb() < minFreeMb;
+      // low: the host under its floor, or (lane P3) the unit within one world of its own MemoryHigh/Max: the worlds share
+      // the unit's cgroup (production 8G/9G), which fills long before the host does, and over MemoryMax a world is killed
+      const room = minFreeMb > 0 ? (this.o.unitRoom ?? cgroupHeadroomMb)() : null;
+      const full = this.running(slug) >= maxRunning, low = minFreeMb > 0 && (memAvailableMb() < minFreeMb || (room !== null && room < (this.o.unitFloorMb ?? PREWARM_MB)));
       if (!full && !low) return;
       if (!(await this.evictIdle(slug))) {
-        const e = new Error(full ? `all ${maxRunning} world slots are in use; try again in a minute` : `the server is low on memory (under ${minFreeMb} MB free); try again in a minute`);
+        const e = new Error(full ? `all ${maxRunning} world slots are in use; try again in a minute` : `the server is low on memory (under ${minFreeMb} MB free, or ${room ?? '?'} MB under the unit's limit); try again in a minute`);
         e.code = 'capacity'; throw e;
       }
       await sleep(200);   // the sleeper's memory takes a moment to come back
@@ -246,7 +274,7 @@ export class ChildPool {
 
   onExit(k, child, code, signal) {
     if (k.child !== child) return;
-    k.child = null; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
+    k.child = null; k.frozen = false; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
     if (this.closing || k.stopped || this.fenced) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
     if (k.status === 'starting') return;  // boot() reports it (to ensure()'s caller, or to the restart loop)
     this.scheduleRestart(k);
@@ -269,6 +297,7 @@ export class ChildPool {
     if (k.adopted) return;   // the previous launcher's child: only it stops it (handover release)
     k.stopped = true; if (k.timer) clearTimeout(k.timer);
     const c = k.child; if (!c) { k.status = 'stopped'; return; }
+    this.thaw(k);   // a frozen world handles SIGTERM (saves its snapshot) only once it runs again
     c.kill('SIGTERM');
     await Promise.race([new Promise((r) => c.once('exit', r)), sleep(10_000)]);
     if (c.exitCode === null && c.signalCode === null) c.kill('SIGKILL');
@@ -302,6 +331,8 @@ export function defaultCommand(world, port, o) {
     SOUL_LIFECYCLE: '1',
     // Souls fade and are lifted up after an hour without an action (green → yellow → red → beam-up), as on /w/eden (R4-LIVE)
     EDGE_FADING: '1',
+    // Nobody watching or acting here for 30 s: the clock runs at a quarter of its wall pace (apps/server/src/attention.ts)
+    SIM_UNWATCHED_PACE: process.env.SIM_UNWATCHED_PACE ?? '0.25',
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),

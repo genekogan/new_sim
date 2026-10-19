@@ -1,3 +1,4 @@
+import { Attention, unwatchedPace } from './attention.ts';
 import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
@@ -148,6 +149,8 @@ server.on('request', (req, res) => {
   void listener(req, res);
 });
 
+// Unwatched worlds run their clock at a slower wall pace (attention.ts; on when SIM_UNWATCHED_PACE is set: the launcher sets it)
+if (process.env.SIM_UNWATCHED_PACE) new Attention((watched) => host.setPace(watched ? 1 : unwatchedPace())).watch(server);
 host.start();
 if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
   if (config.worldKey === 'toy') {

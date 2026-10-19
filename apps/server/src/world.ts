@@ -374,9 +374,21 @@ export class WorldHost {
 
   start() {
     this.last = performance.now();
-    this.timer = setInterval(() => this.frame(), TICK_MS);
+    this.timer = setInterval(() => this.frame(), TICK_MS / this.pace);
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  /** Wall pace of the clock (attention.ts): 1 while anyone watches or acts here, lower while nobody does (an unwatched
+   *  world advances fewer ticks per wall second, and wakes its loop less often). The same ticks run in the same order with
+   *  the same inputs, so schedules (in world time) and takes (cut every 20 ticks) are unchanged; only how fast world time
+   *  passes against the wall clock changes, as while asleep. Not logged, not persisted, not part of `clockRate`. */
+  pace = 1;
+  setPace(pace: number) {
+    if (!(pace > 0 && pace <= 1) || pace === this.pace) return;
+    const now = performance.now();
+    if (this.timer && !this.paused) this.carry += (Math.min(1000, now - this.last) * this.clockRate * this.pace) / TICK_MS;  // the time so far, at the old pace
+    this.last = now; this.pace = pace;
+    if (this.timer) { clearInterval(this.timer); this.timer = setInterval(() => this.frame(), TICK_MS / pace); }
+  }
 
   // ------------------------------------------------------------ the loop
   private frame() {
@@ -384,7 +396,7 @@ export class WorldHost {
     const elapsed = Math.min(1000, now - this.last);
     this.last = now;
     if (this.paused) return;
-    this.carry += (elapsed * this.clockRate) / TICK_MS;
+    this.carry += (elapsed * this.clockRate * this.pace) / TICK_MS;
     let due = Math.floor(this.carry);
     this.carry -= due;
     if (due > 40) {
