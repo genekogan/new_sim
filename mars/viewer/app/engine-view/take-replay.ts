@@ -283,6 +283,17 @@ export class TakePeople {
     return w.cum[lo] + Math.hypot(p[1] - s[lo][1], p[3] - s[lo][3]) / POS_Q;
   }
 
+  /** The take's records (entities0 overlaid by the final state), merged once per take, not every frame: P1 phones -
+   *  Eden 2026's ~4,500 records were re-spread on every frame (~3 ms of a 4x-throttled phone frame). */
+  private recordsMemo: { e0: unknown; fin: unknown; all: Record<string, Entity> } | null = null;
+  private allRecords(): Record<string, Entity> {
+    const e0 = this.take.entities0, fin = this.take.finalState.entities, m = this.recordsMemo;
+    if (m && m.e0 === e0 && m.fin === fin) return m.all;
+    const all = { ...e0, ...fin } as Record<string, Entity>;
+    this.recordsMemo = { e0, fin, all };
+    return all;
+  }
+
   /** Stair links for this frame's components (only when stair-relevant state changed). */
   private stairs(comps: Record<string, Entity>) {
     const rel = Object.values(comps).filter((e) => e.def === 'stair-tread' || def(e.def).category === 'stair' || isPlywood(e));
@@ -301,7 +312,7 @@ export class TakePeople {
     const s0 = performance.now();
     const nativeFrame=sampleTake(this.take,t);
     const boatAppearance=this.nativeBoat?.show(nativeFrame);
-    const frame=(this.frame=projectPlatformFrame(nativeFrame,{...this.take.entities0,...this.take.finalState.entities},this.platformFloors,this.platformBaseY));
+    const frame=(this.frame=this.platformFloors.length?projectPlatformFrame(nativeFrame,this.allRecords(),this.platformFloors,this.platformBaseY):nativeFrame);
     this.sampleMs = performance.now() - s0;
     const comps: Record<string, Entity> = {};
     const fixtures: Record<string, Entity> = {};
