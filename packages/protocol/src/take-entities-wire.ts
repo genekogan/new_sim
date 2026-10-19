@@ -12,6 +12,12 @@
 // The envelope is {t:'take-entities', contract, ids, payload}: ids[i] is chunk i's table id (null: no table);
 // payload is the takes stream (or its take-boundary-wire envelope when that transport is negotiated too).
 export const TAKE_ENTITIES_WIRE_V1='take-entities-ref/1' as const;
+// take-entities-join/1 (lane W1, slim join step 1): a peer that announces it next to take-entities-ref/1 (and gets it echoed
+// in the welcome) receives each snapshot with `entitiesTable: id`, the encoder's id for that snapshot's entity table. That
+// table becomes the connection's last table on both sides, so the join's first take (the same table, Eden 2026: 1.44 MB)
+// travels as a reference or a patch against it instead of a second full copy. Peers that did not announce it, and every
+// HTTP snapshot, are unchanged.
+export const TAKE_ENTITIES_JOIN_V1='take-entities-join/1' as const;
 const REF='$takeEntitiesRefV1',PATCH='$takeEntitiesPatchV1';
 type JsonObject=Record<string,unknown>;
 const record=(v:unknown):v is JsonObject=>!!v&&typeof v==='object'&&!Array.isArray(v)&&(Object.getPrototypeOf(v)===Object.prototype||Object.getPrototypeOf(v)===null);
@@ -61,6 +67,12 @@ export class TakeEntitiesEncoderV1{
   this.patches.set(key,out);if(this.patches.size>64)this.patches.delete(this.patches.keys().next().value!);
   return out;
  }
+ /** take-entities-join/1: register a snapshot's entity table (same registry as the take tables). Returns its id and its
+  *  exact JSON (JSON.stringify(entities)), or null when the table cannot be referenced (it then travels without an id). */
+ register(entities:unknown):{id:number;json:string}|null{
+  if(!record(entities)||Object.getPrototypeOf(entities)!==Object.prototype)return null;
+  const info=this.describe(entities);return info?{id:info.id,json:info.json}:null;
+ }
  /** Encode one public takes stream for a peer whose last received table is `last`. Returns null when the stream has
   *  no entity table (send it raw; the peer's state is unchanged), else the envelope object and the peer's next id. */
  encode(stream:{chunks:unknown[]}&JsonObject,last:number|null):{envelope:JsonObject;last:number|null}|null{
@@ -85,6 +97,16 @@ export class TakeEntitiesEncoderV1{
 const deepFreeze=(v:unknown)=>{if(v&&typeof v==='object'&&!Object.isFrozen(v)){for(const k of Object.keys(v))deepFreeze((v as JsonObject)[k]);Object.freeze(v);}return v;};
 /** Client side state for one connection: the table of the last chunk received (deeply frozen, shared by later chunks). */
 export type TakeEntitiesStateV1={last:{id:number;table:JsonObject}|null};
+/** take-entities-join/1, client side: a snapshot that names its entity table (`entitiesTable`) makes a deeply frozen copy
+ *  of that table the connection's last table (the replica keeps and mutates the snapshot's own objects). Returns the
+ *  snapshot without the field. Throws on a malformed id or table. */
+export function adoptSnapshotTableV1<T extends JsonObject>(snapshot:T,state:TakeEntitiesStateV1):Omit<T,'entitiesTable'>{
+ const {entitiesTable:id,...rest}=snapshot;
+ if(!Number.isSafeInteger(id)||(id as number)<1)fail('snapshot table id');
+ if(!record(rest.entities))fail('snapshot table');
+ state.last={id:id as number,table:deepFreeze(structuredClone(rest.entities)) as JsonObject};
+ return rest;
+}
 /** Restore the exact takes stream from a take-entities envelope (after the inner payload's own transport is restored by
  *  `inner`). Tables are deeply frozen and shared between chunks that carry the same table. Throws on anything else. */
 export function hydrateTakeEntitiesV1(input:unknown,state:TakeEntitiesStateV1,inner:(payload:unknown)=>unknown=p=>p):unknown{

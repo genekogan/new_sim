@@ -64,6 +64,7 @@ import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
 import { BASE } from './base-path.ts';
 import { newWorld } from './world-kind.ts';
+import { sceneOwner, type SceneOwnerMemory } from './scene-owner.ts';
 import { marsFork } from './mars-fork.ts';
 import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
@@ -155,7 +156,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 type ShotPin = { eye: number[]; at: number[]; lifted: number; closer: number; raised: number };
 const shotPin = (): ShotPin | null => { const p = (window as unknown as { __shotCamera?: ShotPin }).__shotCamera; return p && p.eye?.length === 3 && p.at?.length === 3 && [...p.eye, ...p.at].every(Number.isFinite) ? p : null; };
 
-export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
+export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation, bootWorldId }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
   onViewerHandle?(handle: WorldViewerHandle | null): void;
   onViewerState?(state: WorldViewerState): void;
@@ -176,8 +177,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   /** Optional current-world composition; new scenery has no native authority. */
   edenExpansion?:boolean;
   localClassroomPresentation?:LocalClassroomPresentation;
+  /** Lane W1: a new world's page world id; the scene then starts before the socket's welcome (scene-owner.ts). */
+  bootWorldId?:string;
 }) {
   const mount = useRef<HTMLDivElement>(null);
+  const ownerMemory = useRef<SceneOwnerMemory>({}), owner = sceneOwner(sim.conn.welcome, bootWorldId, ownerMemory.current);
   const [cameraMode, setCameraMode] = useState<WorldCameraMode>('broadcast');
   const [manualNavigation,setManualNavigation] = useState<ManualNavigation>('orbit');
   const follow = cameraMode === 'follow';
@@ -225,9 +229,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   useEffect(() => { if (selected) setThing(null); }, [selected]);
 
   useEffect(() => {
-    // The first welcome supplies the world/epoch that owns this scene. Starting
-    // before it arrives immediately tears the scene down and downloads its people twice.
-    if (!mount.current || !sim.conn.welcome) return;
+    // The first welcome supplies the world/epoch that owns this scene; a new world's page starts it from its own world
+    // id and adopts that welcome (scene-owner.ts), so the welcome does not tear it down and download its people twice.
+    if (!mount.current || !owner) return;
+    const ownerKey=[owner.worldId,owner.epoch];
     // Recorded ticks and scene assets belong to one world/epoch. A restarted
     // connection must not keep a paused take or let its pending seek refill it.
     seeking.current?.abort(); seeking.current = null;
@@ -289,7 +294,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let controls=newControls();
     navigation=new WorldNavigation(renderer.domElement,camera,()=>controls.target,()=>({
       mode:context.current.cameraMode,navigation:context.current.manualNavigation,
-      lifecycle:JSON.stringify([context.current.sim.conn.welcome?.worldId,context.current.sim.conn.welcome?.epoch,context.current.selected,context.current.thing,!!past.current,(() => {const c=context.current,id=c.selected?c.sim.conn.replica.souls.get(c.selected)?.entityId:c.thing;return id?id.startsWith('kin:')?!!kin.view.object(id):!!shown.current.entities[id]:null;})()]),
+      lifecycle:JSON.stringify([...ownerKey,context.current.selected,context.current.thing,!!past.current,(() => {const c=context.current,id=c.selected?c.sim.conn.replica.souls.get(c.selected)?.entityId:c.thing;return id?id.startsWith('kin:')?!!kin.view.object(id):!!shown.current.entities[id]:null;})()]),
     }),()=>{
       down=null;if(abort.signal.aborted)return;
       const target=controls.target.clone();controls.dispose();controls=newControls(target);
@@ -517,8 +522,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const newInitialGate=()=>{initialGate?.cancel();const generation=++initialGeneration;initialSnapshot=false;preparingGeneration=0;initialBodyIds=[];const gate=new InitialWorldReadiness(generation,progress=>{if(!abort.signal.aborted&&initialGate===gate){arrivalMark('initial-'+progress.stage);setInitialProgress(progress);}});initialGate=gate;setInitialProgress(gate.snapshot());retryInitial.current=()=>{if(initialGate===gate){preparingGeneration=0;gate.retry();}};return gate;};
 
     const sceneryStatus=(reason:string|null)=>{sceneReason=reason;setSceneryNotice(reason);};
-    const sceneHistory=new WorldSceneHistory(context.current.sim.conn.welcome?.worldId??'',async(hash,signal)=>{
-      const response=await fetch(apiPath('/v1/scenes/'+hash),{signal});
+    const sceneHistory=new WorldSceneHistory(owner.worldId,async(hash,signal)=>{
+      const response=await fetch(apiPath('/v1/scenes/'+hash)+'?world='+encodeURIComponent(owner.worldId),{signal});  // lane W1: browser-cached per world (http.ts)
       if(!response.ok)throw Error('Recorded scenery unavailable');return response.json();
     },decodeSceneCapturePublication);
     const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown,profiles:OptionalAppearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES)=>{
@@ -1050,7 +1055,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       renderer.domElement.remove();
       labels2d.domElement.remove();
     };
-  }, [sim.conn.welcome?.worldId, sim.conn.welcome?.epoch]);
+  }, [owner?.worldId, owner?.epoch]);
 
   useEffect(() => {
     if (!graphicsUnavailable && shown.current.take) return;
