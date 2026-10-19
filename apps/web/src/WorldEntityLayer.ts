@@ -36,7 +36,7 @@ const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
 type Figure = { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: [THREE.Object3D | null, THREE.Object3D | null] } | { missingAt: number };
-type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
+type Drawn = { inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -233,7 +233,14 @@ export class WorldEntityLayer {
     for (const [id, d] of this.drawn) {
       // P1: a settled, still thing (eased in, no motion, not ridden or held) keeps its pose: only its interior visibility
       // can change. ~4,800 entities on Eden 2026; rewriting each pose every frame was most of this loop.
-      if (d.settled && !d.inst && !d.motion && !d.removing && !this.overrides.has(id) && !this.held.has(id)) { d.obj.visible = this.interiorVisible(id); continue; }
+      if (d.settled && !d.inst && !d.motion && !d.removing && !this.overrides.has(id) && !this.held.has(id)) {
+        d.obj.visible = this.interiorVisible(id);
+        // phone tier: its matrices were brought up to date by the last frame; with matrixAutoUpdate off, three.js no longer
+        // recomposes and re-multiplies the subtree every frame (it only walks it)
+        if (this.freezeSettled && !d.frozen) { const list: THREE.Object3D[] = []; d.obj.traverse((o) => { if (o.matrixAutoUpdate) { o.updateMatrix(); o.matrixAutoUpdate = false; list.push(o); } }); d.frozen = list; }
+        continue;
+      }
+      if (d.frozen) { for (const o of d.frozen) o.matrixAutoUpdate = true; d.frozen = undefined; }
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
@@ -249,7 +256,8 @@ export class WorldEntityLayer {
       d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
       if (t >= 1 && !d.motion && !d.removing && !ride && !inHand) d.settled = true;
-      if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
+      // P1: a hidden thing (a storey its building hides, or far furniture on a phone) is not animated: nobody sees it
+      if (d.motion && t >= 1 && !inHand && shown) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
       if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
     void dt;
@@ -284,6 +292,9 @@ export class WorldEntityLayer {
   /** P1 phones: when set (the phone tier), things inside a building further than `interiorRange` metres from this point
    *  are not drawn (a phone shows a building's furniture through its windows as a few pixels; ~1,300 meshes on Eden 2026). */
   interiorFrom: THREE.Vector3 | null = null;
+  /** P1 phones: a settled still thing's subtree leaves scene.updateMatrixWorld (Eden 2026: ~8,700 objects re-multiplied
+   *  every frame, ~13% of a phone frame). Anything that moves it first takes it out of `settled`. */
+  freezeSettled = false;
   interiorRange = 30;
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
   private interiorVisible(id: string): boolean {
