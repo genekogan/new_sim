@@ -54,5 +54,5 @@ export function pickQualityTier(env: QualityEnvironment): QualitySettings {
 export function browserQuality(): QualitySettings {
   if (typeof window === 'undefined') return pickQualityTier({ search: '', coarsePointer: false, screen: [0, 0] });
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  return pickQualityTier({ search: location.search, coarsePointer: coarse, screen: [screen.width, screen.height], deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory });
+  return pickQualityTier({ search: typeof location === 'undefined' ? '' : location.search, coarsePointer: coarse, screen: typeof screen === 'undefined' ? [0, 0] : [screen.width, screen.height], deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory });
 }

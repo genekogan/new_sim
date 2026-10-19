@@ -118,3 +118,15 @@ test('actual local native Hub publishes station through one Connection and echoe
   assert.ok(Number.isSafeInteger(pongs[0].pong.serverTime));assert.ok(pongs[0].receipt.rttMs<1000);assert.equal(connections,1);assert.deepEqual(errors,[]);
   assert.equal(db.paidCost(),0);assert.equal(JSON.stringify({seen,pongs}).includes('PRIVATE'),false);
 });
+
+test('P1: before the join snapshot a slow link may stay silent up to 60 s; after it, 12 s of silence closes the socket',async t=>{
+  const interval=globalThis.setInterval,callbacks:(()=>void)[]=[],tokens:ReturnType<typeof setInterval>[]=[];
+  globalThis.setInterval=((fn:(...args:any[])=>void,delay?:number,...args:any[])=>{const token=interval(fn,delay,...args);tokens.push(token);callbacks.push(()=>fn(...args));return token;}) as typeof setInterval;
+  t.after(()=>{globalThis.setInterval=interval;for(const token of tokens)clearInterval(token);});
+  const f=await setup(t);const ws=f.sockets[0];
+  f.setWall(10000+30_000);callbacks[0]();assert.equal(ws.readyState,1,'a 1.4 MB join snapshot still arriving: keep the socket');
+  f.setWall(10000+61_000);callbacks[0]();assert.equal(ws.readyState,3,'a minute of silence before the snapshot: dead');
+  f.c.connect();const fresh=f.sockets[1];await fresh.onopen();fresh.receive(welcome());
+  fresh.receive({t:'snapshot',entities:{},regions:{},env:null,tick:1,seq:1,paths:[],souls:[]});
+  f.setWall(10000+61_000+13_000);assert.equal(f.c.stats.snapshots,1);callbacks.at(-1)!();assert.equal(fresh.readyState,3,'after the snapshot the 12 s rule applies');
+});
