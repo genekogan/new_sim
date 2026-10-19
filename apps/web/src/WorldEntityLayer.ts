@@ -88,7 +88,7 @@ export class WorldEntityLayer {
       const snap: Snapshot = await r.json(); if (this.signal.aborted || snap.contract !== 'world/1') return;
       ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
-      this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
+      this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
       this.seq = snap.seq;
       this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
       this.sites.refreshAll(JSON.stringify(snap.ground) !== prevGround);
@@ -109,7 +109,7 @@ export class WorldEntityLayer {
     try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json();
       ageNow(snap, r); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
-    this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
+    this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
     // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
     const m0 = this.model, q = new URLSearchParams(location.search), at = q.get('at')?.split(',').map(Number), eyeQ = q.get('eye')?.split(',').map(Number);

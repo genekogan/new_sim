@@ -89,6 +89,10 @@ export class WorldModel {
   private bakes = new Map<string, Baked>();
   private cells = new Map<string, Set<string>>(); // spatial hash of solid footprints
   private footprints = new Map<string, OBB[]>();
+  /** fromSnapshot(..., {lazyIndex}): the solid-footprint index is built on first use (lane W1: a viewer's arrival never
+   *  asks for it, ~0.1 s of its first build). Every index read and write builds it first, from the entities as they are then. */
+  private pendingIndex: (() => void) | null = null;
+  private ensureIndex() { const f = this.pendingIndex; if (f) { this.pendingIndex = null; f(); } }
   private safetyKey?: { parts: unknown[]; key: object };
   /** slotsOf per entity object, kept only inside readPass (lane L3g); any model mutation through its methods drops it. */
   private slotMemo?: Map<Entity, Baked['slots']> | null;
@@ -357,25 +361,28 @@ export class WorldModel {
     return out;
   }
   index(id: string, boxes: OBB[]) {
+    this.ensureIndex();
     this.unindex(id);
     this.footprints.set(id, boxes);
     for (const b of boxes) for (const k of this.cellKeys(b)) { const s = this.cells.get(k) ?? new Set(); s.add(id); this.cells.set(k, s); }
   }
   unindex(id: string) {
+    this.ensureIndex();
     const boxes = this.footprints.get(id); if (!boxes) return;
     for (const b of boxes) for (const k of this.cellKeys(b)) this.cells.get(k)?.delete(id);
     this.footprints.delete(id);
   }
   /** Ids whose indexed footprints might touch any of `boxes`. */
   near(boxes: OBB[]): Set<string> {
+    this.ensureIndex();
     const out = new Set<string>();
     for (const b of boxes) for (const k of this.cellKeys(b)) for (const id of this.cells.get(k) ?? []) out.add(id);
     return out;
   }
-  footprintsOf(id: string): OBB[] { return this.footprints.get(id) ?? []; }
+  footprintsOf(id: string): OBB[] { this.ensureIndex(); return this.footprints.get(id) ?? []; }
   /** Same conservative cells as collision lookup; count each solid entity once per cell. */
-  solidRegionCounts(): Map<string, number> { return new Map([...this.cells].filter(([, ids]) => ids.size).map(([cell, ids]) => [cell, ids.size])); }
-  solidRegionCount(cell: string): number { return this.cells.get(cell)?.size ?? 0; }
+  solidRegionCounts(): Map<string, number> { this.ensureIndex(); return new Map([...this.cells].filter(([, ids]) => ids.size).map(([cell, ids]) => [cell, ids.size])); }
+  solidRegionCount(cell: string): number { this.ensureIndex(); return this.cells.get(cell)?.size ?? 0; }
   /** Only cells touched by a diff's old/new indexed footprints need density checks. */
   solidRegionsOf(ids: Iterable<string>): Set<string> {
     const cells = new Set<string>();
@@ -404,6 +411,7 @@ export class WorldModel {
 
   /** Cheap scratch copy for planning: structural maps copied, immutable caches (bakes, tiles) shared. */
   fork(): WorldModel {
+    this.ensureIndex();
     const w = Object.create(WorldModel.prototype) as WorldModel;
     const self = this as unknown as Record<string, unknown>, out = w as unknown as Record<string, unknown>;
     w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets; w.library = this.library;
@@ -429,7 +437,7 @@ export class WorldModel {
       defRefs: this.defRefs(), entities: [...this.entities.values()].sort((a, b) => (a.id < b.id ? -1 : 1)), ground: this.terrain.ground,
     };
   }
-  static fromSnapshot(s: Omit<ReturnType<WorldModel['snapshot']>, 'defRefs'> & { defRefs?: Record<string, string> }, assets?: AssetLookup, library?: DefLibrary | null): WorldModel {
+  static fromSnapshot(s: Omit<ReturnType<WorldModel['snapshot']>, 'defRefs'> & { defRefs?: Record<string, string> }, assets?: AssetLookup, library?: DefLibrary | null, opts?: { lazyIndex?: boolean }): WorldModel {
     const w = new WorldModel({ constants: s.constants, seed: s.seed, state: s.state, assets });
     w.library = library ?? null;
     w.seq = s.seq; w.editSeq = s.editSeq;
@@ -438,7 +446,8 @@ export class WorldModel {
     for (const [ref, hash] of Object.entries(s.defRefs ?? {})) { const d = w.def('sha:' + hash); if (d) w.defs.set(ref, d); }
     w.terrain = new Terrain(s.ground);
     for (const e of s.entities) w.insert(e);
-    w.readPass(() => { for (const e of s.entities) { const def = w.resolvedDef(e.def); if (def && def.layer === 'solid') w.index(e.id, w.footprint(e, def)); } });
+    const indexAll = (list: Iterable<Entity>) => w.readPass(() => { for (const e of list) { const def = w.resolvedDef(e.def); if (def && def.layer === 'solid') w.index(e.id, w.footprint(e, def)); } });
+    if (opts?.lazyIndex) w.pendingIndex = () => indexAll([...w.entities.values()]); else indexAll(s.entities);
     return w;
   }
 }
