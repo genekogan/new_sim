@@ -54,7 +54,8 @@ test('a Soul fills a watering can from the Mars tank and waters the planter; not
     // a catalogue can (its own fill/empty actions) lying 6 m from the tank: its fill draws only from a source beside it
     { op: 'place', def: 'core/watering-can@1', name: 'old-can', p: [2, -2], state: { level: 0 } }] }, 'water');
   assert.equal(placed.accepted, true, JSON.stringify(placed.failures));
-  await settle(3);
+  // G1 (tranche 2026-10-19): Souls see a god edit once the perception catch-up has run (a second after the last edit)
+  await settle(30);
   await invite(f, 'ana');
   const row: any = await accept(f.host, f.souls.create('dev:ana', { name: 'Ana', description: 'a guest' }));
   const ana = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
