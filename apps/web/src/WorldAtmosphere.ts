@@ -84,6 +84,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0,ferrisAngle=0;
  const own=(o:THREE.Object3D)=>o===root;
  const state:WeatherState={cloud:0,rain:0,wind:0,fog:0,mist:0,wet:0},target:WeatherState={...state};
+ let worldBalloons=false,worldFog=false;
  let profile:'eden'|'world'='eden',setWeather:SetWeather|null=null,lastSet:SetWeather|null=null,godChangeAt=-Infinity,indoorsOf:AtmosphereFrame['indoors']=undefined,lastFlash=0,flashCell=-1;
  let clockAt=0,clockNow=0,active=false,closed=false,initialised=false,expansionSeen=-1,scans=0,nextScan=0,kind:WeatherKind|null=null,lastFound={flowers:0,meadow:0,roofs:0,water:0,harbour:false};
  // Pixel scale for world-sized point sprites, read where the renderer is known (no allocation).
@@ -115,7 +116,12 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   scene.traverse(o=>{const p=o.userData?.edenBalloonLanding;if(!landing&&Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)){o.updateWorldMatrix(true,false);const w=new THREE.Vector3(...p as [number,number,number]).applyMatrix4(o.matrixWorld);landing=w.toArray();}});
   balloons.setLanding(landing);
   // MARSLAND-FAR: a god world's sky palette (GodWorldLiving publishes state.sky.palette on its group)
-  let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});palLook=skyLook(pal);desert=pal==='mars-desert';
+  let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});
+  // W2b: a god world's drifting balloons and its sea fog band (GodWorldLiving publishes both on its group)
+  let tracks:unknown=null,band:unknown=null;scene.traverse(o=>{if(o===root)return;if(tracks===null&&Array.isArray(o.userData?.edenBalloonTracks))tracks=o.userData.edenBalloonTracks;if(band===null&&Array.isArray(o.userData?.edenFogBand))band=o.userData.edenFogBand;});
+  worldBalloons=Array.isArray(tracks)&&tracks.length>0;worldFog=Array.isArray(band)&&band.length>=4;
+  if(worldBalloons)balloons.setTracks(tracks as number[][]);else balloons.setTracks(null);
+  fogBanks.setBand(worldFog?(band as number[]).slice(0,4):null,worldFog?Number((band as number[])[4]??0):0);palLook=skyLook(pal);desert=pal==='mars-desert';
   collectLights();
   // W2: a god world's lighthouses (GodWorldLiving publishes their lanterns); at most four beam pairs
   const lanterns:THREE.Vector3[]=[];scene.traverse(o=>{const l=o.userData?.edenLighthouses;if(o===root||!Array.isArray(l))return;o.updateWorldMatrix(true,false);for(const a of l)if(Array.isArray(a)&&a.length===3&&a.every(Number.isFinite)&&lanterns.length<4)lanterns.push(new THREE.Vector3(a[0],a[1],a[2]).applyMatrix4(o.matrixWorld));});
@@ -286,11 +292,11 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    lighthouse.update(still?0:t,profile==='eden'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);lighthouse.group.visible=profile==='eden';
    for(const b of beacons)b.update(still?0:t,profile==='world'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);
    // fog banks roll over the sea in fog and mist, and on still early mornings
-   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,profile==='world'?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
+   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,profile==='world'&&!worldFog?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
    // the sea: swell and surf (livelier in wind; still for reduced motion)
    SURF.value.x=still?0:t;SURF.value.y=1;SURF.value.z=state.wind;
    ferrisAngle=nextFerrisAngle(ferrisAngle,frame.dt,frame.daylight===null||hourOf(ms)>=7&&hourOf(ms)<19,still);
-   if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}balloons.mesh.visible=profile==='eden';
+   if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}balloons.mesh.visible=profile==='eden'||worldBalloons;
    fireflies.update(t,still?0:Math.max(0,1-day*3)*(1-state.rain)*(1-state.wind*.7),fireflies.uniforms.uFly.value.z);
    if(desert){fauna.mesh.visible=false;fireflies.points.visible=false;}
    smoke.update(t,still?0:1-state.rain*.5,smoke.uniforms.uSmoke.value.z,day,WIND.value.z,WIND.value.w,state.wind);
