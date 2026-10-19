@@ -19,7 +19,7 @@ import { COVER_CELL, KINDS, REC, cellKind, cellSites, coverIndex, coverPalette, 
 /** Per kind: full density within d0 (m), thinning as (d0/d)^exp, gone by dmax; survivors grow by up to maxScale. */
 const LOD: Record<(typeof KINDS)[number], { d0: number; dmax: number; exp: number; maxScale: number; cap: number }> = {
   tall: { d0: 16, dmax: 90, exp: 1.45, maxScale: 1.6, cap: 26000 },
-  tuft: { d0: 9, dmax: 34, exp: 1.3, maxScale: 1.35, cap: 16000 },
+  tuft: { d0: 8, dmax: 28, exp: 1.4, maxScale: 1.35, cap: 12000 },
   flower: { d0: 16, dmax: 70, exp: 1.25, maxScale: 1.5, cap: 7000 },
 };
 const keepAt = (k: (typeof KINDS)[number], d: number) => { const l = LOD[k]; if (d >= l.dmax) return 0; const f = Math.pow(l.d0 / Math.max(d, l.d0), l.exp); const e = (d - l.dmax * 0.75) / (l.dmax * 0.25); return e > 0 ? f * (1 - e * e * (3 - 2 * e)) : f; };
@@ -64,8 +64,8 @@ export function tallGeometry() {
 /** Old Eden's short tuft (WorldGroundDetails.ts): eight leaning blades, one triangle each, darker at the base; metres. */
 export function tuftGeometry() {
   const p: number[] = [], c: number[] = [], base = [0.55, 0.65, 0.46], tip = [1.0, 1.06, 0.8];
-  for (let k = 0; k < 10; k++) {
-    const a = k * 0.628 + 0.3 * (k % 3), lean = 0.05 + 0.05 * (k % 3) / 2, h = 0.16 + 0.12 * ((k * 7) % 5) / 4, w = 0.026;
+  for (let k = 0; k < 7; k++) {
+    const a = k * 0.9 + 0.3 * (k % 3), lean = 0.05 + 0.05 * (k % 3) / 2, h = 0.16 + 0.12 * ((k * 7) % 5) / 4, w = 0.026;
     const ox = Math.cos(a) * 0.035, oz = Math.sin(a) * 0.035, tx = Math.cos(a) * lean, tz = Math.sin(a) * lean, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
     p.push(ox - px, 0, oz - pz, ox + px, 0, oz + pz, ox + tx, h, oz + tz); c.push(...base, ...base, ...tip);
   }
@@ -103,7 +103,7 @@ const FADE = /* glsl */`
 const PETAL_SRC = 'vColor.rgb *= instanceColor.rgb;';
 export const PETALS = THREE.ShaderChunk.color_vertex.replace(PETAL_SRC, 'vColor.rgb *= mix( vec3( 1.0 ), instanceColor.rgb, coverPetal );');
 function coverMaterial(kind: (typeof KINDS)[number]) {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide });
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });   // Lambert: a fraction of Standard's fill cost, grass has no highlights
   m.name = `ground cover ${kind === 'tall' ? 'tall grass' : kind === 'tuft' ? 'grass tufts' : 'wildflowers'}`;
   const l = LOD[kind], uCover = { value: new THREE.Vector4(l.d0, l.dmax, l.exp, l.maxScale) };
   m.onBeforeCompile = (shader) => {
@@ -114,7 +114,7 @@ function coverMaterial(kind: (typeof KINDS)[number]) {
     // normals point up so blades light like the turf they stand in, from either side (no back-face flip)
     shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('gl_FrontFacing ? 1.0 : - 1.0', '1.0'));
   };
-  m.customProgramCacheKey = () => `ground-cover-v2:${kind}`;
+  m.customProgramCacheKey = () => `ground-cover-v3:${kind}`;
   return m;
 }
 
@@ -131,10 +131,11 @@ export class GroundCover {
   private readonly reason: string;
   private index: CoverIndex | null = null;
   private indexModel: WorldModel | null = null;
-  private indexKey: object | null = null;
+  private indexSeq = NaN;
+  private readonly getSeq: () => number;
+  private want: ReturnType<GroundCover['wanted']> = [];
   private signature = '';
   private gen = 0;
-  private checkedAt = 0;
   private readonly cells = new Map<string, CellEntry>();
   private last = new THREE.Vector3(Infinity, Infinity, Infinity);
   private dirty = true;
@@ -142,8 +143,8 @@ export class GroundCover {
   readonly stats: GroundCoverStats;
   private readonly v = new THREE.Vector3();
 
-  constructor(getModel: () => WorldModel | null, opts: { enabled: boolean; reason: string }) {
-    this.getModel = getModel; this.enabled = opts.enabled; this.reason = opts.reason;
+  constructor(getModel: () => WorldModel | null, opts: { enabled: boolean; reason: string }, getSeq: () => number = () => 0) {
+    this.getModel = getModel; this.getSeq = getSeq; this.enabled = opts.enabled; this.reason = opts.reason;
     this.group.name = 'ground cover (tall grass, tufts, wildflowers)';
     const geos = { tall: tallGeometry(), tuft: tuftGeometry(), flower: flowerGeometry() };
     this.layers = KINDS.map((kind, k) => {
@@ -164,16 +165,15 @@ export class GroundCover {
 
   setEnabled(on: boolean) { this.enabled = on; this.stats.enabled = on; this.group.visible = on; this.dirty = true; }
 
-  /** The cover index for the current model: rebuilt when its areas / footprints / ground change (checked ≤ 1/s). */
-  private ensureIndex(model: WorldModel, now: number): boolean {
+  /** The cover index for the current model: checked once per world edit (the layer's seq), rebuilt only when the
+   *  ground, areas or footprints actually changed (bodies moving don't count). */
+  private ensureIndex(model: WorldModel): boolean {
+    const seq = this.getSeq();
+    if (this.indexModel === model && this.indexSeq === seq) return !!this.index;
+    this.indexModel = model; this.indexSeq = seq;
     const palette = (model.state as { ground?: { palette?: string } }).ground?.palette;
-    if (!coverPalette(palette) && !this.hasCoverAreas(model)) { if (this.index) { this.index = null; this.cells.clear(); } return false; }
-    const key = model.safetyCacheKey();
-    if (this.index && this.indexModel === model && this.indexKey === key && this.index.palette === (palette ?? 'grass')) return true;
-    if (this.index && now - this.checkedAt < 1000) return true;
-    this.checkedAt = now;
+    if (!coverPalette(palette) && !this.hasCoverAreas(model)) { this.index = null; this.cells.clear(); this.signature = ''; return false; }
     const sig = signatureOf(model);
-    this.indexModel = model; this.indexKey = key;
     if (this.index && sig === this.signature) { this.index.model = model; return true; }
     this.signature = sig;
     this.index = coverIndex(model, blockCellsOf(model), BLOCK_CELL);
@@ -187,15 +187,18 @@ export class GroundCover {
 
   private follow(camera: THREE.Camera) {
     if (!this.enabled || !(camera as THREE.PerspectiveCamera).isPerspectiveCamera) return;
-    const model = this.getModel(); const now = performance.now(); this.frame++;
-    if (!model || !this.ensureIndex(model, now)) { this.clear(); return; }
+    const model = this.getModel(); this.frame++;
+    if (!model || !this.ensureIndex(model)) { this.clear(); return; }
     const ix = this.index!; camera.getWorldPosition(this.v);
     const gy = model.terrain.sample(this.v.x, this.v.z), above = this.v.y - (Number.isFinite(gy) ? gy : 0);
     if (above > MAX_D) { this.clear(); return; }
+    // nothing to do on most frames: only when the camera has moved a few metres, the world changed or cells are owed
+    const moved = this.v.distanceTo(this.last) >= MOVE;
+    if (!moved && !this.dirty && !this.stats.pending) return;
+    if (moved || this.dirty) { this.want = this.wanted(this.v, above); this.last.copy(this.v); }
     // deal missing / stale cells, nearest first, within a few milliseconds
-    const want = this.wanted(this.v, above);
     const t0 = performance.now(); let dealt = 0, pending = 0;
-    for (const w of want) {
+    for (const w of this.want) {
       const e = this.cells.get(w.key);
       const fresh = e && e.gen === this.gen && w.kinds.every((k) => e.kinds[k]);
       if (fresh) continue;
@@ -205,11 +208,11 @@ export class GroundCover {
       for (const k of w.kinds) entry.kinds[k] ??= cellKind(ix, w.ci, w.cj, k, entry.sites);
       this.cells.set(w.key, entry); dealt++;
     }
-    if (dealt) { this.dirty = true; this.stats.dealMs = +(performance.now() - t0).toFixed(2); this.stats.dealt += dealt; }
+    if (dealt) { this.stats.dealMs = +(performance.now() - t0).toFixed(2); this.stats.dealt += dealt; }
     this.stats.pending = pending;
-    if (!this.dirty && this.v.distanceTo(this.last) < MOVE) return;
-    this.last.copy(this.v); this.dirty = false; this.stats.rebuilds++;
-    this.rebuild(want);
+    if (!moved && !this.dirty && !dealt) return;
+    this.dirty = false; this.stats.rebuilds++;
+    this.rebuild(this.want);
     if (this.cells.size > KEEP_CELLS) this.evict();
   }
 

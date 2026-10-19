@@ -56,7 +56,7 @@ export class WorldEntityLayer {
   readonly instancer = new EntityInstancer();
   readonly sites: WorldBuildSites;
   /** W4: old Eden's tall grass, tufts and wildflowers, drawn around the camera from the ground recipe. */
-  readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting());
+  readonly cover = new GroundCover(() => (this.active ? this.model : null), coverSetting(), () => this.seq);
   get entityCount() { return this.model?.entities.size ?? 0; }
   /** The placed entities once this layer's picture has reached edit `seq` (else null): GodPanel's flags read them here
    *  instead of downloading the public snapshot again on every edit (lane L3h). */
