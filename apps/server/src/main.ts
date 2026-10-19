@@ -35,6 +35,8 @@ import {installBirthLooks} from './god/birth-look.ts';
 import { setKitViewerContract } from '@sim/generators';
 import { standby } from './standby.ts';
 
+// Lane P5: when the boot's phases end (ms since the process started; the first is this release's code load)
+const bootAt: Record<string, number> = { code: performance.now() };
 // Release pre-warm (SIM_STANDBY=1, launcher handover): all code is loaded here; the database and port open only after SIGUSR2.
 await standby(async () => { if (config.engine === 'mars') await import('@sim/engine-mars'); await import('./edge/body/migrate-looks.ts'); });
 
@@ -76,7 +78,9 @@ const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLi
 // ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
 if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
+bootAt.open = performance.now();
 const boot = host.boot();
+bootAt.engine = performance.now();
 if(edenCore)await installEdenCore(host,{applyCrew:process.env.APPLY_EDEN_CREW_CHECKPOINT==='1',applyCommons:process.env.APPLY_EDEN_COMMONS_CHECKPOINT==='1',retainReader:process.env.EDEN_CORE_RETAIN_READER==='1'});
 const edenCapabilities=edenCore&&host.engine.rulesVersion.includes('+crew-removal/1');
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
@@ -173,7 +177,11 @@ if (config.seedNatives && db.liveSouls(host.worldId).length === 0) {
 {const {legacyLookBootHook}=await import('./edge/body/migrate-looks.ts');await legacyLookBootHook(host,db,edge,config.dataDir,process.env);}
 // One-shot operator maintenance: <DATA_DIR>/retire-residents.env retires Souls with no signed-in owner (retire-residents.ts).
 {const {retireResidentsBootHook}=await import('./retire-residents.ts');await retireResidentsBootHook(souls,db,host.worldId,config.dataDir,process.env);}
-server.listen(config.port, config.host, () => console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`));
+server.listen(config.port, config.host, () => {
+  console.log(`[http] listening on http://${config.host}:${config.port} (public ${config.publicUrl}), build ${config.build}, brain ${brain.mode}, budget $${brain.budget}/day, invites ${config.inviteRequired ? 'required' : 'open'}`);
+  const s = (ms: number) => (ms / 1000).toFixed(2);
+  console.log(`[boot] listening ${s(performance.now())} s after start: code ${s(bootAt.code)}, engine ${s(bootAt.engine - bootAt.open)}, the rest ${s(performance.now() - bootAt.engine)}`);
+});
 
 let closing = false;
 const shutdown = async (sig: string) => {

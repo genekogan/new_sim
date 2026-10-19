@@ -136,7 +136,13 @@ export class Spatial {
   /** Patch the previous grids on sync (grid.ts updateGrids, bit-identical) instead of rebuilding; default on. */
   incremental: boolean;
   scene!: SpatialScene;
-  grids!: GridSet;
+  /** Lane P5 (cold boot): a flat-mode sync builds its grids when they are first read, from the inputs captured at that sync
+   *  (the same pure build, so the same grids). A restored ground world syncs flat once in applySnapshot and then enters
+   *  ground mode, which replaces those grids unread: ~0.2 s of an Eden 2026 boot was spent building them. */
+  get grids(): GridSet { const f = this.gridsLater; if (f) { this.gridsLater = null; this.gridsNow = f(); } return this.gridsNow!; }
+  set grids(g: GridSet) { this.gridsLater = null; this.gridsNow = g; }
+  private gridsNow?: GridSet;
+  private gridsLater: (() => GridSet) | null = null;
   epoch = 0;
   /** Set by `rt.profile = true`: wall ms per method (spatial.route includes its spatial.sync). */
   prof?: Profiler;
@@ -284,9 +290,11 @@ export class Spatial {
     const prev = this.scene;
     this.scene = { bounds: this.base.bounds, levels, surfaces, obstacles, links };
     // construction changes a few components: patch only their cells (and the clearance they can reach)
-    const grids = () => (this.incremental && prev && updateGrids(this.grids, prev, this.scene, this.cell, this.raster)) || buildStaticGrids(this.scene, this.cell, this.raster, this.incremental);
-    this.grids = this.prof ? this.prof.time('spatial.sync.grids', grids) : grids();
-    if (this.planner === 'corridor') prepareCorridor(this.grids);
+    // every input is captured now: the previous grids (themselves possibly not built yet), both scenes, cell and raster
+    // (a second sync before any read builds the first one now: pending builds never chain)
+    const before = this.incremental && prev ? this.grids : this.gridsNow, scene = this.scene, cell = this.cell, raster = this.raster, incremental = this.incremental, prof = this.prof, corridor = this.planner === 'corridor';
+    const grids = () => (incremental && prev && updateGrids(before!, prev, scene, cell, raster)) || buildStaticGrids(scene, cell, raster, incremental);
+    this.gridsLater = () => { const g = prof ? prof.time('spatial.sync.grids', grids) : grids(); if (corridor) prepareCorridor(g); return g; };
     this.epoch++;
     return true;
   }

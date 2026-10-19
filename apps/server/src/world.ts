@@ -377,6 +377,9 @@ export class WorldHost {
     this.timer = setInterval(() => this.frame(), TICK_MS / this.pace);
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = null; }
+  /** The world's own clock loop is running (start(); a served world). False while stepped by hand (tests, tools): lane P5
+   *  defers some boot-time derived work only in a served world, so a stepped one sees it at the same tick as before. */
+  get running(): boolean { return this.timer !== null; }
   /** Wall pace of the clock (attention.ts): 1 while anyone watches or acts here, lower while nobody does (an unwatched
    *  world advances fewer ticks per wall second, and wakes its loop less often). The same ticks run in the same order with
    *  the same inputs, so schedules (in world time) and takes (cut every 20 ticks) are unchanged; only how fast world time

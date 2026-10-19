@@ -31,7 +31,11 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
     void (async()=>{for(const spec of missing){if(closed)break;try{await host.installCarrierV1(spec);log(`rowing punt installed: ${spec.id}`);}catch(error){log(`rowing punt refused: ${error instanceof Error?error.message:String(error)}`);}}publish();})()
       .finally(()=>{busy=false;});
   };
-  const listener={afterTick:(tick:number)=>{if(tick%20===0)reconcile();}};
+  // In a served world the first look (a lattice search of each water without a punt, ~0.25 s on Eden 2026, memoised after)
+  // waits 10 s of world time after boot (lane P5), so it does not hold a cold-booted world's first visitor. A world stepped
+  // by hand (tests, tools) looks at once, as before.
+  let first=-1;
+  const listener={afterTick:(tick:number)=>{if(first<0)first=host.running?tick:-Infinity;if(tick%20===0&&tick-first>=200)reconcile();}};
   host.listeners.push(listener);
   return {close(){closed=true;const at=host.listeners.indexOf(listener);if(at>=0)host.listeners.splice(at,1);}};
 }

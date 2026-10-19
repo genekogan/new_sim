@@ -99,7 +99,7 @@ const isPlainObject = (v: object) => {
   return p === Object.prototype || p === null;
 };
 
-type Graph = {
+export type Graph = {
   world: WorldState;
   records: ActionRecord[];
   live: { id: string; custom: boolean; exec: unknown; program: unknown; cancelling: boolean; reason?: Diagnostic; prior: LiveEntry['prior'] }[];

@@ -3,7 +3,7 @@
 // Crashed children restart with exponential backoff; a stop is final.
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
 
@@ -265,7 +265,7 @@ export class ChildPool {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline && !run.exited && !k.stopped) {
       try { const r = await fetch(health, { signal: AbortSignal.timeout(1500) }); if (r.ok) { k.status = 'running'; k.upSince = Date.now(); this.o.onChange?.(k.slug); return port; } } catch { /* booting */ }
-      await sleep(150);
+      await sleep(25);   // (P5: was 150 ms, ~75 ms of a visitor's wait for a cold world; a refused connect costs ~nothing)
     }
     if (!run.exited) child.kill('SIGKILL');
     k.status = 'failed'; this.o.onChange?.(k.slug);
@@ -346,6 +346,8 @@ export function defaultCommand(world, port, o) {
     ...(o.libraryDir ? { SIM_LIBRARY_DIR: o.libraryDir } : {}),
     // Y4b co-builder tokens: off unless the launcher runs with --cobuilders (one god per world, Gene 2026-10-16)
     ...(o.cobuilders ? { SIM_COBUILDERS: '1' } : {}),
+    // Lane P5: V8's compile cache for this release's code (compileCacheDir): a world boots with ~0.4 s less CPU
+    ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
   };
   return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }
@@ -364,8 +366,26 @@ export function forkCommand(world, port, o) {
     WORLD_KEY: world.slug, PORT: String(port), HOST: '127.0.0.1', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin,
     WORLD_PATH: `/w/${world.slug}`, DEV_AUTH: '0', AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: world.fork.accounts,
     SIM_FORK: world.slug,
+    ...(o.compileCache ? { NODE_COMPILE_CACHE: o.compileCache } : {}),
     ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
   };
   return { cmd: process.execPath, args: [`--env-file=${resolve(clerk.envFile)}`, '--experimental-transform-types', 'tools/world-launcher/fork-world.mjs', world.fork.descriptor], env };
 }
+
+/** Lane P5: the directory for world processes' V8 compile cache (NODE_COMPILE_CACHE), one per build under
+ *  `<data>/compile-cache` (the only place a world process may write, besides its own data). Node checks each entry against
+ *  the source it was made from, so a stale entry is only a miss. Other builds' directories untouched for a day are dropped
+ *  (a release handover still finds the previous build's). Null when it cannot be made: worlds then boot as before. */
+export function compileCacheDir(dataDir, build, now = Date.now()) {
+  const root = join(dataDir, 'compile-cache'), dir = join(root, String(build).replace(/[^\w.-]+/g, '_') || 'dev');
+  try {
+    mkdirSync(dir, { recursive: true });
+    for (const d of readdirSync(root)) {
+      const p = join(root, d);
+      if (p !== dir && now - statSync(p).mtimeMs > 86_400_000) rmSync(p, { recursive: true, force: true });
+    }
+    return dir;
+  } catch { return null; }
+}
+

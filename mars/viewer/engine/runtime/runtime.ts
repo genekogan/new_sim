@@ -8,7 +8,7 @@ import { hashOf } from '../core/hash.ts';
 import { listTable, withEntityList, type EntityTable } from '../world/entity-list.ts';
 import { Profiler } from './profile.ts';
 import { deadlockDiagnostics, exhaustedWaitMovers, recoverPersistentWaits } from './waits.ts';
-import { applySnapshot, decodeSnapshot, takeSnapshot, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
+import { applySnapshot, decodeSnapshot, takeSnapshot, type Graph, type RuntimeInternals, type RuntimeSnapshot, type SnapshotOptions } from './snapshot.ts';
 
 export const DT = 1 / 20; // seconds per tick; changing this is a rules-version change
 
@@ -403,8 +403,9 @@ export class Runtime {
 
   /** Rebuild a runtime from a snapshot; stepping it matches stepping the paused original tick for tick.
    *  `services` must be this runtime's own (a fresh Spatial for the same base scene). */
-  static restore(snap: RuntimeSnapshot, registry: Map<string, ActionDef>, services: RuntimeServices, invariants: Invariant[] = []): Runtime {
-    const g = decodeSnapshot(snap);
+  static restore(snap: RuntimeSnapshot, registry: Map<string, ActionDef>, services: RuntimeServices, invariants: Invariant[] = [], decoded?: Graph): Runtime {
+    // `decoded`: decodeSnapshot(snap), already verified and not shared with anything else (lane P5: one decode per boot)
+    const g = decoded ?? decodeSnapshot(snap);
     const rt = new Runtime(g.world, registry, services, invariants);
     applySnapshot(rt, rt.internals(), snap, g);
     return rt;
