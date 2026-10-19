@@ -39,7 +39,7 @@ const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
-import {arrivalMark,whenArrivalCardGone} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
+import {arrivalMark,arrivalOver,whenArrivalCardGone} from './arrival-marks.ts';import {connectionLost} from './viewer-arrival.ts';import {activityWords,doingText} from './place-names.ts';
 import {WorldNativeSocialDraw} from './WorldNativeSocialDraw.ts';
 import {worldDepictionBeat,type WorldBeatSampler} from './WorldDepiction.ts';
 import {RecordedGaitContinuity} from '../../../mars/viewer/app/engine-view/recorded-gait-continuity.ts';
@@ -261,6 +261,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const meshLod=quality.detail&&!phoneOff.has('lod')?new WorldMeshLod(quality.tier==='phone'?PHONE_MESH_LOD:DESKTOP_MESH_LOD,async()=>(!phoneOff.has('worker')&&await workerSimplifier(()=>new Worker(new URL('./mesh-lod.worker.ts',import.meta.url),{type:'module'})))||import('meshoptimizer/simplifier').then(async m=>{await m.MeshoptSimplifier.ready;return m.MeshoptSimplifier.supported?m.MeshoptSimplifier as unknown as Simplifier:null;})):null;  // levels built in a worker (?phoneOff=worker: in-thread)
     (window as unknown as {__simQuality?:unknown}).__simQuality={tier:quality.tier,reason:quality.reason,maxPixelRatio:quality.maxPixelRatio,detail:()=>distanceDetail?{...distanceDetail.stats}:null,lod:()=>meshLod?{...meshLod.stats}:null,standIns:()=>farStandIns?{...farStandIns.stats}:null};
     const shotMode=new URLSearchParams(location.search).has('shot');
+    // P1 phones: a new world's people (character models, clip libraries and composed Soul bodies: ~1.6 MB on Eden 2026,
+    // ~8 s of a 1.6 Mbps link) wait until the arrival is over. Before, they shared the link with the world's own build (its
+    // building worker's code waited behind them) and held the card ~12 s; until they land, a simple figure stands in.
+    // Desktop, old worlds and pictures load them at once and wait for them as before. `?people=wait|later` overrides.
+    const peopleLater=((q:string|null)=>q==='wait'?false:q==='later'?true:quality.tier==='phone'&&!shotMode)(new URLSearchParams(location.search).get('people'))&&newWorld;
     const adaptive=worldResolution(renderer,Math.min(devicePixelRatio,quality.maxPixelRatio),newWorld,shotMode);if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // W2b: shot mode stays at pixel ratio 1; phones cap the ratio (quality tier); ordinary worlds retain adaptive resolution
     renderer.shadowMap.enabled = true;
     // look pass for entity worlds: occlusion, highlight roll-off + night exposure, material detail (rendering/WorldLook.ts)
@@ -488,7 +493,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
     setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
-    const bodyModels=new WorldBodyModels(loader,problem);
+    const bodyModels=new WorldBodyModels(loader,problem);bodyModels.held=peopleLater;
     let capturedPlatforms:readonly PlatformFloor[]|null=null;
     let currentPlatforms:{worldId:string;platforms:PlatformFloor[]}|null=null;
     void fetch(apiPath('/v1/edge/platforms'),{signal:abort.signal}).then(r=>r.ok?r.json():null).then(meta=>{
@@ -739,7 +744,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
           floaters.sync(sampledFloaters);
-          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
+          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}if(!peopleLater){for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));}if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
 
           nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);
           geometry?.setRecordedFixtures(sampled.entities,records);
@@ -876,7 +881,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // initial gate). Only the page's first arrival: once a frame has been shown, later scene changes draw as before.
       const arrivalStage=newWorld&&(entityLayer.active||entityLayer.building)&&!arrivedOnce?(entityLayer.building?'building':initialGate?.snapshot().stage??'waiting'):undefined;
       if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
-      if(newWorld&&!templatesStarted&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
+      if(bodyModels.held&&arrivalOver()){bodyModels.held=false;startTemplates();}  // P1 phones: the people stream in now
+      if(newWorld&&!templatesStarted&&!bodyModels.held&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
       // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
       const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce));
       if(quality.tier==='phone'&&!eyes&&!shotMode){entityLayer.interiorFrom=camera.position;entityLayer.freezeSettled=true;}else{entityLayer.interiorFrom=null;entityLayer.freezeSettled=false;}  // P1 phones: far buildings' furniture is not drawn
@@ -960,7 +966,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         l.leader.style.height=`${Math.hypot(offset.dx,offset.dy)}px`;
         l.leader.style.transform=`rotate(${Math.atan2(offset.dx,-offset.dy)}rad)`;
       }
-      if(initialGate?.attached&&!entityLayer.building&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
+      // P1: a new world prepares its first frame once its layer is built (layerStarted): before, a gate whose takes and
+      // assets were in hand finished while the layer still loaded its snapshot, so the card went, showed bare ground, and came back
+      if(initialGate?.attached&&!entityLayer.building&&(!newWorld||layerStarted)&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{if(!peopleLater)await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
       if (!renderer.getContext().isContextLost()) {if(at.take&&!holdDraw&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;if(drawnTick.current!==null)arrivalMark('first-live-frame');}
       // A paused seek is a discrete displayed moment. Publish its first drawn
       // frame immediately; moving playback retains the existing 250ms cadence.
