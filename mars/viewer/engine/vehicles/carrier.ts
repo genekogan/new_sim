@@ -363,6 +363,23 @@ export const carrierInvariant: Invariant = (rt: Runtime) => {
   return out;
 };
 
+/** E2 (logged rules fact `carrierRerouteV1`): a parked carrier with nobody aboard or at its door moves to a new home and
+ *  flies new route keys from its next flight: a god's ride whose attraction was resized or moved (a bigger ferris wheel
+ *  boards further out and goes round a bigger circle). The spec is an install spec for the same id and def; refused
+ *  (diagnostic, no change) while busy, or for a spec carrierEntity itself would refuse. */
+export function rerouteCarrier(world: { entities: Record<string, Entity> }, spec: CarrierInstallSpec, tick: number): Diagnostic | null {
+  const e = world.entities[spec.id], c = state(e);
+  if (!e || !c) return diag('unknown-carrier', `no carrier ${spec.id}`);
+  if (spec.def !== e.def) return diag('def-mismatch', `${spec.id} is a ${e.def}, not a ${spec.def}`);
+  if (c.phase !== 'parked' || Object.values(c.seats).some(Boolean) || c.doorBy || c.hold) return diag('carrier-busy', `${spec.id} has riders or boarders; it re-routes once parked and empty`, [spec.id]);
+  const next = carrierEntity(spec, tick); if ('code' in next) return next;
+  const n = state(next)!;
+  c.home = n.home; c.yaw = n.yaw; c.route = n.route; c.elapsed = 0; c.departAtTick = null; c.holding = false;
+  if (spec.bank) c.bank = n.bank; else delete c.bank;
+  e.pose = structuredClone(next.pose);
+  return null;
+}
+
 /** CN5 (logged rules fact `carrierRouteV1`): a parked carrier with nobody aboard flies a different named route from its next
  *  flight (e.g. the brisk eden loop); refused (no change) while boarding, aloft or landed, or for a route not ending at home. */
 export function setCarrierRoute(world: { entities: Record<string, Entity> }, id: string, routeId: string): boolean {

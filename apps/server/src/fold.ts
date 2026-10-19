@@ -273,6 +273,8 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       // carrier/1: a ride (balloon) installed at its home; prospective, idempotent by id; refused installs are no-ops.
       const carrierRoute=(e.payload as {carrierRouteV1?:{id:string;route:string}}|null)?.carrierRouteV1;
       if(carrierRoute){const set=(engine as unknown as {setCarrierRouteV1?:(s:unknown)=>boolean}).setCarrierRouteV1;if(!set)throw Error('carrier.reader-required');set.call(engine,carrierRoute);}
+      const reroute=(e.payload as {carrierRerouteV1?:unknown}|null)?.carrierRerouteV1;
+      if(reroute){const fn=(engine as unknown as {rerouteCarrierV1?:(s:unknown)=>boolean}).rerouteCarrierV1;if(!fn)throw Error('carrier.reader-required');fn.call(engine,reroute);}
       const carrier=(e.payload as {carrierV1?:unknown}|null)?.carrierV1;
       if(carrier){const install=(engine as unknown as {installCarrierV1?:(s:unknown)=>boolean}).installCarrierV1;if(!install)throw Error('carrier.reader-required');install.call(engine,carrier);}
       const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };

@@ -322,6 +322,41 @@ test('B7: a god-built ferris wheel is a ride: a resident boards, goes round the 
   assert.deepEqual((w.host.engine as any).runtime.violations, []);
 });
 
+test('E2: a ferris wheel made bigger re-routes its ride: goes round the bigger wheel (top >20 m) and steps off', { timeout: 900000 }, async (t) => {
+  const { Hono } = await import('hono');
+  const { mountEdgeRoutes, edgeSoulResolver } = await import('../edge/routes.ts');
+  const w = await lifeWorld(t, [{ op: 'place', def: coreRef('ferris-wheel'), name: 'big-wheel', p: [20, 20] }]);
+  const app = new Hono(), comms = mountEdgeRoutes(app, { host: w.host, db: w.db, souls: w.souls, soul: edgeSoulResolver(w.host, w.souls, () => undefined), ledger: w.edge } as never);
+  t.after(() => comms.close());
+  const car = () => (w.host.engine as any).world.entities['big-wheel']?.carrier;
+  for (let i = 0; i < 60 && !car(); i++) await w.settle(1);
+  const before = structuredClone(car()); assert.ok(before, 'a native car was installed at the wheel');
+  // the god replaces it with a bigger wheel of their own under the same name (as the Eden 2026 landmarks upgrade does)
+  const bigger = { schema: 'def/1', name: 'test-big-wheel', version: 1, description: 'a bigger wheel', tags: ['ferris-wheel', 'ride'], form: 'point', layer: 'solid',
+    components: { carrier: { seats: 16 }, spin: { axis: 'z', rpm: 0.8, role: 'wheel' } },
+    make: { kind: 'gen', gen: 'kit/2', args: { shapes: [
+      { kind: 'extrude', at: [0, 0, 0], polygon: [[-9, -2.5], [9, -2.5], [9, 2.5], [-9, 2.5]], h: 0.4, color: '#999999' },
+      { kind: 'torus', at: [0, 14, 0], r: 13, r2: 0.13, segments: 48, color: '#eeeeee', role: 'wheel', pivot: [0, 14, 0], collide: false }] } } };
+  const r: any = w.god.act({ ops: [{ op: 'remove', id: w.byName('big-wheel').id }, { op: 'define', def: bigger }, { op: 'place', def: 'test-big-wheel@1', name: 'big-wheel', p: [20, 20] }] }, 'a bigger wheel');
+  assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+  const top = (c: any) => Math.max(...c.route.keys.map((k: any) => k.p[1]));
+  for (let i = 0; i < 1400 && top(car()) === top(before); i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
+  const after = car();
+  assert.ok(top(after) > 1.6 * top(before) - 2, `goes round the bigger wheel (top ${top(before)} -> ${top(after)})`);
+  assert.ok(Math.abs(after.home[0] - 20) < 0.01 && after.home[2] > 22, `still boards in front of the wheel (${after.home})`);
+  assert.equal(after.phase, 'parked');
+  const ana = await w.soul('Ana');
+  const join = w.edge.capabilities(ana).find((c: any) => c.id === 'object:ride-big-wheel:join');
+  assert.ok(join?.available, 'join offered');
+  const { r: jr } = await w.act(ana, join!.id);
+  assert.equal(jr.phase, 'completed', 'aboard: ' + JSON.stringify(jr));
+  let maxY = 0, off = false;
+  for (let i = 0; i < 20 * 180; i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); const b = w.body(ana); maxY = Math.max(maxY, b.pose.p[1]); if (maxY > 5 && !b.human.carrier) { off = true; break; } }
+  assert.ok(maxY > 20, `went round the bigger wheel (top ${maxY.toFixed(1)} m)`);
+  assert.ok(off, 'stepped off after one turn');
+  assert.deepEqual((w.host.engine as any).runtime.violations, []);
+});
+
 test('give: a resident hands a god-built book to another (sets it down at their feet; they pick it up)', { timeout: 600000 }, async (t) => {
   const w = await lifeWorld(t, [{ op: 'place', def: coreRef('table'), tmp: '$t', name: 'table', p: [0, 6] }, { op: 'place', def: coreRef('book'), name: 'novel', in: { parent: '$t', slot: 'top' }, p: [0, 0, 0] }]);
   const ana = await w.soul('Ana'), bo = await w.soul('Bo');

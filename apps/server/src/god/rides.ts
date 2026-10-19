@@ -7,7 +7,8 @@
 //   • The balloon named `eden-balloon` at old Eden's launch meadow flies old Eden's sightseeing loop (11.2 min, brisk),
 //     moved to start and end at its home; the viewer's balloon ride follows the native carrier `eden-balloon`.
 //   • Any other god balloon flies a 6-minute loop round its own home (a 150 m ring at 60–80 m up).
-// Prospective only: a carrier is installed once (idempotent by id); earlier history replays unchanged.
+// Prospective only: a carrier is installed once (idempotent by id); earlier history replays unchanged. E2: when a god's
+// ferris wheel or carousel is resized or moved, its ride re-routes (logged `carrierRerouteV1`, once parked and empty).
 import type { WorldModel } from '@sim/world-compiler';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -51,20 +52,30 @@ export function attractionRoute(kind: 'ferris-wheel' | 'carousel', wp: { x: numb
   return { home, keys, route: 'carousel-three-turns' };
 }
 
+type Wanted = CarrierInstallSpec & { entity: string; attraction?: boolean };
+/** E2: does an installed carrier's home or route differ from what its attraction now wants (it was resized or moved)? */
+export function rerouteNeeded(c: { home: number[]; route: { keys: RouteKey[] } } | undefined, s: CarrierInstallSpec): boolean {
+  if (!c || !s.routeKeys) return false;
+  const near = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) <= 0.02);
+  if (!near(c.home, [s.at[0], s.y ?? 0, s.at[1]])) return true;
+  const a = c.route.keys, b = s.routeKeys;
+  return a.length !== b.length || a.some((k, i) => Math.abs(k.t - b[i].t) > 1e-6 || !near(k.p, b[i].p));
+}
+
 export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: WorldModel; log?: (m: string) => void }) {
   const { host, edge, model } = o, log = o.log ?? (() => {});
   const engine = () => host.engine as any;
   let busy = false, retryAt = 0, closed = false;
   /** The god balloons and the native carrier each one should have. */
-  const wanted = (): (CarrierInstallSpec & { entity: string })[] => {
-    const out: (CarrierInstallSpec & { entity: string })[] = [];
+  const wanted = (): Wanted[] => {
+    const out: Wanted[] = [];
     for (const e of model.entities.values()) {
       const def = model.resolvedDef(e.def) as any; if (!def?.components?.carrier) continue;
       const tags: string[] = def.tags ?? [], attraction = tags.includes('ferris-wheel') ? 'ferris-wheel' : tags.includes('carousel') ? 'carousel' : null;
       if (attraction && e.in.parent === 'world') {
         const wp = model.worldPose(e), name = String(e.name ?? ''), id = /^[a-z0-9][a-z0-9._-]{0,99}$/.test(name) && !model.entities.has(name) ? name : `ride-${e.id.toLowerCase()}`;
         const baked = model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), r = attractionRoute(attraction, wp, model.terrain.sample(wp.x, wp.z), baked.box as [number, number, number]);
-        out.push({ entity: e.id, id, def: 'hot-air-balloon', label: (name || attraction).replace(/-/g, ' '), at: [r.home[0], r.home[2]], y: r.home[1], yaw: wp.yaw - Math.PI / 2, route: r.route, routeKeys: r.keys, waitSeconds: 30 });
+        out.push({ entity: e.id, id, attraction: true, def: 'hot-air-balloon', label: (name || attraction).replace(/-/g, ' '), at: [r.home[0], r.home[2]], y: r.home[1], yaw: wp.yaw - Math.PI / 2, route: r.route, routeKeys: r.keys, waitSeconds: 30 });
         continue;
       }
       if (!tags.includes('balloon')) continue;
@@ -100,10 +111,16 @@ export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: W
     publish();
     if (host.engine.world.tick < retryAt) return;
     retryAt = host.engine.world.tick + 20 * 60;
-    const missing = wanted().filter((s) => !engine().world.entities[s.id]?.carrier);
-    if (!missing.length) return;
+    const all = wanted(), missing = all.filter((s) => !engine().world.entities[s.id]?.carrier);
+    // E2: an attraction resized or moved since its ride was installed (a bigger ferris wheel) re-routes its carrier
+    const moved = all.filter((s) => s.attraction && rerouteNeeded(engine().world.entities[s.id]?.carrier, s));
+    if (!missing.length && !moved.length) return;
     busy = true;
-    void (async () => { for (const spec of missing) { if (closed) break; const { entity: _e, ...s } = spec; try { await host.installCarrierV1(s); log(`balloon ride installed: ${s.id} (${s.route})`); } catch (error) { log(`balloon ride refused: ${s.id}: ${error instanceof Error ? error.message : String(error)}`); } } publish(); })()
+    void (async () => {
+      for (const spec of missing) { if (closed) break; const { entity: _e, attraction: _a, ...s } = spec; try { await host.installCarrierV1(s); log(`balloon ride installed: ${s.id} (${s.route})`); } catch (error) { log(`balloon ride refused: ${s.id}: ${error instanceof Error ? error.message : String(error)}`); } }
+      for (const spec of moved) { if (closed) break; const { entity: _e, attraction: _a, ...s } = spec; try { await host.rerouteCarrierV1(s); log(`ride re-routed: ${s.id} (home ${s.at.join(', ')})`); } catch (error) { log(`ride re-route waits: ${s.id}: ${error instanceof Error ? error.message : String(error)}`); } }
+      publish();
+    })()
       .finally(() => { busy = false; });
   };
   const listener = { afterTick: (tick: number) => { if (tick % 20 === 10) reconcile(); } };

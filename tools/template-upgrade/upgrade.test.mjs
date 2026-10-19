@@ -136,3 +136,19 @@ test('the shipped Eden 2026 spec is the af01d75c -> current template diff', () =
   const names = new Set(cur.batches.flatMap((b) => b.ops.filter((o) => o.op === 'place').map((o) => o.name)));
   assert.ok(s.items.filter((i) => i.kind === 'add').every((i) => names.has(i.path.split('/').pop())), 'every add is in the current template');
 });
+
+test('a def change replaces the thing under the same name in one batch with its new define (E2: the big wheel)', () => {
+  const wheel = { schema: 'def/1', name: 'eden-big-wheel', version: 1, form: 'point', make: { kind: 'gen', gen: 'kit/2', args: { r: 13 } } };
+  const o = { batches: [{ note: 'a', ops: [{ op: 'place', def: 'core/ferris-wheel@1', name: 'wheel', p: [5, 5] }] }] };
+  const n = { batches: [{ note: 'a', ops: [] }, { note: 'b', ops: [{ op: 'define', def: wheel }, { op: 'place', def: 'eden-big-wheel@1', name: 'wheel', p: [5, 5] }] }] };
+  const s = makeSpec(o, n, { id: 't', world: 'w', from: 'a', to: 'b' });
+  assert.deepEqual(s.counts, { define: 1, add: 0, remove: 0, change: 1 });
+  const w = { worldId: 'w-1', seq: 5, defs: [], entities: [ent('e_w', 'wheel', 'core-ferris-wheel@1', [5, 0, 5])] };
+  const p = plan(w, s), [b] = batches(p, 'g', 'n');
+  assert.deepEqual(b.ops.map((x) => x.op), ['define', 'remove', 'place']);
+  assert.equal(b.ops[1].id, 'e_w'); assert.equal(b.ops[2].name, 'wheel'); assert.equal(b.ops[2].def, 'eden-big-wheel@1');
+  const after = { ...w, entities: [ent('e_n', 'wheel', 'eden-big-wheel@1', [5, 0, 5])] };
+  const v = verifyApplied(after, w, { batches: [b], newOps: s.newOps ?? Object.fromEntries(s.items.filter((i) => i.new).map((i) => [i.path, i.new])) });
+  assert.equal(v.ok, true, JSON.stringify(v));
+  const again = plan(after, s); assert.equal(again.units.length, 0, 'an upgraded world plans nothing');
+});

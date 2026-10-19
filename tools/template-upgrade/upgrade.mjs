@@ -142,6 +142,16 @@ export function plan(snapshot, spec) {
         if (!e) { report.kept.push(`${it.path}: missing`); continue; }
         if (matchesOp(e, it.new)) { report.done.push(it.path); continue; }
         if (!matchesOp(e, it.old)) { report.kept.push(`${it.path}: changed since genesis`); continue; }
+        if (normDef(it.new.def) !== normDef(it.old.def)) {
+          // a def change (E2: the 17 m core wheel becomes a bigger local wheel): the old thing goes and the new one is placed
+          // under the same name in the same batch, so what keys on the name (a ride) carries on; group undo restores the old
+          assert(!W.subtree(e.id).length, `${it.path}: a def change replaces only a thing with nothing inside it`);
+          ops.push({ op: 'remove', id: e.id, cascade: true }); meta.push(it.path); expect[e.id] = { id: e.id, v: e.v };
+          const parent = it.parent ? W.resolve(it.parent)?.id : 'world';
+          assert(parent, `${it.path}: parent ${it.parent} missing`);
+          ops.push(placeOp(it.new, parent)); meta.push(it.path);
+          continue;
+        }
         const mv = { op: 'move', id: e.id }, n = it.new, o = it.old;
         for (const k of ['p', 'r', 's', 'shape']) if (!same(n[k], o[k])) mv[k] = structuredClone(n[k] ?? (k === 'r' ? 0 : k === 's' ? 1 : undefined));
         // a root that rests on the ground ([x, z]) and turns settles again with its new footprint, as genesis seats it
@@ -152,7 +162,6 @@ export function plan(snapshot, spec) {
         assert(!gone.length, `${it.path}: the new template drops params ${gone} (set cannot remove keys)`);
         if (pk.length) { ops.push({ op: 'set', id: e.id, params: Object.fromEntries(pk.map((k) => [k, structuredClone(n.params[k])])) }); meta.push(it.path); }
         if (!same(n.state, o.state) && n.state) { ops.push({ op: 'set', id: e.id, state: structuredClone(n.state) }); meta.push(it.path); }
-        assert(normDef(n.def) === normDef(o.def), `${it.path}: def change is not an upgrade op`);
         expect[e.id] = { id: e.id, v: e.v };
       } else {
         if (e && !e.ambiguous) { report[matchesOp(e, it.new) ? 'done' : 'kept'].push(matchesOp(e, it.new) ? it.path : `${it.path}: name taken by a different thing`); continue; }
