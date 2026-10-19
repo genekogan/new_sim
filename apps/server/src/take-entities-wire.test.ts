@@ -180,3 +180,12 @@ test('queue rule: the join set and the first takes after it survive >1 MB queued
  assert.deepEqual(sent.map(x=>x.t),['snapshot','log','takes','takes','takes']);
  t.diagnostic('sent '+sent.length);
 });
+
+test('D6: batches reach a socket still backed up by its join set (a dropped batch is a seq gap and a 1.4 MB resync); stats drop',()=>{
+ const hub=Object.create(Hub.prototype) as any;hub.host={clockAvailable:true,worldId:'w'};hub.lifecycleSouls=null;
+ const sent:any[]=[],ws={readyState:1,bufferedAmount:2_000_000,send:(s:string)=>sent.push(JSON.parse(s)),close(){}};
+ hub.clients=new Set([{ws,sent:0,ready:true}]);
+ hub.broadcast({t:'batch',seq:7,fromTick:1,toTick:2,paths:[],changes:[],log:[],souls:[],removedSouls:[]});
+ hub.broadcast({t:'stats',stats:{}});
+ assert.deepEqual(sent.map(x=>[x.t,x.seq]),[['batch',7]]);
+});
