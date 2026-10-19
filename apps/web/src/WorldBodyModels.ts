@@ -5,6 +5,7 @@ import {recordedBody,admittedBodyUrl} from '../../../mars/viewer/app/engine-view
 import {worldPath} from './world-path.ts';
 import {validateBodyRig} from '../../../mars/viewer/app/engine-view/body-rig.ts';
 import {LOOK_MODEL} from './humanoid/look.ts';
+import {withRetry,type RetryOptions} from '../../../mars/viewer/lib/retry.ts';
 // P1 phones: the template builders (people.ts, humanoid/compose.ts) load with the first body that needs one, not on arrival
 const people=()=>import('../../../mars/viewer/app/engine-view/people.ts'),compose=()=>import('./humanoid/compose.ts');
 /** Validated owner bodies remain separate from the stable built-in template choice. */
@@ -14,7 +15,9 @@ export class WorldBodyModels{
  /** P1 phones: while held, bodies stay unresolved (a simple figure stands in) and nothing is fetched; the next sync after
   *  release starts their loads. LiveWorld holds a new world's people on a phone until its arrival is over. */
  held=false;
- constructor(private loader:GLTFLoader,private problem:(message:string)=>void){}
+ /** Lane B1: an uploaded body is retried after 2, 5 and 10 s on a network error or HTTP 408/429/5xx (a look's kit parts
+  *  retry inside the kit); after that it stays failed: the stand-in, one notice, no more requests. */
+ constructor(private loader:GLTFLoader,private problem:(message:string)=>void,private retry:RetryOptions={}){}
  sync(records:Readonly<Record<string,{kind:string;body?:unknown}>>,entities:Readonly<Record<string,SampledEntity>>){
   this.unresolved.clear();
   for(const [id,e] of Object.entries(entities)){const record=records[id];if(record?.kind!=='human')continue;const b=recordedBody(record.body,e.state);if(b?.family!=='humanoid')continue;
@@ -26,7 +29,7 @@ export class WorldBodyModels{
    if(!b.modelUrl)continue;
    const key=admittedBodyUrl(b.modelUrl);if(!key){this.unresolved.add(id);continue;}if(this.templates.has(key))continue;this.unresolved.add(id);if(this.held||this.pending.has(key)||this.failed.has(key))continue;this.pending.add(key);
    const url=admittedBodyUrl(key,worldPath)!;
-   const task=Promise.all([this.loader.loadAsync(url),people()]).then(([gltf,{templateFromGltf}])=>{if(this.disposed){disposeModel(gltf.scene);return;}try{validateBodyRig(gltf);this.templates.set(key,templateFromGltf(b.model??key,gltf));}catch(error){disposeModel(gltf.scene);throw error;}},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded body could not be shown; a simple figure marks its position.');}).catch(()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded rig could not be shown; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));this.tasks.set(key,task);
+   const task=Promise.all([withRetry(()=>this.loader.loadAsync(url),this.retry),people()]).then(([gltf,{templateFromGltf}])=>{if(this.disposed){disposeModel(gltf.scene);return;}try{validateBodyRig(gltf);this.templates.set(key,templateFromGltf(b.model??key,gltf));}catch(error){disposeModel(gltf.scene);throw error;}},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded body could not be shown; a simple figure marks its position.');}).catch(()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded rig could not be shown; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));this.tasks.set(key,task);
   }
  }
  async readyInitial(records:Readonly<Record<string,{kind:string;body?:unknown}>>,entities:Readonly<Record<string,SampledEntity>>){

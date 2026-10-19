@@ -9,6 +9,7 @@ import {templateFromParts, type Template} from '../../../../mars/viewer/app/engi
 import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, SHAPE_KEYS, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
 import {BASE} from '../base-path.ts';
+import {withRetry, type RetryOptions} from '../../../../mars/viewer/lib/retry.ts';
 import {hatPieces, glassesPieces, bagPieces, skinned, facialHairLayers, mustachePieces, maskLayer, scarfWrap, scarfEndPieces, gloveLayer, earringPieces, necklacePieces, type HeadFit} from './props.ts';
 
 type Landmarks = {min: number[]; max: number[]; cz?: number; rx?: number; rz?: number; top?: number; eye?: [number, number, number]; eyeX?: number; templeX?: number; back?: number; front?: number};
@@ -143,17 +144,25 @@ export class HumanoidKit {
   private rigs = new Map<string, Promise<Rig>>(); private parts = new Map<string, Promise<THREE.BufferGeometry>>();
   private merged = new Map<string, Promise<THREE.BufferGeometry>>(); private templates = new Map<string, Promise<Template>>();
   bytes = 0; files = 0;
+  /** Lane B1: each file is retried after 2, 5 and 10 s on a network error or HTTP 408/429/5xx (lib/retry.ts). */
+  retry: RetryOptions = {};
   constructor(loader: GLTFLoader, base = KIT_URL, read?: KitReader) {
     this.loader = loader; this.base = base;
-    this.read = read ?? (async url => { const r = await fetch(url); if (!r.ok) throw Error(`humanoid kit ${url}: HTTP ${r.status}`); return r.arrayBuffer(); });
+    this.read = read ?? (async url => { const r = await fetch(url); if (!r.ok) throw Object.assign(Error(`humanoid kit ${url}: HTTP ${r.status}`), {status: r.status}); return r.arrayBuffer(); });
   }
-  private async fetch(path: string) { const b = await this.read(this.base + path); this.bytes += b.byteLength; this.files++; return b; }
+  private async fetch(path: string) { const b = await withRetry(() => this.read(this.base + path), this.retry); this.bytes += b.byteLength; this.files++; return b; }
+  /** Cache a load; a failed one is forgotten, so a later ask fetches again (one failed part no longer spoils every look using it). */
+  private cache<T>(map: Map<string, Promise<T>>, key: string, load: () => Promise<T>): Promise<T> {
+    let p = map.get(key);
+    if (!p) { p = load(); map.set(key, p); p.catch(() => { if (map.get(key) === p) map.delete(key); }); }
+    return p;
+  }
   manifest(): Promise<KitManifest> {
-    return this.manifestP ??= this.fetch('kit.json').then(b => { const m = JSON.parse(new TextDecoder().decode(b)) as KitManifest; if (m.contract !== 'humanoid-kit/1') throw Error('unsupported humanoid kit'); return m; });
+    if (!this.manifestP) { const p = this.manifestP = this.fetch('kit.json').then(b => { const m = JSON.parse(new TextDecoder().decode(b)) as KitManifest; if (m.contract !== 'humanoid-kit/1') throw Error('unsupported humanoid kit'); return m; }); p.catch(() => { if (this.manifestP === p) this.manifestP = undefined; }); }
+    return this.manifestP;
   }
   rig(frame: string): Promise<Rig> {
-    let p = this.rigs.get(frame);
-    if (!p) this.rigs.set(frame, p = (async () => {
+    return this.cache(this.rigs, frame, async () => {
       const m = await this.manifest(), f = m.frames[frame]; if (!f) throw Error('unknown frame ' + frame);
       const gltf = await this.loader.parseAsync(await this.fetch(f.rig), '');
       const bin = await gltf.parser.getDependency('buffer', 0) as ArrayBuffer;
@@ -171,24 +180,21 @@ export class HumanoidKit {
       const sk = binder.skeleton.bones, joints = sk.map(b => b.getWorldPosition(new THREE.Vector3()));
       const ends = sk.map(b => { const c = b.children.find(o => (o as THREE.Bone).isBone && sk.includes(o as THREE.Bone)); return c ? c.getWorldPosition(new THREE.Vector3()) : null; });
       return {root, ib: binder.skeleton.boneInverses, clips, names: bones, joints, ends};
-    })());
-    return p;
+    });
   }
   part(slot: string, id: string, frame: string): Promise<THREE.BufferGeometry> {
-    const key = `${slot}-${id}.${frame}`; let p = this.parts.get(key);
-    if (!p) this.parts.set(key, p = (async () => {
+    return this.cache(this.parts, `${slot}-${id}.${frame}`, async () => {
+      const key = `${slot}-${id}.${frame}`;
       const m = await this.manifest(), e = m.parts[slot]?.[id]; if (!e) throw Error(`unknown ${slot} ${id}`);
       const gltf = await this.loader.parseAsync(await this.fetch(e.files[frame].file), '');
       let geo: THREE.BufferGeometry | undefined; gltf.scene.traverse(o => { if ((o as THREE.Mesh).isMesh) geo = (o as THREE.Mesh).geometry; });
       if (!geo) throw Error(`empty part ${key}`);
       const info = geo.getAttribute('_hinfo'); if (info) { geo.setAttribute('hinfo', info); geo.deleteAttribute('_hinfo'); }
       return geo;
-    })());
-    return p;
+    });
   }
   private head(look: Look): Promise<THREE.BufferGeometry> {
-    const key = headKey(look).join(':'); let p = this.merged.get(key);
-    if (!p) this.merged.set(key, p = (async () => {
+    return this.cache(this.merged, headKey(look).join(':'), async () => {
       const m = await this.manifest(), fr = m.frames[look.frame], face = await this.part('face', look.face, look.frame);
       const hair = look.hair === 'bald' ? null : await this.part('hair', look.hair, look.frame);
       const lf = m.parts.face[look.face].landmarks[look.frame], lh = hair ? m.parts.hair[look.hair].landmarks[look.frame] : null;
@@ -205,27 +211,23 @@ export class HumanoidKit {
       if (!covered && look.facialHair !== 'none') pieces.push(...mustachePieces(face, fit, fr.index.head).map(skinned)); // every style has one
       const geo = mergeParts([face, ...(hair ? [look.hat !== 'none' || gear ? withoutFlag(hair, HIDE_UNDER_HAT) : hair] : []), ...pieces, ...layers]);
       return scaleHead(geo, look.headSize, fr.joints.head, fr.index.head);
-    })());
-    return p;
+    });
   }
   private top(look: Look): Promise<THREE.BufferGeometry> {
     if (look.bag === 'none' && look.gloves === 'none' && look.scarf === 'none' && !necklace(look)) return this.part('top', look.top, look.frame);
-    const key = topKey(look).join(':'); let p = this.merged.get(key);
-    if (!p) this.merged.set(key, p = (async () => {
+    return this.cache(this.merged, topKey(look).join(':'), async () => {
       const m = await this.manifest(), fr = m.frames[look.frame], top = await this.part('top', look.top, look.frame), lt = m.parts.top[look.top].landmarks[look.frame];
       const fit = {back: lt.back!, front: lt.front!, chestY: fr.joints.chest[1], hipsY: fr.joints.hips[1]}, neckY = fr.joints.neck[1];
       const pieces = [...bagPieces(look.bag as Look['bag'], fit, fr.index, top), ...(look.scarf !== 'none' ? scarfEndPieces(fit, neckY, fr.index.chest, top) : []), ...(necklace(look) && look.scarf === 'none' ? necklacePieces(neckY, fr.index.chest, top) : [])].map(skinned);
       const layers: THREE.BufferGeometry[] = [];
       if (look.gloves !== 'none') { const rig = await this.rig(look.frame), hands = new Set(rig.names.flatMap((n, i) => HAND_BONE.test(n) ? [i] : [])), g = gloveLayer(top, hands); if (g) layers.push(g); }
       return mergeParts([top, ...pieces, ...layers]);
-    })());
-    return p;
+    });
   }
   /** The look's template (cached by look key). */
   template(params: unknown): Promise<Template> {
-    const look = resolveLook(params), key = lookKey(look); let p = this.templates.get(key);
-    if (!p) this.templates.set(key, p = this.compose(look, key));
-    return p;
+    const look = resolveLook(params), key = lookKey(look);
+    return this.cache(this.templates, key, () => this.compose(look, key));
   }
   /** Tris of a look (budget checks), from the manifest plus prop geometry. */
   async tris(params: unknown) { const look = resolveLook(params), [head, top, b, s] = await this.geometries(look); return [head, top, b, s].reduce((a, g) => a + g.index!.count / 3, 0); }

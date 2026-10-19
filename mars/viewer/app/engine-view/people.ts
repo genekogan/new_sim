@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { ThreeResources, loadGltf } from '../../lib/three-resources.ts';
+import type { RetryOptions } from '../../lib/retry.ts';
 import { BODY_MODEL } from './rig.ts';
 import {collectTemplateAppearance,transferActorAppearance,type TemplateAppearance,type ActorAppearance} from './human-appearance.ts';
 import {BASE} from '../../../../apps/web/src/base-path.ts';
@@ -80,14 +81,17 @@ type Wire = (typeof CHARACTER_WIRE)[keyof typeof CHARACTER_WIRE];
 const wireOf = (name: string): Wire | undefined => (CHARACTER_WIRE as Record<string, Wire>)[name];
 /** One clips download and parse per rig per load (casual and punk share theirs). */
 const clipLoads = new WeakMap<AbortSignal, Map<string, Promise<THREE.AnimationClip[]>>>();
-function loadClips(file: keyof typeof CHARACTER_CLIPS, signal: AbortSignal, resources: ThreeResources): Promise<THREE.AnimationClip[]> {
+function loadClips(file: keyof typeof CHARACTER_CLIPS, signal: AbortSignal, resources: ThreeResources, retry: RetryOptions): Promise<THREE.AnimationClip[]> {
   const byFile = clipLoads.get(signal) ?? clipLoads.set(signal, new Map()).get(signal)!;
   let p = byFile.get(file);
-  if (!p) { p = loadGltf(wireUrl(file, CHARACTER_CLIPS[file].sha256), signal, resources).then((g) => g.animations); p.catch(() => byFile.delete(file)); byFile.set(file, p); }
+  if (!p) { p = loadGltf(wireUrl(file, CHARACTER_CLIPS[file].sha256), signal, resources, undefined, retry).then((g) => g.animations); p.catch(() => byFile.delete(file)); byFile.set(file, p); }
   return p;
 }
 
-export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void;names?:readonly string[];onTemplate?:(template:Template)=>void}): Promise<Template[]> {
+export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void;names?:readonly string[];onTemplate?:(template:Template)=>void;retry?:RetryOptions}): Promise<Template[]> {
+  // Lane B1: each file is retried after 2, 5 and 10 s on a network error or HTTP 408/429/5xx (lib/retry.ts) before the
+  // mesh + clips give way to the old single-file GLB (itself retried the same way); a 404 falls back at once, as before.
+  const retry=options?.retry??{};
   return Promise.all(
     PEOPLE.filter(name=>!options?.names||options.names.includes(name)).map(async (name) => {
       const report=(phase:'start'|'loaded'|'failed')=>{try{options?.onAsset?.(name,phase);}catch{/* Optional download reporting cannot prevent a model load. */}};
@@ -101,8 +105,8 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
         if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,wire&&sha===wire.meshSHA256?wire.sourceSHA256:sha);
       }:undefined;
       if(wire)try{
-        const clips=loadClips(wire.clips,signal,resources);
-        gltf=await loadGltf(wireUrl(wire.mesh,wire.meshSHA256),signal,resources,observe);
+        const clips=loadClips(wire.clips,signal,resources,retry);
+        gltf=await loadGltf(wireUrl(wire.mesh,wire.meshSHA256),signal,resources,observe,retry);
         // own copies: templateFromGltf's fitArms scales this body's arm translation tracks in place
         gltf.animations=(await clips).map(c=>c.clone());
       }catch(error){
@@ -110,7 +114,7 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
         if(signal.aborted)throw error;
         console.warn(`character ${name}: wire files unavailable, loading the source GLB`,error);gltf=undefined;appearance=undefined;
       }
-      gltf??=await loadGltf(characterUrl(name),signal,resources,observe);
+      gltf??=await loadGltf(characterUrl(name),signal,resources,observe,retry);
       const template=templateFromGltf(name,gltf,appearance);options?.onTemplate?.(template);report('loaded');return template;
       }catch(error){report('failed');throw error;}
     }),

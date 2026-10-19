@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { withRetry, type RetryOptions } from './retry.ts';
 /** One owner per asset lifetime. Clones share geometry/materials; skeletons do not. */
 export class ThreeResources {
   private geometries = new Set<THREE.BufferGeometry>();
@@ -79,10 +80,14 @@ export async function loadGltf(
   signal: AbortSignal,
   resources: ThreeResources,
   observeSource?: (bytes: ArrayBuffer, gltf: GLTF) => void | Promise<void>,
+  /** Lane B1: retry the download on a network error or HTTP 408/429/5xx (lib/retry.ts); omitted = one try, as before. */
+  retry?: RetryOptions,
 ): Promise<GLTF> {
-  const response = await fetch(url, { signal });
-  if (!response.ok) throw Error(`Model unavailable (${response.status})`);
-  const bytes = await response.arrayBuffer();
+  const bytes = await withRetry(async () => {
+    const response = await fetch(url, { signal });
+    if (!response.ok) throw Object.assign(Error(`Model unavailable (${response.status})`), { status: response.status });
+    return response.arrayBuffer();
+  }, { ...retry, delays: retry ? retry.delays : [], signal });
   signal.throwIfAborted();
   const gltf = await new GLTFLoader()
     .setMeshoptDecoder(MeshoptDecoder)
