@@ -19,7 +19,9 @@ let ok = 0, failed = 0;
 async function copyDb(src, dest) {
   if (!existsSync(src)) return;
   const db = new DatabaseSync(src);
-  try { await backup(db, `${dest}.tmp`); renameSync(`${dest}.tmp`, dest); ok++; }
+  // one complete step (as apps/server/src/db.ts backupTo does): the default 100-page steps restart from scratch whenever a
+  // live world writes in between, so a busy world's copy never finished (2026-10-19: two runs stuck for 2 h at ~95% CPU)
+  try { await backup(db, `${dest}.tmp`, { rate: 0x7fffffff }); renameSync(`${dest}.tmp`, dest); ok++; }
   catch (e) { failed++; console.error(`backup ${src}: ${e.message}`); }
   finally { db.close(); }
 }

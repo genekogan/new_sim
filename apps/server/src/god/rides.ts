@@ -75,14 +75,25 @@ export function installGodRides(o: { host: WorldHost; edge: EdgeLedger; model: W
     }
     return out;
   };
+  // V7c (tranche 2026-10-19): this ran every 20 ticks and read every comms object (all of them, JSON-parsed) once per
+  // carrier. Now: one read per publish, and only when the set of balloon carriers changed since the last complete publish
+  // (ride objects are never removed at runtime, so an unchanged carrier set has nothing new to publish).
+  let published: string | null = null;
   const publish = () => {
     if (!edge.comms) return;
-    for (const c of (engine().carriers?.() ?? []) as { id: string; def: string; label: string; pose: { p: number[] } }[]) {
-      if (c.def !== 'hot-air-balloon' || edge.comms.objects.all().some((x) => x.id === `ride-${c.id}`)) continue;
+    const balloons = ((engine().carriers?.() ?? []) as { id: string; def: string; label: string; pose: { p: number[] } }[]).filter((c) => c.def === 'hot-air-balloon');
+    const key = balloons.map((c) => c.id).sort().join('\n');
+    if (key === published) return;
+    const have = new Set(edge.comms.objects.all().map((x) => x.id));
+    let complete = true;
+    for (const c of balloons) {
+      if (have.has(`ride-${c.id}`)) continue;
       const vehicle = /ferris/.test(c.id) ? 'ferris-wheel' : /carousel/.test(c.id) ? 'carousel' : 'balloon';
       const place = edge.places.containing(c.pose.p[0], c.pose.p[2], 0).find((p) => !p.carrier)?.id ?? [...edge.places.byId.values()].find((p) => p.parent === null)?.id;
-      if (place) try { edge.comms.objects.create({ id: `ride-${c.id}`, kind: 'ride', name: c.label, placeId: place, params: { carrier: c.id, vehicle } }); } catch { /* exists */ }
+      if (!place) { complete = false; continue; }
+      try { edge.comms.objects.create({ id: `ride-${c.id}`, kind: 'ride', name: c.label, placeId: place, params: { carrier: c.id, vehicle } }); } catch { complete = false; }
     }
+    if (complete) published = key;
   };
   const reconcile = () => {
     if (closed || busy) return;
