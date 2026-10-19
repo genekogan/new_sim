@@ -71,3 +71,25 @@ test('S2: kept upper floors equal a fresh build after every random static edit; 
   assert.equal(farEdits, 5);
   assert.ok(kept.stats.floorHits > 0, 'floors were kept across edits');
 });
+
+test('S2: windows holding the same whole floor share it, bit-identical to each window\'s own build; a cut floor is its own', () => {
+  const scene: SpatialScene = {
+    bounds: [-256, -256, 256, 256], levels: [{ id: 0, y: 0, label: 'ground' }, { id: 1, y: 3, label: 'house floor' }],
+    surfaces: [{ id: 'floor', level: 1, y: 3, obb: { c: [20, 20], half: [5, 4], yaw: 0.3 } }, { id: 'long-deck', level: 1, y: 3, obb: { c: [60, -20], half: [12, 2], yaw: 0 } }],
+    obstacles: [{ id: 'wall', kind: 'component', obb: { c: [20, 22], half: [3, 0.1], yaw: 0.3 }, y0: 3, y1: 5.5 }],
+    links: [],
+  };
+  const nav = new GroundNav(flat, 0.1, { paged: true }); nav.setFloors([]); nav.setSolids(scene.obstacles);
+  const one: TileRect = [0, 0, 0, 0], wide: TileRect = [-1, -1, 1, 0], cut: TileRect = [1, -1, 1, -1];
+  const a = nav.gridsOver(one, scene).levels.get(1), built = nav.stats.floorBuilds;
+  const b = nav.gridsOver(wide, scene).levels.get(1);
+  // the wide window also holds part of the long deck: its floor-1 crop differs, so it is built; a third window holding
+  // exactly the house floor shares the first
+  const c = nav.gridsOver([0, 0, 0, 1], scene).levels.get(1);
+  assert.equal(c, a, 'the same whole floor in another window: shared');
+  assert.equal(nav.stats.floorBuilds, built + 1, 'only the window whose crop differs was built');
+  for (const [r, g] of [[one, a], [wide, b], [[0, 0, 0, 1] as TileRect, c], [cut, nav.gridsOver(cut, scene).levels.get(1)]] as [TileRect, LevelGrid | undefined][]) {
+    const fresh = new GroundNav(flat, 0.1, { paged: true }); fresh.setFloors([]); fresh.setSolids(scene.obstacles);
+    sameGrid(g, fresh.gridsOver(r, scene).levels.get(1), `window ${r}`);
+  }
+});

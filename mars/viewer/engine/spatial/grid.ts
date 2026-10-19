@@ -495,7 +495,7 @@ export function gridsWithObstacles(base: GridSet, extra: Obstacle[]): GridSet {
 }
 
 /** The cell rectangle rasterObb scans for `o` (may be empty: i0 > i1 or j0 > j1); a superset of the covered cells. */
-function obbRange(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz: number): Rect {
+export function obbRange(o: OBB2, ox: number, oz: number, cell: number, nx: number, nz: number): Rect {
   const cs = obbCorners(o);
   let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
   for (const [x, z] of cs) { ax = Math.min(ax, x); az = Math.min(az, z); bx = Math.max(bx, x); bz = Math.max(bz, z); }
