@@ -14,6 +14,10 @@ const idempotent = (method) => !method || method === 'GET' || method === 'HEAD';
 const refused = (e) => [e?.code, e?.cause?.code, ...(e?.cause?.errors ?? []).map((x) => x?.code)].includes('ECONNREFUSED');
 /** Defaults for every call's runtime ({ sleep, random, now }): tests replace the clock here, never the CLI. */
 export const retryDefaults = {};
+// A long wait is said once on stderr (an agent or person watching a silent CLI for ~50 s would think it hung); stdout and
+// the answer are unchanged. `runtime.onWait(ms, status)` replaces it (null: silent).
+export const LONG_WAIT_MS = 5_000;
+const sayWait = (ms, status) => process.stderr.write(`[eden-god] the world asked to slow down (HTTP ${status}); waiting ${Math.round(ms / 1000)} s before trying again (Ctrl-C stops).\n`);
 export async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, retries: 0 }) {
   runtime = { ...retryDefaults, ...runtime };
   const send = runtime.fetch ?? fetch, clock = runtime.now ?? Date.now, random = runtime.random ?? Math.random;
@@ -55,6 +59,8 @@ export async function fetchWithRetry(url, options, runtime = {}, budget = { wait
     const delay = Math.max(1, Math.round(hint === null ? backoff() : hint * (1 + 0.2 * random())));
     if (!room(delay)) return response;
     await response.body?.cancel();
+    const onWait = 'onWait' in runtime ? runtime.onWait : sayWait;
+    if (onWait && delay >= LONG_WAIT_MS) onWait(delay, status);
     await pause(delay);
   }
 }

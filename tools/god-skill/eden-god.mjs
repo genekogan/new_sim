@@ -217,6 +217,9 @@ var RETRY_LIMITS = Object.freeze({ retries: 4, waitMs: 6e4 });
 var idempotent = (method) => !method || method === "GET" || method === "HEAD";
 var refused = (e) => [e?.code, e?.cause?.code, ...(e?.cause?.errors ?? []).map((x) => x?.code)].includes("ECONNREFUSED");
 var retryDefaults = {};
+var LONG_WAIT_MS = 5e3;
+var sayWait = (ms, status2) => process.stderr.write(`[eden-god] the world asked to slow down (HTTP ${status2}); waiting ${Math.round(ms / 1e3)} s before trying again (Ctrl-C stops).
+`);
 async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, retries: 0 }) {
   runtime = { ...retryDefaults, ...runtime };
   const send = runtime.fetch ?? fetch, clock = runtime.now ?? Date.now, random = runtime.random ?? Math.random;
@@ -275,6 +278,8 @@ async function fetchWithRetry(url, options, runtime = {}, budget = { waited: 0, 
     const delay = Math.max(1, Math.round(hint === null ? backoff() : hint * (1 + 0.2 * random())));
     if (!room(delay)) return response;
     await response.body?.cancel();
+    const onWait = "onWait" in runtime ? runtime.onWait : sayWait;
+    if (onWait && delay >= LONG_WAIT_MS) onWait(delay, status2);
     await pause(delay);
   }
 }

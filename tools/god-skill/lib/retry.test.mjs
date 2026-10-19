@@ -94,3 +94,12 @@ test('the caller\'s deadline caps attempts and waits, and its signal cancels an 
   const pending = fetchWithRetry('http://127.0.0.1:5368', { timeoutMs: 60_000, signal: linked.signal }, { fetch: (url, opts) => new Promise((_, reject) => { seen = opts.signal; seen.addEventListener('abort', () => reject(seen.reason)); }) });
   linked.abort(Error('cancelled')); await assert.rejects(pending, /cancelled/); assert.ok(seen.aborted);
 });
+
+test('a wait of 5 s or more is said once on stderr before it starts; shorter waits stay silent', async () => {
+  for (const [hint, expected] of [[48_000, [[48_000, 429]]], [2_000, []]]) {
+    const said = []; let calls = 0;
+    const r = await fetchWithRetry('http://127.0.0.1:5368', { method: 'POST' }, { random: () => 0, sleep: async () => {}, onWait: (ms, status) => said.push([ms, status]),
+      fetch: async () => (++calls === 1 ? Response.json({ retryAfterMs: hint }, { status: 429 }) : Response.json({ ok: true })) });
+    assert.equal(r.status, 200); assert.deepEqual(said, expected);
+  }
+});
