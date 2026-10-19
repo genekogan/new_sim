@@ -173,7 +173,8 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     if (ctx.smokeFx && isSmokeShape(sh)) { smoke.push(sh); continue; } // W2: drawn by the atmosphere's moving smoke
     // W2: a glowing flame-tinted shape (or a warm glow in a def that says fire) is a flame, role or not (fx/flames.ts)
     const role = sh.role ?? (isFlameShape(sh, !!ctx.flameHint, ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))) ? 'flame' : undefined);
-    if (role) { const list = byRole.get(role) ?? []; list.push(sh); byRole.set(role, list); continue; }
+    // E2: each gondola (role `gondola`, pivoted at its own hanger) is a group of its own, so it can hang from the turning wheel
+    if (role) { const key = role === 'gondola' && sh.pivot ? `gondola#${sh.pivot.join(',')}` : role, list = byRole.get(key) ?? []; list.push(sh); byRole.set(key, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
     const k = classOf(sh, args.v, surfaces) + (isSprayShape(sh) ? ' spray' : ctx.plant ? plantPart(sh, ctx.plant) : ''); const list = byClass.get(k) ?? [];
     if (sh.material === 'water' && sh.kind === 'cyl' && !sh.role) discs.push({ x: sh.at[0], y: sh.at[1] + (sh.h ?? 1) / 2 * (sh.scale?.[1] ?? 1), z: sh.at[2], r: (sh.r ?? 0.5) * (sh.scale?.[0] ?? 1) }); list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
@@ -193,7 +194,8 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; const sway = / (trunk|foliage)$/.exec(k)?.[1]; if (sway) mesh.userData.edenWindMode = sway === 'trunk' ? 'trunk' : 'crown'; root.add(mesh); }
   // XP8 hook: faces (text, this world's images, seeded glass/mosaic) sit on their shapes; role faces follow the pivot below.
   if (args.v === 2) for (const sh of args.shapes) if (sh.faces && !sh.role && (!sh.when || kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {}))) for (const face of shapeFaceMeshes(sh, args.round)) root.add(face);
-  for (const [role, shapes] of byRole) {
+  for (const [key, shapes] of byRole) {
+    const role = key.split('#')[0];
     // pivot: explicit on any shape, else the top centre of the role's parts (legs swing from the hip)
     const explicit = shapes.find((s) => s.pivot)?.pivot;
     const pv = explicit ? new THREE.Vector3(...explicit) : (() => { const b = new THREE.Box3(); for (const s of shapes) b.expandByPoint(new THREE.Vector3(...s.at)); const c = b.getCenter(new THREE.Vector3()); return new THREE.Vector3(c.x, b.max.y + (role.startsWith('leg') || role.startsWith('arm') ? (shapes[0].h ?? shapes[0].size?.[1] ?? 0.2) / 2 : 0), c.z); })();

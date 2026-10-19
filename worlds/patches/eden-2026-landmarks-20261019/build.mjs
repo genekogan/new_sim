@@ -122,7 +122,7 @@ function buntingDef() {
 
 // ---------- amphitheatre: a painted round stage floor ----------
 // ---------- the big wheel: old Eden's ~29 m wheel with hanging gondolas, replacing the 17 m core wheel at the resort ----------
-// The wheel turns (spin role `wheel`); sixteen gondolas are roles `wheel-hang-<k>` pivoted at their hanger points, which the
+// The wheel turns (spin role `wheel`); sixteen gondolas are kit role `gondola`, each pivoted at its hanger point, which the
 // viewer carries round with the wheel upright (apps/web gen-mesh/motion.ts hangFrom). Proportions keep its ride (server
 // god/rides.ts attractionRoute: a circle of radius width/2 - 1 about height radius + 1) on the gondolas' own circle, and the
 // bottom gondola at the boarding platform.
@@ -139,23 +139,21 @@ function bigWheelDef() {
     shapes.push({ kind: 'sweep', at: [0, 0, 0], path: [[-legX * 0.55, H * 0.45, z * 0.8], [legX * 0.55, H * 0.45, z * 0.8]], r: 0.16, segments: 6, color: LEG });
   }
   shapes.push({ kind: 'cyl', at: [0, H, 0], r: 0.3, h: 2 * legZ + 0.4, segments: 10, pitch: 1.5708, color: DARK });
-  // the wheel: two rims, spokes from the hub to both rims, an axle between the rims at every gondola
+  // the wheel: two rims with an inner ring, sixteen spokes a side (eight diameters); the kit allows 96 shapes in all
   shapes.push({ kind: 'cyl', at: [0, H, 0], r: 0.8, h: 1.6, segments: 12, pitch: 1.5708, color: '#d9d2c3', ...W });
   for (const z of [-rim, rim]) {
     shapes.push({ kind: 'torus', at: [0, H, z], r: R, r2: 0.13, segments: 64, color: RIM, ...W });
     shapes.push({ kind: 'torus', at: [0, H, z], r: R * 0.55, r2: 0.07, segments: 40, color: RIM, ...W });
-    for (let k = 0; k < 2 * N; k++) { const a = (k / (2 * N)) * Math.PI * 2; shapes.push({ kind: 'box', at: [r3((R / 2) * Math.cos(a)), r3(H + (R / 2) * Math.sin(a)), z], size: [R, 0.07, 0.07], roll: r3(a), color: RIM, ...W }); }
+    for (let k = 0; k < N / 2; k++) { const a = (k / N) * Math.PI * 2 + Math.PI / N; shapes.push({ kind: 'box', at: [0, H, z], size: [2 * R, 0.07, 0.07], roll: r3(a), color: RIM, ...W }); }
   }
   for (let k = 0; k < N; k++) {
     const a = (k / N) * Math.PI * 2 - Math.PI / 2, P = [r3(R * Math.cos(a)), r3(H + R * Math.sin(a)), 0], c = CABS[k % CABS.length];
-    shapes.push({ kind: 'cyl', at: P, r: 0.06, h: 2 * rim, segments: 6, pitch: 1.5708, color: DARK, ...W });
-    // the gondola, hanging under its axle: hanger, white roof, coloured cabin with window band, floor
-    const G = { role: `wheel-hang-${k + 1}`, pivot: P, collide: false };
-    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.2), 0], size: [0.08, 0.4, 0.08], color: DARK, ...G });
+    // the gondola, hanging from its axle between the rims: hanger, white roof, coloured cabin with a window band
+    const G = { role: 'gondola', pivot: P, collide: false };
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.2), 0], size: [0.1, 0.4, 2 * rim], color: DARK, ...G });
     shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.45), 0], size: [1.8, 0.14, 1.5], color: CREAM, ...G });
-    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.95), 0], size: [1.6, 0.85, 1.35], color: c, ...G });
-    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.95), 0], size: [1.64, 0.32, 1.1], color: '#2b3a44', ...G });
-    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 1.45), 0], size: [1.7, 0.16, 1.45], color: c, ...G });
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 1.05), 0], size: [1.6, 1.05, 1.35], color: c, ...G });
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.85), 0], size: [1.64, 0.34, 1.1], color: '#2b3a44', ...G });
   }
   return {
     schema: 'def/1', name: 'eden-big-wheel', version: 1,

@@ -3195,34 +3195,12 @@
        {
         "kind": "box",
         "at": [
-         6.5,
-         15.4,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.375,
-         16.668,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3239,34 +3217,12 @@
        {
         "kind": "box",
         "at": [
-         6.005,
-         17.887,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0.393,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         5.405,
-         19.011,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3283,34 +3239,12 @@
        {
         "kind": "box",
         "at": [
-         4.596,
-         19.996,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0.785,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         3.611,
-         20.805,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3327,34 +3261,12 @@
        {
         "kind": "box",
         "at": [
-         2.487,
-         21.405,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.178,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         1.268,
-         21.775,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3372,33 +3284,11 @@
         "kind": "box",
         "at": [
          0,
-         21.9,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.571,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -1.268,
-         21.775,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3415,34 +3305,12 @@
        {
         "kind": "box",
         "at": [
-         -2.487,
-         21.405,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.963,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -3.611,
-         20.805,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3459,34 +3327,12 @@
        {
         "kind": "box",
         "at": [
-         -4.596,
-         19.996,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 2.356,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -5.405,
-         19.011,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3503,390 +3349,16 @@
        {
         "kind": "box",
         "at": [
-         -6.005,
-         17.887,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 2.749,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.375,
-         16.668,
          -0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
         "roll": 2.945,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.5,
-         15.4,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.142,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.375,
-         14.132,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.338,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.005,
-         12.913,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.534,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -5.405,
-         11.789,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.731,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -4.596,
-         10.804,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.927,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -3.611,
-         9.995,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.123,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -2.487,
-         9.395,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.32,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -1.268,
-         9.025,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.516,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         0,
-         8.9,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.712,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         1.268,
-         9.025,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.909,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         2.487,
-         9.395,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.105,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         3.611,
-         9.995,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.301,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         4.596,
-         10.804,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.498,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         5.405,
-         11.789,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.694,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.005,
-         12.913,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.89,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.375,
-         14.132,
-         -0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 6.087,
         "color": "#f4f0e6",
         "role": "wheel",
         "pivot": [
@@ -3937,34 +3409,12 @@
        {
         "kind": "box",
         "at": [
-         6.5,
-         15.4,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.375,
-         16.668,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -3981,34 +3431,12 @@
        {
         "kind": "box",
         "at": [
-         6.005,
-         17.887,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0.393,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         5.405,
-         19.011,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4025,34 +3453,12 @@
        {
         "kind": "box",
         "at": [
-         4.596,
-         19.996,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 0.785,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         3.611,
-         20.805,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4069,34 +3475,12 @@
        {
         "kind": "box",
         "at": [
-         2.487,
-         21.405,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.178,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         1.268,
-         21.775,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4114,33 +3498,11 @@
         "kind": "box",
         "at": [
          0,
-         21.9,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.571,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -1.268,
-         21.775,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4157,34 +3519,12 @@
        {
         "kind": "box",
         "at": [
-         -2.487,
-         21.405,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 1.963,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -3.611,
-         20.805,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4201,34 +3541,12 @@
        {
         "kind": "box",
         "at": [
-         -4.596,
-         19.996,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 2.356,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -5.405,
-         19.011,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4245,34 +3563,12 @@
        {
         "kind": "box",
         "at": [
-         -6.005,
-         17.887,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 2.749,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
          0,
          15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.375,
-         16.668,
          0.6
         ],
         "size": [
-         13,
+         26,
          0.07,
          0.07
         ],
@@ -4289,389 +3585,17 @@
        {
         "kind": "box",
         "at": [
-         -6.5,
-         15.4,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.142,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.375,
-         14.132,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.338,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -6.005,
-         12.913,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.534,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -5.405,
-         11.789,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.731,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -4.596,
-         10.804,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 3.927,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -3.611,
-         9.995,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.123,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -2.487,
-         9.395,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.32,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -1.268,
-         9.025,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.516,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         0,
-         8.9,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.712,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         1.268,
-         9.025,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 4.909,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         2.487,
-         9.395,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.105,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         3.611,
-         9.995,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.301,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         4.596,
-         10.804,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.498,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         5.405,
-         11.789,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.694,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.005,
-         12.913,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 5.89,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         6.375,
-         14.132,
-         0.6
-        ],
-        "size": [
-         13,
-         0.07,
-         0.07
-        ],
-        "roll": 6.087,
-        "color": "#f4f0e6",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         0,
-         2.4,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
          0,
          2.2,
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-1",
+        "role": "gondola",
         "pivot": [
          0,
          2.4,
@@ -4692,7 +3616,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-1",
+        "role": "gondola",
         "pivot": [
          0,
          2.4,
@@ -4704,16 +3628,16 @@
         "kind": "box",
         "at": [
          0,
-         1.45,
+         1.35,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#c9342d",
-        "role": "wheel-hang-1",
+        "role": "gondola",
         "pivot": [
          0,
          2.4,
@@ -4725,60 +3649,19 @@
         "kind": "box",
         "at": [
          0,
-         1.45,
+         1.55,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-1",
+        "role": "gondola",
         "pivot": [
          0,
          2.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         0,
-         0.95,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#c9342d",
-        "role": "wheel-hang-1",
-        "pivot": [
-         0,
-         2.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         4.975,
-         3.39,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -4791,12 +3674,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-2",
+        "role": "gondola",
         "pivot": [
          4.975,
          3.39,
@@ -4817,7 +3700,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-2",
+        "role": "gondola",
         "pivot": [
          4.975,
          3.39,
@@ -4829,16 +3712,16 @@
         "kind": "box",
         "at": [
          4.975,
-         2.44,
+         2.34,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#f0c040",
-        "role": "wheel-hang-2",
+        "role": "gondola",
         "pivot": [
          4.975,
          3.39,
@@ -4850,60 +3733,19 @@
         "kind": "box",
         "at": [
          4.975,
-         2.44,
+         2.54,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-2",
+        "role": "gondola",
         "pivot": [
          4.975,
          3.39,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         4.975,
-         1.94,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#f0c040",
-        "role": "wheel-hang-2",
-        "pivot": [
-         4.975,
-         3.39,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         9.192,
-         6.208,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -4916,12 +3758,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-3",
+        "role": "gondola",
         "pivot": [
          9.192,
          6.208,
@@ -4942,7 +3784,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-3",
+        "role": "gondola",
         "pivot": [
          9.192,
          6.208,
@@ -4954,16 +3796,16 @@
         "kind": "box",
         "at": [
          9.192,
-         5.258,
+         5.158,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#2e8b57",
-        "role": "wheel-hang-3",
+        "role": "gondola",
         "pivot": [
          9.192,
          6.208,
@@ -4975,60 +3817,19 @@
         "kind": "box",
         "at": [
          9.192,
-         5.258,
+         5.358,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-3",
+        "role": "gondola",
         "pivot": [
          9.192,
          6.208,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         9.192,
-         4.758,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#2e8b57",
-        "role": "wheel-hang-3",
-        "pivot": [
-         9.192,
-         6.208,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         12.01,
-         10.425,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5041,12 +3842,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-4",
+        "role": "gondola",
         "pivot": [
          12.01,
          10.425,
@@ -5067,7 +3868,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-4",
+        "role": "gondola",
         "pivot": [
          12.01,
          10.425,
@@ -5079,16 +3880,16 @@
         "kind": "box",
         "at": [
          12.01,
-         9.475,
+         9.375,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#6a3d8f",
-        "role": "wheel-hang-4",
+        "role": "gondola",
         "pivot": [
          12.01,
          10.425,
@@ -5100,60 +3901,19 @@
         "kind": "box",
         "at": [
          12.01,
-         9.475,
+         9.575,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-4",
+        "role": "gondola",
         "pivot": [
          12.01,
          10.425,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         12.01,
-         8.975,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#6a3d8f",
-        "role": "wheel-hang-4",
-        "pivot": [
-         12.01,
-         10.425,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         13,
-         15.4,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5166,12 +3926,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-5",
+        "role": "gondola",
         "pivot": [
          13,
          15.4,
@@ -5192,7 +3952,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-5",
+        "role": "gondola",
         "pivot": [
          13,
          15.4,
@@ -5204,16 +3964,16 @@
         "kind": "box",
         "at": [
          13,
-         14.45,
+         14.35,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#e07b39",
-        "role": "wheel-hang-5",
+        "role": "gondola",
         "pivot": [
          13,
          15.4,
@@ -5225,59 +3985,18 @@
         "kind": "box",
         "at": [
          13,
-         14.45,
+         14.55,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-5",
+        "role": "gondola",
         "pivot": [
          13,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         13,
-         13.95,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#e07b39",
-        "role": "wheel-hang-5",
-        "pivot": [
-         13,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         12.01,
-         20.375,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
          15.4,
          0
         ],
@@ -5291,12 +4010,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-6",
+        "role": "gondola",
         "pivot": [
          12.01,
          20.375,
@@ -5317,7 +4036,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-6",
+        "role": "gondola",
         "pivot": [
          12.01,
          20.375,
@@ -5329,16 +4048,16 @@
         "kind": "box",
         "at": [
          12.01,
-         19.425,
+         19.325,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#3a7fc4",
-        "role": "wheel-hang-6",
+        "role": "gondola",
         "pivot": [
          12.01,
          20.375,
@@ -5350,60 +4069,19 @@
         "kind": "box",
         "at": [
          12.01,
-         19.425,
+         19.525,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-6",
+        "role": "gondola",
         "pivot": [
          12.01,
          20.375,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         12.01,
-         18.925,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#3a7fc4",
-        "role": "wheel-hang-6",
-        "pivot": [
-         12.01,
-         20.375,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         9.192,
-         24.592,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5416,12 +4094,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-7",
+        "role": "gondola",
         "pivot": [
          9.192,
          24.592,
@@ -5442,7 +4120,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-7",
+        "role": "gondola",
         "pivot": [
          9.192,
          24.592,
@@ -5454,16 +4132,16 @@
         "kind": "box",
         "at": [
          9.192,
-         23.642,
+         23.542,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#c9342d",
-        "role": "wheel-hang-7",
+        "role": "gondola",
         "pivot": [
          9.192,
          24.592,
@@ -5475,60 +4153,19 @@
         "kind": "box",
         "at": [
          9.192,
-         23.642,
+         23.742,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-7",
+        "role": "gondola",
         "pivot": [
          9.192,
          24.592,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         9.192,
-         23.142,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#c9342d",
-        "role": "wheel-hang-7",
-        "pivot": [
-         9.192,
-         24.592,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         4.975,
-         27.41,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5541,12 +4178,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-8",
+        "role": "gondola",
         "pivot": [
          4.975,
          27.41,
@@ -5567,7 +4204,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-8",
+        "role": "gondola",
         "pivot": [
          4.975,
          27.41,
@@ -5579,16 +4216,16 @@
         "kind": "box",
         "at": [
          4.975,
-         26.46,
+         26.36,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#f0c040",
-        "role": "wheel-hang-8",
+        "role": "gondola",
         "pivot": [
          4.975,
          27.41,
@@ -5600,60 +4237,19 @@
         "kind": "box",
         "at": [
          4.975,
-         26.46,
+         26.56,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-8",
+        "role": "gondola",
         "pivot": [
          4.975,
          27.41,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         4.975,
-         25.96,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#f0c040",
-        "role": "wheel-hang-8",
-        "pivot": [
-         4.975,
-         27.41,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         0,
-         28.4,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5666,12 +4262,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-9",
+        "role": "gondola",
         "pivot": [
          0,
          28.4,
@@ -5692,7 +4288,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-9",
+        "role": "gondola",
         "pivot": [
          0,
          28.4,
@@ -5704,16 +4300,16 @@
         "kind": "box",
         "at": [
          0,
-         27.45,
+         27.35,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#2e8b57",
-        "role": "wheel-hang-9",
+        "role": "gondola",
         "pivot": [
          0,
          28.4,
@@ -5725,60 +4321,19 @@
         "kind": "box",
         "at": [
          0,
-         27.45,
+         27.55,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-9",
+        "role": "gondola",
         "pivot": [
          0,
          28.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         0,
-         26.95,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#2e8b57",
-        "role": "wheel-hang-9",
-        "pivot": [
-         0,
-         28.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -4.975,
-         27.41,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5791,12 +4346,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-10",
+        "role": "gondola",
         "pivot": [
          -4.975,
          27.41,
@@ -5817,7 +4372,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-10",
+        "role": "gondola",
         "pivot": [
          -4.975,
          27.41,
@@ -5829,16 +4384,16 @@
         "kind": "box",
         "at": [
          -4.975,
-         26.46,
+         26.36,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#6a3d8f",
-        "role": "wheel-hang-10",
+        "role": "gondola",
         "pivot": [
          -4.975,
          27.41,
@@ -5850,60 +4405,19 @@
         "kind": "box",
         "at": [
          -4.975,
-         26.46,
+         26.56,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-10",
+        "role": "gondola",
         "pivot": [
          -4.975,
          27.41,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -4.975,
-         25.96,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#6a3d8f",
-        "role": "wheel-hang-10",
-        "pivot": [
-         -4.975,
-         27.41,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -9.192,
-         24.592,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -5916,12 +4430,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-11",
+        "role": "gondola",
         "pivot": [
          -9.192,
          24.592,
@@ -5942,7 +4456,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-11",
+        "role": "gondola",
         "pivot": [
          -9.192,
          24.592,
@@ -5954,16 +4468,16 @@
         "kind": "box",
         "at": [
          -9.192,
-         23.642,
+         23.542,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#e07b39",
-        "role": "wheel-hang-11",
+        "role": "gondola",
         "pivot": [
          -9.192,
          24.592,
@@ -5975,60 +4489,19 @@
         "kind": "box",
         "at": [
          -9.192,
-         23.642,
+         23.742,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-11",
+        "role": "gondola",
         "pivot": [
          -9.192,
          24.592,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -9.192,
-         23.142,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#e07b39",
-        "role": "wheel-hang-11",
-        "pivot": [
-         -9.192,
-         24.592,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -12.01,
-         20.375,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -6041,12 +4514,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-12",
+        "role": "gondola",
         "pivot": [
          -12.01,
          20.375,
@@ -6067,7 +4540,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-12",
+        "role": "gondola",
         "pivot": [
          -12.01,
          20.375,
@@ -6079,16 +4552,16 @@
         "kind": "box",
         "at": [
          -12.01,
-         19.425,
+         19.325,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#3a7fc4",
-        "role": "wheel-hang-12",
+        "role": "gondola",
         "pivot": [
          -12.01,
          20.375,
@@ -6100,60 +4573,19 @@
         "kind": "box",
         "at": [
          -12.01,
-         19.425,
+         19.525,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-12",
+        "role": "gondola",
         "pivot": [
          -12.01,
          20.375,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -12.01,
-         18.925,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#3a7fc4",
-        "role": "wheel-hang-12",
-        "pivot": [
-         -12.01,
-         20.375,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -13,
-         15.4,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -6166,12 +4598,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-13",
+        "role": "gondola",
         "pivot": [
          -13,
          15.4,
@@ -6192,7 +4624,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-13",
+        "role": "gondola",
         "pivot": [
          -13,
          15.4,
@@ -6204,16 +4636,16 @@
         "kind": "box",
         "at": [
          -13,
-         14.45,
+         14.35,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#c9342d",
-        "role": "wheel-hang-13",
+        "role": "gondola",
         "pivot": [
          -13,
          15.4,
@@ -6225,59 +4657,18 @@
         "kind": "box",
         "at": [
          -13,
-         14.45,
+         14.55,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-13",
+        "role": "gondola",
         "pivot": [
          -13,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -13,
-         13.95,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#c9342d",
-        "role": "wheel-hang-13",
-        "pivot": [
-         -13,
-         15.4,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -12.01,
-         10.425,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
          15.4,
          0
         ],
@@ -6291,12 +4682,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-14",
+        "role": "gondola",
         "pivot": [
          -12.01,
          10.425,
@@ -6317,7 +4708,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-14",
+        "role": "gondola",
         "pivot": [
          -12.01,
          10.425,
@@ -6329,16 +4720,16 @@
         "kind": "box",
         "at": [
          -12.01,
-         9.475,
+         9.375,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#f0c040",
-        "role": "wheel-hang-14",
+        "role": "gondola",
         "pivot": [
          -12.01,
          10.425,
@@ -6350,60 +4741,19 @@
         "kind": "box",
         "at": [
          -12.01,
-         9.475,
+         9.575,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-14",
+        "role": "gondola",
         "pivot": [
          -12.01,
          10.425,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -12.01,
-         8.975,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#f0c040",
-        "role": "wheel-hang-14",
-        "pivot": [
-         -12.01,
-         10.425,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -9.192,
-         6.208,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -6416,12 +4766,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-15",
+        "role": "gondola",
         "pivot": [
          -9.192,
          6.208,
@@ -6442,7 +4792,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-15",
+        "role": "gondola",
         "pivot": [
          -9.192,
          6.208,
@@ -6454,16 +4804,16 @@
         "kind": "box",
         "at": [
          -9.192,
-         5.258,
+         5.158,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#2e8b57",
-        "role": "wheel-hang-15",
+        "role": "gondola",
         "pivot": [
          -9.192,
          6.208,
@@ -6475,60 +4825,19 @@
         "kind": "box",
         "at": [
          -9.192,
-         5.258,
+         5.358,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-15",
+        "role": "gondola",
         "pivot": [
          -9.192,
          6.208,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -9.192,
-         4.758,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#2e8b57",
-        "role": "wheel-hang-15",
-        "pivot": [
-         -9.192,
-         6.208,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "cyl",
-        "at": [
-         -4.975,
-         3.39,
-         0
-        ],
-        "r": 0.06,
-        "h": 1.2,
-        "segments": 6,
-        "pitch": 1.5708,
-        "color": "#3a3d40",
-        "role": "wheel",
-        "pivot": [
-         0,
-         15.4,
          0
         ],
         "collide": false
@@ -6541,12 +4850,12 @@
          0
         ],
         "size": [
-         0.08,
+         0.1,
          0.4,
-         0.08
+         1.2
         ],
         "color": "#3a3d40",
-        "role": "wheel-hang-16",
+        "role": "gondola",
         "pivot": [
          -4.975,
          3.39,
@@ -6567,7 +4876,7 @@
          1.5
         ],
         "color": "#f4efe4",
-        "role": "wheel-hang-16",
+        "role": "gondola",
         "pivot": [
          -4.975,
          3.39,
@@ -6579,16 +4888,16 @@
         "kind": "box",
         "at": [
          -4.975,
-         2.44,
+         2.34,
          0
         ],
         "size": [
          1.6,
-         0.85,
+         1.05,
          1.35
         ],
         "color": "#6a3d8f",
-        "role": "wheel-hang-16",
+        "role": "gondola",
         "pivot": [
          -4.975,
          3.39,
@@ -6600,37 +4909,16 @@
         "kind": "box",
         "at": [
          -4.975,
-         2.44,
+         2.54,
          0
         ],
         "size": [
          1.64,
-         0.32,
+         0.34,
          1.1
         ],
         "color": "#2b3a44",
-        "role": "wheel-hang-16",
-        "pivot": [
-         -4.975,
-         3.39,
-         0
-        ],
-        "collide": false
-       },
-       {
-        "kind": "box",
-        "at": [
-         -4.975,
-         1.94,
-         0
-        ],
-        "size": [
-         1.7,
-         0.16,
-         1.45
-        ],
-        "color": "#6a3d8f",
-        "role": "wheel-hang-16",
+        "role": "gondola",
         "pivot": [
          -4.975,
          3.39,

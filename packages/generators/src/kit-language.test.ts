@@ -57,3 +57,9 @@ test('triangle admission includes holes, smooth boxes and path subdivisions', ()
   assert.ok(kitPhysics(small).tris >= 32); assert.equal(kitPhysics(small).colliders.length, 1);
   assert.deepEqual(kitPhysics(small).colliders[0].half, [2, 2]);
 });
+
+test('E2: each gondola hangs from its own pivot; other roles still share one', () => {
+  const two = (role: string) => kitArgs.safeParse({ v: 2, shapes: [{ kind: 'box', at: [5, 10, 0], role, pivot: [5, 10, 0] }, { kind: 'box', at: [-5, 10, 0], role, pivot: [-5, 10, 0] }] });
+  assert.equal(two('gondola').success, true);
+  assert.equal(two('wheel').success, false);
+});

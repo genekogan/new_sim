@@ -331,13 +331,11 @@ test('E2: a ferris wheel made bigger re-routes its ride: goes round the bigger w
   const car = () => (w.host.engine as any).world.entities['big-wheel']?.carrier;
   for (let i = 0; i < 60 && !car(); i++) await w.settle(1);
   const before = structuredClone(car()); assert.ok(before, 'a native car was installed at the wheel');
-  // the god replaces it with a bigger wheel of their own under the same name (as the Eden 2026 landmarks upgrade does)
-  const bigger = { schema: 'def/1', name: 'test-big-wheel', version: 1, description: 'a bigger wheel', tags: ['ferris-wheel', 'ride'], form: 'point', layer: 'solid',
-    components: { carrier: { seats: 16 }, spin: { axis: 'z', rpm: 0.8, role: 'wheel' } },
-    make: { kind: 'gen', gen: 'kit/2', args: { shapes: [
-      { kind: 'extrude', at: [0, 0, 0], polygon: [[-9, -2.5], [9, -2.5], [9, 2.5], [-9, 2.5]], h: 0.4, color: '#999999' },
-      { kind: 'torus', at: [0, 14, 0], r: 13, r2: 0.13, segments: 48, color: '#eeeeee', role: 'wheel', pivot: [0, 14, 0], collide: false }] } } };
-  const r: any = w.god.act({ ops: [{ op: 'remove', id: w.byName('big-wheel').id }, { op: 'define', def: bigger }, { op: 'place', def: 'test-big-wheel@1', name: 'big-wheel', p: [20, 20] }] }, 'a bigger wheel');
+  // the god replaces it with a bigger wheel of their own under the same name: Eden 2026's big wheel (landmarks upgrade)
+  const { readFileSync } = await import('node:fs');
+  const tpl = JSON.parse(readFileSync(new URL('../../../../worlds/templates/eden-2026.json', import.meta.url), 'utf8'));
+  const bigger = tpl.batches.flatMap((b: any) => b.ops).find((o: any) => o.op === 'define' && o.def.name === 'eden-big-wheel').def;
+  const r: any = w.god.act({ ops: [{ op: 'remove', id: w.byName('big-wheel').id }, { op: 'define', def: bigger }, { op: 'place', def: 'eden-big-wheel@1', name: 'big-wheel', p: [20, 20] }] }, 'a bigger wheel');
   assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
   const top = (c: any) => Math.max(...c.route.keys.map((k: any) => k.p[1]));
   for (let i = 0; i < 1400 && top(car()) === top(before); i++) { w.host.tickOnce(); if (i % 20 === 0) await w.settle(1); }
