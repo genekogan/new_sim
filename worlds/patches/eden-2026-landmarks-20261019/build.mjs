@@ -81,7 +81,7 @@ function cableCarDef() {
 function bigTopCanopyDef() {
   const S = 24, R = 16.4, H = 8, SK = 15.8, shapes = [];
   for (let k = 0; k < S; k++) shapes.push({ kind: 'cone', at: [0, H / 2, 0], r: R, h: H, segments: 2, arc: r3((2 * Math.PI) / S), yaw: r3((k * 2 * Math.PI) / S), color: k % 2 ? CREAM : RED, material: 'fabric', collide: false });
-  shapes.push({ kind: 'torus', at: [0, 0.05, 0], r: R - 0.1, r2: 0.12, segments: 24, color: GOLD, collide: false });
+  shapes.push({ kind: 'torus', at: [0, 0.05, 0], r: R - 0.1, r2: 0.12, segments: 24, pitch: 1.5708, color: GOLD, collide: false });
   // skirt: 24 panels round the square hall (corners at 15.56 m); the two panels either side of each door axis are left out
   const w = 2 * SK * Math.sin(Math.PI / S) + 0.06;
   for (let k = 0; k < S; k++) {
@@ -122,9 +122,9 @@ function buntingDef() {
 // ---------- amphitheatre: a painted round stage floor ----------
 function stageFloorDef() {
   const S = 8, R = 1.9, cols = ['#d9534f', '#f0ad4e', '#f4d35e', '#5cb85c', '#3d8ab0', '#6f5fb0', '#e86aa8', '#f4efe4'], shapes = [];
-  for (let k = 0; k < S; k++) shapes.push({ kind: 'cyl', at: [0, 0.025, 0], r: R, h: 0.03, segments: 3, arc: r3((2 * Math.PI) / S), yaw: r3((k * 2 * Math.PI) / S), color: cols[k], collide: false });
+  for (let k = 0; k < S; k++) shapes.push({ kind: 'cyl', at: [0, 0.025, 0], r: R, h: 0.03, segments: 6, arc: r3((2 * Math.PI) / S), yaw: r3((k * 2 * Math.PI) / S), color: cols[k], collide: false });
   shapes.push({ kind: 'cyl', at: [0, 0.03, 0], r: 0.35, h: 0.035, segments: 12, color: '#2a2826', collide: false });
-  shapes.push({ kind: 'torus', at: [0, 0.03, 0], r: R, r2: 0.04, segments: 24, color: '#f4efe4', collide: false });
+  shapes.push({ kind: 'torus', at: [0, 0.03, 0], r: R, r2: 0.04, segments: 24, pitch: 1.5708, color: '#f4efe4', collide: false });
   return {
     schema: 'def/1', name: 'eden-stage-floor', version: 1,
     description: 'A round painted stage floor (3.8 m) in eight bright segments with a white rim, laid on the ground for open-air music.',
