@@ -8,6 +8,7 @@ import { ThreeResources, loadGltf } from '../../lib/three-resources.ts';
 import { BODY_MODEL } from './rig.ts';
 import {collectTemplateAppearance,transferActorAppearance,type TemplateAppearance,type ActorAppearance} from './human-appearance.ts';
 import {BASE} from '../../../../apps/web/src/base-path.ts';
+import {CHARACTER_CLIPS,CHARACTER_WIRE} from './character-wire.ts';
 
 export const PEOPLE = ['casual', 'punk', 'woman'] as const;
 export const PERSON_HEIGHT = 1.75;
@@ -70,6 +71,21 @@ const characterUrl = (name: string) => `${BASE}/modular/environment/animated-${n
 /** Directory the character GLBs are served from; other imported models (eden-imports) are served beside them. */
 export const MODEL_DIR = characterUrl('').replace(/animated-\.glb.*$/, '');
 
+/** Lane W3: what the viewer downloads per character (tools/blobs/character-wire.mjs): the mesh file (the source without
+ *  its animations, same indices) and its rig's clips file, shared by casual and punk (bit-identical clips; woman has her
+ *  own), each tagged with its own sha256 so a rebuilt file is a new URL. */
+const wireUrl = (file: string, sha: string) => `${MODEL_DIR}${file}?v=${sha.slice(0, 12)}`;
+type Wire = (typeof CHARACTER_WIRE)[keyof typeof CHARACTER_WIRE];
+const wireOf = (name: string): Wire | undefined => (CHARACTER_WIRE as Record<string, Wire>)[name];
+/** One clips download and parse per rig per load (casual and punk share theirs). */
+const clipLoads = new WeakMap<AbortSignal, Map<string, Promise<THREE.AnimationClip[]>>>();
+function loadClips(file: keyof typeof CHARACTER_CLIPS, signal: AbortSignal, resources: ThreeResources): Promise<THREE.AnimationClip[]> {
+  const byFile = clipLoads.get(signal) ?? clipLoads.set(signal, new Map()).get(signal)!;
+  let p = byFile.get(file);
+  if (!p) { p = loadGltf(wireUrl(file, CHARACTER_CLIPS[file].sha256), signal, resources).then((g) => g.animations); p.catch(() => byFile.delete(file)); byFile.set(file, p); }
+  return p;
+}
+
 export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void;names?:readonly string[];onTemplate?:(template:Template)=>void}): Promise<Template[]> {
   return Promise.all(
     PEOPLE.filter(name=>!options?.names||options.names.includes(name)).map(async (name) => {
@@ -77,11 +93,14 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
       report('start');
       try{
       let appearance:TemplateAppearance|undefined;
-      const gltf = await loadGltf(characterUrl(name), signal, resources,options?.appearances?async(bytes,gltf)=>{
+      const wire=wireOf(name),clips=wire?loadClips(wire.clips,signal,resources):null;
+      const gltf = await loadGltf(wire?wireUrl(wire.mesh,wire.meshSHA256):characterUrl(name), signal, resources,options?.appearances?async(bytes,gltf)=>{
         const digest=await globalThis.crypto.subtle.digest('SHA-256',bytes);
         const sha=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
-        if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,sha);
+        // W3: the mesh file is pinned by its own hash and stands for its source GLB (same node/mesh/material indices)
+        if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,wire&&sha===wire.meshSHA256?wire.sourceSHA256:sha);
       }:undefined);
+      if(clips)gltf.animations=await clips;
       const template=templateFromGltf(name,gltf,appearance);options?.onTemplate?.(template);report('loaded');return template;
       }catch(error){report('failed');throw error;}
     }),
