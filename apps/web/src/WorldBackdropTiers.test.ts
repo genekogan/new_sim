@@ -47,3 +47,14 @@ test('a failed detail load keeps the coarse furniture',async()=>{
   assert.equal(await geometry.addBackdropDetail(loader as never),false);
   let coarse=0;geometry.group.traverse(o=>{if(o.userData.tier==='coarse')coarse++;});assert.equal(coarse,1);
 });
+
+test('the detail tier starts 1.5 s after the arrival is ready, once',async()=>{
+  const url='/browser/campus.glb?v=20260922b';const calls:string[]=[];
+  const loader={loadAsync:async(u:string)=>{calls.push(u);const s=new THREE.Group();s.add(mesh(new THREE.BoxGeometry(),new THREE.MeshStandardMaterial(),u!==BACKDROP_DETAIL[url]));return{scene:s,animations:[]};}};
+  const geometry=new WorldGeometry(null as never);
+  await geometry.addBackdrop({contract:'mars-campus-backdrop/1',url,at:[0,0,0]},loader as never);
+  geometry.backdropDetailWhenSettled(loader as never,1000);geometry.backdropDetailWhenSettled(loader as never,2499);
+  assert.equal(calls.length,1,'not yet');
+  geometry.backdropDetailWhenSettled(loader as never,2500);geometry.backdropDetailWhenSettled(loader as never,2600);
+  assert.deepEqual(calls,[BACKDROP_BLOBS[url],BACKDROP_DETAIL[url]]);
+});

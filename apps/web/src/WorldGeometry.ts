@@ -313,6 +313,10 @@ export class WorldGeometry {
   private placeBackdrop(root:THREE.Object3D,backdrop:MarsBackdrop,name:string){dequantizeBackdrop(root);root.name=name;root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});}
   /** W3: a campus detail tier is waiting (the caller starts it once the arrival is ready). */
   get backdropDetailPending(){return this.backdropDetail!==null;}
+  private backdropReadyAt:number|null=null;
+  /** W3: called every frame once the arrival is ready; starts the detail tier 1.5 s later, so its download and parse
+   * never compete with the arrival card's last frames and fade. */
+  backdropDetailWhenSettled(loader:GLTFLoader,now:number){this.backdropReadyAt??=now;if(now-this.backdropReadyAt>=1500)void this.addBackdropDetail(loader);}
   /** W3: load the campus detail tier once: the exact fittings and furniture join the scene in the same frame as the
    * base tier's coarse ones leave it. False when there is none, it failed (the coarse ones stay) or the view moved on. */
   async addBackdropDetail(loader:GLTFLoader):Promise<boolean>{
