@@ -329,7 +329,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     // W1: readiness follows startup and two drawn frames, with no 2.5 s floor or timer polling.
     void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(async()=>{
-      arrivalMark('entity-built');
+      layerStarted=true;arrivalMark('entity-built');
       if(abort.signal.aborted)return;frameEntityWorld();setEntityWorld(entityLayer.active);
       // lane W1: link the built world's shaders in parallel (KHR_parallel_shader_compile) before its first frame, instead
       // of the first frame stalling the page on each program (~0.2-0.35 s); frames wait for it, at most 3 s
@@ -489,8 +489,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const beginTemplate=(name:string)=>{let resolve!:()=>void,reject!:(error:Error)=>void;const promise=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});void promise.catch(()=>{});templateLoads.set(name,{promise,resolve,reject,failed:false});};
     PEOPLE.forEach(beginTemplate);
     const templateOptions={appearances:humanPresets,onTemplate:(template:typeof templates[number])=>{const i=templates.findIndex(t=>t.name===template.name);if(i>=0)templates[i]=template;else templates.push(template);people?.setTemplates(templates);},onAsset:(name:string,phase:'start'|'loaded'|'failed')=>{if(phase==='start')downloads.start('person:'+name);else{downloads.finish('person:'+name,phase==='failed');const entry=templateLoads.get(name)!;if(phase==='loaded')entry.resolve();else{entry.failed=true;entry.reject(Error('Required person model '+name+' could not be loaded.'));}}}};
-    void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});
-    const requireTemplate=async(name:string)=>{if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
+    // lane W1: a new world loads (and parses, ~0.1 s of main thread) its character templates once it has arrived, or as
+    // soon as an initial body needs one; old worlds load them at once, as before
+    let templatesStarted=false;const startTemplates=()=>{if(templatesStarted)return;templatesStarted=true;void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});};
+    if(!newWorld)startTemplates();
+    const requireTemplate=async(name:string)=>{startTemplates();if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
     // bound segments load their verified base; old unbound history uses neutral ground.
@@ -626,7 +629,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const pacer = new FramePacer();
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
-    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity;  // lane W1: the built world's shaders are still linking in parallel: no frame yet
+    let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false;  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
@@ -859,6 +862,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // initial gate). Only the page's first arrival: once a frame has been shown, later scene changes draw as before.
       const arrivalStage=newWorld&&(entityLayer.active||entityLayer.building)&&!arrivedOnce?(entityLayer.building?'building':initialGate?.snapshot().stage??'waiting'):undefined;
       if(arrivalStage==='first-frame'||arrivalStage==='ready'||arrivalStage==='failed'||arrivalStage==='cancelled')arrivedOnce=true;
+      if(newWorld&&!templatesStarted&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
       const holdDraw=programsPending||(arrivalStage!==undefined&&!arrivedOnce);
       entityLayer.applyEdge(context.current.sim.edge??[]);if(!holdDraw)entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
