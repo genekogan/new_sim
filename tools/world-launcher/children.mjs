@@ -302,6 +302,8 @@ export function defaultCommand(world, port, o) {
     SOUL_LIFECYCLE: '1',
     // Souls fade and are lifted up after an hour without an action (green → yellow → red → beam-up), as on /w/eden (R4-LIVE)
     EDGE_FADING: '1',
+    // Nobody watching or acting here for 30 s: the clock runs at a quarter of its wall pace (apps/server/src/attention.ts)
+    SIM_UNWATCHED_PACE: process.env.SIM_UNWATCHED_PACE ?? '0.25',
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),
