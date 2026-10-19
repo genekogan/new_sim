@@ -139,7 +139,7 @@ function emitBuilding(L: BuildingLayout, made: BuildingBuffers, materials: MeshC
   const { groups, tris } = Builder.fromRaw(made.raw).emit(materials);
   const root = new THREE.Group(); root.name = 'building';
   const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
-  if (made.anchors.length) inner.userData.edenSmokeSources = made.anchors.map((p) => [...p, 0.8]); // W2: atmosphere smoke
+  if (made.anchors.length) inner.userData.edenSmokeSources = made.anchors.map((p) => [...p, 1.4]); // W2: atmosphere smoke
   for (const g of groups.values()) inner.add(g);
   root.add(inner);
   return { group: root, tris };
