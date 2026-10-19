@@ -434,7 +434,9 @@ function moorings(model: WorldModel) {
   return list;
 }
 /** At most one boat surveys its water per frame (none during the first seconds of arrival); drift then eases in. */
+/** Phones: boats sway in place, no water survey. */
 let surveyFrame = -1;
+const onPhone = () => (globalThis as { __simQuality?: { tier?: string } }).__simQuality?.tier === 'phone';
 /** Bob on the swell, roll and pitch; moored boats swing a little on their lines; free boats drift on a slow loop and
  *  turn with it. A pure function of world time and the entity's seed, like every motion here. */
 function boatStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number, base: { y: number; yaw: number }, phase: number, routed: boolean) {
@@ -442,7 +444,7 @@ function boatStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldMo
   const x0 = obj.position.x, z0 = obj.position.z;
   // a boat under way (rowed, towed, moved by a god) holds still on its lines; its water is surveyed once it has rested 1 s
   if (!ud.boat || Math.abs(ud.boat.x - x0) > 0.05 || Math.abs(ud.boat.z - z0) > 0.05) ud.boat = { x: x0, z: z0, drift: 0, moored: true, size: ud.boat?.size ?? 3, at: t };
-  else if (ud.boat.at !== undefined && t - ud.boat.at > 1 && surveyFrame !== Math.floor(t * 60)) { surveyFrame = Math.floor(t * 60); const a = performance.now(); ud.boat = { ...boatRest(model, e, def, x0, z0, obj.scale.x), born: t, ms: performance.now() - a }; }
+  else if (ud.boat.at !== undefined && t - ud.boat.at > 1 && surveyFrame !== Math.floor(t * 60) && !onPhone()) { surveyFrame = Math.floor(t * 60); const a = performance.now(); ud.boat = { ...boatRest(model, e, def, x0, z0, obj.scale.x), born: t, ms: performance.now() - a }; }
   const b = ud.boat; if (b.beached) { obj.rotation.set(0, base.yaw, 0); return; }
   const c = def.components, k = Math.max(0.5, Math.min(2, 3 / Math.max(1, b.size)));   // small boats move more
   const T = Math.PI * 2, bob = c.hover?.bob ?? 0.05, period = c.hover?.period ?? 3.4;

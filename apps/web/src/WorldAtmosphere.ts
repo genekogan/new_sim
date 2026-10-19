@@ -54,7 +54,9 @@ export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camer
 /** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
 export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
 export type AtmosphereInspection={profile:'eden'|'world';dust:({profile:'mars-desert';seed:number}&DustSample)|null;set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
-const SCAN_AT=[0,1.5,5,12,25,45];const RESCAN_EVERY=30;
+const SCAN_AT=[0,1.5,5,12,25,45];
+/** W2b: phones skip the sea fog banks (big alpha-blended puffs: fill rate). */
+const phoneTier=()=>(globalThis as {__simQuality?:{tier?:string}}).__simQuality?.tier==='phone';const RESCAN_EVERY=30;
 const WHITE=new THREE.Color(1,1,1);
 /** The kind a set weather draws as (its own name, or for 'manual' the nearest by its channels). */
 function setKind(w:SetWeather):WeatherKind{
@@ -292,7 +294,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    lighthouse.update(still?0:t,profile==='eden'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);lighthouse.group.visible=profile==='eden';
    for(const b of beacons)b.update(still?0:t,profile==='world'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);
    // fog banks roll over the sea in fog and mist, and on still early mornings
-   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,profile==='world'&&!worldFog?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
+   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,(profile==='world'&&!worldFog)||phoneTier()?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
    // the sea: swell and surf (livelier in wind; still for reduced motion)
    SURF.value.x=still?0:t;SURF.value.y=1;SURF.value.z=state.wind;
    ferrisAngle=nextFerrisAngle(ferrisAngle,frame.dt,frame.daylight===null||hourOf(ms)>=7&&hourOf(ms)<19,still);
