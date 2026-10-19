@@ -34,6 +34,7 @@ import {mountSecretPlaceRoutes} from './edge/perception/secret-routes.ts';
 import { mountGodRoutes } from './god/routes.ts';
 import {VerifyUse} from './god/verify-use.ts';
 import { mountModeration } from './moderation/routes.ts';
+import { mountEdgeSnapshot, safeKey, snapshotKey, withSnapshotKey } from './edge-snapshot.ts';
 import { mountSharedLibraryRoutes } from './god/shared-library.ts';
 import { mountArtRoutes } from './art/routes.ts';
 import { defaultAssetDir } from './god/assets.ts';
@@ -61,7 +62,10 @@ export function buildApp(d: Deps) {
   const portraits=new AutoPortraits(d.host);profiles.autoBytes=(id,hash)=>portraits.bytes(id,hash);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
-  mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
+  const moderation = mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
+  // lane O2: the first snapshot is edge-cacheable when the page asks for it by the current key (edge-snapshot.ts)
+  const godForKey = d.god, currentSnapshotKey = godForKey ? () => snapshotKey({ editSeq: godForKey.model.editSeq, buildsRev: godForKey.store.buildsRev(), moderation: moderation.version() }) : null;
+  if (currentSnapshotKey) mountEdgeSnapshot(app, currentSnapshotKey);
   mountAgentInbox(app, {db: d.db, worldId: d.host.worldId, souls: d.souls, god: d.god, edge: !!d.edge, requireUser: c => requireUser(c), ownerSoul: async (c, id) => { const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, id); if (!d.souls.owns(u.id, s)) throw new ApiError(403, 'forbidden', 'not your soul'); return s; }}); // invite gate as on the central /v1/souls/:id/command
   // Travel (M3, travel/): a Soul whose body is in another world acts there; here only its travel calls answer.
   let travel: Travel | undefined;
@@ -473,7 +477,7 @@ export function buildApp(d: Deps) {
     const currentIndex = () => { try { const m = statSync(indexPath).mtimeMs; if (m !== indexMtime) { index = readFileSync(indexPath, 'utf8'); indexMtime = m; } } catch { /* keep the last good index */ } return index; };
     app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); });
     app.use('/assets/*', serveStatic({ root: d.cfg.webDir }));
-    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(currentIndex(), 200, { 'Cache-Control': 'no-cache' })));
+    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(withSnapshotKey(currentIndex(), safeKey(currentSnapshotKey)), 200, { 'Cache-Control': 'no-cache' })));
   } else app.get('/', (c) => c.text('Sim server is running. The web app has not been built (pnpm build).'));
   return app;
 }
