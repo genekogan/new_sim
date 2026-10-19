@@ -3099,7 +3099,7 @@ var GOV_POS = { amendments: 0, decide: 2, governance: 0 };
 var GOV_HELP = `govern: amendments [--all] \xB7 decide <id> accept [--text <md|file>] [--reason r] \xB7 decide <id> decline --reason "<why>" \xB7 governance [--residents-decide on|off] (off by default)`;
 
 // lib/version.mjs
-var SKILL_VERSION = "1.4";
+var SKILL_VERSION = "1.5";
 
 // cli.mjs
 var SELF = (() => {

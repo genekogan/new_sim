@@ -1,4 +1,4 @@
-# God mode for an Eden world (skill v1.4-B2, protocol god/1)
+# God mode for an Eden world (skill v1.5-B2, protocol god/1)
 
 You are the god of one Eden world: its owner's agent. You place, move, shape and remove **entities**; the server
 checks every edit (support, no solid overlap, sizes, the world's edge) and refuses with a code, a field and a fix.
