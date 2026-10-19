@@ -1,5 +1,5 @@
-import {REGION_EXPLORE} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/index.ts';
-import {INTERIOR_EXPLORE} from '../../../mars/viewer/app/engine-view/content/assets/eden-interiors/index.ts';
+import {REGION_EXPLORE} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/explore.ts';
+import {INTERIOR_EXPLORE} from '../../../mars/viewer/app/engine-view/content/assets/eden-interiors/explore.ts';
 /** Local renderer tour addresses. They identify scenery views, never native
  * entities, controller destinations, attendance, or recorded world facts. */
 export const WORLD_PLACE_VIEWS={

@@ -17,7 +17,7 @@ import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {WorldSoulAvatars} from './SoulAvatars.ts';
 import {edenExpansionCapture} from './WorldEdenActivation.ts';
 import {worldPlaceView,CURATED_WORLD_LOCATIONS,type WorldPlaceId} from './WorldPlaces.ts';
-import {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
+import type {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
 import {worldCameraRenderRoots} from './WorldCameraRenderRoots.ts';
@@ -32,7 +32,10 @@ import {WorldShadowDetail} from './WorldShadowDetail.ts';
 import {WorldPlaceActivity} from './WorldPlaceActivity.ts';
 import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,WorldPost} from './rendering/WorldLook.ts';
 import {installNightLighting,setNightLightStrength,nightLightStrength} from './WorldNightLights.ts';
-import {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
+import type {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
+// P1 phones: the old Eden expansion is its own chunk (old-eden.ts), fetched only by a world that shows it
+let oldEden:typeof import('./old-eden.ts')|null=null,oldEdenLoad:Promise<typeof import('./old-eden.ts')>|null=null;
+const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=>{oldEdenLoad=null;throw e;});
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
@@ -390,6 +393,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let previousCameraMode: WorldCameraMode = 'broadcast';
     let logicalFov = 45;
     let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false;
+    if(context.current.edenExpansion)void loadOldEden().catch(()=>{});  // P1: start fetching the old Eden chunk with the scene
     let expansionSceneInfo:ReturnType<typeof parseSceneInfo>|null=null;
     let cameraGroundInfo:ReturnType<typeof parseSceneInfo>|null|undefined,cameraGroundOwner:ReturnType<typeof createWorldEdenExpansion>|null|undefined;
     const refreshCameraGround=()=>{if(entityLayer.active){cameraGround.bindGround(entityLayer.groundAt,entityLayer);return;}const owner=expansion?.group.visible?expansion:null;if(cameraGroundInfo===expansionSceneInfo&&cameraGroundOwner===owner)return;cameraGroundInfo=expansionSceneInfo;cameraGroundOwner=owner;cameraGround.bindGround(cameraGroundSampler(expansionSceneInfo??undefined,owner?.sampleVisualGround),expansionSceneInfo);};
@@ -737,7 +741,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);
           if(!expansionWanted&&expansion)clearExpansion();
-          if(expansionWanted&&!expansion&&!expansionFailed)try{expansion=createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
+          if(expansionWanted&&!expansion&&!expansionFailed&&!oldEden)void loadOldEden().catch(()=>{expansionFailed=true;problem('Some new Eden scenery could not be shown.');});
+          if(expansionWanted&&!expansion&&!expansionFailed&&oldEden)try{expansion=oldEden.createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=oldEden.createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
           expansion?.sync(sampled.entities,!!past.current,depictedTick*take.dt);
           expansion?.setLocalPresentation(context.current.localClassroomPresentation,s.conn.welcome?.worldId??'',Object.hasOwn(sampled.entities,'eden-classroom-screen-1')&&records['eden-classroom-screen-1']?.kind==='fixture'&&records['eden-classroom-screen-1']?.def==='standing-display',!!past.current);
           floaters.update(sampled.entities, take.startTick + sampled.tick, take.dt); // absolute tick: the bob is replay-stable

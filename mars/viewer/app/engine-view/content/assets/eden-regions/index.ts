@@ -38,43 +38,7 @@ export const REGION_DISTRICTS:{id:string;bounds:readonly [number,number,number,n
 ];
 export {REGION_PLACES} from './places.ts';
 /** Explore-menu views of the Regions (camera → target, world metres); each camera checked to sit outside buildings. */
-export const REGION_EXPLORE:readonly {id:string;label:string;camera:[number,number,number];target:[number,number,number]}[]=Object.freeze([
- {id:'region-east-panorama',label:'Eastern panorama: canal town and hills',camera:[95,45,-60],target:[170,0,30]},
- {id:'region-canal-quarter',label:'Canal quarter',camera:[137,12,-44],target:[137,1,10]},
- {id:'region-old-town-plaza',label:'Old town plaza',camera:[124,9,64],target:[150,3,77]},
- {id:'region-market-street',label:'Market street',camera:[112,4,92],target:[135,2,100]},
- {id:'region-hillside-village',label:'Hillside village',camera:[160,45,40],target:[218,10,-14]},
- {id:'region-lookout-temple',label:'Lookout temple',camera:[250,30,10],target:[226,22,-22]},
- {id:'region-east-suburb',label:'East suburb',camera:[250,22,122],target:[214,0,74]},
- {id:'region-railway-station',label:'Railway station',camera:[126,7,-28],target:[150,2,-50]},
- {id:'region-makers-yard',label:'Makers’ yard',camera:[116,12,-58],target:[146,2,-90]},
- {id:'region-south-panorama',label:'Southern panorama: park, sports and harbour',camera:[0,60,40],target:[10,0,130]},
- {id:'region-park',label:'Park with pond and gazebo',camera:[-24,10,90],target:[-4,0,112]},
- {id:'region-sports-ground',label:'Sports ground',camera:[40,12,90],target:[66,1,112]},
- {id:'region-farm-hamlet',label:'Farm hamlet',camera:[-52,14,98],target:[-78,3,122]},
- {id:'region-harbour',label:'Harbour and lighthouse',camera:[20,9,122],target:[45,1,152]},
- {id:'region-seaside-resort',label:'Seaside resort',camera:[110,40,80],target:[170,0,140]},
- {id:'region-north-panorama',label:'Northern panorama: campus and vineyard',camera:[0,55,-30],target:[10,0,-110]},
- {id:'region-vineyard',label:'Vineyard terraces',camera:[60,40,-40],target:[60,10,-150]},
- {id:'region-campus',label:'Campus quad',camera:[-12,10,-72],target:[-12,3,-105]},
- {id:'region-artists-village',label:'Artists’ village',camera:[-52,12,-86],target:[-76,2,-100]},
- {id:'region-west-lake',label:'West lake shore',camera:[-104,10,-30],target:[-150,0,-20]},
- {id:'region-campsite',label:'Forest campsite',camera:[-122,9,-88],target:[-142,1,-104]},
- {id:'region-abbey',label:'Abbey on the knoll',camera:[-126,16,108],target:[-160,6,100]},
- {id:'region-courtyard-quarter',label:'Courtyard-house quarter',camera:[-102,18,50],target:[-128,0,72]},
- {id:'region-castle-ruin',label:'Castle ruin and turbines',camera:[-120,30,-130],target:[-165,15,-185]},
- {id:'region-japanese-garden',label:'Japanese garden and pagoda',camera:[-60,9,-136],target:[-78,2,-156]},
- {id:'region-observatory',label:'Observatory above the vineyard',camera:[70,24,-160],target:[92,16,-188]},
- {id:'region-west-river',label:'West river and stone bridge',camera:[-160,80,40],target:[-240,0,-40]},
- {id:'region-watermill',label:'Watermill',camera:[-246,8,-96],target:[-226,3,-108]},
- {id:'region-fishing-hamlet',label:'Fishing hamlet at the river mouth',camera:[-190,14,110],target:[-222,0,140]},
- {id:'region-cliff-village',label:'Whitewashed cliff village',camera:[270,22,160],target:[282,8,108]},
- {id:'region-east-crossroads',label:'East crossroads: petrol station and pub',camera:[258,20,16],target:[284,10,-12]},
- {id:'region-golf-course',label:'Golf course',camera:[176,26,-100],target:[218,2,-150]},
- {id:'region-festival-meadow',label:'Festival meadow: big top and balloons',camera:[246,22,90],target:[278,4,50]},
- {id:'region-alpine',label:'Alpine chalets and cable car',camera:[30,40,-170],target:[-4,30,-270]},
- {id:'region-night-town',label:'Canal town by night (best after dusk)',camera:[95,45,-60],target:[170,0,30]},
-]);
+export {REGION_EXPLORE} from './explore.ts';
 export const FAR_CLEAR=35;
 const inDistrict=(x:number,z:number,m=0)=>REGION_DISTRICTS.some(d=>x>d.bounds[0]-m&&x<d.bounds[2]+m&&z>d.bounds[1]-m&&z<d.bounds[3]+m);
 export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():void;stats:{draws:number;triangles:number};sampleVisualGround:Ground;authoredBoundaries:AuthoredBoundaryBox[]}|null{
