@@ -278,7 +278,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     const note = typeof b?.note === 'string' ? b.note : undefined, ref = typeof b?.clientRef === 'string' ? b.clientRef : undefined;
     const saved = rep && ref !== undefined ? d.god.store.receipt(ref) : null; // a retry of a repaired edit: its receipt, never a second walk
     const r = saved ? { ...saved.result, replayed: true } : asGod(c, b, () => rep ? actWithRepair(d.god, b as Record<string, unknown>, rep, note) : d.god.act(b, note));
-    const caps = !r.accepted && Array.isArray((r as { failures?: unknown }).failures) ? ((r as { failures: { code?: unknown; detail?: unknown }[] }).failures).filter(f => typeof f?.code === 'string' && f.code.startsWith('budget.')) : [];
+    const caps = !r.accepted && Array.isArray((r as { failures?: unknown }).failures) ? ((r as { failures: { code?: unknown; detail?: unknown }[] }).failures).filter(f => typeof f?.code === 'string' && (f.code.startsWith('budget.') || (f.code === 'schema' && (f as { field?: unknown }).field === 'ops' && /too big/i.test(String(f.detail))))) : [];
     if (caps.length) capRefusals.note('cap', String(caps[0].code), `POST /v1/god/act: ${String(caps[0].detail ?? '')}`);   // P2: caps refused politely, and logged
     return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore);
   });
