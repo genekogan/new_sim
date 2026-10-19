@@ -1,4 +1,5 @@
 // Y1 / XP7: god kit surfaces. Offline mesher/material/shader-text tests; no renderer, network or test server.
+import { rippleMaterial } from '../fx/water.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
@@ -64,7 +65,8 @@ test('contract-2 kits without surfaces: true draw exactly as before; only an exp
     assert.deepEqual(Object.keys(m.geometry.attributes).sort(), ['color', 'normal', 'position'], m.name);
     // The very material the pre-surface mesher asked for (same MaterialLib key, no surface part).
     const [, kind, level] = m.name.split(':');
-    assert.equal(m.material, lib.get(kind as never, undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}) }), m.name);
+    const asked = lib.get(kind as never, undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}) });
+    assert.equal(m.material, kind === 'water' ? rippleMaterial(asked) : asked, m.name); // W2: water draws with its rippling copy
   }
   assert.deepEqual(meshes(plain).map(m => m.name).sort(), meshes(draw(kit(shapes, 2, { surfaces: false }))).map(m => m.name).sort());
   const o = byName(draw(kit([{ material: 'stone' }, { material: 'stone', pattern: 'ashlar', at: [2, 0.5, 0] }, { material: 'stone', pattern: 'none', at: [4, 0.5, 0] }, { pattern: 'stripes', at: [6, 0.5, 0] }])));

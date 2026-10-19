@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { expandKitProgram, kitArgs, kitWhen, type KitArgs, type KitProgramArgs, type KitShape } from '@sim/generators';
+import { fallingWaterMaterial, fallingWaterSheets, isSprayShape, rippleMaterial, type Disc } from '../fx/water.ts';
 import { flameClusters, flameHint, isFlameShape, isSmokeShape, mountFlames, smokeSources } from '../fx/flames.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { shapeFaceMeshes } from './faces.ts'; // XP8 hook
@@ -163,7 +164,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   const args = expandKitProgram(input, ctx.params);
   const root = new THREE.Group();
   const byClass = new Map<string, THREE.BufferGeometry[]>();
-  const byRole = new Map<string, KitShape[]>(), smoke: KitShape[] = [];
+  const byRole = new Map<string, KitShape[]>(), smoke: KitShape[] = [], discs: Disc[] = [];
   const color = new THREE.Color(), surfaces = args.v === 2 && args.surfaces === true; // Y1: the kit's surfaces opt-in
   for (const sh of args.shapes) {
     if (sh.when && !kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {})) continue;
@@ -172,11 +173,17 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     const role = sh.role ?? (isFlameShape(sh, !!ctx.flameHint, ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))) ? 'flame' : undefined);
     if (role) { const list = byRole.get(role) ?? []; list.push(sh); byRole.set(role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
-    const k = classOf(sh, args.v, surfaces) + (ctx.plant ? plantPart(sh) : ''); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
+    const k = classOf(sh, args.v, surfaces) + (isSprayShape(sh) ? ' spray' : ctx.plant ? plantPart(sh) : ''); const list = byClass.get(k) ?? [];
+    if (sh.material === 'water' && sh.kind === 'cyl' && !sh.role) discs.push({ x: sh.at[0], y: sh.at[1] + (sh.h ?? 1) / 2 * (sh.scale?.[1] ?? 1), z: sh.at[2], r: (sh.r ?? 0.5) * (sh.scale?.[0] ?? 1) }); list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
   }
   const matFor = (k: string): THREE.Material => {
     // W2 sway: a plant's trunk and foliage get their own material (never shared with a building), so the wind can bend them
     const part = / (trunk|foliage)$/.exec(k); if (part) return plantMaterial(matFor(k.slice(0, part.index)), part[1]);
+    if (k.endsWith(' spray')) return fallingWaterMaterial('spray'); // W2: jets and cascades fall
+    if (k.startsWith('water')) return rippleMaterial(matForBase(k)); // W2: fountain water ripples
+    return matForBase(k);
+  };
+  const matForBase = (k: string): THREE.Material => {
     if (args.v !== 2) return k === 'glass' ? ctx.materials.get('glass', undefined, { vertexColors: true }) : k === 'water' ? ctx.materials.get('water', undefined, { vertexColors: true }) : k === 'glow' ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8 }) : ctx.materials.get('paint', undefined, { vertexColors: true });
     const [kind, level] = k.split(':');
     return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}), surface: kitClassSurface(k, surfaces) });
@@ -197,7 +204,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
       mesh.castShadow = true; pivot.add(mesh);
     } else {
       const classes = new Map<string, THREE.BufferGeometry[]>();
-      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2, surfaces), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv, !!kitClassSurface(k, surfaces))); classes.set(k, list); }
+      for (const sh of shapes) { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); const k = classOf(sh, 2, surfaces) + (isSprayShape(sh) ? ' spray' : ''), list = classes.get(k) ?? []; list.push(placed(sh, args.round, 2, color, pv, !!kitClassSurface(k, surfaces))); classes.set(k, list); }
       for (const [k, geos] of classes) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = !k.startsWith('glass:') && !k.startsWith('water:'); mesh.receiveShadow = true; mesh.name = `kit:${k}`; pivot.add(mesh); }
       if (args.v === 2) for (const sh of shapes) for (const face of shapeFaceMeshes(sh, args.round, pv)) pivot.add(face); // XP8 hook
     }
@@ -205,6 +212,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   }
   root.userData.gait = args.gait;
   if (smoke.length) root.userData.edenSmokeSources = smokeSources(smoke);
+  for (const sheet of fallingWaterSheets(discs)) root.add(sheet); // W2: tiered fountains overflow
   return root;
 }
 

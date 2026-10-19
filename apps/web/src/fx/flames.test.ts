@@ -61,3 +61,18 @@ test('a chimney stack\'s grey puffs become one moving-smoke source, never a fire
   assert.ok(moving.getObjectByName('role:flame'), 'drawn puffs travel with the train');
   assert.equal(moving.userData.edenSmokeSources, undefined);
 });
+
+test('fountain water ripples, stacked basins overflow, and spray shapes fall', async () => {
+  const { rippleMaterial, fallingWaterMaterial } = await import('./water.ts');
+  const lib = new MaterialLib();
+  const o = buildKit({ v: 2, shapes: [
+    { kind: 'cyl', at: [0, 0.5, 0], r: 1.8, h: 0.04, material: 'water' }, { kind: 'cyl', at: [0, 1.66, 0], r: 0.7, h: 0.03, material: 'water' },
+    { kind: 'cone', at: [0, 2.2, 0], r: 0.1, h: 0.4, tint: 'spray', material: 'water' } ] } as never, { materials: lib, tint: (_k, f) => f, params: {}, state: {} });
+  const meshes: THREE.Mesh[] = []; o.traverse((c) => { if ((c as THREE.Mesh).isMesh) meshes.push(c as THREE.Mesh); });
+  const sheets = meshes.filter((m) => m.name === 'falling water');
+  assert.equal(sheets.length, 1, 'the upper basin overflows into the lower one');
+  assert.ok(Math.abs(sheets[0].position.y - (0.52 + 1.675) / 2) < 0.02);
+  assert.ok(meshes.some((m) => m.material === fallingWaterMaterial('spray')), 'the jet falls');
+  const water = meshes.find((m) => m.name.startsWith('kit:water') && !m.name.endsWith('spray'))!;
+  assert.equal(water.material, rippleMaterial(lib.get('water', undefined, { vertexColors: true, glow: 0, vertexGlow: true })));
+});
