@@ -56,12 +56,23 @@ function blockCells(model: WorldModel, pad: number, C: number): BlockCells {
 }
 
 const tint = new THREE.Color();
-function instance(group: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[], pts: { x: number; y: number; z: number; s: number; yaw: number; tone: number; sink?: number }[], name: string, local?: THREE.Matrix4) {
+/** W2 sway: scattered plants bend in the wind (trees and bushes from the root, grasses and flowers flutter); rocks and
+ *  cacti stay still. Their own vertex-colour material, so the wind never patches the rocks that share the scatter. */
+const STILL_KINDS = new Set(['rock', 'boulder', 'cactus']), GRASS_KINDS = new Set(['grass', 'reed', 'fern', 'flower']);
+const swayMats = new Map<string, THREE.Material>();
+function swayOf(kind: string): { mode: 'crown' | 'grass'; mat: THREE.Material } | null {
+  if (STILL_KINDS.has(kind)) return null;
+  const mode = GRASS_KINDS.has(kind) ? 'grass' : 'crown';
+  let mat = swayMats.get(mode); if (!mat) { mat = vertexMaterial().clone(); mat.name = `scatter plants ${mode}`; swayMats.set(mode, mat); }
+  return { mode, mat };
+}
+function instance(group: THREE.Group, geo: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[], pts: { x: number; y: number; z: number; s: number; yaw: number; tone: number; sink?: number }[], name: string, local?: THREE.Matrix4, windMode?: string) {
   if (!pts.length) return;
   const im = new THREE.InstancedMesh(geo, mat, pts.length), m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
   pts.forEach((p, i) => { q.setFromAxisAngle(up, p.yaw); m.compose(new THREE.Vector3(p.x, p.y - (p.sink ?? 0) * p.s, p.z), q, new THREE.Vector3(p.s, p.s, p.s)); if (local) m.multiply(local); im.setMatrixAt(i, m); tint.setRGB(0.85 + p.tone * 0.3, 0.88 + p.tone * 0.24, 0.85 + p.tone * 0.25); im.setColorAt(i, tint); });
   im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
   im.castShadow = true; im.receiveShadow = true; im.name = name; im.computeBoundingSphere(); im.userData.cameraTransparent = true;
+  if (windMode) im.userData.edenWindMode = windMode;
   group.add(im);
 }
 
@@ -73,7 +84,7 @@ function instanceDef(group: THREE.Group, ctx: MeshCtx, ref: string, pts: { x: nu
   const obj = b.build({ ...ctx, def, entity: fake, params: {}, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {}, baked: ctx.model.bake(def, {}, 0), tint: (_k, f) => f });
   if (!obj) return false;
   obj.updateMatrixWorld(true);
-  obj.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh && !(mesh as unknown as THREE.InstancedMesh).isInstancedMesh) instance(group, mesh.geometry, mesh.material, pts, `scatter:${ref}`, mesh.matrixWorld.clone()); });
+  obj.traverse((o) => { const mesh = o as THREE.Mesh; if (mesh.isMesh && !(mesh as unknown as THREE.InstancedMesh).isInstancedMesh) instance(group, mesh.geometry, mesh.material, pts, `scatter:${ref}`, mesh.matrixWorld.clone(), mesh.userData.edenWindMode); });
   return true;
 }
 
@@ -91,7 +102,8 @@ registerMesh({
     for (const [k, list] of byK) {
       const entry = pal[k];
       if (entry.def && instanceDef(group, ctx, entry.def, list)) continue;
-      instance(group, speciesGeometry(entry.kind ?? 'oak'), vertexMaterial(), list, `scatter:${entry.kind ?? 'oak'}`);
+      const sway = swayOf(entry.kind ?? 'oak');
+      instance(group, speciesGeometry(entry.kind ?? 'oak'), sway?.mat ?? vertexMaterial(), list, `scatter:${entry.kind ?? 'oak'}`, undefined, sway?.mode);
     }
     group.userData.points = pts.length;
     return group.children.length ? group : null;
@@ -104,7 +116,7 @@ registerMesh({
     const e = ctx.entity; if (!e.shape || !('area' in e.shape)) return null;
     const pts = orchardPoints(e.shape.area as [number, number][], num(ctx.params.spacing, 5), e.seed ?? 0), g = ground(ctx), h = num(ctx.params.height, 4.5) / 4.2;
     const group = new THREE.Group(); group.name = `orchard ${e.name ?? e.id}`;
-    instance(group, speciesGeometry(String(ctx.params.species ?? 'apple')), vertexMaterial(), pts.map((p, i) => ({ x: p.x, y: g(p.x, p.z), z: p.z, s: p.s * h, yaw: i * 2.39, tone: (i * 0.618) % 1, sink: 0.05 })), 'orchard-trees');
+    instance(group, speciesGeometry(String(ctx.params.species ?? 'apple')), swayOf(String(ctx.params.species ?? 'apple'))?.mat ?? vertexMaterial(), pts.map((p, i) => ({ x: p.x, y: g(p.x, p.z), z: p.z, s: p.s * h, yaw: i * 2.39, tone: (i * 0.618) % 1, sink: 0.05 })), 'orchard-trees', undefined, swayOf(String(ctx.params.species ?? 'apple'))?.mode);
     return group;
   },
 });

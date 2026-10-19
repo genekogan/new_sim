@@ -3,7 +3,7 @@
 // village of 300 benches, lamps and trees costs a few draws. Easing is per instance.
 import * as THREE from 'three';
 
-type Part = { geometry: THREE.BufferGeometry; material: THREE.Material | THREE.Material[]; local: THREE.Matrix4; castShadow: boolean; receiveShadow: boolean };
+type Part = { geometry: THREE.BufferGeometry; material: THREE.Material | THREE.Material[]; local: THREE.Matrix4; castShadow: boolean; receiveShadow: boolean; windMode?: string };
 type Pool = { key: string; parts: Part[]; meshes: THREE.InstancedMesh[]; capacity: number; count: number; slots: Map<string, number>; free: number[] };
 
 const tmp = new THREE.Matrix4(), tmp2 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
@@ -32,7 +32,7 @@ export class EntityInstancer {
     const parts: Part[] = [];
     proto.traverse((o) => {
       const m = o as THREE.Mesh; if (!m.isMesh) return;
-      parts.push({ geometry: m.geometry, material: m.material, local: new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld), castShadow: m.castShadow, receiveShadow: m.receiveShadow });
+      parts.push({ geometry: m.geometry, material: m.material, local: new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld), castShadow: m.castShadow, receiveShadow: m.receiveShadow, windMode: m.userData.edenWindMode });
     });
     const pool: Pool = { key, parts, meshes: [], capacity: 0, count: 0, slots: new Map(), free: [] };
     this.pools.set(key, pool);
@@ -64,7 +64,7 @@ export class EntityInstancer {
     const old = pool.meshes;
     pool.meshes = pool.parts.map((part, k) => {
       const m = new THREE.InstancedMesh(part.geometry, part.material, capacity);
-      m.castShadow = part.castShadow; m.receiveShadow = part.receiveShadow; m.name = `instances:${pool.key}:${k}`;
+      m.castShadow = part.castShadow; m.receiveShadow = part.receiveShadow; m.name = `instances:${pool.key}:${k}`; if (part.windMode) m.userData.edenWindMode = part.windMode; // W2: plant parts sway
       m.frustumCulled = false;  // instances spread across the world; per-instance culling is not worth it at this scale
       for (let i = 0; i < capacity; i++) m.setMatrixAt(i, ZERO);
       if (old[k]) { for (let i = 0; i < pool.capacity; i++) { old[k].getMatrixAt(i, tmp); m.setMatrixAt(i, tmp); } this.group.remove(old[k]); old[k].dispose(); }

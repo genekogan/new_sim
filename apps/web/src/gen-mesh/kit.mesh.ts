@@ -136,6 +136,19 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
   out.computeBoundingSphere(); out.computeBoundingBox();
   return out;
 }
+/** W2 sway: which part of a plant a shape is (' trunk', ' foliage', or '' for its pot, soil and stones, which stay still). */
+const PLANT_STILL = /pot|soil|clay|stone|rock|box|planter|metal|rim|base|ground|earth|mulch|gravel|plinth|tub/, PLANT_TRUNK = /bark|trunk|wood|stem|branch|log/;
+function plantPart(sh: KitShape): string { const t = `${sh.tint ?? ''} ${sh.material ?? ''}`; return sh.glow || PLANT_STILL.test(t) ? '' : PLANT_TRUNK.test(t) ? ' trunk' : ' foliage'; }
+const plantMats = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
+function plantMaterial(base: THREE.Material, part: string): THREE.Material {
+  let byPart = plantMats.get(base); if (!byPart) { byPart = new Map(); plantMats.set(base, byPart); }
+  let m = byPart.get(part); if (!m) { m = base.clone(); m.name = `kit plant ${part}`; byPart.set(part, m); }
+  return m;
+}
+/** W2 sway: a def that is a plant (trees, bushes, flowers) sways in the wind. */
+export function isPlantDef(def: { tags: readonly string[]; components?: Record<string, unknown> }): boolean {
+  return !!def.components?.plant || def.tags.some((t) => /^(plant|tree|shrub|bush|flower|flowers|reed|grass|conifer|broadleaf)$/.test(t));
+}
 /** Material class of a shape: shapes of one class merge into one draw. */
 // Four bounded emissive classes, so glow does not add one draw per numerical value.
 const glowLevel = (value: number | undefined) => value ? Math.min(4, Math.ceil(value * 4)) : 0;
@@ -145,7 +158,7 @@ const classOf = (sh: KitShape, v: number, surfaces = false) => v === 2 ? `${sh.m
 export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
   return args.shapes.some((s) => s.when) ? args.shapes.map((s) => (s.when ? (kitWhen(s.when, params, state ?? {}) ? '1' : '0') : '')).join('') : '';
 }
-export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown>; flameHint?: boolean; smokeFx?: boolean }): THREE.Group {
+export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown>; flameHint?: boolean; smokeFx?: boolean; plant?: boolean }): THREE.Group {
   // K2 hook: the same expansion runs before physics and before mesh construction.
   const args = expandKitProgram(input, ctx.params);
   const root = new THREE.Group();
@@ -159,14 +172,16 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     const role = sh.role ?? (isFlameShape(sh, !!ctx.flameHint, ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))) ? 'flame' : undefined);
     if (role) { const list = byRole.get(role) ?? []; list.push(sh); byRole.set(role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
-    const k = classOf(sh, args.v, surfaces); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
+    const k = classOf(sh, args.v, surfaces) + (ctx.plant ? plantPart(sh) : ''); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
   }
-  const matFor = (k: string) => {
+  const matFor = (k: string): THREE.Material => {
+    // W2 sway: a plant's trunk and foliage get their own material (never shared with a building), so the wind can bend them
+    const part = / (trunk|foliage)$/.exec(k); if (part) return plantMaterial(matFor(k.slice(0, part.index)), part[1]);
     if (args.v !== 2) return k === 'glass' ? ctx.materials.get('glass', undefined, { vertexColors: true }) : k === 'water' ? ctx.materials.get('water', undefined, { vertexColors: true }) : k === 'glow' ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8 }) : ctx.materials.get('paint', undefined, { vertexColors: true });
     const [kind, level] = k.split(':');
     return ctx.materials.get(kind as KitShape['material'], undefined, { vertexColors: true, glow: [0, 0.2, 0.4, 0.65, 1][Number(level)], vertexGlow: true, ...(kind === 'metal' ? { finish: 'kit-metal' as const } : {}), surface: kitClassSurface(k, surfaces) });
   };
-  for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; root.add(mesh); }
+  for (const [k, geos] of byClass) { const mesh = new THREE.Mesh(merge(geos), matFor(k)); mesh.castShadow = args.v === 2 ? !k.startsWith('glass:') && !k.startsWith('water:') : k === 'solid'; mesh.receiveShadow = true; mesh.name = `kit:${k}`; const sway = / (trunk|foliage)$/.exec(k)?.[1]; if (sway) mesh.userData.edenWindMode = sway === 'trunk' ? 'trunk' : 'crown'; root.add(mesh); }
   // XP8 hook: faces (text, this world's images, seeded glass/mosaic) sit on their shapes; role faces follow the pivot below.
   if (args.v === 2) for (const sh of args.shapes) if (sh.faces && !sh.role && (!sh.when || kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {}))) for (const face of shapeFaceMeshes(sh, args.round)) root.add(face);
   for (const [role, shapes] of byRole) {
@@ -209,7 +224,7 @@ registerMesh({
     const parsed = parseKitArgs(ctx.args); if (!parsed.success) return null;
     const key = kitCacheKey(ctx, parsed.data);
     let proto = cache.get(key);
-    if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
+    if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), plant: isPlantDef(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
     mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts)

@@ -128,7 +128,8 @@ export class WindPatches{
    if(skip?.(o))return;
    const mesh=o as THREE.Mesh;
    if(mesh.isMesh&&!(o as THREE.SkinnedMesh).isSkinnedMesh){
-    const path=(o.parent?.name??'')+' > '+o.name,candidate=windModeOf(path);
+    // W2: a builder may say what a mesh is (kit plants: trunk / crown), names are the fallback
+    const path=(o.parent?.name??'')+' > '+o.name,candidate=(o.userData.edenWindMode as WindMode|undefined)??windModeOf(path);
     // Merged world-space plants have many distinct roots baked into their
     // vertices. A single origin/base uniform cannot represent those anchors.
     const mode=o.userData.edenWindRooted===false&&candidate&&['grass','crown','trunk'].includes(candidate)?null:candidate;

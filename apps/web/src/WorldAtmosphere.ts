@@ -70,7 +70,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const dustOverride=typeof location!=='undefined'?parseDustOverride(location.search):null;
  const root=new THREE.Group();root.name='atmosphere (decorative; not a camera root)';root.userData.cameraTransparent=true;
  const beacons:Lighthouse[]=[];let lanternKey='';
- registerFx('atmosphere',{set(on){smoke.points.visible=on&&smoke.sourceCount>0;for(const b of beacons)b.group.visible=on;},stats(){return {smoke:smoke.sourceCount,lighthouses:beacons.length};}});
+ let windHeld=0;registerFx('atmosphere',{set(on){smoke.points.visible=on&&smoke.sourceCount>0;for(const b of beacons)b.group.visible=on;if(!on){windHeld=WIND.value.y||windHeld;WIND.value.y=0;}else if(windHeld){WIND.value.y=windHeld;}},stats(){return {smoke:smoke.sourceCount,lighthouses:beacons.length,windMaterials:wind.count};}});
  const fauna=new Fauna(),fireflies=new Fireflies(),smoke=new Smoke(),sky=new SkyDome(),rain=new Rain(),balloons=new Balloons(),halos=new Halos(),lighthouse=new Lighthouse(),fogBanks=new FogBanks();
  root.add(sky.mesh,fauna.mesh,fireflies.points,smoke.points,rain.lines,balloons.mesh,halos.mesh,lighthouse.group,fogBanks.mesh);
  // Fog is installed once, before anything compiles, at zero density (inert) so weather never recompiles programs.
