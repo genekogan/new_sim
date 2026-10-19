@@ -20,7 +20,8 @@ import {publishSession,type Session} from './auth-session.ts';
 import {assetBytes,installAssetMeter} from './asset-bytes.ts';
 import initialAssets from './initial-assets.json';
 import {newWorld} from './world-kind.ts';
-import {forkInitialAssets} from './mars-fork.ts';
+import {forkInitialAssets,marsFork} from './mars-fork.ts';
+import {BACKDROP_BLOBS,MARS_CAMPUS_URL,prefetchBackdrop} from './backdrop-prefetch.ts';
 if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{}));  // MARSLAND-FORK: the Mars fork's own campus
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
@@ -90,6 +91,7 @@ function WorldRoot() {
 // A large CDN file is buffered for its hash check: report its bytes to the arrival bar while they stream in.
 void installCdnAssets(cdnManifestUrl,(url,loaded)=>assetBytes.progress(url,loaded)).finally(()=>{
  installAssetMeter(); // meter the original asset URL, including its CDN attempt and origin fallback
+ if(!newWorld&&worldKey==='mars'&&!marsFork&&!(location.pathname===BASE+'/'&&!location.hash))prefetchBackdrop(BACKDROP_BLOBS[MARS_CAMPUS_URL]!); // W3: campus starts with the page
  createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
 });
 

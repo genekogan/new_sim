@@ -23,12 +23,8 @@ import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {StaticRootRegistry} from './rendering/StaticRootRegistry.ts';
 import {dequantizeBackdrop} from './WorldBackdropDequantize.ts';
 import {backdropCandidates} from './mars-fork.ts';
-/** Legacy backdrop URL (pinned in the server's scene) -> the same campus, content-addressed and immutable at
- * /blobs/assets/<sha[0:2]>/<sha>.glb on sim.eden.art. Lane W3 (2026-10-19): shared parts + placements, sub-pixel detail
- * dropped, AVIF (tools/blobs/campus-parts.mjs on the BLOBS copy 64b8838c…: 41.8 -> 7.5 MB, br 18.5 -> 3.6 MB). */
-export const BACKDROP_BLOBS:Readonly<Record<string,string>>=Object.freeze({
-  '/browser/campus.glb?v=20260922b':'/blobs/assets/0d/0d4736829e1db5c7e05b31c8286b28e99a727eb7f2b0d1bc80d0f482aa7fcf08.glb',
-});
+export {BACKDROP_BLOBS} from './backdrop-prefetch.ts';
+import {BACKDROP_BLOBS,takeBackdrop} from './backdrop-prefetch.ts';
 import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
@@ -303,7 +299,7 @@ export class WorldGeometry {
     try{const urls=backdropCandidates(backdrop.url,BACKDROP_BLOBS[backdrop.url]);let gltf;
       // lane BLOBS: the smaller hashed copy on eden2; the legacy name is the fallback (local dev has no /blobs)
       // MARSLAND-FORK: the Mars fork tries its corrected campus first (mars-fork.ts)
-      for(const url of urls.slice(0,-1)){try{gltf=await loader.loadAsync(url,event=>onProgress?.(url,event));break;}catch{gltf=undefined;}}
+      for(const url of urls.slice(0,-1)){try{const early=takeBackdrop(url);gltf=early?await loader.parseAsync(await early,url.slice(0,url.lastIndexOf('/')+1)):await loader.loadAsync(url,event=>onProgress?.(url,event));break;}catch{gltf=undefined;}}
       gltf??=await loader.loadAsync(backdrop.url,event=>onProgress?.(backdrop.url,event));
       if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;dequantizeBackdrop(root);root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);this.staticRoots.register(root,gltf.animations);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
   }
