@@ -14,7 +14,7 @@ export function installPuntActivities(host:WorldHost,edge:EdgeLedger,log:(text:s
       const door=c.state.bank?.door,place=door?edge.places.containing(door[0],door[2],0)[0]:null;
       const parent=place?.id??[...edge.places.byId.values()].find(p=>p.parent===null)?.id;
       // S1: create() keeps an existing object, so an existing ride is skipped by its id alone (no transaction, no parse)
-      if(parent&&!edge.comms.objects.has(`ride-${c.id}`))edge.comms.objects.create({id:`ride-${c.id}`,kind:'ride',name:c.label,placeId:parent,params:{carrier:c.id,vehicle:'punt'}});
+      if(parent&&!edge.comms.objects.has?.(`ride-${c.id}`))edge.comms.objects.create({id:`ride-${c.id}`,kind:'ride',name:c.label,placeId:parent,params:{carrier:c.id,vehicle:'punt'}});
     }
   };
   const reconcile=()=>{

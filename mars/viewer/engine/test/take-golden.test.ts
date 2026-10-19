@@ -42,7 +42,7 @@ function run(): Take[] {
     if (t === 50) ents.f4 = { ...ents.f4, pose: { ...ents.f4.pose, yaw: 1.5 } };            // replaced
     if (t === 70) { ents.f40 = fixture(40); delete ents.f5; }                                // added, removed
     if (t === 75) ents.box = component('box', 'bench-6ft', [-30, 0, -30]);                  // a sampled thing appears
-    if (t === 90) { (ents.f6.connections ??= []).push({ socket: 's', to: 'f7', toSocket: 't' }); ents.f7.state = { on: true }; }
+    if (t === 90) { (ents.f6.connections ??= []).push({ socket: 's', to: 'f7', toSocket: 't' }); (ents.f7 as Entity & { state?: unknown }).state = { on: true }; }
     if (t === 110) (rt.world as unknown as { entityPhysicsV1: unknown }).entityPhysicsV1 = physics(2);
     if (t === 125) delete ents.box;                                                          // and goes
     if (t === 130) ents.f8.pose.p[2] = -0;                                                    // -0 writes as 0

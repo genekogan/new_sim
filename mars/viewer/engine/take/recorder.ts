@@ -106,7 +106,7 @@ function sameCopy(live: unknown, copy: unknown): boolean {
       const has = i in live;
       if (has !== i in copy || (has && !sameCopy(live[i], copy[i]))) return false;
     }
-    return Object.keys(live).length === live.length || sameKeys(live, copy);
+    return Object.keys(live).length === live.length || sameKeys(live as unknown as Record<string, unknown>, copy as unknown as Record<string, unknown>);
   }
   const proto = Object.getPrototypeOf(live);
   if ((proto !== Object.prototype && proto !== null) || Object.getPrototypeOf(copy) !== Object.prototype) return false;
