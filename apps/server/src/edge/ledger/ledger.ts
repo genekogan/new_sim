@@ -1307,7 +1307,9 @@ function ambientChoice(ledger: EdgeLedger, soul: EdgeSoul, me: {pose: {p: number
     const p = c && plans.get(c.id); if (!c || !p) return; const steps = structuredClone(p.steps); adjust?.(steps); options.push({id: c.id, label: p.label, steps, weight});
   };
   const seconds = (n: number) => (s: Program['steps']) => {for (const x of s) if ('seconds' in (x.params ?? {})) x.params.seconds = n;};
-  add(caps.find(c => c.verb === 'warm-by-fire' && near(c, 15)), 3, seconds(90));
+  // W2b (B6): residents drift to a lit campfire in the evening (old Eden's fireside hours), from across the green
+  const hour = ledger.host.living ? clockAt(world.tick, ledger.host.living.origin, ledger.host.living.dayTicks).hour : 12, evening = hour >= 18 || hour < 1;
+  add(caps.find(c => c.verb === 'warm-by-fire' && near(c, evening ? 60 : 15)), evening ? 8 : 3, seconds(evening ? 180 : 90));
   add(caps.find(c => c.verb === 'sit' && near(c, 10)), 3, seconds(60));
   for (const c of caps.filter(c => c.verb === 'face' && near(c, 6)).slice(0, 2)) add(c, 2);
   add(caps.find(c => c.id === 'wander:here'), 3, s => {for (const x of s) if (x.verb === 'ambient_wander') {x.params.seconds = 25; x.params.radius = 4;}});
