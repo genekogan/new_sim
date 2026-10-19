@@ -5,7 +5,8 @@
 //        (apps/web/src/snapshot-wire.ts expandSnapshot).
 //   GET /v1/world/part/<ref>  a part, content-addressed (sha256 of its JSON, 32 hex) and immutable: one download per
 //        browser for every world and visit with the same defs (or ground). Parts are cut from the moderation-filtered
-//        snapshot, and those cut under an older moderation version are dropped.
+//        snapshot, and those cut under an older moderation version are dropped. Edge-cacheable for a year: Cloudflare
+//        rule B must list paths containing `/v1/world/part/` (team/scratch/t4/o2/CF-STEPS.md).
 // Plain /v1/world/snapshot (CLI, god UI, resync fallbacks, tests) is unchanged.
 import { createHash } from 'node:crypto';
 import { brotliCompress, brotliCompressSync, constants as Z, gzipSync } from 'node:zlib';
@@ -52,9 +53,13 @@ export class SnapshotParts {
 }
 const opts = (q: number, n: number) => ({ params: { [Z.BROTLI_PARAM_QUALITY]: q, [Z.BROTLI_PARAM_SIZE_HINT]: n, [Z.BROTLI_PARAM_MODE]: Z.BROTLI_MODE_TEXT } });
 
-export function mountSnapshotParts(app: Hono, parts: SnapshotParts) {
-  app.get('/v1/world/part/:ref', (c) => {
-    const ref = c.req.param('ref'), row = /^[0-9a-f]{32}$/.test(ref) ? parts.get(ref) : undefined;
+/** `ensure` makes (or reuses) the current wire snapshot, which cuts its parts: an edge-cached snapshot can name parts
+ *  this process has not cut yet (after a restart), so a miss on a well-formed ref cuts once before answering 404. */
+export function mountSnapshotParts(app: Hono, parts: SnapshotParts, ensure?: () => unknown) {
+  app.get('/v1/world/part/:ref', async (c) => {
+    const ref = c.req.param('ref'), ok = /^[0-9a-f]{32}$/.test(ref);
+    let row = ok ? parts.get(ref) : undefined;
+    if (ok && !row && ensure) { await ensure(); row = parts.get(ref); }
     if (!row) return c.json({ error: 'unknown part; fetch /v1/world/snapshot?defs=ref again' }, 404, { 'cache-control': 'no-store' });
     const h: Record<string, string> = { 'content-type': 'application/json; charset=UTF-8', 'cache-control': 'public, max-age=31536000, immutable', vary: 'Accept-Encoding' };
     const enc = c.req.header('accept-encoding');

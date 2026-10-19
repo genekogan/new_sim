@@ -27,3 +27,13 @@ test('parts route: immutable, brotli, unknown 404, parts cut under an older mode
   assert.equal((await app.request(`/v1/world/part/${ground}`)).status, 404, 'a part only the old moderation version cut is gone');
   assert.equal((await app.request(`/v1/world/part/${defs}`)).status, 200, 'the same defs re-cut under m2 are served');
 });
+
+test('parts route: a part named by an edge-cached snapshot is cut again on a miss (restart), once', async () => {
+  const parts = new SnapshotParts(), app = new Hono(); let cuts = 0;
+  const ref = splitSnapshot(snap()).refs.defs;
+  mountSnapshotParts(app, parts, () => { cuts++; parts.cut(snap(), 'm1'); });
+  const r = await app.request(`/v1/world/part/${ref}`);
+  assert.equal(r.status, 200); assert.deepEqual(await r.json(), snap().defs); assert.equal(cuts, 1);
+  assert.equal((await app.request(`/v1/world/part/${ref}`)).status, 200); assert.equal(cuts, 1, 'a hit does not cut');
+  assert.equal((await app.request('/v1/world/part/nope')).status, 404); assert.equal(cuts, 1, 'a malformed ref does not cut');
+});

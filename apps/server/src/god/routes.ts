@@ -162,7 +162,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   const parts = new SnapshotParts();
   const wireSnapshots = new SnapshotCache({ key: () => `${d.god.model.editSeq}.${d.god.model.seq}.${d.god.store.buildsRev()}.${moderation.version()}`,
     build: () => { const snap = d.god.publicSnapshot(), hidden = moderation.hidden(); return parts.cut((hidden.length ? withoutHidden(snap as Parameters<typeof withoutHidden>[0], new Set(hidden)) : snap) as Record<string, unknown>, moderation.version()); } });
-  mountSnapshotParts(app, parts);
+  mountSnapshotParts(app, parts, () => wireSnapshots.respond(undefined));
   app.get('/v1/world/snapshot', async (c) => {
     const wire = c.req.query('defs') === 'ref', r = await (wire ? wireSnapshots : snapshots).respond(c.req.header('accept-encoding'));
     return c.body(new Uint8Array(r.body), 200, { 'content-type': 'application/json; charset=UTF-8', ...noStore, vary: 'Accept-Encoding', [SNAPSHOT_FILTERED_HEADER]: '1',
