@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Lane W3: the Mars campus as shared parts + placements, with the same look.
 //   node tools/blobs/campus-parts.mjs <in.glb> <out.glb> [--report <json>] [--err 0.00025] [--step 0.00025] [--texels 1300]
-//     [--cell 24] [--psnr 34] [--tier all|base|detail] [--coarse 32]   (debug: --skip tex,flat,fold,join --noposq --nouvq)
+//     [--cell 24] [--psnr 34] [--tier all|base|detail] [--coarse 32] [--nohide (any GLB, not the campus: keep every node)]   (debug: --skip tex,flat,fold,join --noposq --nouvq)
 // Tiers (lane W3, 2026-10-19): `base` is the first file a visitor loads: every layer exact as in `all`, except the
 // "Fittings and furniture" leaves (3D-Warehouse objects, 77% of the bytes), which are kept as seen from --coarse metres
 // or farther (texture mips, simplification error and position step scaled by --coarse / 2 m) and marked extras.tier =
@@ -69,7 +69,7 @@ stage('input');
 
 // 1 ------------------------------------------------------------------ never-drawn nodes
 let hidden = 0;
-for (const n of root.listNodes()) { if (n.isDisposed()) continue; const d = n.getExtras(); if (HIDE.kind.includes(d.kind) || HIDE.assembly.includes(d.assembly_id) || HIDE.layer.includes(d.layer)) { const kill = (x) => { for (const c of x.listChildren()) kill(c); x.dispose(); hidden++; }; kill(n); } }
+for (const n of argv.includes('--nohide') ? [] : root.listNodes()) { if (n.isDisposed()) continue; const d = n.getExtras(); if (HIDE.kind.includes(d.kind) || HIDE.assembly.includes(d.assembly_id) || HIDE.layer.includes(d.layer)) { const kill = (x) => { for (const c of x.listChildren()) kill(c); x.dispose(); hidden++; }; kill(n); } }
 await prune(); await doc.transform(F.dequantize());
 // bake each mesh's local rotation/scale (the CAD export's frames and the old quantization volumes) into its vertices,
 // so placements are plain translations and congruent parts relate by similarity transforms
