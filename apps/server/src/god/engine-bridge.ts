@@ -463,7 +463,13 @@ export class EngineBridge {
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
     const label = (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
     const spec: FixtureSpecV1 = { def: asset, kind: a.category === 'item' ? 'item' : 'fixture', label, p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw) };
-    if (spec.kind !== 'item') return spec;
+    if (spec.kind !== 'item') {
+      // E2 (2026-10-19): a root fixture standing on raised ground (a hillside, an alpine terrace) is logged as on the
+      // ground, so its seats are on level 0 there (the engine otherwise takes the floor level nearest its height). Only
+      // those: fixtures on the y-0 plain keep their logged spec byte for byte.
+      if (e.in.parent === 'world' && Math.abs(wp.y) > GROUND_BAND && Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) <= GROUND_BAND) return { ...spec, support: { kind: 'ground' } };
+      return spec;
+    }
     const parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;
     const pdef = parent ? this.model.resolvedDef(parent.def) : undefined;
     if (parent && pdef && isFixtureDef(pdef)) {
