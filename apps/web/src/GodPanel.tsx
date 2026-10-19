@@ -9,6 +9,7 @@ import { Markdown } from './god-ui/markdown.tsx';
 import * as G from './god-ui/god-api.ts';
 import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
+import { SMALL_SCREEN } from './HudMore.tsx';
 import { previewGhost, takePreviewKey, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
 import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
@@ -24,7 +25,7 @@ const shotMode = query.get('shot') === '1';
 // Taking it also strips it from the URL, so the view key does not stay in browser history.
 const landingPreviewKey = typeof location === 'undefined' ? null : takePreviewKey({ location, history });
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
-const PHONE = () => typeof matchMedia === 'function' && matchMedia('(max-width:700px)').matches;
+const PHONE = () => typeof matchMedia === 'function' && matchMedia(SMALL_SCREEN).matches;  // P6: landscape phones (coarse pointer) too
 // Phones keep their own remembered choice and start compact: the open panel covers most of a small screen.
 const openKey = () => 'sim.godPanel.open' + (PHONE() ? '.phone' : '');
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
