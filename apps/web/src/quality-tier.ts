@@ -56,3 +56,12 @@ export function browserQuality(): QualitySettings {
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   return pickQualityTier({ search: typeof location === 'undefined' ? '' : location.search, coarsePointer: coarse, screen: typeof screen === 'undefined' ? [0, 0] : [screen.width, screen.height], deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory });
 }
+/** P1 phones: the progressive first build's radius in metres (null = everything first, as on desktop and in pictures).
+ *  `?nearM=` overrides (0 or 'all' = everything first). */
+export const PHONE_NEAR_M = 35;
+export function progressiveNearM(): number | null {
+  const q = typeof location === 'undefined' ? new URLSearchParams() : new URLSearchParams(location.search);
+  const k = q.get('nearM'); if (k === 'all' || k === '0') return null;
+  if (k !== null && Number.isFinite(Number(k)) && Number(k) > 0) return Number(k);
+  return q.has('shot') || browserQuality().tier !== 'phone' ? null : PHONE_NEAR_M;
+}

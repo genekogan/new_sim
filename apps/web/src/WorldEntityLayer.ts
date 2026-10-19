@@ -22,6 +22,8 @@ import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
 import { eagerShas, planEager } from './gen-mesh/lazy-assets.ts';
+import { progressiveNearM } from './quality-tier.ts';
+import { arrivalOver } from './arrival-marks.ts';
 import { computeVertexNormals } from './gen-mesh/fast-geometry.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { WorldBuildSites, SITE_REFINEMENT, type PublicSite } from './WorldBuildSites.ts';
@@ -49,6 +51,9 @@ export class WorldEntityLayer {
   active = false;
   /** The first build is under way (start): nothing to draw or diff yet. */
   building = false;
+  /** P1 phones: the first build drew what is near the arrival and start() returned; the rest is drawn now, nearest first,
+   *  in small slices between frames. Edge diffs still wait for it (applyEdge). */
+  filling = false;
   private model: WorldModel | null = null;
   private seq = -1;
   private readonly terrainGroup = new THREE.Group();
@@ -149,8 +154,13 @@ export class WorldEntityLayer {
       await nextTask(); if (signal.aborted || this.model !== m) return;
       this.rebuildWater();
       this.buildHorizon();
-      const all = snap.entities;
+      // P1 phones: nearest the arrival first; start() returns once everything within `near` metres of its eye or target is
+      // drawn (the card then goes), and the rest follows between frames (fill). Elsewhere: everything, in snapshot order.
+      const near = progressiveNearM();
+      const all: readonly Entity[] & { dist?: number[] } = near === null ? snap.entities : byDistance(snap.entities, (e) => { try { const p = m.worldPose(e); return [p.x, p.z]; } catch { return null; } }, [pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]);
+      const far = near === null ? -1 : all.dist!.findIndex((d) => d > near), nearCount = far < 0 ? all.length : far;
       for (let i = 0; i < all.length;) {
+        if (i >= nearCount && !this.filling) { this.active = true; this.building = false; this.filling = true; this.fill = this.fillRest(m, all, i, pending, signal); return; }
         const until = performance.now() + BUILD_SLICE_MS;
         m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
         const wait = i < all.length ? pending.get(all[i].id) : undefined;
@@ -159,13 +169,28 @@ export class WorldEntityLayer {
         if (signal.aborted || this.model !== m) return;
       }
       this.active = true;
-    } finally { this.building = false; clearBuildingPrefetch(); }
+    } finally { this.building = false; if (!this.filling) clearBuildingPrefetch(); }
+  }
+  /** The fill after a progressive first build (resolves when it is done or given up). */
+  fill: Promise<void> = Promise.resolve();
+  private async fillRest(m: WorldModel, all: readonly Entity[], from: number, pending: Map<string, Promise<void>>, signal: AbortSignal) {
+    try {
+      // the arrival's own last steps (first frame, shaders, the card) go first: the fill starts once it is over
+      while (!arrivalOver()) { await new Promise((r) => setTimeout(r, 100)); if (signal.aborted || this.model !== m) return; }
+      for (let i = from; i < all.length;) {
+        await nextTask('user-visible'); if (signal.aborted || this.model !== m) return;  // background tasks starve between busy phone frames
+        const until = performance.now() + FILL_SLICE_MS;
+        m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
+        const wait = i < all.length ? pending.get(all[i].id) : undefined;
+        if (wait) await Promise.race([wait, new Promise((r) => setTimeout(r, 3000))]).then(() => pending.delete(all[i].id));
+      }
+    } finally { this.filling = false; clearBuildingPrefetch(); try { performance.mark('sim:entity-filled'); } catch { /* no User Timing */ } }
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
-    if (!this.model || this.building) return;
+    if (!this.model || this.building || this.filling) return;
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
@@ -615,6 +640,15 @@ export class WorldEntityLayer {
 }
 
 const BUILD_SLICE_MS = 50;
+/** P1 phones: the fill's slices run between frames, so they are short. */
+const FILL_SLICE_MS = 25;
+/** Entities sorted by distance (xz) from the nearer of two points; things without a pose (world-wide: terrain kits, ...) first.
+ *  The result carries the sorted distances in `dist`. */
+export function byDistance<T>(list: readonly T[], at: (e: T) => [number, number] | null, a: readonly [number, number], b: readonly [number, number]): T[] & { dist?: number[] } {
+  const d = list.map((e, k) => { const p = at(e); return [p ? Math.min(Math.hypot(p[0] - a[0], p[1] - a[1]), Math.hypot(p[0] - b[0], p[1] - b[1])) : 0, k] as [number, number]; });
+  d.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+  const out = d.map(([, k]) => list[k]) as T[] & { dist?: number[] }; out.dist = d.map(([x]) => x); return out;
+}
 /** An entity's mesh params: its generator's and def's defaults under its own params. */
 function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
   const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
@@ -624,9 +658,9 @@ function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
 }
 /** Continue after every other queued task: at background priority where the browser has a task scheduler (Chrome: the
  *  socket's large join messages are read in many small tasks, each needing a turn), else after one message task. */
-function nextTask(): Promise<void> {
+function nextTask(priority: 'background' | 'user-visible' = 'background'): Promise<void> {
   const sched = (globalThis as { scheduler?: { postTask?: (f: () => void, o: { priority: string }) => Promise<void> } }).scheduler;
-  if (sched?.postTask) return sched.postTask(() => {}, { priority: 'background' });
+  if (sched?.postTask) return sched.postTask(() => {}, { priority });
   if (typeof MessageChannel === 'undefined') return new Promise((r) => setTimeout(r, 0));
   return new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => { ch.port1.close(); r(); }; ch.port2.postMessage(0); });
 }

@@ -9,7 +9,7 @@
 // Content-addressed URLs stay immutable (/assets/<sha>.glb): each GLB is fetched once per browser, whenever it is.
 import * as THREE from 'three';
 import type { Entity, StoredDef } from '@sim/world-compiler';
-import { browserQuality } from '../quality-tier.ts';
+import { browserQuality, progressiveNearM } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
@@ -93,15 +93,19 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   };
   const sizes = snap.assetBytes ?? {};
   if (!LAZY) { eager = null; return sizes; }
+  // P1 phones: the first build draws only what is within `near` of the eye or centre before the card (WorldEntityLayer),
+  // so the eager set (whose things the card waits to see drawn) stays inside that radius too
+  const near = progressiveNearM(), ndist = new Map<string, number>();
   const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
     const def = defOf(e.def), shas = shasOf(def); if (!shas.length) continue;
     const p = posOf(e), d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
-    for (const sha of shas) { dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
+    const nd = p ? Math.min(Math.hypot(p[0] - centre[0], p[1] - centre[1]), eye ? Math.hypot(p[0] - eye[0], p[1] - eye[1]) : Infinity) : 0;
+    for (const sha of shas) { ndist.set(sha, Math.min(ndist.get(sha) ?? Infinity, nd)); dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }
   const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
   const pick = new Set<string>(); let bytes = 0;
-  for (const sha of order) { const n = sizes[sha] ?? 0; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
+  for (const sha of order) { const n = sizes[sha] ?? 0; if (near !== null && ndist.get(sha)! > near) continue; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
   eager = pick;
   // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
   eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);

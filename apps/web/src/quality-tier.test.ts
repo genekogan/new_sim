@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickQualityTier, PHONE_DETAIL, PHONE_SHADOW_EVERY } from './quality-tier.ts';
+import { pickQualityTier, PHONE_DETAIL, PHONE_NEAR_M, PHONE_SHADOW_EVERY, progressiveNearM } from './quality-tier.ts';
 
 const phone = { search: '', coarsePointer: true, screen: [390, 844] as const };
 test('a touch phone gets the phone tier: capped pixels, small shadow map, shadow every few frames', () => {
@@ -17,4 +17,16 @@ test('phone knobs come from the URL for measurements; bad values keep the defaul
   assert.equal(q.shadowEvery, 1); assert.equal(q.detail?.minRadiusPx, 3); assert.equal(q.detail?.shadowNear, PHONE_DETAIL.shadowNear);
   assert.equal(pickQualityTier({ ...phone, search: '?phoneShadowEvery=x' }).shadowEvery, PHONE_SHADOW_EVERY);
   assert.equal(pickQualityTier({ ...phone, search: '?quality=full' }).tier, 'full');
+});
+test('progressive first build: a phone draws within PHONE_NEAR_M first; desktop, ?shot and ?nearM=all draw everything first', () => {
+  const g = globalThis as { location?: unknown; window?: unknown; matchMedia?: unknown; screen?: unknown };
+  const saved = { location: g.location, window: g.window, matchMedia: g.matchMedia, screen: g.screen };
+  const at = (search: string, coarse: boolean) => { g.window = {}; g.location = { search }; g.matchMedia = () => ({ matches: coarse }); g.screen = { width: 390, height: 844 }; return progressiveNearM(); };
+  try {
+    assert.equal(at('', true), PHONE_NEAR_M);
+    assert.equal(at('', false), null);
+    assert.equal(at('?shot=1', true), null);
+    assert.equal(at('?nearM=all', true), null);
+    assert.equal(at('?nearM=80', false), 80);
+  } finally { Object.assign(g, saved); }
 });
