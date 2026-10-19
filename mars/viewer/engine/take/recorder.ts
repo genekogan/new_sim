@@ -88,6 +88,91 @@ export function quantize(e: Entity, t: number): PoseSample {
 const sameValues = (a: PoseSample, b: PoseSample) => a.length === b.length && a.every((v, i) => i === 0 || v === b[i]);
 const samePos = (a: PoseSample, b: PoseSample) => a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
 
+// ---- S1 V7b (tranche 2026-10-19): idle cost of a big world's takes -------------------------------------------------
+// The sorted id order is kept per entity table until its own key list changes (an add or a remove); the final state's
+// copy of an entity (or of a world field) and that copy's stable text are kept per world and reused while the live value
+// still equals the copy exactly. Takes stay byte-identical (test/take-golden.test.ts pins ids recorded before this).
+// Shared copies are never mutated: a take's final state is read-only by contract (wire encoders, archives, replay).
+
+const ORDER = new WeakMap<object, { keys: string[]; sorted: string[] }>();
+/** Object.keys(ents).sort(), the sort reused while the table's own keys are the same, in the same order. */
+function sortedIds(ents: Record<string, unknown>): string[] {
+  const keys = Object.keys(ents), hit = ORDER.get(ents);
+  if (hit && hit.keys.length === keys.length) {
+    let same = true;
+    for (let i = 0; i < keys.length; i++) if (keys[i] !== hit.keys[i]) { same = false; break; }
+    if (same) return hit.sorted;
+  }
+  const sorted = keys.slice().sort();
+  ORDER.set(ents, { keys, sorted });
+  return sorted;
+}
+
+/** True when `copy` is what structuredClone(live) would make of `live` now: plain objects with the same own enumerable keys
+ *  in the same order, arrays of the same length and holes, primitives Object.is-equal (-0 and 0 differ). Anything else
+ *  (Map, Date, typed arrays, class instances) answers false, so it is copied afresh. */
+function sameCopy(live: unknown, copy: unknown): boolean {
+  if (live === null || typeof live !== 'object') return Object.is(live, copy);
+  if (copy === null || typeof copy !== 'object') return false;
+  if (Array.isArray(live)) {
+    if (!Array.isArray(copy) || live.length !== copy.length) return false;
+    for (let i = 0; i < live.length; i++) {
+      const has = i in live;
+      if (has !== i in copy || (has && !sameCopy(live[i], copy[i]))) return false;
+    }
+    return Object.keys(live).length === live.length || sameKeys(live, copy);
+  }
+  const proto = Object.getPrototypeOf(live);
+  if ((proto !== Object.prototype && proto !== null) || Object.getPrototypeOf(copy) !== Object.prototype) return false;
+  return sameKeys(live as Record<string, unknown>, copy as Record<string, unknown>);
+}
+function sameKeys(live: Record<string, unknown>, copy: Record<string, unknown>): boolean {
+  const a = Object.keys(live), b = Object.keys(copy);
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i] || !sameCopy(live[a[i]], copy[a[i]])) return false;
+  return true;
+}
+
+type Kept = { copy: object; text: string };
+type WorldCopies = { fields: Map<string, Kept>; entities: Map<string, Kept> };
+const COPIES = new WeakMap<object, WorldCopies>();
+const keep = (live: object, prev: Kept | undefined): Kept => {
+  if (prev && sameCopy(live, prev.copy)) return prev;
+  const copy = structuredClone(live);
+  return { copy, text: stableStringify(copy) };
+};
+
+/** The take's final state: what `{ ...structuredClone(world without entityPhysicsV1), entityPhysicsV1 }` (or a plain
+ *  structuredClone(world) without physics) was, same keys in the same order, with each unchanged entity and world field
+ *  shared from the copy made for an earlier take; `known` holds every shared copy's stable text for the hash. */
+export function finalStateOf(world: Runtime['world']): { state: Runtime['world']; known: Map<object, string> } {
+  const w = world as unknown as Record<string, unknown>;
+  const physics = w.entityPhysicsV1;
+  const prev = COPIES.get(world), next: WorldCopies = { fields: new Map(), entities: new Map() };
+  const known = new Map<object, string>(), state: Record<string, unknown> = {};
+  for (const k of Object.keys(w)) {
+    if (k === 'entityPhysicsV1' && physics !== undefined) continue;
+    const v = w[k];
+    if (k === 'entities' && v !== null && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+      const ents = v as Record<string, object>, out: Record<string, unknown> = {};
+      for (const id of Object.keys(ents)) {
+        const e = ents[id];
+        if (e === null || typeof e !== 'object') { out[id] = e; continue; }
+        const kept = keep(e, prev?.entities.get(id));
+        next.entities.set(id, kept); known.set(kept.copy, kept.text); out[id] = kept.copy;
+      }
+      state[k] = out;
+      continue;
+    }
+    if (v === null || typeof v !== 'object') { state[k] = v; continue; }
+    const kept = keep(v, prev?.fields.get(k));
+    next.fields.set(k, kept); known.set(kept.copy, kept.text); state[k] = kept.copy;
+  }
+  if (physics !== undefined) state.entityPhysicsV1 = physics;
+  COPIES.set(world, next);
+  return { state: state as unknown as Runtime['world'], known };
+}
+
 /** Recording needs state and events, not the engine scheduler or its services. */
 export type TakeSource = Pick<Runtime, 'world' | 'tick' | 'stateHash' | 'events' | 'observers'>;
 export class TakeRecorder implements RuntimeObserver {
@@ -129,8 +214,7 @@ export class TakeRecorder implements RuntimeObserver {
   private sample() {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
-    const ids = Object.keys(ents).sort();
-    for (const id of ids) {
+    for (const id of sortedIds(ents)) {
       const e = ents[id];
       // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
       // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
@@ -237,10 +321,11 @@ export class TakeRecorder implements RuntimeObserver {
     }
     // E-life P1: the static entity physics (entity-physics/1, ~3 MB on Eden 2026) is replaced, never mutated, when it
     // changes, so the take shares it instead of deep-copying it every take; everything else is copied as before
-    const { entityPhysicsV1: physics, ...rest } = this.rt.world as typeof this.rt.world & { entityPhysicsV1?: unknown };
-    const finalState = (physics === undefined ? structuredClone(this.rt.world) : { ...structuredClone(rest), entityPhysicsV1: physics }) as typeof this.rt.world;
+    // S1 V7b: the copy and its text come from finalStateOf, which shares every entity / world field that still equals its
+    // copy in the take before (an idle Eden 2026 re-copied and re-serialised ~4,900 unchanged entities every second)
+    const { state: finalState, known } = finalStateOf(this.rt.world);
     // E-life P1: the final state is serialised once for its hash and reused inside the take id (byte-identical)
-    const finalText = stableStringify(finalState);
+    const finalText = stableStringify(finalState, known);
     const changes = thinChanges(dedupeChanges(this.changes), { ...INTERP_FIELDS, ...this.opts.fieldTol });
     const entities0: Record<string, TakeEntity0> = {};
     for (const id of [...this.first.keys()].sort()) entities0[id] = this.first.get(id)!;

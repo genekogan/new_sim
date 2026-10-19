@@ -75,4 +75,9 @@ test('golden take ids: chunked takes over a world with entity-world fixtures sta
   // the final states are exact copies of the world at their cut: the next take starts from them
   for (let k = 1; k < takes.length; k++) assert.equal(takes[k].baselineStateHash, takes[k - 1].finalStateHash);
   assert.equal(stableStringify(takes.at(-1)!.finalState).includes('"f40"'), true);
+  // V7b: an unchanged fixture's copy is shared between takes; one changed in place is copied afresh
+  const at = (k: number, id: string) => (takes[k].finalState.entities as Record<string, unknown>)[id];
+  assert.equal(at(1, 'f10'), at(0, 'f10'));
+  assert.notEqual(at(1, 'f3'), at(0, 'f3'));
+  assert.notEqual(at(4, 'f6'), at(3, 'f6'));
 });
