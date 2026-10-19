@@ -67,7 +67,7 @@ void main(){
  vec4 mv=viewMatrix*vec4(p,1.0);
  float size=(.35+age*2.3)*s;
  gl_PointSize=clamp(uSmoke.z*size/max(-mv.z,1.0),1.0,220.0);
- vA=smoothstep(0.0,.08,age)*(1.0-age)*(1.0-age)*.42*uSmoke.y;
+ vA=smoothstep(0.0,.08,age)*(1.0-age)*(1.0-age)*.6*uSmoke.y; // W2: was .42, white-on-sky by day
  gl_Position=projectionMatrix*mv;
  if(uSmoke.y<=.001)gl_Position=vec4(2.0,2.0,2.0,1.0);
 }`;
@@ -76,7 +76,7 @@ uniform vec4 uSmoke;
 varying float vA;
 varying float vAge;
 void main(){vec2 d=gl_PointCoord-.5;float r=dot(d,d)*4.0;if(r>1.0)discard;
- float a=vA*(1.0-r)*(1.0-r);vec3 c=mix(vec3(.11,.11,.13),vec3(.86,.86,.84),.15+.85*uSmoke.w)*mix(.82,1.0,vAge);
+ float a=vA*(1.0-r)*(1.0-r);vec3 c=mix(vec3(.11,.11,.13),vec3(.74,.74,.73),.15+.85*uSmoke.w)*mix(.82,1.0,vAge);
  gl_FragColor=vec4(c,a);
  #include <colorspace_fragment>
 }`;

@@ -92,6 +92,9 @@ type LayerLike = { active: boolean; groundAt(x: number, z: number): number | nul
 /** W2 darker night: a pool's radius and its soft outer halo, per metre of light range (were 0.42 / 1.25: Eden 2026's 800
  *  lamps' halos summed into a wash that lit whole lawns; fires were 0.55). `?poolr=` / `?poolhalo=` are shot dials. */
 const POOL_HALO = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poolhalo')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.4; })();
+/** W2: a lamp pool's peak (was 1.2: pools saturated to full-day grass, lime discs at night). `?poollamp=` dial. */
+/** W2: a lamp pool's peak (was 1.2: pools saturated to full-day grass, lime discs at night). `?poollamp=` dial. */
+const POOL_LAMP = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poollamp')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.8; })();
 const POOL_RADIUS = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poolr')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.3; })();
 export class GodWorldLiving {
   /** Carries the god's lamps as `edenLightSources` for the atmosphere's halos and fireflies (found by its scene scan). */
@@ -142,7 +145,7 @@ export class GodWorldLiving {
         const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
         const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
         const phase = lightPhase(e.id, i, lights.length, pattern);
-        sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
+        sources.push({ x, z, base, radius: range * (fire ? 0.4 : POOL_RADIUS) * this.pools.radius, intensity: fire ? 1.1 : POOL_LAMP, color: light.color ?? '#ffe9c4', halo: range * POOL_HALO * this.pools.radius, pattern, phase });
         marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
     } };

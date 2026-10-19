@@ -175,7 +175,7 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
   const { groups, tris } = b.emit(ctx.materials);
   const root = new THREE.Group(); root.name = 'building';
   const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
-  if (b.anchors.length) inner.userData.edenSmokeSources = b.anchors.map((p) => [...p, 0.8]); // W2: atmosphere smoke
+  if (b.anchors.length) inner.userData.edenSmokeSources = b.anchors.map((p) => [...p, 1.4]); // W2: atmosphere smoke
   for (const g of groups.values()) inner.add(g);
   root.add(inner);
   return { group: root, tris };
