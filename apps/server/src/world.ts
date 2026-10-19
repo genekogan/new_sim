@@ -394,8 +394,12 @@ export class WorldHost {
   }
 
   // ------------------------------------------------------------ the loop
+  /** When it answers true the frame is skipped and its wall time carried to the next one (the hub, while a visitor's join set
+   *  is still going out: lane P5). Holds stay well under the 1 s elapsed cap, so the same ticks run, only later. */
+  holdClock?: () => boolean;
   private frame() {
     const now = performance.now();
+    if (this.holdClock?.()) return;
     const elapsed = Math.min(1000, now - this.last);
     this.last = now;
     if (this.paused) return;

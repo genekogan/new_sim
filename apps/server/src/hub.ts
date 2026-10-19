@@ -33,10 +33,12 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
    *  without its tick (kernelRestV1). */
   takeChunks?:{last:number|null;kernel?:string};
   /** Set by a join until the first takes message with a chunk is written: that one is never dropped for backpressure. */
-  awaitingTakes?:boolean;joinSend?:boolean };
+  awaitingTakes?:boolean;joinSend?:boolean;joinPending?:number };
 /** What anyone may see of the server's numbers: spend is for admins. */
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
+/** Longest the world clock waits for a join set (lane P5); under the frame loop's 1 s elapsed cap, so no world time is lost. */
+const JOIN_HOLD_MS = 750, JOIN_HOLD_REST_MS = 2_000;
 
 /** Live viewers never read a take's static physics (entityPhysicsV1: every building's floors, walls and stairs; they
  *  draw geometry from /v1/scene). On a built world it is ~3 MB of JSON per one-second chunk (Eden 2026), so the live
@@ -97,6 +99,10 @@ export class Hub {
       if (!req.url?.startsWith('/ws')) { for (const h of this.upgradeHandlers) { try { if (h(req, socket, head)) return; } catch { /* a handler fault falls through */ } } socket.destroy(); return; }
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
+    // Lane P5: a join set is written in order, each larger message after its compression finishes (one or two event-loop
+    // turns each). The world's clock waits for it (at most JOIN_HOLD_MS after the hello), so a cold world's first heavy ticks
+    // do not stand between a visitor and their join set; the held time is caught up by the next frame.
+    host.holdClock = () => this.joinInFlight();
     host.listeners.push({
       onClockUnavailable:()=>{for(const c of this.clients){c.ready=false;c.ws.close(1013,'world unavailable');}},
       onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); }
@@ -248,7 +254,8 @@ export class Hub {
       c.ready=false;c.ws.send(JSON.stringify({t:'error',code:'takes.transport-invalid',message:'The take transport cannot be encoded exactly.'}));c.ws.close(1011,'invalid take transport');return false;
     }
     s=this.kernelWire(c,current,s);
-    c.sent += s.length; c.ws.send(s);
+    c.sent += s.length;
+    if(c.joinSend){c.joinPending=(c.joinPending??0)+1;c.ws.send(s,()=>{c.joinPending=(c.joinPending??1)-1;});}else c.ws.send(s);
     if(nextTable!==undefined&&c.takeEntities)c.takeEntities.last=nextTable;
     if(nextTake!==undefined&&c.takeChunks)c.takeChunks.last=nextTake;
     if(current.t==='takes'&&current.chunks.length)c.awaitingTakes=false;
@@ -287,6 +294,19 @@ export class Hub {
       catch(error){this.privateViewFailed(c,error);return false;}
     }
     return true;
+  }
+  /** Some client's join set is still being compressed or written, within JOIN_HOLD_MS of its hello (lane P5). One hold lasts
+   *  at most JOIN_HOLD_MS and is followed by JOIN_HOLD_REST_MS without any, so slow or staggered joiners cannot stall the world. */
+  private holdSince=0;private holdRestUntil=0;
+  private joinInFlight(){
+    const now=Date.now();
+    if(now<this.holdRestUntil)return false;
+    let pending=false;
+    for(const c of this.clients)if(c.joinPending&&now-c.lastHello<JOIN_HOLD_MS&&c.ws.readyState===1){pending=true;break;}
+    if(!pending){this.holdSince=0;return false;}
+    if(!this.holdSince)this.holdSince=now;
+    if(now-this.holdSince<JOIN_HOLD_MS)return true;
+    this.holdSince=0;this.holdRestUntil=now+JOIN_HOLD_REST_MS;return false;
   }
   private privateMessage(c:Client,m:ServerMsg):ServerMsg|null{
     if(m.t==='me'){
