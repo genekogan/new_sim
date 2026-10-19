@@ -504,7 +504,7 @@ export class EngineBridge {
     }
   }
 
-  private perceiveSync() { try { this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+  private perceiveSync(now = false) { try { if (now) this.perceive.sync(); else this.perceive.ensure(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
   /** G1 (tranche 2026-10-19): what Souls perceive of god edits (built objects, the places layer) catches up off the
    *  request path. An edit only notes what changed; the catch-up starts a second after the last edit, or ~2 s after the
    *  first one not yet seen while a god keeps editing, and then runs a slice of at most PERCEIVE_SLICE_MS per tick
@@ -512,6 +512,8 @@ export class EngineBridge {
   private perceiveFirst = 0;
   private perceiveLast = 0;
   private perceiveRunning = false;
+  /** Tick the last catch-up began (at most one start a second; a world without comms objects retries at that pace). */
+  private perceiveStarted = -Infinity;
   /** G1: a trapped-Soul check (it lists every named thing) runs a second after the last edit, or every ~2 s while a
    *  god keeps editing; a closing site's walk-out still follows each edit within 10 ticks. */
   private rescuedAt = -1;
@@ -523,8 +525,11 @@ export class EngineBridge {
   }
   private perceiveStep(tick: number) {
     if (!this.perceiveRunning) {
-      if (!this.perceive.pending() || (tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40)) return;
-      this.perceiveRunning = true; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
+      if (!this.perceive.pending() || tick - this.perceiveStarted < 20) return;
+      // boot: the first catch-up (a whole pass) runs at once, as before; it is not on any request's path
+      if (!this.perceive.stats.runs) { this.perceiveStarted = tick; this.perceiveFirst = -1; this.perceiveSync(true); return; }
+      if (tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40) return;
+      this.perceiveRunning = true; this.perceiveStarted = tick; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
     const t0 = performance.now();
     try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }

@@ -322,7 +322,8 @@ export class GodPerceive {
       }
       this.placesDone = false;
       this.run = this.begin();
-      if (!this.run) { this.needFull = false; this.roots.clear(); return true; }
+      // no comms objects (or no root place) yet: what is noted stays noted, tried again at the next catch-up
+      if (!this.run) { this.noObjects = true; return true; }
       if (performance.now() - t0 >= budgetMs) { this.run.ms += performance.now() - t0; return false; }
     }
     const r = this.run, objs = this.objs as unknown as { create(i: unknown): unknown; fresh(): unknown; refresh?(ids: string[]): void };
@@ -338,7 +339,8 @@ export class GodPerceive {
     return true;
   }
   /** Bring the `built` objects in line with the entity world now (tests; `force` re-derives every thing). */
-  sync(force = false) { if (force) this.needFull = true; for (let n = 0; n < 100 && this.pending(); n++) this.step(); }
+  sync(force = false) { if (force) this.needFull = true; this.noObjects = false; for (let n = 0; n < 100 && this.pending() && !this.noObjects; n++) this.step(); }
+  private noObjects = false;
   /** What a Soul's read sees: the objects as they are (an edit shows within ~2 s), caught up once at the start. */
   ensure() { if (!this.stats.runs) this.sync(); }
 
