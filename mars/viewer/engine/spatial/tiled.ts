@@ -144,13 +144,15 @@ export class GroundNav {
   private fine = new Map<string, FineTile>();
   private composed = new Map<string, LevelGrid>();
   /**
-   * Paged: upper-floor grids over a tile rect (key `rect|level`), kept until the static world is set again (setSolids /
-   * setFloors, which the Spatial calls exactly when it changed), least recently used first out past FLOORS_OVER_BYTES.
-   * A Soul's capabilities read the same far rooms' floors many times (engine P4); grids are never mutated, so shared.
+   * Paged: upper-floor grids over a tile rect (key `rect|level`), each kept with the content key of what it was built from
+   * (floorInputs: that level's height, its surfaces and the obstacles in its body band that reach the rect), least recently
+   * used first out past FLOORS_OVER_BYTES. A Soul's capabilities read the same far rooms' floors many times (engine P4);
+   * grids are never mutated, so shared. S2 (tranche 2026-10-19): a static change used to drop every window's floors (every
+   * window rebuilt every house's floors after any god edit, ~12% of a busy Eden 2026); now only the floors it reaches.
    */
-  private floorsOver = new Map<string, { g: LevelGrid | undefined; bytes: number }>();
+  private floorsOver = new Map<string, { g: LevelGrid | undefined; bytes: number; inputs: string }>();
   private floorsOverBytes = 0;
-  /** This nav and its static generation (bumped with floorsOver), naming memoised floors (gridContentKeys). */
+  /** This nav and a serial per floor it built, naming memoised floors (gridContentKeys): a kept floor keeps its name. */
   private readonly serial = ++navSerials;
   private floorsGen = 0;
   /** Each tile's relevant obstacles and key per (never mutated) obstacle list, as compose reads them per window. */
@@ -182,7 +184,6 @@ export class GroundNav {
     const b = this.base, decks = surfaces.filter((s) => [s.obb.c as Vec2, ...obbCorners(s.obb)].some(([x, z]) => s.y > b.height(x, z) + GroundNav.FLOOR_RISE));
     const key = decks.length ? fnv(decks.map((s) => `${s.id}:${s.y}:${s.obb.c}:${s.obb.half}:${s.obb.yaw}`).join('|')).toString(16) : '';
     if (key !== this.deckKey) { this.deckKey = key; this.field = key ? deckedField(b, decks, key) : b; this.composed.clear(); }
-    this.clearFloorsOver();
     this.floors.clear();
     for (const s of surfaces) {
       let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
@@ -196,7 +197,6 @@ export class GroundNav {
   private solids = new Map<string, Obstacle[]>();
   static SOLID_MIN_HALF = 1.25;
   setSolids(obstacles: Obstacle[]) {
-    this.clearFloorsOver();
     this.solids.clear();
     for (const o of obstacles) {
       if (Math.min(o.obb.half[0], o.obb.half[1]) < GroundNav.SOLID_MIN_HALF) continue;
@@ -487,21 +487,21 @@ export class GroundNav {
   /** Paged: one upper level over a tile rect, as buildGrids builds it among the window's floors (each level is rasterised
    *  on its own; buildGridsOverFloors only crops to its floors, bit-identical), memoised (floorsOver). */
   private floorOver(r: TileRect, scene: SpatialScene, id: number): LevelGrid | undefined {
-    const key = `${r.join(',')}|${id}`, hit = this.floorsOver.get(key);
-    if (hit) { this.floorsOver.delete(key); this.floorsOver.set(key, hit); this.stats.floorHits++; return hit.g; }
+    const key = `${r.join(',')}|${id}`, hit = this.floorsOver.get(key), same = scene.levels.filter((l) => l.id === id);
+    const inputs = floorInputs(scene, same, rectBounds(r), this.cell);
+    if (hit && hit.inputs === inputs) { this.floorsOver.delete(key); this.floorsOver.set(key, hit); this.stats.floorHits++; return hit.g; }
+    if (hit) { this.floorsOverBytes -= hit.bytes; this.floorsOver.delete(key); }
     this.stats.floorBuilds++;
-    const same = scene.levels.filter((l) => l.id === id);
     const g = buildGridsOverFloors({ ...scene, bounds: rectBounds(r), levels: same }, this.cell).levels.get(id);
-    if (g) gridContentKeys.set(g, `floor|${this.serial}.${this.floorsGen}|${key}`);
+    if (g) gridContentKeys.set(g, `floor|${this.serial}.${++this.floorsGen}|${key}`);
     const bytes = g ? g.free.byteLength + g.clearance.byteLength + g.nx * g.nz * 4 : 0;
-    this.floorsOver.set(key, { g, bytes }); this.floorsOverBytes += bytes;
+    this.floorsOver.set(key, { g, bytes, inputs }); this.floorsOverBytes += bytes;
     while (this.floorsOverBytes > FLOORS_OVER_BYTES && this.floorsOver.size > 1) {
       const k = this.floorsOver.keys().next().value!;
       this.floorsOverBytes -= this.floorsOver.get(k)!.bytes; this.floorsOver.delete(k);
     }
     return g;
   }
-  private clearFloorsOver() { this.floorsOver.clear(); this.floorsOverBytes = 0; this.floorsGen++; }
 
   // ---------------------------------------------------------------- coarse routing
 
@@ -583,6 +583,31 @@ export function clusterRects(units: TileRect[], max = MAX_WINDOW_TILES): TileRec
 
 /** Obstacle bounding boxes, memoised per (never mutated) obstacle list: compose reads them for every window (engine P4). */
 const boxesMemo = new WeakMap<Obstacle[], { n: number; b: Float64Array }>();
+/** Grid-relevant identity of an obstacle / a surface (what a floor's raster reads), memoised per (never mutated) object. */
+const inputKeys = new WeakMap<object, string>();
+const obbKey = (o: Obstacle['obb']) => `${o.c[0]},${o.c[1]},${o.half[0]},${o.half[1]},${o.yaw}`;
+const obstacleInput = (o: Obstacle) => { let k = inputKeys.get(o); if (k === undefined) inputKeys.set(o, (k = `${o.id}|${obbKey(o.obb)}|${o.y0},${o.y1}`)); return k; };
+const surfaceInput = (s: Surface) => { let k = inputKeys.get(s); if (k === undefined) inputKeys.set(s, (k = `${s.id}|${s.level}|${obbKey(s.obb)}`)); return k; };
+/**
+ * S2: everything `buildGridsOverFloors({ ...scene, bounds, levels: same }, cell)` reads for those levels, as a string: their
+ * ids and heights, then, in scene order, each of their surfaces and each obstacle in a level's body band whose box (grown by
+ * two cells: a conservative raster touches at most one cell beyond it) reaches `bounds`. Anything else rasterises to no
+ * cell of that grid, so two scenes with the same inputs build bit-identical floors (floor-over-incremental.test.ts).
+ */
+function floorInputs(scene: SpatialScene, same: SpatialScene['levels'], bounds: [number, number, number, number], cell: number): string {
+  const m = 2 * cell, [x0, z0, x1, z1] = bounds, out: string[] = [same.map((l) => `${l.id}@${l.y}`).join(',')];
+  const reaches = (b: Float64Array, k: number) => b[4 * k + 2] >= x0 - m && b[4 * k] <= x1 + m && b[4 * k + 3] >= z0 - m && b[4 * k + 1] <= z1 + m;
+  const ids = new Set(same.map((l) => l.id)), sb = boxesOf(scene.surfaces as unknown as Obstacle[]);   // the same boxes of their OBBs, memoised per list
+  for (let k = 0; k < scene.surfaces.length; k++) { const s = scene.surfaces[k]; if (ids.has(s.level) && reaches(sb, k)) out.push('s' + surfaceInput(s)); }
+  const ob = boxesOf(scene.obstacles);
+  for (let k = 0; k < scene.obstacles.length; k++) {
+    const o = scene.obstacles[k];
+    if (!same.some((l) => !(o.y1 <= l.y + STEP || o.y0 >= l.y + BODY_HEIGHT)) || !reaches(ob, k)) continue;
+    out.push('o' + obstacleInput(o));
+  }
+  return out.join(';');
+}
+
 function boxesOf(obstacles: Obstacle[]): Float64Array {
   const hit = boxesMemo.get(obstacles);
   if (hit && hit.n === obstacles.length) return hit.b;
