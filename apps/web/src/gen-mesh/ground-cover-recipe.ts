@@ -23,13 +23,13 @@ export const COVER_CELL = 8;
 export const KINDS = ['tall', 'tuft', 'flower'] as const;
 export type CoverKind = (typeof KINDS)[number];
 /** Candidate grid step (m) per kind: one candidate per sub-cell, kept with the site's density. */
-const STEP: Record<CoverKind, number> = { tall: 0.62, tuft: 0.5, flower: 0.9 };
+const STEP: Record<CoverKind, number> = { tall: 0.62, tuft: 0.42, flower: 0.7 };
 
 /** What the palette grows on open ground: tall-grass density, tuft density, flower density, tall height (m). */
 const PALETTE: Record<string, { tall: number; tuft: number; flower: number; h: number; rockFrom: number; snow: number }> = {
-  meadow: { tall: 0.5, tuft: 0.55, flower: 0.07, h: 0.62, rockFrom: 0.75, snow: 150 },
-  grass: { tall: 0.34, tuft: 0.5, flower: 0.05, h: 0.5, rockFrom: 0.7, snow: 140 },
-  garden: { tall: 0.28, tuft: 0.5, flower: 0.08, h: 0.45, rockFrom: 0.85, snow: 160 },
+  meadow: { tall: 0.16, tuft: 0.85, flower: 0.12, h: 0.55, rockFrom: 0.75, snow: 150 },
+  grass: { tall: 0.1, tuft: 0.75, flower: 0.06, h: 0.5, rockFrom: 0.7, snow: 140 },
+  garden: { tall: 0.08, tuft: 0.7, flower: 0.1, h: 0.45, rockFrom: 0.85, snow: 160 },
 };
 /** Flower species colours (petals); drifts pick one dominant species. */
 export const FLOWER_COLOURS = ['#f6f3ea', '#f3cf3f', '#d8402e', '#7f93e0', '#b27ad6', '#f08cb6', '#f6f3ea', '#ffb347'];
@@ -87,7 +87,12 @@ function areaKind(e: Entity, def: NonNullable<ReturnType<WorldModel['resolvedDef
   if (gen === 'lawn/1') { const mat = String(e.params?.material ?? 'grass'); return mat === 'grass' || mat === 'moss' ? (e.params?.stripes === true ? 'mown' : 'lawn') : 'bare'; }
   if (gen === 'garden-bed/1' || gen === 'lake/1' || gen === 'shore/1' || tags.includes('garden') && gen.startsWith('scatter')) return 'bare';
   if (tags.includes('meadow') || /meadow|wildflower/.test(def.name)) return 'meadow';
-  if (tags.includes('forest') || tags.includes('orchard')) return 'forest';
+  if (tags.includes('forest') || tags.includes('orchard')) {
+    // a "woodland" planted only with grass, flowers and stones is ground cover, not a wood
+    const pal = e.params?.palette;
+    if (Array.isArray(pal) && pal.length && !pal.some((k) => !/^(grass|flower|rock|stone|boulder|tuft)/.test(String((k as { kind?: unknown })?.kind ?? '')))) return null;
+    return 'forest';
+  }
   if (gen === 'zone/1' || def.name === 'core-zone' || tags.includes('zone')) return 'zone';
   return null;
 }
@@ -116,9 +121,9 @@ export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Si
   const high = h > p.snow ? 0 : 1 - 0.65 * ss(40, 110, h);
   let base = steep * high; if (base <= 0) return null;
   // swathes of long grass with shorter gaps between them; flowers in drifts
-  const drift = vn(x / 13 + 0.37, z / 13 + 0.71, 5), swathe = 0.25 + 0.95 * ss(0.22, 0.72, drift);
+  const drift = vn(x / 13 + 0.37, z / 13 + 0.71, 5), swathe = 0.1 + 1.9 * ss(0.4, 0.8, drift);
   let tall = p.tall * swathe, tuft = p.tuft, flower = p.flower * (0.4 + 1.2 * vn(x / 9, z / 9, 9)), ht = p.h * (0.8 + 0.4 * drift);
-  if (cover?.kind === 'meadow') { tall = 0.9 * (0.55 + 0.45 * swathe); flower = 0.5 * (0.35 + 0.65 * vn(x / 7, z / 7, 9)); ht = p.h * 1.15 * (0.85 + 0.3 * drift); tuft = 0.4; }
+  if (cover?.kind === 'meadow') { tall = 0.75 * (0.45 + 0.3 * swathe); flower = 0.55 * (0.35 + 0.65 * vn(x / 7, z / 7, 9)); ht = p.h * 1.15 * (0.85 + 0.3 * drift); tuft = 0.5; }
   else if (cover?.kind === 'forest') { tall *= 0.9; ht *= 1.1; flower *= 0.4; tuft = 0.45; }
   if (zone) {
     const use = zone.use;
@@ -131,10 +136,10 @@ export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Si
     let d = Infinity; const poly = area.poly;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ax, az] = poly[j], [bx, bz] = poly[i], vx = bx - ax, vz = bz - az, n = vx * vx + vz * vz; const t = n ? Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / n)) : 0; d = Math.min(d, Math.hypot(x - ax - vx * t, z - az - vz * t)); }
     const rim = 1 - ss(area.edge * 0.6, area.edge + 1.2, d);
-    tall = tall * rim; ht *= 0.75 + 0.25 * rim;
+    tall = Math.max(tall, 0.45) * rim; ht *= 0.75 + 0.25 * rim;
     tuft = area.kind === 'mown' ? 0.32 : 0.42; flower = Math.max(flower * rim, area.kind === 'mown' ? 0.035 : 0.03);
   }
-  if (verge) { tall = Math.max(tall, zone && (zone.use === 'civic' || zone.use === 'commercial') ? 0.22 : area ? tall : 0.62); flower = Math.max(flower, area ? flower : 0.16); ht *= 1.08; }
+  if (verge) { tall = Math.max(tall, zone && (zone.use === 'civic' || zone.use === 'commercial') ? 0.2 : area ? tall : 0.5); flower = Math.max(flower, area ? flower : 0.2); ht *= 1.08; }
   tall *= base; tuft *= base; flower *= base;
   // turf colour: the terrain's own paint, times the realism shader's lush/dry field on Eden's meadow
   ix.colour(_c, y, slope, ix.base, x, z);
@@ -175,7 +180,7 @@ export function cellKind(ix: CoverIndex, ci: number, cj: number, k: number, site
       const tone = 0.9 + 0.22 * h01(gi, gj, 61); r *= tone; g *= tone; b *= tone;
       // in the sun-dried swathes some clumps have gone to straw
       if (s.dry > 0.55 && h01(gi, gj, 71) < (s.dry - 0.55) * 1.6) { r = r * 0.55 + 0.42 * 0.45; g = g * 0.55 + 0.36 * 0.45; b = b * 0.55 + 0.16 * 0.45; }
-    } else if (kind === 'tuft') { sc = 0.8 + 0.6 * v; ht = 0.8 + 0.5 * w; const tone = 0.92 + 0.16 * h01(gi, gj, 62); r *= tone; g *= tone; b *= tone; }
+    } else if (kind === 'tuft') { sc = 0.75 + 0.6 * v; ht = 0.6 + 0.9 * w; const tone = 0.92 + 0.16 * h01(gi, gj, 62); r *= tone; g *= tone; b *= tone; }
     else {
       // a drift's own species most of the time, now and then another
       const dom = Math.floor(vn(x / 6 + 3.1, z / 6 + 1.7, 13) * FLOWER_COLOURS.length * 0.999), sp = h01(gi, gj, 81) < 0.72 ? dom : Math.floor(h01(gi, gj, 82) * FLOWER_COLOURS.length);

@@ -29,9 +29,9 @@ function deal(ix: ReturnType<typeof world>, k: number, x0: number, z0: number, x
 test('open meadow ground grows tall grass, tufts and some flowers; cells are deterministic and rank-sorted', () => {
   const ix = world('meadow'), area = 48 * 48;
   const tall = deal(ix, 0, 0, 0, 48, 48), tuft = deal(ix, 1, 0, 0, 48, 48), flower = deal(ix, 2, 0, 0, 48, 48);
-  assert.ok(tall.length / area > 0.6, `tall ${tall.length / area}/m²`);
-  assert.ok(tuft.length / area > 1, `tuft ${tuft.length / area}/m²`);
-  assert.ok(flower.length > 20 && flower.length < tall.length / 3, `flowers ${flower.length}`);
+  assert.ok(tall.length / area > 0.15 && tall.length / area < 1, `tall ${tall.length / area}/m²`);
+  assert.ok(tuft.length / area > 3, `tuft ${tuft.length / area}/m²`);
+  assert.ok(flower.length > 20 && flower.length < tuft.length / 4, `flowers ${flower.length}`);
   const a = cellKind(ix, 2, 3, 0, cellSites(ix, 2, 3)), b = cellKind(ix, 2, 3, 0, cellSites(ix, 2, 3));
   assert.deepEqual(a, b, 'the same blade is always in the same place');
   for (let o = REC; o < a.length; o += REC) assert.ok(a[o + 9] >= a[o - REC + 9], 'records sorted by rank');
@@ -42,7 +42,7 @@ test('open meadow ground grows tall grass, tufts and some flowers; cells are det
 test('a wildflower meadow area is thick with flowers and long grass', () => {
   const ix = world('meadow', [{ op: 'place', def: 'core/wildflowers@1', name: 'wf', shape: { area: sq(100, 0, 148, 48) } }]);
   const open = deal(ix, 2, 0, 0, 48, 48).length, wild = deal(ix, 2, 100, 0, 148, 48).length;
-  assert.ok(wild > open * 3, `flowers: meadow area ${wild} vs open ${open}`);
+  assert.ok(wild > open * 2, `flowers: meadow area ${wild} vs open ${open}`);
   assert.ok(deal(ix, 0, 100, 0, 148, 48).length > deal(ix, 0, 0, 0, 48, 48).length, 'longer grass in the meadow');
 });
 
@@ -51,7 +51,7 @@ test('a mown lawn grows only short tufts and a few daisies inside; its rim is le
   const inner = deal(ix, 0, -24, -24, 24, 24).length, tufts = deal(ix, 1, -24, -24, 24, 24).length, flowers = deal(ix, 2, -24, -24, 24, 24).length;
   assert.equal(inner, 0, 'no tall grass inside the mown lawn');
   assert.ok(tufts > 48 * 48 * 0.8, `tufts ${tufts}`);
-  assert.ok(flowers > 0 && flowers < 48 * 48 * 0.06, `daisies ${flowers}`);
+  assert.ok(flowers > 0 && flowers < 48 * 48 * 0.1, `daisies ${flowers}`);
   const s = siteAt(ix, -39.6, 0, false); assert.ok(s && s.tall > 0.2, `rim tall ${s?.tall}`);
 });
 
@@ -59,7 +59,7 @@ test('paths stay clear; their verges grow longer grass and flowers', () => {
   const ix = world('meadow', [{ op: 'place', def: 'core/footpath@1', name: 'path', shape: { path: [[-60, 4], [60, 4]] }, params: { width: 2 } }]);
   for (const k of [0, 1, 2]) for (const [, z] of deal(ix, k, -40, -4, 40, 12)) assert.ok(Math.abs(z - 4) > 1, `kind ${k} at z ${z} on the path`);
   const verge = siteAt(ix, 0, 6.4, true)!, open = siteAt(ix, 0, 30, false)!;
-  assert.ok(verge.flower >= 0.16 && verge.tall >= 0.62 * 0.9, JSON.stringify(verge));
+  assert.ok(verge.flower >= 0.16 && verge.tall >= 0.45, JSON.stringify(verge));
   assert.ok(open.flower < verge.flower);
 });
 
@@ -72,7 +72,8 @@ test('desert ground grows nothing unless an explicit meadow is placed', () => {
 });
 
 test('cover is on for desktop, ?cover=0|1 overrides', async () => {
-  const { coverSetting } = await import('./ground-cover.ts');
+  const { coverSetting, PETALS } = await import('./ground-cover.ts');
+  assert.match(PETALS, /coverPetal/, 'three\'s color_vertex chunk still has the instance-colour line the petals patch');
   assert.equal(coverSetting('').enabled, true);
   assert.deepEqual(coverSetting('?cover=0'), { enabled: false, reason: '?cover=0' });
   const phone = { tier: 'phone', reason: 'touch screen' };

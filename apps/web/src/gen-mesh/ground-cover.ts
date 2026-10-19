@@ -44,7 +44,7 @@ function geo(p: number[], c: number[], petal?: number[]) {
 /** Tall grass clump, unit height: seven tapered, curving blades (3 triangles each), two of them seed stems with a head. */
 export function tallGeometry() {
   const p: number[] = [], c: number[] = [];
-  const root = [0.42, 0.5, 0.36], mid = [0.86, 0.95, 0.78], tip = [1.28, 1.22, 0.9], seed = [1.3, 1.12, 0.72];
+  const root = [0.45, 0.55, 0.38], mid = [0.78, 0.88, 0.66], tip = [1.02, 1.06, 0.78], seed = [1.05, 0.95, 0.62];
   for (let k = 0; k < 7; k++) {
     const a = k * 2.39 + 0.4, lean = 0.12 + 0.2 * ((k * 5) % 7) / 6, hf = 0.62 + 0.38 * ((k * 3) % 7) / 6, w = k % 3 === 2 ? 0.012 : 0.026, ca = Math.cos(a), sa = Math.sin(a);
     const ox = ca * 0.05, oz = sa * 0.05, px = -sa * w, pz = ca * w;
@@ -63,10 +63,10 @@ export function tallGeometry() {
 }
 /** Old Eden's short tuft (WorldGroundDetails.ts): eight leaning blades, one triangle each, darker at the base; metres. */
 export function tuftGeometry() {
-  const p: number[] = [], c: number[] = [], base = [0.55, 0.62, 0.5], tip = [1.15, 1.15, 0.92];
-  for (let k = 0; k < 8; k++) {
-    const a = k * 0.785 + 0.3 * (k % 3), lean = 0.05 + 0.04 * (k % 3) / 2, h = 0.15 + 0.09 * ((k * 7) % 4) / 3, w = 0.03;
-    const ox = Math.cos(a) * 0.03, oz = Math.sin(a) * 0.03, tx = Math.cos(a) * lean, tz = Math.sin(a) * lean, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
+  const p: number[] = [], c: number[] = [], base = [0.55, 0.65, 0.46], tip = [1.0, 1.06, 0.8];
+  for (let k = 0; k < 10; k++) {
+    const a = k * 0.628 + 0.3 * (k % 3), lean = 0.05 + 0.05 * (k % 3) / 2, h = 0.16 + 0.12 * ((k * 7) % 5) / 4, w = 0.026;
+    const ox = Math.cos(a) * 0.035, oz = Math.sin(a) * 0.035, tx = Math.cos(a) * lean, tz = Math.sin(a) * lean, px = -Math.sin(a) * w, pz = Math.cos(a) * w;
     p.push(ox - px, 0, oz - pz, ox + px, 0, oz + pz, ox + tx, h, oz + tz); c.push(...base, ...base, ...tip);
   }
   return geo(p, c);
@@ -82,10 +82,10 @@ export function flowerGeometry() {
   const cx = 0.03, cy = H, tilt = 0.61, ct = Math.cos(tilt), st = Math.sin(tilt);
   const P = (u: number, v: number, lift = 0) => [cx + u * ct - lift * st, cy + u * st + lift * ct, v];
   for (let k = 0; k < 5; k++) {
-    const a0 = (k / 5) * Math.PI * 2, a1 = a0 + 0.55, a2 = a0 - 0.55, r = 0.06, ri = 0.012;
+    const a0 = (k / 5) * Math.PI * 2, a1 = a0 + 0.55, a2 = a0 - 0.55, r = 0.075, ri = 0.012;
     tri(P(Math.cos(a0) * ri, Math.sin(a0) * ri), P(Math.cos(a2) * r, Math.sin(a2) * r), P(Math.cos(a1) * r, Math.sin(a1) * r), white, 1);
   }
-  for (let k = 0; k < 5; k++) { const a0 = (k / 5) * Math.PI * 2, a1 = ((k + 1) / 5) * Math.PI * 2, r = 0.016; tri(P(0, 0, 0.004), P(Math.cos(a0) * r, Math.sin(a0) * r, 0.004), P(Math.cos(a1) * r, Math.sin(a1) * r, 0.004), eye); }
+  for (let k = 0; k < 5; k++) { const a0 = (k / 5) * Math.PI * 2, a1 = ((k + 1) / 5) * Math.PI * 2, r = 0.02; tri(P(0, 0, 0.004), P(Math.cos(a0) * r, Math.sin(a0) * r, 0.004), P(Math.cos(a1) * r, Math.sin(a1) * r, 0.004), eye); }
   return geo(p, c, f);
 }
 
@@ -99,17 +99,9 @@ const FADE = /* glsl */`
  transformed*=cvS;
 }
 `;
-const PETALS = /* glsl */`
-#if defined( USE_COLOR ) || defined( USE_INSTANCING_COLOR )
- vColor = vec3( 1.0 );
-#endif
-#ifdef USE_COLOR
- vColor *= color;
-#endif
-#ifdef USE_INSTANCING_COLOR
- vColor.xyz *= mix( vec3( 1.0 ), instanceColor.xyz, coverPetal );
-#endif
-`;
+// flowers: the instance colour tints only the petals (stems, leaves and eyes keep their own colour)
+const PETAL_SRC = 'vColor.rgb *= instanceColor.rgb;';
+export const PETALS = THREE.ShaderChunk.color_vertex.replace(PETAL_SRC, 'vColor.rgb *= mix( vec3( 1.0 ), instanceColor.rgb, coverPetal );');
 function coverMaterial(kind: (typeof KINDS)[number]) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, side: THREE.DoubleSide });
   m.name = `ground cover ${kind === 'tall' ? 'tall grass' : kind === 'tuft' ? 'grass tufts' : 'wildflowers'}`;
@@ -119,8 +111,10 @@ function coverMaterial(kind: (typeof KINDS)[number]) {
     shader.vertexShader = `attribute float coverRank;\nuniform vec4 uCover;\n${kind === 'flower' ? 'attribute float coverPetal;\n' : ''}` + shader.vertexShader
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${FADE}`)
       .replace('#include <color_vertex>', kind === 'flower' ? PETALS : '#include <color_vertex>');
+    // normals point up so blades light like the turf they stand in, from either side (no back-face flip)
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>', THREE.ShaderChunk.normal_fragment_begin.replace('gl_FrontFacing ? 1.0 : - 1.0', '1.0'));
   };
-  m.customProgramCacheKey = () => `ground-cover-v1:${kind}`;
+  m.customProgramCacheKey = () => `ground-cover-v2:${kind}`;
   return m;
 }
 
