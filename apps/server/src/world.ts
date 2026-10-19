@@ -1152,6 +1152,13 @@ export class WorldHost {
   setCarrierRouteV1(spec:{id:string;route:string}){
     return this.enqueue('rules','operator:carrier-route',{carrierRouteV1:structuredClone(spec),why:'a ride flies another named route from its next flight (only while parked and empty); prospective, earlier history replays unchanged'});
   }
+  /** E2: a god's ride whose attraction changed size or place moves to its new home and route (only while parked and empty). */
+  rerouteCarrierV1(spec:CarrierInstallSpec){
+    const engine=this.engine as unknown as {previewCarrierRerouteV1?:(s:unknown)=>{code:string;message:string}|null};
+    if(!engine.previewCarrierRerouteV1)return Promise.reject(Error('carrier.reader-required'));
+    const issue=engine.previewCarrierRerouteV1(spec);if(issue)return Promise.reject(Error(`${issue.code}: ${issue.message}`));
+    return this.enqueue('rules','operator:carrier-reroute',{carrierRerouteV1:structuredClone(spec),why:'a ride whose attraction was resized or moved boards at its new home and follows its new route from its next trip (only while parked and empty); prospective, earlier history replays unchanged'});
+  }
   installCarrierV1(spec:CarrierInstallSpec){
     const engine=this.engine as unknown as {previewCarrierV1?:(s:unknown)=>{code:string;message:string}|null;world:{entities:Record<string,{carrier?:unknown}>}};
     if(!engine.previewCarrierV1)return Promise.reject(Error('carrier.reader-required'));

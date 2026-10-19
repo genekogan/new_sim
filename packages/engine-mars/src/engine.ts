@@ -16,7 +16,7 @@ import {fixtureSlots, isFree, seatApproach} from '../../../mars/viewer/engine/so
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
-import {setCarrierRoute,type CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
+import {rerouteCarrier,setCarrierRoute,type CarrierInstallSpec} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {puntCandidates,previewPunt} from './punt.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
@@ -1838,6 +1838,20 @@ export class MarsEngine implements Engine {
   setCarrierRouteV1(spec:{id:string;route:string}):boolean{return setCarrierRoute(this.rt.world as any,spec.id,spec.route);}
   /** CN5: the route id a carrier flies (null if no such carrier). */
   carrierRouteV1(id:string):string|null{return (this.ents[id] as any)?.carrier?.route?.id??null;}
+  /** E2 carrier reroute preview (pure): why `rerouteCarrierV1` would refuse now (busy, bad route, new home not clear), or null. */
+  previewCarrierRerouteV1(spec:CarrierInstallSpec):Diag|null{
+    const e=this.ents[spec.id] as any;if(!e?.carrier)return {code:'carrier.unknown',message:`no carrier ${spec.id}`};
+    const c=e.carrier;if(c.phase!=='parked'||Object.values(c.seats).some(Boolean)||c.doorBy||c.hold)return {code:'carrier.busy',message:`${spec.id} has riders or boarders`};
+    // the new home must be clear ground with the carrier itself away (it parks at its old home, often within a step)
+    const own=this.ents[spec.id];delete this.ents[spec.id];
+    let issue:Diag|null;try{issue=this.previewCarrierV1({...spec,id:`${spec.id}.reroute-preview`});}finally{this.ents[spec.id]=own;this.m.canonicalEntityOrder(this.rt.world);}
+    return issue&&issue.code!=='carrier.bad-id'?issue:null;
+  }
+  /** E2 (logged rules fact `carrierRerouteV1`): a parked, empty carrier moves to a new home and route (its attraction changed). */
+  rerouteCarrierV1(spec:CarrierInstallSpec):boolean{
+    if(this.previewCarrierRerouteV1(spec))return false;
+    return rerouteCarrier(this.rt.world as any,spec,this.rt.tick)===null;
+  }
   /** carrier/1 (logged rules fact `carrierV1`): add the carrier at its home, idempotent by id. */
   installCarrierV1(spec:CarrierInstallSpec):boolean{
     if(this.ents[spec.id]?.carrier)return true;

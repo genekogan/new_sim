@@ -46,11 +46,26 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
     const ang = (t * (c.spin.rpm / 60)) * Math.PI * 2;
     const target = c.spin.role ? obj.getObjectByName(`role:${c.spin.role}`) : obj;
     if (target) { if (c.spin.axis === 'x') target.rotation.x = ang; else if (c.spin.axis === 'z') target.rotation.z = ang; else target.rotation.y = (target === obj ? base.yaw : 0) + ang; }
+    if (target && target !== obj && c.spin.axis === 'z') hangFrom(obj, target, ang);
   }
   if (c.swing) swingStep(obj, entity, c.swing.parts, t);
   if (c.sway) { obj.rotation.z = Math.sin(t * (Math.PI * 2) / c.sway.period + phase) * c.sway.amount * 0.3; obj.rotation.x = Math.cos(t * (Math.PI * 2) / (c.sway.period * 1.3) + phase) * c.sway.amount * 0.2; }
   if (c.hover) obj.position.y = (c.route ? obj.position.y : base.y + c.hover.height) + Math.sin(t * (Math.PI * 2) / c.hover.period + phase) * c.hover.bob;
   if (c.light || c.lights) glowStep(obj, entity, def, model, t);
+}
+
+/** E2: where a part hung from a turning wheel is: its hanger point (rest offset from the hub, in the wheel's plane) turned
+ *  with the wheel; the part itself does not turn, so a gondola keeps hanging upright. */
+export function hangPosition(rest: readonly [number, number], ang: number): [number, number] {
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  return [rest[0] * cs - rest[1] * sn, rest[0] * sn + rest[1] * cs];
+}
+/** E2: a ferris wheel's gondolas (kit role `gondola`, one group each, pivoted at its hanger point on the rim) ride round
+ *  with the wheel while staying upright, as old Eden's did. */
+function hangFrom(obj: THREE.Object3D, wheel: THREE.Object3D, ang: number) {
+  const ud = wheel.userData as { hangs?: { o: THREE.Object3D; rest: [number, number] }[] };
+  if (!ud.hangs) { const hangs: { o: THREE.Object3D; rest: [number, number] }[] = []; obj.traverse((o) => { if (o.name === 'role:gondola') hangs.push({ o, rest: [o.position.x - wheel.position.x, o.position.y - wheel.position.y] }); }); ud.hangs = hangs; }
+  for (const h of ud.hangs) { const [x, y] = hangPosition(h.rest, ang); h.o.position.x = wheel.position.x + x; h.o.position.y = wheel.position.y + y; }
 }
 
 type Swing = NonNullable<StoredDef['components']['swing']>['parts'][number];

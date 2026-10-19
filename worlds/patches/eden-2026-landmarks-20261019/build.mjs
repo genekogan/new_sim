@@ -12,7 +12,7 @@
 // at both doors) with bunting avenues to its doors (three flags and one festoon moved clear of the canvas); two beached
 // marina sailboats moved onto the water; a ticket booth,
 // flags and festoon lights at the Ferris wheel; a sandy, picket-fenced playground yard; a painted stage floor and two
-// speakers at the amphitheatre. Heights along the cable car come from Eden 2026's own terrain (sampled once, below).
+// speakers at the amphitheatre; the 17 m core Ferris wheel replaced by a ~29 m wheel with sixteen hanging gondolas. Heights along the cable car come from Eden 2026's own terrain (sampled once, below).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -121,6 +121,49 @@ function buntingDef() {
 }
 
 // ---------- amphitheatre: a painted round stage floor ----------
+// ---------- the big wheel: old Eden's ~29 m wheel with hanging gondolas, replacing the 17 m core wheel at the resort ----------
+// The wheel turns (spin role `wheel`); sixteen gondolas are kit role `gondola`, each pivoted at its hanger point, which the
+// viewer carries round with the wheel upright (apps/web gen-mesh/motion.ts hangFrom). Proportions keep its ride (server
+// god/rides.ts attractionRoute: a circle of radius width/2 - 1 about height radius + 1) on the gondolas' own circle, and the
+// bottom gondola at the boarding platform.
+const WHEEL = { R: 13, H: 15.4, N: 16, legX: 8, legZ: 1.5, rim: 0.6 };
+function bigWheelDef() {
+  const { R, H, N, legX, legZ, rim } = WHEEL, shapes = [], hub = [0, H, 0];
+  const RIM = '#f4f0e6', LEG = '#c9342d', CABS = ['#c9342d', '#f0c040', '#2e8b57', '#6a3d8f', '#e07b39', '#3a7fc4'];
+  const W = { role: 'wheel', pivot: hub, collide: false };
+  // base platform, boarding steps in front, and two A-frames (front and back) up to the axle
+  shapes.push({ kind: 'extrude', at: [0, 0, 0], polygon: [[-legX - 1, -legZ - 1], [legX + 1, -legZ - 1], [legX + 1, legZ + 1], [-legX - 1, legZ + 1]], h: 0.4, color: '#9a958a' });
+  shapes.push({ kind: 'extrude', at: [0, 0, legZ + 1.6], polygon: [[-2, -0.6], [2, -0.6], [2, 0.6], [-2, 0.6]], h: 0.2, color: '#9a958a' });
+  for (const z of [-legZ, legZ]) {
+    for (const x of [-legX, legX]) shapes.push({ kind: 'sweep', at: [0, 0, 0], path: [[x, 0.4, z], [0, H, z * 0.55]], r: 0.32, segments: 8, color: LEG });
+    shapes.push({ kind: 'sweep', at: [0, 0, 0], path: [[-legX * 0.55, H * 0.45, z * 0.8], [legX * 0.55, H * 0.45, z * 0.8]], r: 0.16, segments: 6, color: LEG });
+  }
+  shapes.push({ kind: 'cyl', at: [0, H, 0], r: 0.3, h: 2 * legZ + 0.4, segments: 10, pitch: 1.5708, color: DARK });
+  // the wheel: two rims with an inner ring, sixteen spokes a side (eight diameters); the kit allows 96 shapes in all
+  shapes.push({ kind: 'cyl', at: [0, H, 0], r: 0.8, h: 1.6, segments: 12, pitch: 1.5708, color: '#d9d2c3', ...W });
+  for (const z of [-rim, rim]) {
+    shapes.push({ kind: 'torus', at: [0, H, z], r: R, r2: 0.13, segments: 64, color: RIM, ...W });
+    shapes.push({ kind: 'torus', at: [0, H, z], r: R * 0.55, r2: 0.07, segments: 40, color: RIM, ...W });
+    for (let k = 0; k < N / 2; k++) { const a = (k / N) * Math.PI * 2 + Math.PI / N; shapes.push({ kind: 'box', at: [0, H, z], size: [2 * R, 0.07, 0.07], roll: r3(a), color: RIM, ...W }); }
+  }
+  for (let k = 0; k < N; k++) {
+    const a = (k / N) * Math.PI * 2 - Math.PI / 2, P = [r3(R * Math.cos(a)), r3(H + R * Math.sin(a)), 0], c = CABS[k % CABS.length];
+    // the gondola, hanging from its axle between the rims: hanger, white roof, coloured cabin with a window band
+    const G = { role: 'gondola', pivot: P, collide: false };
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.2), 0], size: [0.1, 0.4, 2 * rim], color: DARK, ...G });
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.45), 0], size: [1.8, 0.14, 1.5], color: CREAM, ...G });
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 1.05), 0], size: [1.6, 1.05, 1.35], color: c, ...G });
+    shapes.push({ kind: 'box', at: [P[0], r3(P[1] - 0.85), 0], size: [1.64, 0.34, 1.1], color: '#2b3a44', ...G });
+  }
+  return {
+    schema: 'def/1', name: 'eden-big-wheel', version: 1,
+    description: `A big ferris wheel (${Math.round(H + R + 0.3)} m) on red A-frames with sixteen hanging gondolas; it turns slowly and residents ride it.`,
+    tags: ['play', 'ferris-wheel', 'ride', 'fair', 'structure', 'large', 'moving', 'eden'], form: 'point', layer: 'solid',
+    components: { carrier: { seats: 16 }, spin: { axis: 'z', rpm: 0.8, role: 'wheel' } },
+    make: { kind: 'gen', gen: 'kit/2', args: { shapes } },
+  };
+}
+
 function stageFloorDef() {
   const S = 8, R = 1.9, cols = ['#d9534f', '#f0ad4e', '#f4d35e', '#5cb85c', '#3d8ab0', '#6f5fb0', '#e86aa8', '#f4efe4'], shapes = [];
   // each segment an explicit wedge polygon (a cyl `arc` slice drew whole overlapping discs that z-fought)
@@ -144,7 +187,7 @@ const TERRACE_Y = 35.4; // the mountain restaurant's floor level
 const place = (def, name, p, extra = {}) => ({ op: 'place', def, name, ...(p ? { p } : {}), ...extra });
 function landmarkOps() {
   const ops = [
-    { op: 'define', def: cableCarDef() }, { op: 'define', def: buntingDef() }, { op: 'define', def: stageFloorDef() },
+    { op: 'define', def: cableCarDef() }, { op: 'define', def: buntingDef() }, { op: 'define', def: stageFloorDef() }, { op: 'define', def: bigWheelDef() },
     // cable car, at the valley station with its height given (anchor center: no settling, no pad)
     place('eden-cable-car@1', 'alpine-cable-car', [VALLEY.x, VALLEY.g, VALLEY.z], { anchor: 'center' }),
     // mountain restaurant sun terrace, level with the restaurant's pad, on its downhill side
@@ -157,11 +200,13 @@ function landmarkOps() {
     place('core/string-lights@1', 'alpine-terrace-lights', [11, TERRACE_Y, -291.2]),
     // fair: bunting avenues to the big top's two doors
     ...[[272, 75], [282, 75], [272, 29], [282, 29]].map(([x, z], i) => place('eden-bunting@1', `fair-bunting-${i + 1}`, [x, z], { r: 1.5708 })),
-    // Ferris wheel: ticket booth, two flags and festoon lights at its front (the wheel and its ride are unchanged)
-    place('core/kiosk@1', 'resort-ferris-ticket-booth', [192.5, 126.5], { r: -1.5708, params: { paint: '#c43a2a', roof: '#f0c040' } }),
+    // the big wheel in the 17 m core wheel's place (same name, so its ride re-routes rather than doubling), with a ticket
+    // booth, two flags and festoon lights at its front, clear of its base and of the boarding step its ride uses
+    place('eden-big-wheel@1', 'resort-ferris-wheel', [184, 124]),
+    place('core/kiosk@1', 'resort-ferris-ticket-booth', [195.5, 128.5], { r: -1.5708, params: { paint: '#c43a2a', roof: '#f0c040' } }),
     place('core/flagpole@1', 'resort-ferris-flag-1', [176.5, 129.5], { params: { flag: '#c43a2a' } }),
     place('core/flagpole@1', 'resort-ferris-flag-2', [191.5, 130.5], { params: { flag: '#f0c040' } }),
-    place('core/string-lights@1', 'resort-ferris-lights', [184, 130.4]),
+    place('core/string-lights@1', 'resort-ferris-lights', [184, 128.4]),
     // playground: a sandy yard in a red picket fence with gates on the avenue side and the west
     place('core/sand-patch@1', 'park-playground-sand', null, { shape: { area: [[10, 96.5], [26, 96.5], [26, 109], [10, 109]] }, params: { material: 'sand', edge: 0.6 } }),
     place('core/fence@1', 'park-playground-fence', null, { shape: { path: [[9, 95.5], [27, 95.5], [27, 110], [9, 110], [9, 95.5]] }, params: { style: 'picket', color: '#c43a2a', height: 0.9, gates: [{ at: 9, width: 2.2, state: 'open' }, { at: 57.75, width: 2.2, state: 'open' }] } }),
@@ -194,6 +239,8 @@ const PARAMS = { 'land-alpine-switchback': { width: 3, maxGrade: 0.25 } };
 let reparamed = 0;
 for (const b of tpl.batches) for (const o of b.ops) if (o.op === 'place' && PARAMS[o.name] && (o.in?.parent ?? 'world') === 'world') { o.params = { ...o.params, ...PARAMS[o.name] }; o.shape = { path: SWITCHBACK }; reparamed++; }
 if (redefined !== 1 || moved !== Object.keys(MOVES).length || reparamed !== Object.keys(PARAMS).length) throw new Error(`template drifted: redefined ${redefined}, moved ${moved}`);
+// the 17 m core wheel's own op goes (the big wheel above takes its name); absent when this script ran before
+for (const b of tpl.batches) b.ops = b.ops.filter((o) => !(o.op === 'place' && o.name === 'resort-ferris-wheel' && o.def === 'core/ferris-wheel@1'));
 tpl.batches.push({ note: NOTE, group: 'eden-2026', ops: landmarkOps() });
 writeFileSync(TPL, JSON.stringify(tpl, null, 2) + '\n');
 console.log(JSON.stringify({ template: TPL, added: tpl.batches.at(-1).ops.length, redefined, moved, reparamed }));

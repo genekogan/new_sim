@@ -63639,19 +63639,6 @@
       "ops": [
         {
           "op": "place",
-          "def": "core/ferris-wheel@1",
-          "name": "resort-ferris-wheel",
-          "p": [
-            184,
-            124
-          ],
-          "params": {
-            "rim": "#d9534f",
-            "frame": "#f4f0e6"
-          }
-        },
-        {
-          "op": "place",
           "def": "core/carousel@1",
           "name": "resort-carousel",
           "p": [
@@ -86239,6 +86226,2044 @@
           }
         },
         {
+          "op": "define",
+          "def": {
+            "schema": "def/1",
+            "name": "eden-big-wheel",
+            "version": 1,
+            "description": "A big ferris wheel (29 m) on red A-frames with sixteen hanging gondolas; it turns slowly and residents ride it.",
+            "tags": [
+              "play",
+              "ferris-wheel",
+              "ride",
+              "fair",
+              "structure",
+              "large",
+              "moving",
+              "eden"
+            ],
+            "form": "point",
+            "layer": "solid",
+            "components": {
+              "carrier": {
+                "seats": 16
+              },
+              "spin": {
+                "axis": "z",
+                "rpm": 0.8,
+                "role": "wheel"
+              }
+            },
+            "make": {
+              "kind": "gen",
+              "gen": "kit/2",
+              "args": {
+                "shapes": [
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "polygon": [
+                      [
+                        -9,
+                        -2.5
+                      ],
+                      [
+                        9,
+                        -2.5
+                      ],
+                      [
+                        9,
+                        2.5
+                      ],
+                      [
+                        -9,
+                        2.5
+                      ]
+                    ],
+                    "h": 0.4,
+                    "color": "#9a958a"
+                  },
+                  {
+                    "kind": "extrude",
+                    "at": [
+                      0,
+                      0,
+                      3.1
+                    ],
+                    "polygon": [
+                      [
+                        -2,
+                        -0.6
+                      ],
+                      [
+                        2,
+                        -0.6
+                      ],
+                      [
+                        2,
+                        0.6
+                      ],
+                      [
+                        -2,
+                        0.6
+                      ]
+                    ],
+                    "h": 0.2,
+                    "color": "#9a958a"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -8,
+                        0.4,
+                        -1.5
+                      ],
+                      [
+                        0,
+                        15.4,
+                        -0.8250000000000001
+                      ]
+                    ],
+                    "r": 0.32,
+                    "segments": 8,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        8,
+                        0.4,
+                        -1.5
+                      ],
+                      [
+                        0,
+                        15.4,
+                        -0.8250000000000001
+                      ]
+                    ],
+                    "r": 0.32,
+                    "segments": 8,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -4.4,
+                        6.930000000000001,
+                        -1.2000000000000002
+                      ],
+                      [
+                        4.4,
+                        6.930000000000001,
+                        -1.2000000000000002
+                      ]
+                    ],
+                    "r": 0.16,
+                    "segments": 6,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -8,
+                        0.4,
+                        1.5
+                      ],
+                      [
+                        0,
+                        15.4,
+                        0.8250000000000001
+                      ]
+                    ],
+                    "r": 0.32,
+                    "segments": 8,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        8,
+                        0.4,
+                        1.5
+                      ],
+                      [
+                        0,
+                        15.4,
+                        0.8250000000000001
+                      ]
+                    ],
+                    "r": 0.32,
+                    "segments": 8,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "sweep",
+                    "at": [
+                      0,
+                      0,
+                      0
+                    ],
+                    "path": [
+                      [
+                        -4.4,
+                        6.930000000000001,
+                        1.2000000000000002
+                      ],
+                      [
+                        4.4,
+                        6.930000000000001,
+                        1.2000000000000002
+                      ]
+                    ],
+                    "r": 0.16,
+                    "segments": 6,
+                    "color": "#c9342d"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "r": 0.3,
+                    "h": 3.4,
+                    "segments": 10,
+                    "pitch": 1.5708,
+                    "color": "#3a3d40"
+                  },
+                  {
+                    "kind": "cyl",
+                    "at": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "r": 0.8,
+                    "h": 1.6,
+                    "segments": 12,
+                    "pitch": 1.5708,
+                    "color": "#d9d2c3",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "torus",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "r": 13,
+                    "r2": 0.13,
+                    "segments": 64,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "torus",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "r": 7.15,
+                    "r2": 0.07,
+                    "segments": 40,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.196,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.589,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.982,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 1.374,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 1.767,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.16,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.553,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      -0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.945,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "torus",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "r": 13,
+                    "r2": 0.13,
+                    "segments": 64,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "torus",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "r": 7.15,
+                    "r2": 0.07,
+                    "segments": 40,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.196,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.589,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 0.982,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 1.374,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 1.767,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.16,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.553,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      15.4,
+                      0.6
+                    ],
+                    "size": [
+                      26,
+                      0.07,
+                      0.07
+                    ],
+                    "roll": 2.945,
+                    "color": "#f4f0e6",
+                    "role": "wheel",
+                    "pivot": [
+                      0,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      2.2,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      2.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.95,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      2.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.35,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#c9342d",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      2.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      1.55,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      2.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      3.19,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      2.94,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      2.34,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#f0c040",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      2.54,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      6.008,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      5.758,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      5.158,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#2e8b57",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      5.358,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      10.225,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      9.975,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      9.375,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#6a3d8f",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      9.575,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      13,
+                      15.2,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      13,
+                      14.95,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      13,
+                      14.35,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#e07b39",
+                    "role": "gondola",
+                    "pivot": [
+                      13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      13,
+                      14.55,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      20.175,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      19.925,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      19.325,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#3a7fc4",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      12.01,
+                      19.525,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      24.392,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      24.142,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      23.542,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#c9342d",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      9.192,
+                      23.742,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      27.21,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      26.96,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      26.36,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#f0c040",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      4.975,
+                      26.56,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      28.2,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      28.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      27.95,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      28.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      27.35,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#2e8b57",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      28.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      0,
+                      27.55,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      0,
+                      28.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      27.21,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      26.96,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      26.36,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#6a3d8f",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      26.56,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      27.41,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      24.392,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      24.142,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      23.542,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#e07b39",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      23.742,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      24.592,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      20.175,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      19.925,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      19.325,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#3a7fc4",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      19.525,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      20.375,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -13,
+                      15.2,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -13,
+                      14.95,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -13,
+                      14.35,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#c9342d",
+                    "role": "gondola",
+                    "pivot": [
+                      -13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -13,
+                      14.55,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -13,
+                      15.4,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      10.225,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      9.975,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      9.375,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#f0c040",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -12.01,
+                      9.575,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -12.01,
+                      10.425,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      6.008,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      5.758,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      5.158,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#2e8b57",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -9.192,
+                      5.358,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -9.192,
+                      6.208,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      3.19,
+                      0
+                    ],
+                    "size": [
+                      0.1,
+                      0.4,
+                      1.2
+                    ],
+                    "color": "#3a3d40",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      2.94,
+                      0
+                    ],
+                    "size": [
+                      1.8,
+                      0.14,
+                      1.5
+                    ],
+                    "color": "#f4efe4",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      2.34,
+                      0
+                    ],
+                    "size": [
+                      1.6,
+                      1.05,
+                      1.35
+                    ],
+                    "color": "#6a3d8f",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  },
+                  {
+                    "kind": "box",
+                    "at": [
+                      -4.975,
+                      2.54,
+                      0
+                    ],
+                    "size": [
+                      1.64,
+                      0.34,
+                      1.1
+                    ],
+                    "color": "#2b3a44",
+                    "role": "gondola",
+                    "pivot": [
+                      -4.975,
+                      3.39,
+                      0
+                    ],
+                    "collide": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
           "op": "place",
           "def": "eden-cable-car@1",
           "name": "alpine-cable-car",
@@ -86382,11 +88407,20 @@
         },
         {
           "op": "place",
+          "def": "eden-big-wheel@1",
+          "name": "resort-ferris-wheel",
+          "p": [
+            184,
+            124
+          ]
+        },
+        {
+          "op": "place",
           "def": "core/kiosk@1",
           "name": "resort-ferris-ticket-booth",
           "p": [
-            192.5,
-            126.5
+            195.5,
+            128.5
           ],
           "r": -1.5708,
           "params": {
@@ -86424,7 +88458,7 @@
           "name": "resort-ferris-lights",
           "p": [
             184,
-            130.4
+            128.4
           ]
         },
         {

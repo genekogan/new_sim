@@ -15,7 +15,7 @@ const shapeFaces = z.array(shapeFaceSchema).min(1).max(FACE_LIMITS.perShape);
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep', 'loft'] as const;
 /** Y1 / XP7 (contract 2): procedural surfaces, drawn in the shape's own metres; `none` keeps the material flat. */
 export const KIT_PATTERNS = ['marble', 'ashlar', 'planks', 'shingles', 'stripes', 'none'] as const;
-export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen', 'boom', 'forks'] as const;  // boom, forks: E2 #4 working parts (components.swing)
+export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen', 'boom', 'forks', 'gondola'] as const;  // boom, forks: E2 #4 working parts (components.swing); gondola: a car hung from a turning `wheel` (one pivot each: its hanger point)
 
 const shape = z.object({
   kind: z.enum(KIT_PRIMITIVES),
@@ -160,7 +160,7 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
     for (const field of KIT_GEOMETRY_FIELDS) if (sh[field] !== undefined && !used.includes(field)) issue(i, field, `has no effect on ${sh.kind}`, `remove ${field} or choose a primitive that uses it`);
     if (sh.pivot && !sh.role) issue(i, 'pivot', 'needs an animation role', 'add role or remove pivot');
     if (sh.kind === 'rbox' && sh.segments !== undefined && (sh.round ?? Math.max(args.round, 0.06)) <= 0.005) issue(i, 'segments', 'has no effect on a sharp box', 'remove segments or use round > 0.005');
-    if (sh.pivot && sh.role && args.shapes.some((other, j) => j < i && other.role === sh.role && other.pivot && other.pivot.some((v, k) => v !== sh.pivot![k]))) issue(i, 'pivot', 'conflicts with another pivot for this role', 'use one shared pivot for all shapes of a role');
+    if (sh.pivot && sh.role && sh.role !== 'gondola' && args.shapes.some((other, j) => j < i && other.role === sh.role && other.pivot && other.pivot.some((v, k) => v !== sh.pivot![k]))) issue(i, 'pivot', 'conflicts with another pivot for this role', 'use one shared pivot for all shapes of a role');
     if (sh.tint === '') issue(i, 'tint', 'palette key is empty', 'name a palette key or remove tint');
     if (sh.when !== undefined && !sh.when.split('&').every(t => /^!?\s*@?[A-Za-z][\w-]*(?:\s*(?:!=|=|>=|<=|>|<)\s*[^&\s].*)?$/.test(t.trim()))) issue(i, 'when', 'condition is not understood', 'use key, !key, @key, key=value or a numeric comparison; join terms with &');
     if ((sh.kind === 'ring' || sh.kind === 'torus') && sh.r2 === 0) issue(i, 'r2', 'tube radius must be positive', 'use a positive tube radius');
