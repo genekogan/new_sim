@@ -24,7 +24,8 @@ import {StaticRootRegistry} from './rendering/StaticRootRegistry.ts';
 import {dequantizeBackdrop} from './WorldBackdropDequantize.ts';
 import {backdropCandidates} from './mars-fork.ts';
 export {BACKDROP_BLOBS} from './backdrop-prefetch.ts';
-import {BACKDROP_BLOBS,takeBackdrop} from './backdrop-prefetch.ts';
+import {BACKDROP_BLOBS,BACKDROP_DETAIL,takeBackdrop} from './backdrop-prefetch.ts';
+import {dropCoarse} from './WorldBackdropTiers.ts';
 import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
@@ -212,6 +213,8 @@ export class WorldGeometry {
   staticRenderRoots(){return this.staticRoots.roots();}
   get staticRenderRevision(){return this.staticRoots.revision;}
   private disposed = false;
+  /** W3: the campus detail tier still to load (set once the base tier is in the scene). */
+  private backdropDetail:{url:string;base:THREE.Object3D;backdrop:MarsBackdrop}|null=null;
   private desert?: MarsDesert;
   private commons:CommonsSceneMetadataV1|null=null;
   /** Only the exact reviewed native commons gets its optional observer presentation. */
@@ -299,9 +302,28 @@ export class WorldGeometry {
     try{const urls=backdropCandidates(backdrop.url,BACKDROP_BLOBS[backdrop.url]);let gltf;
       // lane BLOBS: the smaller hashed copy on eden2; the legacy name is the fallback (local dev has no /blobs)
       // MARSLAND-FORK: the Mars fork tries its corrected campus first (mars-fork.ts)
-      for(const url of urls.slice(0,-1)){try{const early=takeBackdrop(url);gltf=early?await loader.parseAsync(await early,url.slice(0,url.lastIndexOf('/')+1)):await loader.loadAsync(url,event=>onProgress?.(url,event));break;}catch{gltf=undefined;}}
+      let loaded=backdrop.url;
+      for(const url of urls.slice(0,-1)){try{const early=takeBackdrop(url);gltf=early?await loader.parseAsync(await early,url.slice(0,url.lastIndexOf('/')+1)):await loader.loadAsync(url,event=>onProgress?.(url,event));loaded=url;break;}catch{gltf=undefined;}}
       gltf??=await loader.loadAsync(backdrop.url,event=>onProgress?.(backdrop.url,event));
-      if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;dequantizeBackdrop(root);root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);this.staticRoots.register(root,gltf.animations);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
+      if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;this.placeBackdrop(root,backdrop,'mars-campus-backdrop');this.buildings.add(root);this.staticRoots.register(root,gltf.animations);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;
+      // W3: the base tier's coarse fittings and furniture are replaced by the exact ones after arrival (addBackdropDetail)
+      const detail=BACKDROP_DETAIL[backdrop.url];if(detail&&loaded===BACKDROP_BLOBS[backdrop.url])this.backdropDetail={url:detail,base:root,backdrop};
+      return true;}catch{return false;}
+  }
+  private placeBackdrop(root:THREE.Object3D,backdrop:MarsBackdrop,name:string){dequantizeBackdrop(root);root.name=name;root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});}
+  /** W3: a campus detail tier is waiting (the caller starts it once the arrival is ready). */
+  get backdropDetailPending(){return this.backdropDetail!==null;}
+  private backdropReadyAt:number|null=null;
+  /** W3: called every frame once the arrival is ready; starts the detail tier 1.5 s later, so its download and parse
+   * never compete with the arrival card's last frames and fade. */
+  backdropDetailWhenSettled(loader:GLTFLoader,now:number){this.backdropReadyAt??=now;if(now-this.backdropReadyAt>=1500)void this.addBackdropDetail(loader);}
+  /** W3: load the campus detail tier once: the exact fittings and furniture join the scene in the same frame as the
+   * base tier's coarse ones leave it. False when there is none, it failed (the coarse ones stay) or the view moved on. */
+  async addBackdropDetail(loader:GLTFLoader):Promise<boolean>{
+    const d=this.backdropDetail;if(!d)return false;this.backdropDetail=null;
+    try{const gltf=await loader.loadAsync(d.url);
+      if(this.disposed||d.base.parent!==this.buildings){disposeTree(gltf.scene);return false;}
+      const root=gltf.scene;this.placeBackdrop(root,d.backdrop,'mars-campus-detail');dropCoarse(d.base);this.buildings.add(root);this.staticRoots.register(root,gltf.animations);return true;}catch{return false;}
   }
 
   /** Mars camp only: mark material piles and the build site once the recording supplies regions (WorldMarsDesert.ts). */

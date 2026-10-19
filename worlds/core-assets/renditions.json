@@ -1,0 +1,469 @@
+{
+ "schema": "core-renditions/1",
+ "renditions": {
+  "01dd912871b236900cc57d48c643540184b414d08f5f7d791c29a67e5c0825df": {
+   "sha": "c865812f4d5e8d0b76976ff555cc169deae84ff1a67f17417b74ea3ef7470772",
+   "path": "worlds/core-assets/renditions/c865812f4d5e8d0b76976ff555cc169deae84ff1a67f17417b74ea3ef7470772.glb",
+   "bytes": 6104,
+   "source": "worlds/core-assets/mars/bus-seat.glb"
+  },
+  "082482e2c6a81745d90a7044e6058da0e026d380f46575455766d14446c7c354": {
+   "sha": "779514127d8991df107da6508974819b74ee9cf8e73823f27b0f04654b9950c5",
+   "path": "worlds/core-assets/renditions/779514127d8991df107da6508974819b74ee9cf8e73823f27b0f04654b9950c5.glb",
+   "bytes": 103568,
+   "source": "worlds/core-assets/mars/vehicle-3.glb"
+  },
+  "0d96fcbad918ea8beeeed94e8593c60772a7751278b7ef59c0afdab6ecc9e4ac": {
+   "sha": "36bcff6cdfdf9703bea6c86de4fe6b7137fb3b8ce53dd55690cad7c66e60f8ce",
+   "path": "worlds/core-assets/renditions/36bcff6cdfdf9703bea6c86de4fe6b7137fb3b8ce53dd55690cad7c66e60f8ce.glb",
+   "bytes": 4480,
+   "source": "worlds/core-assets/mars/folding-chair-3.glb"
+  },
+  "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39": {
+   "sha": "b454a1f94dba3fa7b62c46407053a3cfdbabfd0f83d614a85099db6a4e5834c8",
+   "path": "worlds/core-assets/renditions/b454a1f94dba3fa7b62c46407053a3cfdbabfd0f83d614a85099db6a4e5834c8.glb",
+   "bytes": 212880,
+   "source": "worlds/core-assets/mars/mimos.glb"
+  },
+  "11fb51931920e868e00e4b4566508c5e25ed996b475bd5301b7abae9e1be491e": {
+   "sha": "5f7ea2c1719c770808720d7220c9a4708ec615617d6fe8516cf77c81b2cf5d6c",
+   "path": "worlds/core-assets/renditions/5f7ea2c1719c770808720d7220c9a4708ec615617d6fe8516cf77c81b2cf5d6c.glb",
+   "bytes": 134828,
+   "source": "worlds/core-assets/mars/kitchen.glb"
+  },
+  "198e9544236d7aed610174549e6951b00c1ca786d59df284b4ff0b4f2357bb1a": {
+   "sha": "6011aab6f9ad886d56df51a423600535faeb3a7a888680006492540bcbacdebc",
+   "path": "worlds/core-assets/renditions/6011aab6f9ad886d56df51a423600535faeb3a7a888680006492540bcbacdebc.glb",
+   "bytes": 15376,
+   "source": "worlds/core-assets/mars-fidelity/showers.glb"
+  },
+  "1b877b10f4d61bc6f1a2b4e9b0108fb88f1c5b2d90af396963a19ab5fce39377": {
+   "sha": "dfca9fca5f3378832dbea6050a844ece63638c5fc4536cafed81a1a1f731e6d1",
+   "path": "worlds/core-assets/renditions/dfca9fca5f3378832dbea6050a844ece63638c5fc4536cafed81a1a1f731e6d1.glb",
+   "bytes": 5216,
+   "source": "worlds/core-assets/mars/og-worktop.glb"
+  },
+  "1bbc2e9d83cd4c81fc3abafddc5a2c3c43e8d790c01fa11b3d5dd9bcd1ff4c56": {
+   "sha": "73e764c607555b7f64ecedd2f22f8bfbfa6d9a1d30b603887c3a02f1c5223d26",
+   "path": "worlds/core-assets/renditions/73e764c607555b7f64ecedd2f22f8bfbfa6d9a1d30b603887c3a02f1c5223d26.glb",
+   "bytes": 340756,
+   "source": "worlds/core-assets/mars/vehicle-9.glb"
+  },
+  "1d3fb6fd671373826d99c8490589933baf685b07eddd58ac73bfe935d8890f87": {
+   "sha": "07b1f20852a38f630deff1c37dbc60357b7c8602abd229dc6b1540b928cc65b1",
+   "path": "worlds/core-assets/renditions/07b1f20852a38f630deff1c37dbc60357b7c8602abd229dc6b1540b928cc65b1.glb",
+   "bytes": 4488,
+   "source": "worlds/core-assets/mars/freeside-speaker.glb"
+  },
+  "1dafb201c9733fe7f4c6bdad4ddca886121cafcc4890c98923c88693dbd65f92": {
+   "sha": "33789e70a25668f55612586404f6f74d5a7b29d0227379196307350704e18ece",
+   "path": "worlds/core-assets/renditions/33789e70a25668f55612586404f6f74d5a7b29d0227379196307350704e18ece.glb",
+   "bytes": 135036,
+   "source": "worlds/core-assets/mars-fidelity/kitchen.glb"
+  },
+  "219aba825d3d90d736fcb1852f56456438c34550fdedd1552a780834bf6a3b56": {
+   "sha": "549f8bcfd79e951f31afddb315644c0543367a54460cd97570a1907f414d4f6f",
+   "path": "worlds/core-assets/renditions/549f8bcfd79e951f31afddb315644c0543367a54460cd97570a1907f414d4f6f.glb",
+   "bytes": 195248,
+   "source": "worlds/core-assets/mars/vehicle-8.glb"
+  },
+  "2b88aad6559282c4fc7ddb40fcfd2210e0b56e2e5de252920fa56355b56dbd5e": {
+   "sha": "3868d6cf8b4a7d4749784a053ec5f4124fe83b03a8594ac145881f81fb79ed6c",
+   "path": "worlds/core-assets/renditions/3868d6cf8b4a7d4749784a053ec5f4124fe83b03a8594ac145881f81fb79ed6c.glb",
+   "bytes": 13452,
+   "source": "worlds/core-assets/mars/papasan.glb"
+  },
+  "30ab77cb2a63224bd960cb7d4761d2db1c545b83a5e40f6190374d91e9258f2d": {
+   "sha": "22b6815c7bf46147d39bbb47852621cc519f8c959fd5ba5509ad72f2865b2d84",
+   "path": "worlds/core-assets/renditions/22b6815c7bf46147d39bbb47852621cc519f8c959fd5ba5509ad72f2865b2d84.glb",
+   "bytes": 121388,
+   "source": "worlds/core-assets/mars/vehicle-2.glb"
+  },
+  "38a5f85ccfbc7bb01c5fa02e9520d5be6ccf7f6ba49154611501fcb08d3ce838": {
+   "sha": "be09d49fb7503c8e168e0262310548ffb44afd3ba8542325079b49c91cdf5ffa",
+   "path": "worlds/core-assets/renditions/be09d49fb7503c8e168e0262310548ffb44afd3ba8542325079b49c91cdf5ffa.glb",
+   "bytes": 159380,
+   "source": "worlds/core-assets/mars/vehicle-5.glb"
+  },
+  "3a1c4778cf01dc68635b1b6eb34b86f7e11c8773f8e3f1ff2ba74ff9562c52e4": {
+   "sha": "dcbec2fefc20f82a142404cbfcbdbcf03a1ad7e877dd8864dcff155a4725adfc",
+   "path": "worlds/core-assets/renditions/dcbec2fefc20f82a142404cbfcbdbcf03a1ad7e877dd8864dcff155a4725adfc.glb",
+   "bytes": 19572,
+   "source": "worlds/core-assets/mars/forklift-1.glb"
+  },
+  "3b8f07fc1199b040beff8d1ad159dbe51f1d8af7d98f1ff82af22a6a9fdeae29": {
+   "sha": "68f6e5fecc858e04ffa895c9c3ac60555349df94a8283c1b435adebb8155bf1a",
+   "path": "worlds/core-assets/renditions/68f6e5fecc858e04ffa895c9c3ac60555349df94a8283c1b435adebb8155bf1a.glb",
+   "bytes": 4480,
+   "source": "worlds/core-assets/mars/folding-chair-4.glb"
+  },
+  "42b1439ac9ff29c1566b84f68988e3e149c73ae3cb64b5d26cb8f7c581607ecb": {
+   "sha": "edd12071f8114830cfffd9d4fd784fd98a2f302446f6d6fd0371840aa07f6864",
+   "path": "worlds/core-assets/renditions/edd12071f8114830cfffd9d4fd784fd98a2f302446f6d6fd0371840aa07f6864.glb",
+   "bytes": 8308,
+   "source": "worlds/core-assets/mars/rice-cooker.glb"
+  },
+  "443f076c6727cc7b1bf902c603d7961c1259000e12ccae35b1cc083e1150dbae": {
+   "sha": "3d4533fd8a5af4dc001a9db55b7e60e1a850a2bf660c0128effee62598da604b",
+   "path": "worlds/core-assets/renditions/3d4533fd8a5af4dc001a9db55b7e60e1a850a2bf660c0128effee62598da604b.glb",
+   "bytes": 2048,
+   "source": "worlds/core-assets/mars/shelter-5.glb"
+  },
+  "4538d92fc6f6f4a3c90266cb49c1a60eb49dbc7110a488f7d11e1c0b4e3c7ecc": {
+   "sha": "716d8edaadf9f9e6afb1b24e3dd52bf1c929dcf265205bc6d1f525a07b6df372",
+   "path": "worlds/core-assets/renditions/716d8edaadf9f9e6afb1b24e3dd52bf1c929dcf265205bc6d1f525a07b6df372.glb",
+   "bytes": 7836,
+   "source": "worlds/core-assets/mars/sink-counter-lip-2.glb"
+  },
+  "4651a8e82d550b795faf90cdee804bbb9cde453ac8e2b98001378dd751ee9304": {
+   "sha": "351771cc27110be19930a011da55e4e1c4be86c4dcc2c4e8f7e00aebb9ca2c6e",
+   "path": "worlds/core-assets/renditions/351771cc27110be19930a011da55e4e1c4be86c4dcc2c4e8f7e00aebb9ca2c6e.glb",
+   "bytes": 5376,
+   "source": "worlds/core-assets/mars/water-urn.glb"
+  },
+  "49f14f2da02d214643cfdb000b9fb2ee358d6feb51d150cea88fce75a6715ce4": {
+   "sha": "e4b875b84f571fd3a9964f8fb793ac2da84940a64a0106cf230d8486caf2ea05",
+   "path": "worlds/core-assets/renditions/e4b875b84f571fd3a9964f8fb793ac2da84940a64a0106cf230d8486caf2ea05.glb",
+   "bytes": 52332,
+   "source": "worlds/core-assets/mars/dojo.glb"
+  },
+  "4b5e4508f40b98c7d30c5d7c4a45564bf09541032122104eef6c60ca209057be": {
+   "sha": "f80b97a1d9af307aae85869730f2789c4ef45416edc57595e3b5100a4593b42f",
+   "path": "worlds/core-assets/renditions/f80b97a1d9af307aae85869730f2789c4ef45416edc57595e3b5100a4593b42f.glb",
+   "bytes": 766088,
+   "source": "worlds/core-assets/mars/chiba.glb"
+  },
+  "511d056e9649e7af637f5c9cf67a63fe64138df43a5b515bc00ad32cf428dd22": {
+   "sha": "49fa372b7a540709e0ee8a84732064a78e84bcc25f181a8bbf2df5187bfcc14c",
+   "path": "worlds/core-assets/renditions/49fa372b7a540709e0ee8a84732064a78e84bcc25f181a8bbf2df5187bfcc14c.glb",
+   "bytes": 3280,
+   "source": "worlds/core-assets/mars/study-chair.glb"
+  },
+  "515ac21643c3e13e2cb68ac884723834b9ab0bf59a044392ae49b1d8fc11af7e": {
+   "sha": "f9ad8cab09447c9a61ef410b40a5cd2defb5fb6c1cd53e6192de8fc8444f61f8",
+   "path": "worlds/core-assets/renditions/f9ad8cab09447c9a61ef410b40a5cd2defb5fb6c1cd53e6192de8fc8444f61f8.glb",
+   "bytes": 228324,
+   "source": "worlds/core-assets/mars-fidelity/mimos.glb"
+  },
+  "51ac68284a341ae3d8106dbbee59031a68848f765405ca4c460de5e9eb2de6c2": {
+   "sha": "f335eca1d4cd5adabc64d1bd254c117dbe8e48bb29ce23f2370caa06ed700f58",
+   "path": "worlds/core-assets/renditions/f335eca1d4cd5adabc64d1bd254c117dbe8e48bb29ce23f2370caa06ed700f58.glb",
+   "bytes": 9932,
+   "source": "worlds/core-assets/mars/projector-table.glb"
+  },
+  "536ecfa2a531fdaa48c0a1b8c3042e90e6fb9975aec57d86d32e92a255c75884": {
+   "sha": "f58682bfe041ce341ce71a60f728c365e456c284fff0ca50220415df51be6ea5",
+   "path": "worlds/core-assets/renditions/f58682bfe041ce341ce71a60f728c365e456c284fff0ca50220415df51be6ea5.glb",
+   "bytes": 1360088,
+   "source": "worlds/core-assets/mars/tool-camp.glb"
+  },
+  "538cee3fcfb2d3fb7608b17f33ac42c486b514b3b71c5a23fb1ece12cd467890": {
+   "sha": "403ab3cb430c9d507ba3b5a0b759240d8ecc17473db8b8044f31dcd687ce56c1",
+   "path": "worlds/core-assets/renditions/403ab3cb430c9d507ba3b5a0b759240d8ecc17473db8b8044f31dcd687ce56c1.glb",
+   "bytes": 3484,
+   "source": "worlds/core-assets/mars/study-chair-2.glb"
+  },
+  "59f96a3353aafe6bade8bd3e67e6e42010dce92f96d7a1830ca9010636a2e00e": {
+   "sha": "17412be1f846ce2331cc0871214e8d2437725c6cd6490a5bfd19177327903ea4",
+   "path": "worlds/core-assets/renditions/17412be1f846ce2331cc0871214e8d2437725c6cd6490a5bfd19177327903ea4.glb",
+   "bytes": 232320,
+   "source": "worlds/core-assets/mars/vehicle-11.glb"
+  },
+  "5ebcc10017ed85e904f836b2d9ccee1432c42dd2664f82cb184389079d49bf7d": {
+   "sha": "ed9de415154fe166064d15bafe1f3d9b35fd86b7ddf2fce44b812e6fe59dccf3",
+   "path": "worlds/core-assets/renditions/ed9de415154fe166064d15bafe1f3d9b35fd86b7ddf2fce44b812e6fe59dccf3.glb",
+   "bytes": 6184,
+   "source": "worlds/core-assets/mars/tool-library-low-table.glb"
+  },
+  "5f3aa1aceb2d4ddcd48b55970e21ece71ad72cb4f7ee6c59c6887449824174e7": {
+   "sha": "631889aae4fc312e9cdf8e5a669d9133aa426332e791091d5e1d4d44f1859257",
+   "path": "worlds/core-assets/renditions/631889aae4fc312e9cdf8e5a669d9133aa426332e791091d5e1d4d44f1859257.glb",
+   "bytes": 6580,
+   "source": "worlds/core-assets/mars/bus-seat-3.glb"
+  },
+  "652fba3c78ba3207193200375d4520dd00f05260429b4f71ee898dfec6f2733a": {
+   "sha": "6bfc35997f6c8eac5cb24d686c0e95e44d32c5de21797e9d2de8e88696450d38",
+   "path": "worlds/core-assets/renditions/6bfc35997f6c8eac5cb24d686c0e95e44d32c5de21797e9d2de8e88696450d38.glb",
+   "bytes": 6576,
+   "source": "worlds/core-assets/mars/bus-seat-2.glb"
+  },
+  "67747b543fd697a0904d2ba71e1e017d77a8c43159cb10ff640c1b45fe179cfc": {
+   "sha": "48328b2a3ffa40372ca919984e39a8773dbd97404eb1c8f1648a7e8ed7715a76",
+   "path": "worlds/core-assets/renditions/48328b2a3ffa40372ca919984e39a8773dbd97404eb1c8f1648a7e8ed7715a76.glb",
+   "bytes": 20416,
+   "source": "worlds/core-assets/mars/coffee-counter.glb"
+  },
+  "68e8510c9e857a97644e1f5509f33658b2644134a4d8b2f90ad095ddcbda5455": {
+   "sha": "6287291cfe7da3defbaa63cd0b6bf503218613b2e0be1d69b7e49603fa776ff9",
+   "path": "worlds/core-assets/renditions/6287291cfe7da3defbaa63cd0b6bf503218613b2e0be1d69b7e49603fa776ff9.glb",
+   "bytes": 20452,
+   "source": "worlds/core-assets/mars/shelter-4.glb"
+  },
+  "754359ccdf19c08a34cc57a8b87df1d3212874ef9882edcd2c6daa3815ad7d05": {
+   "sha": "6446bd30b969bb40b7721f5c4e325e6a7e996b9dddc03c1abe7a3e7acebceb5c",
+   "path": "worlds/core-assets/renditions/6446bd30b969bb40b7721f5c4e325e6a7e996b9dddc03c1abe7a3e7acebceb5c.glb",
+   "bytes": 4148,
+   "source": "worlds/core-assets/mars/navy-sofa.glb"
+  },
+  "809b7caa0824c5932e441991935002d48fd43461bf4a0bbee96e009b9d43900e": {
+   "sha": "661055fc3feaae6592f6cd178d10dfc319096b31c776a6b17b6d2523a7a436e9",
+   "path": "worlds/core-assets/renditions/661055fc3feaae6592f6cd178d10dfc319096b31c776a6b17b6d2523a7a436e9.glb",
+   "bytes": 4276,
+   "source": "worlds/core-assets/mars/colab-taupe-sofa.glb"
+  },
+  "8232048752de5be3fd489235185cd1fdbfa4177d30a5c61a4cfd9ccc6e2640b2": {
+   "sha": "21368317d856fc78fc72e7c95121be2ea46ad72cff41805e6d9dc12850c65a2c",
+   "path": "worlds/core-assets/renditions/21368317d856fc78fc72e7c95121be2ea46ad72cff41805e6d9dc12850c65a2c.glb",
+   "bytes": 6116,
+   "source": "worlds/core-assets/mars/bus-seat-4.glb"
+  },
+  "86ce0f357d5038f7ce8a5d1447465198005182b89066be9baabab7bc583f6733": {
+   "sha": "4dd11dcc8292fe6e45134754545fff3f00e613605a1c7f2de0c0e2896124de8b",
+   "path": "worlds/core-assets/renditions/4dd11dcc8292fe6e45134754545fff3f00e613605a1c7f2de0c0e2896124de8b.glb",
+   "bytes": 8724,
+   "source": "worlds/core-assets/mars/shelter-1.glb"
+  },
+  "88b5d6b97890d3d187ee1822e78ffdbd3e29158d37afe01f91a1cb9dca1943bf": {
+   "sha": "6dcd232fb2d8cbf4445a6771b02da6393c77da82596603f01c9f4faf2e3e4850",
+   "path": "worlds/core-assets/renditions/6dcd232fb2d8cbf4445a6771b02da6393c77da82596603f01c9f4faf2e3e4850.glb",
+   "bytes": 9252,
+   "source": "worlds/core-assets/mars/field-chair-2.glb"
+  },
+  "88b629b4224d12c783602ebd519d362b660e6befb0ff7250c3449f0ec2d996ff": {
+   "sha": "950c3bfddaa87d984ac375cbbf4d847afd9ae158fd26a61c44e0a07062f696a2",
+   "path": "worlds/core-assets/renditions/950c3bfddaa87d984ac375cbbf4d847afd9ae158fd26a61c44e0a07062f696a2.glb",
+   "bytes": 18100,
+   "source": "worlds/core-assets/mars-fidelity/tool-library-bookshelf-timber.glb"
+  },
+  "895e69d39f4d3ccf5836509c61b6de5067d2322b033ec633ceb960408d2a2f95": {
+   "sha": "37faa7791d2e21c1389254ae94fd9a2af83e0e8a77e51370119a9056b0c632a9",
+   "path": "worlds/core-assets/renditions/37faa7791d2e21c1389254ae94fd9a2af83e0e8a77e51370119a9056b0c632a9.glb",
+   "bytes": 50016,
+   "source": "worlds/core-assets/mars/vehicle-1.glb"
+  },
+  "90f5fc4c2152398157a7fa3973d34bb697f6f245354a4d167cd9d9e94a563a0a": {
+   "sha": "edde3afdd24de3954c551ded562a21f0ced626196a5cfa0944efa730beb0b841",
+   "path": "worlds/core-assets/renditions/edde3afdd24de3954c551ded562a21f0ced626196a5cfa0944efa730beb0b841.glb",
+   "bytes": 5744,
+   "source": "worlds/core-assets/mars/ceramic-mug.glb"
+  },
+  "938c4794f2e6aaad2d1809a386dce6d3cb59b0a6f4d92a98ece697ba6cdb26c0": {
+   "sha": "cbf148c93ac5fa0284091a6f8b8f55ab848c9beb5f339a95b487c09071334a28",
+   "path": "worlds/core-assets/renditions/cbf148c93ac5fa0284091a6f8b8f55ab848c9beb5f339a95b487c09071334a28.glb",
+   "bytes": 15292,
+   "source": "worlds/core-assets/mars/showers.glb"
+  },
+  "953b8b475da44a2cf9d2f433a47750f33abc87b70c3b96a57113ecbc649ed6fb": {
+   "sha": "848d796120ebf62aef9f3c1fdc77b2799c82c6104514e1db06709d44fc414df7",
+   "path": "worlds/core-assets/renditions/848d796120ebf62aef9f3c1fdc77b2799c82c6104514e1db06709d44fc414df7.glb",
+   "bytes": 9624,
+   "source": "worlds/core-assets/mars/og-kitchen-3.glb"
+  },
+  "96947522fc464765fdf8a0058dc9e9b1e32d506bee4db76ae59be22bc4999789": {
+   "sha": "53cd18256145f669c9035f787282ed0184efb8b07b9f3a99bd125e53229fbb6f",
+   "path": "worlds/core-assets/renditions/53cd18256145f669c9035f787282ed0184efb8b07b9f3a99bd125e53229fbb6f.glb",
+   "bytes": 19672,
+   "source": "worlds/core-assets/mars/freeside-hydro-cart-chrome.glb"
+  },
+  "9967860e0bf13d8c8f9815d8528f2759182f44e9a33ffc19c20bcd0d0d60ac31": {
+   "sha": "92d06e120b934d2a9e586c6483ed6fb49d494c7aabd9ad9a74abbc19f400fd69",
+   "path": "worlds/core-assets/renditions/92d06e120b934d2a9e586c6483ed6fb49d494c7aabd9ad9a74abbc19f400fd69.glb",
+   "bytes": 11576,
+   "source": "worlds/core-assets/mars/colab-hut-1.glb"
+  },
+  "99d5c2f524280ef10ca5ef88e9095434ff30a177d42bc67ff5e8d451836e89af": {
+   "sha": "815da2e2fa40e2cfe3989bfc19b872c5239b0d8c874c68f3da07393cf6264520",
+   "path": "worlds/core-assets/renditions/815da2e2fa40e2cfe3989bfc19b872c5239b0d8c874c68f3da07393cf6264520.glb",
+   "bytes": 766488,
+   "source": "worlds/core-assets/mars-fidelity/chiba.glb"
+  },
+  "9aa746c888263d3658b1b13838c4a665d5123c4e58cc1831f2a6f931f807e651": {
+   "sha": "1a20f8991a4db1cdcac2cc500058ad518bec8eff6e9c331dbf35ee1f47d4cf88",
+   "path": "worlds/core-assets/renditions/1a20f8991a4db1cdcac2cc500058ad518bec8eff6e9c331dbf35ee1f47d4cf88.glb",
+   "bytes": 3188,
+   "source": "worlds/core-assets/mars/north-perimeter-counter-return.glb"
+  },
+  "9b996bb6638560d474cb40608ae3f5342b5fbf55ef679ca54f6119009696279d": {
+   "sha": "a1fae4fdb5eaf6012d5689b4f010bd010fa9e5bb3a1479d4580006969afad777",
+   "path": "worlds/core-assets/renditions/a1fae4fdb5eaf6012d5689b4f010bd010fa9e5bb3a1479d4580006969afad777.glb",
+   "bytes": 3356,
+   "source": "worlds/core-assets/mars/honey-sofa.glb"
+  },
+  "9c95cead380bb2fe9c4f7d5d96fb9a20bfb8aecc68f9321b33bdc1fd29942d6a": {
+   "sha": "bd6cc2374e1e58a5589ded8a70f2e2d193841993ec3cb93b0dbe124ea17f6eb8",
+   "path": "worlds/core-assets/renditions/bd6cc2374e1e58a5589ded8a70f2e2d193841993ec3cb93b0dbe124ea17f6eb8.glb",
+   "bytes": 46836,
+   "source": "worlds/core-assets/mars/boat-1.glb"
+  },
+  "9d2d540422c999f403b58f7e34b61d22a4933c50449587922e26f953d4826be9": {
+   "sha": "d2332e753cc0a69840de236d94b27ddd27086c8d0efb282fcbc5d68299fcaa3c",
+   "path": "worlds/core-assets/renditions/d2332e753cc0a69840de236d94b27ddd27086c8d0efb282fcbc5d68299fcaa3c.glb",
+   "bytes": 3276,
+   "source": "worlds/core-assets/mars/study-chair-3.glb"
+  },
+  "9e840a6802e4097f82571eadbe29f5740b5851dab0a0f52dea47c354acad4ff7": {
+   "sha": "d42d9bdf7a45662cdf289fc3d7374917768c2a3306328469410fac4c7f06a4f6",
+   "path": "worlds/core-assets/renditions/d42d9bdf7a45662cdf289fc3d7374917768c2a3306328469410fac4c7f06a4f6.glb",
+   "bytes": 25256,
+   "source": "worlds/core-assets/mars/shelter-3.glb"
+  },
+  "9f985a4d87dd333fbb18939ecdad976795ba055b4bdb3476205f0dff02b266ba": {
+   "sha": "f73e5853fd25a9a717f7b1d55ba395f2a2aabcf23c18fbe6e46b3564d3e045b6",
+   "path": "worlds/core-assets/renditions/f73e5853fd25a9a717f7b1d55ba395f2a2aabcf23c18fbe6e46b3564d3e045b6.glb",
+   "bytes": 276420,
+   "source": "worlds/core-assets/mars/vehicle-10.glb"
+  },
+  "9fa7dda9912b9fef59342529f88d640056ea2c1e04f99aaf465f3cd319aab5a4": {
+   "sha": "ba469d4bcc5558cc670a658c19de43d020283e8469afb3e56ce5692ba637e53e",
+   "path": "worlds/core-assets/renditions/ba469d4bcc5558cc670a658c19de43d020283e8469afb3e56ce5692ba637e53e.glb",
+   "bytes": 10784,
+   "source": "worlds/core-assets/mars/og-clubhouse-1.glb"
+  },
+  "a18863e2f64aa9623ecf0436c5d1ed0f031d4a7f02d0ab893d482fe4b5436a0d": {
+   "sha": "d481519f305b45fcb6855e2d8c69722e8705868ec08b4b9149132454a2e84d3a",
+   "path": "worlds/core-assets/renditions/d481519f305b45fcb6855e2d8c69722e8705868ec08b4b9149132454a2e84d3a.glb",
+   "bytes": 60132,
+   "source": "worlds/core-assets/mars/vehicle-4.glb"
+  },
+  "a4b8b5655ca937d57a27faad4465dfd8d2e8a191f64af153849d52796d820020": {
+   "sha": "27abaccc4f6e42f2e1b3f227929cef179f7b251977f337be48fb1a2329ebe66a",
+   "path": "worlds/core-assets/renditions/27abaccc4f6e42f2e1b3f227929cef179f7b251977f337be48fb1a2329ebe66a.glb",
+   "bytes": 66856,
+   "source": "worlds/core-assets/mars/shelter-2.glb"
+  },
+  "a73eadf7ac51719e0933eac98c4b961f600cb54a01f8a3f2983c4404cf1c90a6": {
+   "sha": "dee3a99b25e9f0a3423c121add1fd8a33ead1cac13c8d22d576f6ded859aa8bd",
+   "path": "worlds/core-assets/renditions/dee3a99b25e9f0a3423c121add1fd8a33ead1cac13c8d22d576f6ded859aa8bd.glb",
+   "bytes": 6068,
+   "source": "worlds/core-assets/mars/perimeter-counter.glb"
+  },
+  "aa230e796dd6cc52701b7f0d87e3b6b421e64ca162869686bbde89c56bb13ac8": {
+   "sha": "bec559babccff876dbf6c86f5e959670f7e43968e5b36f26adb143677ed9ff39",
+   "path": "worlds/core-assets/renditions/bec559babccff876dbf6c86f5e959670f7e43968e5b36f26adb143677ed9ff39.glb",
+   "bytes": 8808,
+   "source": "worlds/core-assets/mars/marzipan-desk-laptop.glb"
+  },
+  "aadbfeb2d9706b810cef01fc152a53ae7da74b43a61b23f420f27a114cecc233": {
+   "sha": "e93ca6d1c3b5f029a95bdcc61408b418a53bb673abb7c4b5965d7ba828ed426d",
+   "path": "worlds/core-assets/renditions/e93ca6d1c3b5f029a95bdcc61408b418a53bb673abb7c4b5965d7ba828ed426d.glb",
+   "bytes": 4480,
+   "source": "worlds/core-assets/mars/folding-chair-2.glb"
+  },
+  "b08eec70d69a6dabe4e07f0079508da6fe393864ac16dfa75fe10623732e1765": {
+   "sha": "9c3fcc9fa0b61a7bd0bba50f9cebdfe689f47ad3fc6fef43130274a9d5cf5297",
+   "path": "worlds/core-assets/renditions/9c3fcc9fa0b61a7bd0bba50f9cebdfe689f47ad3fc6fef43130274a9d5cf5297.glb",
+   "bytes": 22636,
+   "source": "worlds/core-assets/mars/dry-goods-long-shelf.glb"
+  },
+  "b189a3fc963b166052d7aabcfdc8ded9dbf852a4deccd9f1ddc48e366df7fdd9": {
+   "sha": "543c8a6070b45cb58928d64b7f86f8546a345fd72be1d3c77df255b082a52ff1",
+   "path": "worlds/core-assets/renditions/543c8a6070b45cb58928d64b7f86f8546a345fd72be1d3c77df255b082a52ff1.glb",
+   "bytes": 196124,
+   "source": "worlds/core-assets/mars/west-racks.glb"
+  },
+  "b3feb302a3bdefcb376c7830400648c8ee25f77a73e32c090da7d5a5b4cf575b": {
+   "sha": "830aa1c31cb96d2e715512bb69bb5a69a73d5042802396bb94b3d6ed48348975",
+   "path": "worlds/core-assets/renditions/830aa1c31cb96d2e715512bb69bb5a69a73d5042802396bb94b3d6ed48348975.glb",
+   "bytes": 34480,
+   "source": "worlds/core-assets/mars/vehicle-7.glb"
+  },
+  "b51502b9e854a422bc69ef963ed023968c2660546f261de0719caff5145e3bb6": {
+   "sha": "da1a55ffdf32c8e26f24bb764082f574f68fdfc7d84003d865eeed6326f822e7",
+   "path": "worlds/core-assets/renditions/da1a55ffdf32c8e26f24bb764082f574f68fdfc7d84003d865eeed6326f822e7.glb",
+   "bytes": 8464,
+   "source": "worlds/core-assets/mars/shelter-7.glb"
+  },
+  "ba65414a3e95715d4144990bd6af25a07892bd65ebe99f083785314673f06d32": {
+   "sha": "105feb64b24b00b0f2c28c87944aa3265d21f46133f07757142bd53841191791",
+   "path": "worlds/core-assets/renditions/105feb64b24b00b0f2c28c87944aa3265d21f46133f07757142bd53841191791.glb",
+   "bytes": 23820,
+   "source": "worlds/core-assets/mars/shelter-6.glb"
+  },
+  "bd352e4b046087331cd15faea416a277e69a3f71544131f938e23d6c35bf54bf": {
+   "sha": "fd3d20d883bad2d1cbc183677e713d5ff62fb35b3c69858f32f69d04f0cc25e9",
+   "path": "worlds/core-assets/renditions/fd3d20d883bad2d1cbc183677e713d5ff62fb35b3c69858f32f69d04f0cc25e9.glb",
+   "bytes": 2747384,
+   "source": "worlds/core-assets/mars-fidelity/freeside.glb"
+  },
+  "bddd0b752ee65d9e658dbc64d2f0fa0029d2f00362a91615155199685407dec2": {
+   "sha": "fae1b505adda3b2c81d2c127b9160bcaecc4c552c0aad06312d3e3ee63b61012",
+   "path": "worlds/core-assets/renditions/fae1b505adda3b2c81d2c127b9160bcaecc4c552c0aad06312d3e3ee63b61012.glb",
+   "bytes": 4812,
+   "source": "worlds/core-assets/mars/og-ground-1.glb"
+  },
+  "c2035da47a57954c40112363bae662e924eff8d3d1f69e9b965bc0631c761b52": {
+   "sha": "caf6cd16d8580b6841a1120d963181984b12fad6a6184737d31695541992b3fd",
+   "path": "worlds/core-assets/renditions/caf6cd16d8580b6841a1120d963181984b12fad6a6184737d31695541992b3fd.glb",
+   "bytes": 37204,
+   "source": "worlds/core-assets/mars/toilet-1.glb"
+  },
+  "cad8479ed70bd574a3133eac9b75e001e66d63730055576ab46b1c12f6108cda": {
+   "sha": "25c04467a07e81474abd77f0a204ae498596726e37d632ae7cae3b22c70b5aca",
+   "path": "worlds/core-assets/renditions/25c04467a07e81474abd77f0a204ae498596726e37d632ae7cae3b22c70b5aca.glb",
+   "bytes": 3356,
+   "source": "worlds/core-assets/mars/red-sofa.glb"
+  },
+  "cc081d236252a9ebe253c23380d36f8f1c3ab852d82f085f994a928afe2f70ba": {
+   "sha": "7006db28d6c4511358c24b896668f954e8cc7c2d4342c26415e50014553dbc0c",
+   "path": "worlds/core-assets/renditions/7006db28d6c4511358c24b896668f954e8cc7c2d4342c26415e50014553dbc0c.glb",
+   "bytes": 36252,
+   "source": "worlds/core-assets/mars/site-object-2.glb"
+  },
+  "cc6580ffeaf1bb45be6a36fcb3e68275f68e3476642421fd5d6fee46520f7250": {
+   "sha": "07c969fe4b263d9c7e066a057d98c77ce92555b004e0eedfa3afb7ab29dfc69a",
+   "path": "worlds/core-assets/renditions/07c969fe4b263d9c7e066a057d98c77ce92555b004e0eedfa3afb7ab29dfc69a.glb",
+   "bytes": 18040,
+   "source": "worlds/core-assets/mars/tool-library-bookshelf-timber.glb"
+  },
+  "d093875d81ffa5e00ce5963b67d0a452f6234d4f2764b892fd757aaf1e9088e0": {
+   "sha": "e68cb0f117069a4bc2add047fc43466edd3aa248e9ea837711dc608f0ef4a261",
+   "path": "worlds/core-assets/renditions/e68cb0f117069a4bc2add047fc43466edd3aa248e9ea837711dc608f0ef4a261.glb",
+   "bytes": 37264,
+   "source": "worlds/core-assets/mars-fidelity/toilet-1.glb"
+  },
+  "d11765676da6672fcc460453aaab04288263f218c0c11bc82ecd5ac0fd8c322c": {
+   "sha": "f5b8533612cd0fac05da44f9fb94a0d46c412c0cf1c7eb3a1524af8fd69bf748",
+   "path": "worlds/core-assets/renditions/f5b8533612cd0fac05da44f9fb94a0d46c412c0cf1c7eb3a1524af8fd69bf748.glb",
+   "bytes": 4048,
+   "source": "worlds/core-assets/mars/classroom-folding-table.glb"
+  },
+  "d1e7a5e6f7559bb9d189ce0bd221add9d5a4d6d57cca2fa46e0d259c84c765f5": {
+   "sha": "a82487918b72b19967a1e1d9cda3cc52c4029af6af83b4623d801f7b5115848a",
+   "path": "worlds/core-assets/renditions/a82487918b72b19967a1e1d9cda3cc52c4029af6af83b4623d801f7b5115848a.glb",
+   "bytes": 103248,
+   "source": "worlds/core-assets/mars/vehicle-6.glb"
+  },
+  "de894bcccc55a021cf914c4ca1d6ec9b8bd2af477128bcf8879b5d0b917052f6": {
+   "sha": "ba908c6c3bf2000d4b279be00a664fb8d669d87a2f696757e854707884b4e3f1",
+   "path": "worlds/core-assets/renditions/ba908c6c3bf2000d4b279be00a664fb8d669d87a2f696757e854707884b4e3f1.glb",
+   "bytes": 10392,
+   "source": "worlds/core-assets/mars/colab-hut-2.glb"
+  },
+  "e243810e1e549ddc643f71588d1259860f9facb9142b106f2622210b14f6bf05": {
+   "sha": "46642c617e4a1ab4806903f8e1c464da3ec39420f06fba624f582ccd3ca4faaa",
+   "path": "worlds/core-assets/renditions/46642c617e4a1ab4806903f8e1c464da3ec39420f06fba624f582ccd3ca4faaa.glb",
+   "bytes": 3812,
+   "source": "worlds/core-assets/mars/prep-mixing-bowl-2.glb"
+  },
+  "e2b4ba27c3bb417ac3fbd885a16f3266a2c9dde6dbaa11395eed008e59f4d412": {
+   "sha": "8b363c975548fc1edaade606e778e293666576a7988de7b9d4b63c52e3d20ada",
+   "path": "worlds/core-assets/renditions/8b363c975548fc1edaade606e778e293666576a7988de7b9d4b63c52e3d20ada.glb",
+   "bytes": 4300,
+   "source": "worlds/core-assets/mars/colab-drawer-coffee.glb"
+  },
+  "ee2767143db082f10f3a129604e9e8478bbb4a9e272ef75d3548365a32733e71": {
+   "sha": "d33278096ea70534c9f2b2a7172718848208b050f87fa36b5d6b5018f5b7f8e5",
+   "path": "worlds/core-assets/renditions/d33278096ea70534c9f2b2a7172718848208b050f87fa36b5d6b5018f5b7f8e5.glb",
+   "bytes": 7252,
+   "source": "worlds/core-assets/mars/site-object-1.glb"
+  },
+  "fdfa69c4f34bcca9c23cbf1edd287a414a37baef2eccbc806bdd40fdc0b30ebe": {
+   "sha": "3503c5157b0fe5a4859c10603f810665d964eca0cdd7b37fe526755aad3ec4a0",
+   "path": "worlds/core-assets/renditions/3503c5157b0fe5a4859c10603f810665d964eca0cdd7b37fe526755aad3ec4a0.glb",
+   "bytes": 2747204,
+   "source": "worlds/core-assets/mars/freeside.glb"
+  }
+ },
+ "note": "Smaller wire encodings of core mesh assets, served by GET /assets/<source sha>.glb in their place. Generated by tools/blobs/def-renditions.mjs; do not edit.",
+ "options": "--nohide --texels 2600 --err 0.000125 --step 0.000125"
+}

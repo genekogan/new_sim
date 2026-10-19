@@ -25,6 +25,7 @@ import type { AssetInfo, AssetLookup, StoredDef } from '@sim/world-compiler';
 import { vocab } from '@sim/world-compiler';
 import { CREATION_LIMITS as L, assertFootprint, footprintToBaked, type LmFootprint } from '@sim/generators';
 import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
+import { WireCache, acceptsBrotli, readRenditions } from './asset-wire.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
@@ -304,8 +305,9 @@ export class AssetStore {
   private cache = new Map<string, AssetMeta>();
   private core: Record<string, AssetMeta> = {};
   private readonly db?: Db; private readonly worldId?: string;
-  constructor(opts: { dir: string; db?: Db; worldId?: string; coreIndex?: string | null }) {
-    this.dir = resolve(opts.dir); this.db = opts.db; this.worldId = opts.worldId;
+  private readonly renditionIndex: string;
+  constructor(opts: { dir: string; db?: Db; worldId?: string; coreIndex?: string | null; renditionIndex?: string }) {
+    this.dir = resolve(opts.dir); this.db = opts.db; this.worldId = opts.worldId; this.renditionIndex = opts.renditionIndex ?? join(dirname(CORE_ASSET_INDEX), 'renditions.json');
     const idx = opts.coreIndex === undefined ? CORE_ASSET_INDEX : opts.coreIndex;
     if (idx && existsSync(idx)) { try { this.core = (JSON.parse(readFileSync(idx, 'utf8')) as CoreIndex).assets ?? {}; } catch { this.core = {}; } }
     // lane LM: template asset sets beside the core index (`<name>.index.json`, same schema) resolve on any box too
@@ -337,6 +339,9 @@ export class AssetStore {
     const p = m.path ? join(REPO_ROOT, m.path) : join(this.dir, `${sha}.${m.ext}`);
     return existsSync(p) ? p : null;
   }
+  private renditions: ReturnType<typeof readRenditions> | null = null;
+  /** W3b: the smaller encoding of a core mesh the viewer gets instead (worlds/core-assets/renditions.json), or null. */
+  rendition(sha: string) { if (!this.core[sha]) return null; this.renditions ??= readRenditions(this.renditionIndex, REPO_ROOT); return this.renditions.get(sha) ?? null; }
   coreAssets(): AssetMeta[] { return Object.entries(this.core).map(([sha, m]) => ({ ...m, sha })); }
 
   /**
@@ -527,7 +532,7 @@ export function meshDefFor(meta: AssetMeta, opts: { name: string; height?: numbe
 
 // ---------------------------------------------------------------- routes
 
-export type AssetDeps = { god: GodMode; requireGod: (c: Context) => void; store?: AssetStore; dir?: string; asGod?: <T>(c: Context, fn: () => T) => T };
+export type AssetDeps = { god: GodMode; requireGod: (c: Context) => void; store?: AssetStore; dir?: string; asGod?: <T>(c: Context, fn: () => T) => T; wire?: WireCache };
 const noStore = { 'cache-control': 'no-store' };
 
 /**
@@ -551,13 +556,20 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
   const library = () => d.god.model.allDefs().map((x) => (x.extends ? d.god.model.resolvedDef(x.ref) ?? x : x)) as StoredDef[];
   const findDef = (ref: string): StoredDef | undefined => d.god.model.resolvedDef(ref) ?? d.god.model.def(ref.replace(/^core\//, 'core-'));
 
+  // W3b: a core mesh's rendition (renditions.json) goes out under the source sha; brotli once ready (asset-wire.ts)
+  const wire = d.wire ?? new WireCache(join(store.dir, 'wire'));
   app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', (c) => {
     const [sha, ext] = c.req.param('file').split('.');
-    const etag = `"${sha}"`;
-    if (c.req.header('if-none-match') === etag) return c.body(null, 304, { etag, 'cache-control': 'public, max-age=31536000, immutable' });
-    const f = store.file(sha, ext);
-    if (!f) throw new ApiError(404, 'not-found', 'no such asset');
-    return c.body(readFileSync(f) as never, 200, { 'content-type': EXT_TYPES[ext as AssetMeta['ext']], etag, 'cache-control': 'public, max-age=31536000, immutable', 'access-control-allow-origin': '*' });
+    const ren = ext === 'glb' ? store.rendition(sha) : null;
+    const etag = ren ? `"${sha}-r${ren.sha.slice(0, 16)}"` : `"${sha}"`;
+    const cache = { 'cache-control': 'public, max-age=31536000, immutable', vary: 'accept-encoding' };
+    if ((c.req.header('if-none-match') ?? '').replace(/^W\//, '') === etag) return c.body(null, 304, { etag, ...cache });
+    const f = ren ? ren.file : store.file(sha, ext);
+    if (!f || !store.info(sha)) throw new ApiError(404, 'not-found', 'no such asset');
+    const headers: Record<string, string> = { 'content-type': EXT_TYPES[ext as AssetMeta['ext']], etag, ...cache, 'access-control-allow-origin': '*' };
+    const br = ext === 'glb' || ext === 'json' ? wire.brotli(`${ren ? ren.sha : sha}.${ext}`, f) : null;
+    if (br && acceptsBrotli(c.req.header('accept-encoding'))) return c.body(br as never, 200, { ...headers, 'content-encoding': 'br' });
+    return c.body(readFileSync(f) as never, 200, headers);
   });
 
   app.post('/v1/god/assets', godBodyLimit(budget), async (c) => {
