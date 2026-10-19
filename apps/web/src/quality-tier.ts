@@ -13,6 +13,9 @@ export type QualitySettings = {
   shadowMapSize: number;
   /** Render-time distance detail; null leaves every mesh drawn as before. */
   detail: DistanceDetailOptions | null;
+  /** P1 phones: the sun's shadow map is redrawn every n-th frame (1 = every frame). The shadow pass was ~4.5 ms of an
+   *  ~18.6 ms frame for Eden 2026 at phone settings (M3 Max 1x; a 4x-throttled phone pays four times that). */
+  shadowEvery: number;
 };
 export type DistanceDetailOptions = {
   /** Meshes whose bounding sphere projects smaller than this many CSS pixels (radius) are not drawn. */
@@ -24,6 +27,7 @@ export type DistanceDetailOptions = {
   /** Rescan the scene for candidates every n frames. */
   rescanFrames: number;
 };
+export const PHONE_SHADOW_EVERY = 3;
 export const PHONE_DETAIL: DistanceDetailOptions = Object.freeze({ minRadiusPx: 1.25, shadowNear: 24, shadowPerMetre: 14, shadowMaxRadius: 6, standInDistance: 38, rescanFrames: 90 });
 /** Release 3.1: desktops get only the invisible part of distance detail — meshes under half a CSS pixel of radius are
  *  not drawn, small casters far away stop casting — and mesh LOD at half a pixel of error. No flat cards, same pixel
@@ -38,14 +42,17 @@ export function pickQualityTier(env: QualityEnvironment): QualitySettings {
     : env.coarsePointer && shortSide > 0 && shortSide <= 820 ? ['phone', `touch screen, short side ${shortSide}px`]
     : env.coarsePointer && env.deviceMemory !== undefined && env.deviceMemory <= 2 ? ['phone', `touch device with ${env.deviceMemory} GB`]
     : ['full', 'desktop or large screen'];
+  const q = new URLSearchParams(env.search), num = (k: string, d: number) => { const v = Number(q.get(k)); return q.has(k) && Number.isFinite(v) && v > 0 ? v : d; };
+  // P1 phones: ?phoneMinPx= / ?phoneShadowNear= / ?phoneShadowEvery= tune the phone tier for measurements
   return tier === 'phone'
-    ? { tier, reason, maxPixelRatio: 1.5, shadowMapSize: 1024, detail: PHONE_DETAIL }
-    : { tier, reason, maxPixelRatio: 2, shadowMapSize: 2048, detail: new URLSearchParams(env.search).get('desktopDetail') === '0' ? null : DESKTOP_DETAIL };
+    ? { tier, reason, maxPixelRatio: 1.5, shadowMapSize: 1024, shadowEvery: Math.round(num('phoneShadowEvery', PHONE_SHADOW_EVERY)),
+      detail: q.has('phoneMinPx') || q.has('phoneShadowNear') ? { ...PHONE_DETAIL, minRadiusPx: num('phoneMinPx', PHONE_DETAIL.minRadiusPx), shadowNear: num('phoneShadowNear', PHONE_DETAIL.shadowNear) } : PHONE_DETAIL }
+    : { tier, reason, maxPixelRatio: 2, shadowMapSize: 2048, shadowEvery: 1, detail: q.get('desktopDetail') === '0' ? null : DESKTOP_DETAIL };
 }
 
 /** The page's tier (browser only). */
 export function browserQuality(): QualitySettings {
   if (typeof window === 'undefined') return pickQualityTier({ search: '', coarsePointer: false, screen: [0, 0] });
   const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  return pickQualityTier({ search: location.search, coarsePointer: coarse, screen: [screen.width, screen.height], deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory });
+  return pickQualityTier({ search: typeof location === 'undefined' ? '' : location.search, coarsePointer: coarse, screen: typeof screen === 'undefined' ? [0, 0] : [screen.width, screen.height], deviceMemory: (navigator as { deviceMemory?: number }).deviceMemory });
 }

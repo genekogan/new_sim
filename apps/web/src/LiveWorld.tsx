@@ -17,7 +17,7 @@ import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {WorldSoulAvatars} from './SoulAvatars.ts';
 import {edenExpansionCapture} from './WorldEdenActivation.ts';
 import {worldPlaceView,CURATED_WORLD_LOCATIONS,type WorldPlaceId} from './WorldPlaces.ts';
-import {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
+import type {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
 import {worldCameraRenderRoots} from './WorldCameraRenderRoots.ts';
@@ -32,7 +32,10 @@ import {WorldShadowDetail} from './WorldShadowDetail.ts';
 import {WorldPlaceActivity} from './WorldPlaceActivity.ts';
 import {installLookToneCurve,installMaterialDetail,setMaterialDetail,lookSettings,lookExposure,WorldPost} from './rendering/WorldLook.ts';
 import {installNightLighting,setNightLightStrength,nightLightStrength} from './WorldNightLights.ts';
-import {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
+import type {createEdenHouseWindows} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/eden-house-windows.ts';
+// P1 phones: the old Eden expansion is its own chunk (old-eden.ts), fetched only by a world that shows it
+let oldEden:typeof import('./old-eden.ts')|null=null,oldEdenLoad:Promise<typeof import('./old-eden.ts')>|null=null;
+const loadOldEden=()=>oldEdenLoad??=import('./old-eden.ts').then(m=>oldEden=m,e=>{oldEdenLoad=null;throw e;});
 // Patch shared lit-shader chunks before any program compiles (strength stays 0 outside Eden).
 installNightLighting();
 installLookToneCurve();installMaterialDetail();  // look pass (rendering/WorldLook.ts): tone curve + material detail chunks, before any program compiles
@@ -276,6 +279,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     renderer.domElement.addEventListener('webglcontextrestored', onContextRestored);
     const speechVisibility=new WorldRenderedVisibility();
     const labels2d = new CSS2DRenderer();
+    // P1: name tags live in their own scene, so drawing them no longer re-walks (and re-multiplies) every one of the world's
+    // ~9,000 objects each frame: CSS2DRenderer.render was ~20% of an Eden 2026 frame. Tags are placed in world coordinates.
+    const labelScene = new THREE.Scene();
     // zIndex 1 contains CSS2DRenderer's per-label depth z-indices, so speech bubbles (z 3) read above name tags.
     Object.assign(labels2d.domElement.style, { position: 'absolute', top: '0', left: '0', pointerEvents: 'none', zIndex: '1' });
     host.appendChild(labels2d.domElement);
@@ -372,7 +378,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       let lifted=0;for(let i=0;i<4;i++){const l=cameraGround.apply(camera,scene);if(!(l>0))break;lifted+=l;camera.lookAt(controls.target);}
       const round=(v:number)=>Math.round(v*100)/100;
       const pin:ShotPin={eye:camera.position.toArray(),at:controls.target.toArray(),lifted:round(lifted),closer:round(fixed?.closer??0),raised:fixed?.raised??0};(window as unknown as {__shotCamera?:ShotPin}).__shotCamera=pin;return pin;};
-    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,shotCamera,applyEdge:(msg:Parameters<WorldEntityLayer['applyEdge']>[0][number]|Parameters<WorldEntityLayer['applyEdge']>[0])=>entityLayer.applyEdge(Array.isArray(msg)?msg:[msg]),siteStyle:(style:string)=>entityLayer.sites.siteStyle(style),siteStats:()=>entityLayer.sites.inspect(),camera,get controls(){return controls;},residents:()=>{const out:{id:string;p:readonly[number,number,number];speaking?:boolean}[]=[],now=Date.now();for(const s of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[s.entityId];if(e)out.push({id:s.id,p:e.p as readonly[number,number,number],speaking:speeches.some(sp=>sp.speaker===s.id&&now-sp.at<Math.min(9000,1500+sp.text.length*55))});}return out;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
+    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,shotCamera,labelScene,applyEdge:(msg:Parameters<WorldEntityLayer['applyEdge']>[0][number]|Parameters<WorldEntityLayer['applyEdge']>[0])=>entityLayer.applyEdge(Array.isArray(msg)?msg:[msg]),siteStyle:(style:string)=>entityLayer.sites.siteStyle(style),siteStats:()=>entityLayer.sites.inspect(),camera,get controls(){return controls;},residents:()=>{const out:{id:string;p:readonly[number,number,number];speaking?:boolean}[]=[],now=Date.now();for(const s of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[s.entityId];if(e)out.push({id:s.id,p:e.p as readonly[number,number,number],speaking:speeches.some(sp=>sp.speaker===s.id&&now-sp.at<Math.min(9000,1500+sp.text.length*55))});}return out;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -392,6 +398,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let previousCameraMode: WorldCameraMode = 'broadcast';
     let logicalFov = 45;
     let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false;
+    if(context.current.edenExpansion)void loadOldEden().catch(()=>{});  // P1: start fetching the old Eden chunk with the scene
     let expansionSceneInfo:ReturnType<typeof parseSceneInfo>|null=null;
     let cameraGroundInfo:ReturnType<typeof parseSceneInfo>|null|undefined,cameraGroundOwner:ReturnType<typeof createWorldEdenExpansion>|null|undefined;
     const refreshCameraGround=()=>{if(entityLayer.active){cameraGround.bindGround(entityLayer.groundAt,entityLayer);return;}const owner=expansion?.group.visible?expansion:null;if(cameraGroundInfo===expansionSceneInfo&&cameraGroundOwner===owner)return;cameraGroundInfo=expansionSceneInfo;cameraGroundOwner=owner;cameraGround.bindGround(cameraGroundSampler(expansionSceneInfo??undefined,owner?.sampleVisualGround),expansionSceneInfo);};
@@ -569,7 +576,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       clearSocialPaths();
       clearConnectedDressing();
       sceneHistory.cancel();planting?.dispose();planting=null;plantingFailed=false;clearNewcomerMarkers();restMarkers?.dispose();restMarkers=null;publication=null;expansionSceneInfo=null;people?.dispose();people=null;applied=null;floaters.sync(new Map());kin.place([]);standIns.clear();
-      for(const label of labels.values()){scene.remove(label.obj);label.obj.element.remove();}labels.clear();
+      for(const label of labels.values()){labelScene.remove(label.obj);label.obj.element.remove();}labels.clear();
       clearExpansion();geometry.dispose();geometry=new WorldGeometry(null);scene.add(geometry.group);base=null;nativeBoat=undefined;light.setCommonsReadability(false);
       capturedPlatforms=null;
       platformDraw.set([],0,false);
@@ -613,7 +620,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       });
       const obj = new CSS2DObject(el);
       obj.center.set(0.5, 1);
-      scene.add(obj);
+      labelScene.add(obj);
       l = { obj, name, line, card, leader, offset: {dx:0,dy:0}, text: '' };
       labels.set(soul.id, l);
       return l;
@@ -634,6 +641,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const pacer = new FramePacer();
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
     const officeGuardFrom=new THREE.Vector3(),authoredBoundaries=new WorldAuthoredBoundaries();
+    let shadowFrame=0;  // P1 phones
     let programsPending=false,arrivedOnce=false,buildingFrameAt=-Infinity,layerStarted=false,afterNextDraw:(()=>void)|null=null;  // afterNextDraw: ?shot waits for a frame drawn after the build  // lane W1: the built world's shaders are still linking in parallel: no frame yet
     const animate = () => {
       officeGuardFrom.copy(camera.position);
@@ -738,7 +746,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);
           if(!expansionWanted&&expansion)clearExpansion();
-          if(expansionWanted&&!expansion&&!expansionFailed)try{expansion=createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
+          if(expansionWanted&&!expansion&&!expansionFailed&&!oldEden)void loadOldEden().catch(()=>{expansionFailed=true;problem('Some new Eden scenery could not be shown.');});
+          if(expansionWanted&&!expansion&&!expansionFailed&&oldEden)try{expansion=oldEden.createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick),expansionSceneInfo??undefined);scene.add(expansion.group);try{houseWindows=oldEden.createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
           expansion?.sync(sampled.entities,!!past.current,depictedTick*take.dt);
           expansion?.setLocalPresentation(context.current.localClassroomPresentation,s.conn.welcome?.worldId??'',Object.hasOwn(sampled.entities,'eden-classroom-screen-1')&&records['eden-classroom-screen-1']?.kind==='fixture'&&records['eden-classroom-screen-1']?.def==='standing-display',!!past.current);
           floaters.update(sampled.entities, take.startTick + sampled.tick, take.dt); // absolute tick: the bob is replay-stable
@@ -829,7 +838,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const chip=l.obj.element.querySelector('[data-channel-chip]') as HTMLElement|null;if(!chip)continue;const sp=latest.get(id);
           if(!sp||context.current.publishSpeechAnchors){chip.style.display='none';continue;}const c=channelChip(sp,nameOf);chip.textContent=c.text;chip.style.color=c.colour;chip.style.display='';}}
       speechLayer.update(speeches,Date.now(),soulId=>{const id=s.conn.replica.souls.get(soulId)?.entityId,e=id?at.entities[id]:null;if(!id||!e)return null;const body=recordedBody(records[id]?.body,e.state),b=body?.family==='floater'?floaterBody(body):null;return speechHead.set(e.p[0],e.p[1]+(b?b.hoverHeight+b.radius+.05:1.95),e.p[2]).clone();});
-      for (const [id, l] of labels) if (!alive.has(id)) { l.obj.visible = false; if (!s.conn.replica.souls.has(id)) { scene.remove(l.obj); l.obj.element.remove(); labels.delete(id); } }
+      for (const [id, l] of labels) if (!alive.has(id)) { l.obj.visible = false; if (!s.conn.replica.souls.has(id)) { labelScene.remove(l.obj); l.obj.element.remove(); labels.delete(id); } }
       if (!focus && thingId) {
         const q = thingId.startsWith('kin:') ? kin.view.object(thingId)?.position.toArray() : at.entities[thingId]?.p;
         if (q) focus = spot.set(q[0], q[1], q[2]);
@@ -870,6 +879,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(newWorld&&!templatesStarted&&(arrivedOnce||layerStarted&&!entityLayer.active)){startTemplates();}
       // (never for ?shot pictures or a Soul's eyes: those tools time their own frames)
       const holdDraw=!shotMode&&!eyes&&(programsPending||(arrivalStage!==undefined&&!arrivedOnce));
+      if(quality.tier==='phone'&&!eyes&&!shotMode){entityLayer.interiorFrom=camera.position;entityLayer.freezeSettled=true;}else{entityLayer.interiorFrom=null;entityLayer.freezeSettled=false;}  // P1 phones: far buildings' furniture is not drawn
       entityLayer.applyEdge(context.current.sim.edge??[]);if(!holdDraw)entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
       rts.update(step);
@@ -925,13 +935,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
       if(geometry.backdropDetailPending&&(!initialGate||initialGate.snapshot().stage==='ready'))geometry.backdropDetailWhenSettled(loader,now);  // W3: the campus's exact furniture after arrival
       if(look.enabled&&entityLayer.active&&!expansion){if(look.follow)light.follow(controls.target,camera.position);renderer.toneMappingExposure=lookExposure(light.daylight,look.nightExposure);}
-      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();diagnostics.endRender();}};
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);if(!eyes)entityLayer.cull(camera,renderer.domElement.clientHeight,renderer.shadowMap.autoUpdate||renderer.shadowMap.needsUpdate);if(distanceDetail&&!eyes)distanceDetail.apply(scene,camera,renderer.domElement.clientHeight);if(meshLod&&!eyes)meshLod.apply(scene,camera,renderer.domElement.clientHeight);if(farStandIns&&!eyes)farStandIns.apply(scene,camera,renderer.domElement.clientHeight);try{if(!eyes?.render()){if(post&&entityLayer.active)post.render(renderer,scene,camera);else renderer.render(scene,camera);}}finally{farStandIns?.restore();meshLod?.restore();distanceDetail?.restore();entityLayer.uncull();diagnostics.endRender();}};
+      if(quality.shadowEvery>1&&!eyes){renderer.shadowMap.autoUpdate=false;if(shadowFrame++%quality.shadowEvery===0)renderer.shadowMap.needsUpdate=true;}  // P1 phones: the shadow map every n-th frame
       if(holdDraw){/* nothing to show yet */}else{if(batchEnabled)staticBatches.withRender(draw);else draw();if(afterNextDraw){const f=afterNextDraw;afterNextDraw=null;f();}}
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
       balloonRide.restore();
-      if(!eyes&&!holdDraw)labels2d.render(scene,camera);
+      if(!eyes&&!holdDraw)labels2d.render(labelScene,camera);
       // CSS2D owns each projected transform. Read all boxes before writing our
       // separate CSS translation, so packing never changes a body's anchor.
       const hostBox = labels2d.domElement.getBoundingClientRect(), boxes: LabelBox[] = [];
@@ -965,7 +976,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           return [{soulId:soul.id,point:label.obj.position.toArray() as [number,number,number],rendered}];
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
-        if(context.current.publishSpeechAnchors)try{
+        if(context.current.publishSpeechAnchors&&!points.length)speechAnchors=[];  // P1: nobody to place: skip the visibility pass over every mesh (~1 ms a frame on Eden 2026)
+        else if(context.current.publishSpeechAnchors)try{
           speechVisibility.prepareFresh(visualObstructionRoots());
           speechAnchors=projectSpeechAnchors(points,camera,host.clientWidth,host.clientHeight,area,p=>speechVisibility.score({position:camera.position.toArray(),target:[...p],fov:camera.fov},['anchor'],{anchor:{p:[...p],yaw:0,points:[[...p]]}})===1);
         }catch{speechAnchors=[];speechVisibility.reset();}
@@ -1032,7 +1044,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       navigation?.dispose();
       controls.dispose();
       controlsApi.current = null;
-      for (const l of labels.values()) { scene.remove(l.obj); l.obj.element.remove(); }
+      for (const l of labels.values()) { labelScene.remove(l.obj); l.obj.element.remove(); }
       labels.clear();
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount

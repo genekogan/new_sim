@@ -73,6 +73,15 @@ export class CoverProbe {
   }
 }
 const _p = new THREE.Vector3();
+/** One cover probe per root group, shared by everything that asks about the camera (the atmosphere's rain and motes,
+ *  the sound's muffling): P1 phones - each asked its own probe, so the camera's upward ray into the whole layer (~9,000
+ *  objects, several ms on a phone) ran twice; now the second asker within 400 ms and 1 m gets the same answer. */
+const SHARED_COVER = new WeakMap<THREE.Object3D, CoverProbe>();
+export function sharedCoverProbe(root: THREE.Object3D): CoverProbe {
+  let p = SHARED_COVER.get(root);
+  if (!p) SHARED_COVER.set(root, (p = new CoverProbe(() => [root])));
+  return p;
+}
 
 // ---------------------------------------------------------------- the living view of a god world
 
@@ -129,7 +138,8 @@ export class GodWorldLiving {
   readonly group = new THREE.Group();
   private signature = '';
   private checkedAt = -Infinity;
-  private readonly cover: CoverProbe;
+  /** P1 phones: the light scan's inputs (the layer's model and its diff seq); unchanged inputs skip the scan. */
+  private scanned: { model: unknown; seq: number; at: number } | null = null;
   private patterns: PatternNightMap | null = null;
   private reduced = false;
   lights = 0;
@@ -141,7 +151,6 @@ export class GodWorldLiving {
   constructor(layer: LayerLike, renderer?: THREE.WebGLRenderer, pools: { radius: number; gain: number } = { radius: 1, gain: 1 }) {
     this.layer = layer; this.renderer = renderer; this.pools = pools;
     this.group.name = 'god-world lights (presentation)'; this.group.userData.cameraTransparent = true;
-    this.cover = new CoverProbe(() => (this.layer.active ? [this.layer.group] : []));
   }
   private get model(): ModelLike | null { return (this.layer as unknown as { model?: ModelLike | null }).model ?? null; }
   /** Every frame: lamps follow the world clock; the night map is repainted when the god's lights change (checked 2×/s). */
@@ -157,6 +166,11 @@ export class GodWorldLiving {
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
     this.skyThings(m);
+    // P1 phones: the model changes only with a world diff (the layer's seq) or a resync (a new model), so the scan of
+    // every entity (~4,900 on Eden 2026, ~4% of a phone frame) runs only then (and every 10 s, to be safe)
+    const seq = (this.layer as unknown as { seq?: unknown }).seq, s = this.scanned;
+    if (typeof seq === 'number' && s && s.model === m && s.seq === seq && nowMs - s.at < 10_000) return;
+    this.scanned = typeof seq === 'number' ? { model: m, seq, at: nowMs } : null;
     const sources: NightSource[] = [], marks: HaloSource[] = [], beacons: [number, number, number][] = [];
     const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
@@ -202,7 +216,7 @@ export class GodWorldLiving {
   }
   /** For the atmosphere: the god's weather (null = scheduled) and "under a roof" for camera-local rain. */
   atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {
-    return { weather: setWeatherOf(entityWorldState(this.layer)), indoors: (x, y, z) => this.cover.test(x, y, z) };
+    return { weather: setWeatherOf(entityWorldState(this.layer)), indoors: (x, y, z) => this.layer.active && sharedCoverProbe(this.layer.group).test(x, y, z) };
   }
   dispose() { setClockNight(null); this.patterns?.dispose(); this.patterns = null; this.group.removeFromParent(); }
 }

@@ -77,6 +77,7 @@ export function labelSprite(text: string): THREE.Sprite {
   const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   sprite.scale.set((w / 44) * 1.2, 1.2, 1); sprite.renderOrder = 10;
+  sprite.userData.animates = true;  // P1: rescales itself per frame, so its thing never freezes (WorldEntityLayer.freeze)
   // a 1.2 m label drawn over everything grew to fill the screen when the camera stood beside the flag: cap it on screen
   const base = sprite.scale.clone(), size = new THREE.Vector2(), at = new THREE.Vector3();
   sprite.onBeforeRender = (renderer, _scene, camera) => {

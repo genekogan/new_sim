@@ -15,7 +15,7 @@
 import type { WorldModel } from '@sim/world-compiler';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
-import { CoverProbe } from '../world-env.ts';
+import { sharedCoverProbe, type CoverProbe } from '../world-env.ts';
 import { arrivalOver } from '../arrival-marks.ts';
 import type * as THREE from 'three';
 
@@ -206,7 +206,7 @@ function step(host: Host) {
   const ground = host.layer.groundAt?.(x, z) ?? null;
   if (now - lastAmb > 500) {
     lastAmb = now;
-    if (host.layer.group && probeLayer !== host.layer) { probe = new CoverProbe(() => [host.layer.group!]); probeLayer = host.layer; }
+    if (host.layer.group && probeLayer !== host.layer) { probe = sharedCoverProbe(host.layer.group); probeLayer = host.layer; }
     covered = !!probe && probe.test(x, y, z);
     let waters: { area?: [number, number][]; path?: [number, number][]; w?: number; level: number }[] = [], seaLevel: number | undefined;
     try { const g = model.ground() as { waters?: typeof waters; seaLevel?: number }; waters = g.waters ?? []; seaLevel = g.seaLevel; } catch { /* no ground yet */ }

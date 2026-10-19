@@ -13,7 +13,7 @@ import type {DistanceDetailOptions} from './quality-tier.ts';
  * and anything with frustum culling turned off (sky, horizon, overlays) are never touched. Skinned bodies (Souls, kin)
  * are never hidden; beyond `standInDistance` metres they stop casting shadows (release 3.1: a resident 100 m away is a
  * few pixels tall on a phone, yet each of its body parts cost a skinned draw in the shadow pass). The candidate list is rescanned every `rescanFrames` frames. */
-type Candidate={mesh:THREE.Mesh;centre:THREE.Vector3;radius:number};
+type Candidate={mesh:THREE.Mesh;centre:THREE.Vector3;radius:number;anc:THREE.Object3D[]};
 const tmpBody=new THREE.Vector3();
 export class WorldDistanceDetail{
  private candidates:Candidate[]=[];private bodies:THREE.SkinnedMesh[]=[];private frame=0;private hidden:THREE.Mesh[]=[];private noShadow:THREE.Mesh[]=[];
@@ -31,7 +31,8 @@ export class WorldDistanceDetail{
    const im=m as THREE.InstancedMesh;
    if(im.isInstancedMesh){if(!im.boundingSphere)im.computeBoundingSphere();if(!im.boundingSphere)return;this.sphere.copy(im.boundingSphere);}
    else{const g=m.geometry;if(!g)return;if(!g.boundingSphere)g.computeBoundingSphere();if(!g.boundingSphere||!Number.isFinite(g.boundingSphere.radius))return;this.sphere.copy(g.boundingSphere);}
-   this.candidates.push({mesh:m,centre:this.sphere.center.clone(),radius:this.sphere.radius});
+   const anc:THREE.Object3D[]=[];for(let p=m.parent;p&&p!==root;p=p.parent)anc.push(p);   // P1 phones: a mesh under a hidden ancestor (a culled thing, a hidden storey) is skipped cheaply
+   this.candidates.push({mesh:m,centre:this.sphere.center.clone(),radius:this.sphere.radius,anc});
   });
  }
  /** Call right before renderer.render. `viewHeight` is the canvas height in CSS pixels. */
@@ -41,6 +42,7 @@ export class WorldDistanceDetail{
   let culled=0,skipped=0;const cam=camera.position,pxPerUnit=viewHeight/(2*Math.tan(camera.fov*Math.PI/360))*(camera.zoom||1);
   for(const c of this.candidates){
    const m=c.mesh;if(!m.visible)continue;
+   let shown=true;for(const a of c.anc)if(!a.visible){shown=false;break;}if(!shown)continue;
    const e=m.matrixWorld.elements,scale=Math.sqrt(Math.max(e[0]*e[0]+e[1]*e[1]+e[2]*e[2],e[4]*e[4]+e[5]*e[5]+e[6]*e[6],e[8]*e[8]+e[9]*e[9]+e[10]*e[10]));
    const r=c.radius*scale,w=this.world.copy(c.centre).applyMatrix4(m.matrixWorld),d=w.distanceTo(cam)-r;
    if(d<=0)continue;

@@ -34,9 +34,14 @@ const TERRAIN_STEP = 2;              // metres between terrain vertices in the p
 const WATER_SINK_M = 0.03;          // still water drawn this far below its level (no z-fighting with a rim at the level)
 const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+/** P1 phones: motion that only changes a light's glow (lamps: ~790 on Eden 2026); no part of the thing moves. */
+const glowOnly = (def: StoredDef) => !!(def.components.light || def.components.lights) && !hasMotion({ ...def, components: { ...def.components, light: undefined, lights: undefined } } as StoredDef);
+/** P1 phones: a frozen thing's subtree is skipped by scene.updateMatrixWorld (its matrices are current; see freeze). */
+function frozenMatrixWorld(this: THREE.Object3D) { /* nothing: thawed before anything in it changes */ }
+const _box = new THREE.Box3(), _projScreen = new THREE.Matrix4();
 
 type Figure = { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: [THREE.Object3D | null, THREE.Object3D | null] } | { missingAt: number };
-type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
+type Drawn = { interior?: { key: number; host: Drawn | null; slot: string }; inst?: string; settled?: boolean; frozen?: THREE.Object3D[]; thaw?: boolean; noFreeze?: boolean; sphere?: THREE.Sphere; offscreen?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number; glowOnly: boolean } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -228,13 +233,32 @@ export class WorldEntityLayer {
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)
     if (baseGround) baseGround.traverse((o) => { if ((o.name === 'outside-ground' || o.name === 'commons-ground' || (o.parent === baseGround && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry?.type === 'PlaneGeometry')) && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
+    this.interiorFar.clear();
+    const frame = ++this.frame;
+    // P1 phones: frozen things skip the matrix walk on the promise that what they hang from does not move; if it ever does, thaw all
+    if (this.freezeSettled && !this.thingsGroup.matrixWorld.equals(this.frozenUnder)) { this.frozenUnder.copy(this.thingsGroup.matrixWorld); for (const d of this.drawn.values()) if (d.frozen) this.thaw(d); }
+    let k = 0;
     for (const [id, d] of this.drawn) {
+      k++;
+      if (d.thaw) this.thaw(d);
+      // P1: a settled, still thing (eased in, no motion, not ridden or held) keeps its pose: only its interior visibility
+      // can change. ~4,800 entities on Eden 2026; rewriting each pose every frame was most of this loop. On the phone tier a
+      // lamp whose only motion is its glow counts as still too, and glows at a quarter of the frame rate (off screen 1/16).
+      const glowing = this.freezeSettled && !!d.motion?.glowOnly;
+      if (d.settled && !d.inst && (!d.motion || glowing) && !d.removing && !this.overrides.has(id) && !this.held.has(id)) {
+        // phone tier: visibility (interior storeys, far furniture) is checked every other frame
+        if (!this.freezeSettled || !d.frozen || ((k + frame) & 1) === 0) d.obj.visible = this.interiorVisible(id, d);
+        if (glowing && d.obj.visible && ((k + frame) & (d.offscreen ? 15 : 3)) === 0) animate(d.obj, d.motion!.entity, d.motion!.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion!.yaw });
+        if (this.freezeSettled && !d.frozen && !d.noFreeze) this.freeze(d);
+        continue;
+      }
+      if (d.frozen) this.thaw(d);
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
-      const shown = this.interiorVisible(id);
+      const shown = this.interiorVisible(id, d);
       const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
@@ -243,7 +267,9 @@ export class WorldEntityLayer {
       }
       d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
-      if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
+      if (t >= 1 && (!d.motion || (this.freezeSettled && d.motion.glowOnly)) && !d.removing && !ride && !inHand) d.settled = true;
+      // P1: a hidden thing (a storey its building hides, or far furniture on a phone) is not animated: nobody sees it
+      if (d.motion && t >= 1 && !inHand && shown) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
       if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
     void dt;
@@ -275,17 +301,92 @@ export class WorldEntityLayer {
     return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
   }
 
-  /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
-  private interiorVisible(id: string): boolean {
-    if (!this.model) return true;
-    let e = this.model.entities.get(id), slot = e?.in.slot;
-    for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
-      const host = this.drawn.get(e.in.parent)?.obj.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
-      if (host) return (host.floorOf[slot ?? ''] ?? 0) <= host.cut();
-      e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
-    }
-    return true;
+  private frame = 0;
+  private frozenUnder = new THREE.Matrix4();
+  /** P1 phones: a settled still thing's matrices are brought up to date once and its subtree leaves scene.updateMatrixWorld
+   *  altogether (Eden 2026: ~8,500 of the scene's ~8,900 objects were walked, recomposed and re-multiplied every frame,
+   *  ~10% of a phone frame). Anything that moves it first takes it out of `settled` (then `thaw`); a child added anywhere in
+   *  it (a lazy GLB arriving, a clip hook) thaws it for one frame. Things with skinned or clip-animated parts never freeze. */
+  private freeze(d: Drawn) {
+    let live = false;
+    d.obj.traverse((o) => { if ((o as THREE.SkinnedMesh).isSkinnedMesh || o.userData.animates) live = true; });
+    if (live) { d.noFreeze = true; return; }
+    const list: THREE.Object3D[] = [];
+    d.obj.traverse((o) => { if (o.matrixAutoUpdate) { o.updateMatrix(); o.matrixAutoUpdate = false; list.push(o); } o.addEventListener('childadded', this.onFrozenChild); });
+    d.obj.updateMatrixWorld(true);
+    d.obj.userData.frozenDrawn = d;
+    d.obj.updateMatrixWorld = frozenMatrixWorld;
+    _box.setFromObject(d.obj);
+    d.sphere = _box.isEmpty() ? undefined : _box.getBoundingSphere(new THREE.Sphere());
+    d.frozen = list;
   }
+  private thaw(d: Drawn) {
+    if (d.frozen) {
+      for (const o of d.frozen) o.matrixAutoUpdate = true;
+      d.obj.traverse((o) => o.removeEventListener('childadded', this.onFrozenChild));
+      delete (d.obj as { updateMatrixWorld?: unknown }).updateMatrixWorld;  // the prototype's again
+      delete d.obj.userData.frozenDrawn;
+    }
+    d.frozen = undefined; d.thaw = false; d.sphere = undefined;
+  }
+  private readonly onFrozenChild = (ev: { target: THREE.Object3D }) => {
+    for (let o: THREE.Object3D | null = ev.target; o; o = o.parent) { const d = o.userData.frozenDrawn as Drawn | undefined; if (d) { d.thaw = true; return; } }
+  };
+  /** P1 phones: render time only (like WorldDistanceDetail): a frozen thing wholly outside the view, or smaller than `cullPx`
+   *  pixels of radius, is not drawn, so three.js neither walks nor projects its subtree. Frames that redraw the shadow map keep
+   *  off-screen things (they may cast shadows into view). Call `uncull` right after rendering. */
+  cull(camera: THREE.PerspectiveCamera, viewHeight: number, shadowPass: boolean) {
+    if (!this.freezeSettled || !this.active) return;
+    camera.updateMatrixWorld();
+    const frustum = this.frustum.setFromProjectionMatrix(_projScreen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const cam = camera.position, ppu = viewHeight / (2 * Math.tan(camera.fov * Math.PI / 360)) * (camera.zoom || 1);
+    for (const d of this.drawn.values()) {
+      const o = d.obj;
+      if (!d.sphere || !o.visible || !d.frozen) { d.offscreen = false; continue; }
+      const s = d.sphere, dist = s.center.distanceTo(cam) - s.radius;
+      const off = !frustum.intersectsSphere(s);
+      d.offscreen = off;
+      if ((dist > 0 && s.radius * ppu / dist < this.cullPx) || (off && !shadowPass)) { o.visible = false; this.culled.push(o); }
+    }
+    this.cullStats.culled = this.culled.length;
+  }
+  uncull() { for (const o of this.culled) o.visible = true; this.culled.length = 0; }
+  cullPx = 1.25;
+  readonly cullStats = { culled: 0 };
+  private culled: THREE.Object3D[] = [];
+  private frustum = new THREE.Frustum();
+  /** P1 phones: when set (the phone tier), things inside a building further than `interiorRange` metres from this point
+   *  are not drawn (a phone shows a building's furniture through its windows as a few pixels; ~1,300 meshes on Eden 2026). */
+  interiorFrom: THREE.Vector3 | null = null;
+  /** P1 phones: a settled still thing's subtree leaves scene.updateMatrixWorld (Eden 2026: ~8,700 objects re-multiplied
+   *  every frame, ~13% of a phone frame). Anything that moves it first takes it out of `settled`. */
+  freezeSettled = false;
+  interiorRange = 30;
+  /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
+  private interiorVisible(id: string, d: Drawn): boolean {
+    if (!this.model) return true;
+    // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
+    // not by walking the parent chain of all ~4,800 things every frame; kept on the thing itself (no lookup per frame)
+    const key = this.seq * 1_048_576 + this.drawn.size;
+    let c = d.interior;
+    if (!c || c.key !== key || (c.host && !c.host.obj.parent)) {  // (a host redrawn since: find it again)
+      c = { key, host: null, slot: '' };
+      let e = this.model.entities.get(id), slot = e?.in.slot;
+      for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
+        const h = this.drawn.get(e.in.parent);
+        if (h?.obj.userData.interior) { c.host = h; c.slot = slot ?? ''; break; }
+        e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
+      }
+      d.interior = c;
+    }
+    if (c.host === null) return true;
+    const hostObj = c.host.obj, host = hostObj.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
+    if (!host) return true;
+    let far = this.interiorFar.get(hostObj);
+    if (far === undefined) { far = !!this.interiorFrom && hostObj.parent === this.thingsGroup && hostObj.position.distanceToSquared(this.interiorFrom) > this.interiorRange * this.interiorRange; this.interiorFar.set(hostObj, far); }
+    return !far && (host.floorOf[c.slot] ?? 0) <= host.cut();
+  }
+  private interiorFar = new Map<THREE.Object3D, boolean>();
 
   /** A box worth looking at first: the placed things if any, else the middle of the world. */
   viewBounds(): [number, number, number, number] {
@@ -484,7 +585,7 @@ export class WorldEntityLayer {
     if (!instKey) this.thingsGroup.add(built);
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
-    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
+    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? refinement?.seconds ?? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw, glowOnly: glowOnly(def) } } : {}) });
   }
   private undraw(id: string, delaySeconds = 0) {
     this.held.delete(id); this.horizonBy.delete(id);

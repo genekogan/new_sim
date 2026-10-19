@@ -403,7 +403,17 @@ export async function openLauncher(cfg = {}) {
     const etag = `W/"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`;
     Object.assign(headers, { etag, 'last-modified': st.mtime.toUTCString() });
     if (req.headers['if-none-match'] === etag) { res.writeHead(304, headers).end(); return true; }
-    const accept = String(req.headers['accept-encoding'] ?? ''), enc = /\.(glb|json|bin)$/i.test(file) && st.size >= 1024 && st.size <= 32 << 20
+    const accept = String(req.headers['accept-encoding'] ?? '');
+    // P1 phones: the web build's own .br/.gz (deploy/precompress.mjs, made at release time), when the browser takes them
+    if (/\.(js|mjs|css|wasm|svg|json)$/i.test(file)) for (const [e, ext] of [['br', '.br'], ['gzip', '.gz']]) {
+      if (!new RegExp(`\\b${e}\\b`).test(accept)) continue;
+      let pst; try { pst = statSync(file + ext); } catch { continue; }
+      if (!pst.isFile() || pst.mtimeMs < st.mtimeMs) continue;
+      res.writeHead(200, { ...headers, 'content-encoding': e, vary: 'Accept-Encoding', 'content-length': pst.size });
+      if (req.method === 'HEAD') res.end(); else createReadStream(file + ext).pipe(res);
+      return true;
+    }
+    const enc = /\.(glb|json|bin)$/i.test(file) && st.size >= 1024 && st.size <= 32 << 20
       ? (/\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : null) : null;
     if (!enc) { res.writeHead(200, { ...headers, 'content-length': st.size }); if (req.method === 'HEAD') res.end(); else createReadStream(file).pipe(res); return true; }
     const key = `${file}|${enc}`; let hit = packed.get(key);
@@ -640,7 +650,7 @@ export async function openLauncher(cfg = {}) {
         if (path === '/' || path === '/index.html') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
         // lane P4: the installable-app manifest beside the world list (apps/web/src/pwa-manifest.ts)
         if (path === '/manifest.webmanifest' && serveFile(res, join(webDir, 'manifest.webmanifest'), 'public, max-age=3600', req)) return;
-        if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
+        if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable', req)) return; }  // P1: req = ETag/304 + precompressed .br/.gz
         // this release's /modular (the humanoid kit and the environment GLBs; release.sh links the commit's own copy into
         // mars-web): served here, so composed bodies and characters never depend on which world happens to be awake. An
         // old-world fork has no humanoid kit, and its descriptor's mars-web is the copy sealed at cutover (legacy: the

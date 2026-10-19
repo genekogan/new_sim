@@ -62,7 +62,7 @@ const meshBuilder: MeshBuilder = {
       // lane PERF2: repeated static copies (no clips, no roof to hide, no motion rig, no look) share one InstancedMesh per
       // part (glb-instances.ts); the holder stays the anchor the layer eases, carries and removes
       if (GLB_INSTANCING && !inst.clips.length && !b && !lookKey(ctx) && !inst.object.getObjectByName('roof')) adoptInstance(make.asset, holder, inst.object);
-      if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); holder.add(clipHook()); }
+      if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); const hook = clipHook(); hook.userData.animates = true; holder.add(hook); }  // P1: an animated model never freezes (WorldEntityLayer.freeze)
       // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
       // viewer's toggle). PARITY: not when the camera is inside — sim.mars.college keeps every ceiling, and its rooms are
       // in the roofs' shadow (Chiba's whole roof had vanished from the auditorium, the gallery and the diner, which then
