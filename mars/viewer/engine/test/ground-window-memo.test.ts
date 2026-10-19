@@ -63,7 +63,7 @@ function reference(nav: GroundNav, s: SpatialScene, r: [number, number, number, 
 }
 const navFor = (s: SpatialScene) => { const nav = new GroundNav(flat, 0.1, { paged: true }); nav.setFloors([]); nav.setSolids(s.obstacles); return nav; };
 
-test('gridsOver keeps floors per window, bit-identical to the full build; levelOver reads one level; edits rebuild what they reach', () => {
+test('gridsOver keeps floors per window, bit-identical to the full build; levelOver reads one level; setSolids forgets', () => {
   const s = scene(), nav = navFor(s), r = rectOf([[0, 0]]);
   const ref = reference(nav, s, r), a = nav.gridsOver(r, s);
   assert.deepEqual([...a.levels.keys()], [...ref.levels.keys()], 'same levels, same order (the far loft does not touch)');
@@ -78,7 +78,7 @@ test('gridsOver keeps floors per window, bit-identical to the full build; levelO
   const far = rectOf([[150, 150]]), before = nav.stats.floorBuilds;
   sameGrid(nav.levelOver(far, 0, s), reference(nav, s, far).levels.get(0), 'far ground');
   assert.equal(nav.stats.floorBuilds, before, 'reading the ground builds no floor');
-  // S2: a static edit rebuilds only the floors it reaches (the rock is below both floors' body bands; the partition is on
+  // S2: (the test keeps its gate id; "forgets" now means: forgets only what changed) a static edit rebuilds only the floors it reaches (the rock is below both floors' body bands; the partition is on
   // house A's floor), each equal to a fresh build from the new world
   const moved: SpatialScene = { ...s, obstacles: [s.obstacles[0], { ...s.obstacles[1], obb: { ...s.obstacles[1].obb, c: [-4, 6] } }] };
   nav.setSolids(moved.obstacles);
