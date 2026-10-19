@@ -10,7 +10,7 @@ import { Hono, type Context } from 'hono';
 import { decodeJwt } from 'jose';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { adminSchema, commandSchema, inviteSchema, ownerLifecycleCapabilitySchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1 } from '@sim/protocol';
-import { newId, type Auth } from './auth.ts';
+import { hashToken, newId, type Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
@@ -32,6 +32,8 @@ import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
 import {EdgeError} from './edge/contract.ts';
 import {mountSecretPlaceRoutes} from './edge/perception/secret-routes.ts';
 import { mountGodRoutes } from './god/routes.ts';
+import { RefusalLog, floodGuard } from './flood.ts';
+import { poolOf } from './god/builds.ts';
 import {VerifyUse} from './god/verify-use.ts';
 import { mountModeration } from './moderation/routes.ts';
 import { mountEdgeSnapshot, safeKey, snapshotKey, withSnapshotKey } from './edge-snapshot.ts';
@@ -62,6 +64,10 @@ export function buildApp(d: Deps) {
   // resident looks v2: automatic portraits for humanoid looks (SIM_AUTO_PORTRAITS=0 turns them off)
   const portraits=new AutoPortraits(d.host);profiles.autoBytes=(id,hash)=>portraits.bytes(id,hash);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+  // P2 runaway-agent protection: overall buckets per god token and per visitor address, before anything else answers
+  // (SIM_FLOOD=0 turns it off for a local experiment)
+  const refusals = new RefusalLog();   // every 429/413 this world answers, in its log without flooding it
+  if (process.env.SIM_FLOOD !== '0') app.use('*', floodGuard({ log: refusals, godPool: (t) => { const who = d.god?.godIdentity(t); return who ? poolOf(who) : hashToken(t); } }));
   // G8 moderation: first, so its veto checks run before the asset, body and world routes answer
   const moderation = mountModeration(app, { db: d.db.db, worldId: d.host.worldId, bearer, requireUser: (c) => requireUser(c), god: d.god, ownerId: d.cfg.ownerId });
   // lane O2: the first snapshot is edge-cacheable when the page asks for it by the current key (edge-snapshot.ts)
@@ -120,7 +126,7 @@ export function buildApp(d: Deps) {
   if (d.god) { const god = d.god; mountEnvRoutes(app, { host: d.host, god, requireGod: (c) => { const who = god.godIdentity(bearer(c)); if (!who) throw new ApiError(401, 'unauthorized', 'missing or invalid god token'); if (who.child) throw new ApiError(403, 'helper.scope', 'helper tokens cannot change the environment'); return who; } }); }  // R4-LIVE env setter; WD7: helpers refused, edits attributed
 
   app.onError((err, c) => {
-    if (err instanceof ApiError) { if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }
+    if (err instanceof ApiError) { if (err.status === 429 || err.status === 413) refusals.note(err.status === 429 ? 'rate' : 'size', err.code, `${c.req.method} ${c.req.path}: ${err.message}`); if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }
     console.error('[http]', err);
     return c.json({ ok: false, code: 'internal', message: 'internal error' }, 500);
   });
@@ -141,7 +147,7 @@ export function buildApp(d: Deps) {
   for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/account/*','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
-  app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/(?:souls\/[^/]+\/photo|agent\/photo)$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
+  app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/(?:souls\/[^/]+\/photo|agent\/photo)$/.test(c.req.path)?360*1024:64*1024, onError: (c) => { refusals.note('size', 'too-large', `${c.req.method} ${c.req.path}`); return c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413); } })(c,next));
 
   // ---- public
   mountWelcomeRoutes(app,d);

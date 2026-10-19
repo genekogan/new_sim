@@ -29,6 +29,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type {VerifyUse} from './verify-use.ts';
 import { godTokenLimiter } from './rate-limit.ts';
+import { RefusalLog } from '../flood.ts';
 import { CREATION_LIMITS } from '@sim/generators';
 import { siteReport } from './build-integrity.ts';
 import { parseHolder } from '../../../../tools/god-skill/lib/locks.mjs';
@@ -121,6 +122,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     if (refused) return c.json({ ok: false, failures: [refused] }, 200, noStore);
     await next();
   });
+  const capRefusals = new RefusalLog();
   const requireGod = (c: Context) => {
     const cached = identities.get(c); if (cached) return cached;
     const identity = identityOf(c);
@@ -276,6 +278,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     const note = typeof b?.note === 'string' ? b.note : undefined, ref = typeof b?.clientRef === 'string' ? b.clientRef : undefined;
     const saved = rep && ref !== undefined ? d.god.store.receipt(ref) : null; // a retry of a repaired edit: its receipt, never a second walk
     const r = saved ? { ...saved.result, replayed: true } : asGod(c, b, () => rep ? actWithRepair(d.god, b as Record<string, unknown>, rep, note) : d.god.act(b, note));
+    const caps = !r.accepted && Array.isArray((r as { failures?: unknown }).failures) ? ((r as { failures: { code?: unknown; detail?: unknown }[] }).failures).filter(f => typeof f?.code === 'string' && f.code.startsWith('budget.')) : [];
+    if (caps.length) capRefusals.note('cap', String(caps[0].code), `POST /v1/god/act: ${String(caps[0].detail ?? '')}`);   // P2: caps refused politely, and logged
     return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore);
   });
   app.get('/v1/god/mirror', (c) => { const who = requireGod(c), q = c.req.query(), want: MirrorWant = { since: q.since === undefined ? undefined : Number(q.since), builds: q.builds === undefined ? undefined : Number(q.builds), have: q.have, lib: q.lib }; return c.json(mirrorCurrent(d.god, want) ? { contract: 'mirror/1', same: true, seq: d.god.model.editSeq } : mirrorPayload(d.god, want, { child: !!who.child }), 200, noStore); });
