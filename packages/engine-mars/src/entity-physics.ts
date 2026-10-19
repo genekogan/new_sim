@@ -32,6 +32,9 @@ export type WorldEditV1 = {
   assets?: Record<string, unknown>;
 };
 
+/** A string built by += is a rope; reading it char by char flattens it in place (V8), so the many later joins of the
+ *  cached part texts into the physics hash copy flat strings (a join of 3,000 ropes took ~60 ms, of flat ones ~0.3 ms). */
+const flat = (t: string) => { t.charCodeAt(0); return t; };
 export const emptyEntityPhysics = (): EntityPhysicsV1 => ({ version: 'entity-physics/1', seq: 0, hash: '', baseKey: '', levels: [], bounds: null, byEntity: {}, assets: {} });
 export const entityPhysicsHash = (ep: Pick<EntityPhysicsV1, 'levels' | 'byEntity' | 'assets'>) => hashOf({ levels: ep.levels, byEntity: sortKeys(ep.byEntity), assets: sortKeys(ep.assets) });
 function sortKeys<T>(r: Record<string, T>): Record<string, T> { const o: Record<string, T> = {}; for (const k of Object.keys(r).sort()) o[k] = r[k]; return o; }
@@ -68,7 +71,7 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   cur.seq = Math.max(cur.seq, e.seq);
   cur.byEntity = sortKeys(cur.byEntity); cur.assets = sortKeys(cur.assets);
   cur.bounds = floorBounds(cur);
-  for (const p of [...Object.values(cur.byEntity), ...Object.values(cur.assets)]) if (p && typeof p === 'object' && !PART_TEXT.has(p)) PART_TEXT.set(p, stableStringify(p));
+  for (const p of [...Object.values(cur.byEntity), ...Object.values(cur.assets)]) if (p && typeof p === 'object' && !PART_TEXT.has(p)) PART_TEXT.set(p, flat(stableStringify(p)));
   cur.hash = hashStable({ levels: cur.levels, byEntity: cur.byEntity, assets: cur.assets }, PART_TEXT as unknown as ReadonlyMap<object, string>);
   cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
   return cur;

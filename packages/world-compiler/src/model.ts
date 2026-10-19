@@ -3,7 +3,7 @@
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
 import { CREATION_LIMITS, GENERATORS, mergeKitSlots, type Baked, type LocalOBB } from '@sim/generators';
-import { cacheKeyOf, hashOf } from './hash.ts';
+import { cacheKeyOfText, hashOf, stableStringify } from './hash.ts';
 import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
@@ -63,6 +63,14 @@ export function definitionRefs(value: unknown): string[] {
   };
   walk(value); return [...refs];
 }
+
+/** G1 (tranche 2026-10-19): the stable text of a bake input (params, shape, an extending def) by identity. The model
+ *  never mutates these in place (an edit gives the entity new params/shape objects), so each is stringified once, not on
+ *  every bake lookup: a bake key re-stringified a building's ~0.5 KB params per call, the largest share of a layout
+ *  query, a nav or places re-derive at 4,900 entities. The key is unchanged (cacheKeyOf of the same text). */
+const BAKE_TEXT = new WeakMap<object, string>();
+const textOf = (v: unknown): string => { if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? ''; let t = BAKE_TEXT.get(v); if (t === undefined) { t = stableStringify(v); t.charCodeAt(0); BAKE_TEXT.set(v, t); } return t; };   // charCodeAt flattens the rope once
+function bakeKey(def: unknown, params: unknown, seed: number, shape: unknown): string { return cacheKeyOfText(`[${textOf(def)},${textOf(params)},${textOf(seed)},${textOf(shape)}]`); }
 
 export class WorldModel {
   constants: WorldConstants;
@@ -204,7 +212,7 @@ export class WorldModel {
   bake(def: StoredDef, params: Record<string, Value>, seed: number, shape?: Entity['shape']): Baked {
     try {
     // Inherited make/slots/components can change while the child's own content hash stays fixed.
-    const key = cacheKeyOf([def.extends ? def : def.hash, params, seed, shape ?? null]);
+    const key = bakeKey(def.extends ? def : def.hash, params, seed, shape ?? null);
     const hit = this.bakes.get(key);
     if (hit) return hit;
     let baked: Baked;

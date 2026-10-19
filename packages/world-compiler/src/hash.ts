@@ -59,8 +59,9 @@ export const hashOf = (v: unknown) => sha256Hex(stableStringify(v));
 /** In-memory cache key for content (bake keys): two independent 32-bit string hashes plus the length of the stable JSON.
  *  Not for anything persisted or compared across processes (use hashOf); ~20x cheaper than the pure-JS SHA-256, which
  *  dominated a big world's first frame (Eden 2026: ~1.1 s of bake keys while drawing). */
-export function cacheKeyOf(v: unknown): string {
-  const s = stableStringify(v);
+export function cacheKeyOf(v: unknown): string { return cacheKeyOfText(stableStringify(v)); }
+/** cacheKeyOf of text that is already the stable JSON. */
+export function cacheKeyOfText(s: string): string {
   let a = 0x811c9dc5 | 0, b = 0x9e3779b9 | 0;
   for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 16777619); b = Math.imul(b ^ c, 0x5bd1e995); b ^= b >>> 15; }
   a = Math.imul(a ^ (a >>> 16), 0x85ebca6b); b = Math.imul(b ^ (b >>> 13), 0xc2b2ae35);
