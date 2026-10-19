@@ -34,7 +34,7 @@ const PALETTE: Record<string, { tall: number; tuft: number; flower: number; h: n
 /** Flower species colours (petals); drifts pick one dominant species. */
 export const FLOWER_COLOURS = ['#f6f3ea', '#f3cf3f', '#d8402e', '#7f93e0', '#b27ad6', '#f08cb6', '#f6f3ea', '#ffb347'];
 
-type Area = { kind: 'bare' | 'lawn' | 'mown' | 'meadow' | 'forest' | 'zone'; use: string; poly: [number, number][]; bb: [number, number, number, number]; edge: number; size: number };
+type Area = { kind: 'bare' | 'lawn' | 'mown' | 'meadow' | 'forest' | 'zone'; use: string; poly: [number, number][]; bb: [number, number, number, number]; edge: number; size: number; color?: string };
 export type CoverIndex = {
   model: WorldModel; palette: string; realism: boolean; base: number;
   blocked: (x: number, z: number) => boolean;
@@ -77,7 +77,7 @@ export function coverIndex(model: WorldModel, blockedCells: BlockCells, blockCel
     const kind = areaKind(e, def); if (!kind) continue;
     const poly = e.shape.area as [number, number][]; let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
     for (const [x, z] of poly) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); }
-    put({ kind, use: String(e.params?.use ?? ''), poly, bb: [x0, z0, x1, z1], edge: num(e.params?.edge, 1), size: (x1 - x0) * (z1 - z0) });
+    put({ kind, use: String(e.params?.use ?? ''), poly, bb: [x0, z0, x1, z1], edge: num(e.params?.edge, 1), size: (x1 - x0) * (z1 - z0), ...(typeof e.params?.color === 'string' ? { color: e.params.color } : {}) });
   }
   for (const l of areas.values()) l.sort((a, b) => a.size - b.size);   // the smallest area that holds a point speaks for it
   return { model, palette, realism: groundRealismFor(palette), base: model.constants.base ?? 0, blocked: blockTest(blockedCells, blockCell, '\u0000cover'), areas, colour: terrainColorFor(palette) };
@@ -97,7 +97,7 @@ function areaKind(e: Entity, def: NonNullable<ReturnType<WorldModel['resolvedDef
   return null;
 }
 
-export type Site = { tall: number; tuft: number; flower: number; h: number; r: number; g: number; b: number; dry: number; drift: number };
+export type Site = { tall: number; tuft: number; flower: number; h: number; short: number; r: number; g: number; b: number; dry: number; drift: number };
 const _c = new THREE.Color();
 /** The ground at (x, z): null where nothing grows, else densities 0..1, tall height and the turf colour. */
 export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Site | null {
@@ -122,7 +122,7 @@ export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Si
   let base = steep * high; if (base <= 0) return null;
   // swathes of long grass with shorter gaps between them; flowers in drifts
   const drift = vn(x / 13 + 0.37, z / 13 + 0.71, 5), swathe = 0.1 + 1.9 * ss(0.4, 0.8, drift);
-  let tall = p.tall * swathe, tuft = p.tuft, flower = p.flower * (0.4 + 1.2 * vn(x / 9, z / 9, 9)), ht = p.h * (0.8 + 0.4 * drift);
+  let short = 1, lawnTint = 0, tall = p.tall * swathe, tuft = p.tuft, flower = p.flower * (0.4 + 1.2 * vn(x / 9, z / 9, 9)), ht = p.h * (0.8 + 0.4 * drift);
   if (cover?.kind === 'meadow') { tall = 0.75 * (0.45 + 0.3 * swathe); flower = 0.55 * (0.35 + 0.65 * vn(x / 7, z / 7, 9)); ht = p.h * 1.15 * (0.85 + 0.3 * drift); tuft = 0.5; }
   else if (cover?.kind === 'forest') { tall *= 0.9; ht *= 1.1; flower *= 0.4; tuft = 0.45; }
   if (zone) {
@@ -137,18 +137,19 @@ export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Si
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ax, az] = poly[j], [bx, bz] = poly[i], vx = bx - ax, vz = bz - az, n = vx * vx + vz * vz; const t = n ? Math.max(0, Math.min(1, ((x - ax) * vx + (z - az) * vz) / n)) : 0; d = Math.min(d, Math.hypot(x - ax - vx * t, z - az - vz * t)); }
     const rim = 1 - ss(area.edge * 0.6, area.edge + 1.2, d);
     tall = Math.max(tall, 0.45) * rim; ht *= 0.75 + 0.25 * rim;
-    tuft = area.kind === 'mown' ? 0.32 : 0.42; flower = Math.max(flower * rim, area.kind === 'mown' ? 0.035 : 0.03);
+    tuft = area.kind === 'mown' ? 0.6 : 0.55; short = (area.kind === 'mown' ? 0.5 : 0.65) + (area.kind === 'mown' ? 0.5 : 0.35) * rim; lawnTint = area.color ? 1 - rim : 0; flower = Math.max(flower * rim, area.kind === 'mown' ? 0.035 : 0.03);
   }
   if (verge) { tall = Math.max(tall, zone && (zone.use === 'civic' || zone.use === 'commercial') ? 0.2 : area ? tall : 0.5); flower = Math.max(flower, area ? flower : 0.2); ht *= 1.08; }
   tall *= base; tuft *= base; flower *= base;
   // turf colour: the terrain's own paint, times the realism shader's lush/dry field on Eden's meadow
   ix.colour(_c, y, slope, ix.base, x, z);
   let r = _c.r, gg = _c.g, b = _c.b, dry = 0.5;
+  if (lawnTint > 0) { _c.set(area!.color!); r += (_c.r - r) * lawnTint; gg += (_c.g - gg) * lawnTint; b += (_c.b - b) * lawnTint; }   // a lawn's own green
   if (ix.realism) {
     const macro = realismMacro(x, z), t = ss(0.28, 0.78, macro), k = 0.82 + 0.3 * macro; dry = t;
     r *= (0.74 + 0.5 * t) * k; gg *= (0.97 + 0.11 * t) * k; b *= (0.86 - 0.16 * t) * k;
   }
-  return { tall, tuft, flower, h: ht, r, g: gg, b, dry, drift };
+  return { tall, tuft, flower, h: ht, short, r, g: gg, b, dry, drift };
 }
 
 /** One cell's sites: a 2 m grid (5 × 5) of siteAt, verges marked where a path, paving or footprint is within 1.3 m. */
@@ -180,7 +181,7 @@ export function cellKind(ix: CoverIndex, ci: number, cj: number, k: number, site
       const tone = 0.9 + 0.22 * h01(gi, gj, 61); r *= tone; g *= tone; b *= tone;
       // in the sun-dried swathes some clumps have gone to straw
       if (s.dry > 0.55 && h01(gi, gj, 71) < (s.dry - 0.55) * 1.6) { r = r * 0.55 + 0.42 * 0.45; g = g * 0.55 + 0.36 * 0.45; b = b * 0.55 + 0.16 * 0.45; }
-    } else if (kind === 'tuft') { sc = 0.75 + 0.6 * v; ht = 0.6 + 0.9 * w; const tone = 0.92 + 0.16 * h01(gi, gj, 62); r *= tone; g *= tone; b *= tone; }
+    } else if (kind === 'tuft') { sc = 0.75 + 0.6 * v; ht = (0.6 + 0.9 * w) * s.short; const tone = 0.92 + 0.16 * h01(gi, gj, 62); r *= tone; g *= tone; b *= tone; }
     else {
       // a drift's own species most of the time, now and then another
       const dom = Math.floor(vn(x / 6 + 3.1, z / 6 + 1.7, 13) * FLOWER_COLOURS.length * 0.999), sp = h01(gi, gj, 81) < 0.72 ? dom : Math.floor(h01(gi, gj, 82) * FLOWER_COLOURS.length);
