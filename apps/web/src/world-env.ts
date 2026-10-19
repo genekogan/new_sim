@@ -2,7 +2,7 @@
 // state (the god's `world` op; apps/server/src/god/world-env.ts is the setter). Presentation only.
 import * as THREE from 'three';
 import type { SetWeather } from './WorldAtmosphere.ts';
-import { setClockNight, worldSeconds } from './gen-mesh/motion.ts';
+import { nightOf, setClockNight, worldSeconds } from './gen-mesh/motion.ts';
 import { defLights, flickers, lightPhase, PatternNightMap, paintOnlySources, setNightLightStrength, worldNightBounds, type AuthoredLight, type NightSource } from './WorldNightLights.ts';
 import type { HaloSource } from './atmosphere/halos.ts';
 
@@ -142,6 +142,7 @@ export class GodWorldLiving {
   private scanned: { model: unknown; seq: number; at: number } | null = null;
   private patterns: PatternNightMap | null = null;
   private reduced = false;
+  private clockless = false;
   lights = 0;
   // explicit fields (not parameter properties): lane bugs' tests load this file under Node's strip-only TypeScript
   private layer: LayerLike;
@@ -160,12 +161,16 @@ export class GodWorldLiving {
     setNightLightStrength(daylight, this.pools.gain);
     if (this.patterns && this.renderer && (!reducedMotion || reducedMotion !== this.reduced)) this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     this.reduced = reducedMotion;
+    if (daylight !== null && this.clockless) { this.clockless = false; this.checkedAt = -Infinity; }
     if (nowMs - this.checkedAt < 500) return;
     this.checkedAt = nowMs;
     // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
     this.skyThings(m);
+    // P7b: before the first clock a world whose sky palette is not night shows no lamp pools, so the scan of every entity
+    // (~0.14 s of a 4x phone) waits for the clock (a phone's early arrival draws the world before its first take)
+    if (daylight === null && nightOf(m as unknown as Parameters<typeof nightOf>[0]) <= 0) { this.clockless = true; return; }
     // P1 phones: the model changes only with a world diff (the layer's seq) or a resync (a new model), so the scan of
     // every entity (~4,900 on Eden 2026, ~4% of a phone frame) runs only then (and every 10 s, to be safe)
     const seq = (this.layer as unknown as { seq?: unknown }).seq, s = this.scanned;

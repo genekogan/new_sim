@@ -2,6 +2,7 @@ import { FullscreenToggle } from './FullscreenToggle.tsx';
 import { HudMore } from './HudMore.tsx';
 import {explorePresence} from './explore-data.ts';
 import {exploreAvailable} from './explore-control.ts';
+import {arrivalOver} from './arrival-marks.ts';
 import {MySouls,useMySouls} from './MySouls.tsx';
 import {edenReleaseWorlds,edenExperienceEnabled} from './eden-release.ts';
 import {EdenTour,type EdenTourPlace} from './EdenTour.tsx';
@@ -151,7 +152,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
   const tourHandle=viewerHandle;
   const exploreSeen=useRef(false),exploreOn=exploreAvailable(exploreSeen.current,viewerState);exploreSeen.current=exploreOn;  // V1: a viewer blip no longer unmounts Explore
-  const exploreLocations=viewerHandle?.locations?.()??[];
+  const exploreLocations=arrivalOver()?viewerHandle?.locations?.()??[]:[];  // P7b: the first scan of the world's views (~0.12 s on a 4x phone) waits for the card
   const exploreName=worldName;
   const localClassroomPresentation=classroomProjection(edenExpansion,sim.conn.welcome?.worldId,Object.hasOwn(r.entities,classroomScreenEntityId),viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason,lessonIndex,cfg.worldId);
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };

@@ -266,6 +266,7 @@ export class WorldEntityLayer {
     this.now = nowMs;
     if (!this.active) return;
     this.sites.update(nowMs);
+    const moving = arrivalOver();
     // W2b: fill old Eden's generated surface patterns (brick, ashlar, clapboard, tile, slate, turf blades) a few rows a
     // frame; until now only old Eden's own layer did, so entity worlds drew the flat placeholders. No-op once complete.
     stepSurfaceKit(2);
@@ -314,7 +315,9 @@ export class WorldEntityLayer {
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
       if (t >= 1 && (!d.motion || (this.freezeSettled && d.motion.glowOnly)) && !d.removing && !ride && !inHand) d.settled = true;
       // P1: a hidden thing (a storey its building hides, or far furniture on a phone) is not animated: nobody sees it
-      if (d.motion && t >= 1 && !inHand && shown) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
+      // P7b: things stay at their stored pose under the arrival card (the creatures' first route search was ~0.09 s of a 4x
+      // phone's card); nobody sees motion before the card is gone
+      if (d.motion && t >= 1 && !inHand && shown && moving) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
       if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
     void dt;
