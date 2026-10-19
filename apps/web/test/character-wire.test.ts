@@ -61,6 +61,27 @@ test('loadTemplates (mesh files + one parse of each shared clips file) = templat
   } finally { g.fetch = realFetch; if (!hadLocation) delete g.location; }
 });
 
+test('a server without the wire files (3.19 legacy) still draws everyone from the source GLBs', async () => {
+  const g = globalThis as unknown as {fetch: typeof fetch; location?: {href: string}}, realFetch = g.fetch, realWarn = console.warn, hadLocation = 'location' in g;
+  g.location ??= {href: 'http://local/'}; const asked: string[] = []; console.warn = () => {};
+  g.fetch = (async (url: string) => {
+    const name = String(url).split('/').pop()!.split('?')[0]; asked.push(name);
+    if (/\.mesh\.glb$|^clips-/.test(name)) return new Response('{"ok":false}', {status: 404});
+    const b = file(name); return new Response(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer);
+  }) as typeof fetch;
+  try {
+    const got = await loadTemplates(new AbortController().signal, new ThreeResources(), {appearances: true});
+    assert.deepEqual(got.map((t) => t.name).sort(), ['casual', 'punk', 'woman']);
+    for (const name of ['casual', 'punk', 'woman']) assert.ok(asked.includes(`animated-${name}.glb`), name);
+    for (const t of got) {
+      const source = templateFromGltf(t.name, await parse(file(`animated-${t.name}.glb`)));
+      assert.equal(measured(t), measured(source), t.name);
+      assert.deepEqual(clipsOf(t.gltf), clipsOf(source.gltf), t.name);
+      assert.ok(t.appearance, `${t.name}: presets still bind the source`);
+    }
+  } finally { g.fetch = realFetch; console.warn = realWarn; if (!hadLocation) delete g.location; }
+});
+
 for (const name of ['casual', 'punk', 'woman'] as const) {
   test(`${name}: mesh + shared clips load as the source — scene, clips, template and preset bindings`, async () => {
     const w = CHARACTER_WIRE[name], source = await parse(file(`animated-${name}.glb`)), wire = await parse(file(w.mesh));
