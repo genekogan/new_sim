@@ -82,7 +82,7 @@ test('plan is idempotent: an upgraded world plans nothing', () => {
 
 test('batches: defines travel with their users; units never split; <= 256 ops', () => {
   const p = plan(world(), spec), bs = batches(p, 'g', 'n');
-  assert.deepEqual(bs[0].units[0], 'stage-stand'); assert.equal(bs[0].ops[0].op, 'define');
+  assert.ok(bs[0].units.includes('stage-stand')); assert.equal(bs[0].ops[0].op, 'define'); // (moves that make room go before it: E2)
   const big = { defOps: [], units: Array.from({ length: 5 }, (_, i) => ({ unit: `u${i}`, ops: Array.from({ length: 100 }, () => ({ op: 'move', id: `e${i}`, r: 1 })), meta: Array(100).fill(`u${i}`), expect: {} })) };
   const bb = batches(big, 'g', 'n');
   assert.deepEqual(bb.map((b) => b.ops.length), [200, 200, 100]); assert.ok(bb.every((b) => b.ops.length <= MAX_OPS && b.meta.length === b.ops.length));
@@ -151,4 +151,15 @@ test('a def change replaces the thing under the same name in one batch with its 
   const v = verifyApplied(after, w, { batches: [b], newOps: s.newOps ?? Object.fromEntries(s.items.filter((i) => i.new).map((i) => [i.path, i.new])) });
   assert.equal(v.ok, true, JSON.stringify(v));
   const again = plan(after, s); assert.equal(again.units.length, 0, 'an upgraded world plans nothing');
+});
+
+test('a thing moved out of the way goes before the new thing that needs its room, in the same batch', () => {
+  const wheel = { schema: 'def/1', name: 'eden-big-wheel', version: 1, form: 'point', make: { kind: 'gen', gen: 'kit/2', args: { r: 13 } } };
+  const o = { batches: [{ note: 'a', ops: [{ op: 'place', def: 'core/ferris-wheel@1', name: 'wheel', p: [5, 5] }, { op: 'place', def: 'core/kiosk@1', name: 'booth', p: [9, 6] }] }] };
+  const n = { batches: [{ note: 'a', ops: [{ op: 'place', def: 'core/kiosk@1', name: 'booth', p: [16, 9] }] }, { note: 'b', ops: [{ op: 'define', def: wheel }, { op: 'place', def: 'eden-big-wheel@1', name: 'wheel', p: [5, 5] }] }] };
+  const s = makeSpec(o, n, { id: 't', world: 'w', from: 'a', to: 'b' });
+  const w = { worldId: 'w-1', seq: 5, defs: [], entities: [ent('e_w', 'wheel', 'core-ferris-wheel@1', [5, 0, 5]), ent('e_k', 'booth', 'core-kiosk@1', [9, 0, 6])] };
+  const bs = batches(plan(w, s), 'g', 'n');
+  assert.equal(bs.length, 1);
+  assert.deepEqual(bs[0].ops.map((x) => `${x.op}:${x.id ?? x.name ?? x.def?.name}`), ['define:eden-big-wheel', 'move:e_k', 'remove:e_w', 'place:wheel']);
 });

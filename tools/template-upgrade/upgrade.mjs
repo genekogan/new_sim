@@ -194,8 +194,12 @@ export function batches(p, group, note) {
   const fits = (b, u) => b.ops.length + u.ops.length <= MAX_OPS && size(b.ops) + size(b.expect) + size(u.ops) + size(u.expect) < MAX_BYTES;
   const add = (b, u) => { b.ops.push(...u.ops); b.meta.push(...u.meta); Object.assign(b.expect, u.expect); b.units.push(u.unit); };
   let cur = open(); cur.ops.push(...p.defOps); cur.meta.push(...p.defOps.map((o) => 'def:' + o.def.name));
+  // E2: units that only move, set or remove go before the users of new defines when they fit, so a thing moved out of
+  // the way (a ticket booth) makes room for a bigger new one (a wheel) in the same edit
+  const clears = (u) => !uses(u) && u.ops.every((o) => o.op !== 'place'), early = new Set();
+  if (p.units.some(uses)) for (const u of p.units.filter(clears)) if (fits(cur, u) && p.units.filter(uses).reduce((n, x) => n + x.ops.length, 0) + cur.ops.length + u.ops.length <= MAX_OPS) { add(cur, u); early.add(u); }
   for (const u of p.units.filter(uses)) { assert(fits(cur, u), `defines and their users do not fit one batch (${u.unit})`); add(cur, u); }
-  for (const u of p.units.filter((x) => !uses(x))) {
+  for (const u of p.units.filter((x) => !uses(x) && !early.has(x))) {
     assert(fits(open(), u), `unit ${u.unit} alone is over ${MAX_OPS} ops or ${MAX_BYTES} bytes`);
     if (!fits(cur, u)) { if (cur.ops.length) out.push(cur); cur = open(); }
     add(cur, u);
