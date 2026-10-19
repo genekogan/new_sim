@@ -38,7 +38,7 @@ type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; jo
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
 /** Longest the world clock waits for a join set (lane P5); under the frame loop's 1 s elapsed cap, so no world time is lost. */
-const JOIN_HOLD_MS = 750;
+const JOIN_HOLD_MS = 750, JOIN_HOLD_REST_MS = 2_000;
 
 /** Live viewers never read a take's static physics (entityPhysicsV1: every building's floors, walls and stairs; they
  *  draw geometry from /v1/scene). On a built world it is ~3 MB of JSON per one-second chunk (Eden 2026), so the live
@@ -295,11 +295,18 @@ export class Hub {
     }
     return true;
   }
-  /** Some client's join set is still being compressed or written, within JOIN_HOLD_MS of its hello (lane P5). */
+  /** Some client's join set is still being compressed or written, within JOIN_HOLD_MS of its hello (lane P5). One hold lasts
+   *  at most JOIN_HOLD_MS and is followed by JOIN_HOLD_REST_MS without any, so slow or staggered joiners cannot stall the world. */
+  private holdSince=0;private holdRestUntil=0;
   private joinInFlight(){
     const now=Date.now();
-    for(const c of this.clients)if(c.joinPending&&now-c.lastHello<JOIN_HOLD_MS&&c.ws.readyState===1)return true;
-    return false;
+    if(now<this.holdRestUntil)return false;
+    let pending=false;
+    for(const c of this.clients)if(c.joinPending&&now-c.lastHello<JOIN_HOLD_MS&&c.ws.readyState===1){pending=true;break;}
+    if(!pending){this.holdSince=0;return false;}
+    if(!this.holdSince)this.holdSince=now;
+    if(now-this.holdSince<JOIN_HOLD_MS)return true;
+    this.holdSince=0;this.holdRestUntil=now+JOIN_HOLD_REST_MS;return false;
   }
   private privateMessage(c:Client,m:ServerMsg):ServerMsg|null{
     if(m.t==='me'){

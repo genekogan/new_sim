@@ -63,4 +63,13 @@ test('the hub holds the clock only while a join set is unwritten', async (t) => 
   assert.ok(types.includes('snapshot') && types.includes('takes'), `join set arrived: ${types.join(',')}`);
   assert.ok(holds.length >= 2 && holds.slice(0, -1).every(Boolean), `held until the last join message was written: ${holds.join(',')}`);
   assert.equal(host.holdClock!(), false, 'join set out: the clock runs');
+
+  // joiners that never finish (slow, or one after another) hold at most 750 ms, then the clock runs for 2 s regardless
+  const stuck = { joinPending: 1, lastHello: Date.now(), ws: { readyState: 1 } };
+  (clients as unknown as Set<unknown>).add(stuck);
+  const t0 = Date.now(); let releasedAt = 0;
+  while (Date.now() - t0 < 1500) { stuck.lastHello = Date.now(); if (!host.holdClock!()) { releasedAt = Date.now() - t0; break; } await sleep(10); }
+  assert.ok(releasedAt >= 700 && releasedAt < 1200, `one hold ends after ~750 ms (${releasedAt})`);
+  stuck.lastHello = Date.now(); assert.equal(host.holdClock!(), false, 'then a rest without holds');
+  (clients as unknown as Set<unknown>).delete(stuck);
 });
