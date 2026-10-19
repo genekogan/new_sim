@@ -64,10 +64,20 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   - Frozen camp/station fixtures also receive their exact historical producer files as a Git object pack.
     It includes the original commit and directory tree objects plus only fixture-declared source blobs;
     it excludes ancestor history and all other historical file contents. Its receipt is returned in `/out`.
-- **What runs.** The container does a fresh `pnpm install --frozen-lockfile` and then the unchanged
+- **What runs.** Each container does a fresh `pnpm install --frozen-lockfile` and then
   `one-validation.sh --skip V7,V8`: V1 types, V2 builds, V3 package/engine/CLI/launcher/harness suites, V4 web tests,
   V5 recursive server tests and V6 god/Soul/join API e2es. `--baseline-ref none` suppresses the duplicate V4 baseline.
-  The serial server step has a 150-minute envelope (formerly60 minutes); exceeding it always blocks the gate.
+  Each V5 shard has a 150-minute envelope; exceeding it always blocks the gate.
+- **Fan-out (t4-o1, 2026-10-19).** One run is 14 containers at once: six step groups (`GROUPS` in `modal_suite.py`,
+  selected by `SUITE_ONLY`) and eight V5 shards (`V5_SHARD=i/8`: contiguous slices of the sorted server test files,
+  balanced by `v5-durations.json`; each shard also records per-file times in `V5-server-full-files.jsonl`, the source
+  for rebalancing). The cheap V2 builds also run unrecorded first in every group, so later steps see the same tree.
+  `merge()` rebuilds the serial layout: one SUMMARY.tsv in serial order, the shard TAP logs concatenated in order (the
+  serial test order and duplicate-title ordinals), one RUN-METADATA.json that is complete only if every group was.
+  Per-group SUMMARY/metadata/V0/install logs stay in `out/groups/<name>/`. A missing group or shard, a duplicated
+  row or an inexact shard file cover fails closed. The gate's verdict logic is unchanged. Wall time ~15–25 min.
+  Rebalance after big test changes: `node tools/test-harness/v5-shard.mjs` reads `v5-durations.json`; regenerate it
+  from a run's `out/groups/v5-*/V5-server-full-files.jsonl` (sum of top-level `ms` per file).
   - The container has its own network namespace, so the 54xx test ports can't collide with anything.
 - **What's skipped.** V7 (real-Chrome walks) needs a GPU and the `.lane/mars-web` asset overlay. V8 boots the laptop's
   production histories, which must not leave the laptop. Run both locally when needed: `one-validation.sh <out> --skip V1,V2,V3,V4,V5,V6`.
@@ -77,7 +87,7 @@ Billing & plans to unblock hosted CI; Modal remains independent. No billing sett
   V3 retains raw Node TAP/spec output and an explicit exit code for every package. Any package failure fails V3.
   The raw runner returns suite artifacts even for failing assertions; use release-gate.sh to evaluate a ship.
 - **Node.** The default is 22 (eden2 production runs v22.23). Use `--node 26` to match the laptop.
-- **Cost.** CPU only, about 1–2 h × 8 cores per run, roughly $1.
+- **Cost.** CPU only, 14 containers × 8 cores × ~5–10 min per run (about the same core-hours as the old serial hour).
 - **Setup.** Needs `modal` installed and authenticated: `pip install modal && modal token new`. On this laptop it is
   installed (1.5.2) and `modal profile current` answers `edenartlab`.
 - **Smoke test** (install + preflight only, a few minutes):
