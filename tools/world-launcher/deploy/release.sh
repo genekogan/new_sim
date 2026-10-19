@@ -45,6 +45,8 @@ EDEN_WORLDS="${VITE_EDEN_EXPERIENCE_WORLD_IDS-pm-preview-eden-20261005}"
 BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
 grep -q "src=\"$BASE/assets/" "$OUT/apps/web/dist/index.html" || { echo "web build is not under $BASE/"; exit 1; }
 [ -z "$EDEN_WORLDS" ] || grep -qs "${EDEN_WORLDS%%,*}" "$OUT"/apps/web/dist/assets/Shell-*.js || { echo "web build lacks the Eden experience pin ($EDEN_WORLDS)"; exit 1; }
+# P1 phones: .br/.gz beside each hashed asset (the launcher serves them; nothing is compressed on the request path)
+node tools/world-launcher/deploy/precompress.mjs "$OUT/apps/web/dist/assets"
 rsync -aL --delete "$MARS_WEB_SRC/" "$OUT/mars-web/"
 # /modular (the humanoid kit and the environment GLBs) is this commit's own copy, never whatever a lane overlay's
 # symlink pointed at when the release was assembled: a relative link into the archived tree (no second copy).
