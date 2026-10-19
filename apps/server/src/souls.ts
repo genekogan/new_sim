@@ -218,11 +218,12 @@ export class Souls {
 
   /** Internal, unpaired, nonhuman verifier; ordinary journaled birth/retire.
    * Return the row before awaiting admission so even a failed birth can retire. */
-  createVerificationProbe() {
+  /** `near` (birth-near/1): where the probe's walk will start; a built-over arrival point then never refuses the birth. */
+  createVerificationProbe(near?: BirthPayload['near']) {
     const id = PROBE_PREFIX + randomBytes(5).toString('hex'), entityId = `h_${id.slice(2)}`;
     const name = `verifier probe ${id.slice(-8)}`, description = 'Temporary explicit-action use verifier; never thinks or pairs.';
     this.db.createSoul({ id, worldId: this.host.worldId, owner: PROBE_OWNER, entityId, name, description, native: false });
-    try { return { soul: this.db.soul(id)!, ready: this.host.enqueue('birth', `verify-use:${id}`, { soulId: id, entityId, name, description, owner: PROBE_OWNER } satisfies BirthPayload) }; }
+    try { return { soul: this.db.soul(id)!, ready: this.host.enqueue('birth', `verify-use:${id}`, { soulId: id, entityId, name, description, owner: PROBE_OWNER, ...(near ? { near } : {}) } satisfies BirthPayload) }; }
     catch (error) { this.db.retireSoul(id); throw error; }
   }
 

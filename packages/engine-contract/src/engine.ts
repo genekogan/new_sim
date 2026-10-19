@@ -161,8 +161,9 @@ export interface Engine {
   previewAuthoredBoundariesV1?(metadata:import('./authored-boundaries-v1.ts').AuthoredBoundariesDeclarationV1):{code:string;message:string}|null;
   configureAuthoredBoundariesV1?(metadata:import('./authored-boundaries-v1.ts').AuthoredBoundariesV1):void;
   authoredBoundariesV1?():import('./authored-boundaries-v1.ts').AuthoredBoundariesV1|undefined;
-  /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
-  spawnHuman(args: { id: string; label: string; soul: string }): string;
+  /** Spawn a human entity for a Soul at the arrival point; returns the entity id. `near` (birth-near/1, verifier
+   * probes): when the arrival point is built over, land on the nearest clear standing ground instead of refusing. */
+  spawnHuman(args: { id: string; label: string; soul: string; near?: BirthNearV1 }): string;
   removeEntity(id: string): void;
   /** Feasible activities for an actor right now, cheap (no rehearsal). */
   enumerateActivities(actorId: string, intent: Intent | null): ActivityOption[];
@@ -199,3 +200,6 @@ export interface EngineFactory {
   create(world: WorldState): Engine;
   restore(snap: EngineSnapshot): Engine;
 }
+
+/** birth-near/1: a journaled birth hint. `at` is the requested start; `first` searches it before the arrival point. */
+export type BirthNearV1 = { at: [number, number]; first?: boolean };

@@ -72,7 +72,9 @@ export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!
 export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'edge-stop' | 'edge-relocate' | 'edge-god-walkout' | 'edge-attention' | 'body-assignment-v1' | 'world-edit' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'intent-sleep-stop-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
-export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
+export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string;
+  /** birth-near/1 (verifier probes): land on the nearest clear standing ground when the arrival point is built over. */
+  near?: { at: [number, number]; first?: boolean } };
 export type IntentPayload = { soulId: string; intent: WireIntent; source: 'web' | 'api' | 'mcp' | 'system' };
 export type DecisionPayload = {
   soulId: string; entityId: string; option: string; label: string;

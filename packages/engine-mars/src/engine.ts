@@ -42,7 +42,7 @@ import {attachGround,groundRegistry,installGroundV1 as installGround,previewGrou
 //     them back at any time, and the borrower treats that as the scene ending.
 //  3. Feasibility is asked first (verb.plan), because in Mars even a refused
 //     instruction pulls a person out of what they were doing.
-import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
+import { hashOf, physicalView, type BirthNearV1, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
 import { loadMars, type Mars } from './load.ts';
 import type {CampExpansionReader} from './camp-expansion.ts';
 import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
@@ -1118,20 +1118,23 @@ export class MarsEngine implements Engine {
     const r = def.plan(this.rt, parsed.data);
     return r.ok ? { ok: true, metres: Math.round((r.program?.length ?? 0) * 10) / 10 } : { ok: false, code: r.diagnostic.code, message: r.diagnostic.message };
   }
-  spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
+  spawnHuman({ id, label, soul, near }: { id: string; label: string; soul: string; near?: BirthNearV1 }): string {
     if (this.ents[id]) return id;
     const [ax, az] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : this.cfg.arrival;
     const body=this.cfg.scene==='littlemartians'&&['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx'].includes(label)?{family:'floater',model:label.toLowerCase(),radius:.35,hoverHeight:1.45}:undefined;
     const people = listEntities(this.ents).filter((e: any) => e.kind === 'human').map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     let spot: [number, number] | null = null;
-    search: for (let ring = 0; ring < 6; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
+    // birth-near/1 (verifier probes only; journaled, so replay is exact): an explicit start is searched first.
+    if (near?.first) spot = this.freeStandingNearV1(near.at, body?.radius ?? HUMAN_RADIUS);
+    if (!spot) search: for (let ring = 0; ring < 6; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
       const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5;
       // Original history retains its placement math; the explicit new policy
       // uses portable native math and checks the actual standing disc first.
       const x = r3(ax + (this.cfg.safeArrivalV1?dcos(ang):Math.cos(ang)) * ring * 0.9),
         z = r3(az + (this.cfg.safeArrivalV1?dsin(ang):Math.sin(ang)) * ring * 0.9);
       if (people.some(([px, pz]) => (this.cfg.safeArrivalV1?hypot(px-x,pz-z):Math.hypot(px-x,pz-z)) < 0.8)) continue;
-      if(this.cfg.safeArrivalV1){
+      // birth-near/1 also checks the standing disc first: no route is planned from inside a collider.
+      if(this.cfg.safeArrivalV1||near){
         const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
         const grid=spatial.levelAt(0,[x,z]),radius=body?.radius??HUMAN_RADIUS;
         if(!grid||clearanceAt(grid,[x,z])<radius)continue;
@@ -1142,6 +1145,9 @@ export class MarsEngine implements Engine {
       finally{delete this.ents[id];}
       if (ok) { spot = [x, z]; break search; }
     }
+    // birth-near/1: a built-over arrival no longer refuses the birth: the nearest clear standing ground to the
+    // arrival point, else to the hinted start. Events without `near` keep the original refusal.
+    if (!spot && near) spot = this.freeStandingNearV1([ax, az], body?.radius ?? HUMAN_RADIUS) ?? (near.first ? null : this.freeStandingNearV1(near.at, body?.radius ?? HUMAN_RADIUS));
     if (!spot) throw new Error('no free standing room at the arrival point');
     const e = this.m.human(id, spot[0], spot[1], { label, provenance: { origin: 'simulation', confidence: 'hypothetical' } });
     if(this.rt.world.groundV1){const f=(this.rt.services.spatial as Spatial).ground!.field;e.pose.p[1]=standHeight(f,spot[0],spot[1]);}
@@ -1149,6 +1155,21 @@ export class MarsEngine implements Engine {
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
     return id;
+  }
+  /** birth-near/1: the nearest ground point (rings of 0.25 m out to 12 m) with a clear standing disc, nobody within
+   * 0.8 m and no deep water. Walkability from there is proved by the caller's own physical walk, never assumed. */
+  private freeStandingNearV1(at: [number, number], radius: number): [number, number] | null {
+    if (!Array.isArray(at) || at.length !== 2 || !at.every(Number.isFinite)) return null;
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world);
+    const f = this.rt.world.groundV1 ? spatial.ground?.field : undefined;
+    const people = Object.values(this.ents).filter((e: any) => e.kind === 'human' && (e.human?.level ?? 0) === 0).map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
+    for (let ring = 0; ring <= 48; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {
+      const ang = (k / n) * Math.PI * 2, x = r3(at[0] + dcos(ang) * ring * 0.25), z = r3(at[1] + dsin(ang) * ring * 0.25);
+      const grid = spatial.levelAt(0, [x, z]);
+      if (!grid || clearanceAt(grid, [x, z]) < radius || people.some(([px, pz]) => hypot(px - x, pz - z) < 0.8) || (f && f.medium(x, z) > 1)) continue;
+      return [x, z];
+    } }
+    return null;
   }
   /** Detached admission uses the same native standing-disc geometry as the
    * corrected placer. Legacy replay keeps its original births, but a new

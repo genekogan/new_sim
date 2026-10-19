@@ -131,7 +131,9 @@ export class VerifyUse {
       try { entry = this.entry(input, footprint, doors, bridge, engine, inside, !desc.rooms.length, target); }
       finally { receipt.timings.start = round(performance.now() - startAt); }
       const created = await phase('birth', async () => {
-        const born = this.souls.createVerificationProbe(); probe = born.soul;
+        // Born at the arrival point when it has room, else on the nearest clear ground to it or to the walk's start
+        // (an explicit --from is tried first). The physical walk below still starts at entry.start.
+        const born = this.souls.createVerificationProbe({at: [round(entry.start[0]), round(entry.start[1])], ...(input.from ? {first: true} : {})}); probe = born.soul;
         receipt.probe = {created: true, removed: false, removal: 'pending', entityId: probe.entity_id};
         this.host.drainInputs(); await born.ready; return born;
       });
@@ -175,7 +177,7 @@ export class VerifyUse {
       };
       const takeSeat = async (seat: Entity, result: UseResult) => {
         if (confirmSeat(seat, result)) return;
-        const slot = seat.id === target.id && entry.seatSlot ? entry.seatSlot : this.nativeSeats(seat.id, soul.entityId).sort((a, b) => dist(position(), a.p) - dist(position(), b.p))[0]?.id;
+        const slot = seat.id === target.id && entry.seatSlot ? entry.seatSlot : this.reachableSeats([seat.id], {p: position(), level: body().human?.level ?? 0}, soul.entityId)[0]?.slot;
         if (!slot) throw new Failure('verify.no-seat', 'No free native seat slot in the selected fixture.');
         await this.action(soul, seat.id, slot, deadline, () => confirmSeat(seat, result), receipt, started);
       };
@@ -217,7 +219,7 @@ export class VerifyUse {
           } else {
             const sitAt = performance.now();
             try {
-              const seat = enteredSeat ?? this.seat(input.seat, target, entry.goal?.p ?? entry.start);
+              const seat = enteredSeat ?? this.seat(input.seat, target, entry.goal?.p ?? entry.start, {p: position(), level: body().human?.level ?? 0}, soul.entityId);
               result.seat = this.god.model.pathOf(seat.id);
               // Only shortcut AFTER physical entry, and never for an explicit from.
               const thing = bridge.nav.thing(result.seat), goal = thing && bridge.nav.goal(thing, position(), soul.entityId);
@@ -258,8 +260,9 @@ export class VerifyUse {
           const retireAt = performance.now();
           const retirement = this.souls.retire(probe); this.host.drainInputs(); await retirement; retired = true;
           // Native retirement safely releases a sit controller over subsequent
-          // ticks. Briefly observe it, then finish asynchronously if still pending.
-          const cleanupDeadline = performance.now() + 100;
+          // ticks (standing up takes about a second at 20 Hz). Observe that, then
+          // finish asynchronously if still pending (a paused world).
+          const cleanupDeadline = performance.now() + 2000;
           while (this.host.engine.world.entities[probe.entity_id] && performance.now() < cleanupDeadline) await this.wait(cleanupDeadline);
           if (!this.host.engine.world.entities[probe.entity_id]) engineBridges.get(this.god.model)?.bodyRetired({entityId: probe.entity_id});
           receipt.probe.removed = !this.host.minds.has(probe.id) && !this.host.engine.world.entities[probe.entity_id] && !this.god.model.entities.has(probe.entity_id);
@@ -402,7 +405,7 @@ export class VerifyUse {
       if (terminal.kind !== 'completed') throw new Failure('verify.refused', 'The physical entry walk did not complete.', terminal.code ?? terminal.kind);
     } finally { const i = this.host.listeners.indexOf(listener); if (i >= 0) this.host.listeners.splice(i, 1); }
   }
-  private seat(ref: string | undefined, target: Entity, at: V2): Entity {
+  private seat(ref: string | undefined, target: Entity, at: V2, from?: Point, except?: string): Entity {
     const m = this.god.model, ids = new Set([target.id, ...m.subtree(target.id)]);
     const explicit = ref ? m.get(ref) : undefined;
     if (ref && (!explicit || !ids.has(explicit.id))) throw new Failure('verify.no-seat', `Seat ${ref} is not in the target subtree.`);
@@ -411,7 +414,28 @@ export class VerifyUse {
       return slots.length ? [{e, d: Math.min(...slots.map(s => dist(at, [s.p[0], s.p[2]])))}] : [];
     }).sort((a, b) => a.d - b.d || a.e.id.localeCompare(b.e.id));
     if (!candidates[0]) throw new Failure('verify.no-seat', 'No free seat slot in the target subtree.');
+    // Prefer a seat a resident can actually reach from where the probe stands (a pew whose front is the next pew's
+    // back has no standing room; another pew, or the aisle end of the row, may). With none, the nearest stays and
+    // the engine reports its own refusal.
+    if (from && candidates.length > 1) {
+      const byId = new Map(candidates.map(c => [c.e.id, c.e])), best = this.reachableSeats(candidates.map(c => c.e.id), from, except)[0];
+      if (best?.reachable) return byId.get(best.fixture)!;
+    }
     return candidates[0].e;
+  }
+  /** Free native seat slots of these fixtures, best first: a slot whose standing approach exists and is reachable on
+   * foot from `from` (engine route read, at most 12 checked), then one with an approach, then the rest; nearest first
+   * within each. A pure read: nothing is claimed or moved. */
+  private reachableSeats(fixtures: string[], from: Point, except?: string): {fixture: string; slot: string; reachable: boolean}[] {
+    const engine = this.host.engine as unknown as Engine;
+    const slots = fixtures.flatMap(fixture => this.nativeSeats(fixture, except).map(s => ({fixture, ...s, d: dist(from.p, s.approach ?? s.p)})))
+      .sort((a, b) => Number(!a.approach) - Number(!b.approach) || a.d - b.d || a.id.localeCompare(b.id));
+    let checked = 0;
+    const ranked = slots.map(s => {
+      const reachable = !!s.approach && checked++ < 12 && engine.reachV1(from, {p: s.approach, level: s.level}).ok;
+      return {fixture: s.fixture, slot: s.id, reachable};
+    });
+    return [...ranked.filter(s => s.reachable), ...ranked.filter(s => !s.reachable)];
   }
   private checkTime(deadline: number) { if (performance.now() >= deadline) throw new Failure('verify.timeout', 'Verification reached its real-time deadline.'); }
   private async action(soul: EdgeSoul, fixture: string, slot: string, deadline: number, success: () => boolean, receipt: VerifyReceipt, started: number) {

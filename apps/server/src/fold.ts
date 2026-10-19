@@ -93,7 +93,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     case 'intent-controller-v2': { intentControllerFactV2(e); return {}; }
     case 'birth': {
       const p = e.payload as BirthPayload;
-      engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId });
+      engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId, ...(p.near ? { near: p.near } : {}) });
       soulThing(k, p, arrivalPlace(k));
       return {};
     }

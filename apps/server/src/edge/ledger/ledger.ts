@@ -813,7 +813,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
       }
     }
-    if (issue && !WAIT_CODES.has(issue.code)) return {...refuse(issue.code, issue.code.startsWith('carrier.') ? issue.message : humanBlockedExplanationV1(issue.code, label)), ...resolved};
+    // The verifier probe reports the engine's own diagnostic (what blocks the seat, how much room it needs) to the builder.
+    if (issue && !WAIT_CODES.has(issue.code)) return {...refuse(issue.code, issue.code.startsWith('carrier.') || isVerificationProbe(soul.soulId) ? issue.message : humanBlockedExplanationV1(issue.code, label)), ...resolved};
     if (issue) {
       // Asleep or mid-step: stop safely first, then start (receipt `waiting`).
       const r = this.insert(soul, capability, 'waiting', clientRef,false,{},contentParams); commit?.(r.id);

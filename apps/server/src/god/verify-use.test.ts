@@ -89,6 +89,61 @@ test('solid thing across the only doorway cannot produce a successful entry', {t
   assert.equal(r.ok, false, JSON.stringify(r)); assert.equal(r.uses[0].ok, false); assert.ok(r.uses[0].reason); assert.equal(r.probe.removed, true); w.removed();
 });
 
+test('a built-over arrival point births the probe on the nearest clear ground and still proves the walk', {timeout: 30_000}, async t => {
+  const w = world(t); await w.build();
+  // Legacy solid blocks (as harvest identity worlds have: a water tower on the arrival) over arrival (0,0) and
+  // reference (2,0): x -7..5, z -6..6, wider than the original 4.5 m arrival search.
+  for (let i = 0; i < 6; i++) {
+    const e = {id: `e_arrivalblock${i}`, def: coreRef('wall'), name: `arrival-block-${i}`, in: {parent: 'world'}, p: [-1, 0, -5 + i * 2] as [number, number, number], params: {w: 12, h: 3, d: 2}, by: 'legacy-fixture', born: 0, v: 1};
+    w.god.model.insert(e); w.god.model.index(e.id, w.god.model.footprint(e));
+  }
+  w.bridge.reconcile(); await w.settle();
+  const engine = w.host.engine as unknown as {spawnHuman(a: {id: string; label: string; soul: string}): string; stateHash(): string};
+  const before = engine.stateHash();
+  assert.throws(() => engine.spawnHuman({id: 'h_plainbirth', label: 'Plain', soul: 's_plainbirth'}), /no free standing room at the arrival point/, 'an ordinary birth is still refused here');
+  assert.equal(engine.stateHash(), before);
+  const r = await w.drive(w.verify.run({target: 'house', timeoutMs: 12_000}));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const enter = r.uses.find(x => x.use === 'enter')!, sit = r.uses.find(x => x.use === 'sit')!;
+  assert.equal(enter.ok, true); assert.ok(enter.crossing); assert.equal(enter.proof?.kind, 'room'); assert.equal(sit.ok, true); assert.ok(sit.distanceToSlot! <= 0.6);
+  const birth = w.db.events(w.host.worldId, 0, 1000).find(e => e.kind === 'birth' && isVerificationProbe(e.payload.soulId))!;
+  assert.ok(Array.isArray(birth.payload.near?.at) && birth.payload.near.first === undefined, JSON.stringify(birth.payload));
+  w.removed();
+  // An explicit start is searched first and the walk is still physical from there.
+  const from = await w.drive(w.verify.run({target: 'house', uses: ['enter'], from: [10, 7], timeoutMs: 12_000}));
+  assert.equal(from.ok, true, JSON.stringify(from)); w.removed();
+  const second = w.db.events(w.host.worldId, 0, 1000).filter(e => e.kind === 'birth' && isVerificationProbe(e.payload.soulId)).at(-1)!;
+  assert.deepEqual(second.payload.near, {at: [10, 7], first: true});
+});
+
+test('the probe sits on a seat a resident can reach, not the nearest boxed-in one; an explicit boxed seat names its blocker', {timeout: 30_000}, async t => {
+  const w = world(t); await w.build();
+  const far = w.god.act({ops: [{op: 'place', def: coreRef('chair'), name: 'far-chair', in: {parent: w.god.model.get('house')!.id, slot: 'ground'}, p: [2.5, 0, -2]}]});
+  assert.equal(far.accepted, true, JSON.stringify(far));
+  // Legacy blocks from 0.3 m around house/chair (world 8,-1) out past its farthest approach gap (1.5 m): no standing
+  // room in front, behind or beside it.
+  const box: [number, number, number, number][] = [[8, -2, 1.2, 1.4], [8, 0, 1.2, 1.4], [6.95, -1, 1.5, 2], [9.05, -1, 1.5, 2]];
+  box.forEach(([x, z, bw, bd], i) => {
+    const e = {id: `e_seatbox${i}`, def: coreRef('wall'), name: `seat-box-${i}`, in: {parent: 'world'}, p: [x, 0, z] as [number, number, number], params: {w: bw, h: 1.2, d: bd}, by: 'legacy-fixture', born: 0, v: 1};
+    w.god.model.insert(e); w.god.model.index(e.id, w.god.model.footprint(e));
+  });
+  w.bridge.reconcile(); await w.settle();
+  const engine = w.host.engine as unknown as {freeSeatSlotsV1(id: string): {id: string; p: [number, number]; approach?: [number, number]}[]};
+  const boxed = engine.freeSeatSlotsV1(w.god.model.get('house/chair')!.id), open = engine.freeSeatSlotsV1(w.god.model.get('house/far-chair')!.id);
+  assert.equal(boxed.length, 1); assert.equal(boxed[0].approach, undefined, 'the boxed chair has no standing approach');
+  assert.ok(open[0]?.approach, 'the far chair has one');
+  const r = await w.drive(w.verify.run({target: 'house', timeoutMs: 12_000}));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const enter = r.uses.find(x => x.use === 'enter')!, sit = r.uses.find(x => x.use === 'sit')!;
+  const at = enter.proof!.at, d = (p: [number, number]) => Math.hypot(p[0] - at[0], p[1] - at[1]);
+  assert.ok(d(boxed[0].p) < d(open[0].p), 'the boxed chair is the nearer one, so nearest-first would have picked it');
+  assert.equal(sit.seat, 'house/far-chair'); w.removed();
+  // Asked for the boxed chair explicitly: still refused, with the engine's own words on what blocks it.
+  const refused = await w.drive(w.verify.run({target: 'house', uses: ['sit'], seat: 'house/chair', timeoutMs: 5_000}));
+  assert.equal(refused.ok, false); assert.equal(refused.uses[0].reason?.engineCode, 'slot.unreachable');
+  assert.match(refused.uses[0].reason!.message, /cannot be sat on: no standing room .*blocked by/); w.removed();
+});
+
 test('seatless target returns verify.no-seat', async t => {
   const w = world(t); await w.build(false);
   const r = await w.drive(w.verify.run({target: 'house', uses: ['sit'], timeoutMs: 1000}));
