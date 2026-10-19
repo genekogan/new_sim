@@ -47,3 +47,17 @@ test('defs with flames animate (never instanced); removing the entity disposes i
   parent.remove(o);
   assert.equal(flameStats.mounted, before);
 });
+
+test('a chimney stack\'s grey puffs become one moving-smoke source, never a fire; a moving train keeps its puffs', () => {
+  const puffs = [0.22, 0.32, 0.42].map((r, i) => ({ kind: 'sphere', at: [-0.2 + i * 0.2, 2.55 + i * 0.45, 0.1 * i], r, role: 'flame', tint: 'smoke' }));
+  const shapes = [{ kind: 'box', at: [0, 1, 0], size: [0.5, 2, 0.5] }, ...puffs];
+  const kit = (smokeFx: boolean) => buildKit({ v: 2, shapes } as never, { materials: new MaterialLib(), tint: (_k, f) => f, params: {}, state: {}, smokeFx });
+  const still = kit(true);
+  assert.equal(mountFlames(still, 'stack'), false);
+  assert.equal(still.getObjectByName('role:flame'), undefined, 'the puffs are not drawn');
+  const src = still.userData.edenSmokeSources as number[][];
+  assert.equal(src.length, 1); assert.ok(src[0][1] > 2 && src[0][1] < 2.6, `base of the column, got ${src[0][1]}`);
+  const moving = kit(false);
+  assert.ok(moving.getObjectByName('role:flame'), 'drawn puffs travel with the train');
+  assert.equal(moving.userData.edenSmokeSources, undefined);
+});

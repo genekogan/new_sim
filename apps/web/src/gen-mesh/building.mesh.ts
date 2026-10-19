@@ -175,6 +175,7 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
   const { groups, tris } = b.emit(ctx.materials);
   const root = new THREE.Group(); root.name = 'building';
   const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
+  if (b.anchors.length) inner.userData.edenSmokeSources = b.anchors.map((p) => [...p, 0.8]); // W2: atmosphere smoke
   for (const g of groups.values()) inner.add(g);
   root.add(inner);
   return { group: root, tris };
@@ -448,6 +449,7 @@ function drawRoof(b: Builder, L: BuildingLayout, o: { roofCol: string; trim: str
       const h = rise + 1.0, brick = '#8a4a36';
       b.box(cx, top, cz, 0.6, h, 0.6, brick, 'roof'); b.box(cx, top + h, cz, 0.74, 0.08, 0.74, o.trim);
       for (const sd of [-1, 1]) b.cyl(cx + sd * 0.13, top + h + 0.08, cz, 0.06, 0.07, 0.3, '#a3442f', 'roof', 6);
+      b.anchor(cx, top + h + 0.35, cz); // W2: chimney smoke
     }
   });
 

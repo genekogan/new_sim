@@ -80,7 +80,13 @@ void main(){vec2 d=gl_PointCoord-.5;float r=dot(d,d)*4.0;if(r>1.0)discard;
  gl_FragColor=vec4(c,a);
  #include <colorspace_fragment>
 }`;
-export const SMOKE_PER_SOURCE=16,MAX_SMOKE_SOURCES=24;
+export const SMOKE_PER_SOURCE=16,MAX_SMOKE_SOURCES=48;
+/** W2: more chimneys than the smoke can carry: a fixed, seeded choice of which fires are lit (not the first found). */
+function lit<T extends {p:THREE.Vector3}>(list:readonly T[]):readonly T[]{
+ if(list.length<=MAX_SMOKE_SOURCES)return list;
+ const key=(s:T)=>{const x=Math.round(s.p.x*2),z=Math.round(s.p.z*2);let h=2166136261;h=Math.imul(h^x,16777619);h=Math.imul(h^z,16777619);return h>>>0;};
+ return list.map(s=>[key(s),s] as const).sort((a,b)=>a[0]-b[0]).slice(0,MAX_SMOKE_SOURCES).map(x=>x[1]);
+}
 export class Smoke{
  readonly points:THREE.Points<THREE.BufferGeometry,THREE.ShaderMaterial>;
  readonly uniforms={uSmoke:{value:new THREE.Vector4()},uSmokeWind:{value:new THREE.Vector4(1,0,0,0)}};
@@ -94,7 +100,7 @@ export class Smoke{
  }
  /** Chimney tops (world). Scale ~1 for a house chimney, smaller for a stove pipe. */
  setSources(list:readonly {p:THREE.Vector3;scale:number}[]){
-  const g=this.points.geometry,a=g.getAttribute('position') as THREE.BufferAttribute,r=g.getAttribute('aR') as THREE.BufferAttribute;
+  list=lit(list);const g=this.points.geometry,a=g.getAttribute('position') as THREE.BufferAttribute,r=g.getAttribute('aR') as THREE.BufferAttribute;
   this.sources=Math.min(list.length,MAX_SMOKE_SOURCES);
   for(let s=0;s<this.sources;s++)for(let k=0;k<SMOKE_PER_SOURCE;k++){const i=s*SMOKE_PER_SOURCE+k;a.setXYZ(i,list[s].p.x,list[s].p.y,list[s].p.z);r.setZ(i,list[s].scale);r.setX(i,k/SMOKE_PER_SOURCE+hash01(s,k)*.05);}
   a.needsUpdate=true;r.needsUpdate=true;g.setDrawRange(0,this.sources*SMOKE_PER_SOURCE);

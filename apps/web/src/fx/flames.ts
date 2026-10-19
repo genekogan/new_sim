@@ -19,12 +19,20 @@ type ShapeLike = { kind?: string; role?: string; tint?: string; glow?: number; m
 const hsl = { h: 0, s: 0, l: 0 }, tmp = new THREE.Color();
 /** True for a kit shape that draws a flame. `color` is the shape's resolved colour (for the warm-hue test). */
 export function isFlameShape(sh: ShapeLike, hint: boolean, color?: string): boolean {
+  if (isSmokeShape(sh)) return false; // a chimney stack draws its smoke as grey `role: flame` puffs
   if (sh.role === 'flame') return true;
   if (sh.role || !(sh.glow && sh.glow > 0)) return false;
   if (FLAME_TINT.test(sh.tint ?? '')) return true;
   if (!hint || !color) return false;
   tmp.set(color).getHSL(hsl);
   return (hsl.h < 0.16 || hsl.h > 0.97) && hsl.s > 0.45 && hsl.l > 0.3 && hsl.l < 0.72; // cream lamp glass (l ≈ 0.78) is not a flame
+}
+
+/** W2: a grey puff drawn as a shape (tint smoke/steam, no glow): the atmosphere's moving smoke replaces it. */
+export function isSmokeShape(sh: ShapeLike): boolean { return !(sh.glow && sh.glow > 0) && /smoke|steam/.test(sh.tint ?? ''); }
+/** Smoke sources [x, y, z, scale] (kit frame) for the shapes that draw smoke: one per puff column, at its base. */
+export function smokeSources(shapes: readonly ShapeLike[]): [number, number, number, number][] {
+  return flameClusters(shapes, new THREE.Vector3()).map((c) => [c.p[0], c.p[1], c.p[2], Math.max(0.6, Math.min(3, c.r / 0.3))]);
 }
 
 export type FlameCluster = { p: [number, number, number]; r: number; h: number };
@@ -63,8 +71,9 @@ export function hasFlames(def: StoredDef): boolean {
   const args = def.make.args as object | undefined; if (!args) return false;
   let v = flameDefs.get(args);
   if (v === undefined) {
-    const text = JSON.stringify(args);
-    v = /"role":"flame"/.test(text) || /"tint":"[^"]*(flame|fire|ember)[^"]*"/.test(text) && /"glow":/.test(text) || flameHint(def) && /"glow":/.test(text);
+    const shapes = (args as { shapes?: unknown }).shapes, hint = flameHint(def);
+    if (Array.isArray(shapes)) v = shapes.some((sh: ShapeLike) => isFlameShape(sh, hint, sh.color) || hint && !!sh.glow && !isSmokeShape(sh));
+    else { const text = JSON.stringify(args); v = /"role":"flame"/.test(text) || /"tint":"[^"]*(flame|fire|ember)[^"]*"/.test(text) && /"glow":/.test(text) || hint && /"glow":/.test(text); }
     flameDefs.set(args, v);
   }
   return v;

@@ -36,6 +36,9 @@ export class Builder {
   private enabled = true;
   /** Consume the same seeded detail choices while omitting an optional ornament's geometry. */
   optional(enabled: boolean, draw: () => void) { const was = this.enabled; this.enabled = was && enabled; try { draw(); } finally { this.enabled = was; } }
+  /** W2: effect anchors (chimney smoke) in the builder's current frame; enabled ornaments only. */
+  readonly anchors: [number, number, number][] = [];
+  anchor(x: number, y: number, z: number) { if (this.enabled) { const v = new THREE.Vector3(x, y, z).applyMatrix4(this.m); this.anchors.push([v.x, v.y, v.z]); } }
   private m = new THREE.Matrix4(); private stack: THREE.Matrix4[] = [];
   private l = new THREE.Matrix4(); private nm = new THREE.Matrix3(); private v = new THREE.Vector3(); private q = new THREE.Quaternion(); private s = new THREE.Vector3(); private t = new THREE.Vector3(); private e = new THREE.Euler();
   push(x: number, y: number, z: number, yaw = 0) { this.stack.push(this.m.clone()); this.m.multiply(new THREE.Matrix4().makeRotationY(yaw).setPosition(x, y, z)); return this; }
