@@ -70,6 +70,9 @@ export function surfaceKit(){
  const W=1024,H=512,a=flat(N*N*4,[166,166,166,170]),b=flat(N*N*4,[150,150,128,110]),c=flat(N*N*4,[118,64,190,128]),m=flat(W*H*4,[150,160,120,255]);
  kit={patternsA:dataTexture(a,N,N,false),patternsB:dataTexture(b,N,N,false),patternsC:dataTexture(c,N,N,false),mural:dataTexture(m,W,H,true),bytes:Math.round((N*N*4*3+W*H*4)*4/3)};
  kit.mural.wrapS=kit.mural.wrapT=THREE.ClampToEdgeWrapping;
+ // W2b: the ground/turf patterns fill whole screens (lawns, meadow); 4x anisotropic fetches cost ~1 ms a frame at dpr 2
+ // and change nothing visible, since their detail fades to the mean tone by 26-40 m anyway.
+ kit.patternsC.anisotropy=1;
  let blades:Float32Array|null=null;
  jobs=[
   {tex:kit.patternsC,rows:N,next:0,prepare:()=>{blades=bladeField();},row:y=>groundRow(c,y,blades!)},
