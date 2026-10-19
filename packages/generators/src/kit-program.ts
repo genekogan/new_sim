@@ -188,7 +188,8 @@ export function expandKitProgram(input: unknown, params: Record<string, unknown>
       const a = vec(s, 'from'), b = vec(s, 'to'), d = b.map((v, i) => v - a[i]), len = Math.hypot(...d);
       if (len < 1e-6) refuse([...path, 'to'], 'Endpoints coincide', 'Separate from and to');
       s.at = a.map((v, i) => (v + b[i]) / 2);
-      s.pitch = Math.acos(Math.max(-1, Math.min(1, d[1] / len))); s.yaw = Math.atan2(-d[0], -d[2]);
+      // +y → d under the viewer's and colliders' Euler(pitch, yaw, roll, 'YXZ'): (sin p·sin y, cos p, sin p·cos y).
+      s.pitch = Math.acos(Math.max(-1, Math.min(1, d[1] / len))); s.yaw = Math.atan2(d[0], d[2]);
       if (s.kind === 'box' || s.kind === 'rbox') { const size = vec(s, 'size', [0.1, 1, 0.1]); s.size = [size[0], len, size[2]]; }
       else { const r = (s.r ?? 0.2) as number; s.h = s.kind === 'capsule' ? len - 2 * r : len; if ((s.h as number) <= 0) refuse([...path, 'to'], 'Capsule endpoints are closer than its diameter', 'Separate endpoints or reduce r'); }
     }

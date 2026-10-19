@@ -192,3 +192,18 @@ test('L3e: parseKitArgs is kitArgs.safeParse, once per args object (valid, progr
     if (memo.success) { draw(memo.data, { w: 2 }); draw(memo.data, { w: 3 }); assert.deepEqual(memo.data, kitArgs.parse(args), 'building does not mutate the shared result'); }
   }
 });
+
+test('a from/to segment rising and sideways at once is drawn on from→to, not mirrored about its midpoint', () => {
+  // Regression (harvest 2026-10-18): expansion yaw atan2(−dx, −dz) made this YXZ viewer draw the mirror image.
+  const from = [-1, 0.1, -1], to = [1, 2.1, 1.2], d = to.map((v, k) => v - from[k]), len = Math.hypot(...d);
+  const o = draw(kitArgs.parse({ v: 2, round: 0, box: [3, 2.4, 3], shapes: [{ kind: 'box', from, to, size: [0.1, 1, 0.1] }] })); o.updateMatrixWorld(true);
+  const p = new THREE.Vector3(); let lowest = { y: Infinity, x: 0, z: 0 }, worst = 0;
+  for (const m of meshes(o)) { const pos = m.geometry.attributes.position; for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+    const t = ((p.x - from[0]) * d[0] + (p.y - from[1]) * d[1] + (p.z - from[2]) * d[2]) / len ** 2;
+    worst = Math.max(worst, Math.hypot(p.x - from[0] - t * d[0], p.y - from[1] - t * d[1], p.z - from[2] - t * d[2]));
+    if (p.y < lowest.y) lowest = { y: p.y, x: p.x, z: p.z };
+  } }
+  assert.ok(worst < 0.1, `every vertex within the beam's half-diagonal of the from→to line (worst ${worst.toFixed(3)} m)`);
+  assert.ok(Math.hypot(lowest.x - from[0], lowest.z - from[2]) < 0.15, 'the low end stands at from');
+});

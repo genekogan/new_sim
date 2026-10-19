@@ -67,11 +67,13 @@ test('numeric delta steps and n−1 delta lists encode finite variants without a
   refusal({ ...box, repeat: { n: 3, step: [{ at: [1, 0, 0] }] } }, 'repeat.step');
   refusal({ ...box, repeat: { n: 2, step: { code: 'oops' } } }, 'repeat.step.code');
 });
+/** Local +y under THREE.Euler(pitch, yaw, 0, 'YXZ') — the viewer's (kit.mesh.ts) and the colliders' (kit.ts) order: Ry·Rx. */
+const yxzUp = (p: number, y: number) => [Math.sin(y) * Math.sin(p), Math.cos(p), Math.cos(y) * Math.sin(p)];
 test('from/to aligns +y to both endpoints; capsule length includes its caps', () => {
   for (const to of [[3, 2, 4], [2, 0, 0], [0, 0, 2], [0, -2, 0]]) {
     const s = expand({ kind: 'cyl', from: [0, 0, 0], to, r: .1 }).shapes[0];
     const p = s.pitch!, y = s.yaw!, len = s.h!;
-    const axis = [-Math.sin(y) * Math.sin(p), Math.cos(p), -Math.cos(y) * Math.sin(p)];
+    const axis = yxzUp(p, y);
     for (let k = 0; k < 3; k++) assert.ok(Math.abs(axis[k] * len - to[k]) < 1e-10);
   }
   assert.equal(expand({ kind: 'capsule', from: [0, 0, 0], to: [0, 2, 0], r: .2 }).shapes[0].h, 1.6);
@@ -79,6 +81,27 @@ test('from/to aligns +y to both endpoints; capsule length includes its caps', ()
   refusal({ kind: 'cyl', from: [0, 0, 0], to: [0, 0, 0] }, 'to');
   refusal({ ...box, from: [0, 0, 0], to: [0, 2, 0] }, 'from');
   refusal({ kind: 'capsule', from: [0, 0, 0], to: [0, .1, 0], r: 1 }, 'to');
+});
+test('from/to: a segment rising and sideways at once is drawn and collides from→to, not mirrored about its midpoint', () => {
+  // Regression (harvest 2026-10-18): yaw was atan2(−dx, −dz), so the YXZ viewer drew the mirror image (low end under `to`).
+  const from = [-1, 0.1, -1], to = [1, 2.1, 1.2];
+  const s = expand({ kind: 'box', from, to, size: [.18, 1, .18] }).shapes[0];
+  const up = yxzUp(s.pitch!, s.yaw!), half = s.size![1] / 2;
+  for (let k = 0; k < 3; k++) {
+    assert.ok(Math.abs(s.at[k] + up[k] * half - to[k]) < 1e-10, `top end at to (axis ${k})`);
+    assert.ok(Math.abs(s.at[k] - up[k] * half - from[k]) < 1e-10, `bottom end at from (axis ${k})`);
+  }
+  // The tilted collider slices follow the same line: lowest slice nearest `from`, highest nearest `to`, all on the segment in plan.
+  const cols = kitPhysics({ box: [3, 2.4, 3], shapes: [{ kind: 'box', from, to, size: [.18, 1, .18] }] }).colliders;
+  assert.ok(cols.length > 1);
+  const d = to.map((v, k) => v - from[k]);
+  for (const c of cols) {
+    const t = ((c.y0 + c.y1) / 2 - from[1]) / d[1];
+    assert.ok(Math.abs(c.c[0] - (from[0] + t * d[0])) < 1e-6 && Math.abs(c.c[1] - (from[2] + t * d[2])) < 1e-6, `slice at height t=${t.toFixed(2)} lies on from→to`);
+  }
+  // A cone's tip (local +y) points at `to`, also for a level segment.
+  const cone = expand({ kind: 'cone', from: [-1, .5, 1.4], to: [1, .5, 1.4], r: .2 }).shapes[0], tip = yxzUp(cone.pitch!, cone.yaw!);
+  assert.ok(tip[0] > 0.999, 'cone tip towards +x (to)');
 });
 test('pointed arches and filled lancet outlines expand to ordinary kit shapes', () => {
   const a = expand({ kind: 'arch.pointed', at: [0, 2, 0], size: [2, 4, .3], segments: 8 });
