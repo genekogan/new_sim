@@ -16,7 +16,7 @@ import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassK
 import { camera, shoot, keeper, stopKeeper, drawableCount, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
 import { autoWarm, listenerBeat, lookRoute } from './lib/warm.mjs';
 import { remoteLook } from './lib/remote-look.mjs';
-import { kitDefinition } from './lib/kit.mjs';
+import { kitDefinition, kitIgnoredKeys } from './lib/kit.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { return process.argv[1]; } })();
@@ -1127,13 +1127,15 @@ export async function kitLook(json, flags = {}, runtime = {}) {
   return withLookDeadline(runtime, signal => kitLookInner(json, flags, runtime, signal));
 }
 async function kitLookInner(json, flags, runtime, signal) {
-  const overrides = lookOverrides(flags), def = kitDefinition(typeof json === 'string' ? JSON.parse(json) : json);
+  const kit = typeof json === 'string' ? JSON.parse(json) : json, overrides = lookOverrides(flags), def = kitDefinition(kit);
   const admitted = ok(await call('/v1/god/kit/render', { body: { def, ...(flags.beside ? { beside: normDef(flags.beside) } : {}) } }), 'kit look');
   signal.throwIfAborted();
   if (!admitted.accepted) throw Error(`kit look refused: ${admitted.failures.map(explainFailure).join('; ')}`);
+  const fixed = correctedLine(admitted.warnings, kitIgnoredKeys(kit)); // kitlenient
   const shot = await (runtime.shoot ?? (args => shoot(args, runtime)))({ timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()), worldUrl: load().world, studio: admitted, out: resolve(flags.out ?? 'looks/kit-workbench.png'), ...overrides,
     ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) });
-  return flags.json ? shot : `kit look: ${shot.file} · front, side, top, ¾ · ${Math.round(shot.ms) / 1000} s\n${(shot.warnings ?? []).join('\n')}${shot.warnings?.length ? '\n' : ''}  No world edit. Read the sheet before define-kit.`;
+  const rest = (shot.warnings ?? []).filter(w => !String(w).startsWith('kit.corrected: ')); // already in the one corrected line
+  return flags.json ? { ...shot, ...(fixed ? { corrected: fixed } : {}) } : `kit look: ${shot.file} · front, side, top, ¾ · ${Math.round(shot.ms) / 1000} s\n${fixed ? `  ${fixed}\n` : ''}${rest.join('\n')}${rest.length ? '\n' : ''}  No world edit. Read the sheet before define-kit.`;
 }
 export async function look(flags = {}, runtime = {}) {
   return withLookDeadline(runtime, signal => lookInner(flags, runtime, signal));
@@ -1227,26 +1229,32 @@ export const importWorld = (file, flags = {}) => withoutBuild(async () => {
   }
   return out.join('\n');
 });
-export async function define(json) {
+export async function define(json, ignored = []) {
   const def = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   // a generator-made def exposes the generator's params (ranges, defaults) unless it declares its own
   if (def.make?.kind === 'gen' && !def.params) { const g = (await schema()).generators?.find((x) => x.id === def.make.gen); if (g && Object.keys(g.params).length) def.params = g.params; }
-  const r = await act({ ops: [{ op: 'define', def: { schema: 'def/1', ...def } }] }, `define ${def.name}`); return r.accepted ? `defined ${def.name}@${def.version ?? 1} — place it with: place ${def.name}@${def.version ?? 1} --at …` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+  const r = await act({ ops: [{ op: 'define', def: { schema: 'def/1', ...def } }] }, `define ${def.name}`), fixed = correctedLine(r.warnings, ignored);
+  return (r.accepted ? `defined ${def.name}@${def.version ?? 1} — place it with: place ${def.name}@${def.version ?? 1} --at …` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`) + (fixed ? `\n  ${fixed}` : ''); }
+/** kitlenient: the server's kit corrections, and kit keys the CLI did not carry, as one short line ('' when none). */
+export function correctedLine(warnings = [], ignored = []) {
+  const fixes = (warnings ?? []).filter(w => w.startsWith('kit.corrected: ')).map(w => w.slice(15).replace(/ make\.args\./, ' '));
+  const refs = [...new Set(fixes.map(f => f.split(' ')[0]))], items = refs.length === 1 ? fixes.map(f => f.slice(refs[0].length + 1)) : fixes;
+  const shown = [...items.slice(0, 5), ...(items.length > 5 ? [`+${items.length - 5} more`] : []), ...(ignored.length ? [`ignored kit keys: ${ignored.join(', ')}`] : [])];
+  return shown.length ? `corrected${refs.length === 1 ? ` ${refs[0]}` : ''}: ${shown.join('; ')}` : '';
+}
 /** define-kit <json|file>: a kit/2 prop or creature from rounded primitives. {name, shapes:[{kind, at, size|r|h, color, role…}], tags?, gait?, layer?, slots?, components?, description?} */
 export async function defineKit(json, flags = {}) {
   const k = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error('define-kit needs {name, shapes:[…]} (see SKILL.md, kit primitives in SCHEMA.md)');
-  // K2 hook: authored programs are expanded on the server; never guess their bounds from one seed shape.
-  if (!k.box && k.shapes.some(s => s.kind === 'arch.pointed' || ['repeat', 'radial', 'mirror', 'from', 'to', 'outline'].some(key => s[key] !== undefined) || JSON.stringify(s).includes('$'))) throw new Error('define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry');
+  // K2 hook: authored programs are expanded on the server; never guess their bounds from one seed shape (kitlenient: a missing box is measured there).
   // Search name and tags before the write, and surface kept parts before unused defs.
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, ' '), ...(k.tags ?? [])].join(' '))).defs;
   const picks = [...matches.filter(d => usedIn(d).length), ...matches.filter(d => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map(d => d.ref.replace(/^core-/, 'core/'));
   const def = kitDefinition(k);
-  if (flags.dry) return { def, similar };
+  if (flags.dry) return { def, similar, ...(kitIgnoredKeys(k).length ? { ignored: kitIgnoredKeys(k) } : {}) };
   if (picks.length) console.error(`similar defs already in the library: ${picks.map(d => oneLine(d.ref.replace(/^core-/, 'core/')) + usedBadge(d) + (usedIn(d).length && d.hash ? ' · ' + placePart({ sha: d.hash }) : '')).join('; ')} — prefer them when they fit`);
-  const r = await define(def);
-  return r;
+  return define(def, kitIgnoredKeys(k));
 }
 
 // ---------------------------------------------------------------- furnish / gallery (other lanes' libs)

@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
+import { WorldModel, correctKitDefines, creationInputFailure, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, batchSchema, hashOf, type Batch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type UsesHook, type ResidentMove } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -319,6 +319,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   dryrun(batch: unknown) {
     this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false as const, failures: [inputFailure] };
+    const kit = correctKitDefines(batch); batch = kit.batch; // harvest fix kitlenient
     const parsed = previewBatchSchema.safeParse(batch); if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: -1, code: 'schema', field: i.path.join('.'), detail: i.message })) };
     const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { accepted: false as const, failures: [gate] };
     const retirement = this.retirementFailure(parsed.data.ops); if (retirement) return { accepted: false as const, failures: [retirement] };
@@ -328,7 +329,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const p = plan(this.model, { ...parsed.data, group: admission.group }, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: (after, diff, ops) => { scratch = after; const refused = this.bodies?.refuse?.(after, diff, ops); if (refused) return refused; const check = this.builds.check(admission, this.model, after, diff, ops); return 'failure' in check ? check.failure : null; } });
     if (!p.ok) return { accepted: false as const, failures: p.failures };
     const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
-    return { accepted: true as const, ids: p.ids, warnings: [...p.warnings, ...moving.warnings], diff: summarize(p.diff), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
+    return { accepted: true as const, ids: p.ids, warnings: [...kit.warnings, ...p.warnings, ...moving.warnings], diff: summarize(p.diff), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
   }
   act(batch: unknown, note?: string): Result {
     const result = this.commitBatch(batch, note);
@@ -342,6 +343,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private commitBatch(batch: unknown, note?: string, trusted = false): Result {
     this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { accepted: false, failures: [inputFailure] };
+    const kit = correctKitDefines(batch); batch = kit.batch; // harvest fix kitlenient: the corrected ops are the ones stored
     const parsed = submissionSchema.safeParse(batch);
     if (!parsed.success) return { accepted: false, failures: parsed.error.issues.map((i) => ({ op: typeof i.path[1] === 'number' ? i.path[1] : -1, code: 'schema', field: i.path.join('.'), detail: i.message, fix: 'Use the operation shape in GET /v1/god/schema.' })) };
     const input = parsed.data;
@@ -401,7 +403,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
       w.next.done.receipt = buildReceipt(next.fork(), { ...this.builds.body(w.id)!, ...w.next }, targets, undo.ok ? { ok: true, baseline: undo.model } : undo, at); w.receipt = w.next.done.receipt;
       const durable = structuredClone(w.next); delete durable.done!.receipt; w.body = JSON.stringify(durable);
     }
-    result.warnings.push(...admission.warnings, ...roots.warnings, ...updates.warnings);
+    result.warnings.push(...kit.warnings, ...admission.warnings, ...roots.warnings, ...updates.warnings);
     result.warnings.push(...this.parts.warnings(normalized.ops));
     if (normalized.ops.some(o => o.op === 'world' && ['sky', 'time', 'weather'].some(k => Object.hasOwn(o.state, k)))) {
       result.warnings.push(...this.sharedClockWarnings(this.caller.identity));
@@ -615,6 +617,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   preview(batch: unknown) {
     this.builds.sweep();
     const inputFailure = creationInputFailure(batch); if (inputFailure) return { id: null, accepted: false as const, failures: [inputFailure] };
+    const kit = correctKitDefines(batch); batch = kit.batch; // harvest fix kitlenient
     const parsed = previewBatchSchema.safeParse(batch);
     if (!parsed.success) return { id: null, accepted: false as const, failures: [{ op: -1, code: 'schema', field: parsed.error.issues[0]?.path.join('.'), detail: parsed.error.issues.map(i => i.message).join('; '), fix: 'Use a valid edit batch from GET /v1/god/schema.' }] };
     const gate = this.helperGate(this.callerField(parsed.data.build), parsed.data.ops); if (gate) return { id: null, accepted: false as const, failures: [gate] };
@@ -634,7 +637,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.previews.set(id, { viewKeyHash: hashToken(viewKey), at: this.now(), baseEditSeq, expect, subtrees, affected, diff, ops: batchSchema.parse(parsed.data), build: structuredClone(build), ...(!p.ok ? { failures: p.failures } : {}) });
     if (!p.ok) return { id, accepted: false as const, failures: p.failures };
     const moving = scratch ? (this.bodies?.prepare?.(this.model, scratch, p.diff, parsed.data.ops as Op[], { dry: true }) ?? NO_WALKOUTS) : NO_WALKOUTS;
-    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), viewKey, expiresAt: this.now() + 600_000, url: `?preview=${id}#previewKey=${viewKey}`, ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
+    return { id, accepted: true as const, baseEditSeq, expect, subtrees, summary: summarize(p.diff), viewKey, expiresAt: this.now() + 600_000, url: `?preview=${id}#previewKey=${viewKey}`, ...(kit.warnings.length ? { warnings: kit.warnings } : {}), ...(moving.moved.length ? { wouldMove: wouldMove(moving.moved) } : {}) };
   }
   getPreview(id: string) { const v = this.previews.get(id); if (!v || this.now() - v.at >= 600_000) return null; return v; }
   /** A read-only capability for exactly one retained preview; expires with its payload. */

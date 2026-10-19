@@ -1,6 +1,6 @@
 // W1: owner-only, world-free kit admission and never-placed trial cleanup.
 import type { Context, Hono } from 'hono';
-import { batchSchema, creationInputFailure, definitionRefs, plan, type StoredDef } from '@sim/world-compiler';
+import { batchSchema, correctKitDefines, creationInputFailure, definitionRefs, plan, type StoredDef } from '@sim/world-compiler';
 import { CREATION_LIMITS } from '@sim/generators';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -20,7 +20,8 @@ export function admitWorkbench(god: GodMode, raw: unknown) {
   const batch = { ops: [{ op: 'define', def: b?.def }] };
   const inputFailure = creationInputFailure(batch);
   if (inputFailure) return { accepted: false as const, failures: [inputFailure] };
-  const parsed = batchSchema.safeParse(batch);
+  const kit = correctKitDefines(batch); // harvest fix kitlenient: the bench admits what define would
+  const parsed = batchSchema.safeParse(kit.batch);
   if (!parsed.success) return { accepted: false as const, failures: parsed.error.issues.map(i => ({ op: 0, code: 'schema', field: i.path.join('.'), detail: i.message })) };
   const model = god.model.fork(), p = plan(model, parsed.data, 'god', god.opts.tick());
   if (!p.ok) return { accepted: false as const, failures: p.failures };
@@ -32,7 +33,7 @@ export function admitWorkbench(god: GodMode, raw: unknown) {
   const deps = new Map<string, StoredDef>();
   const add = (d: StoredDef) => { if (deps.has(d.ref)) return; deps.set(d.ref, d); for (const ref of definitionRefs(d)) { const child = model.def(ref); if (child) add(child); } };
   add(def); if (beside) add(beside);
-  return { accepted: true as const, def, ...(beside ? { beside } : {}), defs: [...deps.values()], warnings: p.warnings, seq: god.model.editSeq };
+  return { accepted: true as const, def, ...(beside ? { beside } : {}), defs: [...deps.values()], warnings: [...kit.warnings, ...p.warnings], seq: god.model.editSeq };
 }
 
 export function mountWorkbenchRoutes(app: Hono, d: { god: GodMode; requireGod(c: Context): unknown; limitGod(c: Context, bucket: string, max: number): void; asGod<T>(c: Context, fn: () => T): T }) {

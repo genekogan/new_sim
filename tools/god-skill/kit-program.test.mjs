@@ -21,8 +21,10 @@ test('define-kit passes authored endpoint programs unchanged with explicit bound
   const kit = { name: 'beam', box: [3, 3, 1], shapes: [{ kind: 'cyl', from: [0, 0, 0], to: [2, 2, 0], r: .1, mirror: true }] };
   const r = await defineKit(kit, { dry: true });
   assert.deepEqual(r.def.make.args.shapes, kit.shapes); assert.deepEqual(r.def.size.box, kit.box); assert.equal(calls.length, 1);
-  await assert.rejects(defineKit({ ...kit, box: undefined }, { dry: true }), /programs need box/);
-  assert.equal(calls.length, 1);
+  // kitlenient: a program without a box goes to the server unmeasured; the server computes the box from the expansion.
+  const unboxed = await defineKit({ ...kit, box: undefined }, { dry: true });
+  assert.equal(unboxed.def.size.box, undefined); assert.deepEqual(unboxed.def.make.args.shapes, kit.shapes);
+  assert.equal(calls.length, 2);
 });
 test('each measured declarative kit is valid define-kit input without a local generator script', async t => {
   const cwd = process.cwd(), fetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'kit-fixtures-cli-'));

@@ -13,3 +13,4 @@ export { aliasRef, type DefLibrary } from './model.ts';
 export { creationInputFailure } from './input.ts';
 export { buildLibrary, coreLibrary, libraryRef, pinnedOlder } from './library.ts';
 export { frameMediaKind, MEDIA_SLOTS_MAX } from './sign-media.ts';
+export { correctKitDef, correctKitDefines } from './kit-corrections.ts'; // harvest fix kitlenient

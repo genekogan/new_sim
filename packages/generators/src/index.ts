@@ -5,6 +5,7 @@ export { CREATION_LIMITS } from './creation-limits.ts';
 export { reachableFromOutside } from './reachability.ts';
 export { scatterPoints } from './basic.ts';
 export { kitArgs, kitPhysics, kitWhen, setKitViewerContract, KIT_PATTERNS, KIT_PRIMITIVES, KIT_ROLES, type KitArgs, type KitShape } from './kit.ts';
+export { correctKitArgs, isKitProgram, type KitCorrection } from './kit-lenient.ts'; // harvest fix kitlenient
 export { expandKitProgram, kitNumber, KitProgramError, type KitProgramArgs, type KitProgramShape } from './kit-program.ts';
 export { assertFootprint, footprintToBaked, kitFootprintIssues, mergeKitSlots, type LmFootprint } from './kit-footprint.ts';
 export { BUILDING_STYLES, buildingParams, buildingPhysics } from './building.ts';

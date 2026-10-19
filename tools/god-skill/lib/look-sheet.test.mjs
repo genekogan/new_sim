@@ -14,7 +14,7 @@ test('workbench and define-kit share versioned walkable program definitions', ()
   const def = kitDefinition(program);
   assert.equal(def.make.args.v, 2); assert.equal(def.make.args.footprint, 'open');
   assert.deepEqual(def.make.args.shapes, program.shapes); assert.deepEqual(def.size.box, program.box);
-  assert.throws(() => kitDefinition({ ...program, box: undefined }), /programs need box/);
+  assert.equal(kitDefinition({ ...program, box: undefined }).size.box, undefined); // kitlenient: the server measures it
   assert.equal(kitDefinition(def), def);
   assert.equal(kitDefinition({ ...program, surfaces: true }).make.args.surfaces, true); // Y1: kit-level surfaces opt-in
 });

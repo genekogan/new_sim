@@ -2566,21 +2566,28 @@ async function shoot(options, runtime = {}) {
 }
 
 // lib/kit.mjs
+var ARG_KEYS = ["v", "footprint", "gait", "slots", "round", "surfaces"];
+var DEF_KEYS = ["components", "anchor", "state", "params", "actions", "category", "synonyms", "material", "palette", "tilt", "overlaps", "contents", "layers"];
+var OWN_KEYS = ["schema", "name", "version", "description", "tags", "layer", "shapes", "box", "scale"];
+function kitIgnoredKeys(k) {
+  if (!k || typeof k !== "object" || k.schema === "def/1") return [];
+  return Object.keys(k).filter((key) => ![...ARG_KEYS, ...DEF_KEYS, ...OWN_KEYS].includes(key));
+}
 function kitDefinition(k) {
   if (k?.schema === "def/1") return k;
   if (!k?.name || !Array.isArray(k.shapes)) throw Error("kit needs {name, shapes:[\u2026]} or a def/1 definition");
-  if (!k.box && k.shapes.some((s) => s.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s[key] !== void 0) || JSON.stringify(s).includes("$"))) throw Error("define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry");
+  const program = !k.box && k.shapes.some((s) => s?.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s?.[key] !== void 0) || JSON.stringify(s).includes("$"));
   const ext = (sh) => {
     const [x, y, z] = sh.at;
     const sz = sh.size ?? [2 * (sh.r ?? 0.5), sh.h ?? 2 * (sh.r ?? 0.5), 2 * (sh.r ?? 0.5)];
     return [x - sz[0] / 2, y - (["box", "rbox", "sphere", "capsule"].includes(sh.kind) ? sz[1] / 2 : 0), z - sz[2] / 2, x + sz[0] / 2, y + sz[1], z + sz[2] / 2];
   };
-  const e = k.box ? [] : k.shapes.map(ext);
-  const box = k.box ?? [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, Math.round(v * 100) / 100));
+  const e = k.box || program ? [] : k.shapes.map(ext);
+  const box = k.box ?? (program ? void 0 : [Math.max(...e.map((b) => b[3])) - Math.min(...e.map((b) => b[0])), Math.max(...e.map((b) => b[4])), Math.max(...e.map((b) => b[5])) - Math.min(...e.map((b) => b[2]))].map((v) => Math.max(0.05, Math.round(v * 100) / 100)));
   const args = { shapes: k.shapes };
-  for (const key of ["v", "footprint", "gait", "slots", "round", "surfaces"]) if (k[key] !== void 0) args[key] = k[key];
-  const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args }, size: { box, scale: k.scale ?? [0.5, 2] } };
-  for (const key of ["components", "anchor", "state", "params"]) if (k[key] !== void 0) def[key] = k[key];
+  for (const key of ARG_KEYS) if (k[key] !== void 0) args[key] = k[key];
+  const def = { schema: "def/1", name: k.name, version: k.version ?? 1, description: k.description ?? "", tags: k.tags ?? [], form: "point", layer: k.layer ?? "solid", make: { kind: "gen", gen: "kit/2", args }, size: { ...box ? { box } : {}, scale: k.scale ?? [0.5, 2] } };
+  for (const key of DEF_KEYS) if (k[key] !== void 0) def[key] = k[key];
   return def;
 }
 
@@ -4484,10 +4491,11 @@ async function kitLook(json2, flags2 = {}, runtime = {}) {
   return withLookDeadline(runtime, (signal) => kitLookInner(json2, flags2, runtime, signal));
 }
 async function kitLookInner(json2, flags2, runtime, signal) {
-  const overrides = lookOverrides(flags2), def = kitDefinition(typeof json2 === "string" ? JSON.parse(json2) : json2);
+  const kit = typeof json2 === "string" ? JSON.parse(json2) : json2, overrides = lookOverrides(flags2), def = kitDefinition(kit);
   const admitted = ok(await call("/v1/god/kit/render", { body: { def, ...flags2.beside ? { beside: normDef(flags2.beside) } : {} } }), "kit look");
   signal.throwIfAborted();
   if (!admitted.accepted) throw Error(`kit look refused: ${admitted.failures.map(explainFailure).join("; ")}`);
+  const fixed = correctedLine(admitted.warnings, kitIgnoredKeys(kit));
   const shot = await (runtime.shoot ?? ((args) => shoot(args, runtime)))({
     timeoutMs: Math.max(1, runtime.deadlineAt - Date.now()),
     worldUrl: load().world,
@@ -4497,8 +4505,10 @@ async function kitLookInner(json2, flags2, runtime, signal) {
     ...flags2.width ? { width: num(flags2.width) } : {},
     ...flags2.h ? { height: num(flags2.h) } : {}
   });
-  return flags2.json ? shot : `kit look: ${shot.file} \xB7 front, side, top, \xBE \xB7 ${Math.round(shot.ms) / 1e3} s
-${(shot.warnings ?? []).join("\n")}${shot.warnings?.length ? "\n" : ""}  No world edit. Read the sheet before define-kit.`;
+  const rest = (shot.warnings ?? []).filter((w) => !String(w).startsWith("kit.corrected: "));
+  return flags2.json ? { ...shot, ...fixed ? { corrected: fixed } : {} } : `kit look: ${shot.file} \xB7 front, side, top, \xBE \xB7 ${Math.round(shot.ms) / 1e3} s
+${fixed ? `  ${fixed}
+` : ""}${rest.join("\n")}${rest.length ? "\n" : ""}  No world edit. Read the sheet before define-kit.`;
 }
 async function look(flags2 = {}, runtime = {}) {
   return withLookDeadline(runtime, (signal) => lookInner(flags2, runtime, signal));
@@ -4620,27 +4630,32 @@ var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   }
   return out.join("\n");
 });
-async function define(json2) {
+async function define(json2, ignored = []) {
   const def = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
   }
-  const r = await act({ ops: [{ op: "define", def: { schema: "def/1", ...def } }] }, `define ${def.name}`);
-  return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+  const r = await act({ ops: [{ op: "define", def: { schema: "def/1", ...def } }] }, `define ${def.name}`), fixed = correctedLine(r.warnings, ignored);
+  return (r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`) + (fixed ? `
+  ${fixed}` : "");
+}
+function correctedLine(warnings = [], ignored = []) {
+  const fixes = (warnings ?? []).filter((w) => w.startsWith("kit.corrected: ")).map((w) => w.slice(15).replace(/ make\.args\./, " "));
+  const refs = [...new Set(fixes.map((f) => f.split(" ")[0]))], items = refs.length === 1 ? fixes.map((f) => f.slice(refs[0].length + 1)) : fixes;
+  const shown = [...items.slice(0, 5), ...items.length > 5 ? [`+${items.length - 5} more`] : [], ...ignored.length ? [`ignored kit keys: ${ignored.join(", ")}`] : []];
+  return shown.length ? `corrected${refs.length === 1 ? ` ${refs[0]}` : ""}: ${shown.join("; ")}` : "";
 }
 async function defineKit(json2, flags2 = {}) {
   const k = typeof json2 === "string" ? JSON.parse(existsSync8(json2) ? readFileSync8(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
-  if (!k.box && k.shapes.some((s) => s.kind === "arch.pointed" || ["repeat", "radial", "mirror", "from", "to", "outline"].some((key) => s[key] !== void 0) || JSON.stringify(s).includes("$"))) throw new Error("define-kit programs need box:[width,height,depth] in metres; the server validates the expanded geometry");
   const matches = (await searchDefs([k.name.replace(/[-_.]/g, " "), ...k.tags ?? []].join(" "))).defs;
   const picks = [...matches.filter((d) => usedIn(d).length), ...matches.filter((d) => !usedIn(d).length)].slice(0, 5);
   const similar = picks.map((d) => d.ref.replace(/^core-/, "core/"));
   const def = kitDefinition(k);
-  if (flags2.dry) return { def, similar };
+  if (flags2.dry) return { def, similar, ...kitIgnoredKeys(k).length ? { ignored: kitIgnoredKeys(k) } : {} };
   if (picks.length) console.error(`similar defs already in the library: ${picks.map((d) => oneLine(d.ref.replace(/^core-/, "core/")) + usedBadge(d) + (usedIn(d).length && d.hash ? " \xB7 " + placePart({ sha: d.hash }) : "")).join("; ")} \u2014 prefer them when they fit`);
-  const r = await define(def);
-  return r;
+  return define(def, kitIgnoredKeys(k));
 }
 async function furnish(ref, flags2 = {}) {
   if (!ref) throw new Error("usage: furnish <house>[/room] [--style cottage|townhouse|shop|\u2026] [--dry]");
@@ -5012,6 +5027,7 @@ export {
   commit,
   compassKey,
   constitution,
+  correctedLine,
   define,
   defineKit,
   defs,

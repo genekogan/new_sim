@@ -122,6 +122,29 @@ function shapeTriangles(sh: KitShape, round: number, v: number): number {
   }
 }
 
+/** Every field a kit/2 shape may carry (contract 2 refuses others). Y1 / XP7: + pattern. */
+export const KIT_SHAPE_FIELDS: ReadonlySet<string> = new Set(['kind', 'at', 'size', 'r', 'h', 'r2', 'scale', 'yaw', 'pitch', 'roll', 'color', 'material', 'tint', 'round', 'segments', 'profile', 'polygon', 'path', 'holes', 'top', 'arc', 'collide', 'role', 'pivot', 'glow', 'when', 'faces', 'pattern']);
+/** Geometry fields that only some primitives read; contract 2 refuses one on a primitive that ignores it. */
+export const KIT_GEOMETRY_FIELDS = ['size', 'r', 'r2', 'h', 'round', 'segments', 'profile', 'polygon', 'holes', 'top', 'path', 'arc'] as const;
+/** The geometry fields this primitive reads. */
+export function kitPrimitiveFields(sh: { kind: string; polygon?: unknown; profile?: unknown }): string[] {
+  switch (sh.kind) {
+    case 'box': case 'wedge': return ['size', 'round'];
+    case 'rbox': return ['size', 'round', 'segments'];
+    case 'cyl': return ['r', 'r2', 'h', 'segments', 'arc'];
+    case 'cone': return ['r', 'h', 'segments', 'arc'];
+    case 'capsule': return ['r', 'h', 'segments'];
+    case 'sphere': return ['r', 'segments', 'arc'];
+    case 'ring': case 'torus': return ['r', 'r2', 'segments', 'arc'];
+    case 'arch': return sh.polygon ? ['size', 'polygon'] : ['size', 'segments', 'arc'];
+    case 'lathe': return ['profile', 'segments', 'arc'];
+    case 'extrude': return ['polygon', 'holes', 'h', 'round'];
+    case 'loft': return ['polygon', 'top', 'h'];
+    case 'sweep': return ['path', ...(sh.profile ? ['profile'] : ['r', 'segments'])];
+    default: return [...KIT_GEOMETRY_FIELDS];
+  }
+}
+
 function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx: z.RefinementCtx) {
   const issue = (i: number, field: string, message: string, fix: string) => ctx.addIssue({ code: 'custom', path: ['shapes', i, field], message: `${field}: ${message}; fix: ${fix}` });
   for (const [i, sh] of args.shapes.entries()) {
@@ -131,18 +154,10 @@ function validateKit(args: { v: 1 | 2; shapes: KitShape[]; round: number }, ctx:
       if (sh.kind === 'loft' || (sh.kind === 'sweep' && sh.profile)) issue(i, sh.kind === 'loft' ? 'kind' : 'profile', 'requires kit contract 2', 'set make.args.v to 2 and serve the matching viewer bundle');
       continue;
     }
-    const known = new Set(['kind', 'at', 'size', 'r', 'h', 'r2', 'scale', 'yaw', 'pitch', 'roll', 'color', 'material', 'tint', 'round', 'segments', 'profile', 'polygon', 'path', 'holes', 'top', 'arc', 'collide', 'role', 'pivot', 'glow', 'when', 'faces']);
-    known.add('pattern'); // Y1 / XP7 hook
-    for (const f of Object.keys(sh)) if (!known.has(f)) issue(i, f, 'is not a kit field', `remove ${f}`);
+    for (const f of Object.keys(sh)) if (!KIT_SHAPE_FIELDS.has(f)) issue(i, f, 'is not a kit field', `remove ${f}`);
     if (sh.pattern && sh.pattern !== 'none' && (sh.glow || ['glass', 'water', 'emissive'].includes(sh.material ?? ''))) issue(i, 'pattern', 'has no effect on glass, water, emissive or glowing shapes', 'remove pattern or use an opaque, unlit material'); // Y1
-    const fields: Record<KitShape['kind'], string[]> = {
-      box: ['size', 'round'], rbox: ['size', 'round', 'segments'], wedge: ['size', 'round'],
-      cyl: ['r', 'r2', 'h', 'segments', 'arc'], cone: ['r', 'h', 'segments', 'arc'], capsule: ['r', 'h', 'segments'],
-      sphere: ['r', 'segments', 'arc'], ring: ['r', 'r2', 'segments', 'arc'], torus: ['r', 'r2', 'segments', 'arc'],
-      arch: sh.polygon ? ['size', 'polygon'] : ['size', 'segments', 'arc'], lathe: ['profile', 'segments', 'arc'], extrude: ['polygon', 'holes', 'h', 'round'],
-      loft: ['polygon', 'top', 'h'], sweep: ['path', ...(sh.profile ? ['profile'] : ['r', 'segments'])],
-    };
-    for (const field of ['size', 'r', 'r2', 'h', 'round', 'segments', 'profile', 'polygon', 'holes', 'top', 'path', 'arc'] as const) if (sh[field] !== undefined && !fields[sh.kind].includes(field)) issue(i, field, `has no effect on ${sh.kind}`, `remove ${field} or choose a primitive that uses it`);
+    const used = kitPrimitiveFields(sh);
+    for (const field of KIT_GEOMETRY_FIELDS) if (sh[field] !== undefined && !used.includes(field)) issue(i, field, `has no effect on ${sh.kind}`, `remove ${field} or choose a primitive that uses it`);
     if (sh.pivot && !sh.role) issue(i, 'pivot', 'needs an animation role', 'add role or remove pivot');
     if (sh.kind === 'rbox' && sh.segments !== undefined && (sh.round ?? Math.max(args.round, 0.06)) <= 0.005) issue(i, 'segments', 'has no effect on a sharp box', 'remove segments or use round > 0.005');
     if (sh.pivot && sh.role && args.shapes.some((other, j) => j < i && other.role === sh.role && other.pivot && other.pivot.some((v, k) => v !== sh.pivot![k]))) issue(i, 'pivot', 'conflicts with another pivot for this role', 'use one shared pivot for all shapes of a role');
