@@ -10,6 +10,7 @@ import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { engineSettled, runQuery } from './query.ts';
+import { mirrorCurrent, mirrorPayload, type MirrorWant } from './mirror.ts';
 import { mountAssetRoutes } from './assets.ts';
 import { godBodyLimit } from './ingestion.ts';
 import { godVersions } from './versions.ts';
@@ -243,7 +244,9 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { const who = requireGod(c), snapshot = d.god.godSnapshot(); return c.json(who.child ? { ...snapshot, prayers: [] } : snapshot, 200, noStore); });
   app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.dryrun(b)), 200, noStore); });
-  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const b = await body(c); const r = asGod(c, b, () => d.god.act(b, typeof b?.note === 'string' ? b.note : undefined)); return c.json(r, 200, noStore); });
+  // G2: `mirror` (the CLI's mirror state) is not part of the batch: stripped here, answered after the commit with the delta
+  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const raw = await body(c); const want = mirrorWant(raw); const b = want ? (({ mirror: _m, ...rest }) => rest)(raw as Record<string, unknown>) : raw; const r = asGod(c, b, () => d.god.act(b, typeof b?.note === 'string' ? b.note : undefined)); return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore); });
+  app.get('/v1/god/mirror', (c) => { const who = requireGod(c), q = c.req.query(), want: MirrorWant = { since: q.since === undefined ? undefined : Number(q.since), builds: q.builds === undefined ? undefined : Number(q.builds), have: q.have, lib: q.lib }; return c.json(mirrorCurrent(d.god, want) ? { contract: 'mirror/1', same: true, seq: d.god.model.editSeq } : mirrorPayload(d.god, want, { child: !!who.child }), 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
   app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });
   app.post('/v1/god/undo', async (c) => { limitGod(c, 'undo', BUILD_LIMITS.editsPerMinute); const b = await optionalBody(c), g = c.req.query('group'); return c.json(asGod(c, b, () => g ? d.god.undoGroup(g) : d.god.undo()), 200, noStore); });
@@ -275,4 +278,12 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/pray', async (c) => { const s = d.soulFromBearer(c); if (!s) throw new ApiError(401, 'unauthorized', 'a Soul token is required to pray'); const p = prayerSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { text }'); return c.json({ ok: true, prayer: d.god.pray(s, p.data.text), note: 'The god reads prayers when it is present; an answer, if any, appears under GET /v1/god/prayers/mine.' }, 200, noStore); });
   app.get('/v1/god/prayers/mine', (c) => { const s = d.soulFromBearer(c); if (!s) throw new ApiError(401, 'unauthorized', 'a Soul token is required'); return c.json({ prayers: d.god.prayersFor(s.id) }, 200, noStore); });
   app.get('/v1/world/constitution', (c) => c.text(d.god.model.state.constitution || '(this world has no constitution yet)', 200, { 'content-type': 'text/markdown; charset=utf-8', ...noStore }));
+}
+
+/** G2: the act body's optional `mirror` field ({ since, builds, have, lib }), or null. */
+function mirrorWant(raw: unknown): MirrorWant | null {
+  const m = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as { mirror?: unknown }).mirror : undefined;
+  if (!m || typeof m !== 'object') return null;
+  const o = m as Record<string, unknown>, num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined), str = (v: unknown) => (typeof v === 'string' && v.length <= 64 ? v : undefined);
+  return { since: num(o.since), builds: num(o.builds), have: str(o.have), lib: str(o.lib) };
 }

@@ -791,6 +791,7 @@ import { resolve as resolve5 } from "node:path";
 
 // lib/mirror.mjs
 import { existsSync as existsSync3, readFileSync as readFileSync5 } from "node:fs";
+import { createHash } from "node:crypto";
 
 // lib/solver.mjs
 var COMPASS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
@@ -1709,6 +1710,8 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
 // lib/mirror.mjs
 var CACHE = ".eden-god.cache.json";
 var memo = null;
+var synced = null;
+var oldServer = false;
 function readCache() {
   try {
     return existsSync3(CACHE) ? JSON.parse(readFileSync5(CACHE, "utf8")) : null;
@@ -1722,37 +1725,121 @@ function writeCache(c) {
   } catch {
   }
 }
+var mirrorHash = (s) => createHash("sha1").update(s).digest("base64url").slice(0, 16);
+var guardOf = (rows, ents, hr, he, defs2) => mirrorHash(`${rows.map((r) => `${r.id}:${hr[r.id]}`).join(",")}|${ents.map((e) => `${e.id}:${he[e.id]}`).join(",")}|${defs2}`);
+function mirrorState(world = load().world) {
+  const m = memo?.world === world ? memo : readCache();
+  if (!m || m.world !== world || !m.guard) return null;
+  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash };
+}
+function applyMirror(base, p, world) {
+  if (!p || p.contract !== "mirror/1" || p.same) return null;
+  const library = p.library ?? (base?.libraryHash === p.libraryHash ? base.snapshot.library : void 0);
+  if (!library) return null;
+  let entities, rows, defs2, he, hr;
+  if (p.full) {
+    ({ entities, rows, defs: defs2 } = p);
+    he = {};
+    hr = {};
+    for (const e of entities) he[e.id] = mirrorHash(JSON.stringify(e));
+    for (const r of rows) hr[r.id] = mirrorHash(JSON.stringify(r));
+  } else {
+    if (!base?.h || base.guard !== p.since) return null;
+    he = { ...base.h.ents };
+    hr = { ...base.h.rows };
+    const patch = (list2, changed, gone, hs, tail = []) => {
+      const drop = /* @__PURE__ */ new Set([...gone, ...tail]), by = new Map(changed.map((x) => [x.id, x])), had = new Map(list2.map((x) => [x.id, x])), out = [];
+      for (const id of gone) delete hs[id];
+      for (const x of list2) if (!drop.has(x.id)) {
+        out.push(by.get(x.id) ?? x);
+        by.delete(x.id);
+      }
+      for (const id of tail) {
+        const y = by.get(id) ?? had.get(id);
+        if (y) out.push(y);
+        by.delete(id);
+      }
+      out.push(...by.values());
+      for (const x of changed) hs[x.id] = mirrorHash(JSON.stringify(x));
+      return out;
+    };
+    entities = patch(base.snapshot.entities, p.entities, p.entitiesGone, he).sort((a, b) => a.id < b.id ? -1 : 1);
+    rows = patch(base.rows, p.rows, p.rowsGone, hr, p.rowsTail);
+    defs2 = p.defs ?? base.snapshot.defs;
+  }
+  const defsH = p.defs || p.full ? mirrorHash(JSON.stringify(defs2)) : base.h.defs;
+  const guard = guardOf(rows, entities, hr, he, defsH);
+  if (guard !== p.guard) return p.full ? build(world, { ...p.top, entities, defs: defs2, library }, rows, { libraryHash: p.libraryHash }) : null;
+  return build(world, { ...p.top, entities, defs: defs2, library }, rows, { guard, libraryHash: p.libraryHash, h: { rows: hr, ents: he, defs: defsH } });
+}
+async function fetchMirror(q) {
+  const qs2 = Object.entries(q).filter(([, v]) => v !== void 0 && v !== null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+  return call(`/v1/god/mirror${qs2 ? "?" + qs2 : ""}`, { timeoutMs: 6e4 });
+}
 async function mirror({ fresh = false } = {}) {
   const world = load().world;
+  if (!fresh && synced && synced === memo && memo.world === world) {
+    synced = null;
+    return memo;
+  }
+  const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
+  if (!oldServer) {
+    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
+    if (r.status === 0) oldServer = "maybe";
+    else if (r.data?.contract !== "mirror/1" && (r.status === 404 || r.status >= 200 && r.status < 300)) oldServer = true;
+    else {
+      const p = ok(r, "mirror");
+      if (p.same && base) {
+        memo = base;
+        return base;
+      }
+      let m = applyMirror(base, p, world);
+      if (!m) m = applyMirror(null, ok(await fetchMirror({}), "mirror"), world);
+      if (!m) throw new Error("mirror: the server sent a mirror this CLI cannot read; run `mirror --fresh`");
+      memo = m;
+      writeCache(m);
+      return m;
+    }
+  }
   if (memo && memo.world === world && !fresh) {
     const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
     if (s.status === 0) return { ...memo, offline: true };
     if (s.data.seq === memo.seq && s.data.builds === memo.buildsRev) return memo;
   }
-  const cached = memo?.world === world ? memo : readCache();
   const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
+  if (oldServer === "maybe") oldServer = seqR.status !== 0;
   if (seqR.status === 0) {
-    if (cached && cached.world === world) {
-      memo = cached;
-      return { ...cached, offline: true };
+    if (base) {
+      memo = base;
+      return { ...base, offline: true };
     }
     throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
   }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq && cached.buildsRev === seqR.data.builds) {
-    memo = cached;
-    return cached;
+  if (!fresh && base && base.seq === seqR.data.seq && base.buildsRev === seqR.data.builds) {
+    memo = base;
+    return base;
   }
   const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
   const snapshot3 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
-  memo = build(world, snapshot3, layout);
+  memo = build(world, snapshot3, layout.entities);
   writeCache(memo);
   return memo;
 }
+function adoptMirror(p) {
+  const world = load().world, base = memo?.world === world ? memo : readCache();
+  const m = applyMirror(base?.world === world ? base : null, p, world);
+  if (!m) return false;
+  memo = m;
+  synced = m;
+  writeCache(m);
+  return true;
+}
 function invalidate() {
   memo = null;
+  synced = null;
 }
-function build(world, snapshot3, layout) {
-  return { world, seq: snapshot3.seq, buildsRev: snapshot3.buildsRev, at: Date.now(), extent: snapshot3.constants.extent, snapshot: snapshot3, rows: layout.entities };
+function build(world, snapshot3, rows, sync) {
+  return { world, seq: snapshot3.seq, buildsRev: snapshot3.buildsRev, at: Date.now(), extent: snapshot3.constants.extent, snapshot: snapshot3, rows, ...sync ?? {} };
 }
 function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
@@ -3683,8 +3770,13 @@ async function freePlots(size, flags2 = {}) {
   return flags2.json ? r : r.length ? r.map((f) => `- (${f.at.join(", ")}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join("\n") : "no free plot of that size within the radius";
 }
 async function act(batch, note) {
-  const r = ok(await call("/v1/god/act", { body: { ...batch, ...note ? { note } : {} } }), "act");
+  const want = mirrorState();
+  const r = ok(await call("/v1/god/act", { body: { ...batch, ...note ? { note } : {}, ...want ? { mirror: want } : {} } }), "act");
   invalidate();
+  if (r.mirror) {
+    adoptMirror(r.mirror);
+    delete r.mirror;
+  }
   return r;
 }
 async function dryrun(batch) {

@@ -1,44 +1,123 @@
 // The world mirror: the god snapshot + a world-frame layout (poses, bounds, solid footprints, slots,
-// rooms) cached in .eden-god.cache.json. Every command first asks the server for its edit seq (one
-// tiny request); an unchanged seq means the cache is exact and nothing else is fetched. Offline
-// (server unreachable) the cache is used as is and the command says so. `follow` keeps it fresh
-// from the god SSE stream.
+// rooms) cached in .eden-god.cache.json. Every command first asks the server whether the mirror is current (one
+// small request); an unchanged seq means the cache is exact and nothing else is fetched. Offline (server
+// unreachable) the cache is used as is and the command says so. `follow` keeps it fresh from the god SSE stream.
+//
+// G2 (mirror/1): a stale mirror is patched, not refetched. GET /v1/god/mirror?since&builds&have&lib answers
+// `same`, a delta (changed layout rows and entities, ids gone, small top-level fields, defs/library only when they
+// changed) or the whole mirror (the library left out when the client's library hash matches). Every edit (`act`)
+// sends the same state and gets the delta back in its answer, so the command after it needs no refetch. The
+// guard hash (every id and row/entity hash, in order) checks the patched mirror; any mismatch refreshes in full.
+// A server without /v1/god/mirror gets the old snapshot + layout refresh.
 import { existsSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { atomicWrite, call, load, ok } from './state.mjs';
 import { isFlagDef } from './solver.mjs';
 import { noticeInboxHeader } from './inbox-notice.mjs';
 
 export const CACHE = '.eden-god.cache.json';
-let memo = null;
+let memo = null, synced = null, oldServer = false;
 
 function readCache() { try { return existsSync(CACHE) ? JSON.parse(readFileSync(CACHE, 'utf8')) : null; } catch { return null; } }
 function writeCache(c) { try { atomicWrite(CACHE, JSON.stringify(c)); } catch { /* read-only folder: memory only */ } }
 
-/** The mirror, fresh unless the server is unreachable. `{ fresh: true }` refetches regardless. */
+/** Same function as the server's (apps/server/src/god/mirror.ts). */
+export const mirrorHash = (s) => createHash('sha1').update(s).digest('base64url').slice(0, 16);
+const guardOf = (rows, ents, hr, he, defs) => mirrorHash(`${rows.map((r) => `${r.id}:${hr[r.id]}`).join(',')}|${ents.map((e) => `${e.id}:${he[e.id]}`).join(',')}|${defs}`);
+
+/** What this folder's mirror is, for the server: { since, builds, have, lib } (null: no mirror to patch). */
+export function mirrorState(world = load().world) {
+  const m = memo?.world === world ? memo : readCache();
+  if (!m || m.world !== world || !m.guard) return null;
+  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash };
+}
+
+/** Patch `base` with a mirror/1 payload; null when the result does not match the server's guard. */
+export function applyMirror(base, p, world) {
+  if (!p || p.contract !== 'mirror/1' || p.same) return null;
+  const library = p.library ?? (base?.libraryHash === p.libraryHash ? base.snapshot.library : undefined);
+  if (!library) return null;
+  let entities, rows, defs, he, hr;
+  if (p.full) {
+    ({ entities, rows, defs } = p); he = {}; hr = {};
+    for (const e of entities) he[e.id] = mirrorHash(JSON.stringify(e));
+    for (const r of rows) hr[r.id] = mirrorHash(JSON.stringify(r));
+  } else {
+    if (!base?.h || base.guard !== p.since) return null;
+    he = { ...base.h.ents }; hr = { ...base.h.rows };
+    // `tail`: ids that go to the end in this order (rows: the model's insertion order); the others keep their place
+    const patch = (list, changed, gone, hs, tail = []) => {
+      const drop = new Set([...gone, ...tail]), by = new Map(changed.map((x) => [x.id, x])), had = new Map(list.map((x) => [x.id, x])), out = [];
+      for (const id of gone) delete hs[id];
+      for (const x of list) if (!drop.has(x.id)) { out.push(by.get(x.id) ?? x); by.delete(x.id); }
+      for (const id of tail) { const y = by.get(id) ?? had.get(id); if (y) out.push(y); by.delete(id); }
+      out.push(...by.values());
+      for (const x of changed) hs[x.id] = mirrorHash(JSON.stringify(x));
+      return out;
+    };
+    entities = patch(base.snapshot.entities, p.entities, p.entitiesGone, he).sort((a, b) => (a.id < b.id ? -1 : 1)); // the server's snapshot order
+    rows = patch(base.rows, p.rows, p.rowsGone, hr, p.rowsTail);
+    defs = p.defs ?? base.snapshot.defs;
+  }
+  const defsH = p.defs || p.full ? mirrorHash(JSON.stringify(defs)) : base.h.defs;
+  const guard = guardOf(rows, entities, hr, he, defsH);
+  if (guard !== p.guard) return p.full ? build(world, { ...p.top, entities, defs, library }, rows, { libraryHash: p.libraryHash }) : null; // whole but unverifiable: no deltas
+  return build(world, { ...p.top, entities, defs, library }, rows, { guard, libraryHash: p.libraryHash, h: { rows: hr, ents: he, defs: defsH } });
+}
+
+async function fetchMirror(q) {
+  const qs = Object.entries(q).filter(([, v]) => v !== undefined && v !== null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  return call(`/v1/god/mirror${qs ? '?' + qs : ''}`, { timeoutMs: 60_000 });
+}
+
+/** The mirror, fresh unless the server is unreachable. `{ fresh: true }` refetches regardless (the library only when
+ *  it changed). */
 export async function mirror({ fresh = false } = {}) {
   const world = load().world;
+  if (!fresh && synced && synced === memo && memo.world === world) { synced = null; return memo; } // patched by this process's own edit just now
+  const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
+  if (!oldServer) {
+    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
+    if (r.status === 0) oldServer = 'maybe'; // unreachable, or a server that fails the route: the seq request below decides
+    else if (r.data?.contract !== 'mirror/1' && (r.status === 404 || (r.status >= 200 && r.status < 300))) oldServer = true; // a server before mirror/1
+    else {
+      const p = ok(r, 'mirror');
+      if (p.same && base) { memo = base; return base; }
+      let m = applyMirror(base, p, world);
+      if (!m) m = applyMirror(null, ok(await fetchMirror({}), 'mirror'), world); // drift or a lost library: the whole mirror once
+      if (!m) throw new Error('mirror: the server sent a mirror this CLI cannot read; run `mirror --fresh`');
+      memo = m; writeCache(m); return m;
+    }
+  }
   if (memo && memo.world === world && !fresh) {
     const s = await call('/v1/world/seq', { as: 'none', timeoutMs: 5000 });
     if (s.status === 0) return { ...memo, offline: true };
     if (s.data.seq === memo.seq && s.data.builds === memo.buildsRev) return memo;
   }
-  const cached = memo?.world === world ? memo : readCache();
   const seqR = await call('/v1/world/seq', { as: 'none', timeoutMs: 5000 });
+  if (oldServer === 'maybe') oldServer = seqR.status !== 0;
   if (seqR.status === 0) {
-    if (cached && cached.world === world) { memo = cached; return { ...cached, offline: true }; }
+    if (base) { memo = base; return { ...base, offline: true }; }
     throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
   }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq && cached.buildsRev === seqR.data.builds) { memo = cached; return cached; }
+  if (!fresh && base && base.seq === seqR.data.seq && base.buildsRev === seqR.data.builds) { memo = base; return base; }
   const [snap, lay] = await Promise.all([call('/v1/god/snapshot'), call('/v1/god/query', { body: { layout: { obbs: true } } })]);
   const snapshot = ok(snap, 'snapshot'), layout = ok(lay, 'layout').layout;
-  memo = build(world, snapshot, layout);
+  memo = build(world, snapshot, layout.entities);
   writeCache(memo);
   return memo;
 }
-export function invalidate() { memo = null; }
+/** An edit's answer carried the mirror delta (`act` sent mirrorState()): adopt it, so the next read needs no request. */
+export function adoptMirror(p) {
+  const world = load().world, base = memo?.world === world ? memo : readCache();
+  const m = applyMirror(base?.world === world ? base : null, p, world);
+  if (!m) return false;
+  memo = m; synced = m; writeCache(m); return true;
+}
+export function invalidate() { memo = null; synced = null; }
 
-function build(world, snapshot, layout) {
-  return { world, seq: snapshot.seq, buildsRev: snapshot.buildsRev, at: Date.now(), extent: snapshot.constants.extent, snapshot, rows: layout.entities };
+function build(world, snapshot, rows, sync) {
+  return { world, seq: snapshot.seq, buildsRev: snapshot.buildsRev, at: Date.now(), extent: snapshot.constants.extent, snapshot, rows, ...(sync ?? {}) };
 }
 
 /** Index helpers over a mirror. */

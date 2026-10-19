@@ -125,7 +125,7 @@ test('CLI prints the actual remote PNG size in text and JSON', async t => {
     const path = new URL(req.url, 'http://127.0.0.1').pathname;
     if (path.endsWith('/look')) { res.writeHead(200, { 'content-type': 'image/png', 'x-look-size': '1x1' }); res.end(png); return; }
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify(path.endsWith('/seq') ? { seq: 0 } : path.endsWith('/snapshot') ? { seq: 0, constants: { extent: 100 }, entities: [] } : JSON.parse(body).layout ? { layout: { entities: [] } } : { points: [{ y: 0, water: 0 }] }));
+    res.end(JSON.stringify(path.endsWith('/seq') ? { seq: 0 } : path.endsWith('/snapshot') ? { seq: 0, constants: { extent: 100 }, entities: [] } : JSON.parse(body || '{}').layout ? { layout: { entities: [] } } : { points: [{ y: 0, water: 0 }] }));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise(resolve => server.close(resolve)));
