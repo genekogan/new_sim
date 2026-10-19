@@ -17,7 +17,7 @@ import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose
 export function hasMotion(def: StoredDef): boolean {
   const c = def.components;
   if (c.spin || c.swing || c.sway || c.hover || c.route || c.behavior || c.light || c.lights || hasFlames(def)) return true;
-  if (def.tags.includes('creature') || def.tags.includes('moving')) return true;
+  if (def.tags.includes('creature') || def.tags.includes('moving') || isBoat(def)) return true;
   if (def.make.kind === 'gen' && def.make.gen === 'animals/1') return true;
   const gait = def.make.kind === 'gen' && def.make.gen === 'kit/2' ? (def.make.args as { gait?: string } | undefined)?.gait : undefined;
   return !!gait && gait !== 'none';
@@ -39,8 +39,9 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
   if (ud.tick) { ud.tick(t); return; }
   const c = def.components, phase = ((entity.seed ?? hash(entity.id)) % 1000) / 1000 * Math.PI * 2;
   const model = ud.rig?.model ?? ud.model ?? boundModel;
-  if (c.route && model) routeStep(obj, entity, def, model, t, base);
+  const routed = !!c.route && !!model && routeStep(obj, entity, def, model, t, base);
   if (ud.rig) creatureStep(obj, ud.rig, entity, t, base);
+  if (isBoat(def)) { boatStep(obj, entity, def, model, t, base, phase, routed); if (c.light || c.lights) glowStep(obj, entity, def, model, t); return; }
   // VOCAB-MECH: a spinning part stops when its actuator is off (power on:false, play playing:false)
   if (c.spin && entity.state?.on !== false && entity.state?.playing !== false) {
     const ang = (t * (c.spin.rpm / 60)) * Math.PI * 2;
@@ -354,14 +355,14 @@ export function gait(obj: THREE.Object3D, rig: Rig, P: Pose, t: number, s: numbe
 // ---------------------------------------------------------------- routes and lights
 
 /** Follow the entity's own path shape, or a ref entity's path (a road, a river), at `speed` m/s. */
-function routeStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel, t: number, base: { y: number; yaw: number }) {
+function routeStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel, t: number, base: { y: number; yaw: number }): boolean {
   const r = def.components.route!;
   const refE = r.ref ? model.get(r.ref) : null;
   const shape = (refE?.shape ?? e.shape) as { path?: V2[] } | undefined;
-  const path = shape?.path; if (!path || path.length < 2) return;
+  const path = shape?.path; if (!path || path.length < 2) return false;
   const segs: number[] = []; let len = 0;
   for (let i = 1; i < path.length; i++) { const l = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); segs.push(l); len += l; }
-  if (len < 1e-3) return;
+  if (len < 1e-3) return false;
   const closed = Math.hypot(path[0][0] - path[path.length - 1][0], path[0][1] - path[path.length - 1][1]) < 0.5;
   const off = rand(e.seed ?? seedOf(e.id), 1) * len;
   let d = t * r.speed + off;
@@ -375,6 +376,93 @@ function routeStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldM
   obj.position.set(p[0], y, p[1]);
   obj.rotation.y = Math.atan2(ahead[0] - behind[0], ahead[1] - behind[1]);
   void base;
+  return true;
+}
+
+// ---------------------------------------------------------------- boats
+
+/** W2b: a boat — any def tagged boat that floats (rowing boats, canoes, sailboats, god-made boats; not a boat-shaped
+ *  building on land). */
+export function isBoat(def: Pick<StoredDef, 'tags' | 'anchor'>): boolean { return def.anchor === 'float' && def.tags.includes('boat'); }
+const MOOR_WORDS = /pier|dock|jetty|pontoon|quay|wharf|marina|boardwalk|breakwater|landing|mooring/;
+type BoatRest = { x: number; z: number; drift: number; moored: boolean; size: number; beached?: boolean };
+/** Where a boat rests and how far it may drift: a boat within a few metres of land, a pier or a solid is moored
+ *  (it sways on its lines, no drift); one on open water drifts on a slow loop, at most 40% of its clear water (≤ 6 m). */
+export function boatRest(model: WorldModel | null, e: Entity, def: StoredDef, x: number, z: number, scale = 1): BoatRest {
+  const box = def.size?.box ?? [2, 1, 3], size = Math.max(box[0], box[2]) * scale, half = Math.min(box[0], box[2]) * scale / 2;
+  if (!model) return { x, z, drift: 0, moored: true, size };
+  const boxes: Box[] = [];
+  for (const { id, fp } of boatSolids(model)) if (id !== e.id) for (const b of fp) if (Math.hypot(b.c[0] - x, b.c[1] - z) < 20 + Math.hypot(b.half[0], b.half[1])) boxes.push(b);
+  const half2 = model.constants.extent / 2 - 1;
+  const s = { free(px: number, pz: number, r: number) {
+    if (Math.abs(px) > half2 || Math.abs(pz) > half2) return false;
+    const g = model.terrain.sample(px, pz), wl = waterAt(model, px, pz); if (wl === null || wl - g < 0.25) return false;
+    for (const b of boxes) { if (b.y1 < wl + 0.05) continue; const dx = px - b.c[0], dz = pz - b.c[1], c = Math.cos(b.yaw), sn = Math.sin(b.yaw);
+      if (Math.abs(dx * c - dz * sn) < b.half[0] + r && Math.abs(dx * sn + dz * c) < b.half[1] + r) return false; }
+    return true;
+  } };
+  { const wl = waterAt(model, x, z); if (wl === null || wl - model.terrain.sample(x, z) < 0.15) return { x, z, drift: 0, moored: true, size, beached: true }; } // drawn up on the shore: still
+  let clear = 16;
+  rings: for (const r of [size / 2 + 0.8, size / 2 + 2, size / 2 + 3.5, 6, 9, 12, 16]) {
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; if (!s.free(x + Math.cos(a) * r, z + Math.sin(a) * r, half)) { clear = r - size / 2; break rings; } }
+  }
+  // piers and pontoons are walkable surfaces (not solids): a boat alongside one is moored to it
+  let pier = Infinity;
+  for (const m of moorings(model)) pier = Math.min(pier, distToPath(x, z, m.path) - m.w / 2 - size / 2);
+  const moored = clear < 2.6 || pier < 2.5;
+  return { x, z, moored, size, drift: moored ? 0 : Math.max(0, Math.min(6, clear * 0.4, (pier - 1) * 0.4)) };
+}
+let boatSolidScan: { model: WorldModel; key: string; at: number; list: readonly { id: string; fp: readonly Box[] }[] } | null = null;
+/** The solids' footprints for boats' water surveys, kept between frames (refreshed on any model change, or after 30 s). */
+function boatSolids(model: WorldModel) {
+  const key = `${model.entities.size}`, now = performance.now(), c = boatSolidScan;
+  if (c && c.model === model && c.key === key && c.list.length && now - c.at < 30000) return c.list;
+  const list = solidFootprints(model); boatSolidScan = { model, key, at: now, list };
+  return list;
+}
+let mooringScan: { model: WorldModel; size: number; list: { path: [number, number][]; w: number }[] } | null = null;
+/** Every pier, jetty or pontoon path in the world (scanned once per model change, shared by all boats). */
+function moorings(model: WorldModel) {
+  if (mooringScan?.model === model && mooringScan.size === model.entities.size) return mooringScan.list;
+  const list: { path: [number, number][]; w: number }[] = [];
+  model.readPass(() => { for (const p of model.entities.values()) {
+    const path = (p.shape as { path?: [number, number][] } | undefined)?.path; if (!path || path.length < 2) continue;
+    const pd = model.resolvedDef(p.def); if (!pd || !MOOR_WORDS.test(`${pd.name} ${pd.tags.join(' ')} ${(p as { name?: string }).name ?? ''}`)) continue;
+    list.push({ path, w: Number((p.params as Record<string, unknown> | undefined)?.width ?? pd.size?.box?.[2] ?? 2) });
+  } });
+  mooringScan = { model, size: model.entities.size, list };
+  return list;
+}
+/** At most one boat surveys its water per frame (none during the first seconds of arrival); drift then eases in. */
+let surveyFrame = -1;
+/** Bob on the swell, roll and pitch; moored boats swing a little on their lines; free boats drift on a slow loop and
+ *  turn with it. A pure function of world time and the entity's seed, like every motion here. */
+function boatStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number, base: { y: number; yaw: number }, phase: number, routed: boolean) {
+  const ud = obj.userData as { boat?: BoatRest & { at?: number; born?: number; ms?: number } };
+  const x0 = obj.position.x, z0 = obj.position.z;
+  // a boat under way (rowed, towed, moved by a god) holds still on its lines; its water is surveyed once it has rested 1 s
+  if (!ud.boat || Math.abs(ud.boat.x - x0) > 0.05 || Math.abs(ud.boat.z - z0) > 0.05) ud.boat = { x: x0, z: z0, drift: 0, moored: true, size: ud.boat?.size ?? 3, at: t };
+  else if (ud.boat.at !== undefined && t - ud.boat.at > 1 && surveyFrame !== Math.floor(t * 60)) { surveyFrame = Math.floor(t * 60); const a = performance.now(); ud.boat = { ...boatRest(model, e, def, x0, z0, obj.scale.x), born: t, ms: performance.now() - a }; }
+  const b = ud.boat; if (b.beached) { obj.rotation.set(0, base.yaw, 0); return; }
+  const c = def.components, k = Math.max(0.5, Math.min(2, 3 / Math.max(1, b.size)));   // small boats move more
+  const T = Math.PI * 2, bob = c.hover?.bob ?? 0.05, period = c.hover?.period ?? 3.4;
+  const swell = Math.sin((t * T) / period + phase) + 0.35 * Math.sin((t * T) / (period * 2.3) + phase * 1.7);
+  obj.position.y = (routed ? obj.position.y : base.y + (c.hover?.height ?? 0)) + bob * swell;
+  obj.rotation.order = 'YXZ';
+  const roll = (b.moored ? 0.05 : 0.035) * k, pitch = 0.018 * k;
+  obj.rotation.z = roll * Math.sin((t * T) / (period * 1.27) + phase * 2.3) + (c.sway ? c.sway.amount * 0.3 * Math.sin((t * T) / c.sway.period + phase) : 0);
+  obj.rotation.x = pitch * Math.sin((t * T) / (period * 0.93) + phase * 0.7);
+  if (routed) return;
+  if (b.moored) {                       // on its lines: a short surge fore and aft and a slow swing of the bow
+    const surge = 0.12 * Math.sin((t * T) / 11 + phase), cy = Math.cos(base.yaw), sy = Math.sin(base.yaw);
+    obj.position.x = x0 + surge * sy; obj.position.z = z0 + surge * cy;
+    obj.rotation.y = base.yaw + 0.05 * Math.sin((t * T) / 17 + phase * 1.3);
+    return;
+  }
+  const ease = Math.min(1, (t - (b.born ?? t)) / 10), P = 180 + (phase / T) * 120, R = b.drift * ease * ease * (3 - 2 * ease);  // one slow loop every 3-5 minutes
+  obj.position.x = x0 + R * Math.sin((t * T) / P + phase);
+  obj.position.z = z0 + R * Math.sin((t * T) / (P * 1.37) + phase * 2);
+  obj.rotation.y = base.yaw + 0.35 * (R / Math.max(1e-6, b.drift)) * Math.sin((t * T) / (P * 0.9) + phase * 0.5);
 }
 
 /** Lamps glow at dusk and night; `state.on: false` darkens this one (its own material copy). */
