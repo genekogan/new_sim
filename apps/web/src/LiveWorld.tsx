@@ -322,7 +322,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
         const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1,entityLayer.arrivalAt());controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
-      camera.lookAt(controls.target);context.current.setCameraMode('manual');};
+      camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');};  // lane W1: at once, not at React's next render: the socket's takes now arrive during the build, and a broadcast frame in between moved a ?shot's eye/at camera
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotHour=parseShotHour(location.search);
