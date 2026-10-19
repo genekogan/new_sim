@@ -7,8 +7,10 @@
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> [--cpu 4] [--mbps 60] [--interval 250]
 //   node tools/speed/profile-arrival.mjs <world-url> --out <dir> --analyze [--from ms] [--to ms]   (re-analyse a window)
 //   --desktop: 1440x900 (or --size WxH) at --dpr (default 1), no touch, --cpu defaults to 1 and --mbps to 0 (unthrottled).
+//   --stranger: no local dev sign-in (default signs in as dev:admin on lane ports).
 //   --latency ms: added round trip with --mbps (default 40; ~150 is the laptop -> eden2 live path).
-//   --warm: HTTP cache on; one untimed arrival first in the same context, then the timed reload (the returning visitor).
+//   --warm: HTTP cache on; one untimed arrival first in the same context, then about:blank, then the timed load (the
+//          returning visitor; a fresh document even for #hash URLs).
 // Ports: lane ports only via SPEED_PORTS (the live 4930–4990 are always refused).
 import { mkdirSync, writeFileSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -57,7 +59,7 @@ const release = await chromeLease('speed', { waitMs: 2_700_000, staleMs: Infinit
 const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 try {
   const ctx = await browser.newContext({ viewport: { width: vw, height: vh }, deviceScaleFactor: dpr, isMobile: !desktop, hasTouch: !desktop });
-  if (!live) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
+  if (!live && !args.includes('--stranger')) await ctx.addInitScript(() => { try { localStorage.setItem('sim.dev', 'admin'); } catch {} });
   await ctx.addInitScript(INIT);
   const page = await ctx.newPage();
   // GLB timing from the browser context (Playwright follows worker requests too; Resource Timing only sees the page's)
@@ -65,7 +67,10 @@ try {
   const cdp = await ctx.newCDPSession(page);
   cdp.on('Network.webSocketFrameReceived', (e) => { if (navAt) wsFrames.push([Date.now() - navAt, (e.response?.payloadData ?? '').length]); });
   await cdp.send('Network.enable'); await cdp.send('Network.setCacheDisabled', { cacheDisabled: !warm });
-  if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0; }
+  if (warm) { await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 }); await page.waitForFunction(() => window.__arr?.marks.cardDone !== undefined, null, { timeout: 180_000, polling: 100 }); await page.waitForTimeout(8000); glbs.length = 0;
+    // leave the document first: a second goto to a #hash URL is only a hash change in the same page (no reload), so the
+    // timed marks would be the untimed first load's (research B, 2026-10-19)
+    await page.goto('about:blank'); }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   if (mbps > 0) await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: Number(opt('latency', '40')), downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 });
   await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval });
