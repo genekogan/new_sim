@@ -1,0 +1,45 @@
+// P1 phones: Clerk for a world page, loaded on its own after the arrival (main.tsx ClerkWorld). It renders nothing on
+// screen: it mounts ClerkProvider beside the world's Shell (a sibling, so the Shell never remounts when it arrives) and
+// hands the signed-in state up through onAuth. Until then the Shell shows "Signing in…" exactly as it did while
+// clerk-js loaded inside the provider; the world's socket never waited for it (useSim re-hellos when the session lands).
+import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { apiPath } from './world-path.ts';
+import type { AuthCtx } from './Shell.tsx';
+
+export type ClerkBridgeProps = { publishableKey: string; issuer: string | undefined; onAuth(auth: AuthCtx): void; takePendingLogin(): boolean };
+
+export default function ClerkBridge(props: ClerkBridgeProps) {
+  return <ClerkProvider publishableKey={props.publishableKey}><Bridge {...props} /></ClerkProvider>;
+}
+
+function Bridge({ issuer, onAuth, takePendingLogin }: ClerkBridgeProps) {
+  const session = useAuth(), clerk = useClerk(), profile = useUser();
+  const [binding, setBinding] = useState<{ accountId: string; issuer: string; subject: string } | null>(null);
+  const subject = session.userId, sessionId = session.sessionId;
+  const [resolveAttempt, setResolveAttempt] = useState(0);
+  useEffect(() => {
+    setBinding(null); if (!session.isLoaded || !session.isSignedIn || !subject) return;
+    let active = true; const abort = new AbortController();
+    void (async () => { for (let attempt = 0; active && attempt < 5; attempt++) { try { const token: string | null = await session.getToken(); if (!active || !token) return;
+      const response: Response = await fetch(apiPath('/v1/account/session'), { headers: { authorization: 'Bearer ' + token }, signal: abort.signal, cache: 'no-store' });
+      const value: unknown = await response.json();
+      if (active && response.ok && value !== null && typeof value === 'object') { const candidate = value as Record<string, unknown>; if (candidate.subject === subject && typeof candidate.issuer === 'string' && candidate.issuer === issuer && typeof candidate.accountId === 'string' && candidate.accountId.startsWith('acct_')) { setBinding({ accountId: candidate.accountId, issuer: candidate.issuer, subject }); return; } }
+    } catch { /* retried */ } if (active) await new Promise<void>(yes => setTimeout(yes, 1000)); } })(); return () => { active = false; abort.abort(); };
+  }, [session.isLoaded, session.isSignedIn, subject, sessionId, issuer, resolveAttempt]);
+  const accountId = binding && binding.subject === subject && binding.issuer === issuer ? binding.accountId : null;
+  const currentProfile = profile.user?.id === subject ? profile.user : null;
+  // The latest Clerk handles, read by the published functions (the published auth changes only when what it says does).
+  const live = useRef({ session, clerk }); live.current = { session, clerk };
+  const ready = session.isLoaded, signedIn = !!session.isSignedIn, authed = ready && signedIn && !!accountId;
+  const label = currentProfile?.primaryEmailAddress?.emailAddress ?? currentProfile?.firstName ?? null, avatarUrl = currentProfile?.imageUrl ?? null;
+  const auth = useMemo<AuthCtx>(() => ({ mode: 'clerk', ready, authed, label, avatarUrl,
+    login: () => { const { session: s, clerk: c } = live.current; if (s.isSignedIn) setResolveAttempt(n => n + 1); else c.openSignIn({ afterSignInUrl: location.href, afterSignUpUrl: location.href }); },
+    logout: (returnUrl) => live.current.clerk.signOut({ redirectUrl: returnUrl ?? location.href }),
+    getToken: async () => { const s = live.current.session; return s.isLoaded && s.isSignedIn ? s.getToken() : null; },
+    debug: { privyUserId: null, accountIdentity: accountId, wallet: null, linked: [] } }), [ready, authed, label, avatarUrl, accountId]);
+  useEffect(() => { onAuth(auth); }, [auth, onAuth]);
+  // A sign-in asked for before Clerk had loaded (the Shell's placeholder login) opens once it has.
+  useEffect(() => { if (ready && takePendingLogin()) auth.login(); }, [ready, auth, takePendingLogin]);
+  return null;
+}

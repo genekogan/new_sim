@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {agentOnboarding,agentQuickstart,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
+import {agentOnboarding,agentQuickstart,clerkNow,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
+import {readFileSync} from 'node:fs';
 await test('New Soul prompt keeps a raw clickable-world URL and exact plain clipboard sentence',()=>{
  const onboarding=agentOnboarding('https://sim.example/w/eden/');
  assert.equal(onboarding.instructionsUrl,'https://sim.example/w/eden/instructions.md');
@@ -113,4 +114,16 @@ await test('Share Soul, the connection prompt and the onboarding name work on a 
  assert.ok(connectionSetupPrompt(origin+path,'s_Avery',undefined,base)?.includes(JSON.stringify(origin+path)));
  assert.equal(connectionSetupPrompt(origin+path,'s_Avery'),null);
  assert.equal(agentOnboarding(origin+path).world,'Willow Hollow') // V1: slug words, never the raw slug;
+});
+
+await test('P1: a Clerk world page loads its sign-in after the arrival unless the page came for a sign-in step',()=>{
+ const u='https://sim.example/worlds/w/eden-2026/';
+ assert.equal(clerkNow(u,''),false);assert.equal(clerkNow(u+'#watch','#watch'),false);
+ assert.equal(clerkNow(u+'#soul/soul_abc123','#soul/soul_abc123'),false);
+ for(const h of ['#join','#approve/AB12','#godpair/ABCD-EFGH','#my%20soul'])assert.equal(clerkNow(u+h,h),true,h);
+ assert.equal(clerkNow(u+'?__clerk_handshake=x',''),true);assert.equal(clerkNow(u+'?__clerk_db_jwt=x#watch','#watch'),true);
+ // main.tsx: the Shell renders beside the lazy bridge (never inside ClerkProvider), and no static Clerk import
+ const main=readFileSync(new URL('./main.tsx',import.meta.url),'utf8');
+ assert.doesNotMatch(main,/from '@clerk\/clerk-react'/);assert.doesNotMatch(main,/import \{[^}]*LauncherHome[^}]*\} from/);
+ assert.match(main,/<Shell cfg=\{cfg\} auth=\{auth\}[^>]*\/>\s*\{load&&<Suspense fallback=\{null\}><ClerkBridge /);
 });

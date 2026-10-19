@@ -40,6 +40,12 @@ export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOr
  const fragment=approval?'#approve/'+approval:!oldWorld&&/^#godpair\/[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(hash)?hash:soul?'#'+soulFragment(soul):hash==='#join'?'#join':'#watch';
  return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+path.replace(/\/$/,'')+fragment};
 }
+/** P1 phones: whether a Clerk world page loads its sign-in before the arrival (else once the card has gone): Clerk's
+ *  own redirect parameters, or a fragment that is a sign-in step (approval, pairing, join, a tab) rather than watching
+ *  or a Soul link. */
+export function clerkNow(href:string,hash:string):boolean{
+ return /[?&#]__clerk|__session=|__dev_session/.test(href)||!(hash===''||hash==='#'||hash==='#watch'||!!soulFromFragment(hash));
+}
 /** The launcher homepage (`<base>/`) mounts Clerk only on the configured origin too. */
 export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string,base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
