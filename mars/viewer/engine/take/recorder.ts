@@ -13,6 +13,7 @@ import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL, type ChangeEvent, type PoseSample, type Take, type TakeEntity0, type TakeEvent, type TakeHands } from './types.ts';
 import { interpSample } from './replay.ts';
+import { entityKeys, entityList } from '../world/entity-list.ts';
 
 export type RecorderOptions = {
   renderSceneRef?: Take['renderSceneRef'];
@@ -89,24 +90,9 @@ const sameValues = (a: PoseSample, b: PoseSample) => a.length === b.length && a.
 const samePos = (a: PoseSample, b: PoseSample) => a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
 
 // ---- S1 V7b (tranche 2026-10-19): idle cost of a big world's takes -------------------------------------------------
-// The sorted id order is kept per entity table until its own key list changes (an add or a remove); the final state's
-// copy of an entity (or of a world field) and that copy's stable text are kept per world and reused while the live value
+// Each tick samples only the entities the engine moves, sorted by id; the final state's copy of an entity (or of a world field) and that copy's stable text are kept per world and reused while the live value
 // still equals the copy exactly. Takes stay byte-identical (test/take-golden.test.ts pins ids recorded before this).
 // Shared copies are never mutated: a take's final state is read-only by contract (wire encoders, archives, replay).
-
-const ORDER = new WeakMap<object, { keys: string[]; sorted: string[] }>();
-/** Object.keys(ents).sort(), the sort reused while the table's own keys are the same, in the same order. */
-function sortedIds(ents: Record<string, unknown>): string[] {
-  const keys = Object.keys(ents), hit = ORDER.get(ents);
-  if (hit && hit.keys.length === keys.length) {
-    let same = true;
-    for (let i = 0; i < keys.length; i++) if (keys[i] !== hit.keys[i]) { same = false; break; }
-    if (same) return hit.sorted;
-  }
-  const sorted = keys.slice().sort();
-  ORDER.set(ents, { keys, sorted });
-  return sorted;
-}
 
 /** True when `copy` is what structuredClone(live) would make of `live` now: plain objects with the same own enumerable keys
  *  in the same order, arrays of the same length and holes, primitives Object.is-equal (-0 and 0 differ). Anything else
@@ -138,8 +124,9 @@ type WorldCopies = { fields: Map<string, Kept>; entities: Map<string, Kept> };
 const COPIES = new WeakMap<object, WorldCopies>();
 const keep = (live: object, prev: Kept | undefined): Kept => {
   if (prev && sameCopy(live, prev.copy)) return prev;
-  const copy = structuredClone(live);
-  return { copy, text: stableStringify(copy) };
+  const copy = structuredClone(live), text = stableStringify(copy);
+  text.charCodeAt(0);   // flatten the rope once (G1's finding: hashing thousands of cached ropes re-walks them every take)
+  return { copy, text };
 };
 
 /** The take's final state: what `{ ...structuredClone(world without entityPhysicsV1), entityPhysicsV1 }` (or a plain
@@ -214,11 +201,14 @@ export class TakeRecorder implements RuntimeObserver {
   private sample() {
     const t = this.rt.tick - this.startTick;
     const ents = this.rt.world.entities;
-    for (const id of sortedIds(ents)) {
+    // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
+    // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
+    // S1 V7b: only those are sorted (by id, as the sorted id list was), from the tick's shared entity list.
+    const list = entityList(this.rt.world), keys = entityKeys(this.rt.world), dynamic: string[] = [];
+    for (let i = 0; i < list.length; i++) if (!list[i].tags?.includes('entity-world')) dynamic.push(keys[i]);
+    dynamic.sort();
+    for (const id of dynamic) {
       const e = ents[id];
-      // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
-      // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
-      if (e.tags?.includes('entity-world')) continue;
       const s = quantize(e, t);
       const tr = this.tracks.get(id);
       if (!tr) this.tracks.set(id, { committed: s, pending: [], out: [s] });

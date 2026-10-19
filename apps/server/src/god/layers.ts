@@ -102,7 +102,7 @@ export class GodLayers {
     this.entitiesSeen = key ? { key, on } : null;
     return on;
   }
-  private calendarObjects(): (Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> & Partial<Pick<Objects, 'ofKind'>>) | undefined { return (this.h.edge as any)?.comms?.objects; }
+  private calendarObjects(): (Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> & Partial<Pick<Objects, 'ofKind' | 'ids'>>) | undefined { return (this.h.edge as any)?.comms?.objects; }
 
   // ---------- the clock ----------
 
@@ -145,7 +145,9 @@ export class GodLayers {
   private postCalendar(scheduled: Entity[], c: WorldClock): number {
     const objs = this.calendarObjects();
     if (!objs?.kindOf('calendar-item')) return 0;
-    const all = objs.all(), have = new Set(all.map((o) => o.id)), keep = new Set<string>();
+    // S1 V7d: only the calendar items are parsed (an Eden 2026 holds ~3,300 objects, 1.5 MB of JSON, every 2 s)
+    const all = objs.ofKind && objs.ids ? objs.ofKind('calendar-item') : objs.all(), keep = new Set<string>();
+    const have = new Set(objs.ofKind && objs.ids ? objs.ids() : all.map((o) => o.id));
     // Keep surviving sources, including their interest/reminder state. New entries carry private provenance
     // in the existing creation log, so changing the clock does not change their identity. Pre-fix entries
     // have only startsAtTick; retain the old deterministic date fallback for those records.

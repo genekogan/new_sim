@@ -328,15 +328,17 @@ export class Runtime {
     this.admitSocialReturns();
     const ti = this.prof ? this.prof.now() : 0;
     // one entity list for the whole pass (world/entity-list.ts: ~24 Object.values over every entity were most of a tick)
+    // S1 (tranche 2026-10-19): observers (take recorder, metrics, chapter cutter) only read the world, so they share the
+    // pass's entity list too (the recorder listed and sorted every id of a 4,900-entity world every tick)
     withEntityList(this.world, () => {
       for (const inv of this.invariants)
         for (const d of inv(this)) {
           this.violations.push({ ...d, tick: this.tick });
           this.events.push({ tick: this.tick, type: 'violation', code: d.code, message: d.message, subjects: d.subjects });
         }
+      if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
+      for (const o of this.observers) o.onTick?.(this);
     });
-    if (this.prof) this.prof.add('invariants', this.prof.now() - ti);
-    for (const o of this.observers) o.onTick?.(this);
   }
 
   /** Conservative early-stop proof: all live roots, children and ambient actions must certify every internal mover. */

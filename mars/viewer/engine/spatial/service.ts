@@ -6,6 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, hypot, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
+import { passList } from '../world/entity-list.ts';
 import { buildStaticGrids, buildGrids, clearanceAt, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
@@ -494,19 +495,30 @@ export class Spatial {
    * and changes exactly when the former sha256 key over the same fields would (planning.test.ts).
    */
   private navChanged(world: WorldState, onBody?: (e: Entity) => void): boolean {
-    const snaps = this.snaps;
-    let n = 0, changed = false;
-    for (const id in world.entities) {
-      const e = world.entities[id];
-      if (onBody && e.kind === 'human' && e.human) { onBody(e); continue; }
-      if (!isStatic(e)) continue;
-      const s = snaps[n];
-      if (!s) { snaps.push(navSnap(e)); changed = true; }
-      else if (!sameNav(s, e)) { navSnap(e, s); changed = true; }
-      n++;
+    // S1 V7a: inside an invariant pass the tick's shared entity list (world/entity-list.ts: the for-in order this walks),
+    // so a world with a body does not look ~4,900 entities up by key every tick; elsewhere the table itself
+    const shared = passList(world);
+    if (shared) {
+      this.navN = 0; this.navChangedFlag = false;
+      for (let i = 0; i < shared.length; i++) this.navVisit(shared[i], onBody);
+    } else {
+      this.navN = 0; this.navChangedFlag = false;
+      const ents = world.entities;
+      for (const id in ents) this.navVisit(ents[id], onBody);
     }
-    if (snaps.length !== n) { snaps.length = n; changed = true; }
-    return changed;
+    const snaps = this.snaps, n = this.navN;
+    if (snaps.length !== n) { snaps.length = n; this.navChangedFlag = true; }
+    return this.navChangedFlag;
+  }
+  private navN = 0;
+  private navChangedFlag = false;
+  private navVisit(e: Entity, onBody?: (e: Entity) => void) {
+    if (onBody && e.kind === 'human' && e.human) { onBody(e); return; }
+    if (!isStatic(e)) return;
+    const snaps = this.snaps, s = snaps[this.navN];
+    if (!s) { snaps.push(navSnap(e)); this.navChangedFlag = true; }
+    else if (!sameNav(s, e)) { navSnap(e, s); this.navChangedFlag = true; }
+    this.navN++;
   }
 
   route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: RouteOpts): RouteResult {

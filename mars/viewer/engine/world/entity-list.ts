@@ -11,7 +11,7 @@
 // world afresh, as before. The returned arrays are shared: callers never sort or splice them in place.
 import type { Entity, WorldState } from './types.ts';
 
-type Scope = { world: WorldState; entities: WorldState['entities']; list: Entity[]; byId?: Entity[] };
+type Scope = { world: WorldState; entities: WorldState['entities']; list: Entity[]; keys: string[]; byId?: Entity[] };
 let scope: Scope | null = null;
 
 const byIdOrder = (a: Entity, b: Entity) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
@@ -36,10 +36,21 @@ export function entitiesById(w: WorldState): Entity[] {
   return (s.byId ??= s.list.slice().sort(byIdOrder));
 }
 
+/** The shared list while an entity-list pass over `w` is open, else null (callers then walk the table themselves). */
+export function passList(w: WorldState): Entity[] | null {
+  return live(w)?.list ?? null;
+}
+
+/** The world's entity keys in Object.keys order, parallel to entityList (shared during a pass; never mutate the array). */
+export function entityKeys(w: WorldState): string[] {
+  return live(w)?.keys ?? Object.keys(w.entities);
+}
+
 /** Run `fn` (read-only over `w`) with one entity list for the whole call. */
 export function withEntityList<T>(w: WorldState, fn: () => T): T {
-  const prev = scope;
-  scope = { world: w, entities: w.entities, list: listEntities(w.entities) };
+  const prev = scope, entities = w.entities, list: Entity[] = [], keys: string[] = [];
+  for (const k in entities) if (Object.hasOwn(entities, k)) { keys.push(k); list.push(entities[k]); }
+  scope = { world: w, entities, list, keys };
   try {
     return fn();
   } finally {

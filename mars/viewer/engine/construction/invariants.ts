@@ -7,11 +7,16 @@ import { HAND_REACH, handPoint, LIFT_APEX_MAX } from './liftcrew.ts';
 import { EDGE_REACH, ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, KNEEL_BACK, REACH_DOWN } from './handup.ts';
 import { hypot } from '../core/math.ts';
 import { entityList } from '../world/entity-list.ts';
+import type { Entity } from '../world/types.ts';
+
+/** isUpright by def id (it reads only the def; catalog entries are never replaced); an unknown def throws as before. */
+const UPRIGHT_DEFS = new Map<string, boolean>();
+const uprightDef = (e: Entity) => { let v = UPRIGHT_DEFS.get(e.def); if (v === undefined) { v = isUpright(e); UPRIGHT_DEFS.set(e.def, v); } return v; };
 
 export const uprightsSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
   for (const e of entityList(rt.world)) {
-    if (!isUpright(e) || e.phase === 'carried') continue;
+    if (!uprightDef(e) || e.phase === 'carried') continue;
     if (isStanding(e) || e.phase === 'raising') {
       if (!isSupported(rt.world, e) && e.support?.kind !== 'held')
         out.push({ code: 'support.upright-unsupported', message: `${e.id} is standing without enough holders or stabilizing beams`, subjects: [e.id], at: e.pose.p });

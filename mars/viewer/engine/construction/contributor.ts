@@ -51,6 +51,10 @@ export const progressiveContributor: Contributor = (world, base) => {
 export const frameAccessContributor: Contributor = (world) => ({ links: frameLinks(world) });
 
 const PROGRESSIVE = (e: Entity) => isJoist(e) || isPlywood(e) || isStairFlight(e) || e.def === 'stair-tread';
+/** PROGRESSIVE by def id (it reads only the def; catalog entries are never replaced, catalog-adapter registerAssets).
+ *  An unknown def is not remembered, so it throws in def() as before. */
+const PROGRESSIVE_DEFS = new Map<string, boolean>();
+const progressiveDef = (e: Entity) => { let v = PROGRESSIVE_DEFS.get(e.def); if (v === undefined) { v = PROGRESSIVE(e); PROGRESSIVE_DEFS.set(e.def, v); } return v; };
 
 // A completed deck has the same support chain for many ticks. Reuse only a
 // successful proof, after comparing every input read by supportProblems and
@@ -93,7 +97,7 @@ function supportInputs(w: WorldState, previous?: SupportSnap[]): SupportSnap[] |
 export const progressiveSupported: Invariant = (rt) => {
   // S1 V7a: nothing installed is a joist / sheet / stair → nothing to prove (a world without construction skips the
   // per-entity input snapshot every tick). The proof cache is dropped so a later deck is proven from scratch.
-  if (!entityList(rt.world).some((e) => e.phase === 'installed' && PROGRESSIVE(e))) { supported.delete(rt.world); return []; }
+  if (!entityList(rt.world).some((e) => e.phase === 'installed' && progressiveDef(e))) { supported.delete(rt.world); return []; }
   let inputs: SupportSnap[] | undefined;
   try { inputs = supportInputs(rt.world, supported.get(rt.world)); }
   catch (error) { supported.delete(rt.world); throw error; }
