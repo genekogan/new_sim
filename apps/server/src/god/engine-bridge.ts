@@ -16,6 +16,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, syncProviders, usesProviders, type ReachEnd, type ReachEndpoint } from './query.ts';
 import { GodNav } from './nav.ts';
+import { doorInGap, freeDoorOpening, isDoorDef, isShut } from './doors.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
 import { GodLayers } from './layers.ts';
@@ -204,6 +205,8 @@ export class EngineBridge {
     if (!this.reconciled) return; // the first tick reconciles everything
     for (const e of diff.upserts) for (const id of this.model.subtree(e.id)) this.pending.add(id);
     for (const id of diff.removes) this.pending.add(id);
+    // doorblock: a door put into, moved out of or taken from a wall's gate gap changes whether that gate yields to it
+    if (diff.upserts.some((e) => this.doorIds.has(e.id) || this.isDoor(e)) || diff.removes.some((id) => this.doorIds.has(id))) for (const id of this.gated) this.pending.add(id);
     // terrain moved under things (pads, landforms): re-derive everything (each entity is only sent if it changed)
     if (diff.tiles.length) for (const id of this.model.entities.keys()) this.pending.add(id);
   }
@@ -213,6 +216,7 @@ export class EngineBridge {
   /** Derive the changed entities and enqueue one world-edit carrying exactly what differs. */
   private send(ids: Set<string>, seq: number, why: string) {
     const t0 = performance.now();
+    this.doorSpotsCache = null;
     const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
     const known = this.physics?.assets ?? {};
     let linksMoved = false;
@@ -266,6 +270,18 @@ export class EngineBridge {
     return id;
   }
 
+  /** doorblock: door entities (ids), walls/fences with gates (re-derived when a door comes or goes), door spots per send. */
+  private doorIds = new Set<string>();
+  private gated = new Set<string>();
+  private doorSpotsCache: { id: string; p: Vec2 }[] | null = null;
+  private isDoor(e: Entity): boolean { const d = this.model.resolvedDef(e.def); return !!d && isDoorDef(d); }
+  private doorSpots(): { id: string; p: Vec2 }[] {
+    if (this.doorSpotsCache) return this.doorSpotsCache;
+    const out: { id: string; p: Vec2 }[] = [];
+    for (const e of this.model.entities.values()) { if (!this.isDoor(e)) continue; const wp = this.model.worldPose(e); out.push({ id: e.id, p: [wp.x, wp.z] }); }
+    return (this.doorSpotsCache = out);
+  }
+
   /** The engine physics of one entity: its solids, floors and stairs, or its fixture registration. */
   derive(e: Entity, assets: Record<string, unknown>, known: Record<string, unknown>): Part | null {
     const def = this.model.resolvedDef(e.def); if (!def) return null;
@@ -295,10 +311,17 @@ export class EngineBridge {
       const nativeRide = !!(def.components as Record<string, unknown>).carrier && def.tags.includes('balloon');
       if (solids.length && !nativeRide) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
     }
-    // closed doors block their gap
+    // closed doors block their gap; a free-standing door (no doorway of its own) blocks its own width (doorblock)
     const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;
-    for (const o of baked.openings ?? []) {
-      const closed = doorState[o.id] === 'closed' || (doorState[o.id] === undefined && o.state === 'closed') || (def.components.opening && e.state?.open === false);
+    if (isDoorDef(def)) this.doorIds.add(e.id); else this.doorIds.delete(e.id);
+    const free = freeDoorOpening(def, baked), openings = free ? [...(baked.openings ?? []), free] : baked.openings ?? [];
+    const gates = worldFrame ? openings.filter((o) => o.kind === 'gate') : [];
+    if (gates.length) this.gated.add(e.id); else this.gated.delete(e.id);
+    const shut = isShut(e, def);
+    for (const o of openings) {
+      // a wall's or fence's gate with a door standing in it yields to the door (the door blocks or passes by its state)
+      if (worldFrame && o.kind === 'gate' && doorInGap(toWorld(o.at[0], o.at[1]), o.width, this.doorSpots())) continue;
+      const closed = doorState[o.id] === 'closed' || (doorState[o.id] === undefined && o.state === 'closed') || shut;
       if (!closed) continue;
       // a gate of a world-frame wall/fence sits on the ground under it (sill and height are ground-relative)
       const c = toWorld(o.at[0], o.at[1]), sc = worldFrame ? 1 : wp.s;

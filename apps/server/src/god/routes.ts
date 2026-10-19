@@ -9,7 +9,7 @@ import { ApiError } from '../souls.ts';
 import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
-import { runQuery } from './query.ts';
+import { engineSettled, runQuery } from './query.ts';
 import { mountAssetRoutes } from './assets.ts';
 import { godBodyLimit } from './ingestion.ts';
 import { godVersions } from './versions.ts';
@@ -237,7 +237,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     d.god.parts.recordVerify(receipt, requireGod(c));
     return c.json(receipt, 200, noStore);
   });
-  app.post('/v1/god/query', async (c) => { if (d.god.godFromToken(bearer(c))) limitGod(c, 'query', CREATION_LIMITS.godQueriesPerMinute); else d.limitIp(c, 'godquery', CREATION_LIMITS.queriesPerMinute, CREATION_LIMITS.rateWindowMs); return c.json(runQuery(d.god.model, await body(c)), 200, noStore); });
+  app.post('/v1/god/query', async (c) => { if (d.god.godFromToken(bearer(c))) limitGod(c, 'query', CREATION_LIMITS.godQueriesPerMinute); else d.limitIp(c, 'godquery', CREATION_LIMITS.queriesPerMinute, CREATION_LIMITS.rateWindowMs); const q = await body(c); if (q && typeof q === 'object' && ((q as { reach?: unknown }).reach || (q as { describe?: unknown }).describe)) await engineSettled(d.god.model); return c.json(runQuery(d.god.model, q), 200, noStore); });
   app.post('/v1/god/preview', async (c) => { limitGod(c, 'preview', CREATION_LIMITS.previewsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.preview(b)), 200, noStore); });
   app.get('/v1/god/preview/:id', (c) => { if (!d.god.canViewPreview(c.req.param('id'), c.req.header('x-preview-key'))) requireGod(c); const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), baseEditSeq: v.baseEditSeq, expect: v.expect, subtrees: v.subtrees, diff: v.diff, failures: v.failures ?? null, ops: v.ops }, 200, noStore); });
   app.get('/v1/god/previews', (c) => { requireGod(c); return c.json({ previews: d.god.listPreviews() }, 200, noStore); });

@@ -13,6 +13,7 @@
 import { deckRaised } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
+import { isShut } from './doors.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -196,7 +197,7 @@ export class GodNav {
         stands.push(toWorld(front.at[0] + ux * 1.2, front.at[1] + uz * 1.2));
         inside = toWorld(front.at[0] - ux * 1.0, front.at[1] - uz * 1.0);
         const st = ((e.state?.doors ?? {}) as Record<string, unknown>)[front.id];
-        doorOpen = st === 'open' || (st === undefined && front.state !== 'closed' && !(def.components.opening && e.state?.open === false));
+        doorOpen = st === 'open' || (st === undefined && front.state !== 'closed' && !isShut(e, def));
       }
       if (frontSlot) stands.push(toWorld(frontSlot.p[0], frontSlot.p[2]));
       // XP5 hook: the footprint's clear lane can be off-centre, or on an open side without a radial front door.

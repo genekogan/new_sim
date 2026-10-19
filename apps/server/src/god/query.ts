@@ -21,6 +21,13 @@ export const reachProviders = new WeakMap<WorldModel, ReachFn>();
 /** Whether the engine already holds the latest physics of the model (false while the last edit is still on its way);
  *  registered by the engine bridge. Without it `describe` assumes the engine is current. */
 export const syncProviders = new WeakMap<WorldModel, () => boolean>();
+/** doorblock: wait (up to `ms`) until the engine holds the latest edit, so a walk check right after an edit (a door
+ *  shut or opened, a wall moved) answers for the world as it now is. The engine takes an edit in at its next tick. */
+export async function engineSettled(w: WorldModel, ms = 1500): Promise<boolean> {
+  const sync = syncProviders.get(w); if (!sync) return true;
+  for (const t0 = Date.now(); !sync(); ) { if (Date.now() - t0 >= ms) return false; await new Promise((r) => setTimeout(r, 20)); }
+  return true;
+}
 /** Who is using an entity right now (a Soul seated on it, holding it); registered by the engine bridge. */
 export const usesProviders = new WeakMap<WorldModel, (id: string) => unknown>();
 /** F1: Souls sitting on a thing's seat slots now ({slot, soul}); registered by the engine bridge. */
