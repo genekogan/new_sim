@@ -48,12 +48,13 @@ export const SLOT_CLEARANCE = HUMAN_RADIUS + 0.07;
 function levelOf(rt: Runtime, e: Entity): number {
   const sp = rt.services.spatial as Spatial | undefined;
   const levels = sp?.base.levels ?? [{ id: 0, y: 0, label: 'ground' }];
-  // On ground (an entity world's terrain), level 0 lies at the ground under the thing, not at y 0: a parasol table on an
-  // alpine terrace 35 m up is on the ground, and was given the nearest upper floor (no standing room round its chairs).
-  const ground0 = sp?.ground ? sp.ground.standY(e.pose.p[0], e.pose.p[2]) : 0;
+  // On ground (an entity world's terrain), a fixture its host logs as standing on the ground is on level 0 wherever the
+  // ground is: a parasol table on an alpine terrace 35 m up took the upper floor nearest its height (no standing room
+  // round its chairs). Hosts log that support only since E2 (2026-10-19), so earlier journals replay unchanged.
+  if (sp?.ground && e.kind === 'fixture' && e.support?.kind === 'ground') return 0;
   let best = levels[0].id, bd = Infinity;
   for (const l of levels) {
-    const d = Math.abs((l.id === 0 ? ground0 : l.y) - e.pose.p[1]);
+    const d = Math.abs(l.y - e.pose.p[1]);
     if (d < bd) { bd = d; best = l.id; }
   }
   return best;
