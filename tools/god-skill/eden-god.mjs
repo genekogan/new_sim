@@ -1755,12 +1755,18 @@ var guardOf = (rows, ents, hr, he, defs2) => mirrorHash(`${rows.map((r) => `${r.
 function mirrorState(world = load().world) {
   const m = memo?.world === world ? memo : readCache();
   if (!m || m.world !== world || !m.guard) return null;
-  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash };
+  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash, ...m.groundHash ? { ground: m.groundHash } : {} };
 }
 function applyMirror(base, p, world) {
   if (!p || p.contract !== "mirror/1" || p.same) return null;
   const library = p.library ?? (base?.libraryHash === p.libraryHash ? base.snapshot.library : void 0);
   if (!library) return null;
+  let top = p.top;
+  if (p.groundRef) {
+    if (!p.groundHash || base?.groundHash !== p.groundHash || !Object.hasOwn(base.snapshot, "ground")) return null;
+    top = { ...p.top, ground: base.snapshot.ground };
+  }
+  const gs = p.groundHash ? { groundHash: p.groundHash } : {};
   let entities, rows, defs2, he, hr;
   if (p.full) {
     ({ entities, rows, defs: defs2 } = p);
@@ -1794,8 +1800,8 @@ function applyMirror(base, p, world) {
   }
   const defsH = p.defs || p.full ? mirrorHash(JSON.stringify(defs2)) : base.h.defs;
   const guard = guardOf(rows, entities, hr, he, defsH);
-  if (guard !== p.guard) return p.full ? build(world, { ...p.top, entities, defs: defs2, library }, rows, { libraryHash: p.libraryHash }) : null;
-  return build(world, { ...p.top, entities, defs: defs2, library }, rows, { guard, libraryHash: p.libraryHash, h: { rows: hr, ents: he, defs: defsH } });
+  if (guard !== p.guard) return p.full ? build(world, { ...top, entities, defs: defs2, library }, rows, { libraryHash: p.libraryHash }) : null;
+  return build(world, { ...top, entities, defs: defs2, library }, rows, { guard, libraryHash: p.libraryHash, ...gs, h: { rows: hr, ents: he, defs: defsH } });
 }
 async function fetchMirror(q) {
   const qs2 = Object.entries(q).filter(([, v]) => v !== void 0 && v !== null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
@@ -1816,7 +1822,7 @@ async function mirror({ fresh = false, trust = false } = {}) {
   if (!fresh && synced && synced === memo && memo.world === world && Date.now() - syncedAt < 2e3 && syncedWrites === writesSent()) return memo;
   const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
   if (!oldServer) {
-    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
+    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash, ground: base?.groundHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash, ground: base.groundHash });
     if (r.status === 0) oldServer = "maybe";
     else if (r.data?.contract !== "mirror/1" && (r.status === 404 || r.status >= 200 && r.status < 300)) oldServer = true;
     else {

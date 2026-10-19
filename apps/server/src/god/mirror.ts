@@ -14,12 +14,16 @@
 // query.ts); the check per entity is a few identity comparisons, so an act's delta costs what changed, not the world.
 // Model entities are replaced, never changed in place, by every edit (compile.ts), so an entity's own inputs are its
 // object identity.
+//
+// G3: the ground recipe (45 of 47 KB per act at Eden 2026 size) goes by hash, like the library: every answer names
+// `groundHash`; a client that sends the same hash (`ground`) gets `top.ground: null` and `groundRef: true` and keeps its
+// copy. Clients that send no hash (CLIs before G3) get the recipe as before.
 import { createHash } from 'node:crypto';
 import type { Entity, WorldModel } from '@sim/world-compiler';
 import type { GodMode } from './god.ts';
 import { layoutRow, seatProviders } from './query.ts';
 
-export type MirrorWant = { since?: number; builds?: number; have?: string; lib?: string };
+export type MirrorWant = { since?: number; builds?: number; have?: string; lib?: string; ground?: string };
 type State = { guard: string; seq: number; rows: Map<string, string>; ents: Map<string, string>; defs: string; order: string[] };
 const KEEP = 16;
 const memo = new WeakMap<object, State[]>();
@@ -55,7 +59,9 @@ export function mirrorPayload(god: GodMode, want: MirrorWant = {}, { child = fal
   const now: State = { guard, seq: snap.seq as number, rows: new Map(rowH), ents: new Map(entH), defs: defsH, order: rowH.map(([id]) => id) };
   if (!states.some((s) => s.guard === guard)) { states.push(now); if (states.length > KEEP) states.shift(); memo.set(god, states); }
   const { entities, defs, library, ...top } = snap;
-  const head = { contract: 'mirror/1', seq: snap.seq, buildsRev: snap.buildsRev, guard, libraryHash: lib, ...(withLib ? { library } : {}) };
+  const gh = groundHash(top.ground), groundRef = want.ground !== undefined && want.ground === gh;
+  if (groundRef) top.ground = null; // same key, same place: the client puts its copy back where it was
+  const head = { contract: 'mirror/1', seq: snap.seq, buildsRev: snap.buildsRev, guard, libraryHash: lib, groundHash: gh, ...(groundRef ? { groundRef: true } : {}), ...(withLib ? { library } : {}) };
   if (!base) return { ...head, full: true, top, entities, defs, rows };
   const changed = <T extends { id: string }>(list: T[], hs: [string, string][], was: Map<string, string>) => list.filter((x, i) => was.get(x.id) !== hs[i][1]);
   const gone = (was: Map<string, string>, is: Map<string, string>) => [...was.keys()].filter((id) => !is.has(id));
@@ -91,6 +97,21 @@ function defsHash(god: GodMode, defs: unknown[]) {
   const was = defsHashes.get(god);
   if (was && was.defs.length === defs.length && was.defs.every((d, i) => d === defs[i])) return was.h;
   const h = mirrorHash(JSON.stringify(defs)); defsHashes.set(god, { defs, h }); return h;
+}
+/** The ground recipe's hash (as sent: JSON), per recipe object; the model keeps the object until the terrain changes. */
+const groundHashes = new WeakMap<object, string>();
+let lastGroundHashed: { g: object; h: string } | null = null;
+export function groundHash(g: unknown) {
+  if (!g || typeof g !== 'object') return mirrorHash(JSON.stringify(g ?? null));
+  let h = groundHashes.get(g);
+  if (h === undefined) {
+    // an edit that rebuilt the recipe from the same parts in the same key order (see layoutRows): the same JSON, the same hash
+    const was = lastGroundHashed?.g, ka = was && Object.keys(was), kb = Object.keys(g);
+    h = was && sameGround(was, g) && ka!.every((k, i) => k === kb[i]) ? lastGroundHashed!.h : mirrorHash(JSON.stringify(g));
+    groundHashes.set(g, h);
+  }
+  lastGroundHashed = { g, h };
+  return h;
 }
 /** An entity's snapshot hash, per entity object (an edit replaces the object). */
 export function entityHash(e: { id: string }) {

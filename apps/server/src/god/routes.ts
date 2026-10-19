@@ -278,7 +278,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     const r = saved ? { ...saved.result, replayed: true } : asGod(c, b, () => rep ? actWithRepair(d.god, b as Record<string, unknown>, rep, note) : d.god.act(b, note));
     return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore);
   });
-  app.get('/v1/god/mirror', (c) => { const who = requireGod(c), q = c.req.query(), want: MirrorWant = { since: q.since === undefined ? undefined : Number(q.since), builds: q.builds === undefined ? undefined : Number(q.builds), have: q.have, lib: q.lib }; return c.json(mirrorCurrent(d.god, want) ? { contract: 'mirror/1', same: true, seq: d.god.model.editSeq } : mirrorPayload(d.god, want, { child: !!who.child }), 200, noStore); });
+  app.get('/v1/god/mirror', (c) => { const who = requireGod(c), q = c.req.query(), want: MirrorWant = { since: q.since === undefined ? undefined : Number(q.since), builds: q.builds === undefined ? undefined : Number(q.builds), have: q.have, lib: q.lib, ground: q.ground }; return c.json(mirrorCurrent(d.god, want) ? { contract: 'mirror/1', same: true, seq: d.god.model.editSeq } : mirrorPayload(d.god, want, { child: !!who.child }), 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
   app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });
   app.post('/v1/god/undo', async (c) => { limitGod(c, 'undo', BUILD_LIMITS.editsPerMinute); const b = await optionalBody(c), g = c.req.query('group'); return c.json(asGod(c, b, () => g ? d.god.undoGroup(g) : d.god.undo()), 200, noStore); });
@@ -317,5 +317,5 @@ function mirrorWant(raw: unknown): MirrorWant | null {
   const m = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as { mirror?: unknown }).mirror : undefined;
   if (!m || typeof m !== 'object') return null;
   const o = m as Record<string, unknown>, num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined), str = (v: unknown) => (typeof v === 'string' && v.length <= 64 ? v : undefined);
-  return { since: num(o.since), builds: num(o.builds), have: str(o.have), lib: str(o.lib) };
+  return { since: num(o.since), builds: num(o.builds), have: str(o.have), lib: str(o.lib), ground: str(o.ground) };
 }

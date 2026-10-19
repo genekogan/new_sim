@@ -9,6 +9,10 @@
 // sends the same state and gets the delta back in its answer, so the command after it needs no refetch. The
 // guard hash (every id and row/entity hash, in order) checks the patched mirror; any mismatch refreshes in full.
 // A server without /v1/god/mirror gets the old snapshot + layout refresh.
+//
+// G3: the ground recipe goes by hash too (45 of 47 KB per edit at Eden 2026 size): the CLI sends `ground` (the hash the
+// server gave with its copy) and a server that has the same recipe answers `groundRef` with `top.ground: null`; the CLI
+// puts its copy back in that key. A server before G3 sends no `groundHash` and always the recipe.
 import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { atomicWrite, call, load, ok, writesSent } from './state.mjs';
@@ -29,11 +33,11 @@ function writeCache(c) { try { atomicWrite(CACHE, JSON.stringify(c)); } catch { 
 export const mirrorHash = (s) => createHash('sha1').update(s).digest('base64url').slice(0, 16);
 const guardOf = (rows, ents, hr, he, defs) => mirrorHash(`${rows.map((r) => `${r.id}:${hr[r.id]}`).join(',')}|${ents.map((e) => `${e.id}:${he[e.id]}`).join(',')}|${defs}`);
 
-/** What this folder's mirror is, for the server: { since, builds, have, lib } (null: no mirror to patch). */
+/** What this folder's mirror is, for the server: { since, builds, have, lib, ground? } (null: no mirror to patch). */
 export function mirrorState(world = load().world) {
   const m = memo?.world === world ? memo : readCache();
   if (!m || m.world !== world || !m.guard) return null;
-  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash };
+  return { since: m.seq, builds: m.buildsRev, have: m.guard, lib: m.libraryHash, ...(m.groundHash ? { ground: m.groundHash } : {}) };
 }
 
 /** Patch `base` with a mirror/1 payload; null when the result does not match the server's guard. */
@@ -41,6 +45,12 @@ export function applyMirror(base, p, world) {
   if (!p || p.contract !== 'mirror/1' || p.same) return null;
   const library = p.library ?? (base?.libraryHash === p.libraryHash ? base.snapshot.library : undefined);
   if (!library) return null;
+  let top = p.top;
+  if (p.groundRef) { // G3: the server kept the recipe the client said it has
+    if (!p.groundHash || base?.groundHash !== p.groundHash || !Object.hasOwn(base.snapshot, 'ground')) return null;
+    top = { ...p.top, ground: base.snapshot.ground };
+  }
+  const gs = p.groundHash ? { groundHash: p.groundHash } : {};
   let entities, rows, defs, he, hr;
   if (p.full) {
     ({ entities, rows, defs } = p); he = {}; hr = {};
@@ -65,8 +75,8 @@ export function applyMirror(base, p, world) {
   }
   const defsH = p.defs || p.full ? mirrorHash(JSON.stringify(defs)) : base.h.defs;
   const guard = guardOf(rows, entities, hr, he, defsH);
-  if (guard !== p.guard) return p.full ? build(world, { ...p.top, entities, defs, library }, rows, { libraryHash: p.libraryHash }) : null; // whole but unverifiable: no deltas
-  return build(world, { ...p.top, entities, defs, library }, rows, { guard, libraryHash: p.libraryHash, h: { rows: hr, ents: he, defs: defsH } });
+  if (guard !== p.guard) return p.full ? build(world, { ...top, entities, defs, library }, rows, { libraryHash: p.libraryHash }) : null; // whole but unverifiable: no deltas
+  return build(world, { ...top, entities, defs, library }, rows, { guard, libraryHash: p.libraryHash, ...gs, h: { rows: hr, ents: he, defs: defsH } });
 }
 
 async function fetchMirror(q) {
@@ -87,7 +97,7 @@ export async function mirror({ fresh = false, trust = false } = {}) {
   if (!fresh && synced && synced === memo && memo.world === world && Date.now() - syncedAt < 2000 && syncedWrites === writesSent()) return memo;
   const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
   if (!oldServer) {
-    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash });
+    const r = await fetchMirror(fresh || !base ? { lib: base?.libraryHash, ground: base?.groundHash } : { since: base.seq, builds: base.buildsRev, have: base.guard, lib: base.libraryHash, ground: base.groundHash });
     if (r.status === 0) oldServer = 'maybe'; // unreachable, or a server that fails the route: the seq request below decides
     else if (r.data?.contract !== 'mirror/1' && (r.status === 404 || (r.status >= 200 && r.status < 300))) oldServer = true; // a server before mirror/1
     else {
