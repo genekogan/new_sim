@@ -5,7 +5,7 @@ import { areaFrame } from '@sim/generators';
 import * as THREE from 'three';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { groundBaseFor, groundRealismFor } from './ground-palette.ts';
-import { applyWorldRealism } from '../WorldEdenRealism.ts';
+import { applyWorldRealism, applyMownTurf } from '../WorldEdenRealism.ts';
 import { Soup, distEdge, drapeArea, h01, hf, inPoly, mix, rgb, scale, soupMesh, type RGB, type V3 } from './soup.ts';
 
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
@@ -89,15 +89,25 @@ registerMesh({
       return c;
     });
     const mesh = soupMesh(soup, `lawn ${ctx.entity.name ?? ctx.entity.id}`, { shadow: false });
-    // On Eden's meadow, unstriped turf lawns take the same realism ground shader as the terrain around them.
-    if (mesh && groundRealismFor(pal) && !stripes && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf();
+    // On Eden's meadow, unstriped turf lawns take the same realism ground shader as the terrain around them. W2b: a grass
+    // lawn is mown like old Eden's commons (the shader's 3.2 m bands along its long side). Authored stripes keep their own
+    // crisp vertex bands (the turf's blade texture would mute them).
+    if (mesh && groundRealismFor(pal) && !stripes && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf(mat === 'grass' ? (fr.hl >= fr.hw ? fr.v : fr.u) : undefined);
     return mesh;
   },
 });
 
-let turf: THREE.MeshStandardMaterial | null = null;
-function meadowTurf() {
-  if (!turf) { turf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }); turf.name = 'meadow lawn turf'; applyWorldRealism(new THREE.Mesh(new THREE.BufferGeometry(), turf), { classify: () => 'ground' }); }
+const turfs = new Map<string, THREE.MeshStandardMaterial>();
+/** Eden's meadow turf; `mown` = the unit xz axis old Eden's mown bands alternate along (stripes run across it) (one material per 5° of axis). */
+function meadowTurf(mown?: [number, number]) {
+  const deg = mown ? ((Math.round(Math.atan2(mown[1], mown[0]) * 180 / Math.PI / 5) * 5) % 180 + 180) % 180 : -1, key = String(deg);
+  let turf = turfs.get(key);
+  if (!turf) {
+    turf = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }); turf.name = mown ? `meadow lawn turf mown ${deg}` : 'meadow lawn turf';
+    if (mown) applyMownTurf(turf, [Math.cos(deg * Math.PI / 180), Math.sin(deg * Math.PI / 180)]);
+    else applyWorldRealism(new THREE.Mesh(new THREE.BufferGeometry(), turf), { classify: () => 'ground' });
+    turfs.set(key, turf);
+  }
   return turf;
 }
 

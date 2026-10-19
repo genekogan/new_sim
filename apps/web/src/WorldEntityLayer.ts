@@ -17,6 +17,7 @@ import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor, terrainColorDeferred, groundRealismFor } from './gen-mesh/ground-palette.ts';
 import { mottleSector } from './gen-mesh/terrain-mottle.ts';
 import { applyWorldRealism } from './WorldEdenRealism.ts';
+import { stepSurfaceKit } from './WorldEdenSurfaceKit.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 import { assetUrl, loadAsset } from './gen-mesh/gltf-assets.ts';
 import { assetBytes } from './asset-bytes.ts';
@@ -215,6 +216,9 @@ export class WorldEntityLayer {
     this.now = nowMs;
     if (!this.active) return;
     this.sites.update(nowMs);
+    // W2b: fill old Eden's generated surface patterns (brick, ashlar, clapboard, tile, slate, turf blades) a few rows a
+    // frame; until now only old Eden's own layer did, so entity worlds drew the flat placeholders. No-op once complete.
+    stepSurfaceKit(2);
     if (this.horizon) this.horizon.visible = this.horizonBy.size === 0;
     if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;

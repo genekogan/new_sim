@@ -73,6 +73,11 @@ export class Balloons{
  }
  /** Unsupported/missing anchors keep the balloon aloft. No ground fallback. */
  setLanding(p:readonly number[]|null){const v=this.uniforms.uBL.value;if(p?.length===3&&p.every(Number.isFinite))v.set(p[0],p[1],p[2],1);else v.w=0;}
+ /** W2b: a world's own loops [centre x, centre z, radius x, radius z] (one per balloon, GodWorldLiving's
+  * `edenBalloonTracks`); null = old Eden's. */
+ setTracks(tracks:readonly (readonly number[])[]|null){
+  this.uniforms.uBP.value.forEach((v,i)=>{const t=tracks?.[i],d=DRIFTERS[i];if(t?.length===4&&t.every(Number.isFinite))v.set(t[0],t[1],t[2],t[3]);else v.set(d.c[0],d.c[1],d.r[0],d.r[1]);});
+ }
  /** t: atmosphere clock (seconds, wraps at 7200). */
  update(t:number){this.uniforms.uBalloonT.value=t;}
  dispose(){this.mesh.removeFromParent();this.mesh.geometry.dispose();(this.mesh.material as THREE.Material).dispose();}

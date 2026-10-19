@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import type { MaterialLib } from './materials.ts';
+import { applyBuildingFinish } from '../WorldEdenRealism.ts';
 
 /** wall: walls, partitions · floor: slabs, boards, decks · roof · trim: frames, sills, rails, details · glass · glow (lamps, lit lantern). */
 export type Layer = 'wall' | 'floor' | 'roof' | 'trim' | 'glass' | 'glow';
@@ -29,9 +30,14 @@ class F32 {
   get length() { return this.n; }
   view() { return this.a.subarray(0, this.n); }
 }
-type Buf = { p: F32; n: F32; c: F32 };
-/** One (group|layer) soup: positions, normals, colours. */
-export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array };
+/** W2b: vertex ranges [from, to) of a buffer that are a building's outer face (its finish pattern goes there). */
+type Buf = { p: F32; n: F32; c: F32; face?: number[] };
+/** Old Eden's building identity for one building: wall 0 running brick, 1 Flemish, 2 ashlar, 3 clapboard, 4 limewash;
+ *  roof 0 clay tile, 1 slate, 2 shingle. */
+export type Finish = { wall: number; roof: number };
+const WALLS = ['running brick', 'Flemish brick', 'ashlar', 'clapboard', 'limewash'], ROOFS = ['clay tile', 'slate', 'shingle'];
+/** One (group|layer) soup: positions, normals, colours (and W2b's outer-face vertex ranges). */
+export type RawSoup = { k: string; p: Float32Array; n: Float32Array; c: Float32Array; face?: number[] };
 export class Builder {
   readonly buf = new Map<string, Buf>();
   group = 'level-0';
@@ -40,6 +46,12 @@ export class Builder {
   optional(enabled: boolean, draw: () => void) { const was = this.enabled; this.enabled = was && enabled; try { draw(); } finally { this.enabled = was; } }
   /** W2: effect anchors (chimney smoke) in the builder's current frame; enabled ornaments only. */
   readonly anchors: [number, number, number][] = [];
+  /** W2b: the building's finish (null = plain kit materials), and whether the parts drawn now are its outer face. */
+  finish: Finish | null = null;
+  facade = false;
+  /** Draw `f` as the building's outer face (marked for the finish pattern; only the wall layer keeps the mark). */
+  outer(f: () => void) { const was = this.facade; this.facade = true; try { f(); } finally { this.facade = was; } return this; }
+  private mark(b: Buf, layer: Layer, from: number) { if (this.facade && layer === 'wall') { const to = b.p.length / 3, f = (b.face ??= []); if (f.length && f[f.length - 1] === from) f[f.length - 1] = to; else f.push(from, to); } }
   anchor(x: number, y: number, z: number) { if (this.enabled) { const v = new THREE.Vector3(x, y, z).applyMatrix4(this.m); this.anchors.push([v.x, v.y, v.z]); } }
   private m = new THREE.Matrix4(); private stack: THREE.Matrix4[] = [];
   private l = new THREE.Matrix4(); private nm = new THREE.Matrix3(); private v = new THREE.Vector3(); private q = new THREE.Quaternion(); private s = new THREE.Vector3(); private t = new THREE.Vector3(); private e = new THREE.Euler();
@@ -51,12 +63,14 @@ export class Builder {
     if (!this.enabled) return;
     this.q.setFromEuler(this.e.set(rx, ry, rz, 'YXZ')); this.l.compose(this.t.set(cx, cy, cz), this.q, this.s.set(sx, sy, sz)); this.l.premultiply(this.m); this.nm.getNormalMatrix(this.l);
     const b = this.bufOf(layer), P = g.attributes.position as THREE.BufferAttribute, N = g.attributes.normal as THREE.BufferAttribute; tmpC.set(col);
+    const from = b.p.length / 3;
     const cr = tmpC.r, cg = tmpC.g, cb = tmpC.b;
     if (P.normalized || N.normalized || P.itemSize !== 3 || N.itemSize !== 3 || (P as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute || (N as { isInterleavedBufferAttribute?: boolean }).isInterleavedBufferAttribute) {
       for (let i = 0; i < P.count; i++) {
         this.v.fromBufferAttribute(P, i).applyMatrix4(this.l); b.p.push3(this.v.x, this.v.y, this.v.z);
         this.v.fromBufferAttribute(N, i).applyMatrix3(this.nm).normalize(); b.n.push3(this.v.x, this.v.y, this.v.z); b.c.push3(cr, cg, cb);
       }
+      this.mark(b, layer, from);
       return;
     }
     // Vector3.fromBufferAttribute + applyMatrix4 / applyMatrix3 + normalize, inlined term for term (same operations, same order)
@@ -69,6 +83,7 @@ export class Builder {
       const k = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
       b.n.push3(nx * k, ny * k, nz * k); b.c.push3(cr, cg, cb);
     }
+    this.mark(b, layer, from);
   }
   /** Box by its bottom-centre (x, y = bottom, z), size and yaw. */
   box(x: number, y: number, z: number, w: number, h: number, d: number, col: Col, layer: Layer = 'trim', yaw = 0) { if (w > 1e-4 && h > 1e-4 && d > 1e-4) this.add(prim('box', () => new THREE.BoxGeometry(1, 1, 1)), x, y + h / 2, z, w, h, d, col, layer, 0, yaw, 0); return this; }
@@ -89,21 +104,26 @@ export class Builder {
     const ax = X[1] - X[0], ay = Y[1] - Y[0], az = Z[1] - Z[0], bx = X[2] - X[0], by = Y[2] - Y[0], bz = Z[2] - Z[0];
     const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx, k = 1 / (Math.sqrt(cx * cx + cy * cy + cz * cz) || 1);
     const nx = cx * k, ny = cy * k, nz = cz * k, cr = tmpC.r, cg = tmpC.g, cb = tmpC.b;
+    const from = buf.p.length / 3;
     for (const i of [0, 1, 2, 0, 2, 3]) { buf.p.push3(X[i], Y[i], Z[i]); buf.n.push3(nx, ny, nz); buf.c.push3(cr, cg, cb); }
+    this.mark(buf, layer, from);
     return this;
   }
   /**
    * A wall slab in a local frame (x along the wall, y up, z across): faces only where they can be seen —
    * both sides, the top and bottom when asked, the ends when they frame an opening (≈ 6–10 tris instead of 24).
    */
-  wallSlab(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, plus: Col, minus: Col, opts: { top?: Col; bottom?: Col; ends?: Col; endL?: boolean; endR?: boolean } = {}, layer: Layer = 'wall') {
+  wallSlab(x0: number, x1: number, y0: number, y1: number, z0: number, z1: number, plus: Col, minus: Col, opts: { top?: Col; bottom?: Col; ends?: Col; endL?: boolean; endR?: boolean; /** W2b: which side is the outer face (1 plus, -1 minus); its reveals go with it */ outer?: number } = {}, layer: Layer = 'wall') {
     if (x1 - x0 < 1e-4 || y1 - y0 < 1e-4) return this;
-    this.face([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], plus, layer);
-    this.face([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], minus, layer);
+    const out = opts.outer ?? 0, was = this.facade;
+    this.facade = was || out > 0; this.face([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], plus, layer);
+    this.facade = was || out < 0; this.face([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], minus, layer);
+    this.facade = was || out !== 0;
     if (opts.top) this.face([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], opts.top, layer);
     if (opts.bottom) this.face([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], opts.bottom, layer);
     if (opts.endL && opts.ends) this.face([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], opts.ends, layer);
     if (opts.endR && opts.ends) this.face([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], opts.ends, layer);
+    this.facade = was;
     return this;
   }
   /** Box between two plan points (a wall run, a rail): from (ax, az) to (bx, bz), bottom y, height h, thickness d. */
@@ -143,11 +163,11 @@ export class Builder {
   quad(a: THREE.Vector3Tuple, b: THREE.Vector3Tuple, c: THREE.Vector3Tuple, d: THREE.Vector3Tuple, col: Col, layer: Layer = 'roof') { this.tri(a, b, c, col, layer); this.tri(a, c, d, col, layer); return this; }
   tris(): number { let n = 0; for (const b of this.buf.values()) n += b.p.length / 9; return n; }
   /** Lane W1: the accumulated soups as plain arrays (to cross to or from a worker), in the order emit takes them. */
-  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice() })); }
+  raw(): RawSoup[] { return [...this.buf].map(([k, b]) => ({ k, p: b.p.view().slice(), n: b.n.view().slice(), c: b.c.view().slice(), ...(b.face ? { face: b.face.slice() } : {}) })); }
   /** A builder holding soups made elsewhere (raw()), ready to emit exactly as the builder that made them would. */
   static fromRaw(raw: readonly RawSoup[]): Builder {
     const b = new Builder(), f = (a: Float32Array) => { const x = new F32(); x.a = a as Float32Array<ArrayBuffer>; x.n = a.length; return x; };
-    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c) });
+    for (const r of raw) b.buf.set(r.k, { p: f(r.p), n: f(r.n), c: f(r.c), ...(r.face ? { face: r.face.slice() } : {}) });
     return b;
   }
   /** One mesh per (group, layer) under one THREE.Group per group. */
@@ -158,8 +178,9 @@ export class Builder {
       const [gname, layer] = k.split('|') as [string, Layer];
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.p.view(), 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n.view(), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(b.c.view(), 3));
+      if (b.face && this.finish) { const f = new Float32Array(b.p.length / 3); for (let i = 0; i < b.face.length; i += 2) f.fill(1, b.face[i], b.face[i + 1]); g.setAttribute('edenFace', new THREE.Float32BufferAttribute(f, 1)); }
       g.computeBoundingBox(); g.computeBoundingSphere();
-      const mesh = new THREE.Mesh(g, materialFor(materials, layer)); mesh.name = `${gname} ${layer}`;
+      const mesh = new THREE.Mesh(g, materialFor(materials, layer, this.finish)); mesh.name = `${gname} ${layer}`;
       mesh.castShadow = layer !== 'glow' && layer !== 'glass'; mesh.receiveShadow = layer !== 'glow';
       if (layer === 'glass' || layer === 'glow') mesh.userData.cameraTransparent = true;
       let grp = groups.get(gname); if (!grp) { grp = new THREE.Group(); grp.name = gname; groups.set(gname, grp); }
@@ -171,11 +192,20 @@ export class Builder {
 }
 
 let glow: THREE.Material | null = null;
-function materialFor(lib: MaterialLib, layer: Layer): THREE.Material {
+const realismOff = typeof location !== 'undefined' && new URLSearchParams(location.search).get('realism') === '0';
+/** W2b: with a finish, walls, roofs and floors take old Eden's building identity (WorldEdenRealism role 7): one cached
+ *  material per wall pattern and per roof pattern (same program), so a building's finish costs no extra draws. */
+function finished(lib: MaterialLib, kind: 'plaster' | 'tile' | 'wood', layer: 'wall' | 'roof' | 'floor', finish: Finish | null) {
+  if (!finish || realismOff) return lib.get(kind, undefined, { vertexColors: true });
+  const m = lib.get(kind, undefined, { vertexColors: true, buildingFinish: layer === 'wall' ? `wall-${finish.wall}` : layer === 'roof' ? `roof-${finish.roof}` : 'floor' });
+  if (!m.name) m.name = layer === 'wall' ? `building wall ${WALLS[finish.wall]}` : layer === 'roof' ? `building roof ${ROOFS[finish.roof]}` : 'building floor';
+  applyBuildingFinish(m, layer, finish); return m;
+}
+function materialFor(lib: MaterialLib, layer: Layer, finish: Finish | null): THREE.Material {
   switch (layer) {
-    case 'wall': return lib.get('plaster', undefined, { vertexColors: true });
-    case 'floor': return lib.get('wood', undefined, { vertexColors: true });
-    case 'roof': return lib.get('tile', undefined, { vertexColors: true });
+    case 'wall': return finished(lib, 'plaster', 'wall', finish);
+    case 'floor': return finished(lib, 'wood', 'floor', finish);
+    case 'roof': return finished(lib, 'tile', 'roof', finish);
     case 'trim': return lib.get('paint', undefined, { vertexColors: true });
     case 'glass': return lib.get('glass', undefined, { vertexColors: true, side: THREE.DoubleSide });
     case 'glow': return (glow ??= new THREE.MeshBasicMaterial({ vertexColors: true }));

@@ -96,6 +96,34 @@ const POOL_HALO = (() => { const v = typeof location !== 'undefined' ? Number(ne
 /** W2: a lamp pool's peak (was 1.2: pools saturated to full-day grass, lime discs at night). `?poollamp=` dial. */
 const POOL_LAMP = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poollamp')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.8; })();
 const POOL_RADIUS = (() => { const v = typeof location !== 'undefined' ? Number(new URLSearchParams(location.search).get('poolr')) : NaN; return Number.isFinite(v) && v > 0 && v < 4 ? v : 0.3; })();
+type SkyModel = Pick<ModelLike, 'entities' | 'resolvedDef' | 'worldPose' | 'readPass' | 'constants'> & { ground?(): { waters?: { area?: [number, number][]; level?: number }[] } };
+/** W2b: the balloons' loops ([cx, cz, rx, rz] × 4, or null for none) and the fog band ([x0, z0, x1, z1] over the largest
+ *  water at least ~120 m across, and its level; or null). Loops spread over the bounds of the world's top-level things. */
+export function skyThingsOf(m: SkyModel, balloons: unknown): { tracks: number[][] | null; band: number[] | null } {
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity, has = false;
+  const scan = () => { for (const e of m.entities.values()) {
+    if ((e as { in?: { parent?: string } }).in?.parent !== 'world') continue;
+    const d = m.resolvedDef(e.def); if (d?.tags?.includes('balloon')) has = true;
+    if (d?.tags?.some((t) => /^(terrain|landform|ground|lake|sea|ocean|zone|land-use|boundary)$/.test(t))) continue;
+    const p = m.worldPose(e); if (!Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+    x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z);
+  } };
+  if (m.readPass) m.readPass(scan); else scan();
+  let tracks: number[][] | null = null;
+  if (balloons !== false && (balloons === true || has) && Number.isFinite(x0)) {
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = Math.max(60, (x1 - x0) / 2), dd = Math.max(60, (z1 - z0) / 2), k = Math.min(1, Math.min(w, dd) / 250);
+    tracks = [[cx - 0.35 * w, cz - 0.1 * dd, 70 * k, 40 * k], [cx + 0.3 * w, cz - 0.35 * dd, 55 * k, 35 * k], [cx - 0.05 * w, cz + 0.25 * dd, 24 * k, 20 * k], [cx + 0.15 * w, cz + 0.05 * dd, 60 * k, 50 * k]];
+  }
+  let band: number[] | null = null, best = 0;
+  for (const wtr of m.ground?.().waters ?? []) {
+    const a = wtr.area; if (!a || a.length < 3) continue;
+    const xs = a.map((q) => q[0]), zs = a.map((q) => q[1]), bx0 = Math.min(...xs), bx1 = Math.max(...xs), bz0 = Math.min(...zs), bz1 = Math.max(...zs);
+    const area = Math.abs(a.reduce((s, [px, pz], i) => { const [qx, qz] = a[(i + 1) % a.length]; return s + px * qz - qx * pz; }, 0)) / 2;
+    if (Math.min(bx1 - bx0, bz1 - bz0) < 120 || area < 20000 || area <= best) continue;
+    best = area; band = [bx0, bz0, bx1, bz1, wtr.level ?? 0];
+  }
+  return { tracks, band };
+}
 export class GodWorldLiving {
   /** Carries the god's lamps as `edenLightSources` for the atmosphere's halos and fireflies (found by its scene scan). */
   readonly group = new THREE.Group();
@@ -128,6 +156,7 @@ export class GodWorldLiving {
     // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
+    this.skyThings(m);
     const sources: NightSource[] = [], marks: HaloSource[] = [], beacons: [number, number, number][] = [];
     const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
@@ -160,6 +189,16 @@ export class GodWorldLiving {
     } else { this.patterns?.dispose(); this.patterns = null; paintOnlySources(sources, bounds); }
     this.group.userData.edenLightSources = marks;
     this.group.userData.edenLighthouses = beacons;
+  }
+  private skyKey = '';
+  /** W2b: drifting hot-air balloons (a world with balloons of its own, or `state.sky.balloons: true`; `false` = none) on
+   *  loops over what the god built, and the sea fog band over its largest water. Recomputed only when the world changes. */
+  private skyThings(m: ModelLike) {
+    const sky = (entityWorldState(this.layer) as { sky?: { balloons?: unknown } } | null)?.sky;
+    const key = `${m.editSeq ?? ''}:${m.entities.size}:${String(sky?.balloons)}`;
+    if (key === this.skyKey) return; this.skyKey = key;
+    const { tracks, band } = skyThingsOf(m as unknown as SkyModel, sky?.balloons);
+    this.group.userData.edenBalloonTracks = tracks; this.group.userData.edenFogBand = band;
   }
   /** For the atmosphere: the god's weather (null = scheduled) and "under a roof" for camera-local rain. */
   atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {
