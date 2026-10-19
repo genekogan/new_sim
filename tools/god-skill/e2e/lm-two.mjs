@@ -193,11 +193,13 @@ try {
     }
     return { places: genesis.places.length, missing };
   }, (r) => r.places === 113 && !r.missing.length);
+  // byte-exact = the source, or its smaller wire rendition (worlds/core-assets/renditions.json, lane W3b) under the source sha
+  const renditions = JSON.parse(readFileSync(resolve(root, 'worlds/core-assets/renditions.json'), 'utf8')).renditions;
   await step(`G1 every library model (${library.filter((d) => d.make.kind === 'mesh').length} GLBs) is served byte-exact from an empty asset dir`, async () => {
     const bad = [];
     for (const d of library.filter((x) => x.make.kind === 'mesh')) {
-      const r = await fetch(`${base}/assets/${d.make.asset}.glb`); const b = Buffer.from(await r.arrayBuffer());
-      if (!r.ok || createHash('sha256').update(b).digest('hex') !== d.make.asset) bad.push(d.name);
+      const r = await fetch(`${base}/assets/${d.make.asset}.glb`); const b = Buffer.from(await r.arrayBuffer()), h = createHash('sha256').update(b).digest('hex');
+      if (!r.ok || (h !== d.make.asset && h !== renditions[d.make.asset]?.sha)) bad.push(d.name);
     }
     return { bad };
   }, (r) => !r.bad.length);

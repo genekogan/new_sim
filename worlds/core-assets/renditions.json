@@ -61,11 +61,23 @@
    "bytes": 135036,
    "source": "worlds/core-assets/mars-fidelity/kitchen.glb"
   },
+  "21200d03b44ad3c5e74727216f48a7c9452f7e3eb531d17546e57e57279555c8": {
+   "sha": "e1d760b745d6c304395d8ebabdc33b6374f5d12dd47dc6d600467337eceba98c",
+   "path": "worlds/core-assets/renditions/e1d760b745d6c304395d8ebabdc33b6374f5d12dd47dc6d600467337eceba98c.glb",
+   "bytes": 436576,
+   "source": "worlds/littlemartians-two/assets/character-kweku.glb"
+  },
   "219aba825d3d90d736fcb1852f56456438c34550fdedd1552a780834bf6a3b56": {
    "sha": "549f8bcfd79e951f31afddb315644c0543367a54460cd97570a1907f414d4f6f",
    "path": "worlds/core-assets/renditions/549f8bcfd79e951f31afddb315644c0543367a54460cd97570a1907f414d4f6f.glb",
    "bytes": 195248,
    "source": "worlds/core-assets/mars/vehicle-8.glb"
+  },
+  "273909d7072041dcd9b0ced25709d257dbc8b72725a074864b03a18916b98f1a": {
+   "sha": "5193ad3558f435879174ebb8c081615b71ea79c4049af66622c9b292938459e0",
+   "path": "worlds/core-assets/renditions/5193ad3558f435879174ebb8c081615b71ea79c4049af66622c9b292938459e0.glb",
+   "bytes": 471344,
+   "source": "worlds/littlemartians-two/assets/exhibit-drive-9207a5e1c4b1.glb"
   },
   "2b88aad6559282c4fc7ddb40fcfd2210e0b56e2e5de252920fa56355b56dbd5e": {
    "sha": "3868d6cf8b4a7d4749784a053ec5f4124fe83b03a8594ac145881f81fb79ed6c",
@@ -97,6 +109,24 @@
    "bytes": 4480,
    "source": "worlds/core-assets/mars/folding-chair-4.glb"
   },
+  "3bf248f5da4d6c44f52939d6f4fae94940bb157c94981aba72bc286744532c49": {
+   "sha": "c6bb9798a8ea21dcdb5b2f5b2c9fdfe0b1cda3178b85a40a9115521730e68ea8",
+   "path": "worlds/core-assets/renditions/c6bb9798a8ea21dcdb5b2f5b2c9fdfe0b1cda3178b85a40a9115521730e68ea8.glb",
+   "bytes": 1493976,
+   "source": "worlds/littlemartians-two/assets/exhibit-golden-gate-park-tree.glb"
+  },
+  "3f9a130fc303eb353c75844dc44e48ffc73d2676f821fb8e1af096b256683617": {
+   "sha": "05bec04305a1349c227d25f9488f1f27c87199a35f12dac1bc542e562b24efbc",
+   "path": "worlds/core-assets/renditions/05bec04305a1349c227d25f9488f1f27c87199a35f12dac1bc542e562b24efbc.glb",
+   "bytes": 162516,
+   "source": "worlds/littlemartians-two/assets/panel-receding-archways.glb"
+  },
+  "423b2865e614f43ec385af7367cdc0173dc1166f297cd24ec65db030701da071": {
+   "sha": "8a98753d8940d58f7f03060dda5b7491fd75bf5fdf2161833e77337a818f48d4",
+   "path": "worlds/core-assets/renditions/8a98753d8940d58f7f03060dda5b7491fd75bf5fdf2161833e77337a818f48d4.glb",
+   "bytes": 340304,
+   "source": "worlds/littlemartians-two/assets/exhibit-drive-731f06fdb7e6.glb"
+  },
   "42b1439ac9ff29c1566b84f68988e3e149c73ae3cb64b5d26cb8f7c581607ecb": {
    "sha": "edd12071f8114830cfffd9d4fd784fd98a2f302446f6d6fd0371840aa07f6864",
    "path": "worlds/core-assets/renditions/edd12071f8114830cfffd9d4fd784fd98a2f302446f6d6fd0371840aa07f6864.glb",
@@ -120,6 +150,12 @@
    "path": "worlds/core-assets/renditions/351771cc27110be19930a011da55e4e1c4be86c4dcc2c4e8f7e00aebb9ca2c6e.glb",
    "bytes": 5376,
    "source": "worlds/core-assets/mars/water-urn.glb"
+  },
+  "473d35b6b62505c8d5d5ab2fc2a4f6ccfe5c0206985eeadeebb2ac5299884534": {
+   "sha": "b45c0565111dbd3b682fd47b449bead54b002d400f91ce316767904844c67c60",
+   "path": "worlds/core-assets/renditions/b45c0565111dbd3b682fd47b449bead54b002d400f91ce316767904844c67c60.glb",
+   "bytes": 1475048,
+   "source": "worlds/littlemartians-two/assets/scan-celadon-tower.glb"
   },
   "49f14f2da02d214643cfdb000b9fb2ee358d6feb51d150cea88fce75a6715ce4": {
    "sha": "e4b875b84f571fd3a9964f8fb793ac2da84940a64a0106cf230d8486caf2ea05",
@@ -187,11 +223,29 @@
    "bytes": 6576,
    "source": "worlds/core-assets/mars/bus-seat-2.glb"
   },
+  "658f17cb0d2fd323c194f30f1a1c7f0150d5a68f5401bdb03732516751517875": {
+   "sha": "fd220c72b9ed3b347a4cd98d050273b8562f28dd79d3c880369afa986cf5aa9d",
+   "path": "worlds/core-assets/renditions/fd220c72b9ed3b347a4cd98d050273b8562f28dd79d3c880369afa986cf5aa9d.glb",
+   "bytes": 256724,
+   "source": "worlds/littlemartians/buildings/ceramic-tower.glb"
+  },
   "67747b543fd697a0904d2ba71e1e017d77a8c43159cb10ff640c1b45fe179cfc": {
    "sha": "48328b2a3ffa40372ca919984e39a8773dbd97404eb1c8f1648a7e8ed7715a76",
    "path": "worlds/core-assets/renditions/48328b2a3ffa40372ca919984e39a8773dbd97404eb1c8f1648a7e8ed7715a76.glb",
    "bytes": 20416,
    "source": "worlds/core-assets/mars/coffee-counter.glb"
+  },
+  "68043f3fb2b3419656ffe068de5318a221f8c086361ee55ea2333af40edf8a13": {
+   "sha": "11439ca8d17956961ca4127444d01a29985b93a9d1780a523fd639d97b427607",
+   "path": "worlds/core-assets/renditions/11439ca8d17956961ca4127444d01a29985b93a9d1780a523fd639d97b427607.glb",
+   "bytes": 1030972,
+   "source": "worlds/littlemartians-two/assets/exhibit-camel-sculpture.glb"
+  },
+  "680ef38962d6dbe9c0b9fb034a4be49d9bb944bab2de3fb6ffb85b24cda0ae44": {
+   "sha": "8370e8d53b574a0d387be15ec64e67a9f3bc13ab62f9a9c5b4f197e5bc9506ff",
+   "path": "worlds/core-assets/renditions/8370e8d53b574a0d387be15ec64e67a9f3bc13ab62f9a9c5b4f197e5bc9506ff.glb",
+   "bytes": 400100,
+   "source": "worlds/littlemartians-two/assets/exhibit-drive-77e7e7424358.glb"
   },
   "68e8510c9e857a97644e1f5509f33658b2644134a4d8b2f90ad095ddcbda5455": {
    "sha": "6287291cfe7da3defbaa63cd0b6bf503218613b2e0be1d69b7e49603fa776ff9",
@@ -199,11 +253,23 @@
    "bytes": 20452,
    "source": "worlds/core-assets/mars/shelter-4.glb"
   },
+  "6eacf406f9280d327b56dd6d812f84fa2172e5f745a3ae3423f2db35de805ed9": {
+   "sha": "c5d5752b49b52d5f914d007236cea94e4e70af8844b65666f6c3a26b2a3cc647",
+   "path": "worlds/core-assets/renditions/c5d5752b49b52d5f914d007236cea94e4e70af8844b65666f6c3a26b2a3cc647.glb",
+   "bytes": 1505952,
+   "source": "worlds/littlemartians-two/assets/exhibit-two-warriors.glb"
+  },
   "754359ccdf19c08a34cc57a8b87df1d3212874ef9882edcd2c6daa3815ad7d05": {
    "sha": "6446bd30b969bb40b7721f5c4e325e6a7e996b9dddc03c1abe7a3e7acebceb5c",
    "path": "worlds/core-assets/renditions/6446bd30b969bb40b7721f5c4e325e6a7e996b9dddc03c1abe7a3e7acebceb5c.glb",
    "bytes": 4148,
    "source": "worlds/core-assets/mars/navy-sofa.glb"
+  },
+  "78446d149b6d4ef4156b9ee90c4fb046e9c0c7275ef4e88dc3154b9450d15ac7": {
+   "sha": "c19a7bcf35646ccf3d10271110afbfd2b749cca9b6132f7ff8934aeeb52d2ece",
+   "path": "worlds/core-assets/renditions/c19a7bcf35646ccf3d10271110afbfd2b749cca9b6132f7ff8934aeeb52d2ece.glb",
+   "bytes": 191600,
+   "source": "worlds/littlemartians/buildings/minaret-temple.glb"
   },
   "809b7caa0824c5932e441991935002d48fd43461bf4a0bbee96e009b9d43900e": {
    "sha": "661055fc3feaae6592f6cd178d10dfc319096b31c776a6b17b6d2523a7a436e9",
@@ -240,6 +306,12 @@
    "path": "worlds/core-assets/renditions/37faa7791d2e21c1389254ae94fd9a2af83e0e8a77e51370119a9056b0c632a9.glb",
    "bytes": 50016,
    "source": "worlds/core-assets/mars/vehicle-1.glb"
+  },
+  "89777204026c33e802aac6a3ad9e9d4c01c31e7221509940b12d95ff2eba698b": {
+   "sha": "930f3d00c3cf4aa79b5bc73093179cff148e471aae232ed32854a2fa54aeaa3a",
+   "path": "worlds/core-assets/renditions/930f3d00c3cf4aa79b5bc73093179cff148e471aae232ed32854a2fa54aeaa3a.glb",
+   "bytes": 945112,
+   "source": "worlds/littlemartians-two/assets/scan-madmaraca.glb"
   },
   "90f5fc4c2152398157a7fa3973d34bb697f6f245354a4d167cd9d9e94a563a0a": {
    "sha": "edde3afdd24de3954c551ded562a21f0ced626196a5cfa0944efa730beb0b841",
@@ -325,11 +397,29 @@
    "bytes": 60132,
    "source": "worlds/core-assets/mars/vehicle-4.glb"
   },
+  "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b": {
+   "sha": "5bcdf0ace8934855f157bf8dba259bebeb4c9c15dcf6607fc33b2b4c1358bce9",
+   "path": "worlds/core-assets/renditions/5bcdf0ace8934855f157bf8dba259bebeb4c9c15dcf6607fc33b2b4c1358bce9.glb",
+   "bytes": 2784,
+   "source": "worlds/core-assets/packs/mushrooms-tan-pack.glb"
+  },
   "a4b8b5655ca937d57a27faad4465dfd8d2e8a191f64af153849d52796d820020": {
    "sha": "27abaccc4f6e42f2e1b3f227929cef179f7b251977f337be48fb1a2329ebe66a",
    "path": "worlds/core-assets/renditions/27abaccc4f6e42f2e1b3f227929cef179f7b251977f337be48fb1a2329ebe66a.glb",
    "bytes": 66856,
    "source": "worlds/core-assets/mars/shelter-2.glb"
+  },
+  "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564": {
+   "sha": "7ed38d6862411e903857bad598eb8de17cab7938ee87350d7ced0e0bb25b35f9",
+   "path": "worlds/core-assets/renditions/7ed38d6862411e903857bad598eb8de17cab7938ee87350d7ced0e0bb25b35f9.glb",
+   "bytes": 2808,
+   "source": "worlds/core-assets/packs/mushrooms-red-pack.glb"
+  },
+  "a6bfbbfeddab3e727a2498a0c29a01aa6c5089d23afc7685788d68ae068efb1b": {
+   "sha": "cafbc266655038fc29bfbc4dfc1dc83ca73249a1014c5a5f9e61ad3a299b516f",
+   "path": "worlds/core-assets/renditions/cafbc266655038fc29bfbc4dfc1dc83ca73249a1014c5a5f9e61ad3a299b516f.glb",
+   "bytes": 862416,
+   "source": "worlds/littlemartians-two/assets/character-ada.glb"
   },
   "a73eadf7ac51719e0933eac98c4b961f600cb54a01f8a3f2983c4404cf1c90a6": {
    "sha": "dee3a99b25e9f0a3423c121add1fd8a33ead1cac13c8d22d576f6ded859aa8bd",
@@ -349,6 +439,12 @@
    "bytes": 4480,
    "source": "worlds/core-assets/mars/folding-chair-2.glb"
   },
+  "abb4963aa46021a262464985dfc47ee5d8386811b431ba2a89204c264d8d2db7": {
+   "sha": "1d58da3dbb527b3fb14bb9354c3769d07fdaad57ef79407d24beff926270dda4",
+   "path": "worlds/core-assets/renditions/1d58da3dbb527b3fb14bb9354c3769d07fdaad57ef79407d24beff926270dda4.glb",
+   "bytes": 861620,
+   "source": "worlds/littlemartians-two/assets/character-mycos.glb"
+  },
   "b08eec70d69a6dabe4e07f0079508da6fe393864ac16dfa75fe10623732e1765": {
    "sha": "9c3fcc9fa0b61a7bd0bba50f9cebdfe689f47ad3fc6fef43130274a9d5cf5297",
    "path": "worlds/core-assets/renditions/9c3fcc9fa0b61a7bd0bba50f9cebdfe689f47ad3fc6fef43130274a9d5cf5297.glb",
@@ -360,6 +456,12 @@
    "path": "worlds/core-assets/renditions/543c8a6070b45cb58928d64b7f86f8546a345fd72be1d3c77df255b082a52ff1.glb",
    "bytes": 196124,
    "source": "worlds/core-assets/mars/west-racks.glb"
+  },
+  "b20718c22a5be943e10721052457a199f24c7734392120125d3c7fa7901e57b9": {
+   "sha": "080f50959533d065cf40d3db3e5d68c0b5b1075d69775afaed25f699c984f553",
+   "path": "worlds/core-assets/renditions/080f50959533d065cf40d3db3e5d68c0b5b1075d69775afaed25f699c984f553.glb",
+   "bytes": 330312,
+   "source": "worlds/littlemartians-two/assets/exhibit-drive-c30ab0ea1037.glb"
   },
   "b3feb302a3bdefcb376c7830400648c8ee25f77a73e32c090da7d5a5b4cf575b": {
    "sha": "830aa1c31cb96d2e715512bb69bb5a69a73d5042802396bb94b3d6ed48348975",
@@ -391,11 +493,29 @@
    "bytes": 4812,
    "source": "worlds/core-assets/mars/og-ground-1.glb"
   },
+  "bdfaba8553dd65dbcb9fe29006b7b60513d56138f8b8b0a104e5418ece78ad62": {
+   "sha": "437b7b86dd8d41d00d96dc4d34116252705c3dd6e0477e95ab85b98c3056ed63",
+   "path": "worlds/core-assets/renditions/437b7b86dd8d41d00d96dc4d34116252705c3dd6e0477e95ab85b98c3056ed63.glb",
+   "bytes": 839824,
+   "source": "worlds/littlemartians-two/assets/character-shuijing.glb"
+  },
+  "bf258b01ddb1c33370d2d2e1197504c57f05aeac79fbb72b0fe16db0195d8722": {
+   "sha": "d5181b89f76532b408fca0a1dc1d4d93ffb71fd5c5f56da71811ba0fb1e8c138",
+   "path": "worlds/core-assets/renditions/d5181b89f76532b408fca0a1dc1d4d93ffb71fd5c5f56da71811ba0fb1e8c138.glb",
+   "bytes": 434640,
+   "source": "worlds/littlemartians-two/assets/exhibit-drive-72c8fc2f1538.glb"
+  },
   "c2035da47a57954c40112363bae662e924eff8d3d1f69e9b965bc0631c761b52": {
    "sha": "caf6cd16d8580b6841a1120d963181984b12fad6a6184737d31695541992b3fd",
    "path": "worlds/core-assets/renditions/caf6cd16d8580b6841a1120d963181984b12fad6a6184737d31695541992b3fd.glb",
    "bytes": 37204,
    "source": "worlds/core-assets/mars/toilet-1.glb"
+  },
+  "c7151b2ffcb97bbb1d58cb181b5ac40993f8e9eb8e85b3890ef05649d9e0e08d": {
+   "sha": "25218dc97eacc63f90ecc24bb4a7bd45b24b0c68a01350ff1f0d07d585f03c38",
+   "path": "worlds/core-assets/renditions/25218dc97eacc63f90ecc24bb4a7bd45b24b0c68a01350ff1f0d07d585f03c38.glb",
+   "bytes": 1824268,
+   "source": "worlds/littlemartians-two/assets/scan-minarete.glb"
   },
   "cad8479ed70bd574a3133eac9b75e001e66d63730055576ab46b1c12f6108cda": {
    "sha": "25c04467a07e81474abd77f0a204ae498596726e37d632ae7cae3b22c70b5aca",
@@ -414,6 +534,18 @@
    "path": "worlds/core-assets/renditions/07c969fe4b263d9c7e066a057d98c77ce92555b004e0eedfa3afb7ab29dfc69a.glb",
    "bytes": 18040,
    "source": "worlds/core-assets/mars/tool-library-bookshelf-timber.glb"
+  },
+  "ccbc447473f579abe12a32c2ba8d8f3a373315ff25e3509357d832f9773e7e78": {
+   "sha": "bf769a1500245f9b5c3bc9aa376d9ff9f8ff11d9b1bb1195afcedd895e1d1394",
+   "path": "worlds/core-assets/renditions/bf769a1500245f9b5c3bc9aa376d9ff9f8ff11d9b1bb1195afcedd895e1d1394.glb",
+   "bytes": 1235624,
+   "source": "worlds/littlemartians-two/assets/character-kalama.glb"
+  },
+  "cfb9dd3129a42b2524c53faf0803283995cb36f766f1fe977699843854089ec9": {
+   "sha": "464d7e64054436d0bc1f73e4900c2462453e1d2388bd90209da7c4dceb11a3d2",
+   "path": "worlds/core-assets/renditions/464d7e64054436d0bc1f73e4900c2462453e1d2388bd90209da7c4dceb11a3d2.glb",
+   "bytes": 1870200,
+   "source": "worlds/littlemartians-two/assets/exhibit-pupila-corridor.glb"
   },
   "d093875d81ffa5e00ce5963b67d0a452f6234d4f2764b892fd757aaf1e9088e0": {
    "sha": "e68cb0f117069a4bc2add047fc43466edd3aa248e9ea837711dc608f0ef4a261",
@@ -451,11 +583,23 @@
    "bytes": 4300,
    "source": "worlds/core-assets/mars/colab-drawer-coffee.glb"
   },
+  "e4f151920919c4c95a867e71a2d9347dda77a1bc26fc4805bddac97a9df7a638": {
+   "sha": "618ddf1fc4ed16c64e539ac952073ba8525713eeb3e9aa40e25d108e3b02887e",
+   "path": "worlds/core-assets/renditions/618ddf1fc4ed16c64e539ac952073ba8525713eeb3e9aa40e25d108e3b02887e.glb",
+   "bytes": 435444,
+   "source": "worlds/littlemartians-two/assets/character-nyx.glb"
+  },
   "ee2767143db082f10f3a129604e9e8478bbb4a9e272ef75d3548365a32733e71": {
    "sha": "d33278096ea70534c9f2b2a7172718848208b050f87fa36b5d6b5018f5b7f8e5",
    "path": "worlds/core-assets/renditions/d33278096ea70534c9f2b2a7172718848208b050f87fa36b5d6b5018f5b7f8e5.glb",
    "bytes": 7252,
    "source": "worlds/core-assets/mars/site-object-1.glb"
+  },
+  "fa861c75b054316622d516b0f68bbf85c9ccdaa379e73fa2102a4ad732272a90": {
+   "sha": "a699850776c90a77a2caa8cf71035581a425efadc01c8326597f678c323e571d",
+   "path": "worlds/core-assets/renditions/a699850776c90a77a2caa8cf71035581a425efadc01c8326597f678c323e571d.glb",
+   "bytes": 114764,
+   "source": "worlds/littlemartians-two/assets/panel-geometric-pattern.glb"
   },
   "fdfa69c4f34bcca9c23cbf1edd287a414a37baef2eccbc806bdd40fdc0b30ebe": {
    "sha": "3503c5157b0fe5a4859c10603f810665d964eca0cdd7b37fe526755aad3ec4a0",
