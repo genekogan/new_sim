@@ -194,7 +194,7 @@ registerMesh({
     // no water's bounds touch the area: water() is false for every candidate, so the worker's scatter is the whole answer
     const [ax0, az0, ax1, az1] = bbox(area);
     const dry = ctx.model.ground().waters.every((w) => { if (!w.area) return true; const [x0, z0, x1, z1] = bbox(w.area as [number, number][]); return x1 < ax0 || x0 > ax1 || z1 < az0 || z0 > az1; });
-    const job = inWorker(dry ? { kind: 'points', area, params: ctx.params, seed, cells: blockCellsOf(ctx.model), C: BLOCK_CELL, selfId: e.id } : { area, params: ctx.params, seed });
+    const job = inWorker(dry ? { kind: 'points', area, params: ctx.params, seed, cells: blockCellsOf(ctx.model, 0.6, [Math.min(...area.map((q) => q[0])), Math.min(...area.map((q) => q[1])), Math.max(...area.map((q) => q[0])), Math.max(...area.map((q) => q[1]))]), C: BLOCK_CELL, selfId: e.id } : { area, params: ctx.params, seed });
     if (!job) { fill(scatter()); return group.children.length ? group : null; }
     let gone = false;
     group.addEventListener('removed', () => { gone = true; });

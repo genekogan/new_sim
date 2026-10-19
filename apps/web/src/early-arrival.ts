@@ -14,11 +14,15 @@ export function earlyArrivalWanted(tier: string, newWorld: boolean, search: stri
   return EARLY_ARRIVAL && tier === 'phone';
 }
 
-/** Page-wide: the near world has been drawn before the live data came (once per page, like the arrival marks). */
-let shown = false;
+/** Page-wide (once per page, like the arrival marks): `revealed` the world's canvas is shown under the card (a canvas drawn
+ *  while hidden shows blank once revealed, until its next frame); `shown` frames were then drawn into it: the card may go. */
+let shown = false, revealed = false;
 const subs = new Set<() => void>();
+const tell = () => { for (const f of [...subs]) f(); };
 export const earlyArrival = {
   shown: () => shown,
-  mark() { if (shown) return; shown = true; arrivalMark('early-drawn'); for (const f of [...subs]) f(); },
+  revealed: () => revealed,
+  reveal() { if (revealed) return; revealed = true; tell(); },
+  mark() { if (shown) return; shown = revealed = true; arrivalMark('early-drawn'); tell(); },
   subscribe(f: () => void) { subs.add(f); return () => { subs.delete(f); }; },
 };

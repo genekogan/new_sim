@@ -43,3 +43,20 @@ test('the desert-scrub worker scatter (cloned block cells + blockTest) equals th
   assert.ok(here.length > 50, `${here.length}`);
   assert.deepEqual(there, here);
 });
+
+// P7: a scatter builds the index only around itself (the phone's near-first build pays for nearby things only); its test
+// answers exactly as the whole-world index does inside its area
+test('a scatter adds only the things that can reach its area, and blocks as the whole index does there', async () => {
+  const { blockCellsOf, BLOCK_CELL, BLOCK_REACH } = await import('./ecology.mesh.ts');
+  const { blockTest } = await import('./block-test.ts');
+  const ops = [{ op: 'place', def: 'core/bench@1', name: 'near', p: [12, 8] }, { op: 'place', def: 'core/bench@1', name: 'edge', p: [-3, 20] },
+    { op: 'place', def: 'core/bench@1', name: 'far', p: [400, 400] }, { op: 'place', def: 'core/bench@1', name: 'far-2', p: [-420, 300] },
+    { op: 'place', def: 'core/woodland@1', name: 'wood', shape: { area: [[0, 0], [30, 0], [30, 30], [0, 30]] } }];
+  const a = world(), b = world();
+  for (const w of [a, b]) { const r = applyBatch(w, { ops } as never, 'god', 0) as { result: { accepted: boolean } }; assert.equal(r.result.accepted, true); }
+  const seen: string[] = []; const fp = a.footprint.bind(a); a.footprint = ((e: { name?: string }, ...r: unknown[]) => { seen.push(e.name ?? ''); return (fp as (...x: unknown[]) => never)(e, ...r); }) as typeof a.footprint;
+  const regional = blockedBy(a, a.get('wood')!), whole = blockTest(blockCellsOf(b), BLOCK_CELL, b.get('wood')!.id);
+  assert.ok(seen.includes('near') && seen.includes('edge') && !seen.includes('far') && !seen.includes('far-2'), seen.join());
+  assert.ok(BLOCK_REACH >= 64);
+  for (let x = -2; x <= 32; x += 0.25) for (let z = -2; z <= 32; z += 0.25) assert.equal(regional(x, z), whole(x, z), `${x},${z}`);
+});

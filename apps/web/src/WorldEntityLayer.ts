@@ -6,7 +6,7 @@
 import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
 import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
-import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
+import { TILE_M, TILE_N, Terrain, groundForTile, heightAt, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
@@ -150,7 +150,9 @@ export class WorldEntityLayer {
         const def = m.resolvedDef(e.def); if (!def || def.make.kind !== 'gen' || meshFor(def)?.gen !== 'building/1') continue;
         try { const p = prefetchBuilding({ def, entity: e, params: paramsOf(e, def), args: (def.make.args ?? {}) as Record<string, unknown> }); if (p) { pending.set(e.id, p); void p.then(() => pending.delete(e.id)); } } catch { /* built in place */ }
       }
-      this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
+      // P7 (phone): only the sectors near the arrival are baked at full detail before the card; the rest are drawn from a
+      // coarse direct sample (no tile bakes, ~1/16 of the height samples) and refined during the fill
+      this.rebuildTerrain(undefined, true, progressiveNearM() === null ? undefined : { at: [[pose.target[0], pose.target[2]], [pose.eye[0], pose.eye[2]]], r: COARSE_BEYOND_M });   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
       await nextTask(); if (signal.aborted || this.model !== m) return;
       this.rebuildWater();
       this.buildHorizon();
@@ -169,6 +171,7 @@ export class WorldEntityLayer {
         if (signal.aborted || this.model !== m) return;
       }
       this.active = true;
+      if (this.coarse.size && !this.filling) { this.filling = true; this.fill = this.fillRest(m, all, all.length, pending, signal); }   // P7: refine the coarse terrain
     } finally { this.building = false; if (!this.filling) clearBuildingPrefetch(); }
   }
   /** The fill after a progressive first build (resolves when it is done or given up). */
@@ -177,8 +180,12 @@ export class WorldEntityLayer {
     try {
       // the arrival's own last steps (first frame, shaders, the card) go first: the fill starts once it is over
       while (!arrivalOver()) { await new Promise((r) => setTimeout(r, 100)); if (signal.aborted || this.model !== m) return; }
-      for (let i = from; i < all.length;) {
+      const arrival = this.coarse.size ? this.arrivalAt() : null;
+      for (let i = from; i < all.length || this.coarse.size;) {
         await nextTask('user-visible'); if (signal.aborted || this.model !== m) return;  // background tasks starve between busy phone frames
+        // P7: one coarse terrain sector at full detail, then a slice of things
+        if (this.refineCoarseSector(arrival)) { await nextTask('user-visible'); if (signal.aborted || this.model !== m) return; }
+        if (i >= all.length) continue;
         const until = performance.now() + FILL_SLICE_MS;
         m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
         const wait = i < all.length ? pending.get(all[i].id) : undefined;
@@ -467,7 +474,9 @@ export class WorldEntityLayer {
 
   // ---------- terrain ----------
 
-  private rebuildTerrain(onlyTiles?: Set<string>, deferMottle = false) {
+  /** P7: sectors drawn coarse at the arrival, still to be refined (keys `sx,sz`). */
+  private coarse = new Set<string>();
+  private rebuildTerrain(onlyTiles?: Set<string>, deferMottle = false, fineNear?: { at: [number, number][]; r: number }) {
     const m = this.model!; const [bx0, bz0, bx1, bz1] = m.ground().extent;   // GOD-ENV: bounds, a rectangle once extended
     const tx0 = Math.floor(bx0 / TILE_M), tx1 = Math.ceil(bx1 / TILE_M) - 1, tz0 = Math.floor(bz0 / TILE_M), tz1 = Math.ceil(bz1 / TILE_M) - 1;
     const sx0 = Math.floor(tx0 / SECTOR_TILES), sx1 = Math.floor(tx1 / SECTOR_TILES), sz0 = Math.floor(tz0 / SECTOR_TILES), sz1 = Math.floor(tz1 / SECTOR_TILES);
@@ -479,33 +488,50 @@ export class WorldEntityLayer {
         for (const tk of onlyTiles) { const [tx, tz] = tk.split(',').map(Number); if (Math.floor(tx / SECTOR_TILES) === sx && Math.floor(tz / SECTOR_TILES) === sz) { touched = true; break; } }
         if (!touched) continue;
       }
-      const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); }
-      const mesh = this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle);
-      this.sectors.set(key, mesh); this.terrainGroup.add(mesh);
+      const coarse = !!fineNear && !fineNear.at.some(([x, z]) => rectDistance(x, z, sx * SECTOR_TILES * TILE_M, sz * SECTOR_TILES * TILE_M, (sx + 1) * SECTOR_TILES * TILE_M, (sz + 1) * SECTOR_TILES * TILE_M) <= fineNear.r);
+      this.placeSector(key, this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1], deferMottle, coarse ? COARSE_STEP : TERRAIN_STEP));
+      if (coarse) this.coarse.add(key); else this.coarse.delete(key);
     }
-    for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); }
+    for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); this.coarse.delete(key); }
     // things settle on the new ground: refresh poses of root entities (no easing)
     // lane PERF2: world builders (roads, areas, scatters that drape on the ground) are rebuilt only when their shape reaches a
     // re-baked tile; a hill raised in one corner no longer rebuilds every forest and road in the world
     if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') { const world = !!this.drawn.get(e.id)?.world; this.draw(e, false, world && reachesTiles(e, onlyTiles)); }
   }
-  private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false): THREE.Mesh {
+  private placeSector(key: string, mesh: THREE.Mesh) {
+    const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); }
+    this.sectors.set(key, mesh); this.terrainGroup.add(mesh);
+  }
+  /** P7: refine one coarse sector (the nearest to `at` first) at full detail; false when none is left. */
+  refineCoarseSector(at: [number, number] | null): boolean {
+    const m = this.model; if (!m || !this.coarse.size) return false;
+    let best = '', bd = Infinity;
+    for (const key of this.coarse) { const [sx, sz] = key.split(',').map(Number), d = at ? rectDistance(at[0], at[1], sx * SECTOR_TILES * TILE_M, sz * SECTOR_TILES * TILE_M, (sx + 1) * SECTOR_TILES * TILE_M, (sz + 1) * SECTOR_TILES * TILE_M) : 0; if (d < bd) { bd = d; best = key; } }
+    this.coarse.delete(best);
+    const [bx0, bz0, bx1, bz1] = m.ground().extent, [sx, sz] = best.split(',').map(Number);
+    const t: [number, number, number, number] = [Math.floor(bx0 / TILE_M), Math.floor(bz0 / TILE_M), Math.ceil(bx1 / TILE_M) - 1, Math.ceil(bz1 / TILE_M) - 1];
+    if (this.sectors.has(best)) this.placeSector(best, this.sectorMesh(sx, sz, t, true));
+    return true;
+  }
+  private sectorMesh(sx: number, sz: number, t: [number, number, number, number], deferMottle = false, step = TERRAIN_STEP): THREE.Mesh {
     const m = this.model!;
     const tx0 = Math.max(t[0], sx * SECTOR_TILES), tz0 = Math.max(t[1], sz * SECTOR_TILES);
     const tx1 = Math.min(t[2], sx * SECTOR_TILES + SECTOR_TILES - 1), tz1 = Math.min(t[3], sz * SECTOR_TILES + SECTOR_TILES - 1);
     const x0 = tx0 * TILE_M, z0 = tz0 * TILE_M, w = (tx1 - tx0 + 1) * TILE_M, d = (tz1 - tz0 + 1) * TILE_M;
-    const nx = w / TERRAIN_STEP, nz = d / TERRAIN_STEP;
+    const nx = w / step, nz = d / step;
+    // P7 coarse (phone arrival, far sectors): heights straight from the ground recipe at `step` m, no tile bakes
+    const coarse = step !== TERRAIN_STEP ? coarseHeights(m.terrain.ground, x0, z0, nx, nz, step) : null;
     const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array((nx + 1) * (nz + 1) * 3);
     const c = new THREE.Color();
     const palette = (m.state as { ground?: { palette?: string } }).ground?.palette;
     const terrainColor = terrainColorFor(palette), deferred = deferMottle ? terrainColorDeferred(palette) : null;
     const nv = (nx + 1) * (nz + 1), rgb = deferred ? new Float64Array(nv * 3) : null, xz = deferred ? new Float64Array(nv * 2) : null, mottled: number[] = [];
     for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
-      const x = x0 + i * TERRAIN_STEP, z = z0 + j * TERRAIN_STEP;
-      const y = m.terrain.sample(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
+      const x = x0 + i * step, z = z0 + j * step;
+      const y = coarse ? coarse.h[j * (nx + 1) + i] : m.terrain.sample(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
       const k = (j * (nx + 1) + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
-      const slope = m.terrain.slope(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
+      const slope = coarse ? coarse.slope(i, j) : m.terrain.slope(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
       if (deferred) {   // the colour before the mottling now; the mottling (playa-mottle.ts) after, in a worker
         if (deferred(c, y, slope, m.constants.base)) mottled.push(k / 3);
         rgb![k] = c.r; rgb![k + 1] = c.g; rgb![k + 2] = c.b; xz![k / 3 * 2] = x; xz![k / 3 * 2 + 1] = z;
@@ -640,6 +666,24 @@ export class WorldEntityLayer {
 }
 
 const BUILD_SLICE_MS = 50;
+/** P7: a phone's arrival bakes the terrain sectors within this distance of its eye or target; the rest start coarse. */
+const COARSE_BEYOND_M = 96;
+const COARSE_STEP = 4;
+/** Distance from (x, z) to the rectangle [x0, x1] x [z0, z1] (0 inside). */
+function rectDistance(x: number, z: number, x0: number, z0: number, x1: number, z1: number): number {
+  return Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1));
+}
+/** P7: a coarse grid of heights from the ground recipe itself (each tile's own landforms), with its slope by differences. */
+function coarseHeights(g: Ground, x0: number, z0: number, nx: number, nz: number, step: number): { h: Float32Array; slope: (i: number, j: number) => number } {
+  const h = new Float32Array((nx + 1) * (nz + 1)); const locals = new Map<string, Ground>();
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
+    const x = x0 + i * step, z = z0 + j * step, tx = Math.floor(Math.min(x, x0 + nx * step - 1e-3) / TILE_M), tz = Math.floor(Math.min(z, z0 + nz * step - 1e-3) / TILE_M), k = tx + ',' + tz;
+    let local = locals.get(k); if (!local) { local = groundForTile(g, tx, tz); locals.set(k, local); }
+    h[j * (nx + 1) + i] = heightAt(local, x, z);
+  }
+  const at = (i: number, j: number) => h[Math.min(nz, Math.max(0, j)) * (nx + 1) + Math.min(nx, Math.max(0, i))];
+  return { h, slope: (i, j) => Math.hypot((at(i + 1, j) - at(i - 1, j)) / (2 * step), (at(i, j + 1) - at(i, j - 1)) / (2 * step)) };
+}
 /** P1 phones: the fill's slices run between frames, so they are short. */
 const FILL_SLICE_MS = 25;
 /** Entities sorted by distance (xz) from the nearer of two points; things without a pose (world-wide: terrain kits, ...) first.
