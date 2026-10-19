@@ -364,14 +364,16 @@ export class VerifyUse {
     }
     candidates.sort((a, b) => dist(a.at, origin) - dist(b.at, origin));
     let seatStart: V2 | undefined;
+    // a room-less target on a raised floor (a deck reached by its stairs): the goal stands on that floor, the start on the ground
+    const level = doors.length ? 0 : bridge.nav.thing(this.god.model.pathOf(target.id))?.level ?? 0;
     for (const c of candidates) {
       const outside: V2 = [c.at[0] + c.outward[0] * 0.9, c.at[1] + c.outward[1] * 0.9];
       const inward: V2 = [c.at[0] - c.outward[0] * 0.9, c.at[1] - c.outward[1] * 0.9];
       const start = from ?? engine.standableNearV1(outside, 0, undefined, 0.4, 3);
-      const goal = engine.standableNearV1(inward, 0, undefined, 0.4, 3);
+      const goal = engine.standableNearV1(inward, level, undefined, 0.4, 3);
       if (!start || (!from && (allowSeat ? inPoly(start[0], start[1], footprint) : inside(start, 0)))) continue;
       seatStart ??= start;
-      if (goal && inside(goal, 0)) return {start, goal: {p: goal, level: 0}};
+      if (goal && inside(goal, level)) return {start, goal: {p: goal, level}};
     }
     if (allowSeat && seatStart) return {start: seatStart};
     throw new Failure('verify.refused', 'No clear exterior approach and interior standing point at the target boundary.', 'route.no-entry');

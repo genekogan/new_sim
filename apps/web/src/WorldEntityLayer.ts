@@ -155,6 +155,9 @@ export class WorldEntityLayer {
       // children ride with a moved parent: refresh their targets without easing
       const upserted = new Set(d.diff.upserts.map(e => e.id));
       for (const e of d.diff.upserts) for (const cid of this.model.subtree(e.id).slice(1)) { const c = this.model.entities.get(cid); if (c && !upserted.has(cid)) this.draw(c, false); }
+      // a deck's rail opens where another thing's stair lands on it (gen-mesh deck/1): redraw decks when such a thing came or went
+      const links = (e: Entity) => { const def = this.model!.resolvedDef(e.def); try { return !!def && !!this.model!.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).links?.length; } catch { return false; } };
+      if (d.diff.removes.length || d.diff.upserts.some(links)) for (const e of this.model.entities.values()) { const def = this.model.resolvedDef(e.def); if (!upserted.has(e.id) && def?.make.kind === 'gen' && def.make.gen === 'deck/1') this.draw(e, false, true); }
     }
   }
 

@@ -7,6 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
+import { deckRaised, railGaps } from '@sim/generators';
 import { applyBatch, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type ResidentMove, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
@@ -214,6 +215,7 @@ export class EngineBridge {
     const t0 = performance.now();
     const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
     const known = this.physics?.assets ?? {};
+    let linksMoved = false;
     for (const id of [...ids].sort()) {
       const e = this.model.entities.get(id);
       if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
@@ -222,8 +224,18 @@ export class EngineBridge {
       // A removed thing the engine still has (one a Soul held when it went: `sent` forgot it) is removed there too.
       const lingering = !e && (this.engine.world.entities[id]?.tags?.includes('entity-world') || !!this.physics?.byEntity[id]);
       if ((this.sent.get(id) ?? null) === key && !lingering) continue;
+      if (this.sent.get(id)?.includes('"links"') || part?.links?.length) linksMoved = true;
       set[id] = part;
       if (key) this.sent.set(id, key); else this.sent.delete(id);
+    }
+    // a raised deck opens its rails where a stair, ramp or ladder of another thing lands on it (deckAccess): when any link
+    // came, went or moved, every raised deck is derived again (only the changed ones are sent)
+    if (linksMoved) for (const e of this.model.entities.values()) {
+      if (set[e.id] !== undefined || !this.isRaisedDeck(e)) continue;
+      const part = this.derive(e, assets, known), key = part ? JSON.stringify(normPart(part)) : null;
+      if ((this.sent.get(e.id) ?? null) === key) continue;
+      set[e.id] = part;
+      if (key) this.sent.set(e.id, key); else this.sent.delete(e.id);
     }
     if (!Object.keys(set).length) return;
     const draft: WorldEditV1 = { contract: 'world-edit/1', seq, hash: '', levels: structuredClone(this.levels), set, ...(Object.keys(assets).length ? { assets } : {}) };
@@ -297,11 +309,13 @@ export class EngineBridge {
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
     // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
     const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
+    const raisedDeck = this.isRaisedDeck(e, def);
     if (floors.length) part.surfaces = floors.map((s, i) => {
       const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
       const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
-      // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs)
-      const level = worldFrame && abs && s.level === 0 ? 0 : this.levelFor(y, c);
+      // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs); a
+      // raised deck (deck/1 with rails, DECK_RAISED up) is an upper floor of its own that stairs, ramps and ladders reach
+      const level = worldFrame && abs && s.level === 0 && !raisedDeck ? 0 : this.levelFor(y, c);
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
@@ -339,6 +353,7 @@ export class EngineBridge {
       }
       if (l.to.level > 0) (part.surfaces ??= []).push({ id: `${l.id}:head`, level: l.to.level, y: l.to.y, obb: { c: [r3(l.to.p[0] - d[0] * 0.25), r3(l.to.p[1] - d[1] * 0.25)], half: [0.35, r3(l.width / 2)], yaw: l.heading }, label: `${this.model.pathOf(e.id)} ${lid} head`.slice(0, 100) });
     }
+    if (raisedDeck) this.deckAccess(e, part);
     // F1: a decoration (a fountain, a lamp, a sign, a statue, a house) is also a fixture Souls perceive: views list it,
     // `look` finds it. No slots and no obstacle of its own: its solids above are what blocks, exactly as before.
     if (this.seenOnly(e, def)) {
@@ -348,6 +363,61 @@ export class EngineBridge {
     }
     if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
     return part.solids || part.surfaces || part.links || part.fixture ? part : null;
+  }
+  /** A deck/1 at the root, high enough to have rails (generators DECK_RAISED): its floor is a level of its own. */
+  private isRaisedDeck(e: Entity, def = this.model.resolvedDef(e.def)): boolean {
+    return !!def && def.make.kind === 'gen' && def.make.gen === 'deck/1' && def.form !== 'point' && e.in.parent === 'world' && deckRaised(e.params ?? {});
+  }
+  /** Stair, ramp and ladder ends of god things within `pad` metres of a world box: world point, height, width (as derive)
+   *  and where the link's other end is. */
+  private linkEndsNear(box: [number, number, number, number], pad: number, except: string): { p: Vec2; y: number; width: number; other: Vec2 }[] {
+    const out: { p: Vec2; y: number; width: number; other: Vec2 }[] = [];
+    for (const o of this.model.entities.values()) {
+      if (o.id === except) continue;
+      const def = this.model.resolvedDef(o.def); if (!def || this.engineOwned(o)) continue;
+      const worldFrame = def.form !== 'point' && o.in.parent === 'world', wp = this.model.worldPose(o);
+      if (!worldFrame && (wp.x < box[0] - pad || wp.x > box[2] + pad || wp.z < box[1] - pad || wp.z > box[3] + pad)) continue;
+      let baked; try { baked = this.model.bake(def, o.params ?? {}, o.seed ?? 0, o.shape); } catch { continue; }
+      if (!baked.links?.length) continue;
+      const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
+      const toWorld = (x: number, z: number): Vec2 => (worldFrame ? [r3(x), r3(z)] : [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]);
+      const heightAt = (y: number, at: Vec2) => r3(worldFrame ? this.model.terrain.sample(at[0], at[1]) + y : wp.y + y * wp.s);
+      for (const l of baked.links) {
+        if (l.path.length < 2) continue;
+        const helix = helixEnds(l.path), a = toWorld(...(helix?.foot ?? l.path[0])), b = toWorld(...(helix?.head ?? l.path[l.path.length - 1]));
+        const width = r3(l.width * (worldFrame ? 1 : wp.s));
+        out.push({ p: a, y: heightAt(l.y0, a), width, other: b }, { p: b, y: heightAt(l.y1, b), width, other: a });
+      }
+    }
+    return out;
+  }
+  /** A raised deck is walked onto from its stairs: where another thing's stair, ramp or ladder ends at the deck's height
+   *  on its edge, the rail opens for it (generators railGaps; the picture opens the same gap). A deck too low to walk
+   *  under (head room under 2.1 m) is solid below its floor on the ground, so nobody is routed underneath it. */
+  private deckAccess(e: Entity, part: Part) {
+    const floor = part.surfaces?.find((s) => s.id === `${e.id}#f0`); if (!floor || floor.level === 0) return;
+    const area = (e.shape as { area?: Vec2[] } | undefined)?.area; if (!area?.length) return;
+    const xs = area.map((p) => p[0]), zs = area.map((p) => p[1]), box: [number, number, number, number] = [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)];
+    // ends at the deck's height whose flight comes from off the deck (a stair starting on the deck leaves its rail alone)
+    const ends = this.linkEndsNear(box, 24, e.id).filter((x) => Math.abs(x.y - floor.y) <= 0.3 && !inPoly(x.other[0], x.other[1], area));
+    if (ends.length && part.solids?.length) {
+      const solids: NonNullable<Part['solids']> = [];
+      for (const o of part.solids) {
+        if (!o.label?.endsWith(' rail')) { solids.push(o); continue; }
+        const u: Vec2 = [Math.cos(o.obb.yaw), Math.sin(o.obb.yaw)], hl = o.obb.half[0];
+        const a: Vec2 = [o.obb.c[0] - u[0] * hl, o.obb.c[1] - u[1] * hl], b: Vec2 = [o.obb.c[0] + u[0] * hl, o.obb.c[1] + u[1] * hl];
+        const gaps = railGaps(a, b, ends);
+        if (!gaps.length) { solids.push(o); continue; }
+        let t = 0, k = 0;
+        for (const [g0, g1] of [...gaps, [2 * hl, 2 * hl] as [number, number]]) {
+          if (g0 - t > 0.05) { const m = (t + g0) / 2; solids.push({ ...o, id: `${o.id}.${k++}`, obb: { ...o.obb, c: [r3(a[0] + u[0] * m), r3(a[1] + u[1] * m)], half: [r3((g0 - t) / 2), o.obb.half[1]] } }); }
+          t = g1;
+        }
+      }
+      part.solids = solids.length ? solids : undefined;
+    }
+    let ground = Infinity; for (const [x, z] of [...area, [(box[0] + box[2]) / 2, (box[1] + box[3]) / 2] as Vec2]) ground = Math.min(ground, this.model.terrain.sample(x, z));
+    if (floor.y - ground < 2.1) (part.solids ??= []).push({ id: `${e.id}#under`, obb: structuredClone(floor.obb), y0: r3(ground - 0.5), y1: r3(floor.y - 0.1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} under the deck`.slice(0, 100) });
   }
   /** A god-built point thing that is not otherwise an engine fixture or item, and not a creature, a body or a flag. */
   seenOnly(e: Entity, def: StoredDef): boolean {
@@ -727,6 +797,13 @@ export class EngineBridge {
     }
     const body = this.engine.world.entities[e.id];
     if (body?.human) return { p: [body.pose.p[0], body.pose.p[2]], level: body.human.level ?? 0, what: this.model.pathOf(e.id) };
+    // an area or path at the root (a deck, a plaza, a pier) has no pose of its own (0, 0): its end is where a Soul walking
+    // to it goes (nav: the deck's middle on its own floor, a pier's end platform, a plaza's centre)
+    const sdef = this.model.resolvedDef(e.def), t = sdef && sdef.form !== 'point' && e.in.parent === 'world' && e.shape ? this.nav.thing(this.model.pathOf(e.id)) : undefined;
+    if (t && t.kind !== 'water') {
+      const g = this.nav.goal(t, t.at);
+      return g ? { p: g.p, level: g.level, what: this.model.pathOf(e.id) } : { error: `no standing room on ${this.model.pathOf(e.id)}`, endpoint: this.endpoint(this.model.pathOf(e.id), t.at, t.level ? this.levels.find((l) => l.id === t.level)?.y ?? 0 : this.model.terrain.sample(t.at[0], t.at[1]), t.level) };
+    }
     const wp = this.model.worldPose(e), level = body ? this.levelOfY(body.pose.p[1]) : this.levelOfY(wp.y);
     const p = this.engine.standableNearV1([wp.x, wp.z], level, undefined, 0.4, 40);
     return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}`, endpoint: this.endpoint(this.model.pathOf(e.id), [wp.x, wp.z], body ? body.pose.p[1] : wp.y, level) };

@@ -253,6 +253,25 @@ function walkReport(w: WorldModel, e: Entity, slots: ReturnType<typeof slotWorld
   return { state: bad.length ? 'failed' : 'ok', from, rooms: out, note: rooms.length > WALK_ROOMS ? `first ${WALK_ROOMS} of ${rooms.length} rooms checked` : '' };
 }
 
+/** A free-standing flight (stairs/1 and kits with links, no rooms): where its top is and whether a resident walks up off
+ *  it and back down, asked of the engine's planner from 0.7 m before the foot to 1.2 m past the head (past the flight's
+ *  own 0.5 m landing, so a top that lands on no floor says so). Harvest 2026-10-18: builders placed flights backwards
+ *  (`facing` is the foot's side) or a metre short of a deck and read only "route.unreachable" from `reach`. */
+function flightNotes(w: WorldModel, pose: { x: number; y: number; z: number; yaw: number; s: number }, baked: Baked): string[] {
+  const reach = reachProviders.get(w), links = (baked.links ?? []).filter((l) => l.path.length >= 2);
+  if (!reach || !links.length || syncProviders.get(w)?.() === false) return [];
+  return links.slice(0, 4).map((l) => {
+    const a = toWorld(pose, l.path[0][0], l.path[0][1]), b = toWorld(pose, l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = [(b[0] - a[0]) / d, (b[1] - a[1]) / d];
+    const ya = pose.y + l.y0 * pose.s, yb = pose.y + l.y1 * pose.s;
+    const foot = [round(a[0] - u[0] * 0.7), round(ya), round(a[1] - u[1] * 0.7)], top = [round(b[0] + u[0] * 1.2), round(yb), round(b[1] + u[1] * 1.2)];
+    const up = reach(foot as never, top as never) as { reachable?: boolean; code?: string; detail?: string }, down = up.reachable ? reach(top as never, foot as never) as typeof up : up;
+    const where = `foot at ${round(a[0])},${round(a[1])} (y ${round(ya)}), top at ${round(b[0])},${round(b[1])} (y ${round(yb)}) toward ${compassOf(Math.atan2(u[0], u[1]))}`;
+    return up.reachable && down.reachable ? `${l.kind} ${l.id}: ${where}; walked up onto the floor past the top and back down`
+      : `${l.kind} ${l.id}: ${where}; NOT walkable ${up.reachable ? 'back down' : 'up'} onto a floor 1.2 m past the top (${(up.reachable ? down : up).code ?? 'route.unreachable'}): put the top on the edge of a deck or floor at y ${round(yb)} (facing is the foot's side)`;
+  });
+}
+
 function describe(w: WorldModel, ref: string) {
   const e = getRef(w, ref);
   if (!e) return { error: `no such entity ${ref}` };
@@ -288,7 +307,7 @@ function describe(w: WorldModel, ref: string) {
     children: kids.filter((k) => !k.in.slot || !rooms.some((r) => r.id === k.in.slot)).map((k) => ({ name: k.name ?? k.id, def: k.def, slot: k.in.slot ?? null })),
     constraints: (e.constraints ?? []).map((c) => checkConstraint(w, e, c)),
     behaviours: behaviours(def),
-    ground, near, notes: baked.notes ?? [],
+    ground, near, notes: [...(baked.notes ?? []), ...(rooms.length ? [] : flightNotes(w, pose, baked))],
     ...((walk) => (walk ? { walk } : {}))(walkReport(w, e, slots, rooms as { id: string; floor: number; polygon: Vec2[] }[])),
   };
 }

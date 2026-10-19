@@ -10,6 +10,7 @@
 // "sit on the bench by the pond") to them. No edge contract change: no new verbs, fields or routes.
 //
 // Pure reads over the entity model and the engine's standing grids; nothing here is logged or changes the world.
+import { deckRaised } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 
@@ -172,7 +173,10 @@ export class GodNav {
       // F1: a pier, a deck or a bridge is walked ONTO: its end platform (a pier's `end` stand), else the middle of its
       // deck — not the nearest point of its line, which is the shore end
       const deck = !water && def.components.floor ? [...baked.slots.filter((x) => x.kind === 'stand').map((x) => [r3(x.p[0]), r3(x.p[2])] as Vec2), ...(area ? [centroid(area)] : path ? [path[Math.floor(path.length / 2)], ...(path.length === 2 ? [[(path[0][0] + path[1][0]) / 2, (path[0][1] + path[1][1]) / 2] as Vec2] : [])] : [])] : [];
-      return [{ ...base, ref, kind, what: article(kind0), at: deck[0] ?? at, level: 0, ...(area ? { area } : {}), ...(path ? { path, width } : {}), ...(deck.length ? { deck } : {}) }];
+      // a raised deck (deck/1 with rails) is a floor of its own, walked onto by its stairs: its level, not the ground's
+      const deckY = deck.length && def.make.kind === 'gen' && def.make.gen === 'deck/1' && deckRaised(e.params ?? {}) ? (e.params?.at as { y?: number } | undefined)?.y : undefined;
+      const level = typeof deckY === 'number' && deck[0] ? this.h.levelAt(deck[0][0], deck[0][1], deckY) : 0;
+      return [{ ...base, ref, kind, what: article(kind0), at: deck[0] ?? at, level, ...(area ? { area } : {}), ...(path ? { path, width } : {}), ...(deck.length ? { deck } : {}) }];
     }
     const y = wp.y, level = this.h.levelAt(wp.x, wp.z, supportY(m, e));
     // buildings: rooms (ground floor first), a door approach from outside
@@ -264,7 +268,7 @@ export class GodNav {
       const off = t.area ? 1.5 : (t.width ?? 3) / 2 + 1.5;
       goal = near([edge.q[0] + away[0] * off, edge.q[1] + away[1] * off], 0, 16);
     } else if (t.deck?.length) {
-      for (const d of t.deck) { goal = near(d, 0, 6); if (goal) break; }
+      for (const d of t.deck) { goal = near(d, t.level, 6); if (goal) break; }
     } else if (t.kind === 'path') {
       goal = near(nearestOn(t.path!, me, false).q, 0, 16);
     } else if (t.kind === 'area') {

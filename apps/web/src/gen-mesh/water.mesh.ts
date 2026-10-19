@@ -2,7 +2,7 @@
 // Rivers draw their own water (per-point levels, flowing, animated) trimmed where they enter a lake,
 // banks by material (sand, pebbles, stone, reeds), waterfalls with foam and lip rocks where the
 // frozen profile steps; shores ring lakes; bridges, piers and decks stand on posts to the bed.
-import { areaFrame, atOf, bridgeSpan, flowOf, prepareBridge, prepareDeck, queryOf, riverLine, smoothPath } from '@sim/generators';
+import { areaFrame, atOf, bridgeSpan, flowOf, prepareBridge, prepareDeck, queryOf, railGaps, riverLine, smoothPath } from '@sim/generators';
 import type { Ground } from '@sim/ground';
 import * as THREE from 'three';
 import { registerMesh, type MeshCtx } from './registry.ts';
@@ -180,13 +180,51 @@ registerMesh({
     }
     for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; soup.quad([a[0], y, a[1]], [b[0], y, b[1]], [b[0], y - 0.25, b[1]], [a[0], y - 0.25, a[1]], scale(base, 0.68)); }
     for (let a = -fr.hl + 0.2; a <= fr.hl; a += 2) for (let b = -fr.hw + 0.2; b <= fr.hw; b += 2) { const [x, z] = P(Math.min(a, fr.hl - 0.2), Math.min(b, fr.hw - 0.2)); if (!inPoly(x, z, poly)) continue; const gy = ground(x, z) - 0.3; if (y - gy > 0.2) soup.cyl([x, gy, z], 0.1, y - gy - 0.02, POST, 6); }
+    // the rail opens where a stair, ramp or ladder of another thing lands on the deck (the engine bridge opens the same gap)
+    const ends = ctx.params.rails !== false ? linkEndsAt(ctx, e.id, poly, y) : [];
     if (ctx.params.rails !== false && y - Math.min(...poly.map(([x, z]) => ground(x, z))) > 0.4) for (let i = 0; i < poly.length; i++) {
-      const a = poly[i], b = poly[(i + 1) % poly.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.round(len / 1.8));
+      const a = poly[i], b = poly[(i + 1) % poly.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]);
       if (ground((a[0] + b[0]) / 2, (a[1] + b[1]) / 2) > y - 0.4) continue; // edge meets the bank: leave it open
-      for (let j = 0; j <= n; j++) { const x = a[0] + ((b[0] - a[0]) * j) / n, z = a[1] + ((b[1] - a[1]) * j) / n; soup.box([x, y + 0.5, z], [0.09, 1, 0.09], 0, POST, 0.02); }
-      soup.beam([a[0], y + 0.95, a[1]], [b[0], y + 0.95, b[1]], 0.08, 0.07, POST, 0.02);
+      const P = (t: number): [number, number] => [a[0] + ((b[0] - a[0]) * t) / len, a[1] + ((b[1] - a[1]) * t) / len];
+      let t0 = 0;
+      for (const [g0, g1] of [...railGaps(a, b, ends), [len, len]]) {
+        const piece = g0 - t0;
+        if (piece > 0.05) {
+          const n = Math.max(1, Math.round(piece / 1.8)), p0 = P(t0), p1 = P(g0);
+          for (let j = 0; j <= n; j++) { const [x, z] = P(t0 + (piece * j) / n); soup.box([x, y + 0.5, z], [0.09, 1, 0.09], 0, POST, 0.02); }
+          soup.beam([p0[0], y + 0.95, p0[1]], [p1[0], y + 0.95, p1[1]], 0.08, 0.07, POST, 0.02);
+        }
+        t0 = g1;
+      }
     }
     return soupMesh(soup, `deck ${e.name ?? e.id}`);
   },
 });
+/** Stair, ramp and ladder ends of other things at a deck's height within 0.6 m of its outline (the engine bridge's
+ *  linkEndsNear, for the picture) whose flight comes from off the deck: world point and width. */
+function linkEndsAt(ctx: MeshCtx, self: string, poly: [number, number][], y: number): { p: [number, number]; width: number }[] {
+  const m = ctx.model, out: { p: [number, number]; width: number }[] = [];
+  const xs = poly.map((p) => p[0]), zs = poly.map((p) => p[1]), pad = 24, x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, z0 = Math.min(...zs) - pad, z1 = Math.max(...zs) + pad;
+  for (const o of m.entities.values()) {
+    if (o.id === self) continue;
+    const def = m.resolvedDef(o.def); if (!def) continue;
+    const world = def.form !== 'point' && o.in.parent === 'world', wp = m.worldPose(o);
+    if (!world && (wp.x < x0 || wp.x > x1 || wp.z < z0 || wp.z > z1)) continue;
+    let links: ReturnType<typeof m.bake>['links'];
+    try { links = m.bake(def, o.params ?? {}, o.seed ?? 0, o.shape).links; } catch { continue; }
+    if (!links?.length) continue;
+    const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
+    const toWorld = (x: number, z: number): [number, number] => (world ? [x, z] : [wp.x + (x * c + z * s) * wp.s, wp.z + (-x * s + z * c) * wp.s]);
+    for (const l of links) {
+      if (l.path.length < 2) continue;
+      const ends = [[l.path[0], l.y0, l.path[l.path.length - 1]], [l.path[l.path.length - 1], l.y1, l.path[0]]] as const;
+      for (const [q, ly, far] of ends) {
+        const p = toWorld(q[0], q[1]), h = world ? m.terrain.sample(p[0], p[1]) + ly : wp.y + ly * wp.s, o = toWorld(far[0], far[1]);
+        // a flight arriving from off the deck (one starting on the deck leaves its rail alone)
+        if (Math.abs(h - y) <= 0.3 && !inPoly(o[0], o[1], poly)) out.push({ p, width: l.width * (world ? 1 : wp.s) });
+      }
+    }
+  }
+  return out;
+}
 export type { MeshCtx, RGB };

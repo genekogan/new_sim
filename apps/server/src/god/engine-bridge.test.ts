@@ -333,6 +333,9 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   const r: any = w.god.act({ ops: [
     { op: 'place', def: coreRef('garden-wall'), name: 'wall', shape: { path: [[-12, 6], [12, 6]] }, params: { gates: 0 } },
     { op: 'place', def: coreRef('deck'), name: 'deck', shape: { area: [[-4, -18], [4, -18], [4, -12], [-4, -12]] } },
+    // the deck (0.6 m, rails all round) is a floor of its own: a short flight against its north edge is the way on
+    { op: 'define', def: { schema: 'def/1', name: 'deck-steps', version: 1, description: 'Three steps up to a deck.', tags: ['stairs'], form: 'point', size: { box: [1.2, 0.6, 1.2] }, make: { kind: 'gen', gen: 'stairs/1' }, params: { rise: { type: 'number', min: 0.3, max: 12, default: 0.6 }, run: { type: 'number', min: 0.5, max: 20, default: 1.2 }, width: { type: 'number', min: 0.6, max: 6, default: 1.2 } } } },
+    { op: 'place', def: 'deck-steps@1', name: 'steps', p: [0, -11.4] },
     { op: 'place', def: coreRef('road'), name: 'far-road', shape: { path: [[200, -100], [200, 100]] } },
   ] });
   if (!r.accepted) { t.diagnostic(JSON.stringify(r).slice(0, 600)); }
@@ -349,6 +352,7 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   assert.ok(after.length > before.length + 8, `goes round the wall: ${before.length} → ${after.length}`);
   const onDeck = runQuery(w.god.model, { reach: { from: [0, 0], to: 'deck' } }).reach as any;
   assert.equal(onDeck.reachable, true, JSON.stringify(onDeck));
+  assert.ok(onDeck.to.level > 0 && onDeck.to.p[1] < -12, `on the deck's own floor: ${JSON.stringify(onDeck.to)}`);
   // a fence across the south field with one closed gate: Souls go round it; opening the gate lets them through
   const r2: any = w.god.act({ ops: [
     { op: 'place', def: coreRef('fence'), name: 'fence', shape: { path: [[-40, -22], [40, -22]] }, params: { gates: [{ at: 40, width: 1.6 }] } },

@@ -70,6 +70,25 @@ export const pierGen: Generator = {
 };
 
 const areaOf = (shape: Shape | undefined): Vec2[] => shape?.area ?? [[-5, -5], [5, -5], [5, 5], [-5, 5]];
+/** A deck this far or more above the ground (or water) under it has rails and is an upper floor of its own: walked onto by
+ *  stairs, ramps or ladders, never stepped up onto from the ground. Lower decks are slabs on the ground (walked straight on). */
+export const DECK_RAISED = 0.4;
+export const deckRaised = (params: Record<string, Value>): boolean => n(params.height, 0.6) >= DECK_RAISED;
+/** Where the rail along a→b opens for a stair, ramp or ladder end at `p` (within `reach` of the line and its span): intervals in
+ *  metres from a, merged, each the end's width plus 0.3 m. Shared by the engine bridge (rail solids) and the deck picture. */
+export function railGaps(a: Vec2, b: Vec2, ends: { p: Vec2; width: number }[], reach = 0.6): [number, number][] {
+  const len = hyp(b[0] - a[0], b[1] - a[1]); if (len < 1e-6) return [];
+  const ux = (b[0] - a[0]) / len, uz = (b[1] - a[1]) / len, out: [number, number][] = [];
+  for (const e of ends) {
+    const dx = e.p[0] - a[0], dz = e.p[1] - a[1], t = dx * ux + dz * uz, d = Math.abs(-dx * uz + dz * ux), g = e.width / 2 + 0.15;
+    if (d > reach || t < -g || t > len + g) continue;
+    out.push([Math.max(0, t - g), Math.min(len, t + g)]);
+  }
+  out.sort((x, y) => x[0] - y[0]);
+  const merged: [number, number][] = [];
+  for (const iv of out) { const last = merged[merged.length - 1]; if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]); else merged.push([...iv]); }
+  return merged;
+}
 export const deckGen: Generator = {
   id: 'deck/1', form: 'area', owner: 'L3', doc: 'A raised platform on posts (deck, terrace, jetty head) over ground or water; walkable surface with rails on the open edges.',
   params: {
@@ -80,7 +99,7 @@ export const deckGen: Generator = {
   physics({ params, shape }) {
     const area = areaOf(shape), at = atOf(params, shape), y = at?.y ?? n(params.height, 0.6), abs = !!at;
     const ring = [...area, area[0]], s = arcLengths(ring);
-    const rails = params.rails === false || y < 0.4 ? [] : railsAlong(ring, s, 0, () => y).filter((_, i) => i % 2 === 0).map((r) => ({ ...r, abs }));
+    const rails = params.rails === false || !deckRaised(params) ? [] : railsAlong(ring, s, 0, () => y).filter((_, i) => i % 2 === 0).map((r) => ({ ...r, abs }));
     return { box: boxOfBounds(bounds2(area), y + 1), colliders: rails, surfaces: [{ level: 0, y, polygon: area, material: String(params.material ?? 'wood'), tag: 'deck', abs } as AbsSurface], slots: [], tris: area.length * 40 };
   },
 };
