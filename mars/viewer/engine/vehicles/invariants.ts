@@ -19,7 +19,7 @@ import { vehicleProfile } from './profiles.ts';
 import { vehicleGrids } from './curve.ts';
 import { PASS_GAP, PASS_SPEED } from './actions.ts';
 import { vehicleCollision } from './traffic.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 const TOL = 0.03;
 const POSE_TOL = 0.01;
@@ -29,7 +29,7 @@ const riderOfVehicle = (w: WorldState, v: Entity) => (v.support?.kind === 'ridde
 export const vehicleRider: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // vehicles only (world/relevant.ts)
     if (e.kind === 'vehicle' && e.support?.kind === 'ridden-by') {
       const h = ents[e.support.by];
       const pr = vehicleProfile(e.def);
@@ -55,7 +55,7 @@ export const vehicleRider: Invariant = (rt: Runtime) => {
 export const vehicleClearance: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   let sp: Spatial | undefined;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // vehicles only
     if (e.kind !== 'vehicle') continue;
     const h = riderOfVehicle(rt.world, e);
     const pr = vehicleProfile(e.def);
@@ -86,7 +86,7 @@ export const vehicleMotion: Invariant = (rt: Runtime) => {
   const valid = !!prev && prev.world === rt.world && prev.tick === rt.tick - 1;
   const poses = new Map<string, Vec3>();
   const out: Diagnostic[] = [];
-  const ents = entityList(rt.world);
+  const ents = relevantEntities(rt.world);   // vehicles only
   for (const e of ents) {
     if (e.kind !== 'vehicle') continue;
     const pr = vehicleProfile(e.def);

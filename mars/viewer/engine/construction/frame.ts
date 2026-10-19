@@ -21,7 +21,7 @@ import { def } from '../world/catalog.ts';
 import { levelFor } from './access.ts';
 import { beamProblems, memberSeg, memberTop } from './deck.ts';
 import { isBeam, isStanding, isSupported, isUpright, seatPoint } from './rules.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 export const CLIMB_SPEED = 0.35; // m/s along the climb path
 export const BEAM_SPEED = 0.4; // m/s balance-limited walking on a beam
@@ -66,7 +66,7 @@ const pairKey = (a: string, b: string, h: number) => `${a < b ? a : b}|${a < b ?
 
 /** Beam walkways: every installed, supported beam whose partner at the same seat is installed too. */
 export function beamWalkways(w: WorldState): Link[] {
-  const beams = entityList(w).filter((e) => isBeam(e) && e.phase === 'installed').sort(byId);
+  const beams = relevantEntities(w).filter((e) => isBeam(e) && e.phase === 'installed')   // a phase: world/relevant.ts.sort(byId);
   const ends = new Map<string, [BeamEnd, BeamEnd]>();
   const byPair = new Map<string, Entity[]>();
   for (const b of beams) {
@@ -108,7 +108,7 @@ export function beamWalkways(w: WorldState): Link[] {
 /** Climb links: installed, standing, supported uprights; one per column and beam seat there. */
 export function climbLinks(w: WorldState): Link[] {
   const out: Link[] = [];
-  const ups = entityList(w).filter((e) => isUpright(e) && e.phase === 'installed' && isStanding(e) && isSupported(w, e)).sort(byId);
+  const ups = relevantEntities(w).filter((e) => isUpright(e) && e.phase === 'installed' && isStanding(e) && isSupported(w, e)).sort(byId);
   for (const u of ups) {
     const nU = rot2([0, 1], u.pose.yaw);
     const groundY = u.pose.p[1];
@@ -217,7 +217,7 @@ const last = new WeakMap<Runtime, { tick: number; p: Map<string, Vec2> }>();
  */
 export const frameAccessOk: Invariant = (rt) => {
   const out: Diagnostic[] = [];
-  const people = entityList(rt.world).filter((e) => e.human?.on).sort(byId);
+  const people = relevantEntities(rt.world).filter((e) => e.human?.on).sort(byId);
   const prev = last.get(rt);
   const valid = !!prev && prev.tick === rt.tick - 1;
   const now = new Map<string, Vec2>();

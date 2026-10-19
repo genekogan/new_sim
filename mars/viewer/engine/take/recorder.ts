@@ -13,7 +13,7 @@ import { DT, type Runtime, type RuntimeObserver } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
 import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL, type ChangeEvent, type PoseSample, type Take, type TakeEntity0, type TakeEvent, type TakeHands } from './types.ts';
 import { interpSample } from './replay.ts';
-import { entityKeys, entityList } from '../world/entity-list.ts';
+import { entityKeys, entityList, stableIndices } from '../world/entity-list.ts';
 
 export type RecorderOptions = {
   renderSceneRef?: Take['renderSceneRef'];
@@ -215,9 +215,10 @@ export class TakeRecorder implements RuntimeObserver {
     // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
     // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
     // S1 V7b: only those are sorted (by id, as the sorted id list was), from the tick's shared entity list.
-    const list = entityList(this.rt.world), keys = entityKeys(this.rt.world), dynamic: string[] = [];
-    for (let i = 0; i < list.length; i++) if (!list[i].tags?.includes('entity-world')) dynamic.push(keys[i]);
-    dynamic.sort();
+    // S1 r2: found again from the last scan while the table holds the same objects under the same keys (stableIndices:
+    // an entity's tags never change), so an idle world does not read ~4,500 entities' tags every tick (shared: read-only)
+    const list = entityList(this.rt.world), keys = entityKeys(this.rt.world);
+    const dynamic = stableIndices(ents, 'take sample', list, keys, (e) => !e.tags?.includes('entity-world'), (idx) => idx.map((i) => keys[i]).sort()).derived;
     for (const id of dynamic) {
       const e = ents[id];
       const s = quantize(e, t);

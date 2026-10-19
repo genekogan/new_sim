@@ -19,7 +19,8 @@ import { levelFor } from './access.ts';
 import { flatObb, isJoist, isPlywood, memberTop, supportProblems } from './deck.ts';
 import { isStairFlight, stairLink } from './stairs.ts';
 import { frameLinks } from './frame.ts';
-import { entitiesById, entityList } from '../world/entity-list.ts';
+import { entitiesById } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 // (shared and read-only during an invariant pass: world/entity-list.ts)
 const sorted = (w: WorldState) => entitiesById(w);
@@ -97,7 +98,7 @@ function supportInputs(w: WorldState, previous?: SupportSnap[]): SupportSnap[] |
 export const progressiveSupported: Invariant = (rt) => {
   // S1 V7a: nothing installed is a joist / sheet / stair → nothing to prove (a world without construction skips the
   // per-entity input snapshot every tick). The proof cache is dropped so a later deck is proven from scratch.
-  if (!entityList(rt.world).some((e) => e.phase === 'installed' && progressiveDef(e))) { supported.delete(rt.world); return []; }
+  if (!relevantEntities(rt.world).some((e) => e.phase === 'installed' && progressiveDef(e))) { supported.delete(rt.world); return []; }
   let inputs: SupportSnap[] | undefined;
   try { inputs = supportInputs(rt.world, supported.get(rt.world)); }
   catch (error) { supported.delete(rt.world); throw error; }

@@ -12,7 +12,7 @@ import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
 import { CLIMB_SPEED, WALK_MIN, WALK_SPEED_CAP, JOG_SPEED_CAP, RUN_SPEED_CAP, CYCLE_SPEED_CAP } from '../locomotion/walk.ts';
 import { sleepSafetyIssue } from '../activities/sleep.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 const TOL = 0.03;
 const isHumanBody = (e: import('../world/types.ts').Entity) => e.kind === 'human' && !!e.human;
@@ -34,7 +34,8 @@ const onOwnBerth = (rt: Runtime, e: import('../world/types.ts').Entity) => !!e.h
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
   // S1 V7a: no body to check → no spatial sync (a 4,900-entity rescan every tick in an empty world); every planner
   // read syncs lazily on its own, and the first tick with a body syncs here again before reading the grids
-  const list = entityList(rt.world);
+  // S1 r2: bodies only (world/relevant.ts: a body is relevant)
+  const list = relevantEntities(rt.world);
   if (!list.some(isHumanBody)) return [];
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
@@ -60,7 +61,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
 export const humanStaticClearance:Invariant=humanStaticClearanceWithOverlay(()=>false);
 
 export const humanHumanSeparation: Invariant = (rt: Runtime) => {
-  const hs = entityList(rt.world).filter((e) => e.kind === 'human' && e.human);
+  const hs = relevantEntities(rt.world).filter((e) => e.kind === 'human' && e.human);   // bodies only
   const out: Diagnostic[] = [];
   for (let i = 0; i < hs.length; i++)
     for (let j = i + 1; j < hs.length; j++) {
@@ -78,7 +79,7 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
 /** Full lie/rise footprint, ordinary-ground support and active actor/mat ownership. */
 export const supportedSleepSafety: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // bodies only
     if (!e.human?.sleepPose) continue;
     const issue = sleepSafetyIssue(rt, e);
     if (issue) out.push(issue);
@@ -87,7 +88,7 @@ export const supportedSleepSafety: Invariant = (rt: Runtime) => {
 };
 
 export const noUnsupported: Invariant = (rt: Runtime) =>
-  entityList(rt.world)
+  relevantEntities(rt.world)   // components only
     .filter((e) => e.kind === 'component' && e.support?.kind === 'none')
     .map((e) => ({ code: 'support.unsupported', message: `${e.id} (${e.def}) has no support`, subjects: [e.id], at: e.pose.p }));
 
@@ -116,7 +117,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
   const valid = !!prev && prev.world === rt.world && prev.tick === rt.tick - 1;
   const poses = new Map<string, { p: Vec3; yaw: number; ext: number }>();
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // bodies and carried loads (a phase) only
     const human = e.kind === 'human' && !!e.human;
     if (!human && !isCarryLoad(e)) continue;
     const ext = human ? 0 : Math.max(...def(e.def).size) / 2;
@@ -164,7 +165,7 @@ const OVERSPEED_TOL = 1.05;
 /** No person's published speed exceeds its activity's cap + 5 % (MOVEMENT.md "No jumps"). */
 export const speedWithinCap: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // bodies only
     const sp = e.human?.speed;
     if (sp === undefined) continue;
     const cap = SPEED_CAPS[e.human!.activity];
@@ -197,7 +198,7 @@ const distToObb = (p: Vec2, o: OBB2) => {
 export const holdersPresent: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // held things only
     if (e.support?.kind !== 'held') continue;
     let obb: OBB2 | null = null;
     for (const id of e.support.by) {

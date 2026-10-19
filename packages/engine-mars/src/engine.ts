@@ -66,6 +66,7 @@ import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
+import { stableIndices } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
@@ -283,8 +284,12 @@ export class MarsEngine implements Engine {
     }
     if (this.leaving.length) this.leaving = this.leaving.filter((id) => !this.tryRemove(id));
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
-    for (const id of Object.keys(this.ents)) {
-      const e = this.ents[id]; if (e.kind !== 'human') continue;
+    // S1 r2: the bodies in Object.keys order, found again without reading every entity's kind while the table holds the
+    // same objects under the same keys (stableIndices: an entity's kind never changes); the loop adds and removes none
+    const ents = this.ents, keys: string[] = [], list: any[] = [];
+    for (const k in ents) if (Object.hasOwn(ents, k)) { keys.push(k); list.push(ents[k]); }
+    for (const i of stableIndices(ents, 'engine bodies', list, keys, (e: any) => e.kind === 'human').idx) {
+      const id = keys[i], e = list[i];
       // creatures (bodies/creatures.ts) show a rest of 5 s or more as 'settle' (the duck sits, the snail withdraws, the dog lies
       // down); the short pauses inside a walk-with are not a rest
       if (e.body?.type === 'creature') { const resting = this.bodyResting(id) && this.restSecondsOf(id) >= 5; if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }

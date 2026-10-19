@@ -14,7 +14,7 @@ import { CATALOG, HUMAN_RADIUS } from '../world/catalog.ts';
 import { linkUnder, stairClearance } from './climb.ts';
 import { fragileLoadsOk } from './fragile.ts';
 import { hypot } from '../core/math.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 export const GRIP_TOL = 0.05; // m
 const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
@@ -22,7 +22,7 @@ const CLEAR_TOL = 0.03; // m, same tolerance as the human clearance invariant
 export const carryIntegrity: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // carried loads (a phase) only (world/relevant.ts)
     if (!isCarryLoad(e)) continue;
     const s = e.support;
     if (s?.kind === 'forks') continue; // on a forklift: covered by the forkliftLoad invariant (vehicles/forklift.ts)
@@ -30,7 +30,7 @@ export const carryIntegrity: Invariant = (rt: Runtime) => {
       out.push({ code: 'carry.support', message: `${e.id} is carried but not held (support ${s?.kind ?? 'none'})`, subjects: [e.id], at: e.pose.p });
       continue;
     }
-    const gripping = entityList(rt.world).filter((h) => h.human?.grip?.entity === e.id).map((h) => h.id);
+    const gripping = relevantEntities(rt.world).filter((h) => h.human?.grip?.entity === e.id).map((h) => h.id);
     const crew = s.by;
     if (gripping.length !== crew.length || crew.some((c) => !gripping.includes(c)) || crew.some((c) => ents[c]?.kind !== 'human')) {
       out.push({ code: 'carry.support', message: `${e.id} is held by [${crew.join(', ')}] but gripped by [${gripping.join(', ')}]`, subjects: [e.id, ...crew], at: e.pose.p });
@@ -67,7 +67,7 @@ export const humanLoadClearance: Invariant = (rt: Runtime) => {
   const seen = new Set<string>();
   const discs = activeLoadDiscs(rt);
   if (!discs.length) return out;
-  for (const h of entityList(rt.world)) {
+  for (const h of relevantEntities(rt.world)) {   // bodies only
     if (h.kind !== 'human' || !h.human) continue;
     for (const d of discs) {
       if (d.crew.includes(h.id) || h.human.level !== d.level || seen.has(`${h.id}|${d.entity}`)) continue;
@@ -90,7 +90,7 @@ export const carryStairsClearance: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
   let sp: Spatial | null = null;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // components only
     if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held' || !e.support.by.length) continue;
     if (!e.support.by.every((c) => ents[c]?.human?.activity.startsWith('climb'))) continue;
     if (!sp) { sp = rt.services.spatial as Spatial; sp.sync(rt.world); }
@@ -113,7 +113,7 @@ export const carryStairsClearance: Invariant = (rt: Runtime) => {
 /** Fixture transport's authored hand segment stays reachable throughout lift/move/lower. */
 export const fixtureCarryReach: Invariant = rt => {
   const out: Diagnostic[]=[];
-  for(const e of entityList(rt.world)){
+  for(const e of relevantEntities(rt.world)){   // held things only
     const capability=CATALOG[e.def]?.capabilities?.fixtureCarry;
     if(e.kind!=='fixture'||!capability||e.support?.kind!=='held'||!e.reservedBy||rt.records.get(e.reservedBy)?.verb!=='move_fixture'||!rt.isActive(e.reservedBy))continue;
     for(const id of e.support.by){
