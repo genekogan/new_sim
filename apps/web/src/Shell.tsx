@@ -1,4 +1,5 @@
 import { FullscreenToggle } from './FullscreenToggle.tsx';
+import { HudMore } from './HudMore.tsx';
 import {explorePresence} from './explore-data.ts';
 import {exploreAvailable} from './explore-control.ts';
 import {MySouls,useMySouls} from './MySouls.tsx';
@@ -169,7 +170,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
-          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} inviteUrl={joinLink()} newSoul={<BringAgent showButton={!advanced} key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true} worldName={launcherWorld?worldName:undefined}/>}/>
+          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} inviteUrl={joinLink()} newSoul={<BringAgent showButton={!advanced} key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true} worldName={launcherWorld?worldName:undefined}/>}/>{!advanced&&<HudMore/>}
 
         </div>
       </header>
