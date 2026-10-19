@@ -944,7 +944,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // frame immediately; moving playback retains the existing 250ms cadence.
       const pausedFrameChanged = !!past.current && !past.current.playing &&
         latestViewerState.current?.shownTick !== drawnTick.current;
-      if (refresh || pausedFrameChanged) {
+      // lane W1: the first drawn frame is published at once (the arrival card waits for it), not at the next 250 ms tick
+      const firstShown = drawnTick.current !== null && latestViewerState.current?.shownTick == null;
+      if (refresh || pausedFrameChanged || firstShown) {
         const points:SpeechAnchorPoint[]=context.current.publishSpeechAnchors?souls.flatMap(soul=>{
           const label=labels.get(soul.id),rec=records[soul.entityId];
           if(!at.take||!at.entities[soul.entityId]||!label?.obj.visible||rec?.kind!=='human')return [];
