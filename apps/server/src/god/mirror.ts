@@ -8,9 +8,16 @@
 // client's library hash differs. The guard hash (over every id and row/entity hash, in order) lets the client check
 // its patched mirror against the server's and refresh in full on any mismatch. The diff is by content, so
 // neighbours that an edit touched (slot use, a parent's children) come along without knowing why they changed.
+//
+// Rows and entity hashes are cached (G2 row cache, follow-up): an act at Eden 2026 size (4,900 entities) used to lay out
+// and hash every row again (~80 ms). A row is reused while everything it reads is unchanged (see `layoutRow` in
+// query.ts); the check per entity is a few identity comparisons, so an act's delta costs what changed, not the world.
+// Model entities are replaced, never changed in place, by every edit (compile.ts), so an entity's own inputs are its
+// object identity.
 import { createHash } from 'node:crypto';
+import type { Entity, WorldModel } from '@sim/world-compiler';
 import type { GodMode } from './god.ts';
-import { runQuery } from './query.ts';
+import { layoutRow, seatProviders } from './query.ts';
 
 export type MirrorWant = { since?: number; builds?: number; have?: string; lib?: string };
 type State = { guard: string; seq: number; rows: Map<string, string>; ents: Map<string, string>; defs: string; order: string[] };
@@ -39,10 +46,9 @@ export function mirrorPayload(god: GodMode, want: MirrorWant = {}, { child = fal
   const lib = libraryHash(god), withLib = want.lib !== lib;
   const snap = god.godSnapshotOf(withLib) as Record<string, unknown> & { entities: { id: string }[]; defs: unknown[]; library?: unknown[] };
   if (child) snap.prayers = [];
-  const rows = (runQuery(god.model, { layout: { obbs: true } }).layout as { entities: { id: string }[] }).entities;
-  const rowH: [string, string][] = rows.map((r) => [r.id, mirrorHash(JSON.stringify(r))]);
-  const entH: [string, string][] = snap.entities.map((e) => [e.id, mirrorHash(JSON.stringify(e))]);
-  const defsH = mirrorHash(JSON.stringify(snap.defs));
+  const { rows, rowH } = layoutRows(god);
+  const entH: [string, string][] = snap.entities.map((e) => [e.id, entityHash(e)]);
+  const defsH = defsHash(god, snap.defs);
   const guard = guardOf(rowH, entH, defsH);
   const states = memo.get(god) ?? [];
   const base = want.have ? states.find((s) => s.guard === want.have) : undefined;
@@ -64,4 +70,93 @@ export function mirrorPayload(god: GodMode, want: MirrorWant = {}, { child = fal
     rows: changed(rows, rowH, base.rows), rowsGone: gone(base.rows, now.rows),
     ...(defsH !== base.defs ? { defs } : {}),
   };
+}
+
+// ---------------------------------------------------------------- row cache
+
+/** A cached layout row and what it was computed from. `chain`: the entity's effective def identity, then each ancestor
+ *  and its def identity (pose, path and slot frames come from them; a missing parent ends it as undefined). `ground`:
+ *  the terrain recipe its world-frame colliders were sampled on (solid root shapes only). `uses`: which slots its
+ *  children hang in and which seats Souls sit on (things with rooms or slots only). */
+type RowEntry = { e: Entity; chain: unknown[]; ground?: object; uses?: string; seats: boolean; row: Record<string, unknown>; hash: string };
+const rowCaches = new WeakMap<object, Map<string, RowEntry>>();
+const entityHashes = new WeakMap<object, string>();
+/** The last layoutRows call: rows laid out again (the rest were reused) and rows in all. */
+export const rowCacheStats = { recomputed: 0, rows: 0 };
+const MAX_ROWS = 20000;   // query.ts layout's default cap (the mirror asked for the default)
+
+/** The in-use defs' hash; the same def objects in the same order (publicDef is per stored def) keep the last one's. */
+const defsHashes = new WeakMap<object, { defs: unknown[]; h: string }>();
+function defsHash(god: GodMode, defs: unknown[]) {
+  const was = defsHashes.get(god);
+  if (was && was.defs.length === defs.length && was.defs.every((d, i) => d === defs[i])) return was.h;
+  const h = mirrorHash(JSON.stringify(defs)); defsHashes.set(god, { defs, h }); return h;
+}
+/** An entity's snapshot hash, per entity object (an edit replaces the object). */
+export function entityHash(e: { id: string }) {
+  let h = entityHashes.get(e);
+  if (h === undefined) { h = mirrorHash(JSON.stringify(e)); entityHashes.set(e, h); }
+  return h;
+}
+
+const lastGround = new WeakMap<object, object>();
+/** Same terrain recipe: every field the same value, arrays (landforms, waters) the same items in the same order. */
+function sameGround(a: object, b: object): boolean {
+  if (a === b) return true;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!Object.hasOwn(b, k)) return false;
+    const x = (a as Record<string, unknown>)[k], y = (b as Record<string, unknown>)[k];
+    if (x === y) continue;
+    if (!Array.isArray(x) || !Array.isArray(y) || x.length !== y.length || x.some((v, i) => v !== y[i])) return false;
+  }
+  return true;
+}
+function chainOf(w: WorldModel, e: Entity, did: (ref: string) => string): unknown[] {
+  const out: unknown[] = [did(e.def)];
+  for (let cur = e; cur.in.parent !== 'world';) { const p = w.entities.get(cur.in.parent); out.push(p); if (!p) break; out.push(did(p.def)); cur = p; }
+  return out;
+}
+function chainSame(w: WorldModel, e: Entity, chain: unknown[], did: (ref: string) => string): boolean {
+  if (chain[0] !== did(e.def)) return false;
+  let i = 1;
+  for (let cur = e; cur.in.parent !== 'world';) { const p = w.entities.get(cur.in.parent); if (chain[i++] !== p) return false; if (!p) break; if (chain[i++] !== did(p.def)) return false; cur = p; }
+  return i === chain.length;
+}
+/** What a thing's slot rows read besides its own bake: its children's slots and the Souls on its seats. */
+function usesOf(w: WorldModel, e: Entity, seats: boolean): string {
+  let s = '';
+  const kids = w.children.get(e.id);
+  if (kids) for (const c of kids) { const k = w.entities.get(c); if (k) s += `${k.in.slot ?? ''}\u0001`; }
+  if (seats) { const f = seatProviders.get(w); if (f) for (const x of f(e.id)) s += `\u0002${x.slot}`; }
+  return s;
+}
+
+/** The layout rows (exactly query.ts `layout` with obbs, every entity) and their hashes, reusing each cached row whose
+ *  inputs are unchanged. `fresh`: ignore the cache (tests compare against it). */
+export function layoutRows(god: GodMode, { fresh = false } = {}) {
+  const w = god.model, was = fresh ? undefined : rowCaches.get(god), now = new Map<string, RowEntry>();
+  // removing or moving anything rebuilds the ground recipe with the same parts: still the same terrain
+  const last = was && lastGround.get(god), ground = last && sameGround(last, w.terrain.ground) ? last : w.terrain.ground;
+  if (!fresh) lastGround.set(god, ground);
+  const ids = new Map<string, string>(), did = (ref: string) => w.effectiveDefIdentity(ref, ids);
+  const rows: (Record<string, unknown> & { id: string })[] = [], rowH: [string, string][] = [];
+  let recomputed = 0;
+  w.readPass(() => {
+    for (const e of w.entities.values()) {
+      if (rows.length >= MAX_ROWS) break;
+      let c = was?.get(e.id);
+      if (!(c && c.e === e && (c.ground === undefined || c.ground === ground) && chainSame(w, e, c.chain, did) && (c.uses === undefined || c.uses === usesOf(w, e, c.seats)))) {
+        const r = layoutRow(w, e, true); if (!r) continue;
+        recomputed++;
+        const slotted = !!(r.baked.rooms?.length || r.baked.slots.length), seats = r.baked.slots.some((s) => s.kind === 'seat');
+        c = { e, chain: chainOf(w, e, did), ...(e.in.parent === 'world' && r.def.layer === 'solid' && r.def.form !== 'point' ? { ground } : {}), ...(slotted ? { uses: usesOf(w, e, seats) } : {}), seats, row: r.row, hash: mirrorHash(JSON.stringify(r.row)) };
+      }
+      now.set(e.id, c); rows.push(c.row as Record<string, unknown> & { id: string }); rowH.push([e.id, c.hash]);
+    }
+  });
+  if (!fresh) rowCaches.set(god, now);
+  rowCacheStats.recomputed = recomputed; rowCacheStats.rows = rows.length;
+  return { rows, rowH };
 }

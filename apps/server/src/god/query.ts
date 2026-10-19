@@ -156,28 +156,38 @@ function layout(w: WorldModel, o: { area?: [number, number, number, number]; max
   const rows: unknown[] = [];
   for (const e of w.entities.values()) {
     if (rows.length >= max) break;
-    const b = bakedOf(w, e); if (!b) continue;
-    const { pose, fp, aabb, y } = boundsOf(w, e, b.def, b.baked);
+    const r = layoutRow(w, e, wantObbs); if (!r) continue;
+    const { aabb } = r;
     if (o.area && (aabb[2] < o.area[0] || aabb[0] > o.area[2] || aabb[3] < o.area[1] || aabb[1] > o.area[3])) continue;
-    const row: Record<string, unknown> = { id: e.id, path: w.pathOf(e.id), def: e.def, parent: e.in.parent, layer: b.def.layer, form: b.def.form, tags: b.def.tags, pose: [round(pose.x), round(pose.y), round(pose.z), round(pose.yaw), pose.s], box: b.baked.box.map(round), aabb, y };
-    if (e.name) row.name = e.name;
-    if (e.in.slot) row.slot = e.in.slot;
-    if (e.shape) row.shape = e.shape;
-    if (wantObbs && fp.length) row.obbs = fp.slice(0, 48).map((f) => [round(f.c[0]), round(f.c[1]), round(f.half[0]), round(f.half[1]), round(f.yaw), round(f.y0), round(f.y1)]);
-    if (b.baked.rooms?.length || b.baked.slots.length) row.slots = slotWorld(w, e, b.baked).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, used: s.used, ...(s.polygon ? { polygon: s.polygon, local: s.local } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.retired ? { retired: true } : {}) }));
-    if (b.baked.water) row.water = b.baked.water.level;
-    if (e.constraints?.length) row.constraints = e.constraints;
-    // doors (world frame; `out`: opens to the outside) and the building's front, for the CLI solver's
-    // doorway clearance, house-relative walls/corners and paths that start at a door
-    const doors = (b.baked.openings ?? []).filter((o) => o.kind !== 'window');
-    if (doors.length) {
-      const rooms = b.baked.rooms ?? [];
-      row.doors = doors.map((o) => { const probe: Vec2 = [o.at[0] + Math.sin(o.yaw), o.at[1] + Math.cos(o.yaw)]; return { id: o.id, kind: o.kind, level: o.level, width: o.width, at: toWorld(pose, o.at[0], o.at[1]), yaw: round(pose.yaw + o.yaw), out: !rooms.some((r) => r.floor === o.level && pointInPoly(probe[0], probe[1], r.polygon as Vec2[])) }; });
-    }
-    if (b.baked.rooms?.length) { const f = String((e.params as Record<string, unknown> | undefined)?.front ?? (b.def.params as Record<string, { default?: unknown }> | undefined)?.front?.default ?? 's'); row.front = round(pose.yaw + (({ s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 } as Record<string, number>)[f] ?? 0)); }
-    rows.push(row);
+    rows.push(r.row);
   }
   return { seq: w.editSeq, extent: w.constants.extent, bounds: w.ground().extent, entities: rows };
+}
+
+/** One entity's layout row (null: its def does not resolve). What it reads, which the mirror's row cache (mirror.ts)
+ *  checks before reusing a row: the entity; its effective def; its ancestors and their defs (pose, path, a slot's frame);
+ *  the terrain under a world-frame shape's colliders (solid root, form not `point`); and, for a thing with rooms or
+ *  slots, which slots its children hang in and which seats Souls sit on (`used`). Nothing else. */
+export function layoutRow(w: WorldModel, e: Entity, wantObbs = true): { row: Record<string, unknown>; aabb: number[]; def: StoredDef; baked: Baked } | null {
+  const b = bakedOf(w, e); if (!b) return null;
+  const { pose, fp, aabb, y } = boundsOf(w, e, b.def, b.baked);
+  const row: Record<string, unknown> = { id: e.id, path: w.pathOf(e.id), def: e.def, parent: e.in.parent, layer: b.def.layer, form: b.def.form, tags: b.def.tags, pose: [round(pose.x), round(pose.y), round(pose.z), round(pose.yaw), pose.s], box: b.baked.box.map(round), aabb, y };
+  if (e.name) row.name = e.name;
+  if (e.in.slot) row.slot = e.in.slot;
+  if (e.shape) row.shape = e.shape;
+  if (wantObbs && fp.length) row.obbs = fp.slice(0, 48).map((f) => [round(f.c[0]), round(f.c[1]), round(f.half[0]), round(f.half[1]), round(f.yaw), round(f.y0), round(f.y1)]);
+  if (b.baked.rooms?.length || b.baked.slots.length) row.slots = slotWorld(w, e, b.baked).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, used: s.used, ...(s.polygon ? { polygon: s.polygon, local: s.local } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.retired ? { retired: true } : {}) }));
+  if (b.baked.water) row.water = b.baked.water.level;
+  if (e.constraints?.length) row.constraints = e.constraints;
+  // doors (world frame; `out`: opens to the outside) and the building's front, for the CLI solver's
+  // doorway clearance, house-relative walls/corners and paths that start at a door
+  const doors = (b.baked.openings ?? []).filter((o) => o.kind !== 'window');
+  if (doors.length) {
+    const rooms = b.baked.rooms ?? [];
+    row.doors = doors.map((o) => { const probe: Vec2 = [o.at[0] + Math.sin(o.yaw), o.at[1] + Math.cos(o.yaw)]; return { id: o.id, kind: o.kind, level: o.level, width: o.width, at: toWorld(pose, o.at[0], o.at[1]), yaw: round(pose.yaw + o.yaw), out: !rooms.some((r) => r.floor === o.level && pointInPoly(probe[0], probe[1], r.polygon as Vec2[])) }; });
+  }
+  if (b.baked.rooms?.length) { const f = String((e.params as Record<string, unknown> | undefined)?.front ?? (b.def.params as Record<string, { default?: unknown }> | undefined)?.front?.default ?? 's'); row.front = round(pose.yaw + (({ s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 } as Record<string, number>)[f] ?? 0)); }
+  return { row, aabb, def: b.def, baked: b.baked };
 }
 
 // ---------------------------------------------------------------- bake

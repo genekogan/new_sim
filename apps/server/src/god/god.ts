@@ -728,15 +728,18 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   publicSnapshot() {
     const builds = this.builds.publicList();
     const s = this.model.snapshot();
-    const used = new Set<string>(), pending = s.entities.flatMap(e => [e.def, ...definitionRefs(e.params)]);
+    // G2 row cache: the refs an entity's params or a def name, and a def's public form and asset hashes, are remembered per
+    // object (edits replace entities, defs are stored by content): an act's mirror reads this snapshot at Eden 2026 size
+    const used = new Set<string>(), pending: string[] = [];
+    for (const e of s.entities) { pending.push(e.def); for (const r of memo(entityRefs, e, () => definitionRefs(e.params))) pending.push(r); }
     while (pending.length) {
       const d = this.model.def(pending.pop()!); if (!d || used.has(d.hash)) continue; used.add(d.hash);
-      pending.push(...definitionRefs({extends:d.extends,make:d.make,contents:d.contents,params:d.params,components:d.components}));
+      for (const r of memo(defRefs, d, () => definitionRefs({extends:d.extends,make:d.make,contents:d.contents,params:d.params,components:d.components}))) pending.push(r);
     }
     const defs = s.defs.filter(d => used.has(d.hash));
     // byte size of every GLB these defs load (from the asset index), so a viewer's loading bar knows the total up front
     const assetBytes: Record<string, number> = {};
-    for (const d of defs) for (const sha of JSON.stringify(d.make ?? null).match(/[0-9a-f]{64}/g) ?? []) { const m = this.assets.info(sha); if (m?.ext === 'glb' && m.bytes > 0) assetBytes[sha] = m.bytes; }
+    for (const d of defs) for (const sha of memo(defShas, d, () => JSON.stringify(d.make ?? null).match(/[0-9a-f]{64}/g) ?? [])) { const m = this.assets.info(sha); if (m?.ext === 'glb' && m.bytes > 0) assetBytes[sha] = m.bytes; }
     // LAYERS: wallets are private (the god's GET /v1/god/layers and each Soul's /v1/world/layers/me have them)
     const state = s.state.layers ? { ...s.state, layers: { ...s.state.layers, wallets: {} } } : s.state;
     return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes, builds: builds.builds, buildsRev: builds.rev, now: builds.now };
@@ -801,9 +804,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   get head(): number { return this.eventSeq; }
 }
 
+const entityRefs = new WeakMap<object, readonly string[]>(), defRefs = new WeakMap<object, readonly string[]>(), defShas = new WeakMap<object, readonly string[]>();
+const publicDefs = new WeakMap<StoredDef, Omit<StoredDef, 'by'>>();
+function memo<K extends object, V>(m: WeakMap<K, V>, k: K, f: () => V): V { let v = m.get(k); if (v === undefined) { v = f(); m.set(k, v); } return v; }
+/** A def as anyone may read it (no author). The same object for the same stored def (the mirror reuses its hash). */
 function publicDef(d: StoredDef) {
-  const { by: _by, ...rest } = d;
-  return rest;
+  return memo(publicDefs, d, () => { const { by: _by, ...rest } = d; return rest; });
 }
 function summarize(d: Diff) {
   return { upserts: d.upserts.length, removes: d.removes.length, defs: d.defs.map((x) => x.ref), tiles: d.tiles.length, world: d.world ? Object.keys(d.world) : [], answers: d.answers.length };
