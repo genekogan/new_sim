@@ -1,0 +1,4152 @@
+{
+ "schema": "template-upgrade/1",
+ "id": "eden-2026-landmarks-20261019",
+ "world": "eden-2026",
+ "from": "2dbd1790",
+ "to": "e2-landmarks",
+ "counts": {
+  "define": 4,
+  "add": 20,
+  "remove": 0,
+  "change": 7
+ },
+ "items": [
+  {
+   "kind": "define",
+   "name": "eden-big-top-canopy",
+   "old": {
+    "schema": "def/1",
+    "name": "eden-big-top-canopy",
+    "version": 1,
+    "description": "The striped canvas canopy of a circus big top (24 m, red with white seams, a pennant on the king pole); sits on an enterable hall.",
+    "tags": [
+     "eden",
+     "scenery"
+    ],
+    "form": "point",
+    "size": {
+     "box": [
+      24.8,
+      9.8,
+      24.8
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         3.6,
+         0
+        ],
+        "r": 12.4,
+        "h": 7.2,
+        "color": "#c9342d",
+        "segments": 24,
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0.4,
+          7,
+          0
+         ],
+         [
+          6.3,
+          3.6,
+          0
+         ],
+         [
+          12.45,
+          0.05,
+          0
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0.346,
+          7,
+          0.2
+         ],
+         [
+          5.456,
+          3.6,
+          3.15
+         ],
+         [
+          10.782,
+          0.05,
+          6.225
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0.2,
+          7,
+          0.346
+         ],
+         [
+          3.15,
+          3.6,
+          5.456
+         ],
+         [
+          6.225,
+          0.05,
+          10.782
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0,
+          7,
+          0.4
+         ],
+         [
+          0,
+          3.6,
+          6.3
+         ],
+         [
+          0,
+          0.05,
+          12.45
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -0.2,
+          7,
+          0.346
+         ],
+         [
+          -3.15,
+          3.6,
+          5.456
+         ],
+         [
+          -6.225,
+          0.05,
+          10.782
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -0.346,
+          7,
+          0.2
+         ],
+         [
+          -5.456,
+          3.6,
+          3.15
+         ],
+         [
+          -10.782,
+          0.05,
+          6.225
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -0.4,
+          7,
+          0
+         ],
+         [
+          -6.3,
+          3.6,
+          0
+         ],
+         [
+          -12.45,
+          0.05,
+          0
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -0.346,
+          7,
+          -0.2
+         ],
+         [
+          -5.456,
+          3.6,
+          -3.15
+         ],
+         [
+          -10.782,
+          0.05,
+          -6.225
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -0.2,
+          7,
+          -0.346
+         ],
+         [
+          -3.15,
+          3.6,
+          -5.456
+         ],
+         [
+          -6.225,
+          0.05,
+          -10.782
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0,
+          7,
+          -0.4
+         ],
+         [
+          0,
+          3.6,
+          -6.3
+         ],
+         [
+          0,
+          0.05,
+          -12.45
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0.2,
+          7,
+          -0.346
+         ],
+         [
+          3.15,
+          3.6,
+          -5.456
+         ],
+         [
+          6.225,
+          0.05,
+          -10.782
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          0.346,
+          7,
+          -0.2
+         ],
+         [
+          5.456,
+          3.6,
+          -3.15
+         ],
+         [
+          10.782,
+          0.05,
+          -6.225
+         ]
+        ],
+        "r": 0.16,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         0,
+         8.2,
+         0
+        ],
+        "r": 0.08,
+        "h": 3,
+        "color": "#5a4632",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.6,
+         9.3,
+         0
+        ],
+        "size": [
+         1.2,
+         0.7,
+         0.05
+        ],
+        "color": "#f0c040",
+        "collide": false
+       }
+      ]
+     }
+    }
+   },
+   "new": {
+    "schema": "def/1",
+    "name": "eden-big-top-canopy",
+    "version": 1,
+    "description": "The canvas of a circus big top: a red and white striped canopy (33 m) with a gold rim, a striped canvas skirt round the hall below, open at both doors, and a pennant on the king pole; sits on an enterable hall.",
+    "tags": [
+     "eden",
+     "scenery"
+    ],
+    "form": "point",
+    "layer": "decor",
+    "size": {
+     "box": [
+      33,
+      17,
+      33
+     ],
+     "scale": [
+      1,
+      1
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 0,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 0.262,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 0.524,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 0.785,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 1.047,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 1.309,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 1.571,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 1.833,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 2.094,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 2.356,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 2.618,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 2.88,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 3.142,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 3.403,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 3.665,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 3.927,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 4.189,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 4.451,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 4.712,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 4.974,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 5.236,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 5.498,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 5.76,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cone",
+        "at": [
+         0,
+         4,
+         0
+        ],
+        "r": 16.4,
+        "h": 8,
+        "segments": 2,
+        "arc": 0.262,
+        "yaw": 6.021,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "torus",
+        "at": [
+         0,
+         0.05,
+         0
+        ],
+        "r": 16.299999999999997,
+        "r2": 0.12,
+        "segments": 24,
+        "pitch": 1.5708,
+        "color": "#e8b33a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         6.046,
+         -2.55,
+         14.597
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 0.393,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         9.618,
+         -2.55,
+         12.535
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 0.654,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         12.535,
+         -2.55,
+         9.618
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 0.916,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         14.597,
+         -2.55,
+         6.046
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 1.178,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         15.665,
+         -2.55,
+         2.062
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 1.44,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         15.665,
+         -2.55,
+         -2.062
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 1.702,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         14.597,
+         -2.55,
+         -6.046
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 1.963,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         12.535,
+         -2.55,
+         -9.618
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 2.225,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         9.618,
+         -2.55,
+         -12.535
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 2.487,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         6.046,
+         -2.55,
+         -14.597
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 2.749,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -6.046,
+         -2.55,
+         -14.597
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 3.534,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -9.618,
+         -2.55,
+         -12.535
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 3.796,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -12.535,
+         -2.55,
+         -9.618
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 4.058,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -14.597,
+         -2.55,
+         -6.046
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 4.32,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -15.665,
+         -2.55,
+         -2.062
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 4.581,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -15.665,
+         -2.55,
+         2.062
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 4.843,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -14.597,
+         -2.55,
+         6.046
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 5.105,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -12.535,
+         -2.55,
+         9.618
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 5.367,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -9.618,
+         -2.55,
+         12.535
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 5.629,
+        "color": "#c9342d",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         -6.046,
+         -2.55,
+         14.597
+        ],
+        "size": [
+         4.185,
+         5.2,
+         0.08
+        ],
+        "yaw": 5.89,
+        "color": "#f4efe4",
+        "material": "fabric",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         4.089,
+         -2.5,
+         15.262
+        ],
+        "r": 0.1,
+        "h": 5.2,
+        "segments": 6,
+        "color": "#e8b33a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         -4.089,
+         -2.5,
+         15.262
+        ],
+        "r": 0.1,
+        "h": 5.2,
+        "segments": 6,
+        "color": "#e8b33a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         4.089,
+         -2.5,
+         -15.262
+        ],
+        "r": 0.1,
+        "h": 5.2,
+        "segments": 6,
+        "color": "#e8b33a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         -4.089,
+         -2.5,
+         -15.262
+        ],
+        "r": 0.1,
+        "h": 5.2,
+        "segments": 6,
+        "color": "#e8b33a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         0,
+         9.4,
+         0
+        ],
+        "r": 0.09,
+        "h": 3,
+        "segments": 6,
+        "color": "#5a4632",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         0.6,
+         10.5,
+         0
+        ],
+        "size": [
+         1.2,
+         0.7,
+         0.05
+        ],
+        "color": "#f0c040",
+        "collide": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "kind": "define",
+   "name": "eden-cable-car",
+   "old": null,
+   "new": {
+    "schema": "def/1",
+    "name": "eden-cable-car",
+    "version": 1,
+    "description": "The alpine cable car as scenery: five steel pylons, two cables and a red and a yellow cabin from the valley station up to the mountain station (116 m). Placed at the valley station with its height given.",
+    "tags": [
+     "eden",
+     "scenery",
+     "cable-car",
+     "transport"
+    ],
+    "form": "point",
+    "layer": "decor",
+    "anchor": "center",
+    "size": {
+     "box": [
+      17.586,
+      49.9,
+      120.31
+     ],
+     "scale": [
+      1,
+      1
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "box",
+        "at": [
+         1.667,
+         0.41,
+         -19.333
+        ],
+        "size": [
+         1.4,
+         0.6,
+         1.4
+        ],
+        "color": "#9a958a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         1.667,
+         6.213,
+         -19.333
+        ],
+        "r": 0.34,
+        "r2": 0.22,
+        "h": 12.207,
+        "segments": 8,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.667,
+         12.417,
+         -19.333
+        ],
+        "size": [
+         4.4,
+         0.35,
+         0.5
+        ],
+        "yaw": -0.086,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         -0.127,
+         12.697,
+         -19.488
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         3.46,
+         12.697,
+         -19.179
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         3.333,
+         2.16,
+         -38.667
+        ],
+        "size": [
+         1.4,
+         0.6,
+         1.4
+        ],
+        "color": "#9a958a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         3.333,
+         10.747,
+         -38.667
+        ],
+        "r": 0.34,
+        "r2": 0.22,
+        "h": 17.773,
+        "segments": 8,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         3.333,
+         19.733,
+         -38.667
+        ],
+        "size": [
+         4.4,
+         0.35,
+         0.5
+        ],
+        "yaw": -0.086,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         1.54,
+         20.013,
+         -38.821
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         5.127,
+         20.013,
+         -38.512
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         5,
+         7.88,
+         -58
+        ],
+        "size": [
+         1.4,
+         0.6,
+         1.4
+        ],
+        "color": "#9a958a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         5,
+         17.265,
+         -58
+        ],
+        "r": 0.34,
+        "r2": 0.22,
+        "h": 19.37,
+        "segments": 8,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         5,
+         27.05,
+         -58
+        ],
+        "size": [
+         4.4,
+         0.35,
+         0.5
+        ],
+        "yaw": -0.086,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         3.207,
+         27.33,
+         -58.155
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         6.793,
+         27.33,
+         -57.845
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         6.667,
+         18.43,
+         -77.333
+        ],
+        "size": [
+         1.4,
+         0.6,
+         1.4
+        ],
+        "color": "#9a958a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         6.667,
+         26.198,
+         -77.333
+        ],
+        "r": 0.34,
+        "r2": 0.22,
+        "h": 16.137,
+        "segments": 8,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         6.667,
+         34.367,
+         -77.333
+        ],
+        "size": [
+         4.4,
+         0.35,
+         0.5
+        ],
+        "yaw": -0.086,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         4.873,
+         34.647,
+         -77.488
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         8.46,
+         34.647,
+         -77.179
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.333,
+         32.76,
+         -96.667
+        ],
+        "size": [
+         1.4,
+         0.6,
+         1.4
+        ],
+        "color": "#9a958a",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         8.333,
+         37.46,
+         -96.667
+        ],
+        "r": 0.34,
+        "r2": 0.22,
+        "h": 10,
+        "segments": 8,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.333,
+         42.56,
+         -96.667
+        ],
+        "size": [
+         4.4,
+         0.35,
+         0.5
+        ],
+        "yaw": -0.086,
+        "color": "#7a8288",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         6.54,
+         42.84,
+         -96.821
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         10.127,
+         42.84,
+         -96.512
+        ],
+        "r": 0.28,
+        "h": 0.12,
+        "segments": 10,
+        "roll": 1.5708,
+        "yaw": -0.086,
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         0,
+         4.6,
+         0
+        ],
+        "size": [
+         4.8,
+         1.2,
+         1.4
+        ],
+        "yaw": -0.086,
+        "color": "#5a5f66",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         10,
+         48.5,
+         -116
+        ],
+        "size": [
+         4.8,
+         1.2,
+         1.4
+        ],
+        "yaw": -0.086,
+        "color": "#5a5f66",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -1.793,
+          5.45,
+          -0.155
+         ],
+         [
+          -0.96,
+          8.875,
+          -9.821
+         ],
+         [
+          -0.127,
+          12.767,
+          -19.488
+         ],
+         [
+          0.707,
+          16.192,
+          -29.155
+         ],
+         [
+          1.54,
+          20.083,
+          -38.821
+         ],
+         [
+          2.373,
+          23.509,
+          -48.488
+         ],
+         [
+          3.207,
+          27.4,
+          -58.155
+         ],
+         [
+          4.04,
+          30.825,
+          -67.821
+         ],
+         [
+          4.873,
+          34.717,
+          -77.488
+         ],
+         [
+          5.707,
+          38.58,
+          -87.155
+         ],
+         [
+          6.54,
+          42.91,
+          -96.821
+         ],
+         [
+          7.373,
+          45.897,
+          -106.488
+         ],
+         [
+          8.207,
+          49.35,
+          -116.155
+         ]
+        ],
+        "r": 0.045,
+        "segments": 5,
+        "color": "#2a2a2a",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          1.793,
+          5.45,
+          0.155
+         ],
+         [
+          2.627,
+          8.875,
+          -9.512
+         ],
+         [
+          3.46,
+          12.767,
+          -19.179
+         ],
+         [
+          4.293,
+          16.192,
+          -28.845
+         ],
+         [
+          5.127,
+          20.083,
+          -38.512
+         ],
+         [
+          5.96,
+          23.509,
+          -48.179
+         ],
+         [
+          6.793,
+          27.4,
+          -57.845
+         ],
+         [
+          7.627,
+          30.825,
+          -67.512
+         ],
+         [
+          8.46,
+          34.717,
+          -77.179
+         ],
+         [
+          9.293,
+          38.58,
+          -86.845
+         ],
+         [
+          10.127,
+          42.91,
+          -96.512
+         ],
+         [
+          10.96,
+          45.897,
+          -106.179
+         ],
+         [
+          11.793,
+          49.35,
+          -115.845
+         ]
+        ],
+        "r": 0.045,
+        "segments": 5,
+        "color": "#2a2a2a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.707,
+         19.981,
+         -40.755
+        ],
+        "size": [
+         0.08,
+         1.5,
+         0.08
+        ],
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.707,
+         19.181,
+         -40.755
+        ],
+        "size": [
+         2,
+         0.14,
+         2.4
+        ],
+        "yaw": -0.086,
+        "color": "#3a3a3a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.707,
+         18.131,
+         -40.755
+        ],
+        "size": [
+         1.9,
+         2,
+         2.3
+        ],
+        "yaw": -0.086,
+        "round": 0.12,
+        "color": "#c43a2a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         1.707,
+         18.431,
+         -40.755
+        ],
+        "size": [
+         1.94,
+         0.75,
+         2.1
+        ],
+        "yaw": -0.086,
+        "color": "#3b4a52",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.793,
+         35.456,
+         -81.045
+        ],
+        "size": [
+         0.08,
+         1.5,
+         0.08
+        ],
+        "color": "#3a3d40",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.793,
+         34.656,
+         -81.045
+        ],
+        "size": [
+         2,
+         0.14,
+         2.4
+        ],
+        "yaw": -0.086,
+        "color": "#3a3a3a",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.793,
+         33.606,
+         -81.045
+        ],
+        "size": [
+         1.9,
+         2,
+         2.3
+        ],
+        "yaw": -0.086,
+        "round": 0.12,
+        "color": "#f0c040",
+        "collide": false
+       },
+       {
+        "kind": "box",
+        "at": [
+         8.793,
+         33.906,
+         -81.045
+        ],
+        "size": [
+         1.94,
+         0.75,
+         2.1
+        ],
+        "yaw": -0.086,
+        "color": "#3b4a52",
+        "collide": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "kind": "define",
+   "name": "eden-bunting",
+   "old": null,
+   "new": {
+    "schema": "def/1",
+    "name": "eden-bunting",
+    "version": 1,
+    "description": "A 10 m run of coloured bunting: fourteen pennants on a sagging cord between two wooden poles (3.2 m).",
+    "tags": [
+     "eden",
+     "decor",
+     "fair",
+     "bunting"
+    ],
+    "form": "point",
+    "layer": "decor",
+    "size": {
+     "box": [
+      10.2,
+      3.3,
+      0.2
+     ],
+     "scale": [
+      0.5,
+      2
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "cyl",
+        "at": [
+         -5,
+         1.6,
+         0
+        ],
+        "r": 0.06,
+        "h": 3.2,
+        "segments": 6,
+        "color": "#6b5038",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         5,
+         1.6,
+         0
+        ],
+        "r": 0.06,
+        "h": 3.2,
+        "segments": 6,
+        "color": "#6b5038",
+        "collide": false
+       },
+       {
+        "kind": "sweep",
+        "at": [
+         0,
+         0,
+         0
+        ],
+        "path": [
+         [
+          -5,
+          3.05,
+          0
+         ],
+         [
+          -2.5,
+          2.713,
+          0
+         ],
+         [
+          0,
+          2.6,
+          0
+         ],
+         [
+          2.5,
+          2.713,
+          0
+         ],
+         [
+          5,
+          3.05,
+          0
+         ]
+        ],
+        "r": 0.015,
+        "segments": 5,
+        "color": "#3a3430",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -4.45,
+         2.936,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#c9342d",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -3.765,
+         2.835,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#f0c040",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -3.081,
+         2.751,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#3d8ab0",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -2.396,
+         2.683,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#2e9e5a",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -1.712,
+         2.633,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -1.027,
+         2.599,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#e86aa8",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         -0.342,
+         2.582,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#c9342d",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0.342,
+         2.582,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#f0c040",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         1.027,
+         2.599,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#3d8ab0",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         1.712,
+         2.633,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#2e9e5a",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         2.396,
+         2.683,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         3.081,
+         2.751,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#e86aa8",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         3.765,
+         2.835,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#c9342d",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         4.45,
+         2.936,
+         0
+        ],
+        "polygon": [
+         [
+          -0.17,
+          0
+         ],
+         [
+          0.17,
+          0
+         ],
+         [
+          0,
+          0.34
+         ]
+        ],
+        "h": 0.02,
+        "pitch": 1.5708,
+        "color": "#f0c040",
+        "collide": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "kind": "define",
+   "name": "eden-stage-floor",
+   "old": null,
+   "new": {
+    "schema": "def/1",
+    "name": "eden-stage-floor",
+    "version": 1,
+    "description": "A round painted stage floor (3.8 m) in eight bright segments with a white rim, laid on the ground for open-air music.",
+    "tags": [
+     "eden",
+     "decor",
+     "stage",
+     "music"
+    ],
+    "form": "point",
+    "layer": "decor",
+    "size": {
+     "box": [
+      3.9,
+      0.08,
+      3.9
+     ],
+     "scale": [
+      0.5,
+      2
+     ]
+    },
+    "make": {
+     "kind": "gen",
+     "gen": "kit/2",
+     "args": {
+      "shapes": [
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          1.9,
+          0
+         ],
+         [
+          1.884,
+          0.248
+         ],
+         [
+          1.835,
+          0.492
+         ],
+         [
+          1.755,
+          0.727
+         ],
+         [
+          1.645,
+          0.95
+         ],
+         [
+          1.507,
+          1.157
+         ],
+         [
+          1.344,
+          1.344
+         ]
+        ],
+        "h": 0.03,
+        "color": "#d9534f",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          1.344,
+          1.344
+         ],
+         [
+          1.157,
+          1.507
+         ],
+         [
+          0.95,
+          1.645
+         ],
+         [
+          0.727,
+          1.755
+         ],
+         [
+          0.492,
+          1.835
+         ],
+         [
+          0.248,
+          1.884
+         ],
+         [
+          0,
+          1.9
+         ]
+        ],
+        "h": 0.03,
+        "color": "#f0ad4e",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          1.9
+         ],
+         [
+          -0.248,
+          1.884
+         ],
+         [
+          -0.492,
+          1.835
+         ],
+         [
+          -0.727,
+          1.755
+         ],
+         [
+          -0.95,
+          1.645
+         ],
+         [
+          -1.157,
+          1.507
+         ],
+         [
+          -1.344,
+          1.344
+         ]
+        ],
+        "h": 0.03,
+        "color": "#f4d35e",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          -1.344,
+          1.344
+         ],
+         [
+          -1.507,
+          1.157
+         ],
+         [
+          -1.645,
+          0.95
+         ],
+         [
+          -1.755,
+          0.727
+         ],
+         [
+          -1.835,
+          0.492
+         ],
+         [
+          -1.884,
+          0.248
+         ],
+         [
+          -1.9,
+          0
+         ]
+        ],
+        "h": 0.03,
+        "color": "#5cb85c",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          -1.9,
+          0
+         ],
+         [
+          -1.884,
+          -0.248
+         ],
+         [
+          -1.835,
+          -0.492
+         ],
+         [
+          -1.755,
+          -0.727
+         ],
+         [
+          -1.645,
+          -0.95
+         ],
+         [
+          -1.507,
+          -1.157
+         ],
+         [
+          -1.344,
+          -1.344
+         ]
+        ],
+        "h": 0.03,
+        "color": "#3d8ab0",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          -1.344,
+          -1.344
+         ],
+         [
+          -1.157,
+          -1.507
+         ],
+         [
+          -0.95,
+          -1.645
+         ],
+         [
+          -0.727,
+          -1.755
+         ],
+         [
+          -0.492,
+          -1.835
+         ],
+         [
+          -0.248,
+          -1.884
+         ],
+         [
+          0,
+          -1.9
+         ]
+        ],
+        "h": 0.03,
+        "color": "#6f5fb0",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          0,
+          -1.9
+         ],
+         [
+          0.248,
+          -1.884
+         ],
+         [
+          0.492,
+          -1.835
+         ],
+         [
+          0.727,
+          -1.755
+         ],
+         [
+          0.95,
+          -1.645
+         ],
+         [
+          1.157,
+          -1.507
+         ],
+         [
+          1.344,
+          -1.344
+         ]
+        ],
+        "h": 0.03,
+        "color": "#e86aa8",
+        "collide": false
+       },
+       {
+        "kind": "extrude",
+        "at": [
+         0,
+         0.01,
+         0
+        ],
+        "polygon": [
+         [
+          0,
+          0
+         ],
+         [
+          1.344,
+          -1.344
+         ],
+         [
+          1.507,
+          -1.157
+         ],
+         [
+          1.645,
+          -0.95
+         ],
+         [
+          1.755,
+          -0.727
+         ],
+         [
+          1.835,
+          -0.492
+         ],
+         [
+          1.884,
+          -0.248
+         ],
+         [
+          1.9,
+          0
+         ]
+        ],
+        "h": 0.03,
+        "color": "#f4efe4",
+        "collide": false
+       },
+       {
+        "kind": "cyl",
+        "at": [
+         0,
+         0.03,
+         0
+        ],
+        "r": 0.35,
+        "h": 0.035,
+        "segments": 12,
+        "color": "#2a2826",
+        "collide": false
+       },
+       {
+        "kind": "torus",
+        "at": [
+         0,
+         0.03,
+         0
+        ],
+        "r": 1.9,
+        "r2": 0.04,
+        "segments": 24,
+        "pitch": 1.5708,
+        "color": "#f4efe4",
+        "collide": false
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "land-alpine-switchback",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -18,
+       -284
+      ],
+      [
+       6,
+       -303
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.2,
+     "material": "gravel",
+     "maxGrade": 0,
+     "autoBridge": false,
+     "edging": false
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -24,
+       -266
+      ],
+      [
+       22,
+       -273
+      ],
+      [
+       -22,
+       -280
+      ],
+      [
+       20,
+       -287
+      ],
+      [
+       -18,
+       -293
+      ],
+      [
+       1,
+       -297
+      ]
+     ]
+    },
+    "params": {
+     "width": 3,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "marina-sailboat-3",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     121.4,
+     151
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     119.6,
+     169.5
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "marina-sailboat-4",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     126.6,
+     151
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     128.4,
+     169.5
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "festival-lights-2",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "festival-lights-2",
+    "p": [
+     265,
+     60
+    ]
+   },
+   "new": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "festival-lights-2",
+    "p": [
+     262.5,
+     69.5
+    ]
+   }
+  },
+  {
+   "kind": "change",
+   "path": "festival-flag-1",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-1",
+    "p": [
+     268,
+     38
+    ]
+   },
+   "new": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-1",
+    "p": [
+     270.8,
+     34.5
+    ]
+   }
+  },
+  {
+   "kind": "change",
+   "path": "festival-flag-2",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-2",
+    "p": [
+     276,
+     38
+    ]
+   },
+   "new": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-2",
+    "p": [
+     276,
+     34.5
+    ]
+   }
+  },
+  {
+   "kind": "change",
+   "path": "festival-flag-3",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-3",
+    "p": [
+     284,
+     38
+    ]
+   },
+   "new": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-3",
+    "p": [
+     284,
+     34.5
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-cable-car",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-cable-car@1",
+    "name": "alpine-cable-car",
+    "p": [
+     -4,
+     0,
+     -196
+    ],
+    "anchor": "center"
+   }
+  },
+  {
+   "kind": "add",
+   "path": "land-alpine-restaurant-terrace",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/terrace@1",
+    "name": "land-alpine-restaurant-terrace",
+    "shape": {
+     "area": [
+      [
+       5,
+       -297.5
+      ],
+      [
+       17,
+       -297.5
+      ],
+      [
+       17,
+       -290.5
+      ],
+      [
+       5,
+       -290.5
+      ]
+     ]
+    },
+    "params": {
+     "level": 35.4,
+     "edge": 1
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-terrace-table-1",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     8.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-terrace-table-2",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     13.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-terrace-table-3",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     8.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-terrace-table-4",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-4",
+    "p": [
+     13.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "alpine-terrace-lights",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.2
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "fair-bunting-1",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-1",
+    "p": [
+     272,
+     75
+    ],
+    "r": 1.5708
+   }
+  },
+  {
+   "kind": "add",
+   "path": "fair-bunting-2",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-2",
+    "p": [
+     282,
+     75
+    ],
+    "r": 1.5708
+   }
+  },
+  {
+   "kind": "add",
+   "path": "fair-bunting-3",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-3",
+    "p": [
+     272,
+     29
+    ],
+    "r": 1.5708
+   }
+  },
+  {
+   "kind": "add",
+   "path": "fair-bunting-4",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-4",
+    "p": [
+     282,
+     29
+    ],
+    "r": 1.5708
+   }
+  },
+  {
+   "kind": "add",
+   "path": "resort-ferris-ticket-booth",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/kiosk@1",
+    "name": "resort-ferris-ticket-booth",
+    "p": [
+     192.5,
+     126.5
+    ],
+    "r": -1.5708,
+    "params": {
+     "paint": "#c43a2a",
+     "roof": "#f0c040"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "resort-ferris-flag-1",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "resort-ferris-flag-1",
+    "p": [
+     176.5,
+     129.5
+    ],
+    "params": {
+     "flag": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "resort-ferris-flag-2",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "resort-ferris-flag-2",
+    "p": [
+     191.5,
+     130.5
+    ],
+    "params": {
+     "flag": "#f0c040"
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "resort-ferris-lights",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "resort-ferris-lights",
+    "p": [
+     184,
+     130.4
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "park-playground-sand",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/sand-patch@1",
+    "name": "park-playground-sand",
+    "shape": {
+     "area": [
+      [
+       10,
+       96.5
+      ],
+      [
+       26,
+       96.5
+      ],
+      [
+       26,
+       109
+      ],
+      [
+       10,
+       109
+      ]
+     ]
+    },
+    "params": {
+     "material": "sand",
+     "edge": 0.6
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "park-playground-fence",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/fence@1",
+    "name": "park-playground-fence",
+    "shape": {
+     "path": [
+      [
+       9,
+       95.5
+      ],
+      [
+       27,
+       95.5
+      ],
+      [
+       27,
+       110
+      ],
+      [
+       9,
+       110
+      ],
+      [
+       9,
+       95.5
+      ]
+     ]
+    },
+    "params": {
+     "style": "picket",
+     "color": "#c43a2a",
+     "height": 0.9,
+     "gates": [
+      {
+       "at": 9,
+       "width": 2.2,
+       "state": "open"
+      },
+      {
+       "at": 57.75,
+       "width": 2.2,
+       "state": "open"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "kind": "add",
+   "path": "amphitheatre-stage-floor",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "eden-stage-floor@1",
+    "name": "amphitheatre-stage-floor",
+    "p": [
+     76,
+     80.6
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "amphitheatre-speaker-1",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/speaker@1",
+    "name": "amphitheatre-speaker-1",
+    "p": [
+     73.3,
+     79.4
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "amphitheatre-speaker-2",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/speaker@1",
+    "name": "amphitheatre-speaker-2",
+    "p": [
+     78.7,
+     79.4
+    ]
+   }
+  }
+ ],
+ "oldUnits": {
+  "land-alpine-switchback": {
+   "land-alpine-switchback": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -18,
+       -284
+      ],
+      [
+       6,
+       -303
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.2,
+     "material": "gravel",
+     "maxGrade": 0,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  "marina-sailboat-3": {
+   "marina-sailboat-3": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     121.4,
+     151
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  "marina-sailboat-4": {
+   "marina-sailboat-4": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     126.6,
+     151
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
+  "festival-lights-2": {
+   "festival-lights-2": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "festival-lights-2",
+    "p": [
+     265,
+     60
+    ]
+   }
+  },
+  "festival-flag-1": {
+   "festival-flag-1": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-1",
+    "p": [
+     268,
+     38
+    ]
+   }
+  },
+  "festival-flag-2": {
+   "festival-flag-2": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-2",
+    "p": [
+     276,
+     38
+    ]
+   }
+  },
+  "festival-flag-3": {
+   "festival-flag-3": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-3",
+    "p": [
+     284,
+     38
+    ]
+   }
+  }
+ },
+ "newUnits": {
+  "land-alpine-switchback": {
+   "land-alpine-switchback": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-switchback",
+    "shape": {
+     "path": [
+      [
+       -20,
+       -134
+      ],
+      [
+       -45,
+       -177
+      ],
+      [
+       23,
+       -201
+      ],
+      [
+       -31,
+       -235
+      ],
+      [
+       26,
+       -260
+      ],
+      [
+       -24,
+       -266
+      ],
+      [
+       22,
+       -273
+      ],
+      [
+       -22,
+       -280
+      ],
+      [
+       20,
+       -287
+      ],
+      [
+       -18,
+       -293
+      ],
+      [
+       1,
+       -297
+      ]
+     ]
+    },
+    "params": {
+     "width": 3,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false
+    }
+   }
+  },
+  "marina-sailboat-3": {
+   "marina-sailboat-3": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-3",
+    "p": [
+     119.6,
+     169.5
+    ],
+    "params": {
+     "sail": "#fbf8f0"
+    }
+   }
+  },
+  "marina-sailboat-4": {
+   "marina-sailboat-4": {
+    "op": "place",
+    "def": "core/sailboat@1",
+    "name": "marina-sailboat-4",
+    "p": [
+     128.4,
+     169.5
+    ],
+    "params": {
+     "sail": "#7bb37a"
+    }
+   }
+  },
+  "festival-lights-2": {
+   "festival-lights-2": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "festival-lights-2",
+    "p": [
+     262.5,
+     69.5
+    ]
+   }
+  },
+  "festival-flag-1": {
+   "festival-flag-1": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-1",
+    "p": [
+     270.8,
+     34.5
+    ]
+   }
+  },
+  "festival-flag-2": {
+   "festival-flag-2": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-2",
+    "p": [
+     276,
+     34.5
+    ]
+   }
+  },
+  "festival-flag-3": {
+   "festival-flag-3": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "festival-flag-3",
+    "p": [
+     284,
+     34.5
+    ]
+   }
+  },
+  "alpine-cable-car": {
+   "alpine-cable-car": {
+    "op": "place",
+    "def": "eden-cable-car@1",
+    "name": "alpine-cable-car",
+    "p": [
+     -4,
+     0,
+     -196
+    ],
+    "anchor": "center"
+   }
+  },
+  "land-alpine-restaurant-terrace": {
+   "land-alpine-restaurant-terrace": {
+    "op": "place",
+    "def": "core/terrace@1",
+    "name": "land-alpine-restaurant-terrace",
+    "shape": {
+     "area": [
+      [
+       5,
+       -297.5
+      ],
+      [
+       17,
+       -297.5
+      ],
+      [
+       17,
+       -290.5
+      ],
+      [
+       5,
+       -290.5
+      ]
+     ]
+    },
+    "params": {
+     "level": 35.4,
+     "edge": 1
+    }
+   }
+  },
+  "alpine-terrace-table-1": {
+   "alpine-terrace-table-1": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     8.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-table-2": {
+   "alpine-terrace-table-2": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     13.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   }
+  },
+  "alpine-terrace-table-3": {
+   "alpine-terrace-table-3": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     8.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-table-4": {
+   "alpine-terrace-table-4": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-4",
+    "p": [
+     13.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-lights": {
+   "alpine-terrace-lights": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.2
+    ]
+   }
+  },
+  "fair-bunting-1": {
+   "fair-bunting-1": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-1",
+    "p": [
+     272,
+     75
+    ],
+    "r": 1.5708
+   }
+  },
+  "fair-bunting-2": {
+   "fair-bunting-2": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-2",
+    "p": [
+     282,
+     75
+    ],
+    "r": 1.5708
+   }
+  },
+  "fair-bunting-3": {
+   "fair-bunting-3": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-3",
+    "p": [
+     272,
+     29
+    ],
+    "r": 1.5708
+   }
+  },
+  "fair-bunting-4": {
+   "fair-bunting-4": {
+    "op": "place",
+    "def": "eden-bunting@1",
+    "name": "fair-bunting-4",
+    "p": [
+     282,
+     29
+    ],
+    "r": 1.5708
+   }
+  },
+  "resort-ferris-ticket-booth": {
+   "resort-ferris-ticket-booth": {
+    "op": "place",
+    "def": "core/kiosk@1",
+    "name": "resort-ferris-ticket-booth",
+    "p": [
+     192.5,
+     126.5
+    ],
+    "r": -1.5708,
+    "params": {
+     "paint": "#c43a2a",
+     "roof": "#f0c040"
+    }
+   }
+  },
+  "resort-ferris-flag-1": {
+   "resort-ferris-flag-1": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "resort-ferris-flag-1",
+    "p": [
+     176.5,
+     129.5
+    ],
+    "params": {
+     "flag": "#c43a2a"
+    }
+   }
+  },
+  "resort-ferris-flag-2": {
+   "resort-ferris-flag-2": {
+    "op": "place",
+    "def": "core/flagpole@1",
+    "name": "resort-ferris-flag-2",
+    "p": [
+     191.5,
+     130.5
+    ],
+    "params": {
+     "flag": "#f0c040"
+    }
+   }
+  },
+  "resort-ferris-lights": {
+   "resort-ferris-lights": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "resort-ferris-lights",
+    "p": [
+     184,
+     130.4
+    ]
+   }
+  },
+  "park-playground-sand": {
+   "park-playground-sand": {
+    "op": "place",
+    "def": "core/sand-patch@1",
+    "name": "park-playground-sand",
+    "shape": {
+     "area": [
+      [
+       10,
+       96.5
+      ],
+      [
+       26,
+       96.5
+      ],
+      [
+       26,
+       109
+      ],
+      [
+       10,
+       109
+      ]
+     ]
+    },
+    "params": {
+     "material": "sand",
+     "edge": 0.6
+    }
+   }
+  },
+  "park-playground-fence": {
+   "park-playground-fence": {
+    "op": "place",
+    "def": "core/fence@1",
+    "name": "park-playground-fence",
+    "shape": {
+     "path": [
+      [
+       9,
+       95.5
+      ],
+      [
+       27,
+       95.5
+      ],
+      [
+       27,
+       110
+      ],
+      [
+       9,
+       110
+      ],
+      [
+       9,
+       95.5
+      ]
+     ]
+    },
+    "params": {
+     "style": "picket",
+     "color": "#c43a2a",
+     "height": 0.9,
+     "gates": [
+      {
+       "at": 9,
+       "width": 2.2,
+       "state": "open"
+      },
+      {
+       "at": 57.75,
+       "width": 2.2,
+       "state": "open"
+      }
+     ]
+    }
+   }
+  },
+  "amphitheatre-stage-floor": {
+   "amphitheatre-stage-floor": {
+    "op": "place",
+    "def": "eden-stage-floor@1",
+    "name": "amphitheatre-stage-floor",
+    "p": [
+     76,
+     80.6
+    ]
+   }
+  },
+  "amphitheatre-speaker-1": {
+   "amphitheatre-speaker-1": {
+    "op": "place",
+    "def": "core/speaker@1",
+    "name": "amphitheatre-speaker-1",
+    "p": [
+     73.3,
+     79.4
+    ]
+   }
+  },
+  "amphitheatre-speaker-2": {
+   "amphitheatre-speaker-2": {
+    "op": "place",
+    "def": "core/speaker@1",
+    "name": "amphitheatre-speaker-2",
+    "p": [
+     78.7,
+     79.4
+    ]
+   }
+  }
+ }
+}
