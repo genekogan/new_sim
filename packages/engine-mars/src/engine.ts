@@ -2092,8 +2092,10 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       const scene = (s.cfg ?? cfg).scene;
       const base = scene === 'eden-commons' ? m.edenCommonsWorld() : scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       // entity-physics/1: the derived fixture assets must be known before the restored Spatial first syncs
-      {const ep=(decodeSnapshot(s.mars) as any).world?.entityPhysicsV1;if(ep)registerAssets(ep.assets);}
-      const rt = m.Runtime.restore(s.mars, (s as {groundV1?:boolean}).groundV1 ? groundRegistry(registry) : registry, services(base), m.invariants);
+      // (decoded once: registerAssets clones what it keeps, so the graph goes on to Runtime.restore unshared)
+      const decoded=decodeSnapshot(s.mars);
+      {const ep=(decoded as any).world?.entityPhysicsV1;if(ep)registerAssets(ep.assets);}
+      const rt = m.Runtime.restore(s.mars, (s as {groundV1?:boolean}).groundV1 ? groundRegistry(registry) : registry, services(base), m.invariants, decoded);
       if(cfg.scene==='eden-commons'&&(rt.world.base.campus!=='eden-commons'||rt.world.base.staticHash!==base.base.staticHash))throw new Error('snapshot commons physical base differs from the native factory');
       const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving,renderPlatformsV1:s.renderPlatformsV1 });
       if (s.quiet) engine.beginQuiet();
