@@ -35,6 +35,9 @@ import { GodNotices } from './notices.ts';
 import { MapNotices, mapChanges, mapNoticeText, nearSite, planMapNotices, type MapChange, type MapPlan, type MapResident } from './map-notices.ts';
 import type { ApplyContext, WalkoutPrep } from './god.ts';
 import type { BuildNotice } from './builds.ts';
+/** Where a refused body placement points: people as scenery (harvest fix 'figures'). core/figure@1 has no body component,
+ *  so it is never a Soul, never simulated or counted as a resident; it places like any prop. */
+export const PEOPLE_AS_SCENERY = 'for people as scenery (a crowd, waiters, stallholders, a choir) place core/figure@1 instead: `place figure --at x,z --param pose=stand|walk|sit|carry|serve|wave --param hat=none|cap|sunhat|chef|scarf --param top=#hex` (one figure per placement; children --scale 0.6); it is a prop, never a resident';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -628,7 +631,10 @@ export class EngineBridge {
       const e = this.model.entities.get(id);
       if (e && this.model.resolvedDef(e.def)?.components.body) return { op: 0, code: 'body.protected', entity: id, detail: 'A god edit cannot remove a resident body.' };
     }
-    for (const e of diff.upserts) if (after.resolvedDef(e.def)?.components.body && (!this.model.entities.has(e.id) || diff.defs.some(d => d.ref === after.resolvedDef(e.def)?.ref))) return { op: 0, code: 'body.protected', entity: e.id, detail: 'Resident bodies are managed by their Souls.' };
+    for (const e of diff.upserts) if (after.resolvedDef(e.def)?.components.body && (!this.model.entities.has(e.id) || diff.defs.some(d => d.ref === after.resolvedDef(e.def)?.ref))) {
+      const ref = after.resolvedDef(e.def)?.ref, i = ops.findIndex(o => { const x = o as { op?: string; def?: string }; try { return x.op === 'place' && !!x.def && after.resolvedDef(x.def)?.ref === ref; } catch { return false; } });
+      return { op: Math.max(0, i), code: 'body.protected', entity: e.id, detail: `${ref?.replace(/^core-/, 'core/') ?? e.def} is a resident's body: residents (Souls) come only by joining, never by placing, and their bodies are managed by their Souls`, fix: PEOPLE_AS_SCENERY };
+    }
     if (!undo) for (const e of diff.upserts) {
       const holder = e.in.parent !== 'world' ? after.entities.get(e.in.parent) : undefined;
       if (!holder || !after.resolvedDef(holder.def)?.components.body || this.model.entities.get(e.id)?.in.parent === holder.id) continue;

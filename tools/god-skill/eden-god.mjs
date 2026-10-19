@@ -3547,7 +3547,7 @@ var HINTS = {
   "params.invalid": "`defs <name>` shows params with ranges",
   "state.invalid": "unknown or bad state field; `describe` shows the state",
   "name.taken": "names are unique per parent; choose another --name",
-  "body.protected": "a resident's body moves itself; edit the things around it (residents in the way are walked out)",
+  "body.protected": "a resident's body moves itself; edit the things around it (residents in the way are walked out); people as scenery: place figure",
   "entity.unknown": "no such thing; `map` lists paths",
   "architecture.unreachable": "a room has no way in; add a door (plan) or stairs",
   "architecture.headroom": "a floor is too low; raise floorHeight",

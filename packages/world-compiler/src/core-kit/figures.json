@@ -1,0 +1,1108 @@
+[
+ {
+  "schema": "def/1",
+  "name": "core-figure",
+  "version": 1,
+  "description": "A person as scenery (an extra, never a Soul: not a resident, never thinks or walks): stands, walks, sits, carries a crate, serves a tray or waves; hats and colours vary. For waiters, stallholders, children (--scale 0.6), neighbours chatting, a choir, an audience, crowds (one placement per figure). Residents (Souls) come only by joining.",
+  "category": "living.character",
+  "synonyms": [
+   "person",
+   "people",
+   "figure",
+   "extra",
+   "crowd",
+   "pedestrians",
+   "passer-by",
+   "onlooker",
+   "audience",
+   "choir",
+   "singer",
+   "waiter",
+   "stallholder",
+   "vendor",
+   "child",
+   "children",
+   "neighbour",
+   "customer",
+   "shopkeeper",
+   "worker",
+   "chef",
+   "busker",
+   "townsfolk",
+   "statue of a person"
+  ],
+  "tags": [
+   "figure",
+   "person",
+   "people",
+   "extra",
+   "decor",
+   "scenery"
+  ],
+  "form": "point",
+  "layer": "solid",
+  "make": {
+   "kind": "gen",
+   "gen": "kit/2",
+   "args": {
+    "v": 2,
+    "shapes": [
+     {
+      "kind": "rbox",
+      "at": [
+       0,
+       0.95,
+       0
+      ],
+      "size": [
+       0.32,
+       0.16,
+       0.2
+      ],
+      "round": 0.06,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose!=sit"
+     },
+     {
+      "kind": "rbox",
+      "at": [
+       0,
+       1.19,
+       0
+      ],
+      "size": [
+       0.38,
+       0.5,
+       0.22
+      ],
+      "round": 0.08,
+      "tint": "top",
+      "collide": true,
+      "when": "pose!=sit"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.475,
+       0
+      ],
+      "r": 0.045,
+      "h": 0.1,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose!=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.62,
+       0
+      ],
+      "r": 0.115,
+      "segments": 8,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose!=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.665,
+       -0.012
+      ],
+      "r": 0.122,
+      "segments": 8,
+      "tint": "hair",
+      "collide": false,
+      "when": "pose!=sit&hat!=chef&hat!=scarf",
+      "scale": [
+       1,
+       0.72,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.715,
+       0.03
+      ],
+      "r": 0.17,
+      "h": 0.015,
+      "segments": 6,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose!=sit&hat=cap",
+      "scale": [
+       0.75,
+       1,
+       1
+      ]
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.7,
+       -0.005
+      ],
+      "r": 0.12,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose!=sit&hat=cap",
+      "scale": [
+       1,
+       0.6,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.705,
+       0
+      ],
+      "r": 0.27,
+      "h": 0.015,
+      "segments": 10,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose!=sit&hat=sunhat"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.75,
+       0
+      ],
+      "r": 0.12,
+      "r2": 0.1,
+      "h": 0.1,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose!=sit&hat=sunhat"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.79,
+       0
+      ],
+      "r": 0.11,
+      "r2": 0.13,
+      "h": 0.22,
+      "segments": 8,
+      "color": "#f6f4ee",
+      "material": "fabric",
+      "collide": false,
+      "when": "pose!=sit&hat=chef"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.645,
+       -0.02
+      ],
+      "r": 0.13,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose!=sit&hat=scarf",
+      "scale": [
+       1,
+       0.95,
+       1.05
+      ]
+     },
+     {
+      "kind": "rbox",
+      "at": [
+       0,
+       0.53,
+       -0.04
+      ],
+      "size": [
+       0.32,
+       0.16,
+       0.2
+      ],
+      "round": 0.06,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "rbox",
+      "at": [
+       0,
+       0.77,
+       -0.04
+      ],
+      "size": [
+       0.38,
+       0.5,
+       0.22
+      ],
+      "round": 0.08,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.055,
+       -0.04
+      ],
+      "r": 0.045,
+      "h": 0.1,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.2,
+       -0.04
+      ],
+      "r": 0.115,
+      "segments": 8,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.245,
+       -0.052
+      ],
+      "r": 0.122,
+      "segments": 8,
+      "tint": "hair",
+      "collide": false,
+      "when": "pose=sit&hat!=chef&hat!=scarf",
+      "scale": [
+       1,
+       0.72,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.295,
+       -0.01
+      ],
+      "r": 0.17,
+      "h": 0.015,
+      "segments": 6,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose=sit&hat=cap",
+      "scale": [
+       0.75,
+       1,
+       1
+      ]
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.28,
+       -0.045
+      ],
+      "r": 0.12,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose=sit&hat=cap",
+      "scale": [
+       1,
+       0.6,
+       1
+      ]
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.285,
+       -0.04
+      ],
+      "r": 0.27,
+      "h": 0.015,
+      "segments": 10,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose=sit&hat=sunhat"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.33,
+       -0.04
+      ],
+      "r": 0.12,
+      "r2": 0.1,
+      "h": 0.1,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose=sit&hat=sunhat"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0,
+       1.37,
+       -0.04
+      ],
+      "r": 0.11,
+      "r2": 0.13,
+      "h": 0.22,
+      "segments": 8,
+      "color": "#f6f4ee",
+      "material": "fabric",
+      "collide": false,
+      "when": "pose=sit&hat=chef"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0,
+       1.225,
+       -0.06
+      ],
+      "r": 0.13,
+      "segments": 8,
+      "tint": "hatColor",
+      "collide": false,
+      "when": "pose=sit&hat=scarf",
+      "scale": [
+       1,
+       0.95,
+       1.05
+      ]
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.09,
+       0.9,
+       0
+      ],
+      "to": [
+       0.1,
+       0.06,
+       0
+      ],
+      "r": 0.065,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=stand|carry|serve|wave"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.09,
+       0.9,
+       0
+      ],
+      "to": [
+       -0.1,
+       0.06,
+       0
+      ],
+      "r": 0.065,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=stand|carry|serve|wave"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.1,
+       0.04,
+       0.05
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=stand|carry|serve|wave"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.1,
+       0.04,
+       0.05
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=stand|carry|serve|wave"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.09,
+       0.9,
+       0
+      ],
+      "to": [
+       0.09,
+       0.07,
+       0.24
+      ],
+      "r": 0.065,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.09,
+       0.9,
+       0
+      ],
+      "to": [
+       -0.09,
+       0.07,
+       -0.2
+      ],
+      "r": 0.065,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.09,
+       0.04,
+       0.29
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.09,
+       0.04,
+       -0.15000000000000002
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.09,
+       0.5,
+       0
+      ],
+      "to": [
+       0.1,
+       0.5,
+       0.42
+      ],
+      "r": 0.068,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.09,
+       0.5,
+       0
+      ],
+      "to": [
+       -0.1,
+       0.5,
+       0.42
+      ],
+      "r": 0.068,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.1,
+       0.5,
+       0.42
+      ],
+      "to": [
+       0.1,
+       0.07,
+       0.44
+      ],
+      "r": 0.06,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.1,
+       0.5,
+       0.42
+      ],
+      "to": [
+       -0.1,
+       0.07,
+       0.44
+      ],
+      "r": 0.06,
+      "segments": 6,
+      "tint": "bottom",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "box",
+      "at": [
+       0.1,
+       0.04,
+       0.5
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "box",
+      "at": [
+       -0.1,
+       0.04,
+       0.5
+      ],
+      "size": [
+       0.1,
+       0.08,
+       0.22
+      ],
+      "round": 0,
+      "tint": "shoes",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       0.25,
+       0.9,
+       0.02
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=stand"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.25,
+       0.9,
+       0.02
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=stand"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       -0.25,
+       0.9,
+       0.02
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=stand|serve|wave"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.25,
+       0.9,
+       0.02
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=stand|serve|wave"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       0.24,
+       0.95,
+       -0.16
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.24,
+       0.95,
+       -0.16
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       -0.24,
+       0.95,
+       0.17
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.24,
+       0.95,
+       0.17
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=walk"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       0.19,
+       1.08,
+       0.3
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=carry"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.19,
+       1.08,
+       0.3
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=carry"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       -0.19,
+       1.08,
+       0.3
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=carry"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.19,
+       1.08,
+       0.3
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=carry"
+     },
+     {
+      "kind": "rbox",
+      "at": [
+       0,
+       1.12,
+       0.36
+      ],
+      "size": [
+       0.42,
+       0.24,
+       0.3
+      ],
+      "round": 0.03,
+      "tint": "prop",
+      "material": "wood",
+      "collide": false,
+      "when": "pose=carry"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       0.3,
+       1.52,
+       0.24
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=serve"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.3,
+       1.52,
+       0.24
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=serve"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.3,
+       1.585,
+       0.26
+      ],
+      "r": 0.2,
+      "h": 0.02,
+      "segments": 8,
+      "tint": "prop",
+      "material": "metal",
+      "collide": false,
+      "when": "pose=serve"
+     },
+     {
+      "kind": "cyl",
+      "at": [
+       0.25,
+       1.61,
+       0.23
+      ],
+      "r": 0.08,
+      "h": 0.025,
+      "segments": 6,
+      "color": "#f4f1ea",
+      "material": "ceramic",
+      "collide": false,
+      "when": "pose=serve",
+      "repeat": {
+       "n": 2,
+       "step": [
+        0.11,
+        0,
+        0.07
+       ]
+      }
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       1.4,
+       0
+      ],
+      "to": [
+       0.36,
+       1.86,
+       0.02
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=wave"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.36,
+       1.86,
+       0.02
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=wave"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       0.215,
+       0.98,
+       -0.04
+      ],
+      "to": [
+       0.2,
+       0.56,
+       0.22
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       0.2,
+       0.56,
+       0.22
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "cyl",
+      "from": [
+       -0.215,
+       0.98,
+       -0.04
+      ],
+      "to": [
+       -0.2,
+       0.56,
+       0.22
+      ],
+      "r": 0.045,
+      "segments": 6,
+      "tint": "top",
+      "collide": false,
+      "when": "pose=sit"
+     },
+     {
+      "kind": "sphere",
+      "at": [
+       -0.2,
+       0.56,
+       0.22
+      ],
+      "r": 0.05,
+      "segments": 6,
+      "tint": "skin",
+      "collide": false,
+      "when": "pose=sit"
+     }
+    ],
+    "round": 0.02,
+    "surfaces": true
+   }
+  },
+  "params": {
+   "pose": {
+    "type": "enum",
+    "values": [
+     "stand",
+     "walk",
+     "sit",
+     "carry",
+     "serve",
+     "wave"
+    ],
+    "default": "stand",
+    "doc": "stand, walk (mid-stride), sit (on anything 0.45 m high; no collider), carry (a crate), serve (tray at the shoulder), wave"
+   },
+   "hat": {
+    "type": "enum",
+    "values": [
+     "none",
+     "cap",
+     "sunhat",
+     "chef",
+     "scarf"
+    ],
+    "default": "none",
+    "doc": "headwear"
+   },
+   "skin": {
+    "type": "color",
+    "default": "#c8906a",
+    "doc": "skin tone"
+   },
+   "hair": {
+    "type": "color",
+    "default": "#3a2a20",
+    "doc": "hair colour"
+   },
+   "top": {
+    "type": "color",
+    "default": "#3f6f8f",
+    "doc": "shirt/jacket/dress colour (style card: accent)"
+   },
+   "bottom": {
+    "type": "color",
+    "default": "#2f3540",
+    "doc": "trousers/skirt colour"
+   },
+   "shoes": {
+    "type": "color",
+    "default": "#2a2420",
+    "doc": "shoe colour"
+   },
+   "hatColor": {
+    "type": "color",
+    "default": "#d8c49a",
+    "doc": "hat or headscarf colour"
+   },
+   "prop": {
+    "type": "color",
+    "default": "#9a6b43",
+    "doc": "carried crate/tray colour"
+   }
+  },
+  "palette": {
+   "skin": "#c8906a",
+   "hair": "#3a2a20",
+   "top": "#3f6f8f",
+   "bottom": "#2f3540",
+   "shoes": "#2a2420",
+   "hatColor": "#d8c49a",
+   "prop": "#9a6b43"
+  },
+  "size": {
+   "box": [
+    0.623,
+    1.753,
+    0.294
+   ],
+   "scale": [
+    0.5,
+    1.3
+   ]
+  }
+ }
+]

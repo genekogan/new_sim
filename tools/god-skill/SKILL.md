@@ -528,7 +528,7 @@ Read `REFUSED: <code> (op k): <detail> [— field … — fix …] [hint]` befor
 | `revision.stale` | what you previewed or expected changed: `describe` it again and make a fresh preview |
 | `asset.invalid` · `asset.budget` | the uploaded file is not a usable GLB or exceeds the stated limit (measured vs allowed); nothing was stored |
 | `architecture.unreachable` · `architecture.headroom` | the building's plan has a sealed room / too-low floor; change params (`floors`, `floorHeight`, `plan`) |
-| `body.protected` | residents' bodies are managed by their Souls |
+| `body.protected` | residents' bodies are managed by their Souls; people as scenery are `place figure` (core/figure@1: pose, hat, colours) |
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
 | `wallet.insufficient` | the wallet has less than that (a Soul spent it); `layers` shows wallets |
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
