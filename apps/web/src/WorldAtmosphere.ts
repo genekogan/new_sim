@@ -16,6 +16,7 @@ import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
 import {Rain} from './atmosphere/rain.ts';
 import {Halos,type HaloSource} from './atmosphere/halos.ts';
+import {registerFx} from './fx/debug.ts';
 import {Lighthouse} from './atmosphere/lighthouse.ts';
 import {FogBanks} from './atmosphere/fogbanks.ts';
 import {SURF} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/coast-surf.ts';
@@ -68,6 +69,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const override:WeatherOverride=typeof location!=='undefined'?parseWeatherOverride(location.search):null;
  const dustOverride=typeof location!=='undefined'?parseDustOverride(location.search):null;
  const root=new THREE.Group();root.name='atmosphere (decorative; not a camera root)';root.userData.cameraTransparent=true;
+ const beacons:Lighthouse[]=[];let lanternKey='';
+ registerFx('atmosphere',{set(on){smoke.points.visible=on&&smoke.sourceCount>0;for(const b of beacons)b.group.visible=on;},stats(){return {smoke:smoke.sourceCount,lighthouses:beacons.length};}});
  const fauna=new Fauna(),fireflies=new Fireflies(),smoke=new Smoke(),sky=new SkyDome(),rain=new Rain(),balloons=new Balloons(),halos=new Halos(),lighthouse=new Lighthouse(),fogBanks=new FogBanks();
  root.add(sky.mesh,fauna.mesh,fireflies.points,smoke.points,rain.lines,balloons.mesh,halos.mesh,lighthouse.group,fogBanks.mesh);
  // Fog is installed once, before anything compiles, at zero density (inert) so weather never recompiles programs.
@@ -114,6 +117,10 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   // MARSLAND-FAR: a god world's sky palette (GodWorldLiving publishes state.sky.palette on its group)
   let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});palLook=skyLook(pal);desert=pal==='mars-desert';
   collectLights();
+  // W2: a god world's lighthouses (GodWorldLiving publishes their lanterns); at most four beam pairs
+  const lanterns:THREE.Vector3[]=[];scene.traverse(o=>{const l=o.userData?.edenLighthouses;if(o===root||!Array.isArray(l))return;o.updateWorldMatrix(true,false);for(const a of l)if(Array.isArray(a)&&a.length===3&&a.every(Number.isFinite)&&lanterns.length<4)lanterns.push(new THREE.Vector3(a[0],a[1],a[2]).applyMatrix4(o.matrixWorld));});
+  const lkey=lanterns.map(v=>v.toArray().map(n=>n.toFixed(1)).join(',')).join(';');
+  if(lkey!==lanternKey){lanternKey=lkey;for(const b of beacons)b.dispose();beacons.length=0;for(const v of lanterns){const b=new Lighthouse(v);beacons.push(b);root.add(b.group);}}
   scans++;const since=seconds-expansionSeen;nextScan=expansionSeen+(scans<SCAN_AT.length?SCAN_AT[scans]:since+RESCAN_EVERY);
  }
  function deactivate(){
@@ -277,6 +284,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    fauna.update(t,birds,butterflies,day,still?0:1);
    // the lighthouse sweeps from dusk to dawn, its beam stronger in mist and fog
    lighthouse.update(still?0:t,profile==='eden'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);lighthouse.group.visible=profile==='eden';
+   for(const b of beacons)b.update(still?0:t,profile==='world'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);
    // fog banks roll over the sea in fog and mist, and on still early mornings
    {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,profile==='world'?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
    // the sea: swell and surf (livelier in wind; still for reduced motion)
@@ -298,7 +306,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   },
   onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
   inspect(){return {profile,dust:desert?{profile:'mars-desert' as const,seed:DESERT_DUST_SEED,...dustSample}:null,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
-  dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
+  dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();for(const b of beacons)b.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.
  const review=typeof location!=='undefined'&&/[?&](weather|dust|atmos)\b/.test(location.search);

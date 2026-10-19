@@ -78,7 +78,7 @@ const _p = new THREE.Vector3();
 
 type ModelLike = {
   entities: Map<string, { id: string; def: string; state?: Record<string, unknown> }>;
-  resolvedDef(ref: string): { components?: { light?: AuthoredLight; lights?: AuthoredLight[] }; tags?: string[] } | undefined;
+  resolvedDef(ref: string): { components?: { light?: AuthoredLight; lights?: AuthoredLight[] }; tags?: string[]; size?: { box?: readonly number[] } } | undefined;
   worldPose(e: unknown): { x: number; y: number; z: number; yaw?: number; s?: number };
   readPass?<T>(fn: () => T): T;
   constants?: { extent?: number };
@@ -125,10 +125,12 @@ export class GodWorldLiving {
     // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
     this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
-    const sources: NightSource[] = [], marks: HaloSource[] = [];
+    const sources: NightSource[] = [], marks: HaloSource[] = [], beacons: [number, number, number][] = [];
     const scan = () => { for (const e of m.entities.values()) {
       if (e.state?.on === false) continue;
-      const components = m.resolvedDef(e.def)?.components, lights = defLights(components);
+      const def = m.resolvedDef(e.def), components = def?.components, lights = defLights(components);
+      // W2: any lighthouse sweeps its beams at night from its lantern room (near the top of its box)
+      if (def?.tags?.includes('lighthouse')) { const p = m.worldPose(e), h = (def.size?.box?.[1] ?? 16) * (p.s ?? 1); beacons.push([p.x, p.y + h * 0.83, p.z]); }
       if (!lights.length) continue;
       const p = m.worldPose(e), yaw = p.yaw ?? 0, scale = p.s ?? 1, cos = Math.cos(yaw), sin = Math.sin(yaw);
       const fire = /fire|hearth|brazier|campfire|torch/.test(e.def);
@@ -146,7 +148,7 @@ export class GodWorldLiving {
     } };
     if (m.readPass) m.readPass(scan); else scan();
     const bounds = worldNightBounds(m.constants?.extent, m.ground?.().extent);
-    const sig = JSON.stringify([sources, marks, bounds]);
+    const sig = JSON.stringify([sources, marks, bounds, beacons]);
     if (sig === this.signature) return;
     this.signature = sig; this.lights = sources.length;
     if (this.renderer && sources.some(s => s.pattern && s.pattern !== 'steady')) {
@@ -154,6 +156,7 @@ export class GodWorldLiving {
       this.patterns.render(this.renderer, worldSeconds(nowMs / 1000), reducedMotion);
     } else { this.patterns?.dispose(); this.patterns = null; paintOnlySources(sources, bounds); }
     this.group.userData.edenLightSources = marks;
+    this.group.userData.edenLighthouses = beacons;
   }
   /** For the atmosphere: the god's weather (null = scheduled) and "under a roof" for camera-local rain. */
   atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean } {

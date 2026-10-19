@@ -20,11 +20,14 @@ const GLARE_FRAG=/* glsl */`
 uniform vec4 uGlare;varying vec2 vUv;
 void main(){float r2=dot(vUv,vUv);if(r2>1.0)discard;float a=(exp(-r2*4.0)*.6+exp(-r2*40.0))*uGlare.x;gl_FragColor=vec4(vec3(1.0,.9,.72)*a,1.0);}`;
 export class Lighthouse{
+ /** W2: the lantern this beam pair sweeps from (old Eden's harbour by default; god worlds: each lighthouse's). */
+ readonly lantern:THREE.Vector3;
  readonly group=new THREE.Group();
  readonly beamUniforms={uBeam:{value:new THREE.Vector4()}};readonly glareUniforms={uGlare:{value:new THREE.Vector4(0,6,0,0)}};
  private readonly beams:THREE.Mesh;private readonly glare:THREE.Mesh;private yaw=0;private readonly cam=new THREE.Vector3();
- constructor(){
-  this.group.name='atmosphere: lighthouse beam';this.group.position.copy(LIGHTHOUSE_LANTERN);
+ constructor(lantern:THREE.Vector3=LIGHTHOUSE_LANTERN){
+  this.lantern=lantern.clone();
+  this.group.name='atmosphere: lighthouse beam';this.group.position.copy(this.lantern);
   // two opposed cones, apex at the lantern, 160 m long, 9 m wide at the far end; local -y along the beam
   const one=new THREE.ConeGeometry(4.5,160,20,1,true).translate(0,-80,0),two=one.clone().rotateZ(Math.PI);
   const g=new THREE.BufferGeometry();for(const name of ['position','normal'] as const){const a=one.getAttribute(name).array as Float32Array,b=two.getAttribute(name).array as Float32Array,o=new Float32Array(a.length+b.length);o.set(a);o.set(b,a.length);g.setAttribute(name,new THREE.BufferAttribute(o,3));}
@@ -35,7 +38,7 @@ export class Lighthouse{
   this.beams=new THREE.Mesh(g,mat(BEAM_VERT,BEAM_FRAG,this.beamUniforms));this.beams.name='lighthouse beams';
   this.glare=new THREE.Mesh(new THREE.PlaneGeometry(1,1),mat(GLARE_VERT,GLARE_FRAG,this.glareUniforms));this.glare.name='lighthouse lantern glare';
   for(const m of [this.beams,this.glare]){m.frustumCulled=false;m.renderOrder=1e6+2;m.userData.cameraTransparent=true;m.raycast=()=>{};this.group.add(m);}
-  const self=this;this.glare.onBeforeRender=function(_r,_s,camera){camera.getWorldPosition(self.cam).sub(LIGHTHOUSE_LANTERN);self.cam.y=0;
+  const self=this;this.glare.onBeforeRender=function(_r,_s,camera){camera.getWorldPosition(self.cam).sub(self.lantern);self.cam.y=0;
    const d=self.cam.lengthSq()>1e-6?self.cam.normalize():self.cam.set(1,0,0),beam=Math.abs(Math.cos(self.yaw)*d.x-Math.sin(self.yaw)*d.z);
    self.glareUniforms.uGlare.value.x=self.beamUniforms.uBeam.value.x*(.35+1.4*Math.pow(beam,24));};
   this.group.visible=false;
