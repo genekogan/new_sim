@@ -5831,7 +5831,7 @@
                     },
                     {
                       "room": "hall",
-                      "wall": "n",
+                      "wall": "w",
                       "kind": "door",
                       "at": 0.5,
                       "width": 1.5
@@ -88308,9 +88308,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-1",
           "p": [
-            8.5,
+            7.5,
             35.4,
-            -295.5
+            -294.3
           ],
           "params": {
             "canopy": "#c43a2a"
@@ -88321,9 +88321,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-2",
           "p": [
-            13.5,
+            11,
             35.4,
-            -295.5
+            -294.3
           ],
           "params": {
             "canopy": "#f4efe4"
@@ -88334,22 +88334,9 @@
           "def": "core/parasol-table@1",
           "name": "alpine-terrace-table-3",
           "p": [
-            8.5,
+            14.5,
             35.4,
-            -292.5
-          ],
-          "params": {
-            "canopy": "#c43a2a"
-          }
-        },
-        {
-          "op": "place",
-          "def": "core/parasol-table@1",
-          "name": "alpine-terrace-table-4",
-          "p": [
-            13.5,
-            35.4,
-            -292.5
+            -294.3
           ],
           "params": {
             "canopy": "#c43a2a"
@@ -88362,8 +88349,80 @@
           "p": [
             11,
             35.4,
-            -291.2
+            -291.6
           ]
+        },
+        {
+          "op": "place",
+          "def": "core/footpath@1",
+          "name": "land-alpine-station-path",
+          "shape": {
+            "path": [
+              [
+                -1,
+                -301
+              ],
+              [
+                -26,
+                -305
+              ],
+              [
+                -26,
+                -310.2
+              ],
+              [
+                1.2,
+                -310.8
+              ]
+            ]
+          },
+          "params": {
+            "width": 2.5,
+            "material": "gravel",
+            "maxGrade": 0.25,
+            "autoBridge": false,
+            "edging": false,
+            "grade": {
+              "sig": "1dz9lnf",
+              "h": [
+                35.46,
+                35.74,
+                36.11,
+                36.56,
+                37.06,
+                37.6,
+                38.17,
+                38.74,
+                39.31,
+                39.86,
+                40.36,
+                40.81,
+                41.19,
+                41.48,
+                42.28,
+                42.75,
+                43.52,
+                43.8,
+                44.17,
+                44.6,
+                45.09,
+                45.62,
+                46.19,
+                46.76,
+                46.56,
+                46,
+                45.46,
+                44.97,
+                44.54,
+                44.18,
+                43.9
+              ],
+              "spans": [],
+              "maxGrade": 0.25,
+              "cut": 4.01,
+              "fill": 0.6
+            }
+          }
         },
         {
           "op": "place",

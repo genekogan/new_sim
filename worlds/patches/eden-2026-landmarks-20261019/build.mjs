@@ -184,6 +184,11 @@ function stageFloorDef() {
 
 // ---------- the batch ----------
 const TERRACE_Y = 35.4; // the mountain restaurant's floor level
+const STATION_PATH = [[-1, -301], [-26, -305], [-26, -310.2], [1.2, -310.8]];
+// its grade, frozen here (team/scratch/t4/e2/grade-station.ts on the copy before the path): prepareRoad's profile but
+// with its ends on the two pads it joins (35.46 restaurant, 43.9 station). prepareRoad's one-sided 24 m average at the
+// ends left them 4.7 m above the restaurant pad and 3.2 m above the station's: a cliff at each end
+const STATION_GRADE = {"sig":"1dz9lnf","h":[35.46,35.74,36.11,36.56,37.06,37.6,38.17,38.74,39.31,39.86,40.36,40.81,41.19,41.48,42.28,42.75,43.52,43.8,44.17,44.6,45.09,45.62,46.19,46.76,46.56,46,45.46,44.97,44.54,44.18,43.9],"spans":[],"maxGrade":0.25,"cut":4.01,"fill":0.6};
 const place = (def, name, p, extra = {}) => ({ op: 'place', def, name, ...(p ? { p } : {}), ...extra });
 function landmarkOps() {
   const ops = [
@@ -195,9 +200,18 @@ function landmarkOps() {
     // had standing room; it stops short of the restaurant's footprint so the restaurant keeps its own level)
     place('core/terrace@1', 'land-alpine-restaurant-terrace', null, { shape: { area: [[5, -297.5], [17, -297.5], [17, -290.5], [5, -290.5]] }, params: { level: TERRACE_Y, edge: 1 } }),
     // tables and lights at the terrace's level (y given): settled in the same batch as the terrace, each table cut its own
-    // pad at the slope's height, a metre or two below the terrace
-    ...[[8.5, -295.5], [13.5, -295.5], [8.5, -292.5], [13.5, -292.5]].map(([x, z], i) => place('core/parasol-table@1', `alpine-terrace-table-${i + 1}`, [x, TERRACE_Y, z], { params: { canopy: i % 3 === 1 ? CREAM : '#c43a2a' } })),
-    place('core/string-lights@1', 'alpine-terrace-lights', [11, TERRACE_Y, -291.2]),
+    // pad at the slope's height, a metre or two below the terrace. One row of three, each footprint over a metre inside
+    // the terrace's edge (the edge blends 1 m inward): a later edit on this tile re-settles them on their lowest corner, and
+    // with two rows of two the corners on the blend sank them 2.4 m into pads of their own (seen on the copy when the
+    // station path went in). The terrace cannot grow north: the switchback runs along that edge
+    ...[[7.5, -294.3], [11, -294.3], [14.5, -294.3]].map(([x, z], i) => place('core/parasol-table@1', `alpine-terrace-table-${i + 1}`, [x, TERRACE_Y, z], { params: { canopy: i % 3 === 1 ? CREAM : '#c43a2a' } })),
+    place('core/string-lights@1', 'alpine-terrace-lights', [11, TERRACE_Y, -291.6]),
+    // the mountain station's own path: its pad is cut 8 m above the restaurant's (2 m apart, a cliff between), so it was an
+    // island. A graded gravel path like the switchback leaves the restaurant's west side, climbs west across the hillside,
+    // turns and comes back east in a cutting to the station's west apron, round the corner from its south door. Its legs
+    // keep 6-7 m from each other and from the switchback's last leg: graded paths blend 3 m past their edges and the later
+    // one (by id) dragged the other's uphill side into a step a resident could not climb
+    place('core/footpath@1', 'land-alpine-station-path', null, { shape: { path: STATION_PATH }, params: { width: 2.5, material: 'gravel', maxGrade: 0.25, autoBridge: false, edging: false, grade: STATION_GRADE } }),
     // fair: bunting avenues to the big top's two doors
     ...[[272, 75], [282, 75], [272, 29], [282, 29]].map(([x, z], i) => place('eden-bunting@1', `fair-bunting-${i + 1}`, [x, z], { r: 1.5708 })),
     // the big wheel in the 17 m core wheel's place (same name, so its ride re-routes rather than doubling), with a ticket
@@ -238,6 +252,13 @@ const SWITCHBACK = [[-20, -134], [-45, -177], [23, -201], [-31, -235], [26, -260
 const PARAMS = { 'land-alpine-switchback': { width: 3, maxGrade: 0.25 } };
 let reparamed = 0;
 for (const b of tpl.batches) for (const o of b.ops) if (o.op === 'place' && PARAMS[o.name] && (o.in?.parent ?? 'world') === 'world') { o.params = { ...o.params, ...PARAMS[o.name] }; o.shape = { path: SWITCHBACK }; reparamed++; }
+// the mountain station's north door opened onto the 8 m cut behind it and its south door onto the drop to the restaurant
+// (no footing outside either): the north door moves to the west wall, onto the apron where the station path arrives
+let redoored = 0;
+for (const b of tpl.batches) for (const o of b.ops) if (o.op === 'place' && o.name === 'region-alpine-mountain-station' && (o.in?.parent ?? 'world') === 'world') {
+  for (const x of o.params.plan.floors[0].exterior) if (x.kind === 'door' && (x.wall === 'n' || x.wall === 'w')) { x.wall = 'w'; redoored++; }
+}
+if (redoored !== 1) throw new Error(`template drifted: station doors ${redoored}`);
 if (redefined !== 1 || moved !== Object.keys(MOVES).length || reparamed !== Object.keys(PARAMS).length) throw new Error(`template drifted: redefined ${redefined}, moved ${moved}`);
 // the 17 m core wheel's own op goes (the big wheel above takes its name); absent when this script ran before
 for (const b of tpl.batches) b.ops = b.ops.filter((o) => !(o.op === 'place' && o.name === 'resort-ferris-wheel' && o.def === 'core/ferris-wheel@1'));

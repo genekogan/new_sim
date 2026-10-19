@@ -1,0 +1,940 @@
+{
+ "schema": "template-upgrade/1",
+ "id": "eden-2026-station-path-20261019",
+ "world": "eden-2026",
+ "from": "853e0409",
+ "to": "e2-station-path",
+ "counts": {
+  "define": 0,
+  "add": 1,
+  "remove": 1,
+  "change": 5
+ },
+ "items": [
+  {
+   "kind": "remove",
+   "path": "alpine-terrace-table-4",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-4",
+    "p": [
+     13.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   },
+   "new": null
+  },
+  {
+   "kind": "change",
+   "path": "region-alpine-mountain-station",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/hall@1",
+    "name": "region-alpine-mountain-station",
+    "p": [
+     6,
+     -312
+    ],
+    "params": {
+     "wall": "#6e4a30",
+     "trim": "#e9dfcc",
+     "roofColor": "#5a5f66",
+     "w": 8,
+     "d": 7,
+     "floors": 1,
+     "floorHeight": 4,
+     "roof": "flat",
+     "material": "wood",
+     "windows": 0.6,
+     "plan": {
+      "floors": [
+       {
+        "rooms": [
+         {
+          "id": "hall",
+          "name": "Hall",
+          "rect": [
+           0,
+           0,
+           8,
+           7
+          ]
+         }
+        ],
+        "exterior": [
+         {
+          "room": "hall",
+          "wall": "s",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         },
+         {
+          "room": "hall",
+          "wall": "n",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         }
+        ]
+       }
+      ],
+      "stairs": []
+     }
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/hall@1",
+    "name": "region-alpine-mountain-station",
+    "p": [
+     6,
+     -312
+    ],
+    "params": {
+     "wall": "#6e4a30",
+     "trim": "#e9dfcc",
+     "roofColor": "#5a5f66",
+     "w": 8,
+     "d": 7,
+     "floors": 1,
+     "floorHeight": 4,
+     "roof": "flat",
+     "material": "wood",
+     "windows": 0.6,
+     "plan": {
+      "floors": [
+       {
+        "rooms": [
+         {
+          "id": "hall",
+          "name": "Hall",
+          "rect": [
+           0,
+           0,
+           8,
+           7
+          ]
+         }
+        ],
+        "exterior": [
+         {
+          "room": "hall",
+          "wall": "s",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         },
+         {
+          "room": "hall",
+          "wall": "w",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         }
+        ]
+       }
+      ],
+      "stairs": []
+     }
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "alpine-terrace-table-1",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     8.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     7.5,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "alpine-terrace-table-2",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     13.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     11,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "alpine-terrace-table-3",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     8.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   },
+   "new": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     14.5,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  {
+   "kind": "change",
+   "path": "alpine-terrace-lights",
+   "parent": null,
+   "old": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.2
+    ]
+   },
+   "new": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.6
+    ]
+   }
+  },
+  {
+   "kind": "add",
+   "path": "land-alpine-station-path",
+   "parent": null,
+   "old": null,
+   "new": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-station-path",
+    "shape": {
+     "path": [
+      [
+       -1,
+       -301
+      ],
+      [
+       -26,
+       -305
+      ],
+      [
+       -26,
+       -310.2
+      ],
+      [
+       1.2,
+       -310.8
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.5,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false,
+     "grade": {
+      "sig": "1dz9lnf",
+      "h": [
+       35.46,
+       35.74,
+       36.11,
+       36.56,
+       37.06,
+       37.6,
+       38.17,
+       38.74,
+       39.31,
+       39.86,
+       40.36,
+       40.81,
+       41.19,
+       41.48,
+       42.28,
+       42.75,
+       43.52,
+       43.8,
+       44.17,
+       44.6,
+       45.09,
+       45.62,
+       46.19,
+       46.76,
+       46.56,
+       46,
+       45.46,
+       44.97,
+       44.54,
+       44.18,
+       43.9
+      ],
+      "spans": [],
+      "maxGrade": 0.25,
+      "cut": 4.01,
+      "fill": 0.6
+     }
+    }
+   }
+  }
+ ],
+ "oldUnits": {
+  "region-alpine-mountain-station": {
+   "region-alpine-mountain-station": {
+    "op": "place",
+    "def": "core/hall@1",
+    "name": "region-alpine-mountain-station",
+    "p": [
+     6,
+     -312
+    ],
+    "params": {
+     "wall": "#6e4a30",
+     "trim": "#e9dfcc",
+     "roofColor": "#5a5f66",
+     "w": 8,
+     "d": 7,
+     "floors": 1,
+     "floorHeight": 4,
+     "roof": "flat",
+     "material": "wood",
+     "windows": 0.6,
+     "plan": {
+      "floors": [
+       {
+        "rooms": [
+         {
+          "id": "hall",
+          "name": "Hall",
+          "rect": [
+           0,
+           0,
+           8,
+           7
+          ]
+         }
+        ],
+        "exterior": [
+         {
+          "room": "hall",
+          "wall": "s",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         },
+         {
+          "room": "hall",
+          "wall": "n",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         }
+        ]
+       }
+      ],
+      "stairs": []
+     }
+    }
+   },
+   "region-alpine-mountain-station/hall-table": {
+    "op": "place",
+    "def": "core/long-table@1",
+    "name": "hall-table",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     -1.963
+    ],
+    "r": 0
+   },
+   "region-alpine-mountain-station/hall-bench-0": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-0",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -1.833,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-1": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-1",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-2": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-2",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     1.833,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-3": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-3",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -1.833,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-4": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-4",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-5": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-5",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     1.833,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-lamp-1": {
+    "op": "place",
+    "def": "core/floor-lamp@1",
+    "name": "hall-lamp-1",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -3.52,
+     0,
+     -3.02
+    ],
+    "r": 0
+   },
+   "region-alpine-mountain-station/hall-lamp-2": {
+    "op": "place",
+    "def": "core/floor-lamp@1",
+    "name": "hall-lamp-2",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     3.52,
+     0,
+     3.02
+    ],
+    "r": 3.142
+   }
+  },
+  "alpine-terrace-table-1": {
+   "alpine-terrace-table-1": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     8.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-table-2": {
+   "alpine-terrace-table-2": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     13.5,
+     35.4,
+     -295.5
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   }
+  },
+  "alpine-terrace-table-3": {
+   "alpine-terrace-table-3": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     8.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-table-4": {
+   "alpine-terrace-table-4": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-4",
+    "p": [
+     13.5,
+     35.4,
+     -292.5
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-lights": {
+   "alpine-terrace-lights": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.2
+    ]
+   }
+  }
+ },
+ "newUnits": {
+  "region-alpine-mountain-station": {
+   "region-alpine-mountain-station": {
+    "op": "place",
+    "def": "core/hall@1",
+    "name": "region-alpine-mountain-station",
+    "p": [
+     6,
+     -312
+    ],
+    "params": {
+     "wall": "#6e4a30",
+     "trim": "#e9dfcc",
+     "roofColor": "#5a5f66",
+     "w": 8,
+     "d": 7,
+     "floors": 1,
+     "floorHeight": 4,
+     "roof": "flat",
+     "material": "wood",
+     "windows": 0.6,
+     "plan": {
+      "floors": [
+       {
+        "rooms": [
+         {
+          "id": "hall",
+          "name": "Hall",
+          "rect": [
+           0,
+           0,
+           8,
+           7
+          ]
+         }
+        ],
+        "exterior": [
+         {
+          "room": "hall",
+          "wall": "s",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         },
+         {
+          "room": "hall",
+          "wall": "w",
+          "kind": "door",
+          "at": 0.5,
+          "width": 1.5
+         }
+        ]
+       }
+      ],
+      "stairs": []
+     }
+    }
+   },
+   "region-alpine-mountain-station/hall-table": {
+    "op": "place",
+    "def": "core/long-table@1",
+    "name": "hall-table",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     -1.963
+    ],
+    "r": 0
+   },
+   "region-alpine-mountain-station/hall-bench-0": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-0",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -1.833,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-1": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-1",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-2": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-2",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     1.833,
+     0,
+     0
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-3": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-3",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -1.833,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-4": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-4",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     0,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-bench-5": {
+    "op": "place",
+    "def": "core/bench-seat@1",
+    "name": "hall-bench-5",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     1.833,
+     0,
+     1.234
+    ],
+    "r": 3.142
+   },
+   "region-alpine-mountain-station/hall-lamp-1": {
+    "op": "place",
+    "def": "core/floor-lamp@1",
+    "name": "hall-lamp-1",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     -3.52,
+     0,
+     -3.02
+    ],
+    "r": 0
+   },
+   "region-alpine-mountain-station/hall-lamp-2": {
+    "op": "place",
+    "def": "core/floor-lamp@1",
+    "name": "hall-lamp-2",
+    "in": {
+     "parent": "region-alpine-mountain-station",
+     "slot": "hall"
+    },
+    "p": [
+     3.52,
+     0,
+     3.02
+    ],
+    "r": 3.142
+   }
+  },
+  "alpine-terrace-table-1": {
+   "alpine-terrace-table-1": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-1",
+    "p": [
+     7.5,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-table-2": {
+   "alpine-terrace-table-2": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-2",
+    "p": [
+     11,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#f4efe4"
+    }
+   }
+  },
+  "alpine-terrace-table-3": {
+   "alpine-terrace-table-3": {
+    "op": "place",
+    "def": "core/parasol-table@1",
+    "name": "alpine-terrace-table-3",
+    "p": [
+     14.5,
+     35.4,
+     -294.3
+    ],
+    "params": {
+     "canopy": "#c43a2a"
+    }
+   }
+  },
+  "alpine-terrace-lights": {
+   "alpine-terrace-lights": {
+    "op": "place",
+    "def": "core/string-lights@1",
+    "name": "alpine-terrace-lights",
+    "p": [
+     11,
+     35.4,
+     -291.6
+    ]
+   }
+  },
+  "land-alpine-station-path": {
+   "land-alpine-station-path": {
+    "op": "place",
+    "def": "core/footpath@1",
+    "name": "land-alpine-station-path",
+    "shape": {
+     "path": [
+      [
+       -1,
+       -301
+      ],
+      [
+       -26,
+       -305
+      ],
+      [
+       -26,
+       -310.2
+      ],
+      [
+       1.2,
+       -310.8
+      ]
+     ]
+    },
+    "params": {
+     "width": 2.5,
+     "material": "gravel",
+     "maxGrade": 0.25,
+     "autoBridge": false,
+     "edging": false,
+     "grade": {
+      "sig": "1dz9lnf",
+      "h": [
+       35.46,
+       35.74,
+       36.11,
+       36.56,
+       37.06,
+       37.6,
+       38.17,
+       38.74,
+       39.31,
+       39.86,
+       40.36,
+       40.81,
+       41.19,
+       41.48,
+       42.28,
+       42.75,
+       43.52,
+       43.8,
+       44.17,
+       44.6,
+       45.09,
+       45.62,
+       46.19,
+       46.76,
+       46.56,
+       46,
+       45.46,
+       44.97,
+       44.54,
+       44.18,
+       43.9
+      ],
+      "spans": [],
+      "maxGrade": 0.25,
+      "cut": 4.01,
+      "fill": 0.6
+     }
+    }
+   }
+  }
+ }
+}

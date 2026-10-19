@@ -464,10 +464,11 @@ export class EngineBridge {
     const label = (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
     const spec: FixtureSpecV1 = { def: asset, kind: a.category === 'item' ? 'item' : 'fixture', label, p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw) };
     if (spec.kind !== 'item') {
-      // E2 (2026-10-19): a root fixture standing on raised ground (a hillside, an alpine terrace) is logged as on the
-      // ground, so its seats are on level 0 there (the engine otherwise takes the floor level nearest its height). Only
-      // those: fixtures on the y-0 plain keep their logged spec byte for byte.
-      if (e.in.parent === 'world' && Math.abs(wp.y) > GROUND_BAND && Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) <= GROUND_BAND) return { ...spec, support: { kind: 'ground' } };
+      // E2 (2026-10-19): a fixture standing on raised ground (a hillside, an alpine terrace, or the ground floor of a
+      // building on its pad up there) is logged as on the ground, so its seats are on level 0 there (the engine otherwise
+      // takes the floor level nearest its height: the alpine station's benches got an upper floor elsewhere and no
+      // resident could reach them). Only those: fixtures on the y-0 plain, and upper floors, keep their spec byte for byte.
+      if (Math.abs(wp.y) > GROUND_BAND && Math.abs(wp.y - this.model.terrain.sample(wp.x, wp.z)) <= GROUND_BAND) return { ...spec, support: { kind: 'ground' } };
       return spec;
     }
     const parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;

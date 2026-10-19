@@ -436,3 +436,21 @@ test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; 
   assert.equal(w.god.model.worldPose(w.god.model.entities.get(house)!).x, 28);
   assert.deepEqual(E.runtime.violations, []);
 });
+
+test('E2: furniture on the ground floor of a house on raised ground is logged on the ground (level-0 seats); upstairs is not', { timeout: 300000 }, async t => {
+  // Eden 2026's alpine station stands on its pad 43.9 m up: its benches took the floor level nearest their height (an upper
+  // floor elsewhere) and no resident could reach them. Upstairs furniture keeps its floor.
+  const w = await world(); w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const terrace: any = w.god.act({ ops: [{ op: 'place', def: coreRef('terrace'), name: 'shelf', shape: { area: [[0, -9], [20, -9], [20, 9], [0, 9]] }, params: { level: 3, edge: 1 } }] });
+  assert.equal(terrace.accepted, true, JSON.stringify(terrace));
+  const batch = HOUSE_BATCH(); batch.ops.push({ op: 'place', def: coreRef('chair'), name: 'hall-chair', in: { parent: '$h', slot: 'ground' }, p: [-2, 0, 1] } as any);
+  const r: any = w.god.act(batch, 'house on the shelf');
+  assert.equal(r.accepted, true, JSON.stringify(r));
+  await w.settle(3);
+  const E = w.host.engine as any, id = (p: string) => w.god.model.get(p)!.id;
+  assert.ok(Math.abs(w.god.model.worldPose(w.god.model.get('house')!).y - 3) < 0.2, 'the house stands on the shelf');
+  assert.equal(E.world.entities[id('house/hall-chair')]?.support?.kind, 'ground', 'ground-floor chair: on the ground');
+  assert.notEqual(E.world.entities[id('house/chair')]?.support?.kind, 'ground', 'upstairs chair: on its floor');
+});
