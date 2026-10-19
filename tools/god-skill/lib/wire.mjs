@@ -29,10 +29,10 @@ export async function startWire(world, { file = WIRE } = {}) {
   const h2 = () => {
     if (session && !session.closed && !session.destroyed) return session;
     const s = http2.connect(origin);
-    let up = false;
-    s.on('connect', () => { up = true; if (s.alpnProtocol && s.alpnProtocol !== 'h2') { mode = 'h1'; s.close(); } });
+    let up = false, born = 0;
+    s.on('connect', () => { up = true; born = Date.now(); if (s.alpnProtocol && s.alpnProtocol !== 'h2') { mode = 'h1'; s.close(); } });
     s.on('error', () => { if (!up) mode = 'h1'; }); // a world that cannot speak HTTP/2: keep-alive HTTP/1.1 from now on
-    s.on('close', () => { if (session === s) session = null; if (up && !closed && mode === 'h2') setTimeout(() => { if (!closed && !session) { try { h2(); } catch { /* lazily next time */ } } }, 1000).unref(); });
+    s.on('close', () => { if (session === s) session = null; if (up && !closed && mode === 'h2' && Date.now() - born > 30_000) setTimeout(() => { if (!closed && !session) { try { h2(); } catch { /* lazily next time */ } } }, 1000).unref(); });
     s.unref();
     session = s;
     return s;
@@ -58,8 +58,12 @@ export async function startWire(world, { file = WIRE } = {}) {
         res.on('close', () => { if (!res.writableFinished) stream.close(http2.constants.NGHTTP2_CANCEL); });
         req.pipe(stream);
       };
-      if (s.connecting) { s.once('connect', () => (mode === 'h2' ? go() : relayH1())); s.once('error', () => relayH1()); }
-      else go();
+      if (s.connecting) { // whichever comes first decides, once: a later session error must never resend this request
+        let decided = false;
+        const decide = (fn) => () => { if (decided) return; decided = true; s.off('connect', onConnect); s.off('error', onError); fn(); };
+        const onConnect = decide(() => (mode === 'h2' ? go() : relayH1())), onError = decide(() => relayH1());
+        s.once('connect', onConnect); s.once('error', onError);
+      } else go();
       return;
     }
     relayH1();

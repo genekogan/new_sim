@@ -279,9 +279,10 @@ async function startWire(world, { file = WIRE } = {}) {
   const h2 = () => {
     if (session && !session.closed && !session.destroyed) return session;
     const s = http2.connect(origin);
-    let up = false;
+    let up = false, born = 0;
     s.on("connect", () => {
       up = true;
+      born = Date.now();
       if (s.alpnProtocol && s.alpnProtocol !== "h2") {
         mode = "h1";
         s.close();
@@ -292,7 +293,7 @@ async function startWire(world, { file = WIRE } = {}) {
     });
     s.on("close", () => {
       if (session === s) session = null;
-      if (up && !closed && mode === "h2") setTimeout(() => {
+      if (up && !closed && mode === "h2" && Date.now() - born > 3e4) setTimeout(() => {
         if (!closed && !session) {
           try {
             h2();
@@ -352,8 +353,17 @@ async function startWire(world, { file = WIRE } = {}) {
         req.pipe(stream2);
       };
       if (s.connecting) {
-        s.once("connect", () => mode === "h2" ? go() : relayH1());
-        s.once("error", () => relayH1());
+        let decided = false;
+        const decide2 = (fn) => () => {
+          if (decided) return;
+          decided = true;
+          s.off("connect", onConnect);
+          s.off("error", onError);
+          fn();
+        };
+        const onConnect = decide2(() => mode === "h2" ? go() : relayH1()), onError = decide2(() => relayH1());
+        s.once("connect", onConnect);
+        s.once("error", onError);
       } else go();
       return;
     }
