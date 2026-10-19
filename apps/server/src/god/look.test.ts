@@ -180,6 +180,40 @@ test('server page scripts require readiness/count/easing and preserve local span
   drift = false; await assert.rejects(vm.runInContext(captureExpression(lookSchema.parse({ eye: [0, 0, 0.05], at: [0, 0, 0] })), context), /near clipping/);
 });
 
+test('lookrace: the page pins the camera through the viewer, captures the pinned (ground-lifted, > 320 m) eye and never refuses while the viewer holds it', async () => {
+  class Vector {
+    values: number[] = [0, 0, 0];
+    set(...values: number[]) { this.values = values; }
+    toArray() { return [...this.values]; }
+  }
+  const camera = { fov: 45, aspect: 1.6, near: 0.1, far: 2400, position: new Vector(), lookAt() {}, updateProjectionMatrix() {} }, target = new Vector();
+  // The live viewer's interactive camera rules (orbit max distance 320 m, never underground) as the render loop applies them
+  // every frame; the pin (shotCamera) lifts once and is then re-applied after them, as LiveWorld does in ?shot=1 pages.
+  const ground = 50; let pin: { eye: number[]; at: number[]; lifted: number } | null = null, calls = 0;
+  const shotCamera = (eye: number[], at: number[]) => { calls++; const lifted = Math.max(0, ground + 1.2 - eye[1]); pin = { eye: [eye[0], eye[1] + lifted, eye[2]], at: [...at], lifted }; camera.position.set(...pin.eye); target.set(...pin.at); return pin; };
+  const viewerFrame = () => {
+    const p = camera.position.toArray(), t = target.toArray(), d = Math.hypot(...p.map((v, i) => v - t[i]));
+    if (d > 320) camera.position.set(...p.map((v, i) => t[i] + (v - t[i]) * 320 / d));            // OrbitControls.maxDistance
+    const q = camera.position.toArray(); if (q[1] < ground + 1.2) camera.position.set(q[0], ground + 1.2, q[2]); // camera ground clamp
+    if (pin) { camera.position.set(...pin.eye); target.set(...pin.at); }                              // lookrace pin
+  };
+  const canvas = { width: 1024, height: 640, style: {}, children: [], parentElement: null, toDataURL: () => 'data:image/png;base64,' + png.toString('base64') };
+  const context = vm.createContext({ window: { __shotReady: true, __simEntity: { camera, controls: { target, update: viewerFrame }, shotCamera, layer: { active: true }, scene: { fog: null, traverse() {} } } },
+    document: { title: 'ready', querySelector: () => canvas, querySelectorAll: () => [canvas] }, performance: { now: () => 0 },
+    requestAnimationFrame: (fn: () => void) => { viewerFrame(); fn(); }, setTimeout: (fn: () => void) => { for (let i = 0; i < 48; i++) viewerFrame(); fn(); },
+  });
+  for (const look of [{ eye: [0, 168.2, 457.2], at: [0, 0.4, 150] }, { eye: [167.8, 20, 150], at: [80, 67.6, 150] }, { eye: [-75.8, 80, 40], at: [-60, 60, 40] }, { eye: [204.5, 158.3, 334.5], at: [0, 0.3, 130] }]) {
+    assert.match(await vm.runInContext(captureExpression(lookSchema.parse(look)), context), /^data:image\/png/, `no refusal for ${JSON.stringify(look)}`);
+    assert.deepEqual(camera.position.toArray(), pin!.eye, 'the captured camera is the pinned one');
+    if (look.eye[1] > ground + 1.2) assert.deepEqual(pin!.eye, look.eye, 'an eye above the ground is captured exactly as requested, even beyond 320 m');
+    else assert.ok(pin!.lifted > 0 && camera.position.toArray()[1] === ground + 1.2, 'an underground eye is lifted once, then held');
+  }
+  assert.equal(calls, 4);
+  // Without the pin (an older viewer) the same 457 m request is still caught and refused, never captured from the wrong camera.
+  delete (context.window as { __simEntity: { shotCamera?: unknown } }).__simEntity.shotCamera; pin = null;
+  await assert.rejects(vm.runInContext(captureExpression(lookSchema.parse({ eye: [0, 168.2, 457.2], at: [0, 0.4, 150] })), context), /camera changed/);
+});
+
 test('renderer drives the full CDP pipe lifecycle and disposes its owned process/profile with a stub host', async t => {
   const dir = mkdtempSync(join(tmpdir(), 'w2-cdp-host-')), executable = join(dir, 'chrome'), transcript = join(dir, 'requests.jsonl');
   const previous = process.env.GOD_LOOK_CHROME;

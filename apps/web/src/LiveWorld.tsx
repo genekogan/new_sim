@@ -87,7 +87,7 @@ import {paintSpeakingDot} from './dialogue-speaking.ts';
 import {WorldGames} from './WorldGames.ts';
 import {parsePlatformFloors,platformFloorOffset,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {WorldPlatforms} from './WorldPlatforms.ts';
-import {cameraGround,cameraGroundSampler} from './WorldCameraGround.ts';
+import {cameraGround,cameraGroundSampler,clearShotEye} from './WorldCameraGround.ts';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
 import {WorldFollowMotion} from './WorldFollowMotion.ts';
 import { WorldBroadcast, type WorldCameraMode, type CarrierPose } from './WorldBroadcast.ts';
@@ -149,6 +149,9 @@ function cardsAt(plays: readonly PlayView[], tick: number): Map<string, PlayView
 }
 const cardText = (p: PlayView | undefined) => (p ? `“${p.card}”${p.targetName ? ` → ${p.targetName}` : ''}` : '');
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+/** lookrace: the camera a `god look` pinned on this ?shot=1 page (eye already lifted clear of the ground). */
+type ShotPin = { eye: number[]; at: number[]; lifted: number; closer: number; raised: number };
+const shotPin = (): ShotPin | null => { const p = (window as unknown as { __shotCamera?: ShotPin }).__shotCamera; return p && p.eye?.length === 3 && p.at?.length === 3 && [...p.eye, ...p.at].every(Number.isFinite) ? p : null; };
 
 export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
@@ -309,7 +312,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const godLightning=newWorld?new WorldLightning(entityLayer):null;if(godLightning)scene.add(godLightning.group);  // GOD-ENV: bolts, flash, thunder (new worlds only)
     // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
     // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
-    const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),eye=q.get('eye')?.split(',').map(Number),at=q.get('at')?.split(',').map(Number);
+    const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),pin=shotMode?shotPin():null,eye=pin?.eye??q.get('eye')?.split(',').map(Number),at=pin?.at??q.get('at')?.split(',').map(Number);  // lookrace: a re-mounted shot page keeps the look's pinned camera
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}}  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
@@ -345,7 +348,18 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
       const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
     };
-    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,applyEdge:(msg:Parameters<WorldEntityLayer['applyEdge']>[0][number]|Parameters<WorldEntityLayer['applyEdge']>[0])=>entityLayer.applyEdge(Array.isArray(msg)?msg:[msg]),siteStyle:(style:string)=>entityLayer.sites.siteStyle(style),siteStats:()=>entityLayer.sites.inspect(),camera,get controls(){return controls;},residents:()=>{const out:{id:string;p:readonly[number,number,number];speaking?:boolean}[]=[],now=Date.now();for(const s of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[s.entityId];if(e)out.push({id:s.id,p:e.p as readonly[number,number,number],speaking:speeches.some(sp=>sp.speaker===s.id&&now-sp.at<Math.min(9000,1500+sp.text.length*55))});}return out;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
+    // lookrace: `god look` pins its camera here once (?shot=1 pages only), then the render loop holds it exactly, so nothing
+    // (orbit distance limits, the ground clamp, a camera mode, a re-mount) moves it between the request and the capture.
+    // An eye under the ground moves toward its target, or rises on its side, until the view clears the terrain
+    // (clearShotEye; else the live view's clamp lifts it); `closer`/`raised`/`lifted` say how. Returns the camera used.
+    const shotCamera=(eye:readonly number[],at:readonly number[])=>{
+      if(!shotMode)throw Error('shotCamera: only on a ?shot=1 page');
+      refreshCameraGround();const ground=(x:number,z:number)=>cameraGround.heightAt(scene,x,z),fixed=clearShotEye(eye,at,ground),start=fixed?.eye??eye;
+      controls.target.set(at[0],at[1],at[2]);camera.position.set(start[0],start[1],start[2]);camera.up.set(0,1,0);camera.lookAt(controls.target);
+      let lifted=0;for(let i=0;i<4;i++){const l=cameraGround.apply(camera,scene);if(!(l>0))break;lifted+=l;camera.lookAt(controls.target);}
+      const round=(v:number)=>Math.round(v*100)/100;
+      const pin:ShotPin={eye:camera.position.toArray(),at:controls.target.toArray(),lifted:round(lifted),closer:round(fixed?.closer??0),raised:fixed?.raised??0};(window as unknown as {__shotCamera?:ShotPin}).__shotCamera=pin;return pin;};
+    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,shotCamera,applyEdge:(msg:Parameters<WorldEntityLayer['applyEdge']>[0][number]|Parameters<WorldEntityLayer['applyEdge']>[0])=>entityLayer.applyEdge(Array.isArray(msg)?msg:[msg]),siteStyle:(style:string)=>entityLayer.sites.siteStyle(style),siteStats:()=>entityLayer.sites.inspect(),camera,get controls(){return controls;},residents:()=>{const out:{id:string;p:readonly[number,number,number];speaking?:boolean}[]=[],now=Date.now();for(const s of context.current.sim.conn.replica.souls.values()){const e=shown.current.entities[s.entityId];if(e)out.push({id:s.id,p:e.p as readonly[number,number,number],speaking:speeches.some(sp=>sp.speaker===s.id&&now-sp.at<Math.min(9000,1500+sp.text.length*55))});}return out;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -855,6 +869,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(cameraGround.apply(camera,scene)>0&&!(viewing==='manual'&&context.current.manualNavigation==='free'))camera.lookAt(controls.target);  // never underground (Gene)
       if(context.current.cameraMode==='manual'&&expansion?.group.visible)constrainOfficeGuardCamera(camera,controls.target,officeGuardFrom,expansion.officeGuards);
       authoredBoundaries.bind(publication);if(context.current.cameraMode==='manual')authoredBoundaries.constrain(camera,controls.target,officeGuardFrom,at.tick);
+      if(shotMode){const pin=shotPin();if(pin){controls.target.fromArray(pin.at);camera.position.fromArray(pin.eye);camera.up.set(0,1,0);camera.lookAt(controls.target);}}  // lookrace: a look's camera is held exactly until the capture
       composeVisibleViewport(camera, host.clientWidth, host.clientHeight, entityLayer.active ? undefined : context.current.viewportInsets, logicalFov);  // new worlds: a centred projection (no inset view offset: it skews the view and moves the pivot off the screen centre)
       if(fadeOverride.size&&!past.current){const states=new Map<string,FadingState>(),now=performance.now();
         for(const soul of s.conn.replica.souls.values()){const v=fadeOverride.get(soul.name.toLowerCase());if(!v)continue;if(!fadeSince.has(soul.id))fadeSince.set(soul.id,now);

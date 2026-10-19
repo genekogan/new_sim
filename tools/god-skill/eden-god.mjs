@@ -2342,10 +2342,19 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
         const eyeDistance = Math.hypot(...e.map((c, i2) => c - a[i2]));
         if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error("Requested look camera is within the viewer near clipping plane");
         window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
-        w.controls.target.set(a[0], a[1], a[2]);
-        w.camera.position.set(e[0], e[1], e[2]);
-        w.camera.lookAt(w.controls.target);
-        w.controls.update?.();
+        let lifted = 0, closer = 0, raised = 0;
+        if (typeof w.shotCamera === "function") {
+          const pin = w.shotCamera(e, a);
+          e = pin.eye;
+          lifted = pin.lifted;
+          closer = pin.closer ?? 0;
+          raised = pin.raised ?? 0;
+        } else {
+          w.controls.target.set(a[0], a[1], a[2]);
+          w.camera.position.set(e[0], e[1], e[2]);
+          w.camera.lookAt(w.controls.target);
+          w.controls.update?.();
+        }
         const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
         if (w.camera.far < dist * 3) {
           w.camera.far = dist * 3;
@@ -2376,7 +2385,7 @@ async function shootLocal({ worldUrl, eye, at, out, hour, weather: weather2, hid
         let n = 0;
         const t = performance.now();
         const tick = () => {
-          if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a });
+          if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a, ...lifted > 0 ? { lifted } : {}, ...closer > 0 ? { closer } : {}, ...raised > 0 ? { raised } : {} });
           else requestAnimationFrame(tick);
         };
         requestAnimationFrame(tick);
@@ -4448,7 +4457,7 @@ async function lookInner(flags2 = {}, runtime = {}, signal) {
   }
   if (flags2.json) return { ...shot, eye: cam.eye, at: cam.at };
   return `look: ${shot.file}
-  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.size ? `, ${shot.size} px` : ""}${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
+  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(", ")}) toward (${cam.at.join(", ")})${shot.frames?.closer || shot.frames?.raised || shot.frames?.lifted ? ` (the requested eye was under the ground: ${[shot.frames.closer ? `moved ${shot.frames.closer} m closer along the view` : "", shot.frames.raised ? `raised ${shot.frames.raised}\xB0 on its side` : "", shot.frames.lifted ? `lifted ${shot.frames.lifted} m` : ""].filter(Boolean).join(", ")} to see the target)` : ""}, ${Math.round(shot.ms / 100) / 10} s${shot.size ? `, ${shot.size} px` : ""}${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
   Read the image file; then fix what looks wrong.`;
 }
 async function exportWorld(file, flags2 = {}) {

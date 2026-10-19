@@ -24,7 +24,11 @@ const frame = `([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
     if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error('Requested look camera is within the viewer near clipping plane');
     // L2's interior view: roofs (and the storeys above \`cut\`) off for every building
     window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
-    w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
+    // lookrace: the viewer pins the camera (an eye under the ground moves toward the target or rises on its side until the view clears, then it is held exactly until the capture); an older
+    // viewer without the pin gets the old direct set
+    let lifted = 0, closer = 0, raised = 0;
+    if (typeof w.shotCamera === 'function') { const pin = w.shotCamera(e, a); e = pin.eye; lifted = pin.lifted; closer = pin.closer ?? 0; raised = pin.raised ?? 0; }
+    else { w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.(); }
     // a world-scale look (the camera a kilometre out) must not be cut by the play camera's far plane or fog
     const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
     if (w.camera.far < dist * 3) { w.camera.far = dist * 3; w.camera.updateProjectionMatrix?.(); }
@@ -35,7 +39,7 @@ const frame = `([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
     window.__lookRestore = () => { for (const o of hidden) o.visible = true; };
     const canvas = document.querySelector('canvas');
     if (canvas) { const keep = new Set(); for (let n = canvas; n; n = n.parentElement) keep.add(n); for (const n of keep) for (const c of n.children ?? []) if (!keep.has(c)) c.style.visibility = 'hidden'; }
-    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a, ...(lifted > 0 ? { lifted } : {}), ...(closer > 0 ? { closer } : {}), ...(raised > 0 ? { raised } : {}) }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
   })`;
 
 const canvas = `({ eye, at }) => {

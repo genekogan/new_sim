@@ -95,3 +95,27 @@ export function cameraGroundSampler(info?:Pick<SceneInfo,'scene'|'shore'>,drawnG
   return y;
  };
 }
+
+/** lookrace: where a picture's eye goes when the requested one is under the ground (terrain only). An eye that clears
+ * the ground is kept as asked. A buried eye first keeps its view line and moves toward the target, to the farthest
+ * point that clears the ground by `margin` and whose line to the target clears it by `lineMargin` (the last `targetSlack` metres before the target, which
+ * usually sits on the ground, are not tested), as long as at least `keep` of the distance remains; otherwise it keeps
+ * its compass side and distance and rises (2° steps) until the whole line clears. Null: neither works (buried target). */
+export type ShotEye={eye:number[];closer:number;raised:number};
+export function clearShotEye(eye:readonly number[],at:readonly number[],heightAt:(x:number,z:number)=>number|null,margin=CAMERA_GROUND_MARGIN,targetSlack=3,keep=.35,lineMargin=.3):ShotEye|null{
+ const point=(e:readonly number[],t:number)=>[e[0]+(at[0]-e[0])*t,e[1]+(at[1]-e[1])*t,e[2]+(at[2]-e[2])*t];
+ const clear=(p:readonly number[],m=margin)=>{const g=heightAt(p[0],p[2]);return g===null||p[1]>=g+m;};
+ if(clear(eye))return {eye:[...eye],closer:0,raised:0};
+ const len=Math.hypot(at[0]-eye[0],at[1]-eye[1],at[2]-eye[2]);if(!(len>targetSlack))return null;
+ const end=1-targetSlack/len,steps=Math.max(8,Math.min(512,Math.ceil(len)));
+ const lineClear=(e:readonly number[])=>{for(let i=1;i<=steps;i++)if(!clear(point(e,end*i/steps),lineMargin))return false;return true;};
+ // walk back from the target: the first buried sample bounds the clear stretch next to the target
+ let t=end;for(let i=steps;i>=0;i--){const s=end*i/steps;if(!clear(point(eye,s),lineMargin))break;t=s;}
+ // the eye itself needs the camera margin: step on toward the target until it has it
+ for(let i=Math.round(t/end*steps);i<steps&&!clear(point(eye,t));i++)t=end*(i+1)/steps;
+ if(t<end&&clear(point(eye,t))&&1-t>=keep)return {eye:point(eye,t),closer:t*len,raised:0};
+ const h=Math.hypot(eye[0]-at[0],eye[2]-at[2]),el0=Math.atan2(eye[1]-at[1],h),ux=h>1e-9?(eye[0]-at[0])/h:0,uz=h>1e-9?(eye[2]-at[2])/h:1;
+ for(let deg=2;el0+deg*Math.PI/180<Math.PI*89/180;deg+=2){const el=el0+deg*Math.PI/180,e=[at[0]+ux*Math.cos(el)*len,at[1]+Math.sin(el)*len,at[2]+uz*Math.cos(el)*len];
+  if(clear(e)&&lineClear(e))return {eye:e,closer:0,raised:deg};}
+ return null;
+}

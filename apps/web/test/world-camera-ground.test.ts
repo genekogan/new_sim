@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import * as THREE from 'three';
-import {CameraGroundClamp,CAMERA_GROUND_MARGIN,cameraGroundSampler} from '../src/WorldCameraGround.ts';
+import {CameraGroundClamp,CAMERA_GROUND_MARGIN,cameraGroundSampler,clearShotEye} from '../src/WorldCameraGround.ts';
 import type {SceneInfo} from '../src/WorldGeometry.ts';
 import {groundTriangleSampler} from '../../../mars/viewer/lib/ground-triangles.ts';
 import {Builder,Materials} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';
@@ -78,4 +78,34 @@ test('qualified null support and publication/scene refresh never reuse old heigh
   g.bindGround(()=>null,b);assert.equal(g.heightAt(scene,100,0,30),null);assert.equal(g.apply(cam(100,-10,0),scene,30),0,'qualified missing support never falls back to a roof or invented Y0');
   g.bindGround(undefined);const replacement=new THREE.Scene();replacement.add(plane(400,400,2));replacement.updateMatrixWorld(true);
   assert.equal(g.heightAt(replacement,100,0,40),2,'provider release clears legacy scene cache too');
+});
+
+// lookrace: a `god look` eye under the terrain moves toward its target (or rises on its side) until the view clears.
+const hill = (x: number, z: number) => Math.max(0, 60 - Math.hypot(x - 100, z) * 0.6); // a 60 m cone at (100, 0)
+const flat = () => 0;
+const slope = (x: number) => Math.max(0, -x * 1.5);                                 // ground rising steeply to the west
+const sameLine = (eye: number[], at: number[], p: number[]) => { const d = at.map((c, i) => c - eye[i]), t = (p[0] - eye[0]) / d[0]; return d.every((c, i) => Math.abs(eye[i] + c * t - p[i]) < 1e-9); };
+const clearLine = (e: number[], at: number[], g: (x: number, z: number) => number) => { for (let t = 0; t <= 1; t += 0.005) { const p = e.map((v, i) => v + (at[i] - v) * t); if (Math.hypot(...p.map((v, i) => v - at[i])) > 3 && p[1] < g(p[0], p[2]) + (t === 0 ? CAMERA_GROUND_MARGIN : 0.3) - 1e-6) return false; } return true; };
+
+test('an eye above the ground is kept exactly as asked (also beyond 320 m, also when terrain is in the way)', () => {
+  assert.deepEqual(clearShotEye([0, 168.2, 457.2], [0, 0.4, 150], flat), { eye: [0, 168.2, 457.2], closer: 0, raised: 0 });
+  assert.deepEqual(clearShotEye([-10, 5, 0], [0, 1, 0], hill), { eye: [-10, 5, 0], closer: 0, raised: 0 });
+});
+
+test('a buried eye keeps its view line and moves to the farthest point with a clear line to the target', () => {
+  const eye = [140, 20, 0], at = [-200, 1, 0], got = clearShotEye(eye, at, hill)!;
+  assert.ok(got && got.closer > 1 && got.raised === 0);
+  assert.ok(sameLine(eye, at, got.eye), 'same view direction'); assert.ok(clearLine(got.eye, at, hill), 'the target is in clear view');
+  assert.ok(Math.abs(Math.hypot(...got.eye.map((v, i) => v - eye[i])) - got.closer) < 1e-9);
+});
+
+test('a buried eye whose clear stretch would leave it right at the target rises on its side instead, at the same distance', () => {
+  const eye = [-40, 20, 0], at = [0, 0.5, 0], got = clearShotEye(eye, at, slope)!;   // the slope is steeper than the view line
+  assert.ok(got && got.raised > 0 && got.closer === 0);
+  assert.ok(Math.abs(Math.hypot(...got.eye.map((v, i) => v - at[i])) - Math.hypot(...eye.map((v, i) => v - at[i]))) < 1e-9, 'same distance');
+  assert.ok(got.eye[0] < 0 && Math.abs(got.eye[2]) < 1e-9, 'same compass side'); assert.ok(clearLine(got.eye, at, slope));
+});
+
+test('a buried target gives null (the caller falls back to lifting the eye)', () => {
+  assert.equal(clearShotEye([140, 20, 0], [100, 10, 0], hill), null);
 });
