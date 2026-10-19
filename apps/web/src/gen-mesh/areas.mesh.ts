@@ -89,9 +89,10 @@ registerMesh({
       return c;
     });
     const mesh = soupMesh(soup, `lawn ${ctx.entity.name ?? ctx.entity.id}`, { shadow: false });
-    // On Eden's meadow, turf lawns take the same realism ground shader as the terrain around them. W2b: a grass lawn is
-    // mown like old Eden's commons (the shader's 3.2 m light/dark bands); one with authored stripes keeps its own.
-    if (mesh && groundRealismFor(pal) && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf(mat === 'grass' && !stripes ? (fr.hl >= fr.hw ? fr.v : fr.u) : undefined);
+    // On Eden's meadow, unstriped turf lawns take the same realism ground shader as the terrain around them. W2b: a grass
+    // lawn is mown like old Eden's commons (the shader's 3.2 m bands along its long side). Authored stripes keep their own
+    // crisp vertex bands (the turf's blade texture would mute them).
+    if (mesh && groundRealismFor(pal) && !stripes && (mat === 'grass' || mat === 'moss')) mesh.material = meadowTurf(mat === 'grass' ? (fr.hl >= fr.hw ? fr.v : fr.u) : undefined);
     return mesh;
   },
 });
