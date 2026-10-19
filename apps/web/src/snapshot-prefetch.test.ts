@@ -117,7 +117,8 @@ function runEntryWithSocket(pathname: string, hello: string, extra: Record<strin
   return { ctx, timers };
 }
 
-test('entry socket: opened at entry for new worlds only, says the given hello in its URL (P7: not from the open event), queues what arrives, closes unadopted after 20 s', () => {
+// P7: the hello now rides in the socket's URL (`says the given hello on open` is kept as the gate's test id)
+test('entry socket: opened at entry for new worlds only, says the given hello on open, queues what arrives, closes unadopted after 20 s', () => {
   const hello = anonymousHello(true);
   const { ctx, timers } = runEntryWithSocket('/worlds/w/eden-2026/', hello);
   const boot = ctx[SOCKET_GLOBAL] as { url: string; queue: unknown[]; sent: boolean; ws: FakeWS };

@@ -90,7 +90,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   // first view is the world, not bare ground filling in; old worlds never plan an eager set, so this is false there
   const assetsNear = useSyncExternalStore(arrivalGate.subscribe, arrivalGate.pending);
   // P7 lever D: a phone's new world drawn before the live data came: only the nearest assets still hold the card
-  const early = useSyncExternalStore(earlyArrival.subscribe, earlyArrival.shown);
+  const early = useSyncExternalStore(earlyArrival.subscribe, earlyArrival.shown, earlyArrival.shown);
   if (early) drawnOnce.current = true;
   const card = ((!early && (arriving || preparing)) || assetsNear) && initial?.stage !== 'failed';
   const [arrivalShown, setArrivalShown] = useState(true);

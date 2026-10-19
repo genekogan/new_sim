@@ -13,5 +13,5 @@ test('the entity world framing switches the live camera mode to manual synchrono
   assert.match(body, /camera\.position\.set\(eye\[0\],eye\[1\],eye\[2\]\)/, 'eye/at set the camera');
   assert.match(body, /context\.current\.cameraMode='manual';context\.current\.setCameraMode\('manual'\)/, 'mode switched before the next frame');
   // the broadcast branch of the render loop reads the live mode, so the switch above is what keeps it off the camera
-  assert.match(source, /if \(context\.current\.cameraMode === 'broadcast'\) \{\n\s*const shot = broadcast\.sample\(/);
+  assert.match(source, /if \(context\.current\.cameraMode === 'broadcast'[^{\n]*\) \{\n\s*const shot = broadcast\.sample\(/);  // P7: + the early fill's camera hold
 });

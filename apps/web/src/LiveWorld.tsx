@@ -200,7 +200,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [, refreshPlayback] = useState(0);
   const [draft, setDraft] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const earlyShown=useSyncExternalStore(earlyArrival.subscribe,earlyArrival.revealed);
+  const earlyShown=useSyncExternalStore(earlyArrival.subscribe,earlyArrival.revealed,earlyArrival.revealed);
   const [initialProgress,setInitialProgress]=useState<InitialWorldProgress>({generation:0,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
   const retryInitial=useRef<(()=>void)|null>(null);
   useEffect(()=>{onInitialProgress?.(initialProgress);},[initialProgress,onInitialProgress]);
