@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // Lane W3: the Mars campus as shared parts + placements, with the same look.
 //   node tools/blobs/campus-parts.mjs <in.glb> <out.glb> [--report <json>] [--err 0.00025] [--step 0.00025] [--texels 1300]
-//     [--cell 24] [--psnr 34]   (debug: --skip tex,flat,fold,join --noposq --nouvq)
+//     [--cell 24] [--psnr 34] [--tier all|base|detail] [--coarse 32]   (debug: --skip tex,flat,fold,join --noposq --nouvq)
+// Tiers (lane W3, 2026-10-19): `base` is the first file a visitor loads: every layer exact as in `all`, except the
+// "Fittings and furniture" leaves (3D-Warehouse objects, 77% of the bytes), which are kept as seen from --coarse metres
+// or farther (texture mips, simplification error and position step scaled by --coarse / 2 m) and marked extras.tier =
+// 'coarse'. `detail` is only those leaves, exact; the viewer loads it after arrival and then drops the coarse ones.
 // Input: the served campus (/blobs/assets/64/64b8838c….glb, tools/blobs/shrink-campus.mjs output) or the raw
 // /browser/campus.glb. Why the old file is 41.8 MB: the CAD export gives every component instance its own baked copy,
 // every face its own normal and its own UV island (3.26 M vertices for 1.2 M triangles), 3D-Warehouse fittings carry
@@ -40,10 +44,13 @@ const argv = process.argv.slice(2); const [inPath, outPath] = argv;
 const opt = (k, d) => { const i = argv.indexOf(k); return i < 0 ? d : argv[i + 1]; };
 const SKIP = new Set((opt('--skip', '') ?? '').split(',').filter(Boolean)); // debugging: tex, flat, fold, join
 if (!inPath || !outPath) { console.error('usage: campus-parts.mjs <in.glb> <out.glb> [--report json] [--err m] [--texels n] [--cell m]'); process.exit(2); }
+const TIER = opt('--tier', 'all'), COARSE = +opt('--coarse', 32);
+if (!['all', 'base', 'detail'].includes(TIER)) throw Error(`--tier ${TIER}`);
 const STEP = +opt('--step', 0.00025), ERR = +opt('--err', 0.00025), TEXELS = +opt('--texels', 1300), CELL = +opt('--cell', 24), COS = 0.9994, SAME = 0.0002, SOLID_SD = 4;
 /** packages/engine-mars/src/mars-2026-map.ts: the scene's render-only exclusions (pinned by campus-parts.test.mjs). */
 export const HIDE = { kind: ['context_person', 'context_group', 'reference'], assembly: ['people', 'reference-ground'], layer: ['Aerial reference'] };
-const KEEP_EXTRAS = ['kind', 'assembly_id', 'layer'];
+const KEEP_EXTRAS = ['kind', 'assembly_id', 'layer', 'tier'];
+const DETAIL_LAYER = 'Fittings and furniture';
 
 await Promise.all([MeshoptDecoder.ready, MeshoptEncoder.ready, MeshoptSimplifier.ready]);
 const io = new NodeIO().registerExtensions(EXT.ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder, 'meshopt.encoder': MeshoptEncoder });
@@ -75,6 +82,19 @@ for (const m of root.listMeshes()) {
   for (const u of users) u.setRotation([0, 0, 0, 1]).setScale([1, 1, 1]); baked++;
 }
 report.hiddenNodesDropped = hidden; report.bakedFrames = baked; stage('visible');
+// tiers: leaves on the detail layer are coarse in `base`; `detail` keeps only them (and the groups above them)
+const isDetail = (n) => n.getMesh() && n.getExtras().layer === DETAIL_LAYER;
+let tierNodes = 0;
+if (TIER === 'base') for (const n of root.listNodes()) if (isDetail(n)) { n.setExtras({ ...n.getExtras(), tier: 'coarse' }); tierNodes++; }
+if (TIER === 'detail') {
+  const keep = (n) => { let any = !!isDetail(n); for (const c of n.listChildren()) any = keep(c) || any; if (n.getMesh() && !isDetail(n)) n.setMesh(null); if (!any) { n.dispose(); tierNodes++; } return any; };
+  for (const r of root.listScenes().flatMap((sc) => sc.listChildren())) keep(r);
+  await prune();
+}
+/** How much farther than the 2 m design distance this node is ever seen first: --coarse / 2 for coarse leaves. */
+const far = (n) => (n.getExtras().tier === 'coarse' ? COARSE / 2 : 1);
+const near = (users) => Math.min(...users.map(far));
+report.tier = { tier: TIER, coarse: TIER === 'base' ? COARSE : null, nodes: tierNodes }; stage('tier');
 
 // 2 ------------------------------------------------------------------ never-sampled mips, sub-pixel textures
 const textureSlots = (mat) => mat ? [['baseColor', mat.getBaseColorTexture(), mat.getBaseColorTextureInfo()], ['normal', mat.getNormalTexture(), mat.getNormalTextureInfo()], ['occlusion', mat.getOcclusionTexture(), mat.getOcclusionTextureInfo()], ['emissive', mat.getEmissiveTexture(), mat.getEmissiveTextureInfo()], ['metallicRoughness', mat.getMetallicRoughnessTexture(), mat.getMetallicRoughnessTextureInfo()]].filter((s) => s[1]) : [];
@@ -118,7 +138,7 @@ const solidOf = new Map(); // material -> its solid-colour twin
 const keepDensity = new Map(); // texture -> min density over the uses that keep it
 for (const m of SKIP.has('tex') ? [] : root.listMeshes()) for (const p of m.listPrimitives()) {
   const mat = p.getMaterial(); const slots = textureSlots(mat); if (!slots.length) continue;
-  const users = usersOf(m); const dens = slots.map(([slot, t, info]) => [slot, t, Math.min(...users.map((n) => primDensity(n, p, t, info)))]);
+  const users = usersOf(m); const dens = slots.map(([slot, t, info]) => [slot, t, Math.min(...users.map((n) => primDensity(n, p, t, info) * far(n)))]);
   if (slots.length === 1 && slots[0][0] === 'baseColor' && baseOnly(slots[0][1])) {
     const [, t, d] = dens[0]; const s = await levelStats(t, finestLevel(d) + 1);
     if (s.opaque && s.sd <= SOLID_SD) {
@@ -256,7 +276,8 @@ report.sharedDefinitions = { meshesFolded: shared, shearPlacements }; stage('ded
 // 5 ------------------------------------------------------------------ absolute-error simplification
 if (ERR > 0) {
   for (const m of root.listMeshes()) {
-    const s = Math.max(...usersOf(m).map(worldScale), 1e-9);
+    const s = Math.max(...usersOf(m).map(worldScale), 1e-9) / near(usersOf(m)); // coarse leaves: error x --coarse/2
+    const flags = near(usersOf(m)) > 1 ? ['ErrorAbsolute', 'Prune'] : ['ErrorAbsolute']; // coarse: drop parts smaller than the error
     for (const p of [...m.listPrimitives()]) {
       if (p.getMode() !== 4) continue;
       const pos = p.getAttribute('POSITION').getArray(), idx = new Uint32Array(p.getIndices().getArray()), nv = pos.length / 3;
@@ -265,8 +286,8 @@ if (ERR > 0) {
       if (extra.length) {
         const as = extra.reduce((n, [, a]) => n + a.getElementSize(), 0), at = new Float32Array(nv * as), wts = [];
         let o = 0; for (const [x, a] of extra) { const arr = a.getArray(), e = a.getElementSize(); for (let i = 0; i < nv; i++) for (let c = 0; c < e; c++) at[i * as + o + c] = arr[i * e + c]; for (let c = 0; c < e; c++) wts.push(x === 'NORMAL' ? 0.5 : 1); o += e; }
-        out = MeshoptSimplifier.simplifyWithAttributes(idx, pos, 3, at, as, wts, null, 0, ERR / s, ['ErrorAbsolute'])[0];
-      } else out = MeshoptSimplifier.simplify(idx, pos, 3, 0, ERR / s, ['ErrorAbsolute'])[0];
+        out = MeshoptSimplifier.simplifyWithAttributes(idx, pos, 3, at, as, wts, null, 0, ERR / s, flags)[0];
+      } else out = MeshoptSimplifier.simplify(idx, pos, 3, 0, ERR / s, flags)[0];
       if (!out.length) { p.dispose(); continue; }
       if (out.length < idx.length) { p.getIndices().setArray(nv < 65536 ? new Uint16Array(out) : out); F.compactPrimitive(p); }
     }
@@ -282,7 +303,7 @@ for (const n of root.listNodes()) {
   const m = n.getMesh(); if (!m || usersOf(m).length !== 1 || n.listChildren().length) continue; const parent = parentOf(n); if (!parent) continue;
   const W = n.getWorldMatrix(); singles++;
   for (const p of m.listPrimitives()) {
-    const key = [root.listNodes().indexOf(parent), p.getMaterial() ? root.listMaterials().indexOf(p.getMaterial()) : -1, p.listSemantics().sort().join(','), p.getMode(), Math.floor(W[12] / CELL), Math.floor(W[14] / CELL)].join('|');
+    const key = [root.listNodes().indexOf(parent), p.getMaterial() ? root.listMaterials().indexOf(p.getMaterial()) : -1, p.listSemantics().sort().join(','), p.getMode(), n.getExtras().tier ?? '', Math.floor(W[12] / CELL), Math.floor(W[14] / CELL)].join('|');
     if (!buckets.has(key)) buckets.set(key, { parent, items: [] }); buckets.get(key).items.push({ node: n, prim: p });
   }
 }
@@ -325,9 +346,9 @@ function invert(m) { // general 4x4 inverse (column-major)
 
 // 7 ------------------------------------------------------------------ extras, quantization, textures, meshopt
 // Leaves keep only `kind`; groups keep kind/assembly_id/layer (the hide rules match groups, which hide their subtree).
-for (const n of root.listNodes()) { const e = n.getExtras(), keep = {}; for (const k of n.listChildren().length ? KEEP_EXTRAS : ['kind']) if (e[k] !== undefined) keep[k] = e[k]; n.setExtras(keep); }
+for (const n of root.listNodes()) { const e = n.getExtras(), keep = {}; for (const k of n.listChildren().length ? KEEP_EXTRAS : ['kind', 'tier']) if (e[k] !== undefined) keep[k] = e[k]; n.setExtras(keep); }
 for (const m of root.listMeshes()) m.setExtras({});
-root.getAsset().extras = { 'campus-parts/1': { source: report.input.sha256, err: ERR, texels: TEXELS, cell: CELL, step: STEP, hidden: HIDE } };
+root.getAsset().extras = { 'campus-parts/1': { source: report.input.sha256, err: ERR, texels: TEXELS, cell: CELL, step: STEP, hidden: HIDE, ...(TIER === 'all' ? {} : { tier: TIER }), ...(TIER === 'base' ? { coarse: COARSE } : {}) } };
 stage('extras');
 await doc.transform(F.reorder({ encoder: MeshoptEncoder, level: 'high' }));
 stage('reordered');
@@ -339,7 +360,7 @@ for (const m of argv.includes('--noposq') ? [] : root.listMeshes()) {
   if (accs.some((a) => a.listParents().some((p) => p.propertyType === 'Primitive' && !m.listPrimitives().includes(p)))) continue;
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (const a of accs) { const v = a.getArray(); for (let i = 0; i < v.length; i++) { const c = i % 3; if (v[i] < lo[c]) lo[c] = v[i]; if (v[i] > hi[c]) hi[c] = v[i]; } }
-  const s = Math.max(...users.map(worldScale)); let step = STEP / s; const ext = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]); if (ext / step > 65535) { step = ext / 65535; qCoarse++; }
+  const s = Math.max(...users.map(worldScale)); let step = STEP * near(users) / s; const ext = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]); if (ext / step > 65535) { step = ext / 65535; qCoarse++; }
   for (const a of accs) { const v = a.getArray(), q = new Uint16Array(v.length); for (let i = 0; i < v.length; i++) q[i] = Math.round((v[i] - lo[i % 3]) / step); a.setArray(q).setNormalized(false); }
   const T = [step, 0, 0, 0, 0, step, 0, 0, 0, 0, step, 0, lo[0], lo[1], lo[2], 1];
   for (const u of users) u.setMatrix(mul(u.getMatrix(), T)); qMeshes++;
