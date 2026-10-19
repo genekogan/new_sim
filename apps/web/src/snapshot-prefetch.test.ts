@@ -20,7 +20,7 @@ function runEntry(base: string, pathname: string) {
   return { calls, left: ctx[PREFETCH_GLOBAL] as { url: string; response: Promise<Response> } | undefined };
 }
 
-test('entry script: one plain GET of this new world\'s snapshot URL (and its config) (the layer\'s exact URL), none on old worlds', () => {
+test('entry script: one plain GET of this new world\'s snapshot URL (the layer\'s exact URL), none on old worlds', () => {
   for (const base of ['', '/worlds']) for (const pathname of PATHS) {
     const key = worldKeyFrom(pathname, base), apiUrl = `${base}/w/${key}/v1/world/snapshot`;  // = world-path apiPath('/v1/world/snapshot')
     assert.equal(key, keyBefore(pathname, base), `${base} ${pathname}: same world key as before`);
