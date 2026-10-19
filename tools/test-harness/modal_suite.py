@@ -47,6 +47,7 @@ prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 re
   echo "install $(basename "$2") rc=$rc"; tail -n 3 "/out/install-$(basename "$2").log"
   return "$rc"
 }
+rm -rf /out /work  # never inherit a previous input's tree or results (see single_use_containers below)
 mkdir -p /out
 cp /in/RUN-METADATA.json /out/
 cp /in/historical-inputs.pack.json /out/ 2>/dev/null || true
@@ -91,7 +92,9 @@ V5_SHARDS = 8
 assert sorted(s for g in GROUPS.values() for s in g) == sorted(set(ORDER) - {"V5-server-full", "V5-server-baseline"})
 
 
-@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600)
+# single_use_containers: a preempted input is restarted by Modal, and without this it can land on a warm container that
+# already ran another group (2026-10-19, R's 3.9 gate: group b's suite came back as shard v5-1). One input per container.
+@app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600, single_use_containers=True)
 def run(skip: str, server_files: str = "", only: str = "", shard: str = "") -> bytes:
     files = server_files.split()
     if any(not re.fullmatch(r"src/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
