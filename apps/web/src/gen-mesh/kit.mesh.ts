@@ -137,9 +137,10 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
   out.computeBoundingSphere(); out.computeBoundingBox();
   return out;
 }
-/** W2 sway: which part of a plant a shape is (' trunk', ' foliage', or '' for its pot, soil and stones, which stay still). */
+/** W2 sway: which part of a plant a shape is (' trunk', ' foliage', or '' for its pot, soil and stones, which stay still).
+ *  A small plant sways whole (its pot sits at the root, where the bend is ~0), so it keeps its one draw. */
 const PLANT_STILL = /pot|soil|clay|stone|rock|box|planter|metal|rim|base|ground|earth|mulch|gravel|plinth|tub/, PLANT_TRUNK = /bark|trunk|wood|stem|branch|log/;
-function plantPart(sh: KitShape): string { const t = `${sh.tint ?? ''} ${sh.material ?? ''}`; return sh.glow || PLANT_STILL.test(t) ? '' : PLANT_TRUNK.test(t) ? ' trunk' : ' foliage'; }
+function plantPart(sh: KitShape, plant: 'tree' | 'small'): string { const t = `${sh.tint ?? ''} ${sh.material ?? ''}`; return sh.glow ? '' : plant === 'small' ? ' foliage' : PLANT_STILL.test(t) ? '' : PLANT_TRUNK.test(t) ? ' trunk' : ' foliage'; }
 const plantMats = new WeakMap<THREE.Material, Map<string, THREE.Material>>();
 function plantMaterial(base: THREE.Material, part: string): THREE.Material {
   let byPart = plantMats.get(base); if (!byPart) { byPart = new Map(); plantMats.set(base, byPart); }
@@ -147,8 +148,9 @@ function plantMaterial(base: THREE.Material, part: string): THREE.Material {
   return m;
 }
 /** W2 sway: a def that is a plant (trees, bushes, flowers) sways in the wind. */
-export function isPlantDef(def: { tags: readonly string[]; components?: Record<string, unknown> }): boolean {
-  return !!def.components?.plant || def.tags.some((t) => /^(plant|tree|shrub|bush|flower|flowers|reed|grass|conifer|broadleaf)$/.test(t));
+export function isPlantDef(def: { tags: readonly string[]; components?: Record<string, unknown> }): 'tree' | 'small' | null {
+  if (def.tags.some((t) => /^(tree|conifer|broadleaf|palm)$/.test(t))) return 'tree';
+  return def.components?.plant || def.tags.some((t) => /^(plant|shrub|bush|flower|flowers|reed|grass)$/.test(t)) ? 'small' : null;
 }
 /** Material class of a shape: shapes of one class merge into one draw. */
 // Four bounded emissive classes, so glow does not add one draw per numerical value.
@@ -159,7 +161,7 @@ const classOf = (sh: KitShape, v: number, surfaces = false) => v === 2 ? `${sh.m
 export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
   return args.shapes.some((s) => s.when) ? args.shapes.map((s) => (s.when ? (kitWhen(s.when, params, state ?? {}) ? '1' : '0') : '')).join('') : '';
 }
-export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown>; flameHint?: boolean; smokeFx?: boolean; plant?: boolean }): THREE.Group {
+export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown>; flameHint?: boolean; smokeFx?: boolean; plant?: 'tree' | 'small' | null }): THREE.Group {
   // K2 hook: the same expansion runs before physics and before mesh construction.
   const args = expandKitProgram(input, ctx.params);
   const root = new THREE.Group();
@@ -173,7 +175,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     const role = sh.role ?? (isFlameShape(sh, !!ctx.flameHint, ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))) ? 'flame' : undefined);
     if (role) { const list = byRole.get(role) ?? []; list.push(sh); byRole.set(role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
-    const k = classOf(sh, args.v, surfaces) + (isSprayShape(sh) ? ' spray' : ctx.plant ? plantPart(sh) : ''); const list = byClass.get(k) ?? [];
+    const k = classOf(sh, args.v, surfaces) + (isSprayShape(sh) ? ' spray' : ctx.plant ? plantPart(sh, ctx.plant) : ''); const list = byClass.get(k) ?? [];
     if (sh.material === 'water' && sh.kind === 'cyl' && !sh.role) discs.push({ x: sh.at[0], y: sh.at[1] + (sh.h ?? 1) / 2 * (sh.scale?.[1] ?? 1), z: sh.at[2], r: (sh.r ?? 0.5) * (sh.scale?.[0] ?? 1) }); list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
   }
   const matFor = (k: string): THREE.Material => {
@@ -235,7 +237,7 @@ registerMesh({
     if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def), plant: isPlantDef(ctx.def), smokeFx: !ctx.def.components.route && !ctx.def.tags.includes('moving') }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
-    mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts)
+    if (ctx.params.condition !== 'construction') mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts); not on a building site
     return obj;
   },
   instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },

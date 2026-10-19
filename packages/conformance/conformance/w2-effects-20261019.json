@@ -1,0 +1,26 @@
+{
+  "schema": "catalog-conformance-supplement/1",
+  "note": "Tranche 2026-10-19 lane W2 (old Eden effects). Kit shapes that draw smoke (tint smoke/steam, no glow) are no longer drawn as grey puffs: the atmosphere draws moving smoke from their base instead (one draw for the whole world). Two documented construction-view draw overruns therefore shrink by one draw: core-chimney-stack 14 -> 13, core-locomotive 27 -> 26 (same def hashes, same stage/code/field). Re-pinned with the new detail; no budget, sample or gap check is relaxed; nothing else is accepted.",
+  "findings": [
+    {
+      "def": "core-chimney-stack@1",
+      "hash": "7d573c1fd76fa07fa86c793957ea63a92c50e16e60a6b271b2b5ce12c1af28cd",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "13 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    },
+    {
+      "def": "core-locomotive@1",
+      "hash": "b92d2f97a5bd8e51b65eb7d8b45e3cbff675111b304faeea72a9dcd4ee7fea87",
+      "stage": "gallery-budget",
+      "code": "draws",
+      "detail": "26 > 4",
+      "fields": [
+        "params.condition=construction"
+      ]
+    }
+  ]
+}
