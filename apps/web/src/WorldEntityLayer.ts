@@ -39,6 +39,8 @@ type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Obj
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
   active = false;
+  /** The first build is under way (start): nothing to draw or diff yet. */
+  building = false;
   private model: WorldModel | null = null;
   private seq = -1;
   private readonly terrainGroup = new THREE.Group();
@@ -120,17 +122,30 @@ export class WorldEntityLayer {
     for (const sha of eagerShas()) void loadAsset(sha).catch(() => {});
     this.seq = snap.seq;
     this.sites.reset(snap.builds ?? [], snap.buildsRev ?? 0, snap.now);
-    this.active = true;
-    this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
-    this.rebuildWater();
-    this.buildHorizon();
-    this.model.readPass(() => { for (const e of snap.entities) this.draw(e, false); });
+    // lane W1: the first build runs in slices of ~50 ms with the main thread free in between, so the socket's join set,
+    // the first takes and the initial downloads proceed while it builds (the arrival card covers it; LiveWorld draws
+    // nothing while `building`). Same draws in the same order; edge diffs wait until it is done (applyEdge).
+    this.building = true;
+    try {
+      const m = this.model;
+      this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
+      await nextTask(); if (signal.aborted || this.model !== m) return;
+      this.rebuildWater();
+      this.buildHorizon();
+      const all = snap.entities;
+      for (let i = 0; i < all.length;) {
+        const until = performance.now() + BUILD_SLICE_MS;
+        m.readPass(() => { while (i < all.length) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
+        if (i < all.length) { await nextTask(); if (signal.aborted || this.model !== m) return; }
+      }
+      this.active = true;
+    } finally { this.building = false; }
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
   readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown; rev?: unknown }[]) {
-    if (!this.model) return;
+    if (!this.model || this.building) return;
     for (const m of msgs) {
       // CE8: attention hints keep the current rev; the sites layer parses each message once.
       if (m.kind === 'world-build') { if ((m as { event?: unknown }).event === 'attention' || (typeof m.rev === 'number' && m.rev > this.sites.maxRev)) this.sites.apply(m); continue; }
@@ -482,6 +497,15 @@ export class WorldEntityLayer {
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 
+const BUILD_SLICE_MS = 50;
+/** Continue after every other queued task: at background priority where the browser has a task scheduler (Chrome: the
+ *  socket's large join messages are read in many small tasks, each needing a turn), else after one message task. */
+function nextTask(): Promise<void> {
+  const sched = (globalThis as { scheduler?: { postTask?: (f: () => void, o: { priority: string }) => Promise<void> } }).scheduler;
+  if (sched?.postTask) return sched.postTask(() => {}, { priority: 'background' });
+  if (typeof MessageChannel === 'undefined') return new Promise((r) => setTimeout(r, 0));
+  return new Promise((r) => { const ch = new MessageChannel(); ch.port1.onmessage = () => { ch.port1.close(); r(); }; ch.port2.postMessage(0); });
+}
 /** A cached snapshot (the server's snapshot cache or an edge copy, lanes W1/O2) says how old it is: its `now` is moved on by that. */
 function ageNow(snap: { now?: number }, r: Response) { const age = Number(r.headers.get('age')) || 0; if (age > 0 && typeof snap.now === 'number') snap.now += age * 1000; }
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
