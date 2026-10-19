@@ -76,4 +76,7 @@ test('the page HTML carries the key first thing in <head>; no key leaves it unto
   assert.ok(out.indexOf('__simSnapshotKey') < out.indexOf('prefetch()'), 'set before the prefetch script runs');
   assert.equal(withSnapshotKey(html, null), html);
   assert.equal(withSnapshotKey('<p>no head</p>', '1.0.0.0'), '<p>no head</p>');
+  const a = 'a'.repeat(32), b = 'b'.repeat(32);
+  assert.ok(withSnapshotKey(html, '12.0.0.0', { defs: a, ground: b }).includes(`<script>window.__simSnapshotKey="12.0.0.0";window.__simSnapshotParts=["${a}","${b}"]</script>`), 'P7: the parts ride with the key');
+  assert.ok(!withSnapshotKey(html, '12.0.0.0', { defs: '</script>', ground: b }).includes('__simSnapshotParts'), 'only well-formed refs');
 });

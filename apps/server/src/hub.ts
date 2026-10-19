@@ -146,17 +146,24 @@ export class Hub {
     ws.on('pong', () => (c.alive = true));
     ws.on('close', () => this.clients.delete(c));
     ws.on('error', () => this.clients.delete(c));
-    ws.on('message', (data) => {
+    const inbound = (data: unknown, fromUrl = false) => {
       // inbound messages are validated and rate limited (20 per 10 s is far more than a well-behaved client sends)
       const now = Date.now(); if (now - c.windowStart > 10_000) { c.windowStart = now; c.msgs = 0; }
       if (++c.msgs > 20) { ws.close(1008, 'too many messages'); return; }
       let raw: unknown; try { raw = JSON.parse(String(data)); } catch { return; }
       const p = clientMsg.safeParse(raw); if (!p.success) return;
+      // a hello in the URL is the page's anonymous one: never a token (URLs end up in logs), never anything but a hello
+      if (fromUrl && (p.data.t !== 'hello' || p.data.token !== undefined)) return;
       const pending=this.onMessage(c,p.data as ClientMsg);
       const generation=c.helloGeneration;
       if(this.lifecycleSouls)void pending.catch(error=>{if(this.clients.has(c)&&c.helloGeneration===generation)this.privateViewFailed(c,error);});
       else void pending;
-    });
+    };
+    ws.on('message', (data) => inbound(data));
+    // P7: the page's entry socket says its anonymous hello in the URL (/ws?hello=…), so the join leaves as soon as the
+    // socket is open: a hello sent from the page's open event waited for its main thread, busy building the world (~1 s
+    // on a phone)
+    const hello = urlHello(req.url); if (hello) inbound(hello, true);
   }
 
   private async onMessage(c: Client, m: ClientMsg) {
@@ -374,4 +381,10 @@ export class Hub {
     };
   }
   clientList() { return [...this.clients].map((c) => ({ user: c.me?.short ?? 'anon', role: c.me?.role ?? null, joinedAt: c.joinedAt, resyncs: c.resyncs, sentBytes: c.sent, buffered: c.ws.bufferedAmount })); }
+}
+
+/** The `hello` query parameter of a socket's upgrade URL (at most 2 KB), or null. */
+export function urlHello(url: string | undefined): string | null {
+  const q = url?.indexOf('?') ?? -1; if (!url || q < 0) return null;
+  try { const h = new URLSearchParams(url.slice(q + 1)).get('hello'); return h && h.length <= 2048 ? h : null; } catch { return null; }
 }

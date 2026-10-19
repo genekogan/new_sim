@@ -44,10 +44,17 @@ export function safeKey(currentKey: (() => string) | null | undefined): string |
   try { return currentKey ? currentKey() : null; } catch { return null; }
 }
 
-/** The world page's HTML with the current key set first thing in <head>, before any script that reads it. */
-export function withSnapshotKey(html: string, key: string | null): string {
+/** The window property naming the parts (god/snapshot-wire.ts) of the last wire snapshot: [defsRef, groundRef]. */
+export const SNAPSHOT_PARTS_GLOBAL = '__simSnapshotParts';
+
+/** The world page's HTML with the current key set first thing in <head>, before any script that reads it. P7: with
+ *  `parts`, also the refs of the last wire snapshot's parts, so the entry script fetches them at once instead of after
+ *  the snapshot's response headers (on a slow phone link those came ~5 s in, and the parts a round trip later). A
+ *  stale ref only costs its download: the page uses a prefetched part only for the ref its snapshot names. */
+export function withSnapshotKey(html: string, key: string | null, parts?: { defs: string; ground: string } | null): string {
   if (!key) return html;
-  const tag = `<script>window.${SNAPSHOT_KEY_GLOBAL}=${JSON.stringify(key)}</script>`;
+  const refs = parts && [parts.defs, parts.ground].every((r) => /^[0-9a-f]{32}$/.test(r)) ? `;window.${SNAPSHOT_PARTS_GLOBAL}=${JSON.stringify([parts.defs, parts.ground])}` : '';
+  const tag = `<script>window.${SNAPSHOT_KEY_GLOBAL}=${JSON.stringify(key)}${refs}</script>`;
   const at = html.search(/<head[^>]*>/i);
   if (at < 0) return html;
   const end = html.indexOf('>', at) + 1;

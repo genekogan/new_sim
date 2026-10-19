@@ -20,7 +20,8 @@ export const PREFETCH_GLOBAL = '__simSnapshotPrefetch';
 export const CONFIG_GLOBAL = '__simConfigPrefetch';
 export const SOCKET_GLOBAL = '__simSocketPrefetch';
 type Prefetch = { url: string; response: Promise<Response> };
-/** Lane W1: the world's WebSocket, opened at page entry with an anonymous hello; useSim's Connection adopts it (queue:
+/** Lane W1: the world's WebSocket, opened at page entry with an anonymous hello (P7: in its URL, `?hello=`, said by the
+ *  server at the upgrade); useSim's Connection adopts it (queue:
  *  every message that arrived before then, in order). Closed after 20 s if nothing adopted it. */
 export type BootSocket = { url: string; ws: WebSocket; queue: unknown[]; hello: string; sent: boolean; adopted?: boolean };
 
@@ -33,9 +34,13 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
     + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
     // W3: the wire form (snapshot-wire.ts); its defs/ground part fetches start as soon as the response headers name them
     + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
-    + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={};sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){var f=r.headers.get(h);if(f&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}});},function(){});`
-    + (hello ? `if(typeof WebSocket!=='function')return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u),o={url:u,ws:s,queue:[],hello:h,sent:false};`
-      + `s.onmessage=function(e){o.queue.push(e.data);};s.onopen=function(){try{s.send(h);o.sent=true;}catch(e){}};`
+    // P7: the parts the HTML names (window.__simSnapshotParts) leave at once; any other the snapshot's headers name, then
+    + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={},pf=function(f){if(typeof f==='string'&&/^[0-9a-f]{32}$/.test(f)&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}},hp=window.__simSnapshotParts;if(hp&&hp.forEach)hp.forEach(pf);`
+    + `sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){pf(r.headers.get(h));});},function(){});`
+    // P7: the hello rides in the socket's URL (the server says it at the upgrade), not from the open event: that waited
+    // for the page's main thread, busy building the world, and the join with it (~1 s on a phone)
+    + (hello ? `if(typeof WebSocket!=='function')return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u+'?hello='+encodeURIComponent(h)),o={url:u,ws:s,queue:[],hello:h,sent:true};`
+      + `s.onmessage=function(e){o.queue.push(e.data);};`
       + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;` : '')
     + `}catch(e){}})();`;
 }

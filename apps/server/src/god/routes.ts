@@ -63,7 +63,7 @@ const prayerSchema = z.object({ text: z.string().min(1).max(2000) });
 const answerSchema = z.object({ prayer: z.string(), text: z.string().min(1).max(4000) });
 const noStore = { 'cache-control': 'no-store' };
 
-export function mountGodRoutes(app: Hono, d: GodDeps) {
+export function mountGodRoutes(app: Hono, d: GodDeps): { partRefs: () => { defs: string; ground: string } | null } {
   // RL7 trace (trace.ts): metadata of every god request, recorded after the route answered — never payload text.
   const trace = d.god.trace, traced = new WeakMap<Context, { build?: string; step?: number }>();
   app.use('/v1/god/*', async (c, next) => {
@@ -314,6 +314,10 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/pray', async (c) => { const s = d.soulFromBearer(c); if (!s) throw new ApiError(401, 'unauthorized', 'a Soul token is required to pray'); const p = prayerSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { text }'); return c.json({ ok: true, prayer: d.god.pray(s, p.data.text), note: 'The god reads prayers when it is present; an answer, if any, appears under GET /v1/god/prayers/mine.' }, 200, noStore); });
   app.get('/v1/god/prayers/mine', (c) => { const s = d.soulFromBearer(c); if (!s) throw new ApiError(401, 'unauthorized', 'a Soul token is required'); return c.json({ prayers: d.god.prayersFor(s.id) }, 200, noStore); });
   app.get('/v1/world/constitution', (c) => c.text(d.god.model.state.constitution || '(this world has no constitution yet)', 200, { 'content-type': 'text/markdown; charset=utf-8', ...noStore }));
+
+  // P7: the parts the last wire snapshot named, for the world page's HTML (its entry script fetches them at once)
+  // (none cut yet, after a restart: start the cut so the next page has them)
+  return { partRefs: () => { if (!parts.current) void Promise.resolve().then(() => wireSnapshots.respond(undefined)).catch(() => {}); return parts.current; } };
 }
 
 /** G2: the act body's optional `mirror` field ({ since, builds, have, lib }), or null. */

@@ -117,12 +117,13 @@ function runEntryWithSocket(pathname: string, hello: string, extra: Record<strin
   return { ctx, timers };
 }
 
-test('entry socket: opened at entry for new worlds only, says the given hello on open, queues what arrives, closes unadopted after 20 s', () => {
+test('entry socket: opened at entry for new worlds only, says the given hello in its URL (P7: not from the open event), queues what arrives, closes unadopted after 20 s', () => {
   const hello = anonymousHello(true);
   const { ctx, timers } = runEntryWithSocket('/worlds/w/eden-2026/', hello);
   const boot = ctx[SOCKET_GLOBAL] as { url: string; queue: unknown[]; sent: boolean; ws: FakeWS };
   assert.equal(FakeWS.made.length, 1); assert.equal(boot.url, 'wss://sim.test/worlds/w/eden-2026/ws');
-  boot.ws.open(); assert.deepEqual(boot.ws.sent, [hello]); assert.equal(boot.sent, true);
+  assert.equal(boot.ws.url, `wss://sim.test/worlds/w/eden-2026/ws?hello=${encodeURIComponent(hello)}`); assert.equal(boot.sent, true);
+  boot.ws.open(); assert.deepEqual(boot.ws.sent, [], 'nothing sent from the open event');
   boot.ws.recv({ t: 'welcome' }); assert.equal(boot.queue.length, 1);
   timers.forEach((f) => f()); assert.equal(boot.ws.closed, true);
   runEntryWithSocket('/worlds/w/mars/', hello); assert.equal(FakeWS.made.length, 0, 'old worlds open nothing');
@@ -147,7 +148,7 @@ test('entry socket: adopted socket keeps the identical anonymous hello and repla
       assert.deepEqual(seen, ['log'], 'the queued message reached the handlers');
       await new Promise((r) => setTimeout(r, 5));
       assert.equal(conn.replica.seq, 5, 'the queued snapshot reached the replica');
-      if (token === null) { assert.equal(fresh.length, 0, 'same hello (its queued snapshot does not count as a replica it said hello with): the entry socket is kept'); assert.deepEqual(boot.ws.sent, [anonymousHello(true)], 'no second hello'); }
+      if (token === null) { assert.equal(fresh.length, 0, 'same hello (its queued snapshot does not count as a replica it said hello with): the entry socket is kept'); assert.deepEqual(boot.ws.sent, [], 'no second hello (the first was in the URL)'); }
       else { assert.equal(fresh.length, 1, 'signed in: a fresh socket at once'); assert.equal(boot.ws.closed, true); fresh[0].open(); await new Promise((r) => setTimeout(r, 5)); assert.match(fresh[0].sent[0], /"token":"dev:someone"/); }
       conn.close();
     }
@@ -188,4 +189,16 @@ test('W3 entry script: the wire snapshot\'s part headers start the part fetches;
     assert.ok(takeSnapshotPrefetch('/w/eden-2026/v1/world/snapshot?defs=ref'));
     assert.ok(takePartPrefetch('a'.repeat(32))); assert.equal(takePartPrefetch('a'.repeat(32)), null);
   } finally { delete g[PREFETCH_GLOBAL]; if (!hadWindow) delete g.window; }
+});
+
+test('P7 entry script: parts the HTML names leave before the snapshot answers, once each; a part only the headers name follows', async () => {
+  const calls: string[] = []; let answer!: (r: Response) => void;
+  const ctx: Record<string, unknown> = { location: { pathname: '/w/eden-2026' }, __simSnapshotParts: ['a'.repeat(32), 'c'.repeat(32), 'not-a-ref'],
+    fetch: (u: string) => { calls.push(u); return u.includes('snapshot') ? new Promise<Response>((r) => { answer = r; }) : Promise.resolve(new Response('{}')); } };
+  ctx.window = ctx;
+  vm.runInNewContext(entryPrefetchScript(''), ctx);
+  assert.deepEqual(calls.filter((u) => /part/.test(u)), [`/w/eden-2026/v1/world/part/${'a'.repeat(32)}`, `/w/eden-2026/v1/world/part/${'c'.repeat(32)}`], 'before the snapshot answered; a malformed ref is ignored');
+  answer(new Response('{}', { headers: { 'x-defs-ref': 'a'.repeat(32), 'x-ground-ref': 'b'.repeat(32) } }));
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(calls.filter((u) => /part/.test(u)).map((u) => u.slice(-32)), ['a'.repeat(32), 'c'.repeat(32), 'b'.repeat(32)]);
 });
