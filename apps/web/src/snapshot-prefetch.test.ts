@@ -135,6 +135,8 @@ test('entry socket: adopted socket keeps the identical anonymous hello and repla
     for (const token of [null, 'dev:someone']) {
       const { ctx } = runEntryWithSocket('/worlds/w/eden-2026/', anonymousHello(true));
       const boot = ctx[SOCKET_GLOBAL] as { ws: FakeWS }; boot.ws.open();
+      boot.ws.recv({ t: 'welcome', proto: 1, worldId: 'w', epoch: 'e1', dt: 0.05, clockRate: 1, serverTick: 1, you: null, serverTime: 0, build: 'dev', takeTransport: 'take-boundary-facts/1', takeEntities: 'take-entities-ref/1', takeChunks: 'take-chunk-ref/1' });
+      boot.ws.recv({ t: 'snapshot', reason: 'join', tick: 1, seq: 5, viewHash: '', entities: {}, regions: {}, env: null, paths: [], souls: [] });
       boot.ws.recv({ t: 'log', events: [] });
       g[SOCKET_GLOBAL] = ctx[SOCKET_GLOBAL];
       const seen: string[] = []; const fresh: FakeWS[] = [];
@@ -144,7 +146,8 @@ test('entry socket: adopted socket keeps the identical anonymous hello and repla
       conn.connect();
       assert.deepEqual(seen, ['log'], 'the queued message reached the handlers');
       await new Promise((r) => setTimeout(r, 5));
-      if (token === null) { assert.equal(fresh.length, 0, 'same hello: the entry socket is kept'); assert.deepEqual(boot.ws.sent, [anonymousHello(true)], 'no second hello'); }
+      assert.equal(conn.replica.seq, 5, 'the queued snapshot reached the replica');
+      if (token === null) { assert.equal(fresh.length, 0, 'same hello (its queued snapshot does not count as a replica it said hello with): the entry socket is kept'); assert.deepEqual(boot.ws.sent, [anonymousHello(true)], 'no second hello'); }
       else { assert.equal(fresh.length, 1, 'signed in: a fresh socket at once'); assert.equal(boot.ws.closed, true); fresh[0].open(); await new Promise((r) => setTimeout(r, 5)); assert.match(fresh[0].sent[0], /"token":"dev:someone"/); }
       conn.close();
     }

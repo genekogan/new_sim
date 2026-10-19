@@ -230,7 +230,9 @@ export class Connection {
         stationContracts: this.stationOffer, takeBoundaryTransport: this.takeBoundaryTransport }));
       // an adopted socket that already said this hello goes on as it is; one that said another (a signed-in page) is
       // replaced at once (the server ignores a second hello within 3 s), resuming from what it already received
-      if (adopted && boot!.sent) { if (boot!.hello !== hello) { this.open(); return; } }
+      // (compared without since/epoch: the entry socket spoke for a page with no replica yet; its queued snapshot, replayed
+      // below before the token is known, must not make that look like a different hello)
+      if (adopted && boot!.sent) { if (boot!.hello !== JSON.stringify(helloMessage({ token, stationContracts: this.stationOffer, takeBoundaryTransport: this.takeBoundaryTransport }))) { this.open(); return; } }
       else ws.send(hello);
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
