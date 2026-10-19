@@ -122,7 +122,12 @@ function buntingDef() {
 // ---------- amphitheatre: a painted round stage floor ----------
 function stageFloorDef() {
   const S = 8, R = 1.9, cols = ['#d9534f', '#f0ad4e', '#f4d35e', '#5cb85c', '#3d8ab0', '#6f5fb0', '#e86aa8', '#f4efe4'], shapes = [];
-  for (let k = 0; k < S; k++) shapes.push({ kind: 'cyl', at: [0, 0.025, 0], r: R, h: 0.03, segments: 6, arc: r3((2 * Math.PI) / S), yaw: r3((k * 2 * Math.PI) / S), color: cols[k], collide: false });
+  // each segment an explicit wedge polygon (a cyl `arc` slice drew whole overlapping discs that z-fought)
+  for (let k = 0; k < S; k++) {
+    const poly = [[0, 0]];
+    for (let j = 0; j <= 6; j++) { const a = ((k + j / 6) * 2 * Math.PI) / S; poly.push([r3(R * Math.cos(a)), r3(R * Math.sin(a))]); }
+    shapes.push({ kind: 'extrude', at: [0, 0.01, 0], polygon: poly, h: 0.03, color: cols[k], collide: false });
+  }
   shapes.push({ kind: 'cyl', at: [0, 0.03, 0], r: 0.35, h: 0.035, segments: 12, color: '#2a2826', collide: false });
   shapes.push({ kind: 'torus', at: [0, 0.03, 0], r: R, r2: 0.04, segments: 24, pitch: 1.5708, color: '#f4efe4', collide: false });
   return {
