@@ -16,6 +16,7 @@ import type { WorldModel } from '@sim/world-compiler';
 import { ambienceAt, condition, DEFAULT_SETTINGS, distanceTo, emittersOf, exposureAt, falloff, loadSettings, Movement, saveSettings, treeIndex, treesOf, type Emitter, type Resident, type SoundKind, type SoundSettings, type Source, type TreeIndex } from './sound-plan.ts';
 import { nightOf } from './motion.ts';
 import { CoverProbe } from '../world-env.ts';
+import { arrivalOver } from '../arrival-marks.ts';
 import type * as THREE from 'three';
 
 export { condition, distanceTo, falloff, emittersOf } from './sound-plan.ts';
@@ -293,6 +294,7 @@ export function startSoundLayer() {
     unlock,
   };
   for (const ev of ['pointerdown', 'keydown', 'touchstart'] as const) window.addEventListener(ev, unlock, { capture: true, passive: true });
-  setInterval(() => { const host = w.__simEntity; if (host?.camera && host.layer) { mountUi(); try { step(host); } catch { /* a world mid-reload */ } } }, TICK_MS);
+  // lane W1: the first scan of the world's sound sources (~0.2 s at 2x CPU on Eden 2026) waits until the arrival is over
+  setInterval(() => { const host = w.__simEntity; if (host?.camera && host.layer && arrivalOver()) { mountUi(); try { step(host); } catch { /* a world mid-reload */ } } }, TICK_MS);
 }
 startSoundLayer();
