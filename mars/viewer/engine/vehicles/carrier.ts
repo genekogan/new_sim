@@ -21,7 +21,8 @@ import type { Runtime, Invariant } from '../runtime/runtime.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { angleDelta, heading, hypot, rot2, wrapAngle, type Vec2, type Vec3 } from '../core/math.ts';
 import { CATALOG } from '../world/catalog.ts';
-import { entityList } from '../world/entity-list.ts';
+import { entityList, stableIndices, type EntityTable } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 export type CarrierSeatDef = { id: string; local: Vec2; yaw: number; exit: Vec2 };
 export type CarrierDef = { seats: CarrierSeatDef[]; door: Vec2; floorY: number; transferSpeed: number; landingClear: number };
@@ -298,10 +299,17 @@ function landingClear(rt: Runtime, e: Entity, c: CarrierState, d: CarrierDef): b
   }
   return true;
 }
-/** Advance every carrier one tick (call before the runtime steps). No carriers → no effect. */
-export function stepCarriers(rt: Runtime): void {
-  for (const e of entityList(rt.world)) {   // a snapshot, as Object.values was (0.46 -> 0.17 ms a tick on Eden 2026)
-    const c = state(e), d = carrierDef(e); if (!c || !d) continue;
+/** Advance every carrier one tick (call before the runtime steps). No carriers → no effect. `table`: the caller's
+ *  current listing of the world's entity table (S1 r2: the engine lists once and hands the same listing to the runtime
+ *  step; this function changes entities' fields, never the table's entries). */
+export function stepCarriers(rt: Runtime, table?: EntityTable | null): void {
+  // a snapshot, as Object.values was (0.46 -> 0.17 ms a tick on Eden 2026). S1 r2: only the entities with a ride state
+  // (fixed for an entity's life), found again without reading every entity while the table holds the same objects
+  // (world/entity-list.ts stableIndices); only a ride looks its def up in the catalogue.
+  const list = table && table.entities === rt.world.entities ? table.list : entityList(rt.world);
+  for (const i of stableIndices(rt.world.entities, 'carrier/1 rides', list, null, (e) => !!state(e)).idx) {
+    const e = list[i], c = state(e)!;
+    const d = carrierDef(e); if (!d) continue;
     const riders = Object.values(c.seats).filter((a): a is string => !!a);
     const tick = rt.tick;
     if (c.phase === 'boarding') {
@@ -341,7 +349,7 @@ export function stepCarriers(rt: Runtime): void {
 /** Seats, riders and bodies agree; a seated rider sits exactly in its seat frame. */
 export const carrierInvariant: Invariant = (rt: Runtime) => {
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // riders (a body) and rides (ride state) only (world/relevant.ts)
     const b = carried(e);
     if (b) { const v = rt.world.entities[b.id]; if (state(v)?.seats[b.slot] !== e.id) out.push(diag('rider-mismatch', `${e.id} rides ${b.id}#${b.slot}, which does not hold it`, [e.id, b.id])); }
     const c = state(e); if (!c) continue;

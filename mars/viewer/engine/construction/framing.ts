@@ -50,7 +50,7 @@ import { GIVE_MAX, REACH_DOWN, setHands, T } from './handup.ts';
 import { gripHands, localToWorld, reachGap, SETPART_SLOT, setPartSlot } from './setpart.ts';
 import { BODY_H, BODY_R, parseStance, STANCE_ARM, STANCE_DOWN, STANCE_UP } from './stance.ts';
 import { BODY_MODEL, restHands } from '../body/model.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 const SIDE = 0.35; // m: givers stand this far beside the member (its local ±z) at their grip
 export const FRAMING_CLEAR = 0.02; // m: slid over its supports this far above them, then set down
@@ -430,7 +430,7 @@ function planFraming(rt: Runtime, part: string, c: CrewParams, role: FramingRole
   const crews: Record<Role, Holder[]> = { give: giver, relay, install: inst };
   // ---- every motion sample: the holders' reach, the givers' ground, everyone's body
   const g0 = spatialOf(rt).level(givers[0].human!.level);
-  const humans = entityList(w).filter((h) => h.kind === 'human' && h.human).sort((a, b) => (a.id < b.id ? -1 : 1));
+  const humans = relevantEntities(w).filter((h) => h.kind === 'human' && h.human)   // bodies: world/relevant.ts.sort((a, b) => (a.id < b.id ? -1 : 1));
   for (const s of segs) {
     if (s.phase === 'crouch') continue;
     // who holds during this segment (a take: both crews, the member still)
@@ -651,7 +651,7 @@ export const FRAMING_ACTIONS: ActionDef[] = [installTopPlate, installRafter, ins
 export const framingHandsInReach: Invariant = (rt) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const h of entityList(rt.world)) {
+  for (const h of relevantEntities(rt.world)) {   // bodies only
     const g = h.human?.grip;
     if (!g || !g.slot.startsWith(SETPART_SLOT) || !isFramingMember(ents[g.entity])) continue;
     const hs = h.human!.hands;
@@ -666,7 +666,7 @@ export const framingHandsInReach: Invariant = (rt) => {
 /** Installed framing members keep their supports (plates on stable frames with top beams, rafters on installed plates…) at the end of every tick. */
 export const framingSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // a phase only
     if (e.phase !== 'installed' || !isFramingMember(e)) continue;
     const p = framingSupportProblem(rt.world, e);
     if (p) out.push(bad('framing.unsupported', `${label(e)} is installed but unsupported: ${p}`, [e.id], e.pose.p));

@@ -66,6 +66,7 @@ import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
+import { listTable, stableIndices, withEntityList, type EntityTable } from '../../../mars/viewer/engine/world/entity-list.ts';
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
@@ -269,22 +270,36 @@ export class MarsEngine implements Engine {
     // Reader wrappers finish restoring public policies after construction.
     // Discard only their empty initial recorder before the first new frame.
     if(!this.readerRecordingDepth&&this.renderBaseKey!==this.renderContextKeyV1()){this.finishRecorder();this.startRecorder();}
-    this.m.stepCarriers(this.rt);   // carrier/1: rides move their seated riders first (no carriers: no effect)
-    this.rt.step();
+    // S1 r2 (tranche 2026-10-19): one listing of the entity table a tick on an idle world instead of three (~4,500
+    // entries on Eden 2026: listing them was over a quarter of an idle tick). The rides step changes no entry, so the
+    // runtime's invariant pass reuses this listing when it runs no action code first (Runtime.step); the rest of this
+    // tick reuses the pass's listing while nothing that runs here can add, remove or replace an entity: no live action
+    // (clearStairHeads, timeoutStalledReflexes and the quiet point act only through live actions), no programme to
+    // advance, no quiet point, no one leaving. The clock, attention and take recorder change no entry.
+    const table: EntityTable = listTable(this.ents);
+    this.m.stepCarriers(this.rt, table);   // carrier/1: rides move their seated riders first (no carriers: no effect)
+    this.rt.step(table);
+    const pass: EntityTable | null = (this.rt as any).passTable ?? null;
+    const still = !!pass && pass.entities === this.ents && (this.rt as any).live.size === 0 && !this.quiet && this.programs.size === 0 && this.leaving.length === 0;
     this.updateClock();
-    if (this.rt.tick % 10 === 0) this.updateAttention();
+    if (this.rt.tick % 10 === 0) this.updateAttention(still ? pass : null);
     if (this.quiet) this.advanceQuiet();
     if (this.cfg.stairMakeWayV1 === true && this.rt.tick % 200 === 0) this.clearStairHeads();
     if (this.cfg.reflexTimeoutV1 === true && this.rt.tick % 200 === 100) this.timeoutStalledReflexes();
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
-      this.startRecorder(this.finishRecorder());   // the next take's baseline is the state the last one ended in, this tick
+      // the next take's baseline is the state the last one ended in, this tick (the recorder samples from the pass's listing while it holds)
+      const cut = () => this.startRecorder(this.finishRecorder());
+      if (still) withEntityList(this.rt.world, cut, pass); else cut();
     }
     if (this.leaving.length) this.leaving = this.leaving.filter((id) => !this.tryRemove(id));
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
-    for (const id of Object.keys(this.ents)) {
-      const e = this.ents[id]; if (e.kind !== 'human') continue;
+    // S1 r2: the bodies in Object.keys order, found again without reading every entity's kind while the table holds the
+    // same objects under the same keys (stableIndices: an entity's kind never changes); the loop adds and removes none
+    const ents = this.ents, { keys, list } = still ? pass! : listTable(ents) as { keys: string[]; list: any[] };
+    for (const i of stableIndices(ents, 'engine bodies', list, keys, (e: any) => e.kind === 'human').idx) {
+      const id = keys[i], e = list[i];
       // creatures (bodies/creatures.ts) show a rest of 5 s or more as 'settle' (the duck sits, the snail withdraws, the dog lies
       // down); the short pauses inside a walk-with are not a rest
       if (e.body?.type === 'creature') { const resting = this.bodyResting(id) && this.restSecondsOf(id) >= 5; if (resting && e.human.activity === 'idle') e.human.activity = 'settle'; else if (!resting && e.human.activity === 'settle') e.human.activity = 'idle'; }
@@ -1237,8 +1252,8 @@ export class MarsEngine implements Engine {
   }
   observeBodyLocation(actorId:string):BodyLocationV1|null|undefined{return this.physical?.bodyLocation?.(this.rt,actorId);}
 
-  private updateAttention() {
-    const people = (listEntities(this.ents) as any[]).filter(e => e.kind === 'human').sort((a,b) => a.id.localeCompare(b.id));
+  private updateAttention(table: EntityTable | null = null) {
+    const people = ((table?.list ?? listEntities(this.ents)) as any[]).filter(e => e.kind === 'human').sort((a,b) => a.id.localeCompare(b.id));
     for (const e of people) {
       // attention/1 (logged 'edge-attention'): a Soul's own look/turn/auto-face holds its head until it expires
       if (e.human.gaze && this.gazeAt(e)) continue;

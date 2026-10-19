@@ -6,7 +6,7 @@ import { hashOf } from '../core/hash.ts';
 import { dcos, dsin, hypot, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { passList } from '../world/entity-list.ts';
+import { passRelevant } from '../world/relevant.ts';
 import { buildStaticGrids, buildGrids, clearanceAt, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
@@ -496,8 +496,10 @@ export class Spatial {
    */
   private navChanged(world: WorldState, onBody?: (e: Entity) => void): boolean {
     // S1 V7a: inside an invariant pass the tick's shared entity list (world/entity-list.ts: the for-in order this walks),
-    // so a world with a body does not look ~4,900 entities up by key every tick; elsewhere the table itself
-    const shared = passList(world);
+    // so a world with a body does not look ~4,900 entities up by key every tick; elsewhere the table itself.
+    // S1 r2: only its relevant entities (world/relevant.ts): a plain fixture is neither static (no phase, not a catalogue
+    // obstacle) nor a body, so the bodies and the static entities come in the same order as from the whole list.
+    const shared = passRelevant(world);
     if (shared) {
       this.navN = 0; this.navChangedFlag = false;
       for (let i = 0; i < shared.length; i++) this.navVisit(shared[i], onBody);

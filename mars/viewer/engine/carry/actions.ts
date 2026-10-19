@@ -18,7 +18,7 @@ import { carriedPose, carrierSpots, entityFrame, formationFor, laidPose, worldDi
 import { poseHit } from './sweep.ts';
 import { labelOf, laidIssue, planCarryAction, type CarryParams, type CarryProgram } from './validate.ts';
 import { planCarry } from './planner.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 export const CARRY_SPEED = 0.9; // m/s of the fastest-moving formation point (centre + load tips under rotation)
 const ACCEL = 0.5; // m/s²
@@ -83,7 +83,7 @@ export const carryExecsOf = (rt: Runtime): Map<string, CarryExec> => (rt.service
  */
 export function activeLoadDiscs(rt: Runtime, braking = false): LoadDisc[] {
   const out: LoadDisc[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // carried loads (a phase) only (world/relevant.ts)
     if (!isCarryLoad(e) || e.support?.kind !== 'held' || !e.support.by.length) continue;
     const actionId = e.reservedBy;
     if (!actionId || !['carry', 'move_fixture'].includes(rt.records.get(actionId)?.verb ?? '') || !rt.isActive(actionId)) continue;

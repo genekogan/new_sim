@@ -21,7 +21,7 @@ import { clearanceAt } from '../spatial/grid.ts';
 import { def, HUMAN_RADIUS } from '../world/catalog.ts';
 import { vehicleProfile, type VehicleProfile } from './profiles.ts';
 import { planCurve, vehicleGrids, type Curve } from './curve.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 
 /** Body gap (m) a yielding vehicle keeps from the right-of-way vehicle's lane (its path ± half-width). */
 export const YIELD_GAP = 1.0;
@@ -55,7 +55,7 @@ export function footprintOf(w: WorldState, v: Entity): Footprint {
   const r = riderOf(w, v);
   if (r?.human) boxes.push({ c: [0, 0], half: [HR, HR], yaw: 0, y0: r.pose.p[1], y1: r.pose.p[1] + BODY_H, part: r.id });
   boxes.push(...(FOOTPRINT_PARTS[v.def]?.(w, v) ?? []));
-  for (const e of entityList(w)) {
+  for (const e of relevantEntities(w)) {   // things on forks only (world/relevant.ts)
     if (e.support?.kind !== 'forks' || e.support.vehicle !== v.id) continue;
     const ld = def(e.def);
     boxes.push({ c: rot2(sub2([e.pose.p[0], e.pose.p[2]], vp), -v.pose.yaw), half: [ld.size[0] / 2, ld.size[2] / 2], yaw: wrapAngle(e.pose.yaw - v.pose.yaw), y0: e.pose.p[1], y1: e.pose.p[1] + ld.size[1], part: e.id });
@@ -146,7 +146,7 @@ export type Other = { v: Entity; rider: Entity; fp: Footprint; boxes: Box[]; lan
 export function othersOnLevel(rt: Runtime, self: string, level: number): Other[] {
   const out: Other[] = [];
   const w = rt.world;
-  for (const v of entityList(w)) {
+  for (const v of relevantEntities(w)) {   // vehicles only
     if (v.kind !== 'vehicle' || v.id === self || v.support?.kind !== 'ridden-by') continue;
     const r = w.entities[v.support.by];
     if (!r?.human || r.human.level !== level || !vehicleProfile(v.def)) continue;
@@ -328,7 +328,7 @@ function conflict(me: { actor: string; v: Entity }, o: Other, hit: { t: number; 
 export const vehicleCollision: Invariant = (rt: Runtime) => {
   const w = rt.world;
   const vs: Entity[] = [];
-  for (const e of entityList(w)) if (e.kind === 'vehicle' && vehicleProfile(e.def)) vs.push(e);
+  for (const e of relevantEntities(w)) if (e.kind === 'vehicle' && vehicleProfile(e.def)) vs.push(e);   // vehicles only
   if (vs.length < 2) return [];
   const placed = vs.map((v) => ({ v, boxes: place(footprintOf(w, v), [v.pose.p[0], v.pose.p[2]], v.pose.yaw) }));
   const out: Diagnostic[] = [];

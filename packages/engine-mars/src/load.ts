@@ -41,7 +41,7 @@ export type Mars = {
   seedRng: (seed: string) => [number, number, number, number];
   nextRandom: (st: [number, number, number, number]) => number;
   /** carrier/1: advance every carrier one tick (before the runtime steps), and the carrier entity factory. */
-  stepCarriers: (rt: any) => void;
+  stepCarriers: (rt: any, table?: any) => void;
   carrierEntity: (spec: any, tick: number) => any;
 };
 

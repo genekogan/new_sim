@@ -6,7 +6,7 @@ import { isStanding, isSupported, isUpright } from './rules.ts';
 import { HAND_REACH, handPoint, LIFT_APEX_MAX } from './liftcrew.ts';
 import { EDGE_REACH, ENVELOPE_TOL, envelopeGap, GIVE_MAX, HANDUP_SLOT_PREFIX, handsOf, KNEEL_BACK, REACH_DOWN } from './handup.ts';
 import { hypot } from '../core/math.ts';
-import { entityList } from '../world/entity-list.ts';
+import { relevantEntities } from '../world/relevant.ts';
 import type { Entity } from '../world/types.ts';
 
 /** isUpright by def id (it reads only the def; catalog entries are never replaced); an unknown def throws as before. */
@@ -15,7 +15,7 @@ const uprightDef = (e: Entity) => { let v = UPRIGHT_DEFS.get(e.def); if (v === u
 
 export const uprightsSupported: Invariant = (rt) => {
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // rack uprights only (a relevant def: world/relevant.ts)
     if (!uprightDef(e) || e.phase === 'carried') continue;
     if (isStanding(e) || e.phase === 'raising') {
       if (!isSupported(rt.world, e) && e.support?.kind !== 'held')
@@ -38,7 +38,7 @@ export const uprightsSupported: Invariant = (rt) => {
 export const liftHandsInReach: Invariant = (rt) => {
   const out: Diagnostic[] = [];
   const ents = rt.world.entities;
-  for (const e of entityList(rt.world)) {
+  for (const e of relevantEntities(rt.world)) {   // components only
     if (e.kind !== 'component' || e.phase !== 'carried' || e.support?.kind !== 'held') continue;
     for (const id of e.support.by) {
       const h = ents[id];
@@ -56,7 +56,7 @@ export const liftHandsInReach: Invariant = (rt) => {
         });
     }
   }
-  for (const h of entityList(rt.world)) {
+  for (const h of relevantEntities(rt.world)) {   // bodies only
     const slot = h.human?.grip?.slot;
     if (!slot?.startsWith(HANDUP_SLOT_PREFIX)) continue;
     const part = h.human!.grip!.entity;
