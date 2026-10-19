@@ -31,7 +31,9 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
   return `(function(){try{var b=${JSON.stringify(base)},k=(${worldKeyFrom.toString()})(location.pathname,b);`
     + `if(${JSON.stringify(oldKeys)}.indexOf(k)>=0||typeof fetch!=='function')return;`
     + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
-    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'?v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
+    // W3: the wire form (snapshot-wire.ts); its defs/ground part fetches start as soon as the response headers name them
+    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot?defs=ref';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'&v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
+    + `var sp=window[${JSON.stringify(PREFETCH_GLOBAL)}],pp=sp.parts={};sp.response.then(function(r){['x-defs-ref','x-ground-ref'].forEach(function(h){var f=r.headers.get(h);if(f&&!pp[f]){pp[f]=fetch(w+'/v1/world/part/'+f);pp[f].catch(function(){});}});},function(){});`
     + (hello ? `if(typeof WebSocket!=='function')return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u),o={url:u,ws:s,queue:[],hello:h,sent:false};`
       + `s.onmessage=function(e){o.queue.push(e.data);};s.onopen=function(){try{s.send(h);o.sent=true;}catch(e){}};`
       + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;` : '')
@@ -41,6 +43,10 @@ export function entryPrefetchScript(base: string, oldKeys: readonly string[] = O
 /** Lane O2: the world server puts the current snapshot's key on the page (window.__simSnapshotKey); the first start
  *  GETs `<snapshot>?v=<key>`, which the edge may cache (the entry prefetch already did); every later fetch (resync) uses
  *  the plain no-store URL. */
+export function entryWireUrl(plain: string): string {
+  const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
+  return `${plain}?defs=ref` + (typeof x === 'string' && x ? `&v=${encodeURIComponent(x)}` : '');
+}
 export function entrySnapshotUrl(plain: string): string {
   const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
   return typeof x === 'string' && x ? `${plain}?v=${encodeURIComponent(x)}` : plain;
@@ -70,4 +76,11 @@ function takePrefetch(name: string, url: string): Promise<Response> | null {
 
 /** The entry prefetch's response when it was for this exact URL, at most once per page (a later start, a resync or any
  *  other caller fetches afresh). null: there was none (old world, a test, a script-less page) or it is already taken. */
-export function takeSnapshotPrefetch(url: string): Promise<Response> | null { return takePrefetch(PREFETCH_GLOBAL, url); }
+export function takeSnapshotPrefetch(url: string): Promise<Response> | null {
+  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, (Prefetch & { parts?: Record<string, Promise<Response>> }) | undefined> | null;
+  const p = w?.[PREFETCH_GLOBAL]; if (p && p.url === url) parts = p.parts ?? {};
+  return takePrefetch(PREFETCH_GLOBAL, url);
+}
+let parts: Record<string, Promise<Response>> = {};
+/** A part (snapshot-wire.ts) the entry prefetch started for the snapshot just taken, at most once. */
+export function takePartPrefetch(ref: string): Promise<Response> | null { const p = parts[ref] ?? null; delete parts[ref]; return p; }
