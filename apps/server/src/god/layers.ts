@@ -83,8 +83,26 @@ export class GodLayers {
 
   private get m() { return this.h.model; }
   /** Is this world using any layer at all? (cheap) */
-  active(): boolean { if (this.h.buildingActive?.() || this.m.state.layers || this.sets.active()) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access || (!this.h.buildingActive && this.h.building?.(e.id))) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
-  private calendarObjects(): Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> | undefined { return (this.h.edge as any)?.comms?.objects; }
+  active(): boolean {
+    if (this.h.buildingActive?.() || this.m.state.layers) return true;
+    if (this.entitiesActive()) return true;
+    const objs = this.calendarObjects();
+    return (objs?.ofKind ? objs.ofKind('calendar-item') : objs?.all())?.some(godCalendar) ?? false;
+  }
+  /** S1 V7d: whether an event set is in play or any entity carries a layer field, cached on the model's safety key (world-compiler model.ts: a new
+   *  key whenever its entity or def maps change; untracked maps give a fresh key every call, so no caching), so an idle
+   *  Eden 2026 does not walk its 4,900 entities every 2 s. With no buildingActive host the answer reads live build
+   *  state, so it is never cached. */
+  private entitiesSeen: { key: object; on: boolean } | null = null;
+  private entitiesActive(): boolean {
+    const key = this.h.buildingActive ? this.m.safetyCacheKey() : null;
+    if (key && this.entitiesSeen?.key === key) return this.entitiesSeen.on;
+    let on = this.sets.active();
+    if (!on) for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access || (!this.h.buildingActive && this.h.building?.(e.id))) { on = true; break; }
+    this.entitiesSeen = key ? { key, on } : null;
+    return on;
+  }
+  private calendarObjects(): (Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> & Partial<Pick<Objects, 'ofKind'>>) | undefined { return (this.h.edge as any)?.comms?.objects; }
 
   // ---------- the clock ----------
 

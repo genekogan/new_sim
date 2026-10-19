@@ -695,13 +695,30 @@ export class EngineBridge {
   }
 
   /** Items the Souls moved: write their new support back as entity-world moves. */
+  /** S1 V7d: the model key and engine entities of the last write-back that found nothing to write with no body in the
+   *  engine world. Without bodies nothing moves a god thing in the engine (Souls carry, rides seat bodies) except an
+   *  edit flushed from the model, which changes the key, so the next pass would find nothing again. */
+  private writeBackQuiet: { key: object; ents: object } | null = null;
   writeBack() {
     if (this.writeBackBusy) return;
+    if (this.writeBackQuiet) {
+      const ents = this.engine.world.entities as Record<string, any>;
+      let body = false;
+      for (const id in ents) if (ents[id]?.human) { body = true; break; }
+      if (!body && this.writeBackQuiet.key === this.model.safetyCacheKey() && this.writeBackQuiet.ents === ents) return;
+      this.writeBackQuiet = null;
+    }
     this.writeBackBusy = true;
     try {
       const ops: Op[] = [], bodies = new Set<string>(), holders = new Set<string>();
-      for (const [id, x] of Object.entries(this.engine.world.entities)) {
-        if (!x.tags?.includes('entity-world') || x.kind !== 'component') continue;
+      // S1 V7d: one allocation-free walk (Object.entries' order) collects the god things and the bodies; the cheap kind
+      // test goes first. Eden 2026 lists ~4,900 engine entities twice a second here.
+      const ents = this.engine.world.entities as Record<string, any>, humans: string[] = [];
+      for (const id in ents) {
+        if (!Object.hasOwn(ents, id)) continue;
+        const x = ents[id];
+        if (x?.human) humans.push(id);
+        if (x.kind !== 'component' || !x.tags?.includes('entity-world')) continue;
         const e = this.model.entities.get(id); if (!e) continue;
         const s = x.support;
         if (s?.kind === 'in-hand') {
@@ -736,14 +753,15 @@ export class EngineBridge {
       }
       // F1: every Soul's body entity follows its engine body once it comes to rest (a walk's end, a seat), so the god's
       // map and snapshot show where Souls are and what they sit on (one engine edit per stop, none while walking)
-      for (const [id, b] of Object.entries(this.engine.world.entities) as [string, any][]) {
+      for (const id of humans) {
+        const b = ents[id];
         if (!b?.human || bodies.has(id) || holders.has(id)) continue;
         const e = this.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
         if ((b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity)) continue;
         const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
         if (d > 0.4) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
       }
-      if (!ops.length) return;
+      if (!ops.length) { if (!humans.length) this.writeBackQuiet = { key: this.model.safetyCacheKey(), ents }; return; }
       for (const op of ops) {
         { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) continue; }
         const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);

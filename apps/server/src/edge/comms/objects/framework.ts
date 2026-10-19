@@ -43,6 +43,10 @@ export class Objects {
   all(): ObjectRecord[] {
     return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
   }
+  /** `all()` of one kind (same order): only that kind's bodies are parsed (S1 V7d: the layers' calendar check every 2 s). */
+  ofKind(kind: string): ObjectRecord[] {
+    return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? AND kind = ? ORDER BY id').all(this.core.worldId, kind) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
+  }
 
   /** Original creation input; private provenance survives actions and process restarts. */
   creationParams(id: string): Record<string, unknown> | undefined {

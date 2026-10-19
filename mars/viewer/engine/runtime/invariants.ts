@@ -15,6 +15,7 @@ import { sleepSafetyIssue } from '../activities/sleep.ts';
 import { entityList } from '../world/entity-list.ts';
 
 const TOL = 0.03;
+const isHumanBody = (e: import('../world/types.ts').Entity) => e.kind === 'human' && !!e.human;
 /**
  * Activities exempt from `collision.human-static` besides climb-*: a person sitting on a seat
  * fixture (engine/social) is inside that chair/bench's footprint by design, and moves between the
@@ -31,10 +32,14 @@ export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down'
 /** beds/1: a body lying on a bed's berth, while its own active take_slot holds that berth (social/actions.ts). */
 const onOwnBerth = (rt: Runtime, e: import('../world/types.ts').Entity) => !!e.human?.berth && !!e.human.task && rt.holder(`slot:${e.human.berth}`).includes(e.human.task);
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
+  // S1 V7a: no body to check → no spatial sync (a 4,900-entity rescan every tick in an empty world); every planner
+  // read syncs lazily on its own, and the first tick with a body syncs here again before reading the grids
+  const list = entityList(rt.world);
+  if (!list.some(isHumanBody)) return [];
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
   const out: Diagnostic[] = [];
-  for (const e of entityList(rt.world)) {
+  for (const e of list) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
     // activities/1 overlays on a seat (read, play-piano…) keep the seated exemption (baseActivity 'sit'; social/pose.ts)
     if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || onOwnBerth(rt, e) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
