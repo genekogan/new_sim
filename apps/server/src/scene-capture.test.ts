@@ -140,6 +140,9 @@ test('real Hub/anonymous socket and Hono scene routes expose scoped immutable pu
   const response=await app.request(`/v1/scenes/${ref.hash}`);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
   const capture:any=await response.json();assert.equal(capture.worldId,host.worldId);assert.deepEqual(capture.ref,ref);
   assert.deepEqual(decodeSceneCapturePublication(capture),capture);
+  // lane W1: a page that names its world may keep the content-addressed capture; another world's name is not found
+  const kept=await app.request(`/v1/scenes/${ref.hash}?world=${encodeURIComponent(host.worldId)}`);assert.equal(kept.status,200);assert.equal(kept.headers.get('cache-control'),'private, max-age=604800, immutable');assert.deepEqual(await kept.json(),capture);
+  const elsewhere=await app.request(`/v1/scenes/${ref.hash}?world=other-world`);assert.equal(elsewhere.status,404);assert.equal(elsewhere.headers.get('cache-control'),'no-store');
   const {worldId:_worldId,...body}=capture;assert.deepEqual(body,db.renderSceneCapture(host.worldId,ref.hash));
   const current=await (await app.request('/v1/scene')).json() as any;assert.deepEqual(current.renderSceneRef,ref);
   host.engine.configureClock!({origin:100,dayTicks:72000});
