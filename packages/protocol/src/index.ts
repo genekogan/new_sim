@@ -151,7 +151,7 @@ export * from './take-boundary-wire.ts';
 export * from './take-entities-wire.ts';
 export * from './take-chunk-wire.ts';
 export type ClientMsg =
-  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[];takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1' }
+  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[];takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1';takeEntitiesJoin?:'take-entities-join/1' }
   | { t: 'resync'; reason: string }
   | { t: 'ping'; n: number };
 
@@ -174,8 +174,8 @@ export type ServerMsg =
   | {t:'me';view:MeLiveViewV1}
   | { t:'station-v2';view:StationLiveV2 }
   | { t:'station';view:StationLiveV1 }
-  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null;privateMe?:MeLiveDescriptorV1;takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1' }
-  | ({ t: 'snapshot'; reason: string } & Snapshot)
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null;privateMe?:MeLiveDescriptorV1;takeTransport?:'take-boundary-facts/1';takeEntities?:'take-entities-ref/1';takeChunks?:'take-chunk-ref/1';takeEntitiesJoin?:'take-entities-join/1' }
+  | ({ t: 'snapshot'; reason: string; /** take-entities-join/1 only: this snapshot's entity table id */ entitiesTable?: number } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)
   | ({ t: 'takes' } & TakeStream)

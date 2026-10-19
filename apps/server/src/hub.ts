@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,TakeEntitiesEncoderV1,TAKE_CHUNKS_WIRE_V1,TakeChunksEncoderV1,kernelRestV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -19,15 +19,16 @@ const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
     stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional(),
     // an unknown later contract is not an error: the peer simply gets the full table
-    takeEntities:z.string().max(40).optional(),takeChunks:z.string().max(40).optional() }),
+    takeEntities:z.string().max(40).optional(),takeChunks:z.string().max(40).optional(),takeEntitiesJoin:z.string().max(40).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
 type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null;
   authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1;
-  /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet). */
-  takeEntities?:{last:number|null};
+  /** take-entities-ref/1 peers: the id of the last entity table this socket was sent (null: none yet); `join`:
+   *  take-entities-join/1 was negotiated too (each snapshot names its table, which becomes `last`). */
+  takeEntities?:{last:number|null;join?:true};
   /** take-chunk-ref/1 peers: the id of the last take this socket was sent (null: none yet) and the last kernel view sent
    *  without its tick (kernelRestV1). */
   takeChunks?:{last:number|null;kernel?:string};
@@ -169,7 +170,7 @@ export class Hub {
       c.authUserId=u&&(!this.lifecycleSouls||this.db.user(u.id))?u.id:null;
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
       c.takeTransport=m.takeTransport===TAKE_BOUNDARY_WIRE_V1?TAKE_BOUNDARY_WIRE_V1:undefined;
-      c.takeEntities=m.takeEntities===TAKE_ENTITIES_WIRE_V1?{last:null}:undefined;
+      c.takeEntities=m.takeEntities===TAKE_ENTITIES_WIRE_V1?{last:null,...(m.takeEntitiesJoin===TAKE_ENTITIES_JOIN_V1?{join:true as const}:{})}:undefined;
       c.takeChunks=m.takeChunks===TAKE_CHUNKS_WIRE_V1?{last:null}:undefined;
       c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
         [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
@@ -206,7 +207,7 @@ export class Hub {
     const sent=this.send(c,{t:'welcome',build:this.build,proto:PROTO,worldId:h.worldId,rulesVersion:e.rulesVersion,schema:e.schema,dt:e.dt,
       clockRate:h.clockRate,serverTick:e.world.tick,you:c.me,serverTime:Date.now(),epoch:this.epoch,paused:h.paused,
       ...(this.lifecycleSouls?{privateMe:{contract:'me-live/1' as const,connectionId:c.meScope!.connectionId,userId:c.meScope!.userId,revision:1 as const}}:{}),
-      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{}),...(c.takeEntities?{takeEntities:TAKE_ENTITIES_WIRE_V1}:{}),...(c.takeChunks?{takeChunks:TAKE_CHUNKS_WIRE_V1}:{})});
+      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{}),...(c.takeEntities?{takeEntities:TAKE_ENTITIES_WIRE_V1}:{}),...(c.takeEntities?.join?{takeEntitiesJoin:TAKE_ENTITIES_JOIN_V1}:{}),...(c.takeChunks?{takeChunks:TAKE_CHUNKS_WIRE_V1}:{})});
     if(sent)c.publishedMe=JSON.stringify(c.me);return sent;
   }
   private sendStation(c:Client){
@@ -230,7 +231,12 @@ export class Hub {
       const entities=stream.t==='takes'&&c.takeEntities?this.takeEntities.encode(stream,c.takeEntities.last):null;
       const key=(entities?`${mode}|${c.takeEntities!.last}`:mode)+(chunks?`|c${c.takeChunks!.last}`:''),cached=takeStrings?.get(current)??{};
       const inner=(v:unknown)=>mode==='wire'?stringifyTakeBoundaryWireV1(v):JSON.stringify(v);
+      // take-entities-join/1: the snapshot names its entity table, which becomes this peer's last table (its next take's
+      // table then travels as a reference or a patch against it)
+      const joined=current.t==='snapshot'&&c.takeEntities?.join?this.takeEntities.register(current.entities):null;
+      if(joined)nextTable=joined.id;
       s=cached[key]??(()=>{
+        if(joined){const {entities:_e,...rest}=current as Extract<ServerMsg,{t:'snapshot'}>;return JSON.stringify({...rest,entitiesTable:joined.id}).slice(0,-1)+',"entities":'+joined.json+'}';}
         const packed=entities?JSON.stringify({t:'take-entities',contract:TAKE_ENTITIES_WIRE_V1,ids:entities.envelope.ids}).slice(0,-1)+',"payload":'+inner(entities.envelope.payload)+'}':inner(stream);
         return chunks?JSON.stringify({t:'take-chunks',contract:TAKE_CHUNKS_WIRE_V1,ids:chunks.ids,same:chunks.same}).slice(0,-1)+',"payload":'+packed+'}':packed;
       })();

@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
+import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1,TAKE_ENTITIES_WIRE_V1,TAKE_ENTITIES_JOIN_V1,adoptSnapshotTableV1,hydrateTakeEntitiesV1,type TakeEntitiesStateV1,TAKE_CHUNKS_WIRE_V1,hydrateTakeChunksV1,hydrateKernelTickV1,type TakeChunksStateV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 import { helloMessage } from './hello.ts';
@@ -259,6 +259,10 @@ export class Connection {
         }else if((m as {t:string}).t==='kernel-tick'){
           if(!this.takeBoundaryTransport||this.welcome?.takeChunks!==TAKE_CHUNKS_WIRE_V1)throw new Error('unnegotiated take transport');
           m=hydrateKernelTickV1(m,lastKernelJson) as ServerMsg;
+        }else if(m.t==='snapshot'&&Object.hasOwn(m,'entitiesTable')){
+          // take-entities-join/1: this snapshot's entity table is now the socket's last table (the next take refers to it)
+          if(!this.takeBoundaryTransport||this.welcome?.takeEntities!==TAKE_ENTITIES_WIRE_V1||this.welcome?.takeEntitiesJoin!==TAKE_ENTITIES_JOIN_V1)throw new Error('unnegotiated take transport');
+          m=adoptSnapshotTableV1(m,takeEntities) as ServerMsg;
         }else{
           if(m.t==='kernel')lastKernelJson=s;
           m=entities(m) as ServerMsg;
