@@ -10,6 +10,7 @@ import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground'
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
+import { clearBuildingPrefetch, prefetchBuilding } from './gen-mesh/building.mesh.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
@@ -128,6 +129,13 @@ export class WorldEntityLayer {
     this.building = true;
     try {
       const m = this.model;
+      // lane W1: every building's geometry starts in the building workers now; the slices below wait for one only when
+      // they reach it before it is done (building.mesh.ts prefetchBuilding)
+      const pending = new Map<string, Promise<void>>();
+      for (const e of snap.entities) {
+        const def = m.resolvedDef(e.def); if (!def || def.make.kind !== 'gen' || meshFor(def)?.gen !== 'building/1') continue;
+        try { const p = prefetchBuilding({ def, entity: e, params: paramsOf(e, def), args: (def.make.args ?? {}) as Record<string, unknown> }); if (p) { pending.set(e.id, p); void p.then(() => pending.delete(e.id)); } } catch { /* built in place */ }
+      }
       this.rebuildTerrain(undefined, true);   // lane L3: the first build's playa mottling runs in a worker (terrain-mottle.ts)
       await nextTask(); if (signal.aborted || this.model !== m) return;
       this.rebuildWater();
@@ -135,11 +143,14 @@ export class WorldEntityLayer {
       const all = snap.entities;
       for (let i = 0; i < all.length;) {
         const until = performance.now() + BUILD_SLICE_MS;
-        m.readPass(() => { while (i < all.length) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
-        if (i < all.length) { await nextTask(); if (signal.aborted || this.model !== m) return; }
+        m.readPass(() => { while (i < all.length && !pending.has(all[i].id)) { this.draw(all[i++], false); if (performance.now() >= until) break; } });
+        const wait = i < all.length ? pending.get(all[i].id) : undefined;
+        if (wait) await Promise.race([wait, new Promise((r) => setTimeout(r, 3000))]).then(() => pending.delete(all[i].id));
+        else if (i < all.length) await nextTask();
+        if (signal.aborted || this.model !== m) return;
       }
       this.active = true;
-    } finally { this.building = false; }
+    } finally { this.building = false; clearBuildingPrefetch(); }
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
@@ -482,10 +493,7 @@ export class WorldEntityLayer {
     if (def.make.kind === 'none' || def.make.kind === 'parts') return null;
     const builder = meshFor(def);
     if (!builder) return null;
-    const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
-    const defaults: Record<string, unknown> = {};
-    for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: unknown }).default !== undefined) defaults[k] = (f as { default?: unknown }).default;
-    const params = { ...defaults, ...(e.params ?? {}) } as MeshCtx['params'];
+    const params = paramsOf(e, def);
     const ctx: MeshCtx = {
       def, entity: e, params, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {},
       baked: m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), model: m, materials: this.lib,
@@ -498,6 +506,13 @@ export class WorldEntityLayer {
 }
 
 const BUILD_SLICE_MS = 50;
+/** An entity's mesh params: its generator's and def's defaults under its own params. */
+function paramsOf(e: Entity, def: StoredDef): MeshCtx['params'] {
+  const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
+  const defaults: Record<string, unknown> = {};
+  for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: unknown }).default !== undefined) defaults[k] = (f as { default?: unknown }).default;
+  return { ...defaults, ...(e.params ?? {}) } as MeshCtx['params'];
+}
 /** Continue after every other queued task: at background priority where the browser has a task scheduler (Chrome: the
  *  socket's large join messages are read in many small tasks, each needing a turn), else after one message task. */
 function nextTask(): Promise<void> {
