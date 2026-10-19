@@ -199,7 +199,9 @@ export class EngineBridge {
   reconcile() {
     this.reconciled = true;
     const ep = this.engine.world.entityPhysicsV1;
-    this.physics = ep ? structuredClone(ep) : undefined; this.levels = ep ? structuredClone(ep.levels) : [];
+    // G1: shared, not cloned: a physics value is never mutated (nextEntityPhysics makes a new one), so the bridge and the
+    // engine share its parts and their cached hash texts (a clone made the first edit after boot stringify every part twice)
+    this.physics = ep; this.levels = ep ? structuredClone(ep.levels) : [];
     // seed `sent` from the engine's own state so only real differences are sent
     for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, JSON.stringify(normPart(part as Part)));
     for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part)));
