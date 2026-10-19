@@ -18,8 +18,18 @@ export SUITE_COVERAGE_DIR="$OUT"
 REMAP="--import=$ROOT/tools/test-harness/port-remap.mjs"
 DESCRIPTORS=<team>/pm-integration/auth-account-20261009/runtime-modern-context-prep-001
 cd "$ROOT" || exit 1
+# Fan-out (modal_suite.py runs step groups in separate containers, then merges SUMMARY rows and logs):
+#   SUITE_ONLY=V1-types,V3-packages,…  run only these steps (rows for nothing else); the cheap V2 builds still run
+#                                       first, unrecorded, so later steps see the same tree as in the serial order.
+#   V5_SHARD=<i>/<n>                    V5 runs contiguous slice i of n of the sorted server test files, balanced by
+#                                       v5-durations.json; concatenating the n logs in order reproduces the serial TAP.
+want() { [ -z "${SUITE_ONLY:-}" ] && return 0; case ",$SUITE_ONLY," in *",$1,"*) return 0;; esac; return 1; }
 step() {  # step <id> <seconds> <command…>
   local id="$1" t="$2"; shift 2
+  if ! want "$id"; then
+    case "$id" in V2-build-*) perl -e 'alarm shift; exec @ARGV' "$t" "$@" > "$OUT/prep-$id.log" 2>&1;; esac
+    return
+  fi
   case ",$SKIP," in *",${id%%-*},"*|*",$id,"*) echo -e "$id\tSKIP\t0\t-" >> "$SUM"; return;; esac
   local s=$(date +%s); echo "== $id: $*"
   perl -e 'alarm shift; exec @ARGV' "$t" "$@" > "$OUT/$id.log" 2>&1; local rc=$?
@@ -62,22 +72,33 @@ server_tests() {
   if [ -n "${SERVER_TEST_FILES:-}" ]; then read -r -a files <<< "$SERVER_TEST_FILES";
   else shopt -s globstar nullglob; files=(src/**/*.test.ts); fi
   [ "${#files[@]}" -gt 0 ] || return 1
-  env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 node --test --test-reporter=tap --test-concurrency=1 "${files[@]}"
+  local reporters=(--test-reporter=tap)
+  if [ -n "${V5_SHARD:-}" ]; then
+    printf '%s\n' "${files[@]}" > "$SUITE_COVERAGE_DIR/V5-all-files.txt"
+    local picked; picked=$(node "$HARNESS_DIR/v5-shard.mjs" "$V5_SHARD" "$HARNESS_DIR/v5-durations.json" < "$SUITE_COVERAGE_DIR/V5-all-files.txt") || return 1
+    mapfile -t files <<< "$picked"
+    printf '%s\n' "${files[@]}" > "$SUITE_COVERAGE_DIR/V5-shard-files.txt"
+    [ "${#files[@]}" -gt 0 ] || return 1
+    reporters+=(--test-reporter="$HARNESS_DIR/file-reporter.mjs" --test-reporter-destination=stdout --test-reporter-destination="$SUITE_COVERAGE_DIR/V5-server-full-files.jsonl")
+  fi
+  env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 node --test "${reporters[@]}" --test-concurrency=1 "${files[@]}"
 }
 export -f server_tests
-export REMAP
+export REMAP HARNESS_DIR="$ROOT/tools/test-harness"
 step V5-server-full 9000 bash -c 'server_tests "$1"' _ "$ROOT"
 if [ -n "${SERVER_TEST_FILES:-}" ] && [ "$BASELINE" != none ] && [ "$BASELINE" != "$ROOT" ]; then
   step V5-server-baseline 9000 bash -c 'server_tests "$1"' _ "$BASELINE"
 fi
-[ -z "$(busy)" ] || echo "WARNING: listeners left in 5400-5449 after V5" | tee -a "$OUT/V5-server-full.log"
+! want V5-server-full || [ -z "$(busy)" ] || echo "WARNING: listeners left in 5400-5449 after V5" | tee -a "$OUT/V5-server-full.log"
 # V6 new worlds: god + Soul e2es (real servers, fake minds, $0), Clerk via synthetic issuer, under /worlds
 step V6-scenarios 1500 node tools/god-skill/e2e/scenarios.mjs --port 5420
 step V6-party 1500 node tools/god-skill/e2e/party.mjs --no-shots --port 5421
 step V6-souls-r2 1500 node tools/god-skill/e2e/souls-r2.mjs --no-shots --port 5422
 step V6-join-clerk 900 node tools/god-skill/e2e/join.mjs --mode clerk --base /worlds --port 5425 --range 5426-5429
 step V6-join-dev 900 node tools/god-skill/e2e/join.mjs --mode dev --no-shots --port 5430 --range 5431-5434
-if skipped V6 || skipped V6-launcher; then
+if ! want V6-launcher; then
+  :
+elif skipped V6 || skipped V6-launcher; then
   echo -e "V6-launcher\tSKIP\t0\t-" >> "$SUM"
 elif [ "${REMOTE_SUITE_CPU:-}" = 1 ]; then
   # A named exclusion, never a green browser claim. The release gate validates the owner/reason.
@@ -91,7 +112,7 @@ for e in souls-ux mars-two lm-two; do [ -f tools/god-skill/e2e/$e.mjs ] && step 
 # V7 real input in real Chrome (lease, GPU), dpr 1 and 2
 #   old worlds: local root-path eden/mars/LM from this tree (5401-5403) beside the baseline tree (5411-5413)
 #   new world:  launcher under /worlds (5441, children 5442-5444): home → New world → arrival, camera, Join line
-if ! skipped V7; then
+if ! skipped V7 && want V7; then
 OLD_WORLDS_OUT="$OUT/old-worlds" node tools/test-harness/old-worlds.mjs "$ROOT" 5401 head > "$OUT/V7-servers-head.log" 2>&1 & P1=$!
 OLD_WORLDS_OUT="$OUT/old-worlds" node tools/test-harness/old-worlds.mjs "$BASELINE" 5411 base > "$OUT/V7-servers-base.log" 2>&1 & P2=$!
 for p in 5403 5413; do for i in $(seq 1 90); do curl -s -m 2 "http://127.0.0.1:$p/w/littlemartians/v1/config" >/dev/null && break; sleep 2; done; done
