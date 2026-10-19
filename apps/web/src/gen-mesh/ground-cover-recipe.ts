@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { levelAmong, watersNear } from '@sim/ground';
 import type { Entity, WorldModel } from '@sim/world-compiler';
-import { blockTest, inPoly, type BlockCells } from './block-test.ts';
+import { blockTest, inPoly, shapeBox, shapeHits, type BlockCells, type BlockShape } from './block-test.ts';
 import { terrainColorFor, groundRealismFor } from './ground-palette.ts';
 
 export const COVER_CELL = 8;
@@ -38,6 +38,8 @@ type Area = { kind: 'bare' | 'lawn' | 'mown' | 'meadow' | 'forest' | 'zone'; use
 export type CoverIndex = {
   model: WorldModel; palette: string; realism: boolean; base: number;
   blocked: (x: number, z: number) => boolean;
+  /** The blocked test narrowed to one rectangle's shapes (a cell deals a few hundred candidates against them). */
+  blockedIn: (x0: number, z0: number, x1: number, z1: number) => (x: number, z: number) => boolean;
   areas: Map<string, Area[]>;
   colour: (c: THREE.Color, y: number, slope: number, base: number, x?: number, z?: number) => void;
 };
@@ -80,7 +82,15 @@ export function coverIndex(model: WorldModel, blockedCells: BlockCells, blockCel
     put({ kind, use: String(e.params?.use ?? ''), poly, bb: [x0, z0, x1, z1], edge: num(e.params?.edge, 1), size: (x1 - x0) * (z1 - z0), ...(typeof e.params?.color === 'string' ? { color: e.params.color } : {}) });
   }
   for (const l of areas.values()) l.sort((a, b) => a.size - b.size);   // the smallest area that holds a point speaks for it
-  return { model, palette, realism: groundRealismFor(palette), base: model.constants.base ?? 0, blocked: blockTest(blockedCells, blockCell, '\u0000cover'), areas, colour: terrainColorFor(palette) };
+  return { model, palette, realism: groundRealismFor(palette), base: model.constants.base ?? 0, blocked: blockTest(blockedCells, blockCell, '\u0000cover'), blockedIn: (x0, z0, x1, z1) => narrowBlock(blockedCells, blockCell, x0, z0, x1, z1), areas, colour: terrainColorFor(palette) };
+}
+function narrowBlock(cells: BlockCells, C: number, x0: number, z0: number, x1: number, z1: number) {
+  const hit = new Set<BlockShape>();
+  for (let gz = Math.floor(z0 / C); gz <= Math.floor(z1 / C); gz++) for (let gx = Math.floor(x0 / C); gx <= Math.floor(x1 / C); gx++) for (const s of cells.get(`${gx},${gz}`) ?? []) {
+    if (hit.has(s)) continue; const b = shapeBox(s); if (b[0] <= x1 && b[2] >= x0 && b[1] <= z1 && b[3] >= z0) hit.add(s);
+  }
+  const list = [...hit];
+  return list.length ? (x: number, z: number) => { for (const s of list) if (shapeHits(s, x, z)) return true; return false; } : () => false;
 }
 function areaKind(e: Entity, def: NonNullable<ReturnType<WorldModel['resolvedDef']>>): Area['kind'] | null {
   const gen = def.make.kind === 'gen' ? def.make.gen : '', tags = def.tags ?? [];
@@ -152,19 +162,28 @@ export function siteAt(ix: CoverIndex, x: number, z: number, verge: boolean): Si
   return { tall, tuft, flower, h: ht, short, r, g: gg, b, dry, drift };
 }
 
-/** One cell's sites: a 2 m grid (5 × 5) of siteAt, verges marked where a path, paving or footprint is within 1.3 m. */
-export function cellSites(ix: CoverIndex, ci: number, cj: number): (Site | null)[] {
-  const x0 = ci * COVER_CELL, z0 = cj * COVER_CELL, S = SITES, sites: (Site | null)[] = [];
-  const blocked = ix.blocked, near = (x: number, z: number) => blocked(x + 1.3, z) || blocked(x - 1.3, z) || blocked(x, z + 1.3) || blocked(x, z - 1.3);
-  for (let j = 0; j <= S; j++) for (let i = 0; i <= S; i++) { const x = x0 + (i * COVER_CELL) / S, z = z0 + (j * COVER_CELL) / S; sites.push(siteAt(ix, x, z, blocked(x, z) || near(x, z))); }
-  return sites;
+/** One cell's sites: a 2 m grid (the terrain picture's own vertex step, so heights interpolate onto its surface) (5 × 5) of siteAt, verges marked where a path, paving or footprint is within 1.3 m. */
+export type CellSites = (Site | null)[] & { y?: Float32Array };
+export function cellSites(ix: CoverIndex, ci: number, cj: number): CellSites {
+  const x0 = ci * COVER_CELL, z0 = cj * COVER_CELL, S = SITES, sites: CellSites = [], y = new Float32Array((S + 1) * (S + 1));
+  const blocked = ix.blockedIn(x0 - 1.4, z0 - 1.4, x0 + COVER_CELL + 1.4, z0 + COVER_CELL + 1.4), near = (x: number, z: number) => blocked(x + 1.3, z) || blocked(x - 1.3, z) || blocked(x, z + 1.3) || blocked(x, z - 1.3);
+  for (let j = 0; j <= S; j++) for (let i = 0; i <= S; i++) { const x = x0 + (i * COVER_CELL) / S, z = z0 + (j * COVER_CELL) / S; y[j * (S + 1) + i] = ix.model.terrain.sample(x, z); sites.push(siteAt(ix, x, z, blocked(x, z) || near(x, z))); }
+  sites.y = y; return sites;
 }
 const SITES = 4;
 /** Floats per dealt instance: x, y, z, yaw, width scale, height scale, r, g, b, rank. */
 export const REC = 10;
 /** Deal one kind in one 8 m cell from its sites: records of REC floats sorted by rank (the renderer keeps a prefix). */
-export function cellKind(ix: CoverIndex, ci: number, cj: number, k: number, sites: (Site | null)[]): Float32Array {
-  const x0 = ci * COVER_CELL, z0 = cj * COVER_CELL, S = SITES, m = ix.model, blocked = ix.blocked;
+export function cellKind(ix: CoverIndex, ci: number, cj: number, k: number, sites: CellSites): Float32Array {
+  const x0 = ci * COVER_CELL, z0 = cj * COVER_CELL, S = SITES, m = ix.model, blocked = ix.blockedIn(x0, z0, x0 + COVER_CELL, z0 + COVER_CELL);
+  const Y = sites.y, G = COVER_CELL / S;
+  // ground height: bilinear on the 2 m site grid (where the terrain picture's vertices are), else an exact sample
+  const yAt = (x: number, z: number) => {
+    if (!Y) return m.terrain.sample(x, z);
+    const u = (x - x0) / G, v = (z - z0) / G, i = Math.min(S - 1, Math.floor(u)), j = Math.min(S - 1, Math.floor(v)), fu = u - i, fv = v - j, o = j * (S + 1) + i;
+    const h = (Y[o] * (1 - fu) + Y[o + 1] * fu) * (1 - fv) + (Y[o + S + 1] * (1 - fu) + Y[o + S + 2] * fu) * fv;
+    return Number.isFinite(h) ? h : m.terrain.sample(x, z);
+  };
   const at = (x: number, z: number) => sites[Math.round(((z - z0) / COVER_CELL) * S) * (S + 1) + Math.round(((x - x0) / COVER_CELL) * S)];
   const kind = KINDS[k], step = STEP[kind], n1 = Math.round(COVER_CELL / step), list: number[][] = [];
   for (let j = 0; j < n1; j++) for (let i = 0; i < n1; i++) {
@@ -173,7 +192,7 @@ export function cellKind(ix: CoverIndex, ci: number, cj: number, k: number, site
     const s = at(x, z); if (!s) continue;
     const want = kind === 'tall' ? s.tall : kind === 'tuft' ? s.tuft : s.flower;
     if (h01(gi, gj, 31 + k) >= want || blocked(x, z)) continue;
-    const y = m.terrain.sample(x, z); if (!Number.isFinite(y)) continue;
+    const y = yAt(x, z); if (!Number.isFinite(y)) continue;
     const v = h01(gi, gj, 41 + k), w = h01(gi, gj, 51 + k);
     let r = s.r, g = s.g, b = s.b, sc = 1, ht = 1;
     if (kind === 'tall') {

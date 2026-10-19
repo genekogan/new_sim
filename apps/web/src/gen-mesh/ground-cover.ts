@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import type { WorldModel } from '@sim/world-compiler';
 import { blockCellsOf, BLOCK_CELL } from './ecology.mesh.ts';
 import { browserQuality } from '../quality-tier.ts';
-import { COVER_CELL, KINDS, REC, cellKind, cellSites, coverIndex, coverPalette, prefix, type CoverIndex, type Site } from './ground-cover-recipe.ts';
+import { COVER_CELL, KINDS, REC, cellKind, cellSites, coverIndex, coverPalette, prefix, type CellSites, type CoverIndex } from './ground-cover-recipe.ts';
 
 /** Per kind: full density within d0 (m), thinning as (d0/d)^exp, gone by dmax; survivors grow by up to maxScale. */
 const LOD: Record<(typeof KINDS)[number], { d0: number; dmax: number; exp: number; maxScale: number; cap: number }> = {
@@ -24,7 +24,7 @@ const LOD: Record<(typeof KINDS)[number], { d0: number; dmax: number; exp: numbe
 };
 const keepAt = (k: (typeof KINDS)[number], d: number) => { const l = LOD[k]; if (d >= l.dmax) return 0; const f = Math.pow(l.d0 / Math.max(d, l.d0), l.exp); const e = (d - l.dmax * 0.75) / (l.dmax * 0.25); return e > 0 ? f * (1 - e * e * (3 - 2 * e)) : f; };
 const MAX_D = Math.max(...Object.values(LOD).map((l) => l.dmax));
-const MOVE = 2.5, DEAL_MS = 3, KEEP_CELLS = 1400;
+const MOVE = 2.5, DEAL_MS = 1, KEEP_CELLS = 1400;
 
 /** On or off for this page: off on the phone tier (P1's browserQuality), `?cover=0|1` overrides either way. */
 export function coverSetting(search = typeof location === 'undefined' ? '' : location.search, tier: { tier: string; reason: string } = browserQuality()): { enabled: boolean; reason: string } {
@@ -120,7 +120,7 @@ function coverMaterial(kind: (typeof KINDS)[number]) {
 
 // ---------------------------------------------------------------- the layer
 type Layer = { kind: (typeof KINDS)[number]; k: number; mesh: THREE.InstancedMesh; rank: THREE.InstancedBufferAttribute };
-type CellEntry = { gen: number; sites: (Site | null)[]; kinds: (Float32Array | null)[]; used: number };
+type CellEntry = { gen: number; sites: CellSites; kinds: (Float32Array | null)[]; used: number };
 export type GroundCoverStats = { enabled: boolean; reason: string; cells: number; dealt: number; instances: Record<string, number>; dealMs: number; rebuilds: number; pending: number };
 
 export class GroundCover {
