@@ -160,10 +160,10 @@ export class ChildPool {
     }
     return frozen;
   }
-  /** Wake a frozen world (SIGCONT); it counts as just used. */
-  thaw(k) {
+  /** Wake a frozen world (SIGCONT); it counts as just used unless `use` is false (a passive read: it may sleep again soon). */
+  thaw(k, { use = true } = {}) {
     if (!k?.frozen) return;
-    k.frozen = false; k.frozenAt = null; k.lastUsed = Date.now();
+    k.frozen = false; k.frozenAt = null; if (use) k.lastUsed = Date.now();
     try { k.child?.kill('SIGCONT'); } catch { /* gone */ }
     this.o.onChange?.(k.slug);
   }
@@ -183,12 +183,12 @@ export class ChildPool {
   }
 
   /** Start (or join the start of) a world; resolves with its port once /healthz answers. */
-  ensure(world, { timeoutMs = 90_000 } = {}) {
+  ensure(world, { timeoutMs = 90_000, passive = false } = {}) {
     if (this.fenced) { const e = new Error(`world ${world.slug} is served by a newer launcher`); e.code = 'handed-over'; return Promise.reject(e); }
     let k = this.kids.get(world.slug);
     if (k?.handedBack) { const e = new Error(`world ${world.slug} is going back to the previous launcher`); e.code = 'handed-back'; return Promise.reject(e); }
-    if (k) k.lastUsed = Date.now();
-    if (k?.frozen) this.thaw(k);
+    if (k && !passive) k.lastUsed = Date.now();
+    if (k?.frozen) this.thaw(k, { use: !passive });
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
     // adopted but its handover failed: the previous launcher may still hold its database, so it is never started here

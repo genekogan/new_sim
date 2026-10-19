@@ -161,7 +161,11 @@ test('an idle world falls asleep (frozen in place) and wakes at once on its next
     const k = L4.pool.state('idle'); assert.equal(k.frozen, true);
     assert.equal(stateOf(k.child.pid), 'T', 'the process is stopped, not exited');
     const pid = k.child.pid;
-    const t0 = Date.now(); const r = await fetch(`${base}/w/idle/healthz`); const wakeMs = Date.now() - t0;
+    // a monitor's health read is answered (the world wakes for it) but is not a visit: the world goes back to sleep
+    assert.equal((await fetch(`${base}/w/idle/healthz`)).status, 200);
+    for (let i = 0; i < 40 && (await kids()).idle !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.equal((await kids()).idle, 'asleep', 'a passive read does not keep it awake');
+    const t0 = Date.now(); const r = await fetch(`${base}/w/idle/slow?ms=1`); const wakeMs = Date.now() - t0;
     assert.equal(r.status, 200); assert.ok(wakeMs < 500, `woke in ${wakeMs} ms`);
     assert.equal(L4.pool.state('idle').child.pid, pid, 'the same process, thawed');
     assert.equal((await kids()).idle, 'running');
