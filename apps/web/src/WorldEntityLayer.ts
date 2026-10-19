@@ -228,7 +228,12 @@ export class WorldEntityLayer {
     // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
     // plane at y ≈ 0 would cover every pond, river and cut below it)
     if (baseGround) baseGround.traverse((o) => { if ((o.name === 'outside-ground' || o.name === 'commons-ground' || (o.parent === baseGround && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry?.type === 'PlaneGeometry')) && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
+    this.interiorFar.clear();
+    if (this.interiorHosts.size > this.drawn.size * 2 + 64) this.interiorHosts.clear();
     for (const [id, d] of this.drawn) {
+      // P1: a settled, still thing (eased in, no motion, not ridden or held) keeps its pose: only its interior visibility
+      // can change. ~4,800 entities on Eden 2026; rewriting each pose every frame was most of this loop.
+      if (d.settled && !d.inst && !d.motion && !d.removing && !this.overrides.has(id) && !this.held.has(id)) { d.obj.visible = this.interiorVisible(id); continue; }
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const ride = this.overrides.get(id); if (ride) d.obj.position.copy(ride);
@@ -243,6 +248,7 @@ export class WorldEntityLayer {
       }
       d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
+      if (t >= 1 && !d.motion && !d.removing && !ride && !inHand) d.settled = true;
       if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: ride ? ride.y : d.to.p.y, yaw: d.motion.yaw });
       if (ride) { d.obj.position.x = ride.x; d.obj.position.z = ride.z; }
     }
@@ -275,17 +281,35 @@ export class WorldEntityLayer {
     return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
   }
 
+  /** P1 phones: when set (the phone tier), things inside a building further than `interiorRange` metres from this point
+   *  are not drawn (a phone shows a building's furniture through its windows as a few pixels; ~1,300 meshes on Eden 2026). */
+  interiorFrom: THREE.Vector3 | null = null;
+  interiorRange = 30;
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
   private interiorVisible(id: string): boolean {
     if (!this.model) return true;
-    let e = this.model.entities.get(id), slot = e?.in.slot;
-    for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
-      const host = this.drawn.get(e.in.parent)?.obj.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
-      if (host) return (host.floorOf[slot ?? ''] ?? 0) <= host.cut();
-      e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
+    // P1: which building (if any) holds a thing, and on which slot, is found once per world revision (seq + drawn count),
+    // not by walking the parent chain of all ~4,800 things every frame; each building's answer is memoised per frame
+    const key = `${this.seq}:${this.drawn.size}`;
+    let c = this.interiorHosts.get(id);
+    if (!c || c.key !== key) {
+      c = { key, host: null, slot: '' };
+      let e = this.model.entities.get(id), slot = e?.in.slot;
+      for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
+        if (this.drawn.get(e.in.parent)?.obj.userData.interior) { c.host = e.in.parent; c.slot = slot ?? ''; break; }
+        e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
+      }
+      this.interiorHosts.set(id, c);
     }
-    return true;
+    if (c.host === null) return true;
+    const hostObj = this.drawn.get(c.host)?.obj, host = hostObj?.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
+    if (!hostObj || !host) return true;
+    let far = this.interiorFar.get(hostObj);
+    if (far === undefined) { far = !!this.interiorFrom && hostObj.parent === this.thingsGroup && hostObj.position.distanceToSquared(this.interiorFrom) > this.interiorRange * this.interiorRange; this.interiorFar.set(hostObj, far); }
+    return !far && (host.floorOf[c.slot] ?? 0) <= host.cut();
   }
+  private interiorHosts = new Map<string, { key: string; host: string | null; slot: string }>();
+  private interiorFar = new Map<THREE.Object3D, boolean>();
 
   /** A box worth looking at first: the placed things if any, else the middle of the world. */
   viewBounds(): [number, number, number, number] {

@@ -183,7 +183,7 @@ try {
         if (await collapse.count()) await collapse.first().tap({ timeout: 4000 }).catch(() => {});
         if (await open.count()) speechTap = await open.tap({ timeout: 4000, trial: true }).then(() => 'avatar tappable', () => 'avatar covered by another control');
         // Frame the speaker at a phone-chat distance (entity worlds expose the camera): the tag's anchor is the head.
-        speechTap += ' / ' + await page.evaluate((id) => { const w = window.__simEntity; let at = null; w?.scene.traverse((o) => { if (o.isCSS2DObject && o.element?.dataset?.soulId === id) at = o.position.clone(); }); if (!at) return 'speaker not found'; w.controls.target.copy(at); w.camera.position.set(at.x + 5, at.y + 2.5, at.z + 7); w.camera.lookAt(at); w.controls.update?.(); return 'framed'; }, soul.id);
+        speechTap += ' / ' + await page.evaluate((id) => { const w = window.__simEntity; let at = null; (w?.labelScene ?? w?.scene)?.traverse((o) => { if (o.isCSS2DObject && o.element?.dataset?.soulId === id) at = o.position.clone(); }); if (!at) return 'speaker not found'; w.controls.target.copy(at); w.camera.position.set(at.x + 5, at.y + 2.5, at.z + 7); w.camera.lookAt(at); w.controls.update?.(); return 'framed'; }, soul.id);
         await page.waitForTimeout(2000);
         const said = await ctx.request.post(base + '/v1/edge/say', { headers: { authorization: `Bearer ${cred.token}` }, data: { text: 'Hello from this phone. Can you read these two lines while walking through the world?' } });
         await page.waitForFunction(() => [...document.querySelectorAll('.dialogue-popup')].some((e) => !e.hidden && e.getClientRects().length), null, { timeout: 30000 }).catch(() => {});
