@@ -10,8 +10,9 @@
 // No dependencies, no network. The off-box watcher (team/ops/sim-watch, Modal) reads `hostOk`/`hostCodes` from healthz and
 // DMs Gene. Exit 0 always (a failed check must not flap the unit).
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readdirSync, readFileSync, renameSync, statfsSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readdirSync, readFileSync, realpathSync, renameSync, statfsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export function memAvailableMb(meminfo) {
   const m = /^MemAvailable:\s+(\d+)\s+kB/m.exec(meminfo);
@@ -99,4 +100,6 @@ function main(argv) {
   console.log(JSON.stringify(status));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2));
+// Compare real paths: on eden2 the unit runs it through the /srv/sim-worlds/<stage> symlink, while import.meta.url is the
+// resolved release path, so a plain string compare never ran main().
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) main(process.argv.slice(2));
