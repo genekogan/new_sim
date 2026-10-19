@@ -91,28 +91,28 @@ const spawn: ActionDef<{ id: string }, null, { id: string }> = {
 test('a step reuses the caller\'s table listing only when it runs no action code before its pass', () => {
   const reg = createRegistry([spawn as ActionDef]);
   const rt = new Runtime(world(), reg, { spatial: new Spatial(open(30)) }, ENGINE_INVARIANTS);
-  let seen: { list: Entity[]; keys: string[] } | null = null;
-  rt.observers.push({ onTick: (r) => { seen = { list: entityList(r.world), keys: entityKeys(r.world) }; } });
+  const seenBy: { list: Entity[]; keys: string[] }[] = [], seen = () => seenBy.at(-1)!;
+  rt.observers.push({ onTick: (r) => { seenBy.push({ list: entityList(r.world), keys: entityKeys(r.world) }); } });
   const fresh = () => ({ list: Object.values(rt.world.entities), keys: Object.keys(rt.world.entities) });
   // idle: the given listing is the pass's
   let t = listTable(rt.world.entities);
   rt.step(t);
   assert.equal(rt.passTable, t);
-  assert.equal(seen!.list, t.list);
-  assert.deepEqual(seen, fresh());
+  assert.equal(seen().list, t.list);
+  assert.deepEqual(seen(), fresh());
   // a live action that adds an entity: the pass lists the table afresh and sees it
   rt.submit('spawn_test', { id: 'spawned' });
   t = listTable(rt.world.entities);
   rt.step(t);
   assert.notEqual(rt.passTable, t);
-  assert.ok(seen!.list.some((e) => e.id === 'spawned'));
-  assert.deepEqual(seen, fresh());
+  assert.ok(seen().list.some((e) => e.id === 'spawned'));
+  assert.deepEqual(seen(), fresh());
   // a listing of another table object is ignored
   const other = listTable({ ...rt.world.entities });
   rt.step(other);
   assert.notEqual(rt.passTable, other);
-  assert.deepEqual(seen, fresh());
+  assert.deepEqual(seen(), fresh());
   // no listing given: the pass lists the table itself, as before
   rt.step();
-  assert.deepEqual(seen, fresh());
+  assert.deepEqual(seen(), fresh());
 });
