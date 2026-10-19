@@ -139,11 +139,13 @@ export class GodPlaces {
     return this.cache;
   }
   private gen: { key: string; it: Generator<void, GodPlace[], void> } | null = null;
+  /** The index key last put in the ledger (an engine-only edit leaves it: nothing to install again). */
+  private installedKey: string | undefined;
   /** Re-derive the places in slices of about `budgetMs`, then put them in the ledger's index. True when done. An edit
    *  landing mid-way is picked up by the next call (the host notes every edit). */
   syncStep(budgetMs: number): boolean {
     if (!this.h.edge?.places) return true;
-    if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { this.sync(); return true; } this.gen = { key, it: this.deriveGen() }; this.stats.derives++; }
+    if (!this.gen) { const key = this.key(); if (this.cache?.key === key) { if (this.installedKey !== key) this.sync(); return true; } this.gen = { key, it: this.deriveGen() }; this.stats.derives++; }
     const t0 = performance.now();
     for (;;) {
       const r = this.gen.it.next();
@@ -350,7 +352,7 @@ export class GodPlaces {
   /** Put the places in the ledger's index; take out the ones the god removed. */
   sync(fresh = false) {
     const places = this.h.edge?.places; if (!places) return;
-    const want = new Map(this.list(fresh).map((p) => [p.id, p]));
+    const want = new Map(this.list(fresh).map((p) => [p.id, p])); this.installedKey = this.cache?.key;
     for (const id of [...this.installed]) if (!want.has(id)) { places.byId.delete(id); this.installed.delete(id); }
     for (const [id, p] of want) {
       const cur = places.byId.get(id); if (cur && !this.installed.has(id)) continue;   // a boot place keeps its own
