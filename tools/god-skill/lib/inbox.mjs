@@ -5,6 +5,8 @@ import { call, ok, sleep } from './state.mjs';
  * transient answer (network, 408, 429, 5xx such as a world restarting at a deploy): it backs off 1..30 s and polls again,
  * quietly, so a background command wakes its session only for a message. Other errors (401, 403, 404...) still throw.
  * `beat` runs before every poll (G1: the listener heartbeat that keeps the look keeper warm). */
+/** P2: 50 ms after a real long poll; a poll answered at once (an older server, a proxy) waits 50, 100, 200 ms ... up to 5 s, never a tight loop. */
+export const idleWait = (quick) => Math.min(5000, 50 * 2 ** Math.max(0, quick - 1));
 export const transient = (status) => status === 0 || status === 408 || status === 429 || status >= 500;
 export async function listen(flags = {}, { poll: pollFn, beat = () => {}, wait = sleep } = {}) {
   const seconds = flags.timeout === undefined ? 25 : Number(flags.timeout);
@@ -14,17 +16,18 @@ export async function listen(flags = {}, { poll: pollFn, beat = () => {}, wait =
   if (flags.follow && flags.once) throw new Error('listen takes --follow or --once, not both');
   const poll = pollFn ?? (after => call(`/v1/god/inbox/listen?${new URLSearchParams({ timeoutMs: String(Math.round(seconds * 1000)), ...(after ? { after } : {}) })}`, { timeoutMs: Math.round(seconds * 1000) + 10_000 }));
   if (flags.follow) return followInbox({ poll, after: flags.after, beat, wait });
-  let delay = 0;
+  let delay = 0, quick = 0;
   for (;;) {
     beat();
-    const r = await poll(flags.after);
+    const t0 = Date.now(), r = await poll(flags.after);
     if (!flags.once && transient(r.status)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await wait(delay); continue; }
     delay = 0;
     const data = ok(r, 'listen');
     if (!data?.inbox) throw new Error('listen: this world does not serve the owner inbox yet');
     const message = data.inbox.latest;
     if (flags.once || (message && message.state !== 'acknowledged' && message.id !== flags.after)) return data;
-    await wait(50); // Avoid a tight loop if an older server returns immediately.
+    quick = Date.now() - t0 < 1000 ? quick + 1 : 0;
+    await wait(idleWait(quick)); // after a long poll at once; a server that answers at once is polled ever more slowly (P2)
   }
 }
 
@@ -37,16 +40,16 @@ export async function ack(id, reply) {
 /** listen --follow: never returns; prints one compact JSON line per new owner message
  * (an event stream for a script; it never exits, so a background command would never wake its session). Network, 429 and 5xx answers back off and retry. */
 export async function followInbox({ poll, after, write = line => process.stdout.write(line + '\n'), wait = sleep, stop = () => false, beat = () => {} }) {
-  let last = after, delay = 0;
+  let last = after, delay = 0, quick = 0;
   while (!stop()) {
     beat();
-    const r = await poll(last);
+    const t0 = Date.now(), r = await poll(last);
     if (transient(r.status)) { delay = Math.min(30_000, delay ? delay * 2 : 1000); await wait(delay); continue; }
     delay = 0;
     if (r.status < 200 || r.status >= 300) throw new Error(`listen: HTTP ${r.status} ${JSON.stringify(r.data).slice(0, 300)}`);
     if (!r.data?.inbox) throw new Error('listen: this world does not serve the owner inbox yet');
     const m = r.data.inbox.latest;
     if (m && m.state !== 'acknowledged' && m.id !== last) { write(JSON.stringify({ id: m.id, text: m.text, sentAt: m.sentAt })); last = m.id; }
-    else await wait(50);
+    else { quick = Date.now() - t0 < 1000 ? quick + 1 : 0; await wait(idleWait(quick)); }
   }
 }

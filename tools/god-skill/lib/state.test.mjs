@@ -4,6 +4,9 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { call } from './state.mjs';
+import { retryDefaults } from './retry.mjs';
+
+retryDefaults.sleep = async () => {};   // P2 backoff waits are real in the CLI, instant here
 
 const json = (data, status = 200) => Response.json(data, { status });
 const accepted = { accepted: true, seq: 8, warnings: [], diff: { upserts: 1 } };
@@ -71,9 +74,10 @@ test('a lost resend response gets one final receipt read', async (t) => {
 });
 
 test('an unavailable lookup never authorizes a resend', async (t) => {
-  const calls = fixture(t, [timeout, disconnect]);
+  // P2: the receipt lookup is a GET, so a lost connection is retried (four times) before it counts as unavailable
+  const calls = fixture(t, [timeout, disconnect, disconnect, disconnect, disconnect, disconnect]);
   const result = await call('/v1/god/act', { body: { ops: [] } });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 6); assert.equal(calls.filter((c) => c.method === 'POST').length, 1);
   assert.equal(result.status, 0);
   assert.equal(result.data.code, 'slow');
   assert.equal(result.data.clientRef, JSON.parse(calls[0].body).clientRef);
@@ -107,11 +111,12 @@ test('typed refusals and HTTP errors are returned without transport retry', asyn
 });
 
 test('reads, query, dryrun and preview stay single requests without edit refs', async (t) => {
-  const calls = fixture(t, [json({}), json({}), json({}), json({}), disconnect]);
+  // P2: a read that loses its connection is retried four times, then reported
+  const calls = fixture(t, [json({}), json({}), json({}), json({}), disconnect, disconnect, disconnect, disconnect, disconnect]);
   await call('/v1/god/status');
   for (const path of ['/v1/god/query', '/v1/god/dryrun', '/v1/god/preview']) await call(path, { body: { ops: [] } });
   assert.equal((await call('/v1/god/status')).status, 0);
-  assert.equal(calls.length, 5);
+  assert.equal(calls.length, 9); assert.equal(calls.filter((c) => c.method === 'POST').length, 3);
   for (const c of calls) assert.equal(c.body ? JSON.parse(c.body).clientRef : undefined, undefined);
 });
 

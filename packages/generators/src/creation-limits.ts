@@ -12,8 +12,12 @@ export const CREATION_LIMITS = Object.freeze({
   kitColliderSlices: 8,
   /** Target vertical over-coverage for a sliced tilted primitive, before the slice cap. */
   kitColliderSliceRiseM: 0.25,
-  /** Existing entity ceiling; all expansion/clone paths share admission now. */
-  worldEntities: 50_000,
+  /** Entity ceiling; all expansion/clone paths share admission. P2 2026-10-19: 50,000 -> 20,000. A world is one Node process
+   *  with --max-old-space-size 768 in production; locally a hamlet grown with simple placements measured 129 MB RSS empty,
+   *  268 MB at 5k, 520 MB at 10k, 668 MB at 20k entities (~25 MB per 1,000), and Eden 2026 (4.9k richer entities) runs at
+   *  ~717 MB on eden2: 50,000 would not fit the heap and would crash-loop its world. 20,000 is 4x Eden 2026 (the largest
+   *  live world, 4,947). Growth past it is refused (budget.world, logged); removal always works. */
+  worldEntities: 20_000,
   /** Retained definition hashes, including historical versions needed by undo. */
   worldDefs: 10_000,
   /** Sum of baked triangles for placed instances (including expanded children). */

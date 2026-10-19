@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { listen, ack } from './inbox.mjs';
+import { listen, ack, idleWait } from './inbox.mjs';
 import { call } from './state.mjs';
 import { COMMANDS, checkArgs, parseFlags } from '../cli.mjs';
 import { noticeOwnerInbox, noticeInboxHeader } from './inbox-notice.mjs';
@@ -162,4 +162,8 @@ test('G1: listen retries network, 408, 429 and 5xx quietly and exits only with a
   const many = Array.from({ length: 8 }, () => ({ status: 500, data: {} })).concat([{ status: 200, data: envelope(latest('m')) }]), w2 = [];
   await listen({}, { poll: async () => many.shift(), wait: async ms => { w2.push(ms); } });
   assert.equal(Math.max(...w2), 30000);
+});
+
+test('P2: a listen answered at once by the server is polled ever more slowly, never in a tight loop', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(idleWait), [50, 50, 100, 200, 400, 800, 1600, 3200, 5000, 5000]);
 });

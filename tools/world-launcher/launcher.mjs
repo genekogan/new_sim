@@ -79,6 +79,7 @@ import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
 import { EXISTING_WORLDS, decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 import { makeHandoff } from './handoff.mjs';
+import { launcherFlood } from './flood.mjs';
 import { archiveWorld, archivedSlugs, listArchive, readAudit, restoreWorld, tokenLabel } from './worldops.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
@@ -125,6 +126,7 @@ export async function openLauncher(cfg = {}) {
   const templateList = cachedTemplates(templatesDir);   // P2: never parse ~2 MB of templates per proxied request
   const marsWebDir = cfg.marsWebDir ?? (existsSync(join(root, '.lane/mars-web')) ? join(root, '.lane/mars-web') : undefined);
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
+  const flood = process.env.SIM_FLOOD === '0' ? () => null : launcherFlood({ log, limits: cfg.floodLimits });   // P2 coarse ceiling, see flood.mjs
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
   const authEnvFile = cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE;
@@ -434,6 +436,17 @@ export async function openLauncher(cfg = {}) {
   // P2: a public page GET must not rewrite worlds.json synchronously each time (a look loop would): one save per 2 s at most
   let saveTimer = null;
   const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; registry.save(); }, 2000); saveTimer.unref?.(); };
+  // P2: a refusal is held for a second before it is sent, so a flooder that waits for each answer (every HTTP client does)
+  // sends at most one request a second per connection instead of thousands: the cheapest work for this shared loop is a
+  // timer. At most 2,000 refusals are held at once; past that the connection is closed at once.
+  let held = 0;
+  function refuseSlowly(req, res, flooded) {
+    if (held >= 2000) { res.shouldKeepAlive = false; json(res, flooded.status, flooded.body, { ...flooded.headers, connection: 'close' }); return; }
+    held++; let done = false;
+    const finish = () => { if (done) return; done = true; held--; clearTimeout(timer); };
+    const timer = setTimeout(() => { finish(); if (!res.destroyed) json(res, flooded.status, flooded.body, flooded.headers); }, 1000);
+    res.once('close', finish);
+  }
   function observe(slug, req, url) {
     const s = seenOf(slug), rest = url.pathname.slice(wp(slug).length) || '/';
     // `god look` loads the page with ?shot=1 (29 WP0): count it as a look.
@@ -468,6 +481,10 @@ export async function openLauncher(cfg = {}) {
       if ((req.headers.accept ?? '').includes('text/html')) { res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' }).end(`<!doctype html><meta charset="utf-8"><title>No such world</title><body style="font:16px system-ui;max-width:640px;margin:12vh auto;padding:0 20px"><h1>No world called “${slug.replace(/[<>&"]/g, '')}” here</h1><p><a href="${B}/">See the worlds here</a>, or make a new one.</p>`); return; }
       json(res, 404, { ok: false, code: 'world.not-served', slug }); return;
     }
+    // P2: one flooding visitor or agent is refused here (every world shares this loop), before its world is contacted: a
+    // refusal neither boots nor wakes a sleeping world, keeps it awake, counts as its use, nor counts as a look or an agent
+    const flooded = retried ? null : flood(req, url.pathname.slice(wp(slug).length) || '/', behindProxy, slug);
+    if (flooded) { refuseSlowly(req, res, flooded); return; }
     // a monitor's or the homepage's read (health, config, status, no token) is answered, waking the world if it sleeps, but
     // is not a visit: it neither keeps the world awake nor counts as its last use (lane P3; sim-watch polls every 5 min)
     const passive = PASSIVE_READ.test(url.pathname) && (req.method === 'GET' || req.method === 'HEAD') && !req.headers.authorization;

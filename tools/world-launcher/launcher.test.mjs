@@ -187,6 +187,26 @@ test('an idle world falls asleep (frozen in place) and wakes at once on its next
     await L4.pool.stop('held'); assert.ok(['SIGTERM', 0].includes(await exited));
   } finally { await L4.close(); }
 });
+test('a flood refusal (P2) neither wakes a sleeping world nor counts as its use', async () => {
+  const P = 6548, base = `http://127.0.0.1:${P}`;   // lane P2's ports
+  const L5 = await openLauncher({ port: P, range: [6549, 6549], dataDir: join(dir, 'data-flood'), webDir, templatesDir, command, sleepMs: 400, eager: 0, log: () => {}, floodLimits: { godTokenPerS: 0.001, godTokenBurst: 1 } });
+  const kids = async () => Object.fromEntries((await (await fetch(`${base}/__sim/launcher`)).json()).children.map((c) => [c.slug, c.status]));
+  const asleep = async () => { for (let i = 0; i < 40 && (await kids()).calm !== 'asleep'; i++) await new Promise((r) => setTimeout(r, 100)); return (await kids()).calm; };
+  const god = { headers: { authorization: 'Bearer god_ok' } };
+  try {
+    assert.equal((await fetch(`${base}/__sim/worlds`, { method: 'POST', body: JSON.stringify({ name: 'Calm' }) })).status, 201);
+    assert.equal((await fetch(`${base}/w/calm/v1/god/edits?limit=1`, god)).status, 200, 'the first request is within the burst');
+    assert.equal(await asleep(), 'asleep');
+    const pid = L5.pool.state('calm').child.pid, used = L5.pool.state('calm').lastUsed;
+    const t0 = Date.now(), r = await fetch(`${base}/w/calm/v1/god/edits?limit=1`, god);
+    assert.equal(r.status, 429); assert.ok(r.headers.get('retry-after')); assert.ok(Date.now() - t0 >= 900, 'held about a second');
+    assert.match((await r.json()).message, /slow down/);
+    assert.equal((await kids()).calm, 'asleep', 'refused before the world was woken');
+    assert.equal(L5.pool.state('calm').frozen, true);
+    assert.equal(L5.pool.state('calm').child.pid, pid);
+    assert.equal(L5.pool.state('calm').lastUsed, used, 'a refusal is not a use');
+  } finally { await L5.close(); }
+});
 test('children a hard-killed launcher left behind are stopped before their worlds start again', async () => {
   const { spawn } = await import('node:child_process');
   const orphan = spawn(process.execPath, [fake], { env: { ...process.env, WORLD_KEY: 'orphan', PORT: '6208' }, stdio: 'ignore' });
