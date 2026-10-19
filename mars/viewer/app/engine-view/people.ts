@@ -100,7 +100,8 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
         // W3: the mesh file is pinned by its own hash and stands for its source GLB (same node/mesh/material indices)
         if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,wire&&sha===wire.meshSHA256?wire.sourceSHA256:sha);
       }:undefined);
-      if(clips)gltf.animations=await clips;
+      // own copies: templateFromGltf's fitArms scales this body's arm translation tracks in place
+      if(clips)gltf.animations=(await clips).map(c=>c.clone());
       const template=templateFromGltf(name,gltf,appearance);options?.onTemplate?.(template);report('loaded');return template;
       }catch(error){report('failed');throw error;}
     }),

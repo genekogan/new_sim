@@ -7,7 +7,8 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import * as THREE from 'three';
 import {GLTFLoader, type GLTF} from 'three/addons/loaders/GLTFLoader.js';
-import {templateFromGltf} from '../../../mars/viewer/app/engine-view/people.ts';
+import {loadTemplates, templateFromGltf} from '../../../mars/viewer/app/engine-view/people.ts';
+import {ThreeResources} from '../../../mars/viewer/lib/three-resources.ts';
 import {collectTemplateAppearance} from '../../../mars/viewer/app/engine-view/human-appearance.ts';
 import {CHARACTER_CLIPS, CHARACTER_WIRE} from '../../../mars/viewer/app/engine-view/character-wire.ts';
 // @ts-expect-error a plain .mjs tool without types
@@ -42,6 +43,22 @@ test('the committed wire files and character-wire.ts are exactly what the tool m
   }
   for (const [name, c] of Object.entries(CHARACTER_CLIPS)) assert.equal(sha(file(name)), c.sha256, name);
   assert.equal(CHARACTER_WIRE.casual.clips, CHARACTER_WIRE.punk.clips, 'casual and punk share one clips file');
+});
+
+test('loadTemplates (mesh files + one parse of each shared clips file) = templates from the source GLBs, after every fit', async () => {
+  const g = globalThis as unknown as {fetch: typeof fetch; location?: {href: string}}, realFetch = g.fetch, hadLocation = 'location' in g;
+  g.location ??= {href: 'http://local/'}; const asked: string[] = [];
+  g.fetch = (async (url: string) => { const name = String(url).split('/').pop()!.split('?')[0]; asked.push(name); const b = file(name); return new Response(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer); }) as typeof fetch;
+  try {
+    const wire = await loadTemplates(new AbortController().signal, new ThreeResources());
+    assert.deepEqual(asked.sort(), ['animated-casual.mesh.glb', 'animated-punk.mesh.glb', 'animated-woman.mesh.glb', 'clips-ual-woman.glb', 'clips-ual.glb'], 'each clips file once');
+    for (const t of wire) {
+      const source = templateFromGltf(t.name, await parse(file(`animated-${t.name}.glb`)));
+      assert.equal(measured(t), measured(source), t.name);
+      assert.deepEqual(clipsOf(t.gltf), clipsOf(source.gltf), `${t.name}: clips after this body's arm fit`);
+      assert.equal(fingerprint(t.gltf.scene), fingerprint(source.gltf.scene), t.name);
+    }
+  } finally { g.fetch = realFetch; if (!hadLocation) delete g.location; }
 });
 
 for (const name of ['casual', 'punk', 'woman'] as const) {
