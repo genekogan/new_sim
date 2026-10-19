@@ -5,7 +5,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { memAvailableMb, prewarmBlocked, rotateLog } from './production.mjs';
+import { cgroupHeadroomMb, memAvailableMb, PREWARM_MB, prewarmBlocked, rotateLog } from './production.mjs';
 
 /** Printed by a world process started with SIM_STANDBY=1 once its code is loaded (apps/server/src/standby.ts). */
 export const STANDBY_MARK = '[standby] ready';
@@ -207,10 +207,13 @@ export class ChildPool {
   async makeRoom(slug) {
     const { maxRunning = Infinity, minFreeMb = 0 } = this.o;
     for (;;) {
-      const full = this.running(slug) >= maxRunning, low = minFreeMb > 0 && memAvailableMb() < minFreeMb;
+      // low: the host under its floor, or (lane P3) the unit within one world of its own MemoryHigh/Max: the worlds share
+      // the unit's cgroup (production 8G/9G), which fills long before the host does, and over MemoryMax a world is killed
+      const room = minFreeMb > 0 ? (this.o.unitRoom ?? cgroupHeadroomMb)() : null;
+      const full = this.running(slug) >= maxRunning, low = minFreeMb > 0 && (memAvailableMb() < minFreeMb || (room !== null && room < (this.o.unitFloorMb ?? PREWARM_MB)));
       if (!full && !low) return;
       if (!(await this.evictIdle(slug))) {
-        const e = new Error(full ? `all ${maxRunning} world slots are in use; try again in a minute` : `the server is low on memory (under ${minFreeMb} MB free); try again in a minute`);
+        const e = new Error(full ? `all ${maxRunning} world slots are in use; try again in a minute` : `the server is low on memory (under ${minFreeMb} MB free, or ${room ?? '?'} MB under the unit's limit); try again in a minute`);
         e.code = 'capacity'; throw e;
       }
       await sleep(200);   // the sleeper's memory takes a moment to come back
