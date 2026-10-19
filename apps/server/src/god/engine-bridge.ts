@@ -528,7 +528,7 @@ export class EngineBridge {
     }
     const t0 = performance.now();
     try { if (this.perceive.step(PERCEIVE_SLICE_MS)) this.perceiveRunning = false; }
-    catch (e) { this.log(`perceive: ${(e as Error).message}`); }
+    catch (e) { this.perceiveRunning = false; this.log(`perceive: ${(e as Error).message}`); }   // retried on the next catch-up, never every tick
     const c = this.catchUp, ms = performance.now() - t0; c.slices++; if (ms > c.maxMs) c.maxMs = ms;
     // a slice that ran long (one place or the named things re-derived at once) is worth a line in the world's log
     if (!this.perceiveRunning && c.maxMs > 40) this.log(`perceive catch-up: ${this.perceive.stats.lastIds} things${this.perceive.stats.lastFull ? ' (whole pass)' : ''}, ${c.slices} slices, longest ${Math.round(c.maxMs)} ms, ${Math.round(performance.now() - c.t0)} ms in all`);
