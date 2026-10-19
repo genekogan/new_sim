@@ -13,7 +13,7 @@
 // used. `on: "<name>"` puts a small item on an earlier item's `top` slot. Items that would cross a
 // wall, the stairs or a rail, stand in a doorway or at the foot/head of the stairs, or overlap an
 // earlier item are dropped and reported.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { obbOverlap } from '../../../packages/world-compiler/src/index.ts';
@@ -29,10 +29,17 @@ const itemBoxes = (baked, p, y, yaw) => {
   return boxes.map(b => ({ c: [p[0] + b.c[0] * c + b.c[1] * s, p[1] - b.c[0] * s + b.c[1] * c], half: b.half, yaw: b.yaw + yaw, y0: y + b.y0, y1: y + b.y1 }));
 };
 
-export function loadRecipe(style) {
-  const file = resolve(RECIPES, `${style}.json`);
-  if (!existsSync(file)) return JSON.parse(readFileSync(resolve(RECIPES, 'cottage.json'), 'utf8'));
-  return JSON.parse(readFileSync(file, 'utf8'));
+/** The furnish styles (recipe files), sorted. */
+export const furnishStyles = () => readdirSync(RECIPES).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).sort();
+const hasRecipe = (style) => /^[a-z0-9][a-z0-9-]*$/.test(String(style)) && existsSync(resolve(RECIPES, `${style}.json`));
+/** A style's recipe. `strict` (an explicit --style): an unknown style throws with the list of styles instead of
+ *  silently furnishing as a cottage; otherwise (a building's own style) it falls back to cottage. */
+export function loadRecipe(style, { strict = false } = {}) {
+  if (!hasRecipe(style)) {
+    if (strict) throw new Error(`furnish has no style "${style}"; styles: ${furnishStyles().join(', ')}`);
+    return JSON.parse(readFileSync(resolve(RECIPES, 'cottage.json'), 'utf8'));
+  }
+  return JSON.parse(readFileSync(resolve(RECIPES, `${style}.json`), 'utf8'));
 }
 
 /** Kind of a room from its id: `bedroom-2` → `bedroom`. */
@@ -50,13 +57,14 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   if (!baked.rooms?.length) return { ops: [], placed: [], dropped: [], notes: [`${buildingId} has no rooms`] };
   const args = def.make?.args ?? {};
   const st = style ?? args.furnish ?? args.style ?? b.params?.style ?? 'cottage';   // args.furnish: a def may borrow another style's recipe (roundhouse → cottage)
-  const recipe = opts.recipe ?? loadRecipe(st);
+  const recipe = opts.recipe ?? loadRecipe(st, { strict: style != null });
   const th = def.make?.kind === 'gen' && def.make.gen === 'building/1' && !(b.params?.plan) ? FRONT_YAW[b.params?.front ?? def.params?.front?.default ?? 's'] ?? 0 : 0;
   const c = Math.cos(th), s = Math.sin(th);
   const R = ([x, z]) => [x * c + z * s, -x * s + z * c];         // canonical → def frame
   const Ri = ([x, z]) => [x * c - z * s, x * s + z * c];         // def frame → canonical
   const existing = new Set([...(model.children.get(b.id) ?? [])].map((id) => model.entities.get(id)?.name).filter(Boolean));
   const ops = [], placed = [], dropped = [], notes = [];
+  if (!opts.recipe && style == null && !hasRecipe(st)) notes.push(`no "${st}" furnish recipe; furnished as a cottage (pass --style: ${furnishStyles().join(', ')})`);
   const taken = [];   // accepted item OBBs in the def frame, with floor
   const doors = (baked.openings ?? []).filter((o) => o.kind === 'door' || o.kind === 'arch');
   // the ends of each flight: the walk planner steps on and off 0.7 m beyond them (sideways where a flight starts against a

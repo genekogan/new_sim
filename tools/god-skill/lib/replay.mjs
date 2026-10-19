@@ -2,7 +2,7 @@
 // never coordinates or wording. Transcript rows are `{at, cmd, ms, out|error}`; rows written since RL6 also carry
 // `argv` (exact words). Older rows only have `cmd` = the words joined by one space, so `argvOf` re-splits them with
 // the CLI's own reading tables. Nothing here talks to a network: the caller supplies the world's fetch.
-import { checkArgs, parseFlags, COMMANDS, CLI_SHAPE } from '../cli.mjs';
+import { checkArgs, readArgs, COMMANDS, CLI_SHAPE } from '../cli.mjs';
 
 const { POS, BOOL, boolsFor } = CLI_SHAPE;
 /** Commands a replay cannot reproduce in-process: browsers, engine probes, the shared clock, pairing, waits. */
@@ -94,13 +94,13 @@ export function unreplayable(row, argv = argvOf(row)) {
 
 /** The CLI's own refusal (parse + checkArgs) for an argv, or null when the CLI would send it. */
 export function cliRefusal(argv) {
-  const [cmd, ...rest] = argv, { flags, rest: words } = parseFlags(rest, boolsFor(cmd));
+  const [cmd, ...rest] = argv, { flags, rest: words } = readArgs(cmd, rest);   // the CLI's own reading, shell repairs included
   try { checkArgs(cmd, flags, words); return null; } catch (e) { return String(e.message ?? e); }
 }
 
 /** Run one argv through the real CLI (inside the caller's replay folder and fetch). Returns the transcript form. */
 export async function runArgv(argv) {
-  const [cmd, ...rest] = argv, { flags, rest: words } = parseFlags(rest, boolsFor(cmd));
+  const [cmd, ...rest] = argv, { flags, rest: words } = readArgs(cmd, rest);
   try { checkArgs(cmd, flags, words); } catch (e) { return { error: `REFUSED by the CLI: ${e.message}` }; }
   try { const out = await COMMANDS[cmd](words, flags); return { out: typeof out === 'string' ? out : out ?? null }; }
   catch (e) { return { error: String(e?.message ?? e) }; }

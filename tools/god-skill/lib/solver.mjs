@@ -342,7 +342,10 @@ export function solve(v, thing, rel) {
   if (rel.along) {
     const host = v.get(rel.along); if (!host) throw new Error(`no such path: ${rel.along}`);
     const path = host.shape?.path; if (!path) throw new Error(`${host.path} is not a path (it has no shape.path)`);
-    const L = polylineLength(path), pw = (host.shape.width ?? host.box?.[0] ?? 4) / 2;
+    // a road/river keeps its width in params (shape.width is optional): box[0] is the path's LENGTH, never its width.
+    // The server offsets from shape.width/2 (0 when absent), so the offset sent is measured from that line (spw).
+    const hostE = v.entity?.(host.id), hostDef = v.def?.(hostE?.def ?? host.def);
+    const L = polylineLength(path), pw = Number(host.shape.width ?? hostE?.params?.width ?? hostDef?.params?.width?.default ?? 4) / 2, spw = Number(host.shape.width ?? 0) / 2;
     const sides = rel.side === 'both' ? ['left', 'right'] : [rel.side ?? 'center'];
     const want = Number(rel.row ?? rel.count ?? 1);
     // --spacing: centre to centre; --gap: clear space between neighbours (edge to edge)
@@ -368,7 +371,7 @@ export function solve(v, thing, rel) {
         const tt = Math.min(1, Math.max(0, t + dt)); const q = pointAlong(path, tt); const lf = leftOf(q.dir);
         const xx = q.p[0] + lf[0] * sg * off, zz = q.p[1] + lf[1] * sg * off;
         if (dt !== 0 && !free(xx, zz, yaw)) continue;
-        cands.push(pose(xx, zz, yaw, { constraints: [{ kind: 'along', ref: host.path, t: r2(tt), side: serverSide(side), offset: r2(sg ? off - pw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r2(off - pw - hd)} m back from the edge` : ''}` }));
+        cands.push(pose(xx, zz, yaw, { constraints: [{ kind: 'along', ref: host.path, t: r2(tt), side: serverSide(side), offset: r2(sg ? off - spw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r2(off - pw - hd)} m back from the edge` : ''}` }));
       }
       items.push({ candidates: cands });
     }

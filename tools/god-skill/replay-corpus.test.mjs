@@ -54,14 +54,16 @@ test('the CLI writes exact argv into a transcript (quoting survives), with token
   try {
     writeFileSync(join(dir, '.eden-god.json'), JSON.stringify({ transcript: tr }));
     const run = args => spawnSync(process.execPath, [join(here, 'eden-god.mjs'), ...args], { cwd: dir, encoding: 'utf8', env: { ...process.env, EDEN_GOD_TRACE: '' } });
-    run(['help', 'two words']); run(['place', 'bench', '--param a=1 --param b=2', '--note', 'god_world_secret']);
+    // (a plain "--param a=1 --param b=2" in one argument is now read as separate words — fix cliargs — so the refusal
+    // recorded here is one with quotes inside, which the CLI never splits)
+    run(['help', 'two words']); run(['place', 'bench', '--param "label=a b" --scale 2', '--note', 'god_world_secret']);
     const rows = readFileSync(tr, 'utf8').trim().split('\n').map(l => JSON.parse(l));
     assert.deepEqual(rows[0].argv, ['help', 'two words']);
-    assert.deepEqual(rows[1].argv, ['place', 'bench', '--param a=1 --param b=2', '--note', 'god_…']);
+    assert.deepEqual(rows[1].argv, ['place', 'bench', '--param "label=a b" --scale 2', '--note', 'god_…']);
     assert.equal(outcomeOf(rows[1]), 'cli');
     assert.equal(unreplayable(rows[1]), null); // the joined cmd could not replay this refusal; exact argv can
-    assert.ok(cliRefusal(argvOf(rows[1])));
-    assert.equal(cliRefusal(argvOf({ cmd: rows[1].cmd })), null);
+    assert.match(cliRefusal(argvOf(rows[1])), /ONE argument/);
+    assert.notEqual(cliRefusal(argvOf({ cmd: rows[1].cmd })), cliRefusal(argvOf(rows[1])));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

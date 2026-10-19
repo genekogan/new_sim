@@ -1013,7 +1013,8 @@ function solve(v, thing, rel) {
     if (!host) throw new Error(`no such path: ${rel.along}`);
     const path = host.shape?.path;
     if (!path) throw new Error(`${host.path} is not a path (it has no shape.path)`);
-    const L = polylineLength(path), pw = (host.shape.width ?? host.box?.[0] ?? 4) / 2;
+    const hostE = v.entity?.(host.id), hostDef = v.def?.(hostE?.def ?? host.def);
+    const L = polylineLength(path), pw = Number(host.shape.width ?? hostE?.params?.width ?? hostDef?.params?.width?.default ?? 4) / 2, spw = Number(host.shape.width ?? 0) / 2;
     const sides = rel.side === "both" ? ["left", "right"] : [rel.side ?? "center"];
     const want = Number(rel.row ?? rel.count ?? 1);
     const step = (rel.spacing !== void 0 ? Number(rel.spacing) : 2 * hw + (rel.gap !== void 0 ? Number(rel.gap) : 4)) / L;
@@ -1038,7 +1039,7 @@ function solve(v, thing, rel) {
         const lf = leftOf(q.dir);
         const xx = q.p[0] + lf[0] * sg * off, zz = q.p[1] + lf[1] * sg * off;
         if (dt !== 0 && !free(xx, zz, yaw2)) continue;
-        cands.push(pose(xx, zz, yaw2, { constraints: [{ kind: "along", ref: host.path, t: r22(tt), side: serverSide(side), offset: r22(sg ? off - pw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r22(off - pw - hd)} m back from the edge` : ""}` }));
+        cands.push(pose(xx, zz, yaw2, { constraints: [{ kind: "along", ref: host.path, t: r22(tt), side: serverSide(side), offset: r22(sg ? off - spw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r22(off - pw - hd)} m back from the edge` : ""}` }));
       }
       items2.push({ candidates: cands });
     }
@@ -1581,9 +1582,22 @@ function view(m) {
   const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
   const children = (id) => m.rows.filter((r) => r.parent === id);
   const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
-  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
+  const refs = [...new Set([...m.snapshot.defs ?? [], ...m.snapshot.library ?? []].map((d) => d.ref).filter(Boolean))];
+  return { m, rows: m.rows, byId, byPath, get, entity, children, def, refs, extent: m.extent };
 }
 var normDef = (d) => d.includes("@") || d.startsWith("sha:") ? d : `core/${d}@1`;
+function resolveDef(v, ref) {
+  const s = String(ref ?? "").trim();
+  if (!s || s.startsWith("sha:") || v.def(s)) return null;
+  const m = /^(?:core[/-])?([a-z0-9][a-z0-9._-]*?)(?:@(\d+))?$/i.exec(s);
+  if (!m) return null;
+  const [, name, ver] = m, hits = /* @__PURE__ */ new Set();
+  for (const r of v.refs ?? []) {
+    const d = /^(core[/-])?(.+)@(\d+)$/.exec(r);
+    if (d && d[2] === name && (!ver || d[3] === ver)) hits.add(d[1] ? `core/${d[2]}@${d[3]}` : r);
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
 async function follow(seconds = 3600, onEvent = () => {
 }) {
   const s = load();
@@ -1613,6 +1627,103 @@ async function follow(seconds = 3600, onEvent = () => {
   } catch {
   }
   return { ended: true };
+}
+
+// lib/args.mjs
+var FREE = /* @__PURE__ */ new Set(["title", "brief", "say", "note", "asks", "steps", "mass", "event", "views", "state", "path", "area", "label", "text"]);
+var WORD = /* @__PURE__ */ new Set(["at", "near", "along", "t", "side", "facing", "name", "scale", "yaw", "dir", "dist", "offset", "by", "step", "inside", "on", "against", "wall", "corner", "count", "row", "gap", "spacing", "from", "to", "radius", "size", "setback", "around", "via"]);
+var REF_POS = /* @__PURE__ */ new Set(["place", "terrain", "move", "set", "clone", "describe", "where", "clear", "furnish"]);
+var POINT = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
+var kindOf = (w) => POINT.test(w) ? "point" : w !== "" && Number.isFinite(Number(w)) ? "num" : "word";
+var accepts = (k, numeric) => numeric.has(k) ? ["num"] : k === "by" || k === "step" ? ["point"] : k === "offset" ? ["point", "num"] : ["name", "facing", "dir", "wall", "corner", "side"].includes(k) ? ["word"] : ["point", "word"];
+var isOpt = (a) => typeof a === "string" && a.startsWith("--") && a.length > 2;
+function* permutations(n) {
+  const a = [...Array(n).keys()];
+  const rec = function* (i) {
+    if (i === n) {
+      yield [...a];
+      return;
+    }
+    for (let j = i; j < n; j++) {
+      [a[i], a[j]] = [a[j], a[i]];
+      yield* rec(i + 1);
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+  };
+  yield* rec(0);
+}
+function normalizeArgv(cmd, argv, { bools = /* @__PURE__ */ new Set(), numeric = /* @__PURE__ */ new Set(), needsValue = () => true } = {}) {
+  const notes = [];
+  let out = [];
+  for (const a of argv) {
+    const m = typeof a === "string" ? /^--([a-z][\w-]*)\s+\S/i.exec(a) : null;
+    if (m && !FREE.has(m[1]) && !/["'{}[\]]/.test(a)) {
+      const parts2 = a.trim().split(/\s+/);
+      out.push(...parts2);
+      notes.push(`read "${a}" as ${parts2.length} words: ${parts2.join(" ")}`);
+    } else out.push(a);
+  }
+  const opts = [], pos = [];
+  for (let i = 0; i < out.length; i++) {
+    const a = out[i];
+    if (!isOpt(a)) {
+      pos.push(i);
+      continue;
+    }
+    if (a.includes("=")) continue;
+    const k = a.slice(2);
+    if (k === "between") {
+      i += 2;
+      continue;
+    }
+    if (bools.has(k)) continue;
+    if (out[i + 1] !== void 0 && !isOpt(out[i + 1])) {
+      opts.push({ k, at: i, value: i + 1 });
+      i++;
+    } else opts.push({ k, at: i, value: null });
+  }
+  const empties = opts.filter((o) => o.value === null && needsValue(o.k));
+  const spaced = (s) => typeof s === "string" && /\S\s+\S/.test(s.trim()) && !/^\s*[[{]/.test(s);
+  const sources = [
+    ...opts.filter((o) => o.value !== null && WORD.has(o.k) && spaced(out[o.value])).map((o) => ({ idx: o.value, pos: false })),
+    ...REF_POS.has(cmd) && pos.length && spaced(out[pos[0]]) ? [{ idx: pos[0], pos: true }] : []
+  ].sort((a, b) => a.idx - b.idx);
+  if (!sources.length) return { argv: out, notes, hint: null };
+  const hint = `a value with spaces (${sources.map((s) => JSON.stringify(out[s.idx])).join(", ")}) usually means the shell did not split a variable (zsh never splits unquoted $vars): give each value its own word, e.g. use \${=row} in zsh or an array, or run the loop in bash`;
+  if (!empties.length) return { argv: out, notes, hint };
+  const extras = [];
+  for (const s of sources) {
+    const words = out[s.idx].trim().split(/\s+/);
+    if (s.pos && (cmd === "place" || cmd === "terrain") && !words[0].includes("@")) {
+      const last = words[words.length - 1], v = /@\d+$/.exec(last);
+      if (v) {
+        if (kindOf(last.slice(0, v.index)) === "word") return { argv: out, notes, hint };
+        words[words.length - 1] = last.slice(0, v.index);
+        words[0] += v[0];
+      }
+    }
+    s.first = words[0];
+    extras.push(...words.slice(1).map((w) => ({ w, src: s.idx })));
+  }
+  if (extras.length !== empties.length || extras.length > 6) return { argv: out, notes, hint };
+  const fits = (perm) => perm.every((e, j) => accepts(empties[j].k, numeric).includes(kindOf(extras[e].w)));
+  let pick = null;
+  const identity = extras.map((_, j) => j);
+  if (fits(identity)) pick = identity;
+  else {
+    const ok2 = [...permutations(extras.length)].filter(fits);
+    if (ok2.length === 1) pick = ok2[0];
+  }
+  if (!pick) return { argv: out, notes, hint };
+  const fill = new Map(empties.map((o, j) => [o.at, extras[pick[j]].w]));
+  const firsts = new Map(sources.map((s) => [s.idx, s.first]));
+  const next = [];
+  out.forEach((a, i) => {
+    next.push(firsts.has(i) ? firsts.get(i) : a);
+    if (fill.has(i)) next.push(fill.get(i));
+  });
+  notes.push(`a variable arrived unsplit; read as: ${cmd} ${next.map((w) => /\s/.test(w) || w === "" ? JSON.stringify(w) : w).join(" ")}`);
+  return { argv: next, notes, hint: null };
 }
 
 // lib/export.mjs
@@ -3480,7 +3591,7 @@ var relFrom = (f) => ({
   between: f.between ? [].concat(f.between).flatMap((x) => String(x).split(/\s+|;/)).filter(Boolean).slice(0, 2) : void 0,
   along: f.along,
   t: f.t,
-  side: f.side,
+  side: f.side === "centre" ? "center" : f.side,
   setback: f.setback ?? (f.along ? f.offset : void 0),
   inside: f.inside,
   corner: f.corner,
@@ -3501,14 +3612,26 @@ var relFrom = (f) => ({
 var hasRelation = (f) => ["at", "near", "around", "against", "between", "along", "across", "inside", "on", "free", "from", "row", "grid"].some((k) => f[k] !== void 0);
 async function place(defIn, flags2 = {}) {
   if (!defIn) throw new Error("usage: place <def> [--at \u2026|--near \u2026|--inside \u2026|--on \u2026|--along \u2026|--against \u2026|--between a b] [--facing \u2026] [--name n] [--param k=v]");
-  const def = normDef(defIn);
+  let def = normDef(defIn), readAs = null;
+  if (flags2.side !== void 0 && flags2.along === void 0) throw new Error("--side picks a side of a path: use it with --along <road|river|wall> (left|right|both); elsewhere use --dir or --facing");
   const params = flags2.param ? parseKV(flags2.param) : void 0;
   let shape;
   if (flags2.path) shape = { path: JSON.parse(flags2.path), ...flags2.width ? { width: num(flags2.width) } : {} };
   if (flags2.area) shape = { area: JSON.parse(flags2.area) };
   if (flags2.rect) shape = { area: rectArea(flags2.rect) };
   if (flags2.circle) shape = { area: circleArea(flags2.circle) };
-  const info = await bakeInfo(def, params, shape);
+  let info;
+  try {
+    info = await bakeInfo(def, params, shape);
+  } catch (e) {
+    const alt = /def\.unknown/.test(String(e?.message)) ? resolveDef(view(await mirror({ fresh: true })), defIn) : null;
+    if (!alt) throw e;
+    def = alt;
+    readAs = `read "${defIn}" as ${alt} (the only def of that name)`;
+    info = await bakeInfo(def, params, shape);
+  }
+  const tell = (r) => !readAs ? r : typeof r === "string" ? `${r}
+  note: ${readAs}` : { ...r, readAs };
   if (info.form !== "point" && !shape && !(info.form === "path" && (flags2.from || flags2.between || flags2.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === "path" ? "--path '[[x,z],\u2026]' [--width w] or --from <ref> --to <ref> [--via x,z]" : "--area '[[x,z],\u2026]', --rect cx,cz,w,d or --circle cx,cz,r"}`);
   const m = await mirror();
   const v = view(m);
@@ -3517,12 +3640,12 @@ async function place(defIn, flags2 = {}) {
     const spots = (await query({ free: { size: [info.box[0] + 1, info.box[2] + 1], near: [near.x, near.z], radius: flags2.radius ? num(flags2.radius) : 200, count: Number(flags2.count ?? 1) } })).free;
     if (!spots.length) throw new Error("no free flat dry plot found; try --radius or a smaller thing");
     flags2 = { ...flags2, at: void 0, near: void 0 };
-    return commitItems(v, def, info, flags2, params, spots.map((s) => ({ candidates: [{ p: s.at, ...flags2.facing ? {} : {}, note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []);
+    return tell(await commitItems(v, def, info, flags2, params, spots.map((s) => ({ candidates: [{ p: s.at, ...flags2.facing ? {} : {}, note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []));
   }
-  if (shape) return commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []);
+  if (shape) return tell(await commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []));
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0) throw new Error("where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free");
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags2.scale ? num(flags2.scale) : 1 }, relFrom(flags2));
-  return commitItems(v, def, info, flags2, params, sol.items, sol.notes);
+  return tell(await commitItems(v, def, info, flags2, params, sol.items, sol.notes));
 }
 var PREPARED = /* @__PURE__ */ new Set(["road/1", "path/1", "river/1", "bridge/1", "pier/1", "deck/1"]);
 async function prepareShape(def, info, shape, params) {
@@ -3762,13 +3885,22 @@ async function remove(ids) {
 }
 async function clone(id, flags2) {
   const o = { op: "clone", id, ...flags2.name ? { name: flags2.name } : {}, ...flags2.count ? { count: num(flags2.count) } : {}, ...flags2.step ? { step: String(flags2.step).split(",").map(Number) } : {}, ...flags2.yaw !== void 0 ? { r: num(flags2.yaw) } : {}, mode: flags2.nudge ? "nudge" : "strict" };
+  let from = "";
   if (flags2.at) {
     const v = view(await mirror());
     const p = refPoint(v, flags2.at, flags2.offset);
     o.p = [p.x, p.z];
+  } else if (o.count > 1 || o.step) {
+    const v = view(await mirror()), row = v.get(id), e = row ? v.entity(row.id) : null;
+    if (e) {
+      const step = o.step ?? [r2(Math.max(2, (row.box?.[0] ?? 1) * 1.5)), 0], b = e.p ?? [0, 0];
+      o.step = step;
+      o.p = b.length === 3 ? [r2(b[0] + step[0]), b[1], r2(b[2] + step[1])] : [r2(b[0] + step[0]), r2(b[1] + step[1])];
+      from = `, starting one step (${step.join(",")}) from ${row.path}`;
+    }
   }
   const r = await act({ ops: [o] }, flags2.note);
-  return r.accepted ? `cloned ${id}${o.count > 1 ? ` \xD7${o.count}` : ""} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+  return r.accepted ? `cloned ${id}${o.count > 1 ? ` \xD7${o.count}` : ""}${from} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 var SKY_PALETTES = PALETTE_LIST;
 async function worldState() {
@@ -4638,15 +4770,17 @@ var FLAGS = {
   ...GOV_FLAGS
 };
 var POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
+var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "scale", "floor", "height", "h", "frames", "every", "slope", "gap", "yaw"]);
+var SIDES = ["left", "right", "both", "center", "centre"];
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
   for (const [k, v] of Object.entries(f)) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}\u2026": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => "--" + x).join(" ")}`);
     for (const x of [].concat(v)) {
-      if (x === true && !boolsFor(cmd).has(k) && !(cmd === "build" && (k === "take" || k === "delete")) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
-      if (NUMERIC.has(k) && !(cmd === "build" && k === "steps") && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (x === true && !bareOk(cmd, k)) throw new Error(`--${k} needs a value`);
+      if ((NUMERIC.has(k) || k === "side" && cmd === "land") && !(cmd === "build" && k === "steps") && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (k === "side" && cmd !== "land" && x !== true && !SIDES.includes(String(x))) throw new Error(`--side is ${SIDES.slice(0, 4).join(", ")} (with --along <path>), got "${x}"`);
       if (cmd === "look" && ["dist", "span"].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === "" || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === "by" || k === "step") && cmd !== "land" && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
@@ -4655,6 +4789,18 @@ function checkArgs(cmd, f, rest) {
   }
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
+}
+var bareOk = (cmd, k) => boolsFor(cmd).has(k) || cmd === "build" && (k === "take" || k === "delete") || cmd === "look" && k === "inside" || cmd === "undo" && k === "group" || k === "free";
+function readArgs(cmd, argv) {
+  const numeric = /* @__PURE__ */ new Set([...NUMERIC, ...cmd === "land" ? ["side"] : []]);
+  const n = normalizeArgv(cmd, argv, { bools: boolsFor(cmd), numeric, needsValue: (k) => !bareOk(cmd, k) });
+  return { ...parseFlags(n.argv, boolsFor(cmd)), argv: n.argv, notes: n.notes, hint: n.hint };
+}
+function helpFor(cmd) {
+  const re = new RegExp(`(^[\\w-]+:\\s+|\xB7 |^)${cmd.replace(/[-]/g, "\\-")}(:| |$)`);
+  const lines = HELP.split("\n").filter((l) => re.test(l));
+  const opts = ["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)];
+  return [...lines.length ? lines : [`${cmd}: see help`], `${cmd} options: ${opts.map((x) => "--" + x).join(" ")}`].join("\n");
 }
 var CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
 var readArg = (r) => r[0] !== void 0 ? existsSync8(r[0]) && !r[0].trim().startsWith("{") ? readFileSync8(r[0], "utf8") : r[0] : readFileSync8(0, "utf8");
@@ -4788,7 +4934,7 @@ learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (pa
 var NO_WARM = /* @__PURE__ */ new Set(["help", "register", "mint", "pair", "doctor", "look", "look-shot", "look-keeper"]);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
-  const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
+  const { flags: f, rest, argv: readAs, notes, hint } = readArgs(cmd, argv);
   const fn = COMMANDS[cmd ?? "help"];
   if (!fn) {
     console.error(`unknown command ${cmd}
@@ -4804,18 +4950,27 @@ ${HELP}`);
     }
   })();
   const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026");
+  const changed = notes.length > 0;
   const record = (out, error) => {
     if (!tr || cmd === "look-shot" || cmd === "look-keeper") return;
     try {
-      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: redact([cmd, ...argv].join(" ")), argv: [cmd ?? "help", ...argv].map(redact), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
+      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: redact([cmd, ...argv].join(" ")), argv: [cmd ?? "help", ...argv].map(redact), ...changed ? { readAs: [cmd, ...readAs].map(redact) } : {}, ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
     } catch {
     }
   };
+  if (!["look-shot", "look-keeper"].includes(cmd)) for (const n of notes) console.error(`note: ${n}`);
+  if (cmd && f.help !== void 0 && !["look-shot", "look-keeper"].includes(cmd)) {
+    const h = helpFor(cmd);
+    record(h);
+    console.log(h);
+    process.exit(0);
+  }
   if (!["look-shot", "look-keeper"].includes(cmd)) try {
     checkArgs(cmd ?? "help", f, rest);
   } catch (e) {
-    record(null, `REFUSED by the CLI: ${e.message}`);
-    console.error(`REFUSED by the CLI: ${e.message}`);
+    const msg = `REFUSED by the CLI: ${e.message}${hint && /needs a value|takes a number|cannot read|takes dx,dz|--side is/.test(e.message) ? ` \u2014 ${hint}` : ""}`;
+    record(null, msg);
+    console.error(msg);
     process.exit(2);
   }
   if (tr && cmd === "look") try {
@@ -4874,6 +5029,7 @@ export {
   furnish,
   gallery,
   group,
+  helpFor,
   history,
   importWorld,
   kitLook,
@@ -4900,6 +5056,7 @@ export {
   preview,
   query,
   reach,
+  readArgs,
   recolor,
   redo,
   refPoint,

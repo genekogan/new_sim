@@ -9,7 +9,8 @@ import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { activeClaim, atomicWrite, attention, buildHeader, call, claimFile, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
-import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
+import { mirror, view, normDef, resolveDef, follow, invalidate } from './lib/mirror.mjs';
+import { normalizeArgv } from './lib/args.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper, drawableCount, LOOK_DEFAULT_MS, LOOK_MAX_MS } from './lib/look.mjs';
@@ -418,7 +419,7 @@ const uniqueName = (v, parentId, stem, taken) => { const has = (n) => taken.has(
 const relFrom = (f) => ({
   at: f.at, offset: f.offset, near: f.near, around: f.around, dist: f.dist, dir: f.dir, count: f.count, facing: f.facing, yaw: f.yaw,
   against: f.against, between: f.between ? [].concat(f.between).flatMap((x) => String(x).split(/\s+|;/)).filter(Boolean).slice(0, 2) : undefined,
-  along: f.along, t: f.t, side: f.side, setback: f.setback ?? (f.along ? f.offset : undefined), inside: f.inside, corner: f.corner, wall: f.wall, on: f.on,
+  along: f.along, t: f.t, side: f.side === 'centre' ? 'center' : f.side, setback: f.setback ?? (f.along ? f.offset : undefined), inside: f.inside, corner: f.corner, wall: f.wall, on: f.on,
   row: f.row, grid: f.grid, gap: f.gap, spacing: f.spacing, float: !!f.float, from: f.from, to: f.to, via: f.via, width: f.width, across: f.across, span: f.span,
 });
 const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along', 'across', 'inside', 'on', 'free', 'from', 'row', 'grid'].some((k) => f[k] !== undefined);
@@ -429,14 +430,22 @@ const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along
  */
 export async function place(defIn, flags = {}) {
   if (!defIn) throw new Error('usage: place <def> [--at …|--near …|--inside …|--on …|--along …|--against …|--between a b] [--facing …] [--name n] [--param k=v]');
-  const def = normDef(defIn);
+  let def = normDef(defIn), readAs = null;
+  if (flags.side !== undefined && flags.along === undefined) throw new Error('--side picks a side of a path: use it with --along <road|river|wall> (left|right|both); elsewhere use --dir or --facing');
   const params = flags.param ? parseKV(flags.param) : undefined;
   let shape;
   if (flags.path) shape = { path: JSON.parse(flags.path), ...(flags.width ? { width: num(flags.width) } : {}) };
   if (flags.area) shape = { area: JSON.parse(flags.area) };
   if (flags.rect) shape = { area: rectArea(flags.rect) };
   if (flags.circle) shape = { area: circleArea(flags.circle) };
-  const info = await bakeInfo(def, params, shape);
+  let info;
+  try { info = await bakeInfo(def, params, shape); } catch (e) {
+    // def.unknown although the library has exactly one def of that name (core/<local>, a name without @v, <core name>@v)
+    const alt = /def\.unknown/.test(String(e?.message)) ? resolveDef(view(await mirror({ fresh: true })), defIn) : null;
+    if (!alt) throw e;
+    def = alt; readAs = `read "${defIn}" as ${alt} (the only def of that name)`; info = await bakeInfo(def, params, shape);
+  }
+  const tell = (r) => (!readAs ? r : typeof r === 'string' ? `${r}\n  note: ${readAs}` : { ...r, readAs });
   if (info.form !== 'point' && !shape && !(info.form === 'path' && (flags.from || flags.between || flags.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === 'path' ? '--path \'[[x,z],…]\' [--width w] or --from <ref> --to <ref> [--via x,z]' : '--area \'[[x,z],…]\', --rect cx,cz,w,d or --circle cx,cz,r'}`);
   const m = await mirror(); const v = view(m);
   if (flags.free) {
@@ -444,12 +453,12 @@ export async function place(defIn, flags = {}) {
     const spots = (await query({ free: { size: [info.box[0] + 1, info.box[2] + 1], near: [near.x, near.z], radius: flags.radius ? num(flags.radius) : 200, count: Number(flags.count ?? 1) } })).free;
     if (!spots.length) throw new Error('no free flat dry plot found; try --radius or a smaller thing');
     flags = { ...flags, at: undefined, near: undefined };
-    return commitItems(v, def, info, flags, params, spots.map((s) => ({ candidates: [{ p: s.at, ...(flags.facing ? {} : {}), note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []);
+    return tell(await commitItems(v, def, info, flags, params, spots.map((s) => ({ candidates: [{ p: s.at, ...(flags.facing ? {} : {}), note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []));
   }
-  if (shape) return commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []);
+  if (shape) return tell(await commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []));
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined) throw new Error('where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free');
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags.scale ? num(flags.scale) : 1 }, relFrom(flags));
-  return commitItems(v, def, info, flags, params, sol.items, sol.notes);
+  return tell(await commitItems(v, def, info, flags, params, sol.items, sol.notes));
 }
 const PREPARED = new Set(['road/1', 'path/1', 'river/1', 'bridge/1', 'pier/1', 'deck/1']);
 /** Roads, rivers, bridges, piers, decks freeze ground facts (grade, bridge spans, flow, deck height) into params
@@ -621,7 +630,18 @@ export async function recolor(id, color, flags = {}) {
   return r.accepted ? `recoloured ${id} ${color}${op.params ? ` (${Object.keys(op.params)[0]})` : ''}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
 export async function remove(ids) { const v0 = view(await mirror()); const list = [].concat(ids).filter(Boolean).flatMap((id) => (v0.get(id) ? [id] : setOf(v0, id)?.members.map((r) => r.path) ?? [id])); if (!list.length) throw new Error('usage: remove <ref> [<ref>…]'); const r = await act({ ops: list.map((id) => ({ op: 'remove', id })) }); return r.accepted ? `removed ${list.join(', ')} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
-export async function clone(id, flags) { const o = { op: 'clone', id, ...(flags.name ? { name: flags.name } : {}), ...(flags.count ? { count: num(flags.count) } : {}), ...(flags.step ? { step: String(flags.step).split(',').map(Number) } : {}), ...(flags.yaw !== undefined ? { r: num(flags.yaw) } : {}), mode: flags.nudge ? 'nudge' : 'strict' }; if (flags.at) { const v = view(await mirror()); const p = refPoint(v, flags.at, flags.offset); o.p = [p.x, p.z]; } const r = await act({ ops: [o] }, flags.note); return r.accepted ? `cloned ${id}${o.count > 1 ? ` ×${o.count}` : ''} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+export async function clone(id, flags) { const o = { op: 'clone', id, ...(flags.name ? { name: flags.name } : {}), ...(flags.count ? { count: num(flags.count) } : {}), ...(flags.step ? { step: String(flags.step).split(',').map(Number) } : {}), ...(flags.yaw !== undefined ? { r: num(flags.yaw) } : {}), mode: flags.nudge ? 'nudge' : 'strict' }; let from = '';
+  if (flags.at) { const v = view(await mirror()); const p = refPoint(v, flags.at, flags.offset); o.p = [p.x, p.z]; }
+  else if (o.count > 1 || o.step) {
+    // without --at the server starts a row ON the original (always overlap.solid): start one step away instead
+    const v = view(await mirror()), row = v.get(id), e = row ? v.entity(row.id) : null;
+    if (e) {
+      const step = o.step ?? [r2(Math.max(2, (row.box?.[0] ?? 1) * 1.5)), 0], b = e.p ?? [0, 0];
+      o.step = step; o.p = b.length === 3 ? [r2(b[0] + step[0]), b[1], r2(b[2] + step[1])] : [r2(b[0] + step[0]), r2(b[1] + step[1])];
+      from = `, starting one step (${step.join(',')}) from ${row.path}`;
+    }
+  }
+  const r = await act({ ops: [o] }, flags.note); return r.accepted ? `cloned ${id}${o.count > 1 ? ` ×${o.count}` : ''}${from} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 /** The sky palettes the viewer draws (apps/web; the server refuses others once L7 patch S2 lands). */
 export const SKY_PALETTES = PALETTE_LIST;
 async function worldState() { return (await snapshot()).state ?? {}; }
@@ -1306,7 +1326,9 @@ const FLAGS = {
 };
 // how many positional words each command takes (Infinity: free text or a list)
 const POS = { ...GOV_POS, listen: 0, ack: 2, doctor: 0, trace: 0, kit: 2, build: 2, 'verify-use': 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, reach: 2, clear: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
+// `side` is a word for place/terrain/move (--along road --side left|right|both) and a number only for `land cliff --side 1|-1`.
+const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'scale', 'floor', 'height', 'h', 'frames', 'every', 'slope', 'gap', 'yaw']);
+const SIDES = ['left', 'right', 'both', 'center', 'centre'];
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
   const allowed = new Set(['json', 'no-build', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
@@ -1314,8 +1336,9 @@ export function checkArgs(cmd, f, rest) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}…": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => '--' + x).join(' ')}`);
     for (const x of [].concat(v)) {
-      if (x === true && !boolsFor(cmd).has(k) && !(cmd === 'build' && (k === 'take' || k === 'delete' /* Y3 */)) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
-      if (NUMERIC.has(k) && !(cmd === 'build' && k === 'steps') && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (x === true && !bareOk(cmd, k) /* build --take/--delete: Y3 */) throw new Error(`--${k} needs a value`);
+      if ((NUMERIC.has(k) || (k === 'side' && cmd === 'land')) && !(cmd === 'build' && k === 'steps') && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (k === 'side' && cmd !== 'land' && x !== true && !SIDES.includes(String(x))) throw new Error(`--side is ${SIDES.slice(0, 4).join(', ')} (with --along <path>), got "${x}"`);
       if (cmd === 'look' && ['dist', 'span'].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === '' || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === 'by' || k === 'step') && cmd !== 'land' && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
@@ -1324,6 +1347,22 @@ export function checkArgs(cmd, f, rest) {
   }
   const max = POS[cmd] ?? Infinity;
   if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
+}
+/** Values a command may take bare (checkArgs' exceptions to "--k needs a value"). */
+const bareOk = (cmd, k) => boolsFor(cmd).has(k) || (cmd === 'build' && (k === 'take' || k === 'delete')) || (cmd === 'look' && k === 'inside') || (cmd === 'undo' && k === 'group') || k === 'free';
+/** How the CLI reads one command line: shell-shape repairs (lib/args.mjs), then flags. `notes` say what was repaired;
+ *  `hint` explains an unsplit shell variable when a refusal follows. */
+export function readArgs(cmd, argv) {
+  const numeric = new Set([...NUMERIC, ...(cmd === 'land' ? ['side'] : [])]);
+  const n = normalizeArgv(cmd, argv, { bools: boolsFor(cmd), numeric, needsValue: (k) => !bareOk(cmd, k) });
+  return { ...parseFlags(n.argv, boolsFor(cmd)), argv: n.argv, notes: n.notes, hint: n.hint };
+}
+/** `<verb> --help`: the help lines that mention the verb, and its options. */
+export function helpFor(cmd) {
+  const re = new RegExp(`(^[\\w-]+:\\s+|· |^)${cmd.replace(/[-]/g, '\\-')}(:| |$)`);
+  const lines = HELP.split('\n').filter((l) => re.test(l));
+  const opts = ['json', 'no-build', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)];
+  return [...(lines.length ? lines : [`${cmd}: see help`]), `${cmd} options: ${opts.map((x) => '--' + x).join(' ')}`].join('\n');
 }
 /** RL6 replay/lint: the CLI's own reading tables (read-only). */
 export const CLI_SHAPE = { POS, FLAGS, BOOL, NUMERIC, boolsFor };
@@ -1379,7 +1418,7 @@ learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palett
 
 const NO_WARM = new Set(['help', 'register', 'mint', 'pair', 'doctor', 'look', 'look-shot', 'look-keeper']);
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {
-  const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
+  const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest, argv: readAs, notes, hint } = readArgs(cmd, argv);
   const fn = COMMANDS[cmd ?? 'help'];
   if (!fn) { console.error(`unknown command ${cmd}\n${HELP}`); process.exit(2); }
 
@@ -1388,8 +1427,11 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const tr = (() => { try { return load().transcript; } catch { return null; } })();
   // RL6: argv keeps the exact words (a replay cannot recover quoting from the joined cmd).
   const redact = (s) => String(s).replace(/god_[A-Za-z0-9_-]+/g, 'god_…');
-  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: redact([cmd, ...argv].join(' ')), argv: [cmd ?? 'help', ...argv].map(redact), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
-  if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
+  const changed = notes.length > 0;
+  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: redact([cmd, ...argv].join(' ')), argv: [cmd ?? 'help', ...argv].map(redact), ...(changed ? { readAs: [cmd, ...readAs].map(redact) } : {}), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  if (!['look-shot', 'look-keeper'].includes(cmd)) for (const n of notes) console.error(`note: ${n}`);
+  if (cmd && f.help !== undefined && !['look-shot', 'look-keeper'].includes(cmd)) { const h = helpFor(cmd); record(h); console.log(h); process.exit(0); }
+  if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { const msg = `REFUSED by the CLI: ${e.message}${hint && /needs a value|takes a number|cannot read|takes dx,dz|--side is/.test(e.message) ? ` — ${hint}` : ''}`; record(null, msg); console.error(msg); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
   // G1: start (or restart) the warm look keeper in the background; status and listen also after a `look --stop`
   if (!NO_WARM.has(cmd ?? 'help')) autoWarm(SELF, { force: ['status', 'listen'].includes(cmd) });

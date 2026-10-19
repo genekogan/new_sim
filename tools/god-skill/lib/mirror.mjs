@@ -56,9 +56,24 @@ export function view(m) {
   const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
   const children = (id) => m.rows.filter((r) => r.parent === id);
   const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
-  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
+  const refs = [...new Set([...(m.snapshot.defs ?? []), ...(m.snapshot.library ?? [])].map((d) => d.ref).filter(Boolean))];
+  return { m, rows: m.rows, byId, byPath, get, entity, children, def, refs, extent: m.extent };
 }
 export const normDef = (d) => (d.includes('@') || d.startsWith('sha:') ? d : `core/${d}@1`);
+/** An unknown def ref that names exactly one library def (harvest P0 #8): `core/<local>@k` → `<local>@k`, `<name>` (no
+ *  version) → its only version, `<name>@k` → `core/<name>@k`. Returns the library ref, or null when the ref is known,
+ *  unknown, or ambiguous (several versions/namespaces), so the caller refuses as before. */
+export function resolveDef(v, ref) {
+  const s = String(ref ?? '').trim();
+  if (!s || s.startsWith('sha:') || v.def(s)) return null;
+  const m = /^(?:core[/-])?([a-z0-9][a-z0-9._-]*?)(?:@(\d+))?$/i.exec(s); if (!m) return null;
+  const [, name, ver] = m, hits = new Set();
+  for (const r of v.refs ?? []) {
+    const d = /^(core[/-])?(.+)@(\d+)$/.exec(r);
+    if (d && d[2] === name && (!ver || d[3] === ver)) hits.add(d[1] ? `core/${d[2]}@${d[3]}` : r);
+  }
+  return hits.size === 1 ? [...hits][0] : null;
+}
 
 /** follow [seconds]: keep the mirror fresh from the god stream (refetch on every diff). */
 export async function follow(seconds = 3600, onEvent = () => {}) {

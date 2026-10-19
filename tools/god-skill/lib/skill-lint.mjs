@@ -62,6 +62,9 @@ const isPlaceholder = (v) => /[A-Za-z<>…|]|\.\./.test(v);
 const placeholder = (cmd, k, v) => {
   if (v === undefined) return NUMERIC.has(k) && !(cmd === 'build' && k === 'steps') ? '1' : (k === 'by' || k === 'step') && cmd !== 'land' ? '1,1' : k === 'grid' ? '2x2' : k === 'param' ? 'k=v' : 'x';
   if (!isPlaceholder(v)) return v;
+  // `left|right|both`, `1|-1`: an agent types one of the alternatives, so read the first one literally (a placeholder
+  // standing for a number used to hide that `--side left` was refused)
+  if (/^[^<>…|\s]+(\|[^<>…|\s]+)+$/.test(v)) { const first = v.split('|')[0]; return NUMERIC.has(k) && notNumber(first) ? '1' : first; }
   return NUMERIC.has(k) && notNumber(v) && !(cmd === 'build' && k === 'steps') ? '1'
     : (k === 'by' || k === 'step') && cmd !== 'land' && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(v) ? '1,1'
     : k === 'grid' && !/^\d+[x×]\d+$/.test(v) ? '2x2' : v;
