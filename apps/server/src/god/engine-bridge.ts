@@ -532,9 +532,11 @@ export class EngineBridge {
   private perceiveStep(tick: number) {
     if (!this.perceiveRunning) {
       if (!this.perceive.pending() || tick - this.perceiveStarted < 20) return;
-      // boot: the first catch-up (a whole pass) runs at once, as before; it is not on any request's path
-      if (!this.perceive.stats.runs) { this.perceiveStarted = tick; this.perceiveFirst = -1; this.perceiveSync(true); return; }
-      if (tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40) return;
+      // boot: the first catch-up is a whole pass (~0.4 s at 4,900 entities). A served world runs it in slices too (lane P5):
+      // at once it held a cold-booted world's first visitor. A Soul's read before it ends catches up at once (perceive.ensure).
+      // A world stepped by hand (tests, tools) runs it at once, as before.
+      if (!this.perceive.stats.runs && !this.host.running) { this.perceiveStarted = tick; this.perceiveFirst = -1; this.perceiveSync(true); return; }
+      if (this.perceive.stats.runs && tick - this.perceiveLast < 20 && tick - this.perceiveFirst < 40) return;
       this.perceiveRunning = true; this.perceiveStarted = tick; this.perceiveFirst = -1; this.catchUp = { slices: 0, maxMs: 0, t0: performance.now() };
     }
     const t0 = performance.now();

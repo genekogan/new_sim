@@ -73,7 +73,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, slugFor } from './registry.mjs';
-import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
+import { ChildPool, compileCacheDir, defaultCommand, forkCommand } from './children.mjs';
 import { legacyWorldFor, redirectSwitch } from './redirects.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
 import { creationPolicy, checkAccountCreation } from './creation-policy.mjs';
@@ -162,7 +162,7 @@ export async function openLauncher(cfg = {}) {
   // with a key made fresh for this run and handed to the children in their environment.
   const siteKey = randomBytes(32).toString('hex');
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
-  const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
+  const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), compileCache: cfg.compileCache === false || process.env.SIM_COMPILE_CACHE === '0' ? null : compileCacheDir(dataDir, BUILD), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
     maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0 || (httpLive.get(slug) ?? 0) > 0, sleepMs: cfg.sleepMs ?? SLEEP_MS, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) { d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; if (oldRoot) Object.assign(d.env, { SIM_FORK_ROOT: '1', INVITE_REQUIRED: '0', SEED_NATIVES: '0' }); } return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? templateList({ all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
