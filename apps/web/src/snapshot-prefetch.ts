@@ -15,23 +15,59 @@ export function worldKeyFrom(pathname: string, base: string): string {
   return m ? m[1] : 'toy';
 }
 
-/** The window property the inline script leaves its one request on. */
+/** The window properties the inline script leaves its requests on. */
 export const PREFETCH_GLOBAL = '__simSnapshotPrefetch';
+export const CONFIG_GLOBAL = '__simConfigPrefetch';
+export const SOCKET_GLOBAL = '__simSocketPrefetch';
 type Prefetch = { url: string; response: Promise<Response> };
+/** Lane W1: the world's WebSocket, opened at page entry with an anonymous hello; useSim's Connection adopts it (queue:
+ *  every message that arrived before then, in order). Closed after 20 s if nothing adopted it. */
+export type BootSocket = { url: string; ws: WebSocket; queue: unknown[]; hello: string; sent: boolean; adopted?: boolean };
 
-/** index.html's inline head script: on a new world's page, GET its snapshot now and leave the promise on the window. */
-export function entryPrefetchScript(base: string, oldKeys: readonly string[] = OLD_WORLD_KEYS): string {
+/** index.html's inline head script: on a new world's page, GET its snapshot and /v1/config now, and (with `hello`, the
+ *  exact anonymous hello the page's Connection would send) open the world's socket and say hello, so the page's first
+ *  round trips to the server all leave at once instead of one after another (research B, 2026-10-19). */
+export function entryPrefetchScript(base: string, oldKeys: readonly string[] = OLD_WORLD_KEYS, hello?: string): string {
   return `(function(){try{var b=${JSON.stringify(base)},k=(${worldKeyFrom.toString()})(location.pathname,b);`
     + `if(${JSON.stringify(oldKeys)}.indexOf(k)>=0||typeof fetch!=='function')return;`
-    + `var u=b+'/w/'+k+'/v1/world/snapshot',p=fetch(u);p.catch(function(){});window[${JSON.stringify(PREFETCH_GLOBAL)}]={url:u,response:p};}catch(e){}})();`;
+    + `var w=b+'/w/'+k,g=function(n,u){var p=fetch(u);p.catch(function(){});window[n]={url:u,response:p};};`
+    + `var x=window.__simSnapshotKey,n=w+'/v1/world/snapshot';g(${JSON.stringify(PREFETCH_GLOBAL)},typeof x==='string'&&x?n+'?v='+encodeURIComponent(x):n);g(${JSON.stringify(CONFIG_GLOBAL)},w+'/v1/config');`
+    + (hello ? `if(typeof WebSocket!=='function')return;var h=${JSON.stringify(hello)},u=(location.protocol==='https:'?'wss':'ws')+'://'+location.host+w+'/ws',s=new WebSocket(u),o={url:u,ws:s,queue:[],hello:h,sent:false};`
+      + `s.onmessage=function(e){o.queue.push(e.data);};s.onopen=function(){try{s.send(h);o.sent=true;}catch(e){}};`
+      + `setTimeout(function(){if(!o.adopted)try{s.close();}catch(e){}},20000);window[${JSON.stringify(SOCKET_GLOBAL)}]=o;` : '')
+    + `}catch(e){}})();`;
+}
+
+/** Lane O2: the world server puts the current snapshot's key on the page (window.__simSnapshotKey); the first start
+ *  GETs `<snapshot>?v=<key>`, which the edge may cache (the entry prefetch already did); every later fetch (resync) uses
+ *  the plain no-store URL. */
+export function entrySnapshotUrl(plain: string): string {
+  const x = typeof window === 'undefined' ? undefined : (window as unknown as { __simSnapshotKey?: unknown }).__simSnapshotKey;
+  return typeof x === 'string' && x ? `${plain}?v=${encodeURIComponent(x)}` : plain;
+}
+
+/** The entry socket when it was opened for this exact URL and is still usable, at most once per page. */
+export function takeBootSocket(url: string): BootSocket | null {
+  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, BootSocket | undefined> | null;
+  const o = w?.[SOCKET_GLOBAL];
+  if (!o) return null;
+  delete w![SOCKET_GLOBAL];
+  if (o.url !== url || o.ws.readyState > 1) { try { o.ws.close(); } catch { /* already closing */ } return null; }
+  o.adopted = true;
+  return o;
+}
+
+/** The entry config GET when it was for this exact URL, at most once per page (a retry fetches afresh). */
+export function takeConfigPrefetch(url: string): Promise<Response> | null { return takePrefetch(CONFIG_GLOBAL, url); }
+
+function takePrefetch(name: string, url: string): Promise<Response> | null {
+  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, Prefetch | undefined> | null;
+  const p = w?.[name];
+  if (!p) return null;
+  delete w![name];
+  return p.url === url ? p.response : null;
 }
 
 /** The entry prefetch's response when it was for this exact URL, at most once per page (a later start, a resync or any
  *  other caller fetches afresh). null: there was none (old world, a test, a script-less page) or it is already taken. */
-export function takeSnapshotPrefetch(url: string): Promise<Response> | null {
-  const w = (typeof window === 'undefined' ? null : window) as unknown as Record<string, Prefetch | undefined> | null;
-  const p = w?.[PREFETCH_GLOBAL];
-  if (!p) return null;
-  delete w![PREFETCH_GLOBAL];
-  return p.url === url ? p.response : null;
-}
+export function takeSnapshotPrefetch(url: string): Promise<Response> | null { return takePrefetch(PREFETCH_GLOBAL, url); }

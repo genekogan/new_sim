@@ -153,16 +153,22 @@ function installCdnImages(manifest: CdnManifest) {
 
 declare const __SIM_ASSETS_CDN_ENABLED__: boolean;
 declare const __SIM_ASSETS_CDN_ORIGIN__: string;
-/** Fail open to today's origin transport, including a missing or invalid publication manifest. */
-export async function installCdnAssets(manifestPath: string, onProgress?: CdnProgress): Promise<void> {
+/** Fail open to today's origin transport, including a missing or invalid publication manifest.
+ *  Lane W1: installed at once (the page no longer waits for the manifest GET before it starts); only asset-file
+ *  fetches wait for the manifest, everything else goes straight to the original fetch. */
+export function installCdnAssets(manifestPath: string, onProgress?: CdnProgress): void {
   if (typeof __SIM_ASSETS_CDN_ENABLED__ === 'undefined' || !__SIM_ASSETS_CDN_ENABLED__) return;
-  try {
-    const original = window.fetch.bind(window);
-    const response = await original(manifestPath, { signal: AbortSignal.timeout(3000) });
-    if (!response.ok) return;
+  const original = window.fetch.bind(window);
+  const transport: Promise<Fetch | null> = original(manifestPath, { signal: AbortSignal.timeout(3000) }).then(async (response) => {
+    if (!response.ok) return null;
     const manifest = readCdnManifest(await response.json());
-    const transport = cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
-    window.fetch = transport;
     installCdnImages(manifest);
-  } catch { /* origin remains available even when manifest/configuration is broken */ }
+    return cdnFetch(original, manifest, __SIM_ASSETS_CDN_ORIGIN__, location.href, undefined, onProgress);
+  }).catch(() => null);
+  window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    let path = '';
+    try { path = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.href).pathname; } catch { /* not a URL: origin */ }
+    if (!FILE.test(path)) return original(input, init);
+    return transport.then((t) => (t ?? original)(input, init));
+  }) as Fetch;
 }

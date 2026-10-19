@@ -3,6 +3,8 @@ import {createApiRequest} from './api-request.ts';
 import {matchingMe} from './auth-projection.ts';
 import {acceptPrivateAuthority,acceptLivePrivateAuthority,retirePrivateAuthority} from './private-authority.ts';
 import { apiPath, worldPath } from './world-path.ts';
+import { takeBootSocket } from './snapshot-prefetch.ts';
+import { arrivalMark } from './arrival-marks.ts';
 import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
 import {createStationConnection,type StationConnection} from './score/station-connection.mjs';
@@ -65,12 +67,14 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       onStationV2: (view,receipt)=>st.station?.onStationV2(view,receipt),
       onPong: (pong,receipt)=>st.station?.onPong(pong,receipt),
       onTakes: stream => {
+        arrivalMark('ws-takes');
         const old = stream.serverTick < st.takes.serverTick ? [] : st.takes.chunks;
         const merged = new Map(old.map(c => [c.toTick, c]));
         for (const raw of stream.chunks) {const chunk=ownLiveChunk(raw);if(chunk)merged.set(chunk.toTick,chunk);}
         st.takes = {serverTick: stream.serverTick, chunks: [...merged.values()].sort((a,b) => a.toTick-b.toTick).slice(-12), receivedAt: performance.now()};
       },
       onWelcome: (me, w) => {
+        arrivalMark('ws-welcome');
         st.station?.onWelcome(w);
         if (w.epoch !== st.takeEpoch) st.takes.chunks = [];
         st.takeEpoch = w.epoch;
@@ -92,6 +96,8 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       // Spread so this compiles before and after the client declares onEdge; re-render comes from the 200 ms tick.
       ...({ onEdge: (m: EdgeMsg) => { st.edge = [...st.edge, m].slice(-300); } } as { onEdge(m: EdgeMsg): void }),
     }, (u) => new WebSocket(u) as never,undefined,undefined,stationCapabilities,true);
+    // lane W1: the socket index.html opened at page entry (snapshot-prefetch.ts), with what it has received so far
+    const boot = takeBootSocket(st.conn.url); if (boot) st.conn.adopt(boot as never);
   }
   useEffect(() => {
     const st = s.current; st.conn!.connect();

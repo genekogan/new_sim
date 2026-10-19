@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import {ImportCredits} from './ImportCredits.tsx';
 import { createPortal } from 'react-dom';
 import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
+import { arrivalMark } from './arrival-marks.ts';
 import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import { assetBytes, megabytes } from './asset-bytes.ts';
@@ -89,7 +90,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   const assetsNear = useSyncExternalStore(arrivalGate.subscribe, arrivalGate.pending);
   const card = (arriving || preparing || assetsNear) && initial?.stage !== 'failed';
   const [arrivalShown, setArrivalShown] = useState(true);
-  useEffect(() => { if (card) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [card]);
+  useEffect(() => { if (card) { setArrivalShown(true); return; } arrivalMark('card-done'); const id = setTimeout(() => setArrivalShown(false), 300); /* lane W1: the .25 s fade (world-chrome.css), then gone */ return () => clearTimeout(id); }, [card]);
   // The bar counts bytes (asset-bytes.ts: every asset fetch, total known up front), never files; it only moves forward
   // and is full once the world is ready. Without a byte total yet, the older measures stand in.
   const bytes = useSyncExternalStore(assetBytes.subscribe.bind(assetBytes), () => assetBytes.snapshot());
