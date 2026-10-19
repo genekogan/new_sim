@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import type { SetWeather } from './WorldAtmosphere.ts';
 import { setClockNight, worldSeconds } from './gen-mesh/motion.ts';
-import { defLights, lightPhase, PatternNightMap, paintOnlySources, setNightLightStrength, worldNightBounds, type AuthoredLight, type NightSource } from './WorldNightLights.ts';
+import { defLights, flickers, lightPhase, PatternNightMap, paintOnlySources, setNightLightStrength, worldNightBounds, type AuthoredLight, type NightSource } from './WorldNightLights.ts';
 import type { HaloSource } from './atmosphere/halos.ts';
 
 type WorldStateLike = { weather?: { kind?: string; clouds?: number; rain?: number; wind?: number; fog?: number; intensity?: number } } | null | undefined;
@@ -128,14 +128,16 @@ export class GodWorldLiving {
       if (!lights.length) continue;
       const p = m.worldPose(e), yaw = p.yaw ?? 0, scale = p.s ?? 1, cos = Math.cos(yaw), sin = Math.sin(yaw);
       const fire = /fire|hearth|brazier|campfire|torch/.test(e.def);
+      const flame = flickers(e.def); // W2: fire pools and halos flicker (an authored pattern wins)
       for (const [i, light] of lights.entries()) {
         if (light.on === false) continue;
         const at = light.at, dx = (at?.[0] ?? 0) * scale, dz = (at?.[at.length - 1] ?? 0) * scale;
         const x = p.x + dx * cos + dz * sin, z = p.z - dx * sin + dz * cos;
         const base = this.layer.groundAt(x, z) ?? 0, range = Math.max(2, Math.min(14, light.range ?? 8));
-        const phase = lightPhase(e.id, i, lights.length, light.pattern);
-        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25 * this.pools.radius, pattern: light.pattern, phase });
-        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, light.pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
+        const pattern = light.pattern ?? (flame ? 'flicker' as const : undefined);
+        const phase = lightPhase(e.id, i, lights.length, pattern);
+        sources.push({ x, z, base, radius: range * (fire ? 0.55 : 0.42) * this.pools.radius, intensity: fire ? 1.3 : 1.2, color: light.color ?? '#ffe9c4', halo: range * 1.25 * this.pools.radius, pattern, phase });
+        marks.push([x, at ? p.y + (at.length === 3 ? at[1] * scale : 0) : base, z, at ? 'festoon' : fire ? 'fire' : 'lamp', range / 8, pattern, phase, at || light.pattern || components?.lights ? light.color : undefined]);
       }
     } };
     if (m.readPass) m.readPass(scan); else scan();

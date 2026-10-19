@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 // L1: optional authored-light metadata; the original five-field scenery anchors stay unchanged.
-import {LIGHT_PATTERN_GLSL,type LightPattern} from '../WorldNightLights.ts';
+import {LIGHT_PATTERN_GLSL,LIGHT_PATTERNS,type LightPattern} from '../WorldNightLights.ts';
 export type HaloSource=readonly [number,number,number,string,number,LightPattern?,number?,string?];
 /** Lamp bloom without a post pass: one instanced draw of camera-facing glow sprites at every published
  * night light (`userData.edenLightSources` [x, groundY, z, kind, scale] — lamps, park lamps, lanterns,
@@ -63,14 +63,14 @@ export class Halos{
   for(const [x,y,z,kind,scale,pattern,phase,color] of list){const k=KINDS[kind];if(!k||n>=attr.count)continue;const s=Number.isFinite(scale)?scale:1,hy=y+k.height(s);
    if(placed.some(p=>Math.abs(p[0]-x)<.3&&Math.abs(p[1]-hy)<.3&&Math.abs(p[2]-z)<.3))continue;placed.push([x,hy,z]);
    const size=k.size*Math.max(.6,Math.min(1.5,s));m.makeScale(size,size,size).setPosition(x,hy,z);this.mesh.setMatrixAt(n,m);
-   c.set(color??k.color).multiplyScalar(k.intensity);attr.setXYZW(n,c.r,c.g,c.b,k.flicker&&pattern===undefined?(n*.618)%1:-1);patterns.setXY(n,Math.max(0,['steady','blink','twinkle','chase','pulse'].indexOf(pattern??'steady')),phase??0);n++;}
+   c.set(color??k.color).multiplyScalar(k.intensity);attr.setXYZW(n,c.r,c.g,c.b,k.flicker&&pattern===undefined?(n*.618)%1:-1);patterns.setXY(n,Math.max(0,LIGHT_PATTERNS.indexOf(pattern??'steady')),phase??0);n++;}
   this.count=n;this.mesh.count=n;this.mesh.instanceMatrix.needsUpdate=true;attr.needsUpdate=true;patterns.needsUpdate=true;
  }
  get size(){return this.count;}
  /** Night strength 0..1; the pixel scale (uHalo.z) is set per render from the renderer and camera. */
  update(seconds:number,night:number,reducedMotion=false){
   const u=this.uniforms.uHalo.value;u.x=night;u.y=seconds%600;
-  this.uniforms.uPatternTime.value.set(((typeof performance!=='undefined'?performance.timeOrigin+performance.now():Date.now())/1000)%6,reducedMotion?1:0);
+  this.uniforms.uPatternTime.value.set(((typeof performance!=='undefined'?performance.timeOrigin+performance.now():Date.now())/1000)%600,reducedMotion?1:0);
   this.mesh.visible=night>.01&&this.count>0;
  }
  dispose(){this.mesh.removeFromParent();this.mesh.geometry.dispose();(this.mesh.material as THREE.Material).dispose();}

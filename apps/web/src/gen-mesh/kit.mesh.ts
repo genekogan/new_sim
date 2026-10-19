@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { expandKitProgram, kitArgs, kitWhen, type KitArgs, type KitProgramArgs, type KitShape } from '@sim/generators';
+import { flameClusters, flameHint, isFlameShape, mountFlames } from '../fx/flames.ts';
 import { registerMesh, type MeshCtx } from './registry.ts';
 import { shapeFaceMeshes } from './faces.ts'; // XP8 hook
 import { kitClassSurface, kitSurfaceAttribute, kitSurfaceSuffix } from './kit-surfaces.ts'; // Y1 / XP7 hook
@@ -144,7 +145,7 @@ const classOf = (sh: KitShape, v: number, surfaces = false) => v === 2 ? `${sh.m
 export function kitWhenKey(args: KitArgs | KitProgramArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
   return args.shapes.some((s) => s.when) ? args.shapes.map((s) => (s.when ? (kitWhen(s.when, params, state ?? {}) ? '1' : '0') : '')).join('') : '';
 }
-export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown> }): THREE.Group {
+export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown>; flameHint?: boolean }): THREE.Group {
   // K2 hook: the same expansion runs before physics and before mesh construction.
   const args = expandKitProgram(input, ctx.params);
   const root = new THREE.Group();
@@ -153,7 +154,9 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
   const color = new THREE.Color(), surfaces = args.v === 2 && args.surfaces === true; // Y1: the kit's surfaces opt-in
   for (const sh of args.shapes) {
     if (sh.when && !kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {})) continue;
-    if (sh.role) { const list = byRole.get(sh.role) ?? []; list.push(sh); byRole.set(sh.role, list); continue; }
+    // W2: a glowing flame-tinted shape (or a warm glow in a def that says fire) is a flame, role or not (fx/flames.ts)
+    const role = sh.role ?? (isFlameShape(sh, !!ctx.flameHint, ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))) ? 'flame' : undefined);
+    if (role) { const list = byRole.get(role) ?? []; list.push(sh); byRole.set(role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
     const k = classOf(sh, args.v, surfaces); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, args.v, color, undefined, args.v === 2 && !!kitClassSurface(k, surfaces))); byClass.set(k, list);
   }
@@ -170,6 +173,7 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     const explicit = shapes.find((s) => s.pivot)?.pivot;
     const pv = explicit ? new THREE.Vector3(...explicit) : (() => { const b = new THREE.Box3(); for (const s of shapes) b.expandByPoint(new THREE.Vector3(...s.at)); const c = b.getCenter(new THREE.Vector3()); return new THREE.Vector3(c.x, b.max.y + (role.startsWith('leg') || role.startsWith('arm') ? (shapes[0].h ?? shapes[0].size?.[1] ?? 0.2) / 2 : 0), c.z); })();
     const pivot = new THREE.Group(); pivot.name = `role:${role}`; pivot.position.copy(pv); pivot.userData.role = role; pivot.userData.rest = pivot.quaternion.clone();
+    if (role === 'flame') pivot.userData.flames = flameClusters(shapes, pv); // W2: where the animated fires go
     if (args.v !== 2) {
       const geos = shapes.map((sh) => { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); return placed(sh, args.round, args.v, color, pv); });
       // W2: a flame glows in its own tint (vertex colour); the plain emissive class glows cream-white whatever the tint
@@ -203,9 +207,10 @@ registerMesh({
     const parsed = parseKitArgs(ctx.args); if (!parsed.success) return null;
     const key = kitCacheKey(ctx, parsed.data);
     let proto = cache.get(key);
-    if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {} }); cache.set(key, proto); }
+    if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {}, flameHint: flameHint(ctx.def) }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
+    mountFlames(obj, ctx.entity.id); // W2: flame parts burn (fx/flames.ts)
     return obj;
   },
   instanceKey(ctx) { const a = parseKitArgs(ctx.args); return a.success ? kitCacheKey(ctx, a.data) : null; },

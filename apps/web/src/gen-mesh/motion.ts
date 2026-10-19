@@ -9,13 +9,14 @@
 import type * as THREE from 'three';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 // L1: the singular and plural light components share their pattern curves with pools and halos.
-import {defLights,lightPatternLevel,lightPhase} from '../WorldNightLights.ts';
+import {defLights,flickers,lightPatternLevel,lightPhase} from '../WorldNightLights.ts';
+import { hasFlames } from '../fx/flames.ts';
 import { pose, RouteCache, rand, seedOf, type BehaviorKind, type Plan, type Pose, type Surroundings, type V2 } from './creatures/behavior.ts';
 
 /** True if this entity needs per-frame motion (the layer only calls `animate` for these). */
 export function hasMotion(def: StoredDef): boolean {
   const c = def.components;
-  if (c.spin || c.swing || c.sway || c.hover || c.route || c.behavior || c.light || c.lights) return true;
+  if (c.spin || c.swing || c.sway || c.hover || c.route || c.behavior || c.light || c.lights || hasFlames(def)) return true;
   if (def.tags.includes('creature') || def.tags.includes('moving')) return true;
   if (def.make.kind === 'gen' && def.make.gen === 'animals/1') return true;
   const gait = def.make.kind === 'gen' && def.make.gen === 'kit/2' ? (def.make.args as { gait?: string } | undefined)?.gait : undefined;
@@ -33,7 +34,8 @@ export function bindMotionModel(m: WorldModel | null) { boundModel = m; }
 /** Apply motion at world time `t` (seconds). `base` is the resting local transform the layer computed. */
 export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn: number, base: { y: number; yaw: number }) {
   const t = worldSeconds(tIn);
-  const ud = obj.userData as { tick?: (t: number) => void; rig?: Rig; model?: WorldModel };
+  const ud = obj.userData as { tick?: (t: number) => void; fx?: (t: number) => void; rig?: Rig; model?: WorldModel };
+  ud.fx?.(t); // W2: animated fire (fx/flames.ts)
   if (ud.tick) { ud.tick(t); return; }
   const c = def.components, phase = ((entity.seed ?? hash(entity.id)) % 1000) / 1000 * Math.PI * 2;
   const model = ud.rig?.model ?? ud.model ?? boundModel;
@@ -390,9 +392,9 @@ function glowStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldMo
   if (off) for (const m of ud.glow) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = 0;
   if (off) return;
   const reduced=!!reducedLightMotion?.matches;
-  const patterned=lights.some(l=>l.pattern&&l.pattern!=='steady');
-  const pattern=patterned?lights.reduce((v,l,i)=>v+(l.on===false?0:lightPatternLevel(l.pattern,t,lightPhase(e.id,i,lights.length,l.pattern),reduced)),0)/lights.length:1;
-  const night = nightOf(model), level = (0.25 + 1.4 * night + (patterned?0:0.03 * Math.sin(t * 3)))*pattern;
+  const patterned=lights.some(l=>l.pattern&&l.pattern!=='steady'),flame=!patterned&&flickers(e.def); // W2: a flame's own glow flickers with its pool
+  const pattern=flame?lightPatternLevel('flicker',t,lightPhase(e.id,0,1,'flicker'),reduced):patterned?lights.reduce((v,l,i)=>v+(l.on===false?0:lightPatternLevel(l.pattern,t,lightPhase(e.id,i,lights.length,l.pattern),reduced)),0)/lights.length:1;
+  const night = nightOf(model), level = (0.25 + 1.4 * night + (patterned||flame?0:0.03 * Math.sin(t * 3)))*pattern;
   // K1 / XP1: retain v2's per-shape glow level through the day/night and pattern multiplier.
   for (const m of ud.glow) { const mat = m.material as THREE.MeshStandardMaterial, v = level * (mat.userData.kitGlowIntensity ?? 1); mat.emissiveIntensity = mat.userData.flameCap ? Math.max(FLAME_GLOW_MIN, Math.min(v, mat.userData.flameCap)) : v; }
 }

@@ -17,15 +17,26 @@ import {installGroundOcclusion} from './WorldGroundOcclusion.ts';
 export type NightSource={x:number;z:number;radius:number;intensity:number;color:string;halo?:number;
  /** Ground height under the source (metres, default 0). */
  base?:number;pattern?:LightPattern;phase?:number};
-export type LightPattern='steady'|'blink'|'twinkle'|'chase'|'pulse';
+export type LightPattern='steady'|'blink'|'twinkle'|'chase'|'pulse'|'flicker';
+/** Shader index of each pattern. W2: 'flicker' is the viewer's own (fires and lanterns), not an authored pattern. */
+export const LIGHT_PATTERNS:readonly LightPattern[]=['steady','blink','twinkle','chase','pulse','flicker'];
+/** W2: defs whose light is a flame (fires, hearths, torches, candles, lanterns) flicker unless their author set a pattern. */
+const FLICKER_DEF=/(campfire|bonfire|hearth|brazier|torch|candle|fireplace|fire-?pit|fire-?bowl|fire-circle|(^|[\/-])fire($|[@-])|lantern(?!-post))/;
+export function flickers(defRef:string|undefined):boolean{return !!defRef&&FLICKER_DEF.test(defRef.toLowerCase());}
+const hash1=(n:number)=>{const s=Math.sin(n*127.1+311.7)*43758.5453;return s-Math.floor(s);};
+const noise1=(x:number)=>{const i=Math.floor(x),f=x-i,u=f*f*(3-2*f);return hash1(i)*(1-u)+hash1(i+1)*u;};
 export type AuthoredLight={color?:string;range?:number;on?:boolean;at?:readonly number[];pattern?:LightPattern};
 export function defLights(components?:{light?:AuthoredLight;lights?:AuthoredLight[]}):readonly AuthoredLight[]{return components?.lights??(components?.light?[components.light]:[]);}
 export function lightPhase(id:string,index:number,count:number,pattern?:LightPattern){
  if(pattern==='chase')return index/Math.max(1,count);
- if(pattern!=='twinkle')return 0;let h=2166136261;for(const c of id)h=Math.imul(h^c.charCodeAt(0),16777619);return ((h>>>0)/4294967296+index*.61803398875)%1;
+ if(pattern!=='twinkle'&&pattern!=='flicker')return 0;let h=2166136261;for(const c of id)h=Math.imul(h^c.charCodeAt(0),16777619);return ((h>>>0)/4294967296+index*.61803398875)%1;
 }
-export const LIGHT_PATTERN_GLSL=`float edenPattern(float pattern,float seconds,float phase,float reduced){
+export const LIGHT_PATTERN_GLSL=`float edenFlickerHash(float n){return fract(sin(n*127.1+311.7)*43758.5453);}
+float edenFlickerNoise(float x){float i=floor(x),f=fract(x);f=f*f*(3.0-2.0*f);return mix(edenFlickerHash(i),edenFlickerHash(i+1.0),f);}
+float edenPattern(float pattern,float seconds,float phase,float reduced){
  if(reduced>.5||pattern<.5)return 1.0;
+ if(pattern>4.5){float s=phase*97.0;return .72+.5*(.55*edenFlickerNoise(seconds*5.1+s)+.3*edenFlickerNoise(seconds*11.7+s*2.1)+.15*edenFlickerNoise(seconds*23.3+s*3.7));}
+ seconds=mod(seconds,6.0);
  float wave=.5+.5*cos(6.28318530718*(seconds*(pattern>1.5&&pattern<2.5?1.0/3.0:.5)-phase));
  if(pattern<1.5)return wave>=.5?1.0:.15;
  if(pattern<2.5)return .35+.65*wave*wave;
@@ -41,6 +52,7 @@ export function worldNightBounds(extent=1000,bounds?:readonly number[]):NightBou
 /** Same curves as the GPU pool pass. One cycle per 2 s (blink/pulse/chase) or 3 s (twinkle). */
 export function lightPatternLevel(pattern:LightPattern='steady',seconds=0,phase=0,reducedMotion=false):number{
  if(reducedMotion||pattern==='steady')return 1;
+ if(pattern==='flicker'){const s=phase*97;seconds%=600;return .72+.5*(.55*noise1(seconds*5.1+s)+.3*noise1(seconds*11.7+s*2.1)+.15*noise1(seconds*23.3+s*3.7));}
  seconds=((seconds%6)+6)%6;
  const wave=.5+.5*Math.cos(2*Math.PI*(seconds*(pattern==='twinkle'?1/3:.5)-phase));
  if(pattern==='blink')return wave>=.5?1:.15;
@@ -237,12 +249,12 @@ export class PatternNightMap {
   this.bounds=bounds;this.material.uniforms.bounds.value.set(bounds.x0,bounds.z0,bounds.x1-bounds.x0,bounds.z1-bounds.z0);
   const g=new THREE.InstancedBufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute([-1,-1,0,1,-1,0,1,1,0,-1,-1,0,1,1,0,-1,1,0],3));
   const centers:number[]=[],shapes:number[]=[],colors:number[]=[],kinds:number[]=[],c=new THREE.Color();
-  for(const s of sources){centers.push(s.x,s.z);shapes.push(s.radius,s.halo??s.radius*2.5,s.intensity,s.phase??0);c.set(s.color);colors.push(c.r,c.g,c.b,Math.max(0,Math.min(1,((s.base??0)-BASE_MIN)/BASE_RANGE)));kinds.push(['steady','blink','twinkle','chase','pulse'].indexOf(s.pattern??'steady'));}
+  for(const s of sources){centers.push(s.x,s.z);shapes.push(s.radius,s.halo??s.radius*2.5,s.intensity,s.phase??0);c.set(s.color);colors.push(c.r,c.g,c.b,Math.max(0,Math.min(1,((s.base??0)-BASE_MIN)/BASE_RANGE)));kinds.push(LIGHT_PATTERNS.indexOf(s.pattern??'steady'));}
   for(const [key,data,size] of [['center',centers,2],['shape',shapes,4],['tint',colors,4],['kind',kinds,1]] as const)g.setAttribute(key,new THREE.InstancedBufferAttribute(new Float32Array(data),size));
   g.instanceCount=sources.length;this.geometry.dispose();this.geometry=g;this.mesh.geometry=g;
  }
  render(renderer:THREE.WebGLRenderer,seconds:number,reducedMotion=false){
-  this.material.uniforms.seconds.value=seconds%6;this.material.uniforms.reduced.value=reducedMotion?1:0;
+  this.material.uniforms.seconds.value=seconds%600;this.material.uniforms.reduced.value=reducedMotion?1:0;
   const target=renderer.getRenderTarget(),face=renderer.getActiveCubeFace(),mip=renderer.getActiveMipmapLevel(),auto=renderer.autoClear,shadow=renderer.shadowMap.autoUpdate,xr=renderer.xr.enabled;
   renderer.getViewport(this.viewport);renderer.getScissor(this.scissor);const scissorTest=renderer.getScissorTest(),alpha=renderer.getClearAlpha();renderer.getClearColor(this.clearColor);
   try{renderer.xr.enabled=false;renderer.shadowMap.autoUpdate=false;renderer.autoClear=false;renderer.setRenderTarget(this.target);renderer.setScissorTest(false);renderer.setClearColor(0,0);renderer.clear();renderer.render(this.scene,this.camera);useMap(this.target.texture,this.bounds,1);}
