@@ -9,10 +9,14 @@
 // Content-addressed URLs stay immutable (/assets/<sha>.glb): each GLB is fetched once per browser, whenever it is.
 import * as THREE from 'three';
 import type { Entity, StoredDef } from '@sim/world-compiler';
+import { browserQuality } from '../quality-tier.ts';
 
 const qs = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
 export const LAZY = !qs.has('shot') && qs.get('assets') !== 'eager';
-export const EAGER_BYTES = Math.max(1, Number(qs.get('eagerMB') ?? 24)) * 1e6;
+// P1 phones: a phone (quality tier) holds the arrival card for at most ~1 MB of the nearest GLBs and 3 s; the rest fills in
+// after the card. On a Slow 4G link (~180 KB/s) 24 MB / 30 s kept a phone on the card for the full 30 s. ?eagerMB still wins.
+const PHONE = browserQuality().tier === 'phone';
+export const EAGER_BYTES = Math.max(1, Number(qs.get('eagerMB') ?? (PHONE ? 1 : 24))) * 1e6;
 export const NEAR_M = 120;
 const BACKGROUND_DELAY_MS = 6000, BACKGROUND_PARALLEL = 2;
 const QUEUED = qs.get('loadqueue') !== '0'; // same-bundle A/B against the legacy near-camera burst
@@ -107,7 +111,7 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
 }
 /** The arrival gate (lane PERF): true while the eager GLBs (nearest the arrival) are not yet drawn, for at most GATE_MS.
  *  ViewerFrame keeps the arrival card (and its byte bar) up meanwhile. Old worlds never plan, so it is always false. */
-const GATE_MS = 30_000;
+const GATE_MS = PHONE ? 3_000 : 30_000;
 const eagerLeft = new Set<string>(); let gateUntil = 0;
 const gateListeners = new Set<() => void>();
 function notifyGate() { for (const f of gateListeners) f(); }
