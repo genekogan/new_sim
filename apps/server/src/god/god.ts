@@ -748,7 +748,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.db.db.prepare('DELETE FROM god_find_misses_v1 WHERE world_id=? AND (at,query) NOT IN (SELECT at,query FROM god_find_misses_v1 WHERE world_id=? ORDER BY at DESC,query LIMIT 1000)').run(this.opts.worldId, this.opts.worldId);
   }
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
-  godSnapshot({ library = true }: { library?: boolean } = {}) {
+  godSnapshot() { const s = this.godSnapshotOf(true); return { ...s, library: s.library! }; }
+  /** G2: the god snapshot without the library (the CLI mirror sends it only when its hash changed). */
+  godSnapshotOf(library: boolean) {
     const pub = this.publicSnapshot();
     return { ...pub, ...(library ? { library: this.model.allDefs().map(publicDef) } : {}), libraryRef: this.model.library ? libraryRef(this.model.library) : null,
       owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };

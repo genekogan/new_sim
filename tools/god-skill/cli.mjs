@@ -8,8 +8,8 @@ import { doctor } from './lib/doctor.mjs';
 import { catalog, line as catalogLine, recommend, taxonomy } from './lib/catalog.mjs';
 import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { activeClaim, atomicWrite, attention, buildHeader, call, claimFile, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
-import { mirror, view, normDef, resolveDef, follow, invalidate, mirrorState, adoptMirror } from './lib/mirror.mjs';
+import { activeClaim, atomicWrite, attention, buildHeader, call, claimFile, decorate, helperFile, load, num, ok, OUTPUT_SUFFIX, r2, save, sleep, withBuildOptions, withDeadline, withStateLock, withoutBuild } from './lib/state.mjs';
+import { mirror, view, normDef, resolveDef, follow, invalidate, mirrorState, adoptMirror, speaksMirror, wasTrusted } from './lib/mirror.mjs';
 import { normalizeArgv } from './lib/args.mjs';
 import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
@@ -415,10 +415,21 @@ export const explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.fie
 
 const parseKV = (list) => Object.fromEntries([].concat(list ?? []).map((kv) => { const i = kv.indexOf('='); const k = kv.slice(0, i), v = kv.slice(i + 1); return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : /^[[{]/.test(v) ? JSON.parse(v) : v]; }));
 const bakeCache = new Map();
-/** The physical facts of a def at given params (box, rooms, slots), from the server's own generators. */
-export async function bakeInfo(def, params, shape) {
+// G2: bakes of shapeless defs kept in the folder per library state (a def's bake depends only on its content), so a
+// place of a def used before needs no bake request. Only a commit whose ifSeq held may save them (place: ctx.bakes).
+const BAKES = '.eden-god.bakes.json';
+const readBakes = (lib) => { try { const b = JSON.parse(readFileSync(BAKES, 'utf8')); return b.lib === lib ? b.bakes : {}; } catch { return {}; } };
+export function saveBakes(lib, fresh) {
+  if (!lib || !Object.keys(fresh).length) return;
+  try { const all = Object.entries({ ...readBakes(lib), ...fresh }).slice(-300); atomicWrite(BAKES, JSON.stringify({ lib, bakes: Object.fromEntries(all) })); } catch { /* best effort */ }
+}
+/** The physical facts of a def at given params (box, rooms, slots), from the server's own generators. `kept`: { lib,
+ *  fresh } — read the folder's bakes for that library state and collect the ones fetched now (place saves them). */
+export async function bakeInfo(def, params, shape, kept) {
   const key = JSON.stringify([def, params ?? {}, shape ?? null]);
+  if (kept?.lib && !shape && !bakeCache.has(key)) { const b = readBakes(kept.lib)[key]; if (b) return b; }
   if (!bakeCache.has(key)) { const b = (await query({ bake: { def: normDef(def), params: params ?? {}, ...(shape ? { shape } : {}) } })).bake; if (b.error) { const word = String(def).replace(/^core[/-]/, '').replace(/@\d+$/, '').replace(/-/g, ' '); let near = []; if (/def\.unknown/.test(b.error)) try { near = (await defs(word, { json: true })).slice(0, 4).map((d) => d.ref); } catch { /* offline */ } throw new Error(`${b.error}${near.length ? ` — the library has: ${near.join(', ')}` : ''}. \`defs ${word}\` searches the library; define only what it lacks.`); } bakeCache.set(key, b); }
+  if (kept?.lib && !shape) kept.fresh[key] = bakeCache.get(key);
   return bakeCache.get(key);
 }
 const uniqueName = (v, parentId, stem, taken) => { const has = (n) => taken.has(`${parentId}/${n}`) || v.rows.some((r) => r.parent === parentId && r.name === n); if (!has(stem)) return stem; for (let k = 2; k < 9999; k++) if (!has(`${stem}-${k}`)) return `${stem}-${k}`; return `${stem}-${Date.now() % 1e5}`; };
@@ -434,7 +445,15 @@ const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along
  * place <def> [relations] — the solver turns relations into a pose, dry-runs, walks to the next candidate
  * (or the server's suggestion, or a nudge) on overlap, then commits and says what it did.
  */
+const STALE = Symbol('the world changed since the cached mirror');
 export async function place(defIn, flags = {}) {
+  // G2: solve on the cached mirror; the commit's ifSeq says whether the world moved on, and only then do it again fresh
+  // (any failure before the edit was sent, on a mirror read without a request, also tries again fresh: it may be stale)
+  const ctx = { trusted: true, sent: false, read: false };
+  try { return await placeOnce(defIn, flags, ctx); } catch (e) { if (e !== STALE && (ctx.sent || !ctx.read)) throw e; }
+  return placeOnce(defIn, flags, { trusted: false, sent: false });
+}
+async function placeOnce(defIn, flags, ctx) {
   if (!defIn) throw new Error('usage: place <def> [--at …|--near …|--inside …|--on …|--along …|--against …|--between a b] [--facing …] [--name n] [--param k=v]');
   let def = normDef(defIn), readAs = null;
   if (flags.side !== undefined && flags.along === undefined) throw new Error('--side picks a side of a path: use it with --along <road|river|wall> (left|right|both); elsewhere use --dir or --facing');
@@ -445,7 +464,8 @@ export async function place(defIn, flags = {}) {
   if (flags.rect) shape = { area: rectArea(flags.rect) };
   if (flags.circle) shape = { area: circleArea(flags.circle) };
   let info;
-  try { info = await bakeInfo(def, params, shape); } catch (e) {
+  if (ctx.trusted) ctx.bakes = { lib: mirrorState()?.lib, fresh: {} };
+  try { info = await bakeInfo(def, params, shape, ctx.bakes); } catch (e) {
     // def.unknown although the library has exactly one def of that name (core/<local>, a name without @v, <core name>@v)
     const alt = /def\.unknown/.test(String(e?.message)) ? resolveDef(view(await mirror({ fresh: true })), defIn) : null;
     if (!alt) throw e;
@@ -453,18 +473,18 @@ export async function place(defIn, flags = {}) {
   }
   const tell = (r) => (!readAs ? r : typeof r === 'string' ? `${r}\n  note: ${readAs}` : { ...r, readAs });
   if (info.form !== 'point' && !shape && !(info.form === 'path' && (flags.from || flags.between || flags.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === 'path' ? '--path \'[[x,z],…]\' [--width w] or --from <ref> --to <ref> [--via x,z]' : '--area \'[[x,z],…]\', --rect cx,cz,w,d or --circle cx,cz,r'}`);
-  const m = await mirror(); const v = view(m);
+  const m = await mirror({ trust: ctx.trusted }); ctx.read = wasTrusted(); const v = view(m);
   if (flags.free) {
     const near = flags.near ? refPoint(v, flags.near) : flags.at ? refPoint(v, flags.at) : { x: 0, z: 0 };
     const spots = (await query({ free: { size: [info.box[0] + 1, info.box[2] + 1], near: [near.x, near.z], radius: flags.radius ? num(flags.radius) : 200, count: Number(flags.count ?? 1) } })).free;
     if (!spots.length) throw new Error('no free flat dry plot found; try --radius or a smaller thing');
     flags = { ...flags, at: undefined, near: undefined };
-    return tell(await commitItems(v, def, info, flags, params, spots.map((s) => ({ candidates: [{ p: s.at, ...(flags.facing ? {} : {}), note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []));
+    return tell(await commitItems(v, def, info, flags, params, spots.map((s) => ({ candidates: [{ p: s.at, ...(flags.facing ? {} : {}), note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), [], { ctx }));
   }
-  if (shape) return tell(await commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []));
+  if (shape) return tell(await commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], [], { ctx }));
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined) throw new Error('where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free');
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags.scale ? num(flags.scale) : 1 }, relFrom(flags));
-  return tell(await commitItems(v, def, info, flags, params, sol.items, sol.notes));
+  return tell(await commitItems(v, def, info, flags, params, sol.items, sol.notes, { ctx }));
 }
 const PREPARED = new Set(['road/1', 'path/1', 'river/1', 'bridge/1', 'pier/1', 'deck/1']);
 /** Roads, rivers, bridges, piers, decks freeze ground facts (grade, bridge spans, flow, deck height) into params
@@ -476,7 +496,7 @@ export async function prepareShape(def, info, shape, params) {
   return { params: { ...(params ?? {}), ...(p.params ?? {}) }, shape: p.path ? { ...shape, path: p.path } : shape };
 }
 /** Build ops from solver items, dry-run, repair, commit. */
-async function commitItems(v, def, info, flags, params, items, notes, { op = 'place', id, rowId } = {}) {
+async function commitItems(v, def, info, flags, params, items, notes, { op = 'place', id, rowId, ctx = null } = {}) {
   if (!items.length) throw new Error('the solver found no placement');
   for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) { const pr = await prepareShape(def, info, c.shape, params); c.shape = pr.shape; c.params = pr.params; }
   const taken = new Set();
@@ -503,8 +523,28 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
     return o;
   };
   let ops = items.map((_, k) => mk(k));
-  let r;
-  for (let attempt = 0; attempt < 12; attempt++) {
+  let r, committed = null;
+  // G2: one round trip. The server walks the candidates this loop would try (same rules, same notes) and commits.
+  if (items.length === 1 && !flags.dry && !flags.plan && speaksMirror()) {
+    const keep = [...taken], world = () => [...taken].filter((t) => t.startsWith('world/'));
+    const cands = [ops[0]], seen = [world()];
+    for (let c = 1; c < items[0].candidates.length && c < 64; c++) { choice[0] = c; cands.push(mk(0)); seen.push(world()); }
+    choice[0] = 0; taken.clear(); for (const t of keep) taken.add(t);
+    const { ops: _o, ...dry } = decorate(load(), '/v1/god/dryrun', 'POST', { ops: [] });
+    if (ctx) ctx.sent = true;
+    const res = await act({ ops: [cands[0]], ...(flags.group ? { group: flags.group } : {}), repair: { candidates: cands, taken: seen, kind: op, dry, ifSeq: v.m.seq, ...(v.m.libraryHash ? { ifLib: v.m.libraryHash } : {}) } }, flags.note);
+    const rep = res.repair; delete res.repair;
+    if (rep?.stage === 'stale' && ctx?.read) { ctx.sent = false; throw STALE; }
+    if (rep?.stage === 'act' && ctx?.read && ctx.bakes) saveBakes(ctx.bakes.lib, ctx.bakes.fresh); // the library was as cached
+    if (rep?.stage !== 'stale') {
+      if (rep) { choice[0] = rep.choice; fixes[0] = rep.fixes; ops = [rep.op]; }
+      if (rep?.stage === 'dryrun') r = { accepted: false, failures: res.failures };
+      else { r = { accepted: true }; committed = res; }
+    }
+  }
+  const walked = !!r;
+  if (!walked && ctx?.read) throw STALE; // the client-side loop needs a checked mirror: solve again on one
+  for (let attempt = 0; attempt < 12 && !walked; attempt++) {
     r = await dryrun({ ops });
     if (r.accepted) break;
     const f = r.failures[0]; const k = f.op;
@@ -527,7 +567,8 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
     const tells = flags.against ? [...notes, ...items.map((it, k) => it.candidates[choice[k]].note)] : notes;
     return flags.json ? { dry: true, ops, notes: tells } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => '  ' + JSON.stringify(o)), ...tells.map((note) => `  note: ${note}`)].join('\n');
   }
-  const res = await act({ ops, ...(flags.group ? { group: flags.group } : {}) }, flags.note);
+  if (ctx) ctx.sent = true;
+  const res = committed ?? await act({ ops, ...(flags.group ? { group: flags.group } : {}) }, flags.note);
   if (!res.accepted) return `REFUSED at commit: ${res.failures.map(explainFailure).join('; ')}`;
   if (flags.json) return { ...res, ops };
   const m2 = await mirror(); const v2 = view(m2);

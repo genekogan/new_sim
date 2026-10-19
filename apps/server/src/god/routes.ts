@@ -11,6 +11,7 @@ import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { engineSettled, runQuery } from './query.ts';
 import { mirrorCurrent, mirrorPayload, type MirrorWant } from './mirror.ts';
+import { actWithRepair, parseRepair } from './repair.ts';
 import { mountAssetRoutes } from './assets.ts';
 import { godBodyLimit } from './ingestion.ts';
 import { godVersions } from './versions.ts';
@@ -245,7 +246,18 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/snapshot', (c) => { const who = requireGod(c), snapshot = d.god.godSnapshot(); return c.json(who.child ? { ...snapshot, prayers: [] } : snapshot, 200, noStore); });
   app.post('/v1/god/dryrun', async (c) => { limitGod(c, 'dryrun', CREATION_LIMITS.dryrunsPerMinute); const b = await body(c); return c.json(asGod(c, b, () => d.god.dryrun(b)), 200, noStore); });
   // G2: `mirror` (the CLI's mirror state) is not part of the batch: stripped here, answered after the commit with the delta
-  app.post('/v1/god/act', async (c) => { limitGod(c, 'act', CREATION_LIMITS.actsPerMinute); const raw = await body(c); const want = mirrorWant(raw); const b = want ? (({ mirror: _m, ...rest }) => rest)(raw as Record<string, unknown>) : raw; const r = asGod(c, b, () => d.god.act(b, typeof b?.note === 'string' ? b.note : undefined)); return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore); });
+  // G2: `repair` (place/move candidates, see repair.ts) is not part of the batch either: the server walks them, then commits
+  app.post('/v1/god/act', async (c) => {
+    limitGod(c, 'act', CREATION_LIMITS.actsPerMinute);
+    const raw = await body(c), want = mirrorWant(raw), obj = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+    const rep = obj && Object.hasOwn(obj, 'repair') ? parseRepair(obj.repair) : null;
+    if (obj && Object.hasOwn(obj, 'repair') && !rep) throw new ApiError(400, 'invalid', 'repair must be { candidates, taken, kind, dry, ifSeq }');
+    const b = want || rep ? (({ mirror: _m, repair: _r, ...rest }) => rest)(obj!) : raw;
+    const note = typeof b?.note === 'string' ? b.note : undefined, ref = typeof b?.clientRef === 'string' ? b.clientRef : undefined;
+    const saved = rep && ref !== undefined ? d.god.store.receipt(ref) : null; // a retry of a repaired edit: its receipt, never a second walk
+    const r = saved ? { ...saved.result, replayed: true } : asGod(c, b, () => rep ? actWithRepair(d.god, b as Record<string, unknown>, rep, note) : d.god.act(b, note));
+    return c.json(want && r.accepted ? { ...r, mirror: mirrorPayload(d.god, want, { child: !!requireGod(c).child }) } : r, 200, noStore);
+  });
   app.get('/v1/god/mirror', (c) => { const who = requireGod(c), q = c.req.query(), want: MirrorWant = { since: q.since === undefined ? undefined : Number(q.since), builds: q.builds === undefined ? undefined : Number(q.builds), have: q.have, lib: q.lib }; return c.json(mirrorCurrent(d.god, want) ? { contract: 'mirror/1', same: true, seq: d.god.model.editSeq } : mirrorPayload(d.god, want, { child: !!who.child }), 200, noStore); });
   app.get('/v1/god/requests/:clientRef', (c) => { requireGod(c); const receipt = d.god.store.receipt(c.req.param('clientRef')); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for this clientRef (only the last 1000 accepted requests are retained)'); return c.json(receipt, 200, noStore); });
   app.get('/v1/god/requests/', (c) => { requireGod(c); const receipt = d.god.store.receipt(''); if (!receipt) throw new ApiError(404, 'not-found', 'no committed receipt for the empty clientRef'); return c.json(receipt, 200, noStore); });

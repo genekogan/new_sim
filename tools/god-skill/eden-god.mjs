@@ -565,12 +565,7 @@ var need = (s, k, hint) => {
 };
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var EDIT_PATHS = /* @__PURE__ */ new Set(["/v1/god/act", "/v1/god/env", "/v1/god/land", "/v1/god/strike", "/v1/god/undo", "/v1/god/redo", "/v1/god/answer"]);
-async function call(path, { body, method, as = "god", noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
-  const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
-  if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
-  if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
-  headers["x-eden-god-holder"] = JSON.stringify(holder("eden-god CLI"));
-  const verb = method ?? (body ? "POST" : "GET"), pathname = path.split("?")[0];
+function decorate(s, pathname, verb, body, { as = "god", noBuild = false } = {}) {
   const batchPath = ["/v1/god/act", "/v1/god/preview", "/v1/god/dryrun"].includes(pathname);
   const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
   const sealed = body && Object.hasOwn(body, "preview");
@@ -584,6 +579,16 @@ async function call(path, { body, method, as = "god", noBuild = false, timeoutMs
     }
     if (batchPath && body.group === void 0 && s.group) body.group = s.group;
   } else if (batchPath && !sealed && body?.group === void 0 && s.group && !s.build) body = { ...body, group: s.group };
+  return body;
+}
+async function call(path, { body, method, as = "god", noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
+  const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
+  if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
+  if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
+  headers["x-eden-god-holder"] = JSON.stringify(holder("eden-god CLI"));
+  const verb = method ?? (body ? "POST" : "GET"), pathname = path.split("?")[0];
+  const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
+  body = decorate(s, pathname, verb, body, { as, noBuild });
   const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID2() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
@@ -1712,6 +1717,10 @@ var CACHE = ".eden-god.cache.json";
 var memo = null;
 var synced = null;
 var oldServer = false;
+var speaks = false;
+var trustedRead = false;
+var wasTrusted = () => trustedRead;
+var speaksMirror = () => speaks && !oldServer;
 function readCache() {
   try {
     return existsSync3(CACHE) ? JSON.parse(readFileSync5(CACHE, "utf8")) : null;
@@ -1776,8 +1785,18 @@ async function fetchMirror(q) {
   const qs2 = Object.entries(q).filter(([, v]) => v !== void 0 && v !== null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
   return call(`/v1/god/mirror${qs2 ? "?" + qs2 : ""}`, { timeoutMs: 6e4 });
 }
-async function mirror({ fresh = false } = {}) {
+async function mirror({ fresh = false, trust = false } = {}) {
   const world = load().world;
+  if (trust && !fresh) {
+    const c = memo?.world === world ? memo : readCache();
+    if (c?.world === world && c.guard) {
+      memo = c;
+      speaks = true;
+      trustedRead = true;
+      return c;
+    }
+  }
+  trustedRead = false;
   if (!fresh && synced && synced === memo && memo.world === world) {
     synced = null;
     return memo;
@@ -1789,6 +1808,7 @@ async function mirror({ fresh = false } = {}) {
     else if (r.data?.contract !== "mirror/1" && (r.status === 404 || r.status >= 200 && r.status < 300)) oldServer = true;
     else {
       const p = ok(r, "mirror");
+      speaks = true;
       if (p.same && base) {
         memo = base;
         return base;
@@ -3848,8 +3868,29 @@ var parseKV = (list2) => Object.fromEntries([].concat(list2 ?? []).map((kv) => {
   return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === "true" ? true : v === "false" ? false : /^[[{]/.test(v) ? JSON.parse(v) : v];
 }));
 var bakeCache = /* @__PURE__ */ new Map();
-async function bakeInfo(def, params, shape) {
+var BAKES = ".eden-god.bakes.json";
+var readBakes = (lib) => {
+  try {
+    const b = JSON.parse(readFileSync9(BAKES, "utf8"));
+    return b.lib === lib ? b.bakes : {};
+  } catch {
+    return {};
+  }
+};
+function saveBakes(lib, fresh) {
+  if (!lib || !Object.keys(fresh).length) return;
+  try {
+    const all = Object.entries({ ...readBakes(lib), ...fresh }).slice(-300);
+    atomicWrite(BAKES, JSON.stringify({ lib, bakes: Object.fromEntries(all) }));
+  } catch {
+  }
+}
+async function bakeInfo(def, params, shape, kept) {
   const key = JSON.stringify([def, params ?? {}, shape ?? null]);
+  if (kept?.lib && !shape && !bakeCache.has(key)) {
+    const b = readBakes(kept.lib)[key];
+    if (b) return b;
+  }
   if (!bakeCache.has(key)) {
     const b = (await query({ bake: { def: normDef(def), params: params ?? {}, ...shape ? { shape } : {} } })).bake;
     if (b.error) {
@@ -3863,6 +3904,7 @@ async function bakeInfo(def, params, shape) {
     }
     bakeCache.set(key, b);
   }
+  if (kept?.lib && !shape) kept.fresh[key] = bakeCache.get(key);
   return bakeCache.get(key);
 }
 var uniqueName = (v, parentId, stem, taken) => {
@@ -3904,7 +3946,17 @@ var relFrom = (f) => ({
   span: f.span
 });
 var hasRelation = (f) => ["at", "near", "around", "against", "between", "along", "across", "inside", "on", "free", "from", "row", "grid"].some((k) => f[k] !== void 0);
+var STALE = /* @__PURE__ */ Symbol("the world changed since the cached mirror");
 async function place(defIn, flags2 = {}) {
+  const ctx = { trusted: true, sent: false, read: false };
+  try {
+    return await placeOnce(defIn, flags2, ctx);
+  } catch (e) {
+    if (e !== STALE && (ctx.sent || !ctx.read)) throw e;
+  }
+  return placeOnce(defIn, flags2, { trusted: false, sent: false });
+}
+async function placeOnce(defIn, flags2, ctx) {
   if (!defIn) throw new Error("usage: place <def> [--at \u2026|--near \u2026|--inside \u2026|--on \u2026|--along \u2026|--against \u2026|--between a b] [--facing \u2026] [--name n] [--param k=v]");
   let def = normDef(defIn), readAs = null;
   if (flags2.side !== void 0 && flags2.along === void 0) throw new Error("--side picks a side of a path: use it with --along <road|river|wall> (left|right|both); elsewhere use --dir or --facing");
@@ -3915,8 +3967,9 @@ async function place(defIn, flags2 = {}) {
   if (flags2.rect) shape = { area: rectArea(flags2.rect) };
   if (flags2.circle) shape = { area: circleArea(flags2.circle) };
   let info;
+  if (ctx.trusted) ctx.bakes = { lib: mirrorState()?.lib, fresh: {} };
   try {
-    info = await bakeInfo(def, params, shape);
+    info = await bakeInfo(def, params, shape, ctx.bakes);
   } catch (e) {
     const alt = /def\.unknown/.test(String(e?.message)) ? resolveDef(view(await mirror({ fresh: true })), defIn) : null;
     if (!alt) throw e;
@@ -3927,19 +3980,20 @@ async function place(defIn, flags2 = {}) {
   const tell = (r) => !readAs ? r : typeof r === "string" ? `${r}
   note: ${readAs}` : { ...r, readAs };
   if (info.form !== "point" && !shape && !(info.form === "path" && (flags2.from || flags2.between || flags2.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === "path" ? "--path '[[x,z],\u2026]' [--width w] or --from <ref> --to <ref> [--via x,z]" : "--area '[[x,z],\u2026]', --rect cx,cz,w,d or --circle cx,cz,r"}`);
-  const m = await mirror();
+  const m = await mirror({ trust: ctx.trusted });
+  ctx.read = wasTrusted();
   const v = view(m);
   if (flags2.free) {
     const near = flags2.near ? refPoint(v, flags2.near) : flags2.at ? refPoint(v, flags2.at) : { x: 0, z: 0 };
     const spots = (await query({ free: { size: [info.box[0] + 1, info.box[2] + 1], near: [near.x, near.z], radius: flags2.radius ? num(flags2.radius) : 200, count: Number(flags2.count ?? 1) } })).free;
     if (!spots.length) throw new Error("no free flat dry plot found; try --radius or a smaller thing");
     flags2 = { ...flags2, at: void 0, near: void 0 };
-    return tell(await commitItems(v, def, info, flags2, params, spots.map((s) => ({ candidates: [{ p: s.at, ...flags2.facing ? {} : {}, note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []));
+    return tell(await commitItems(v, def, info, flags2, params, spots.map((s) => ({ candidates: [{ p: s.at, ...flags2.facing ? {} : {}, note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), [], { ctx }));
   }
-  if (shape) return tell(await commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []));
+  if (shape) return tell(await commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], [], { ctx }));
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0) throw new Error("where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free");
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags2.scale ? num(flags2.scale) : 1 }, relFrom(flags2));
-  return tell(await commitItems(v, def, info, flags2, params, sol.items, sol.notes));
+  return tell(await commitItems(v, def, info, flags2, params, sol.items, sol.notes, { ctx }));
 }
 var PREPARED = /* @__PURE__ */ new Set(["road/1", "path/1", "river/1", "bridge/1", "pier/1", "deck/1"]);
 async function prepareShape(def, info, shape, params) {
@@ -3948,7 +4002,7 @@ async function prepareShape(def, info, shape, params) {
   if (!p || p.error) return { params, shape };
   return { params: { ...params ?? {}, ...p.params ?? {} }, shape: p.path ? { ...shape, path: p.path } : shape };
 }
-async function commitItems(v, def, info, flags2, params, items, notes, { op = "place", id, rowId } = {}) {
+async function commitItems(v, def, info, flags2, params, items, notes, { op = "place", id, rowId, ctx = null } = {}) {
   if (!items.length) throw new Error("the solver found no placement");
   for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) {
     const pr = await prepareShape(def, info, c.shape, params);
@@ -3985,8 +4039,44 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     return o;
   };
   let ops = items.map((_, k) => mk(k));
-  let r;
-  for (let attempt = 0; attempt < 12; attempt++) {
+  let r, committed = null;
+  if (items.length === 1 && !flags2.dry && !flags2.plan && speaksMirror()) {
+    const keep = [...taken], world = () => [...taken].filter((t) => t.startsWith("world/"));
+    const cands = [ops[0]], seen = [world()];
+    for (let c = 1; c < items[0].candidates.length && c < 64; c++) {
+      choice[0] = c;
+      cands.push(mk(0));
+      seen.push(world());
+    }
+    choice[0] = 0;
+    taken.clear();
+    for (const t of keep) taken.add(t);
+    const { ops: _o, ...dry } = decorate(load(), "/v1/god/dryrun", "POST", { ops: [] });
+    if (ctx) ctx.sent = true;
+    const res2 = await act({ ops: [cands[0]], ...flags2.group ? { group: flags2.group } : {}, repair: { candidates: cands, taken: seen, kind: op, dry, ifSeq: v.m.seq, ...v.m.libraryHash ? { ifLib: v.m.libraryHash } : {} } }, flags2.note);
+    const rep = res2.repair;
+    delete res2.repair;
+    if (rep?.stage === "stale" && ctx?.read) {
+      ctx.sent = false;
+      throw STALE;
+    }
+    if (rep?.stage === "act" && ctx?.read && ctx.bakes) saveBakes(ctx.bakes.lib, ctx.bakes.fresh);
+    if (rep?.stage !== "stale") {
+      if (rep) {
+        choice[0] = rep.choice;
+        fixes[0] = rep.fixes;
+        ops = [rep.op];
+      }
+      if (rep?.stage === "dryrun") r = { accepted: false, failures: res2.failures };
+      else {
+        r = { accepted: true };
+        committed = res2;
+      }
+    }
+  }
+  const walked = !!r;
+  if (!walked && ctx?.read) throw STALE;
+  for (let attempt = 0; attempt < 12 && !walked; attempt++) {
     r = await dryrun({ ops });
     if (r.accepted) break;
     const f = r.failures[0];
@@ -4027,7 +4117,8 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     const tells = flags2.against ? [...notes, ...items.map((it, k) => it.candidates[choice[k]].note)] : notes;
     return flags2.json ? { dry: true, ops, notes: tells } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => "  " + JSON.stringify(o)), ...tells.map((note) => `  note: ${note}`)].join("\n");
   }
-  const res = await act({ ops, ...flags2.group ? { group: flags2.group } : {} }, flags2.note);
+  if (ctx) ctx.sent = true;
+  const res = committed ?? await act({ ops, ...flags2.group ? { group: flags2.group } : {} }, flags2.note);
   if (!res.accepted) return `REFUSED at commit: ${res.failures.map(explainFailure).join("; ")}`;
   if (flags2.json) return { ...res, ops };
   const m2 = await mirror();
@@ -5367,6 +5458,7 @@ export {
   remove,
   request,
   resolveCmd,
+  saveBakes,
   schema,
   schemaMarkdown,
   select,

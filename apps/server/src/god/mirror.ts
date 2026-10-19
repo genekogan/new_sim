@@ -37,7 +37,7 @@ export const mirrorCurrent = (god: GodMode, want: MirrorWant) => want.since === 
  *  (no prayers, as in GET /v1/god/snapshot). */
 export function mirrorPayload(god: GodMode, want: MirrorWant = {}, { child = false } = {}) {
   const lib = libraryHash(god), withLib = want.lib !== lib;
-  const snap = god.godSnapshot({ library: withLib }) as Record<string, unknown> & { entities: { id: string }[]; defs: unknown[]; library?: unknown[] };
+  const snap = god.godSnapshotOf(withLib) as Record<string, unknown> & { entities: { id: string }[]; defs: unknown[]; library?: unknown[] };
   if (child) snap.prayers = [];
   const rows = (runQuery(god.model, { layout: { obbs: true } }).layout as { entities: { id: string }[] }).entities;
   const rowH: [string, string][] = rows.map((r) => [r.id, mirrorHash(JSON.stringify(r))]);

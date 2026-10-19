@@ -95,12 +95,9 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const EDIT_PATHS = new Set(['/v1/god/act', '/v1/god/env', '/v1/god/land', '/v1/god/strike', '/v1/god/undo', '/v1/god/redo', '/v1/god/answer']);
 
-export async function call(path, { body, method, as = 'god', noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 180_000) } = {}) {
-  const s = load(), world = need(s, 'world', 'Run: node eden-god.mjs register <world-url>'), headers = { 'content-type': 'application/json' };
-  if (as === 'god' && s.token) headers.authorization = `Bearer ${s.token}`;
-  if (as === 'owner' && s.identity) headers.authorization = `Bearer ${s.identity}`;
-  headers['x-eden-god-holder'] = JSON.stringify(holder('eden-god CLI'));
-  const verb = method ?? (body ? 'POST' : 'GET'), pathname = path.split('?')[0];
+/** The build/group fields a god batch request carries (the lead's build step, the current group). Exported so a
+ *  request that asks the server to run dryruns for it (G2: place/move repairs) can say what those dryruns carry. */
+export function decorate(s, pathname, verb, body, { as = 'god', noBuild = false } = {}) {
   const batchPath = ['/v1/god/act', '/v1/god/preview', '/v1/god/dryrun'].includes(pathname);
   const revertPath = ['/v1/god/undo', '/v1/god/redo'].includes(pathname);
   const sealed = body && Object.hasOwn(body, 'preview');
@@ -111,6 +108,16 @@ export async function call(path, { body, method, as = 'god', noBuild = false, ti
     if (!body.build && s.build) { const b = s.build; body.build = { id: b.id, ...(b.claim ? { claim: b.claim } : { lease: b.lease }), step: b.n, label: b.label }; }
     if (batchPath && body.group === undefined && s.group) body.group = s.group;
   } else if (batchPath && !sealed && body?.group === undefined && s.group && !s.build) body = { ...body, group: s.group };
+  return body;
+}
+export async function call(path, { body, method, as = 'god', noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 180_000) } = {}) {
+  const s = load(), world = need(s, 'world', 'Run: node eden-god.mjs register <world-url>'), headers = { 'content-type': 'application/json' };
+  if (as === 'god' && s.token) headers.authorization = `Bearer ${s.token}`;
+  if (as === 'owner' && s.identity) headers.authorization = `Bearer ${s.identity}`;
+  headers['x-eden-god-holder'] = JSON.stringify(holder('eden-god CLI'));
+  const verb = method ?? (body ? 'POST' : 'GET'), pathname = path.split('?')[0];
+  const revertPath = ['/v1/god/undo', '/v1/god/redo'].includes(pathname);
+  body = decorate(s, pathname, verb, body, { as, noBuild });
   // A new command is a new request, even if its input batch carried an old ref.
   // Keep the serialized bytes for the transport retry; never re-create the payload.
   const clientRef = as === 'god' && verb !== 'GET' && EDIT_PATHS.has(pathname) ? randomUUID() : undefined;

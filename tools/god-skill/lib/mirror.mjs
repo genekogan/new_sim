@@ -16,7 +16,11 @@ import { isFlagDef } from './solver.mjs';
 import { noticeInboxHeader } from './inbox-notice.mjs';
 
 export const CACHE = '.eden-god.cache.json';
-let memo = null, synced = null, oldServer = false;
+let memo = null, synced = null, oldServer = false, speaks = false, trustedRead = false;
+/** Was the last mirror() a trusted cache read (no request)? */
+export const wasTrusted = () => trustedRead;
+/** Did this world answer mirror/1 in this process (so it also takes act `repair`, G2 C)? */
+export const speaksMirror = () => speaks && !oldServer;
 
 function readCache() { try { return existsSync(CACHE) ? JSON.parse(readFileSync(CACHE, 'utf8')) : null; } catch { return null; } }
 function writeCache(c) { try { atomicWrite(CACHE, JSON.stringify(c)); } catch { /* read-only folder: memory only */ } }
@@ -72,8 +76,13 @@ async function fetchMirror(q) {
 
 /** The mirror, fresh unless the server is unreachable. `{ fresh: true }` refetches regardless (the library only when
  *  it changed). */
-export async function mirror({ fresh = false } = {}) {
+export async function mirror({ fresh = false, trust = false } = {}) {
   const world = load().world;
+  if (trust && !fresh) { // G2: a caller that checks the seq itself (place: act ifSeq) takes a mirror/1 cache without a request
+    const c = memo?.world === world ? memo : readCache();
+    if (c?.world === world && c.guard) { memo = c; speaks = true; trustedRead = true; return c; }
+  }
+  trustedRead = false;
   if (!fresh && synced && synced === memo && memo.world === world) { synced = null; return memo; } // patched by this process's own edit just now
   const cached = memo?.world === world ? memo : readCache(), base = cached?.world === world ? cached : null;
   if (!oldServer) {
@@ -81,7 +90,7 @@ export async function mirror({ fresh = false } = {}) {
     if (r.status === 0) oldServer = 'maybe'; // unreachable, or a server that fails the route: the seq request below decides
     else if (r.data?.contract !== 'mirror/1' && (r.status === 404 || (r.status >= 200 && r.status < 300))) oldServer = true; // a server before mirror/1
     else {
-      const p = ok(r, 'mirror');
+      const p = ok(r, 'mirror'); speaks = true;
       if (p.same && base) { memo = base; return base; }
       let m = applyMirror(base, p, world);
       if (!m) m = applyMirror(null, ok(await fetchMirror({}), 'mirror'), world); // drift or a lost library: the whole mirror once
