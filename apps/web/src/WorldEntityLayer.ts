@@ -4,7 +4,7 @@
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
 import { noteModeration, noteSnapshotVersion } from './moderation-hidden.ts';
-import { entrySnapshotUrl, takeSnapshotPrefetch } from './snapshot-prefetch.ts';
+import { loadSnapshot } from './snapshot-wire.ts';
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
@@ -85,8 +85,8 @@ export class WorldEntityLayer {
     if (this.resyncing || !this.signal) return;
     this.resyncing = true;
     try {
-      const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return; noteSnapshotVersion(r.headers.get('x-moderation-version'));
-      const snap: Snapshot = await r.json(); if (this.signal.aborted || snap.contract !== 'world/1') return;
+      const got = await loadSnapshot(this.api('/v1/world/snapshot'), this.signal); if (!got) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version'));
+      const snap = got.snap as unknown as Snapshot; if (this.signal.aborted || snap.contract !== 'world/1') return;
       ageNow(snap, r);
       const prevGround = JSON.stringify(this.model?.ground() ?? null);
       this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });
@@ -106,8 +106,8 @@ export class WorldEntityLayer {
     let snap: Snapshot;
     // lane L3h: the first start takes the snapshot GET index.html sent at page entry (snapshot-prefetch.ts), one request
     // lane W1/O2: the page's edge-cacheable snapshot URL when the server named one (its `now` is then as old as the copy)
-    const url = entrySnapshotUrl(this.api('/v1/world/snapshot'));
-    try { const r = await (takeSnapshotPrefetch(url) ?? fetch(url, { signal })); if (!r.ok || signal.aborted) return; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = await r.json();
+    // lane W3: in its wire form (snapshot-wire.ts: defs and ground as cached content-addressed parts)
+    try { const got = await loadSnapshot(this.api('/v1/world/snapshot'), signal, true); if (!got || signal.aborted) return; const r = got.response; noteSnapshotVersion(r.headers.get('x-moderation-version')); snap = got.snap as unknown as Snapshot;
       ageNow(snap, r); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground }, undefined, undefined, { lazyIndex: true });

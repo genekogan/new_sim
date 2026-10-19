@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { registerHooks } from 'node:module';
-import { entryPrefetchScript, OLD_WORLD_KEYS, PREFETCH_GLOBAL, takeSnapshotPrefetch, worldKeyFrom } from './snapshot-prefetch.ts';
+import { entryPrefetchScript, OLD_WORLD_KEYS, PREFETCH_GLOBAL, takeSnapshotPrefetch, takePartPrefetch, worldKeyFrom } from './snapshot-prefetch.ts';
 
 // world-path.ts's key before this lane (inline in that file): the shared worldKeyFrom must give the same key
 const keyBefore = (pathname: string, base: string) => (base && pathname.startsWith(base + '/') ? pathname.slice(base.length) : pathname).match(/^\/w\/([a-z][a-z0-9-]{0,31})(?:\/|$)/)?.[1] ?? 'toy';
@@ -22,7 +22,7 @@ function runEntry(base: string, pathname: string) {
 
 test('entry script: one plain GET of this new world\'s snapshot URL (the layer\'s exact URL), none on old worlds', () => {
   for (const base of ['', '/worlds']) for (const pathname of PATHS) {
-    const key = worldKeyFrom(pathname, base), apiUrl = `${base}/w/${key}/v1/world/snapshot`;  // = world-path apiPath('/v1/world/snapshot')
+    const key = worldKeyFrom(pathname, base), apiUrl = `${base}/w/${key}/v1/world/snapshot?defs=ref`;  // = world-path apiPath('/v1/world/snapshot') in W3's wire form
     assert.equal(key, keyBefore(pathname, base), `${base} ${pathname}: same world key as before`);
     const { calls, left } = runEntry(base, pathname);
     if (OLD_WORLD_KEYS.includes(key)) { assert.equal(calls.length, 0, `${base} ${pathname}: old world, no prefetch`); assert.equal(left, undefined); continue; }
@@ -67,12 +67,12 @@ test('WorldEntityLayer.start takes the entry response (no second request); a lat
   globalThis.fetch = (async (u: string) => { fetched.push(String(u)); return Response.json({ contract: 'not-world' }); }) as typeof fetch;
   try {
     const layer = new WorldEntityLayer((p) => '/w/fixture' + p), entry = new Response(JSON.stringify({ contract: 'not-world' }));
-    g[PREFETCH_GLOBAL] = { url: '/w/fixture/v1/world/snapshot', response: Promise.resolve(entry) };
+    g[PREFETCH_GLOBAL] = { url: '/w/fixture/v1/world/snapshot?defs=ref', response: Promise.resolve(entry) };
     await layer.start(new AbortController().signal);
     assert.deepEqual(fetched, [], 'start sent no request of its own');
     assert.equal(entry.bodyUsed, true, 'start read the entry response');
     await layer.start(new AbortController().signal);
-    assert.deepEqual(fetched, ['/w/fixture/v1/world/snapshot'], 'a re-mount (new epoch) takes a fresh snapshot, as before');
+    assert.deepEqual(fetched, ['/w/fixture/v1/world/snapshot?defs=ref'], 'a re-mount (new epoch) takes a fresh snapshot, as before');
   } finally { globalThis.fetch = realFetch; delete g[PREFETCH_GLOBAL]; if (!hadWindow) delete g.window; }
 });
 
@@ -101,7 +101,7 @@ test('GodPanel flags: flagRefsOf over the layer\'s entities = the old snapshot d
 });
 
 // Lane W1: the socket at page entry, adopted by useSim's Connection.
-import { CONFIG_GLOBAL, SOCKET_GLOBAL, takeBootSocket, takeConfigPrefetch, entrySnapshotUrl } from './snapshot-prefetch.ts';
+import { CONFIG_GLOBAL, SOCKET_GLOBAL, takeBootSocket, takeConfigPrefetch, entrySnapshotUrl, entryWireUrl } from './snapshot-prefetch.ts';
 import { anonymousHello, Connection } from '@sim/client';
 
 class FakeWS { static made: FakeWS[] = []; readyState = 0; sent: string[] = []; closed = false; onopen: any; onmessage: any; onclose: any; onerror: any; url: string;
@@ -170,7 +170,22 @@ test('entry script: with the server-named snapshot key it prefetches the keyed U
   const calls: unknown[][] = [];
   const ctx: Record<string, unknown> = { location: { pathname: '/worlds/w/eden-2026/' }, fetch: (...a: unknown[]) => { calls.push(a); return Promise.resolve(new Response('{}')); }, __simSnapshotKey: '9.1.0.0' };
   ctx.window = ctx; vm.runInNewContext(entryPrefetchScript('/worlds'), ctx);
-  assert.deepEqual(calls[0], ['/worlds/w/eden-2026/v1/world/snapshot?v=9.1.0.0']);
+  assert.deepEqual(calls[0], ['/worlds/w/eden-2026/v1/world/snapshot?defs=ref&v=9.1.0.0']);
   const g = globalThis as Record<string, unknown>; const hadWindow = 'window' in g; g.window ??= g;
-  try { g.__simSnapshotKey = '9.1.0.0'; assert.equal(entrySnapshotUrl('/worlds/w/eden-2026/v1/world/snapshot'), calls[0][0]); } finally { delete g.__simSnapshotKey; if (!hadWindow) delete g.window; }
+  try { g.__simSnapshotKey = '9.1.0.0'; assert.equal(entryWireUrl('/worlds/w/eden-2026/v1/world/snapshot'), calls[0][0]); } finally { delete g.__simSnapshotKey; if (!hadWindow) delete g.window; }
+});
+
+test('W3 entry script: the wire snapshot\'s part headers start the part fetches; takePartPrefetch hands each over once', async () => {
+  const calls: string[] = [];
+  const ctx: Record<string, unknown> = { location: { pathname: '/w/eden-2026' }, fetch: (u: string) => { calls.push(u); return Promise.resolve(new Response('{}', { headers: u.includes('snapshot') ? { 'x-defs-ref': 'a'.repeat(32), 'x-ground-ref': 'b'.repeat(32) } : {} })); } };
+  ctx.window = ctx;
+  vm.runInNewContext(entryPrefetchScript(''), ctx);
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(calls.filter((u) => /snapshot|part/.test(u)), ['/w/eden-2026/v1/world/snapshot?defs=ref', `/w/eden-2026/v1/world/part/${'a'.repeat(32)}`, `/w/eden-2026/v1/world/part/${'b'.repeat(32)}`]);
+  const g = globalThis as Record<string, unknown>; const hadWindow = 'window' in g; g.window ??= g;
+  try {
+    g[PREFETCH_GLOBAL] = ctx[PREFETCH_GLOBAL];
+    assert.ok(takeSnapshotPrefetch('/w/eden-2026/v1/world/snapshot?defs=ref'));
+    assert.ok(takePartPrefetch('a'.repeat(32))); assert.equal(takePartPrefetch('a'.repeat(32)), null);
+  } finally { delete g[PREFETCH_GLOBAL]; if (!hadWindow) delete g.window; }
 });
