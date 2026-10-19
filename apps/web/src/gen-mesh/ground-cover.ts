@@ -72,7 +72,7 @@ export function flowerGeometry() {
   tri([0, 0.08, 0], [0.09, 0.16, 0.03], [0.012, 0.14, 0], leaf); tri([0.005, 0.15, 0], [-0.08, 0.24, -0.03], [0.01, 0.21, 0], leaf);
   // head: centre at the top of the stem, its face tilted 35° towards +x
   const cx = 0.03, cy = H, tilt = 0.61, ct = Math.cos(tilt), st = Math.sin(tilt);
-  const P = (u: number, v: number, lift = 0) => [cx + u * ct - lift * st * -1 * 0 + (lift ? -lift * st : 0), cy + u * st + lift * ct, v];
+  const P = (u: number, v: number, lift = 0) => [cx + u * ct - lift * st, cy + u * st + lift * ct, v];
   for (let k = 0; k < 5; k++) {
     const a0 = (k / 5) * Math.PI * 2, a1 = a0 + 0.55, a2 = a0 - 0.55, r = 0.06, ri = 0.012;
     tri(P(Math.cos(a0) * ri, Math.sin(a0) * ri), P(Math.cos(a2) * r, Math.sin(a2) * r), P(Math.cos(a1) * r, Math.sin(a1) * r), white, 1);
@@ -270,8 +270,7 @@ function signatureOf(model: WorldModel): string {
     const d = model.resolvedDef(e.def); if (!d || d.components.body) continue;
     if (e.shape) { mix(e.id); mix(JSON.stringify(e.shape)); mix(JSON.stringify(e.params ?? null)); continue; }
     if (d.layer !== 'solid' && d.layer !== 'surface') continue;
-    const p = e.p as unknown as number[] | undefined;
-    mix(e.id); mix(e.def); if (p) mix(`${Math.round(p[0] * 10)},${Math.round(p[2] * 10)},${Math.round((e.yaw ?? 0) * 100)}`);
+    mix(e.id); mix(e.def); mix(JSON.stringify([e.p ?? null, e.r ?? null, e.s ?? null, e.in.parent]));
   }
   return h.toString(16) + ':' + model.entities.size;
 }
