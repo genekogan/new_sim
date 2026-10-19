@@ -1,7 +1,7 @@
 // The launcher's registry of local worlds (<dataDir>/worlds.json) and the
 // genesis templates it offers (worlds/templates/*.json). Plain data, atomic
 // writes; no world process is touched here.
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { shadowsExisting } from './production.mjs';
 
@@ -84,4 +84,25 @@ export function listTemplates(dir, { all = false } = {}) {
   // Hello hamlet is the canonical starter: right after the empty plain.
   found.sort((a, b) => (a.id === 'hello-hamlet' ? -1 : b.id === 'hello-hamlet' ? 1 : a.name.localeCompare(b.name)));
   return [...out, ...found];
+}
+
+/**
+ * listTemplates, parsed again only when the folder or a template file changes (looked at no more than every `everyMs`).
+ * Every proxied request builds its world's environment (the genesis file), and parsing every template (~2 MB of JSON;
+ * Eden 2026 alone is 1.8 MB) took 30-100 ms of the launcher's one event loop per request, so one busy world slowed
+ * every other world (lane P2, 2026-10-19). Callers must not mutate the arrays returned.
+ */
+export function cachedTemplates(dir, { everyMs = 2000, now = Date.now } = {}) {
+  const memo = new Map(); let sig = null, checked = -Infinity;
+  const signature = () => {
+    try { return readdirSync(dir).filter((f) => f.endsWith('.json')).sort().map((f) => { const s = statSync(join(dir, f)); return `${f}:${s.mtimeMs}:${s.size}`; }).join('|'); }
+    catch { return ''; }
+  };
+  return ({ all = false } = {}) => {
+    const t = now();
+    if (t - checked >= everyMs) { checked = t; const s = signature(); if (s !== sig) { sig = s; memo.clear(); } }
+    const key = all ? 'all' : 'shown';
+    if (!memo.has(key)) memo.set(key, listTemplates(dir, { all }));
+    return memo.get(key);
+  };
 }

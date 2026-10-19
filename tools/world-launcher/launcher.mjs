@@ -72,7 +72,7 @@ import { brotliCompressSync, gzipSync, constants as zlibConstants } from 'node:z
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
+import { FORK_SLUGS, RESERVED, Registry, SLUG_RE, cachedTemplates, slugFor } from './registry.mjs';
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { legacyWorldFor, redirectSwitch } from './redirects.mjs';
 import { verifiedCreator } from './creator-auth.mjs';
@@ -118,6 +118,7 @@ export async function openLauncher(cfg = {}) {
   const dataDir = resolve(cfg.dataDir ?? join(root, '.lane/launcher'));
   const webDir = resolve(cfg.webDir ?? join(root, 'apps/web/dist'));
   const templatesDir = resolve(cfg.templatesDir ?? join(root, 'worlds/templates'));
+  const templateList = cachedTemplates(templatesDir);   // P2: never parse ~2 MB of templates per proxied request
   const marsWebDir = cfg.marsWebDir ?? (existsSync(join(root, '.lane/mars-web')) ? join(root, '.lane/mars-web') : undefined);
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
   const origin = `http://127.0.0.1:${port}`;
@@ -155,7 +156,7 @@ export async function openLauncher(cfg = {}) {
   const siteOk = (req) => { const h = String(req.headers['x-sim-site-key'] ?? ''); return direct(req) && h.length === siteKey.length && timingSafeEqual(Buffer.from(h), Buffer.from(siteKey)); };
   const pool = new ChildPool({ root, range, site: { url: `${origin}${prod.base}`, key: siteKey }, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), libraryDir: join(dataDir, 'library'), cobuilders: cfg.cobuilders ?? process.env.SIM_COBUILDERS === '1', idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
     maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, /* handover pre-warm: only world commands that know SIM_STANDBY (this release's own) */ prewarm: cfg.prewarm ?? (!cfg.command && process.env.SIM_PREWARM !== '0'), busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) { d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; if (oldRoot) Object.assign(d.env, { SIM_FORK_ROOT: '1', INVITE_REQUIRED: '0', SEED_NATIVES: '0' }); } return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
-  const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
+  const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? templateList({ all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
   async function refreshStats(w) {
@@ -174,14 +175,14 @@ export async function openLauncher(cfg = {}) {
     } catch { /* busy; keep the cached numbers */ }
   }
   const describe = (w) => {
-    const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir, { all: true }).find((x) => x.id === w.template);
+    const st = pool.status(w.slug), s = stats.get(w.slug), t = templateList({ all: true }).find((x) => x.id === w.template);
     // two worlds with the same shown name are told apart by their slug (the address people see), e.g. "Mars · my-mars-2"
     const twin = registry.worlds.some((x) => x !== w && sameName(x.name, w.name));
     return { nameTag: twin ? w.slug : null, claimable: w.claimable !== false, key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
-    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
+    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: templateList().map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
   }
 
   /** A world the site admin marked not claimable, while it still has no god: nobody may claim it or mint for it. */
@@ -242,7 +243,7 @@ export async function openLauncher(cfg = {}) {
     if (!op && auth && !creator) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
     const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 60) return [400, { ok: false, code: 'invalid', message: 'name: 1–60 characters' }];
-    const templates = listTemplates(templatesDir);
+    const templates = templateList();
     const template = typeof body?.template === 'string' ? body.template : 'empty';
     const t = templates.find((x) => x.id === template);
     if (!t) return [400, { ok: false, code: 'invalid', message: `unknown template ${template}; one of ${templates.map((x) => x.id).join(', ')}` }];
@@ -419,10 +420,13 @@ export async function openLauncher(cfg = {}) {
     try { return await pool.ensure(worldEnv(w)); } catch { return anyRunning(); }
   };
   const anyRunning = () => { const up = registry.worlds.filter((w) => pool.status(w.slug).status === 'running'); const w = up.find((x) => !x.fork) ?? up[0]; return w ? pool.status(w.slug).port ?? null : null; };
+  // P2: a public page GET must not rewrite worlds.json synchronously each time (a look loop would): one save per 2 s at most
+  let saveTimer = null;
+  const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; registry.save(); }, 2000); saveTimer.unref?.(); };
   function observe(slug, req, url) {
     const s = seenOf(slug), rest = url.pathname.slice(wp(slug).length) || '/';
     // `god look` loads the page with ?shot=1 (29 WP0): count it as a look.
-    if (req.method === 'GET' && (rest === '/' || rest === '') && url.searchParams.get('shot') === '1') { s.looks++; s.lastLookAt = Date.now(); registry.update(slug, { looks: s.looks, lastLookAt: s.lastLookAt }); }
+    if (req.method === 'GET' && (rest === '/' || rest === '') && url.searchParams.get('shot') === '1') { s.looks++; s.lastLookAt = Date.now(); const w = registry.get(slug); if (w) { Object.assign(w, { looks: s.looks, lastLookAt: s.lastLookAt }); saveSoon(); } }
     // an agent (not a browser) using a god token
     const auth = req.headers.authorization ?? '', ua = req.headers['user-agent'] ?? '';
     if (!s.agentSeenAt && rest.startsWith('/v1/god/') && /^Bearer god_/i.test(auth) && !/Mozilla\//.test(ua)) { s.agentSeenAt = Date.now(); registry.update(slug, { agentSeenAt: s.agentSeenAt }); }
@@ -495,7 +499,7 @@ export async function openLauncher(cfg = {}) {
         json(res, 404, { ok: false, code: 'not-found', message: `this server answers under ${B}/` }); return;
       }
       if (path === '/__sim/worlds.json' && req.method === 'GET') { json(res, 200, await worldsJson()); return; }
-      if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t) }); return; }
+      if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: templateList().map(({ file: _f, ...t }) => t) }); return; }
       if (oldRoot && req.method === 'POST' && (path === '/__sim/worlds' || path === '/__sim/op/create-world')) {
         json(res, 403, { ok: false, code: 'creation.elsewhere', message: 'This server keeps the original worlds. Make new worlds at /worlds/.', url: '/worlds/' }); return;
       }
@@ -651,6 +655,8 @@ export async function openLauncher(cfg = {}) {
     const left = () => { if (gone) return; gone = true; const n = (live.get(slug) ?? 1) - 1; if (n > 0) live.set(slug, n); else live.delete(slug); const k = pool.state(slug); if (k) k.lastUsed = Date.now(); };
     socket.once('end', left); socket.once('close', left);
   });
+  // declared before listen(): a request that arrives while orphans are reaped below must not hit its temporal dead zone (P2)
+  let closed = false;
   // Under the keeper the port is the keeper's: connections arrive through accept() instead of listen().
   if (cfg.listen !== false) await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
   if (adopting) {
@@ -665,7 +671,6 @@ export async function openLauncher(cfg = {}) {
   const wakeRecent = () => { for (const w of [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).slice(0, cfg.eager ?? 4)) if (pool.status(w.slug).status !== 'running') pool.ensure(worldEnv(w)).then((p) => log(`woke ${w.slug} on :${p}`), (e) => log(`could not wake ${w.slug}: ${e.message}`)); };
   if (!adopting) wakeRecent();   // a handover wakes nothing until it has taken over (takeOverAll)
 
-  let closed = false;
   return {
     server, url: origin, registry, pool, dataDir, auth: auth?.public ?? { provider: 'dev' }, build: BUILD,
     /** Keeper: a connection accepted on the public port, passed to this launcher. */
