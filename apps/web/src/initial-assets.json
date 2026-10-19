@@ -4,9 +4,11 @@
  "at": "2026-10-11T05:49:14.419Z",
  "worlds": {
   "eden": {
-   "/modular/environment/animated-casual.glb": 1857308,
-   "/modular/environment/animated-punk.glb": 1807856,
-   "/modular/environment/animated-woman.glb": 1917076,
+   "/modular/environment/animated-casual.mesh.glb": 691076,
+   "/modular/environment/clips-ual.glb": 1179384,
+   "/modular/environment/animated-punk.mesh.glb": 640724,
+   "/modular/environment/animated-woman.mesh.glb": 742640,
+   "/modular/environment/clips-ual-woman.glb": 1184832,
    "/modular/environment/eden-animals.glb": 1065648,
    "/modular/environment/eden-boats-bikes.glb": 76784,
    "/modular/environment/eden-crops.glb": 288184,
@@ -16,15 +18,19 @@
   },
   "mars": {
    "/blobs/assets/ab/abad8cfc1353cc29f93273e31245f0d96bc75b43074850e6329c529f0433eace.glb": 4585464,
-   "/modular/environment/animated-casual.glb": 1857308,
-   "/modular/environment/animated-punk.glb": 1807856,
-   "/modular/environment/animated-woman.glb": 1917076
+   "/modular/environment/animated-casual.mesh.glb": 691076,
+   "/modular/environment/clips-ual.glb": 1179384,
+   "/modular/environment/animated-punk.mesh.glb": 640724,
+   "/modular/environment/animated-woman.mesh.glb": 742640,
+   "/modular/environment/clips-ual-woman.glb": 1184832
   },
   "littlemartians": {
    "/mars-assets/draco/draco_decoder.wasm": 192420,
-   "/modular/environment/animated-casual.glb": 1857308,
-   "/modular/environment/animated-punk.glb": 1807856,
-   "/modular/environment/animated-woman.glb": 1917076,
+   "/modular/environment/animated-casual.mesh.glb": 691076,
+   "/modular/environment/clips-ual.glb": 1179384,
+   "/modular/environment/animated-punk.mesh.glb": 640724,
+   "/modular/environment/animated-woman.mesh.glb": 742640,
+   "/modular/environment/clips-ual-woman.glb": 1184832,
    "/world-assets/littlemartians/buildings/ceramic-tower.glb": 1093356,
    "/world-assets/littlemartians/buildings/minaret-temple.glb": 830800,
    "/world-assets/littlemartians/characters/kin/chebel.glb": 759124,
@@ -35,5 +41,5 @@
    "/world-assets/littlemartians/characters/kin/green-patterns-blue.glb": 927776
   }
  },
- "note": "mars campus: lane BLOBS 2026-10-11 swapped /browser/campus.glb (70772556) for its smaller hashed copy (decoded bytes)"
+ "note": "mars campus: lane BLOBS 2026-10-11 swapped /browser/campus.glb (70772556) for its smaller hashed copy (decoded bytes); W3 2026-10-19: the character GLBs are their mesh files plus shared clips files (tools/blobs/character-wire.mjs)"
 }
