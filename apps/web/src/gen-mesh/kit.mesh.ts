@@ -172,7 +172,8 @@ export function buildKit(input: unknown, ctx: Pick<MeshCtx, 'materials' | 'tint'
     const pivot = new THREE.Group(); pivot.name = `role:${role}`; pivot.position.copy(pv); pivot.userData.role = role; pivot.userData.rest = pivot.quaternion.clone();
     if (args.v !== 2) {
       const geos = shapes.map((sh) => { color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material))); return placed(sh, args.round, args.v, color, pv); });
-      const mesh = new THREE.Mesh(merge(geos), shapes.some((s) => s.glow) ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8 }) : ctx.materials.get('paint', undefined, { vertexColors: true }));
+      // W2: a flame glows in its own tint (vertex colour); the plain emissive class glows cream-white whatever the tint
+      const mesh = new THREE.Mesh(merge(geos), shapes.some((s) => s.glow) ? ctx.materials.get('emissive', undefined, { vertexColors: true, glow: 0.8, ...(role === 'flame' ? { vertexGlow: true } : {}) }) : ctx.materials.get('paint', undefined, { vertexColors: true }));
       mesh.castShadow = true; pivot.add(mesh);
     } else {
       const classes = new Map<string, THREE.BufferGeometry[]>();

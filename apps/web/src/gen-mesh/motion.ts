@@ -379,7 +379,9 @@ function routeStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldM
 function glowStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldModel | null, t: number) {
   const ud = obj.userData as { glow?: THREE.Mesh[] };
   if (!ud.glow) {
-    ud.glow = []; obj.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && (m as { emissive?: THREE.Color }).emissive && m.emissive.getHex() !== 0 && m.emissiveIntensity > 0) { (c as THREE.Mesh).material=m.clone();ud.glow!.push(c as THREE.Mesh); } });
+    ud.glow = []; obj.traverse((c) => { const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined; if (m && (m as { emissive?: THREE.Color }).emissive && m.emissive.getHex() !== 0 && m.emissiveIntensity > 0) { const own = m.clone(); (c as THREE.Mesh).material = own; ud.glow!.push(c as THREE.Mesh);
+      // W2: a flame part glows by itself; its lit albedo plus a night-boosted emissive clipped it to white ("an orange cone")
+      if (isFlamePart(c)) { own.userData.flameCap = FLAME_GLOW_CAP; own.color.multiplyScalar(0.15); } } });
     // The layer caches its library materials; these per-entity copies belong to this root instead.
     const disposeGlow=()=>{for(const mesh of ud.glow??[])(mesh.material as THREE.Material).dispose();obj.removeEventListener('removed',disposeGlow);};
     obj.addEventListener('removed',disposeGlow);
@@ -392,7 +394,14 @@ function glowStep(obj: THREE.Object3D, e: Entity, def: StoredDef, model: WorldMo
   const pattern=patterned?lights.reduce((v,l,i)=>v+(l.on===false?0:lightPatternLevel(l.pattern,t,lightPhase(e.id,i,lights.length,l.pattern),reduced)),0)/lights.length:1;
   const night = nightOf(model), level = (0.25 + 1.4 * night + (patterned?0:0.03 * Math.sin(t * 3)))*pattern;
   // K1 / XP1: retain v2's per-shape glow level through the day/night and pattern multiplier.
-  for (const m of ud.glow) { const mat = m.material as THREE.MeshStandardMaterial; mat.emissiveIntensity = level * (mat.userData.kitGlowIntensity ?? 1); }
+  for (const m of ud.glow) { const mat = m.material as THREE.MeshStandardMaterial, v = level * (mat.userData.kitGlowIntensity ?? 1); mat.emissiveIntensity = mat.userData.flameCap ? Math.max(FLAME_GLOW_MIN, Math.min(v, mat.userData.flameCap)) : v; }
+}
+/** W2: the brightest a flame part's emissive gets (×its tint): saturated orange, never clipped white by the night boost. */
+const FLAME_GLOW_CAP = 0.85, FLAME_GLOW_MIN = 0.55;
+/** W2: a mesh that draws a flame — a kit part with `role: flame`, or one tinted flame/ember/fire. */
+export function isFlamePart(o: THREE.Object3D): boolean {
+  for (let p: THREE.Object3D | null = o; p; p = p.parent) { if (p.name === 'role:flame') return true; if (p.userData?.role) return false; }
+  return false;
 }
 
 function pointInPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }
