@@ -436,6 +436,17 @@ export async function openLauncher(cfg = {}) {
   // P2: a public page GET must not rewrite worlds.json synchronously each time (a look loop would): one save per 2 s at most
   let saveTimer = null;
   const saveSoon = () => { if (saveTimer) return; saveTimer = setTimeout(() => { saveTimer = null; registry.save(); }, 2000); saveTimer.unref?.(); };
+  // P2: a refusal is held for a second before it is sent, so a flooder that waits for each answer (every HTTP client does)
+  // sends at most one request a second per connection instead of thousands: the cheapest work for this shared loop is a
+  // timer. At most 2,000 refusals are held at once; past that the connection is closed at once.
+  let held = 0;
+  function refuseSlowly(req, res, flooded) {
+    if (held >= 2000) { res.shouldKeepAlive = false; json(res, flooded.status, flooded.body, { ...flooded.headers, connection: 'close' }); return; }
+    held++; let done = false;
+    const finish = () => { if (done) return; done = true; held--; clearTimeout(timer); };
+    const timer = setTimeout(() => { finish(); if (!res.destroyed) json(res, flooded.status, flooded.body, flooded.headers); }, 1000);
+    res.once('close', finish);
+  }
   function observe(slug, req, url) {
     const s = seenOf(slug), rest = url.pathname.slice(wp(slug).length) || '/';
     // `god look` loads the page with ?shot=1 (29 WP0): count it as a look.
@@ -487,7 +498,7 @@ export async function openLauncher(cfg = {}) {
     const rest = retried ? url.pathname : observe(slug, req, url);
     // P2: one flooding visitor or agent is refused here, before its world is even contacted (every world shares this loop)
     const flooded = retried ? null : flood(req, rest, behindProxy, slug);
-    if (flooded) { json(res, flooded.status, flooded.body, flooded.headers); return; }
+    if (flooded) { refuseSlowly(req, res, flooded); return; }
     if (req.method === 'POST' && CLAIM_PATHS.has(rest) && claimLocked(w)) { json(res, 403, { ok: false, code: 'not-claimable', message: 'this world is not open for claiming' }); return; }
     const tee = req.method === 'POST' && rest === '/v1/god/preview' ? (body) => { if (typeof body?.id !== 'string') return; const s = seenOf(slug); s.previews.unshift({ id: body.id, accepted: !!body.accepted, summary: body.summary ?? null, failures: body.failures ?? null, at: Date.now() }); s.previews.length = Math.min(s.previews.length, 20); } : undefined;
     const again = !retried && (req.method === 'GET' || req.method === 'HEAD') ? () => void toWorld(req, res, slug, url, true).catch(() => { if (!res.headersSent) json(res, 502, { ok: false, code: 'world.unavailable' }); }) : undefined;
