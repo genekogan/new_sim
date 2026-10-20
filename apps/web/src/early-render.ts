@@ -24,13 +24,15 @@ export const earlyRenderWanted = (search = location.search): boolean => EARLY_RE
 /** A poster LiveWorld never replaced (it failed or never came) goes after this long. */
 const POSTER_MAX_MS = 20_000;
 
-/** Start once the early layer's near world is built (early-entry.ts calls this when the snapshot is in). */
-export function startEarlyRender(): void {
+/** Start once the early layer's near world is built (early-entry.ts calls this when the snapshot is in). `done` lets the
+ *  page's second phase run: called once the poster is on screen, or at once when this draws nothing. */
+export function startEarlyRender(done: () => void = () => {}): void {
   const early = peekEarlyLayer();
-  if (!early || !earlyRenderWanted() || earlyRenderClaimed() || early.abort.signal.aborted) return;
+  if (!early || !earlyRenderWanted() || earlyRenderClaimed() || early.abort.signal.aborted) return done();
   let made: Made | null = null;
   try { made = setUp(early); } catch (e) { console.warn('early renderer', e); }
-  if (made) { const m = made; void early.started.then(() => { try { arrive(early, m); } catch (e) { console.warn('early renderer', e); } }); }
+  if (!made) return done();
+  const m = made; void early.started.then(() => { try { arrive(early, m, done); } catch (e) { console.warn('early renderer', e); done(); } }, done);
 }
 
 type Made = ReturnType<typeof setUp>;
@@ -61,12 +63,12 @@ function setUp(early: EarlyLayer) {
 }
 
 /** The near world is built: the arrival pose, the nearest models, the remaining programs, one frame, the poster. */
-function arrive(early: EarlyLayer, made: NonNullable<Made>) {
+function arrive(early: EarlyLayer, made: NonNullable<Made>, done: () => void) {
   const layer = early.layer, { renderer, scene, camera, light, atmosphere, look, quality, hand, h } = made;
-  if (!layer.active) return;
+  if (!layer.active) return done();
   const pose = entityArrivalPose(layer.viewBounds(), layer.entityCount, layer.groundAt, camera.fov, camera.aspect, 1, layer.arrivalAt());
   hand.target = [...pose.target]; hand.eye = [...pose.eye];   // LiveWorld frames the same view, whoever draws first
-  if (earlyRenderClaimed() || early.abort.signal.aborted) return;
+  if (earlyRenderClaimed() || early.abort.signal.aborted) return done();
   arrivalMark('early-render-built');
   const target = new THREE.Vector3().fromArray(pose.target);
   camera.position.fromArray(pose.eye); camera.lookAt(target);
@@ -79,7 +81,7 @@ function arrive(early: EarlyLayer, made: NonNullable<Made>) {
     if (look.enabled) { if (look.follow) light.follow(target, camera.position); renderer.toneMappingExposure = lookExposure(light.daylight, look.nightExposure); }
   };
   const draw = () => {
-    if (earlyRenderClaimed() || early.abort.signal.aborted) return;   // LiveWorld has it now
+    if (earlyRenderClaimed() || early.abort.signal.aborted) return done();   // LiveWorld has it now
     prepare();
     layer.cull(camera, h, true);
     try { renderer.render(scene, camera); } finally { layer.uncull(); }
@@ -90,10 +92,11 @@ function arrive(early: EarlyLayer, made: NonNullable<Made>) {
     Object.assign(still.style, { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%', zIndex: '2147480000', pointerEvents: 'none', display: 'block' });
     still.getContext('2d')?.drawImage(gl, 0, 0);
     document.body.appendChild(still); setEarlyPoster(still);
-    requestAnimationFrame(() => { arrivalMark('early-poster'); earlyArrival.mark(); });
+    requestAnimationFrame(() => { arrivalMark('early-poster'); earlyArrival.mark(); done(); });
     setTimeout(removeEarlyPoster, POSTER_MAX_MS);
   };
+  const safeDraw = () => { try { draw(); } catch (e) { console.warn('early renderer', e); done(); } };
   // the nearest models first (the card waited for them too), then the programs linked in parallel, then one frame
   const gate = new Promise<void>((resolve) => { if (!arrivalGate.pending()) return resolve(); const off = arrivalGate.subscribe(() => { if (!arrivalGate.pending()) { off(); resolve(); } }); setTimeout(resolve, 3_000); });
-  void gate.then(() => { if (earlyRenderClaimed()) return; arrivalMark('early-render-gate'); prepare(); return compileSceneAsync(renderer, scene, camera).then(() => arrivalMark('early-render-linked')); }).then(() => requestAnimationFrame(draw), () => requestAnimationFrame(draw));
+  void gate.then(() => { if (earlyRenderClaimed()) return; arrivalMark('early-render-gate'); prepare(); return compileSceneAsync(renderer, scene, camera).then(() => arrivalMark('early-render-linked')); }).then(() => requestAnimationFrame(safeDraw), () => requestAnimationFrame(safeDraw));
 }

@@ -5,12 +5,22 @@ import { installAssetTransport } from './boot-assets.ts';
 import { earlyLayerWanted, startEarlyLayer } from './early-layer.ts';
 import { PHASE2_GLOBAL } from './phased-entry.ts';
 
-const phase2 = () => { try { (window as unknown as Record<string, (() => void) | undefined>)[PHASE2_GLOBAL]?.(); } catch { /* the loader's own fallback runs it */ } };
+const phase2 = (hold = false) => { try { (window as unknown as Record<string, ((hold?: boolean) => void) | undefined>)[PHASE2_GLOBAL]?.(hold); } catch { /* the loader's own fallback runs it */ } };
+/** P7d: phase two's entry waits at most this long after the snapshot for the early renderer's poster. */
+const POSTER_WAIT_MS = 5_000;
 let started = false;
 try {
-  // P7d: when the snapshot is in, the early renderer's chunk is asked for first (ahead of phase two on the link)
+  // P7d: when the snapshot is in, the early renderer's chunk is asked for first (ahead of phase two on the link); phase
+  // two downloads (and its socket opens) meanwhile, but its entry (React, the Shell, LiveWorld: ~1 s of a phone's CPU)
+  // runs once the poster is up or the early renderer gave up, so LiveWorld never takes the renderer before the poster
   let asked = false;
-  const onSnapshot = () => { try { if (!asked && (asked = true) && new URLSearchParams(location.search).get('earlyRender') !== '0') void import('./early-render.ts').then((m) => m.startEarlyRender(), () => {}); } catch { /* LiveWorld draws it */ } phase2(); };
+  const onSnapshot = () => {
+    if (asked) return; asked = true;
+    if (new URLSearchParams(location.search).get('earlyRender') === '0') return phase2();
+    let released = false; const release = () => { if (!released) { released = true; phase2(); } };
+    phase2(true); setTimeout(release, POSTER_WAIT_MS);
+    try { void import('./early-render.ts').then((m) => m.startEarlyRender(release), release); } catch { release(); }
+  };
   if (earlyLayerWanted()) { installAssetTransport(); started = startEarlyLayer(onSnapshot); }
 } catch { /* LiveWorld makes its own layer */ }
 if (!started) phase2();

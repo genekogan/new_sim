@@ -40,6 +40,11 @@ test('rewritePhasedHtml: one loader in place of the module script and preloads; 
   assert.deepEqual(two.added.map((a) => a.url), ['/worlds/assets/three-B.js', '/worlds/assets/early-E.js']);
   (two.win[PHASE2_GLOBAL] as () => void)(); (two.win[PHASE2_GLOBAL] as () => void)(); two.timers.forEach((f) => f());
   assert.deepEqual(two.added.slice(2).map((a) => `${a.tag} ${a.url}`), ['modulepreload /worlds/assets/react-C.js', 'modulepreload /worlds/assets/Shell-D.js', 'entry /worlds/assets/main-A.js', 'socket ']);
+  // P7d: phase two's downloads and socket first (held entry), its entry at the next call or the fallback
+  const held = runLoader(js, true); (held.win[PHASE2_GLOBAL] as (h?: boolean) => void)(true); (held.win[PHASE2_GLOBAL] as (h?: boolean) => void)(true);
+  assert.deepEqual(held.added.slice(2).map((a) => `${a.tag} ${a.url}`), ['modulepreload /worlds/assets/react-C.js', 'modulepreload /worlds/assets/Shell-D.js', 'socket ']);
+  held.timers.forEach((f) => f()); (held.win[PHASE2_GLOBAL] as () => void)();
+  assert.deepEqual(held.added.slice(5).map((a) => `${a.tag} ${a.url}`), ['entry /worlds/assets/main-A.js']);
   // the early entry failing to load starts phase two
   const fail = runLoader(js, true); (fail.added[1].el.onerror as () => void)();
   assert.equal(fail.added.filter((a) => a.tag === 'entry').length, 2);
