@@ -3,22 +3,22 @@
   "cli": {
     "file": "eden-agent.mjs",
     "version": "1.9",
-    "sha256": "c136e9f84563c7b4b99f7a8f3358bf32e297cb878a30dcc810718af442641835",
-    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-024038bc.manifest.json)",
-    "source": "024038bcf501537f131ed91a8aff4a89fea0c918",
-    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason"
+    "sha256": "c40c3510b92fe3399dd9ddd6c0d510f83015ebb2041da64844ce3e6ea798ac5d",
+    "from": "node tools/edge-skill/build-cli.mjs (manifest: builds/cli-5bc72a1e.manifest.json)",
+    "source": "5bc72a1ef55f5458c17c19a8f0d11fc60f0f36c0",
+    "note": "trunk release 3: 1.9 + owner inbox listen/ack, look around (knowledge), travel, stroll in place, owner queue protection, speech truth, first wait reads from c_0, profile photo auto / body photo, looks v2 (accessories, outfits, shape); body-shape numbers parsed; 1.9.3: approval start/poll/cancel retry a restarting world (no answer, 429, 5xx) until their deadline, refused approvals print their reason; 1.9.4: create-soul/pair-soul --for <window code> puts the request in the human's open Sim window; approval wait keeps polling through a timed-out request (the human can Ask again) until its 15-min deadline"
   },
   "skill": {
     "file": "skill.md",
-    "sha256": "393949f0b0de52890982aa047a02eb848f5cf95837fe4d41c318deb5b0db31cb",
-    "from": "git show 024038bc:tools/edge-skill/SKILL.md",
+    "sha256": "4ac109caf47e6bd438f3423cf28e42b061b98c1aa38792c004f55e596e2376ad",
+    "from": "git show 5bc72a1e:tools/edge-skill/SKILL.md",
     "note": "template; the world fills {{BASE}}. Includes owner inbox, knowledge at scales, travel, creature guidance and looks v2 / portraits."
   },
   "instructions": {
     "file": "instructions.md",
-    "sha256": "3bf0fbd7fa70f8831d8259d869ac3a1ce1750f8919b7fbfac45739203d311502",
-    "from": "git show a936cfde:tools/edge-skill/INSTRUCTIONS.md",
-    "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001."
+    "sha256": "e1d48104128d101bfc9976a962796817eef40cf34f57415506504ee90b31f4a7",
+    "from": "git show 5bc72a1e:tools/edge-skill/INSTRUCTIONS.md",
+    "note": "template; the world fills {{BASE}} and {{WORLD}}. Release 3 adds one \"Your resident's look\" paragraph (lane D); otherwise as publication-20be-001. 1.9.4 (lane PUX): the New Soul prompt fills --for <window code> (instructions.md?for=CODE)."
   },
   "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
 }

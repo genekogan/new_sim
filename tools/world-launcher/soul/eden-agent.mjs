@@ -41,7 +41,7 @@ function clientHelp(version, contract) {
   return `eden-agent ${version} (${contract})
 Usage: node eden-agent.mjs <command> [args]
 
-Start: register <world URL> \xB7 create-soul "Name" ["Character"] \xB7 approval wait
+Start: register <world URL> \xB7 create-soul "Name" ["Character"] [--for CODE] \xB7 approval wait
 Reconnect an existing Soul: pair-soul <Soul ID> \xB7 select-soul <Soul ID>
 See: status \xB7 here \xB7 look around (explore) \xB7 observe \xB7 capabilities \xB7 map \xB7 view --alt-only
 Find: capabilities --search "<ID, verb or label>" \xB7 capabilities --verb "<exact verb>"
@@ -189,7 +189,8 @@ function approvalPublic(data, world) {
   const a = data?.approval ?? data;
   if (!a || !/^ap_[a-f0-9]{32}$/.test(a.id ?? "") || !["pending", "creating", "ready", "refused", "cancelled", "expired"].includes(a.status)) throw Error("Canonical account approval response unavailable.");
   const approvalURL = world + "/#approve/" + a.id;
-  return { approvalId: a.id, status: a.status, name: a.name, soulId: a.soulId ?? null, approvalURL, ...a.status === "refused" && typeof a.reason?.message === "string" ? { reason: a.reason.message, reasonCode: a.reason.code } : {}, ...a.status === "pending" ? { next: "Ask your human to open the approval link, sign in, and approve the intended world, Soul and agent. Then run: approval wait." } : a.status === "creating" ? { next: "Creation is accepted but its body is not ready. Run: approval wait." } : {} };
+  const inWindow = a.inWindow === true;
+  return { approvalId: a.id, status: a.status, name: a.name, soulId: a.soulId ?? null, approvalURL, ...inWindow ? { delivery: "window" } : {}, ...a.status === "refused" && typeof a.reason?.message === "string" ? { reason: a.reason.message, reasonCode: a.reason.code } : {}, ...a.status === "pending" ? { next: inWindow ? "Tell your human: approve it in your open Sim window (backup: the approval link). Then run: approval wait." : "Ask your human to open the approval link, sign in, and approve the intended world, Soul and agent. Then run: approval wait." } : a.status === "creating" ? { next: "Creation is accepted but its body is not ready. Run: approval wait." } : a.status === "expired" ? { next: "The request timed out. Your human can press Ask again on it (their open window or the link); run approval wait to pick it up, or create-soul again for a fresh request." } : {} };
 }
 function acceptDelegation(data, pending, world) {
   if (data?.status !== "ready") return null;
@@ -3627,7 +3628,7 @@ async function travelCommand(args, { load: load2, save: save2, live: live2 = () 
 }
 
 // tools/edge-skill/eden-agent.mjs
-var SKILL_VERSION = "1.9.3";
+var SKILL_VERSION = "1.9.4";
 var CONTRACT = "eden-edge/1";
 var API_CONTRACT = "eden-edge/1.1";
 var STATE = ".eden-agent.json";
@@ -3812,7 +3813,26 @@ async function pair(soul) {
   save({ token: t.token, soul });
   return true;
 }
-async function createSoul(name, description) {
+function forOption(argv) {
+  const rest = [], codes = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--for") {
+      codes.push(argv[++i]);
+      continue;
+    }
+    const m = /^--for=(.*)$/.exec(argv[i] ?? "");
+    if (m) {
+      codes.push(m[1]);
+      continue;
+    }
+    rest.push(argv[i]);
+  }
+  const code = codes.at(-1);
+  if (codes.length && !/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/.test(String(code ?? "").trim().toUpperCase())) throw Error("--for takes the window code your human was given, like K7QX-M2PA");
+  return { rest, forCode: code === void 0 ? void 0 : String(code).trim().toUpperCase() };
+}
+async function createSoul(...argv) {
+  const { rest: [name, description], forCode } = forOption(argv);
   if (liveRunning()) throw Error("Stop this folder\u2019s mind before changing its selected Soul, or use a fresh agent folder.");
   if (!name || description !== void 0 && !description) throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
   if (load().accountAuth) {
@@ -3821,7 +3841,7 @@ async function createSoul(name, description) {
       const own = await call("/v1/agent/me");
       if (own.status === 200 && own.data?.soul?.id === s.soul && own.data.soul.name === name) return { created: false, soul: { id: s.soul, name }, paired: true, reason: "The exact selected Soul is already ready and granted; no new birth was requested." };
     }
-    return startApproval({ name, description, ...s.reconnectSoul?.world === s.world && s.reconnectSoul.name === name ? { soulId: s.reconnectSoul.id } : {} });
+    return startApproval({ name, description, forCode, ...s.reconnectSoul?.world === s.world && s.reconnectSoul.name === name ? { soulId: s.reconnectSoul.id } : {} });
   }
   const me = ok(await call(OWNER.me, { as: "owner" }), "create-soul");
   const existing = me.souls.filter((s) => s.name === name);
@@ -3840,13 +3860,13 @@ async function createSoul(name, description) {
   folderGuide(d.soul?.name ?? name);
   return { created: true, soul: { id: id3, name: d.soul?.name ?? name }, paired: true, wrote: "AGENTS.md + CLAUDE.md (so a later agent session here knows how to relay your requests)" };
 }
-async function startApproval({ name, description, soulId }) {
+async function startApproval({ name, description, soulId, forCode }) {
   let s = load();
   if (!s.accountAuth) throw Error("This world does not advertise account approvals.");
   if (s.pendingApproval?.approvalId) {
     const p = s.pendingApproval, r = await approvalCall("/v1/agent/approval/poll", { approvalId: p.approvalId, pollSecret: p.input.pollSecret }, "check previous approval", Date.now() + 6e4);
     if (["refused", "cancelled", "expired"].includes(r.status) || r.status === "ready" && !r.token) {
-      finishApproval(r, p, s.world, r.status === "ready" ? "unavailable" : "terminal");
+      finishApproval(r, p, s.world, r.status === "ready" ? "unavailable" : "terminal", { release: true });
       s = load();
     }
   }
@@ -3857,13 +3877,13 @@ async function startApproval({ name, description, soulId }) {
     pending = { world: s.world, worldId: s.worldId, input: { name, ...description === void 0 ? {} : { description }, ...soulId ? { soulId } : {}, agentLabel: "eden-agent " + SKILL_VERSION, idempotencyKey: randomUUID4(), pollSecret: randomBytes2(32).toString("base64url") } };
     save({ pendingApproval: pending });
   }
-  const data = await approvalCall("/v1/agent/approval/start", pending.input, "approval start", Date.now() + 6e4);
+  const data = await approvalCall("/v1/agent/approval/start", { ...pending.input, ...forCode ? { for: forCode } : {} }, "approval start", Date.now() + 6e4);
   if (data.approval.worldId !== pending.worldId) throw Error("Approval world differs from registration.");
   pending.approvalId = data.approval.id;
   save({ pendingApproval: pending });
   return approvalPublic(data, s.world);
 }
-function finishApproval(dto2, pending, world, connection) {
+function finishApproval(dto2, pending, world, connection, { release = false } = {}) {
   if (dto2.id !== pending.approvalId || dto2.worldId !== pending.worldId || pending.world !== world) throw Error("Approval receipt scope differs; no pending request was discarded.");
   if (dto2.status === "ready") acceptDelegation(dto2, pending, world);
   const receipt2 = { ...approvalPublic(dto2, world), connection, worldId: pending.worldId, recordedAt: now() };
@@ -3880,7 +3900,7 @@ function finishApproval(dto2, pending, world, connection) {
     if (!delegate) throw Error("Ready delegation unavailable; pending recovery was retained.");
     const current = load(), grants = { ...current.delegations ?? {}, [delegate.soul]: { world: delegate.world, token: delegate.token } };
     save({ ...delegate, delegations: grants, pendingApproval: void 0, reconnectSoul: void 0, mode: void 0, lastAcceptedAt: now() });
-  } else save({ pendingApproval: void 0, ...connection === "unavailable" ? { reconnectSoul: { id: dto2.soulId, name: dto2.name, world } } : {} });
+  } else if (dto2.status !== "expired" || release) save({ pendingApproval: void 0, ...connection === "unavailable" ? { reconnectSoul: { id: dto2.soulId, name: dto2.name, world } } : {} });
   return receipt2;
 }
 async function approval(action = "status") {
@@ -3898,7 +3918,7 @@ async function approval(action = "status") {
   const body2 = { approvalId: pending.approvalId, pollSecret: pending.input.pollSecret }, deadline = Date.now() + (action === "wait" ? 15 * 6e4 : 3e4);
   for (; ; ) {
     let data = await approvalCall("/v1/agent/approval/poll", body2, "approval " + action, deadline), dto2 = data.approval ?? data;
-    if (["refused", "cancelled", "expired"].includes(dto2.status)) return finishApproval(dto2, pending, s.world, "terminal");
+    if (["refused", "cancelled"].includes(dto2.status) || dto2.status === "expired" && (action !== "wait" || Date.now() >= deadline)) return finishApproval(dto2, pending, s.world, "terminal", { release: action === "cancel" });
     if (dto2.status === "ready" && !data.token) {
       const receipt2 = finishApproval(dto2, pending, s.world, "unavailable");
       return { ...receipt2, next: "The body exists but this agent grant is unavailable. Run pair-soul " + dto2.soulId + ' "' + dto2.name + '" for fresh human approval; do not create a replacement Soul.' };
@@ -3914,16 +3934,17 @@ async function approval(action = "status") {
       folderGuide(dto2.name);
       return { approvalId: dto2.id, status: "ready", soul: { id: delegate.soul, name: dto2.name }, paired: true, next: "Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it." };
     }
-    if (action !== "wait" || ["refused", "cancelled", "expired"].includes(dto2.status) || Date.now() >= deadline) return approvalPublic(dto2, s.world);
+    if (action !== "wait" || ["refused", "cancelled"].includes(dto2.status) || Date.now() >= deadline) return approvalPublic(dto2, s.world);
     await sleep(3e3);
   }
 }
-async function pairSoul(id3, name) {
+async function pairSoul(...argv) {
+  const { rest: [id3, name], forCode } = forOption(argv);
   if (liveRunning()) throw Error("Stop this folder\u2019s mind before changing its selected Soul.");
   if (!/^s_[A-Za-z0-9_-]+$/.test(id3 ?? "")) throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');
   if (load().accountAuth) {
     if (!name) throw Error("Include the current Soul name for the approval preview.");
-    return startApproval({ name, soulId: id3 });
+    return startApproval({ name, soulId: id3, forCode });
   }
   const me = ok(await call(OWNER.me, { as: "owner" }), "pair-soul");
   if (!me.souls.some((s) => s.id === id3)) throw Error("That Soul is not owned by this identity.");
@@ -6411,6 +6432,7 @@ export {
   digest,
   events,
   explore,
+  forOption,
   here,
   intentOf,
   listen,
