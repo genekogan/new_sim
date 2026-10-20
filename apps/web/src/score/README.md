@@ -119,7 +119,7 @@ real owners, mobile/device load, full AudioContext leak or shared-radio claim.
 ## World playlist
 
 Lane S3 (2026-10-20). Gene: "music sucks. didn't we make better music? check the tone.js task for some of the music we
-made and put those on a playlist." The music in every world page (new worlds and the old `/w/eden`, `/w/mars`, ...) is
+made and put those on a playlist." The music in every world page (new worlds and the old `/w/eden`) is
 now a playlist of Sim Score pieces, replacing the sound layer's own generative `music` bed.
 
 - **Source.** Gene's Sim Score repository `<sim-score-repo>` (HEAD `3b806f2`, 64 Tone.js pieces composed in the
