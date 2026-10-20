@@ -1,4 +1,71 @@
-# CDN publishing path (lane cdn, 2026-10-15)
+# CDN publishing path (lane cdn, 2026-10-15; CDN rule and audit, CDN2, 2026-10-20)
+
+## The rule (Gene, 2026-10-20)
+
+"yes put it on cdn. anything that loads faster from cdn should be on cdn. as a rule. i dont know why you are asking me
+questions like this. i want to make the best possible loading app." (Gene, verbatim, 2026-10-20.)
+
+This supersedes the earlier rule that private-project derivatives (Little Martians, Mars College) never get shared
+`/assets/<sha>` aliases: those files are already served publicly from the origin by hash, so the CDN adds speed, not
+exposure. Whether an asset class goes on the CDN is decided by measured speed alone. Records: `tools/cdn/served-public.json`
+(see `tools/cdn/README.md`).
+
+## Audit, 2026-10-20 (CDN2)
+
+Method: real headless Chrome loaded https://sim.eden.art/, /w/eden, /w/mars, /w/littlemartians and
+/worlds/w/little-martians-arium and listed every request (`team/scratch/t4/cdn2/capture.mjs`, `cap1.json`); then paired
+curl timings and wire bytes from this laptop, origin through Cloudflare vs `assets.eden.art`, warm (no query) and cold
+(a unique query on both, so each is an edge miss), alternated (`paired.sh`, `timing1.txt`, `batch76.txt`).
+
+Both hosts are the same Cloudflare edge. Warm hits are equal (small file ~60 ms either way; 2 MB 0.11-0.15 s; 42 MB
+0.85-1.3 s on both), and cold misses are equal within noise (6.6 KB: 0.18-0.20 s origin vs 0.16-0.26 s CDN). The
+difference is **wire bytes**: `assets.eden.art` compresses GLB on the fly at about brotli quality 4 (verdelis.glb:
+1,638,445 B = q4), while the origin sends either nothing (`/assets/<sha>` routes, cached uncompressed by Cloudflare) or
+precompressed quality 11 (BLOBS, `/modular`, the Vite bundles). So a class is faster from the CDN exactly when the origin
+sends it uncompressed, or it is incompressible and the CDN gives better caching.
+
+| Class (what loads it) | Immutable? | Origin on the wire | CDN on the wire | Decision |
+|---|---|---|---|---|
+| Core set by hash: `/assets/<sha>`, `/worlds/assets/<sha>`, `/w/<slug>/assets/<sha>`, `/worlds/w/<slug>/assets/<sha>` (every placed core mesh, lods, littlemartians-two art; 117 of the arium's 119 asset requests, 74.6 MB) | yes (sha) | uncompressed: Cloudflare caches the route without encoding | br q4: 76 CC0 models 3,336,012 -> 1,392,741 B, 0.18 -> 0.14 s; whole set -34% (core index), -11% (lods), -7% (littlemartians-two), -36% (mars-fidelity) | **On the CDN.** 571 shas, 573 objects / 130.9 MB incl. the 125 private lods; renditions mapped (`of`). Live evidence 571/571 bytes match. |
+| Same files by name: `/world-assets/**`, `/worlds/world-assets/**` | per release | br ~q11 (verdelis 1,614,028 B) | br q4 (1,638,445 B, +1.5%) | On the CDN (the four aliases). The client asks for these by sha, so the name aliases are rarely used. |
+| Little Martians scans/buildings on /w/littlemartians; Mars campus + BLOBS copy on /w/mars | yes | | | Already on the CDN, world-scoped (lane cdn2, Oct 16). Unchanged. |
+| Mars backdrop tiers + fork campus `/blobs/assets/<sha>` (/w/mars) | yes (sha) | br q11 precompressed: base 4,585,464 -> 1,407,181 B | q4 estimate 1,554,144 B (+10%) | **Origin.** Slower from the CDN until precompressed upload. |
+| Character models, clips, Eden packs `/modular/environment/*`, `/worlds/modular/*` (every world, ~4.4 MB raw) | name, max-age 600 / 86400 | br q11 (`/modular`), ~q5 (`/worlds/modular`) | q4: +18-45% (environment set 1,661,713 vs 2,022,329 B) | **Origin**, same reason. |
+| Vite bundles `/assets/*.js`, css, mp4, icons (~1 MB br per page) | yes (hashed) | br q11 precompressed (release.sh), edge HIT | q4, plus a second host: +31-51 ms connection setup on the boot path; script tags bypass the fetch transport | **Origin.** |
+| Draco decoder `/mars-assets/draco/*` (wasm, js; ~70 KB) | name, max-age 600 | br | | **Origin.** Tiny, and the transport does not map wasm. A longer origin max-age would remove its revalidations. |
+| World JSON: `/engine/*.json`, templates, `scene.json`, footprints | name | br | | **Origin.** The client manifest carries no JSON (mutable, path-pinned). |
+| Mars history images `/history/**`, `/2020/**` (345 files, ~46 MB) | name | | | Not added: the Sim client never requests them (legacy viewer only). |
+| Catalogue thumbnails `/v1/god/defs/<ref>/thumb.png` | no (by ref) | | | **Origin.** God tooling only; mutable. |
+| Fonts | | | | None loaded from the origin. |
+| API (`/v1/*`, snapshot, config, scenes) | no | | | Dynamic. |
+| God uploads `/worlds/w/<slug>/assets/<sha>` outside the core set | yes (sha) | uncompressed (same route) | | Designed below, not built. 0 of the arium's 119 asset requests today. |
+
+### Design: precompressed objects (would move BLOBS, `/modular` and give the core set another ~5-10%)
+
+Upload each compressible object (GLB, JSON) as quality-11 brotli bytes with `Content-Encoding: br`, same key, and keep
+`x-amz-meta-sha256` = the decoded bytes' hash. Browsers then receive exactly the origin's smallest encoding from the
+nearest edge, and the client's hash check is unchanged (fetch decodes). Open check before relying on it (the October 11
+design flagged the same): on the real domain, a client that does not send `br` must still get decodable bytes, and the
+Compression Rule must not recompress. The publisher's HEAD/readback checks and `verify.mjs` (which asks for identity)
+need a `content-encoding` field. This needs the key and one live object to prove, so it is the release owner's step.
+
+### Design: god uploads on the CDN (not built; tell main before building an uploader)
+
+A god upload (`POST /v1/god/assets`) is content-addressed and, outside the core set, never has a rendition, so its URL
+sha is its content sha. Two ways:
+
+1. **Pull-through Worker (recommended).** A Cloudflare Worker on `assets.eden.art/w/*` with an R2 binding: on an R2 miss
+   for `assets/w/<slug>/<sha>.<ext>` it fetches `https://sim.eden.art/worlds/w/<slug>/assets/<sha>.<ext>`, checks the
+   sha256, stores the object (immutable headers) and returns it. No key on eden2, no upload queue, nothing to drain.
+2. **On-box uploader.** After ingest, the server queues the sha; a worker on eden2 PUTs it with `If-None-Match: *`
+   (publish.mjs signing). Needs a long-lived R2 key on eden2 (today's keys are 7-day) and a retry queue.
+
+Either way the client needs to know which uploads exist on the CDN, because the static manifest is built per release:
+the world's `/v1/config` (or snapshot) lists its CDN-backed upload shas and byte counts, and the transport adds them as
+hash aliases at run time. The sha in the URL is what the client verifies, so a wrong mapping falls back to the origin.
+Cloudflare Worker deployment is a Cloudflare setting (coordinator's domain).
+
+## Earlier notes (lane cdn, 2026-10-15)
 
 `assets.eden.art`, its R2 bucket, CORS and cache rule have been active since October 13. Publishing credentials have
 not been installed or used by this lane. No real uploads or live cache proof are claimed. The older plan below is
@@ -17,10 +84,9 @@ The existing key expires October 20. If its one-time secret was lost or expired,
 Object Read & Write key scoped only to `eden-assets`. Agents must not retrieve, display or install its values.
 
 The local inventory covers the three root worlds' public sources, the immutable release overlay and `/worlds` assets.
-Unknown/restricted assets remain explicit exclusions. A reviewed CC0 derivative allowlist (76 models plus their 20 CC0 lod1 meshes, 96 objects) is tied
-to the source-pack records in `team/asset-scouting/SOURCES.csv`; it permits 3,745,692 bytes. The 125 private lods stay on origin. The measured campus is
-70,772,556 bytes (67.49 MiB) and is excluded pending explicit publication provenance. This work does not by itself
-move the large private Mars or Little Martians files to the CDN.
+A reviewed CC0 derivative allowlist (76 models plus their 20 CC0 lod1 meshes, 96 objects) is tied to the source-pack
+records in `team/asset-scouting/SOURCES.csv`; it permits 3,745,692 bytes. Since 2026-10-20 the served-public records add
+the rest of the core set (477 objects, 127,111,668 bytes, the 125 private lods included); see the rule above.
 
 The web switch is off in a plain vite build; `tools/world-launcher/deploy/release.sh` builds both root and `/worlds` web
 artifacts with `SIM_ASSETS_CDN_ENABLED=1` by default (CDN1, 2026-10-20) and refuses a build without the CDN origin or the

@@ -33,25 +33,56 @@ only; the function-level override exists for isolated tests. The upload receipt 
 `approved-derivatives.json` additionally pins the 76 reviewed CC0 split models from `worlds/core-assets/index.json`
 to the source families in `tools/god-skill/scripts/import-packs.mjs` and exact CSV source-pack rows, plus (CDN1, 2026-10-20)
 the 20 CC0 lod1 meshes in `worlds/core-assets/lods/` (`tools/core-lods`), each pinned to its own bytes and to its approved
-parent model (`lodOf`, same source family); `lodsIndexSha256` pins `lods.index.json`. The other 125 lods (103 Little Martians,
-22 Mars College) have no record and stay on origin: a rights decision for Gene and the Little Martians artist, not this list. Changed/missing source
-records, changed derivative bytes, unknown or restricted licences are excluded. This is a bounded shared CC0 list.
-World-specific art can instead qualify for delivery to its existing public world under the scoped authorization below;
-an existing URL alone does not establish its owner, rights constraints or permitted audience.
+parent model (`lodOf`, same source family); `lodsIndexSha256` pins `lods.index.json`. Changed/missing source records,
+changed derivative bytes, unknown or restricted licences are excluded from this CC0 list.
+
+## The CDN rule (Gene, 2026-10-20) and served-public records
+
+Gene, 2026-10-20, verbatim: "yes put it on cdn. anything that loads faster from cdn should be on cdn. as a rule. i dont
+know why you are asking me questions like this. i want to make the best possible loading app."
+
+This supersedes the earlier rule that private-project derivatives (Little Martians, Mars College) never get shared
+`/assets/<sha>` aliases. Those files are already served publicly from the origin by hash, so the CDN adds speed, not
+exposure. The test for any asset class is now speed alone: an immutable file the origin already serves publicly goes on
+the CDN when it loads faster from `assets.eden.art`; otherwise the reason it stays on origin is recorded (the audit table in
+`docs/god/CDN.md`). Rights stay with their holders: the CDN is a transport, not a licence.
+
+`served-public.json` (`node tools/cdn/served-public.mjs --write`; without `--write` it checks the file is current) records,
+with exact SHA-256, bytes and the index's licence text unchanged (`rights`), every file of the server's core set that
+`GET /assets/<sha>` serves and the CC0 list does not cover: `worlds/core-assets/index.json` plus every other
+`worlds/core-assets/*.index.json` (lods, littlemartians-two, mars-fidelity). That includes the 125 private lod1 meshes
+(103 Little Martians, 22 Mars College), the 242 Mars College models and the Little Martians art: 477 objects,
+127,111,668 bytes. It pins each index and `renditions.json` by hash. Objects are uploaded with licence label
+`served-public`; the publisher and the client accept it next to `CC0-1.0` and `own-work`.
+
+Hash aliases name exactly the bytes the origin route sends. For a core GLB with a rendition (`renditions.json`, W3b) the
+origin sends the smaller rendition under the source sha, so `/assets/<sha>.glb` maps to the rendition's object and the
+entry carries `of: <sha>` (the client checks the alias against `of`). A rendition sha itself has no alias (the origin has
+no route for it). Every core-set file also gets its two named aliases (`/world-assets/...`, `/worlds/world-assets/...`).
+
+Why this class is faster from the CDN (measured 2026-10-20 from the laptop, `team/scratch/t4/cdn2/`): Cloudflare caches
+the origin's `/assets/<sha>` route uncompressed (no `content-encoding` even when br is accepted), while `assets.eden.art`
+sends brotli. The 76 CC0 models fetched in parallel: 3,336,012 -> 1,392,741 wire bytes, 0.18 -> 0.14 s (median of 5).
+Live evidence: all 571 core-set hash aliases served by https://sim.eden.art matched the manifest bytes exactly.
 
 ## Excluded large assets and world-scoped publication
 
-The prepared manifest contains 384 aliases for 96 CC0 objects: 76 models (3,337,244 bytes) and 20 lod1 meshes (408,448 bytes). It excludes these assets:
+The prepared manifest contains 2,296 aliases for 573 objects (130,857,360 bytes): 96 CC0 (76 models, 20 lod1 meshes)
+and 477 served-public. These stay on origin because the origin is as fast or faster (see the audit in `docs/god/CDN.md`):
 
-| Asset | Local evidence and current hold |
+| Asset | Why it stays on origin |
 |---|---|
-| Mars campus | The read-only `.lane/mars-web/browser/campus.glb` is 70,772,556 bytes (67.49 MiB), SHA-256 `675f4bebed89d73fb579493e708476f0dfd4c44c0106958a1aad1a92c932a8c4`. There is no exact CC0/own-work CSV record. The corrected-campus references in `apps/web/src/mars-fork.ts` also need their own file identity and scoped authorization. |
-| Private Mars derivatives | `worlds/core-assets/mars/` and the Mars records in `worlds/core-assets/index.json` identify campus CAD and the 2026 photographic recipe as private to this project. These records do not grant a shared CC0 catalogue licence. |
-| Little Martians scans and derivatives | `worlds/littlemartians/characters/manifest.json` records Vanessa Rosa's ownership, no open licence, and project-limited terms for character/ceramic-head scans. The associated kin meshes and ceramic building derivatives in the core index retain those constraints. |
+| `/blobs/assets/<sha>` (Mars backdrop tiers, Mars fork campus) | The origin sends precompressed brotli at quality 11; `assets.eden.art` compresses on the fly at about quality 4: backdrop base tier 1,407,181 B on origin vs 1,554,144 B (+10%) from the CDN. |
+| `/modular/environment/*` (character models, clips, Eden packs; every world) | Same: origin q11 brotli, the CDN 18-45% larger (environment set 1,661,713 vs 2,022,329 B). |
+| Vite bundles (`/assets/*.js`, css) | Same edge, origin q11 brotli, and a second host adds 31-51 ms of connection setup on the boot path. |
+| Mars campus `/browser/campus.glb?v=20260922b` | Already on the CDN, world-scoped (below). |
 
-The release owner's default permits assets already served publicly to a world to use CDN delivery **for that same world
-under a world-scoped path**. They must never enter the shared catalogue or receive shared `/assets/<sha>` aliases through
-this route. Existing reviewed world-owner/public-serving authorization can establish the basis within its recorded limits;
+A precompressed upload (objects stored with `Content-Encoding: br` at quality 11) would make the CDN at least as small as
+the origin for all of these; the design and its open check are in `docs/god/CDN.md`.
+
+Before the CDN rule above, the release owner's default permitted assets already served publicly to a world to use CDN
+delivery **for that same world under a world-scoped path** (the records below are still live and still valid). Since
+2026-10-20 such files may also take shared aliases when that loads faster. Existing reviewed world-owner/public-serving authorization can establish the basis within its recorded limits;
 it does not turn the art into CC0 or extend its audience or reuse rights.
 The authorization record may cite this release-owner default together with evidence of existing same-world public
 serving; it does not require a new open licence for that scoped delivery.
@@ -169,7 +200,7 @@ Verify the checked-in prepared manifest independently against actual repo files 
 node --test <worktrees>/lane-cdn/tools/cdn/manifest-integrity.test.mjs
 ```
 
-This retains and checks all 384 aliases. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
+This checks every alias (2,296 today), and that each hash alias carries the bytes the origin route sends. Named `/world-assets/` and `/worlds/world-assets/` entries resolve to their
 literal files under repo `worlds/`; canonical hash aliases resolve through the reviewed core index. Unknown, unsafe,
 unresolvable or symlinked paths fail, and every entry must match an independently computed file SHA-256 and byte count.
 
@@ -185,7 +216,7 @@ origin or `cdn-manifest-*.json`; `SIM_ASSETS_CDN_ENABLED=0 release.sh ...` turns
 `https://assets.eden.art`; only that origin and loopback HTTP test origins are accepted. Release the public manifest
 with the web app at `apps/web/src/cdn-manifest.json`, after its objects have been uploaded and verified. Vite emits its
 hashed URL under `/assets/`, with the correct build prefix; both existing static servers serve this path. The prepared
-manifest contains only approved CC0 entries; it is safe to ship with the switch off. Both root and `/worlds` builds use
+manifest contains only CC0 and served-public entries (files the origin already serves publicly); it is safe to ship with the switch off. Both root and `/worlds` builds use
 the same entry-point transport. Dynamic world asset routes only resolve to explicitly listed immutable hash aliases.
 There is no browser query/localStorage override. Unpublished, missing and invalid manifest entries stay on origin.
 The content-hashed manifest uses the browser's default cache mode, so repeat visits can reuse its immutable URL.
