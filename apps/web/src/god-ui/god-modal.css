@@ -50,6 +50,8 @@
 /* connect your agent: the one line, as a slip to hand over, with its Copy; the skill opens in a new tab */
 .gm-connect { margin: 0 0 16px; padding: 14px 14px 14px 16px; border-radius: 14px; background: color-mix(in srgb, var(--gm-off) 6%, var(--gm-soft)); border: 1px solid color-mix(in srgb, var(--gm-off) 22%, var(--gm-line)); }
 .god-modal .gm-connect h3 { margin: 0 0 10px; font: 650 15.5px/1.25 system-ui, sans-serif; letter-spacing: -.01em; color: var(--fg); text-transform: none; }
+.gm-connect h3 { display: flex; align-items: center; gap: 8px; }
+.gm-connect-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gm-off); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gm-off) 20%, transparent); flex: none; }
 .gm-connect-line { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 13px; border-radius: 10px; border: 1px dashed color-mix(in srgb, var(--fg) 30%, transparent); background: color-mix(in srgb, var(--bg) 62%, transparent); }
 .gm-connect-line p { flex: 1; min-width: 0; margin: 0; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--fg); overflow-wrap: anywhere; }
 .gm-connect-line a { color: var(--fg); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--fg) 40%, transparent); text-underline-offset: 3px; }
@@ -61,6 +63,7 @@
 /* undo/redo and the weather: two small groups under the command box */
 .gm-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 12px 0 0; }
 .gm-tool-group { display: inline-flex; border: 1px solid color-mix(in srgb, var(--fg) 16%, transparent); border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.gm-tool svg { width: 14px; height: 14px; margin-right: 5px; vertical-align: -2.5px; }
 .god-modal .gm-tool { min-height: 0; padding: 6px 13px; border: 0; border-radius: 0; background: transparent; color: var(--fg); font: 550 12.5px/1.2 system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
 .god-modal .gm-tool + .gm-tool { border-left: 1px solid color-mix(in srgb, var(--fg) 12%, transparent); }
 .god-modal .gm-tool:hover:not(:disabled) { background: var(--gm-soft); }

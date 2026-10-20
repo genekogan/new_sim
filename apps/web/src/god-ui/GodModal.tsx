@@ -73,7 +73,7 @@ function Connect({ url }: { url: string }) {
   useEffect(() => { if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t); }, [copied]);
   const copy = async () => { if (await copyText(line)) setCopied(true); else setManual(true); };
   return <section className="gm-connect" data-connect="1" aria-labelledby="gm-connect-h">
-    <h3 id="gm-connect-h">Connect your agent to God mode</h3>
+    <h3 id="gm-connect-h"><i className="gm-connect-dot" aria-hidden="true" />Connect your agent to God mode</h3>
     <div className="gm-connect-line">
       <p data-connect-line={line}>Read <a href={url} target="_blank" rel="noreferrer" data-skill-link="1">{url}<span className="gm-out">{OUT}</span></a> and follow its God mode section to control this world.</p>
       <button type="button" className="gm-copy" data-connect-copy="1" onClick={() => void copy()} aria-label="Copy the line for your agent">{copied ? 'Copied' : 'Copy'}</button>

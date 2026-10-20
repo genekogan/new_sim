@@ -38,6 +38,8 @@ const INTRO_KEY = `sim.godIntro:${worldKey}`;   // G4: God opens by itself once,
 type Sim = { controls?: { target: { x: number; z: number } } };
 /** Where the camera looks (the orbit target), for a strike near the view's centre. */
 const viewCentre = (): [number, number] | null => { const t = (window as unknown as { __simEntity?: Sim }).__simEntity?.controls?.target; return t ? [Math.round(t.x * 10) / 10, Math.round(t.z * 10) / 10] : null; };
+const UNDO = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5 2.5 6.5l3 3M2.8 6.5h6.7a3.5 3.5 0 0 1 0 7H7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const REDO = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.5l3 3-3 3M13.2 6.5H6.5a3.5 3.5 0 0 0 0 7H9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 
 export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boolean; onFlagMode: (v: boolean) => void; entitiesAt?: (seq: number) => Iterable<G.FlagSource> | null }) {
@@ -256,8 +258,8 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
   const connectUrl = !agentsPaired || (god.inbox && !connected) ? `${status.base || location.origin + apiPath('')}/SKILL.md` : null;
   const tools = <>
     <div className="gm-tool-group" role="group" aria-label="Undo and redo">
-      <button type="button" className="gm-tool" data-undo="1" disabled={!canUndo || !!busy} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
-      <button type="button" className="gm-tool" data-redo="1" disabled={!!busy} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
+      <button type="button" className="gm-tool" data-undo="1" disabled={!canUndo || !!busy} onClick={() => undoRedo('undo')} title="Undo the newest edit">{UNDO}Undo</button>
+      <button type="button" className="gm-tool" data-redo="1" disabled={!!busy} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">{REDO}Redo</button>
     </div>
     <div className="gm-tool-group" role="group" aria-label="Weather" data-weather="1" title="The same as your agent's weather and strike: each press is one edit">
       <button type="button" className="gm-tool" data-weather-kind="rain" disabled={!!busy} onClick={() => weather('rain')}>Rain</button>
@@ -294,10 +296,11 @@ export function GodPanel({ flagMode, onFlagMode, entitiesAt }: { flagMode: boole
     </section>}
     {godFeature('constitution') && <section className="gm-more"><ConstitutionBody /></section>}
   </>;
+  // the owner here is 'owner' (signed in) or 'god' (the owner's own god token in this browser): both may forsake
   return <>
     {ghostBar}
     {god.open && <OwnerGod banner={banner} connectUrl={connectUrl} paired={agentsPaired} tools={tools} prayers={<PrayersWaiting />} more={more}
-      forsake={status.you === 'owner' ? <ForsakeWorld name={name} /> : null} />}
+      forsake={<ForsakeWorld name={name} />} />}
   </>;
 }
 

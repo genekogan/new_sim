@@ -178,8 +178,9 @@ try {
     const exit = await Promise.race([done, sleep(30_000).then(() => 'timeout')]);
     return { approve: ok.status, exit, token: JSON.parse(readFileSync(join(gaiaDir, '.eden-god.json'), 'utf8')).token?.startsWith(`god_${slug}-1_`) };
   }, (r) => r.approve === 200 && r.exit === 0 && r.token);
+  // G5: the CLI's flag verb is switched off; a flag placed through act stays a place Souls walk to (the page hides it)
   await step('G2 the god builds: a plaza flag, a bench facing it, a cottage, a garden flag', async () => {
-    for (const a of [['flag', 'plaza', '--at', '0,12'], ['place', 'bench', '--at', '3,12', '--name', 'bench', '--facing', 'w'], ['place', 'cottage', '--at', '-14,-8', '--name', 'cottage'], ['flag', 'garden', '--at', '-10,6']]) await godCli(gaiaDir, ...a);
+    for (const a of [['act', JSON.stringify({ ops: [{ op: 'place', def: 'core/flag@1', name: 'plaza', p: [0, 12], state: { label: 'plaza' } }] })], ['place', 'bench', '--at', '3,12', '--name', 'bench', '--facing', 'w'], ['place', 'cottage', '--at', '-14,-8', '--name', 'cottage'], ['act', JSON.stringify({ ops: [{ op: 'place', def: 'core/flag@1', name: 'garden', p: [-10, 6], state: { label: 'garden' } }] })]]) await godCli(gaiaDir, ...a);
     const snap = (await api('/v1/world/snapshot')).data;
     for (const n of ['bench', 'cottage', 'plaza', 'garden']) ids[n] = snap.entities.find((e) => e.name === n)?.id;
     return { ids };
@@ -245,14 +246,13 @@ try {
         if (page.newSoulDialog) { await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' }); }
         return page;
       };
-      // G4: open the God modal if it is not (God may open by itself a moment later: the button toggles, so check before each press), then a section
-      const godSection = async (page, section) => {
+      // G4/G5: open the God Mode modal if it is not (God may open by itself a moment later: the button toggles, so check before each press); one view, no tabs
+      const godOpen = async (page) => {
         for (let i = 0; i < 3 && !(await page.locator('[data-god-modal][open]').count()); i++) {
           await page.locator('[data-god-open]').click({ timeout: 2000 }).catch(() => {});
           await page.locator('[data-god-modal][open]').waitFor({ timeout: 2000 }).catch(() => {});
         }
-        await page.locator(`[data-god-modal] [data-tab="${section}"]`).click();
-        await page.locator(`[data-god-modal] [data-section="${section}"]`).waitFor();
+        await page.locator('[data-god-modal] [data-section="agent"]').waitFor();
       };
       await step('P0 a stranger (not signed in) on #join gets e8\'s New Soul dialog and no god-panel card (lane UXFIX2)', async () => {
         const page = await open(null, '#join');
@@ -282,30 +282,28 @@ try {
         return { paired: r.status.paired, walk: walk.phase, souls };
       }, (r) => r.paired && r.walk === 'completed' && r.souls.includes('Ben'));
       await benPage.context().close();
-      await step('P3 the god\'s Souls tab: both Souls (the link to share is in the account menu); clicking Ana flies to her', async () => {
-        const page = await open('gaia', '#join');
-        await page.locator('[data-souls-tab]').waitFor({ timeout: 60_000 });
-        await page.locator('[data-soul="Ben"]').waitFor({ timeout: 30_000 });
-        const link = await page.locator('[data-join-link]').getAttribute('data-join-link');  // the account menu's "Copy invite link" (lane UXFIX)
-        await page.locator('[data-soul="Ana"] .gp-link').click().catch(() => {});
-        await sleep(2500);
-        await shot(page, '05-god-souls-tab');
-        const souls = await page.locator('[data-soul]').evaluateAll((els) => els.map((e) => e.getAttribute('data-soul')));
-        const errors = page.errors; await page.context().close();
-        return { link, souls, errors };
-      }, (r) => r.link === `${base}/#join` && r.souls.includes('Ana') && r.souls.includes('Ben') && !r.errors.length);
-      await step('P4 the god\'s start tab points to the one skill (SKILL.md link and the welcome\'s paste line)', async () => {
+      await step('P3 the god sees both Souls in Explore (the Souls tab is gone, G5; the link to share is in the account menu); clicking Ana flies to her', async () => {
         const page = await open('gaia');
-        await godSection(page, 'start');   // G4: the owner's God controls are one God modal (the God button right of Explore)
-        await page.locator('.gp-files a', { hasText: 'SKILL.md' }).waitFor();
-        const href = await page.locator('.gp-files a', { hasText: 'SKILL.md' }).getAttribute('href');
-        // the Agent section: the paste line until an agent is paired; after, while it is away, "Copy the line that restarts it"
-        await godSection(page, 'agent');
-        const text = await page.locator('[data-god-modal]').innerText();
-        const restart = await page.locator('[data-god-modal] .gm-textbtn[title]').first().getAttribute('title', { timeout: 15_000 }).catch(() => '');
-        await shot(page, '06-god-start-one-skill'); await page.context().close();
-        return { href, paste: text.includes(`Read ${base}/SKILL.md and follow its God mode section`) || !!restart?.startsWith(`Read ${base}/SKILL.md and resume God mode`) };
-      }, (r) => r.href === `${BASE}/w/${slug}/SKILL.md` && r.paste);
+        const link = await page.locator('[data-join-link]').getAttribute('data-join-link', { timeout: 60_000 });  // the account menu's "Copy invite link" (lane UXFIX)
+        await page.locator('button.explore-open:not(.god-open)').first().click();
+        const explore = page.locator('[aria-labelledby="explore-souls"]');
+        await explore.waitFor({ timeout: 60_000 });
+        await page.waitForFunction(() => /Ben/.test(document.querySelector('[aria-labelledby="explore-souls"]')?.textContent ?? ''), null, { timeout: 30_000 });
+        const text = await explore.innerText();
+        await shot(page, '05-god-explore-souls');
+        const errors = page.errors; await page.context().close();
+        return { link, souls: ['Ana', 'Ben'].filter((n) => text.includes(n)), errors };
+      }, (r) => r.link === `${base}/#join` && r.souls.includes('Ana') && r.souls.includes('Ben') && !r.errors.length);
+      await step('P4 God Mode names the one skill: the Connect line copies "Read <SKILL.md> and follow its God mode section" and links the file', async () => {
+        const page = await open('gaia');
+        await godOpen(page);   // G4: the owner's God controls are one God modal (the God button right of Explore)
+        await page.locator('[data-god-modal] [data-connect]').waitFor({ timeout: 60_000 });   // shown once the agent is away (its last call over 30 s ago)
+        const href = await page.locator('[data-god-modal] [data-skill-link]').getAttribute('href');
+        const line = await page.locator('[data-god-modal] [data-connect-line]').getAttribute('data-connect-line');
+        const target = await page.locator('[data-god-modal] [data-skill-link]').getAttribute('target');
+        await shot(page, '06-god-connect-one-skill'); await page.context().close();
+        return { href, line, target };
+      }, (r) => r.href === `${base}/SKILL.md` && r.target === '_blank' && r.line === `Read ${base}/SKILL.md and follow its God mode section to control this world.`);
       await step('P5 an approval link opens the approval card (signed out: it asks to sign in; the request stays pending)', async () => {
         const page = await open(null, '#approve/ap_' + '0'.repeat(32));
         await page.locator('[data-approval]').waitFor({ timeout: 60_000 });

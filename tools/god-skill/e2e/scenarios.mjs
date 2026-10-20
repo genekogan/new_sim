@@ -170,19 +170,14 @@ try {
     const s2 = await snapshot(); const b = find(s2, 'camp-bench');
     return { r1, r2, flagAt: [f.p[0], f.p[2]], benchAt: [b?.p?.[0], b?.p?.[2]] };
   }, (r) => accepted(r.r1) && accepted(r.r2) && r.benchAt[0] === r.flagAt[0] + 8);
-  if (chromium && page) await step('S8 the owner drops a labelled flag from the website (⚑ button, then click the ground)', async () => {
+  // G5 (Gene 2026-10-20b): flags are switched off on the page (apps/web/src/god-ui/features.ts): no ⚑ button, Alt+click places nothing
+  if (chromium && page) await step('S8 flags are switched off on the website: no flag button, Alt+click on the ground places nothing', async () => {
     const n0 = (await snapshot()).entities.length;
-    const btn = page.locator('[data-flag-button]'); await btn.waitFor({ timeout: 15000 }); await btn.click();
-    for (let i = 0; i < 20 && (await btn.getAttribute('aria-pressed')) !== 'true'; i++) await page.waitForTimeout(100);
-    const armed = await btn.getAttribute('aria-pressed');
-    let dialogSeen = null; page.once('dialog', (d) => { dialogSeen = d.message(); void d.accept('north gate'); });
-    await page.locator('canvas').first().click({ position: { x: 640, y: 420 } });
-    for (let i = 0; i < 30 && !dialogSeen; i++) await page.waitForTimeout(100);
+    let dialogSeen = null; page.once('dialog', (d) => { dialogSeen = d.message(); void d.dismiss(); });
+    await page.locator('canvas').first().click({ position: { x: 640, y: 420 }, modifiers: ['Alt'] });
     await page.waitForTimeout(2500);
-    const s = await snapshot(); const f = find(s, 'north-gate');
-    const body = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 300));
-    return { n: s.entities.length - n0, flag: !!f, label: f?.state?.label, armed, dialogSeen, body };
-  }, (r) => r.n === 1 && r.flag && r.label === 'north gate');
+    return { n: (await snapshot()).entities.length - n0, button: await page.locator('[data-flag-button]').count(), dialogSeen };
+  }, (r) => r.n === 0 && r.button === 0 && !r.dialogSeen);
   await shot('s8-flags', { eye: [-110, 40, -10], at: [-60, 2, -60], wait: 4000 });
 
   // S7: restart — everything survives

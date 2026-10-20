@@ -1,6 +1,6 @@
 // G5 (Gene 2026-10-20): flags and the Constitution are switched off by default (tools/god-skill/lib/features.mjs).
-// A new flag is refused with a precise code (act, dryrun, preview); flags a world already has stay; the Constitution's
-// writes answer 404 feature.off while its reads and data stay. Turning a feature back on restores it.
+// Flags are ignored by the server (the CLI's flag verbs refuse, the page hides them; a flag placed through the API stays a
+// place Souls can walk to); the Constitution's writes answer 404 feature.off while its reads and data stay.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Hono, type Context } from 'hono';
@@ -34,14 +34,10 @@ function fixture() {
 }
 const FLAG = { op: 'place', def: 'core/flag@1', name: 'camp', p: [4, 4], state: { label: 'camp' } };
 
-test('a new flag is refused with feature.off (act, dryrun, preview); other things still place', (t) => {
+test('flags are ignored, not refused: a flag placed through the API is kept (Souls walk to it); only the page hides it', (t) => {
   const { god } = fixture(); t.after(() => { delete process.env.SIM_GOD_FEATURES; });
-  for (const r of [god.act({ ops: [FLAG] }), god.dryrun({ ops: [FLAG] }), god.preview({ ops: [FLAG] })] as any[]) {
-    assert.equal(r.accepted, false); assert.equal(r.failures[0].code, 'feature.off'); assert.match(r.failures[0].fix, /--name/);
-  }
-  { const r = god.act({ ops: [{ op: 'place', def: 'core/fountain@1', name: 'arrival', p: [0, 0] }] }) as any; assert.equal(r.accepted, true, JSON.stringify(r)); }
-  process.env.SIM_GOD_FEATURES = 'flags';
-  assert.equal((god.act({ ops: [FLAG] }) as any).accepted, true, 'turned back on, a flag places');
+  const r = god.act({ ops: [FLAG] }) as any; assert.equal(r.accepted, true, JSON.stringify(r));
+  assert.equal((god.dryrun({ ops: [{ ...FLAG, name: 'camp-2' }] }) as any).accepted, true);
 });
 
 test('the Constitution\'s writes answer 404 feature.off; on again they work', async (t) => {

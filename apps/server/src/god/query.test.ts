@@ -5,7 +5,6 @@ import assert from 'node:assert/strict';
 import { Db } from '../db.ts';
 import { GodMode } from './god.ts';
 import { runQuery } from './query.ts';
-process.env.SIM_GOD_FEATURES = 'flags';   // G5: switched off by default (tools/god-skill/lib/features.mjs); this file places a flag
 
 function world() {
   let tick = 1;
