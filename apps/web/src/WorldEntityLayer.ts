@@ -366,7 +366,10 @@ export class WorldEntityLayer {
     d.obj.userData.frozenDrawn = d;
     d.obj.updateMatrixWorld = frozenMatrixWorld;
     _box.setFromObject(d.obj);
-    d.sphere = _box.isEmpty() ? undefined : _box.getBoundingSphere(new THREE.Sphere());
+    // Z2: no extent yet (only frame hooks, whose geometry is one point: a mesh with a distant version picks and loads its
+    // model from its hook, mesh-lod.ts) = nothing to cull by. A zero-radius sphere was always "under cullPx", so the hook
+    // never ran and the thing never appeared on phones.
+    d.sphere = _box.isEmpty() || _box.min.equals(_box.max) ? undefined : _box.getBoundingSphere(new THREE.Sphere());
     d.frozen = list;
   }
   private thaw(d: Drawn) {

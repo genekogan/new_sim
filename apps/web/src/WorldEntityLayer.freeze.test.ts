@@ -114,6 +114,22 @@ test('phone: render-time cull - off screen (except shadow-map frames) and sub-pi
   assert.equal(behind.obj.visible, false);
 });
 
+test('phone: a thing whose only child is a frame hook (no extent yet) is never culled, so its hook runs', async () => {
+  const { layer, inner, frame } = await layerFor(true);
+  const obj = new THREE.Group(); obj.position.set(0, 0, -300);
+  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0, 0, 0, 0], 3)); geo.setDrawRange(0, 0);
+  obj.add(new THREE.Mesh(geo)); inner.thingsGroup.add(obj);
+  const p = new THREE.Vector3(0, 0, -300);
+  inner.drawn.set('lod', { settled: true, obj, from: { p, s: 1 }, to: { p: p.clone(), s: 1 }, t0: 0, dur: 0.001, defHash: 'lod' });
+  frame();
+  assert.ok(inner.drawn.get('lod')!.frozen, 'frozen');
+  assert.equal(inner.drawn.get('lod')!.sphere, undefined, 'no sphere: a point has no size to cull by');
+  const cam = new THREE.PerspectiveCamera(60, 390 / 844, 0.1, 2000); cam.position.set(0, 0.5, 0); cam.lookAt(0, 0.5, -1);
+  layer.cull(cam, 844, false);
+  assert.equal(obj.visible, true, 'drawn, so its hook can choose and load the model');
+  layer.uncull();
+});
+
 test('desktop (freezeSettled off): nothing freezes and cull is a no-op', async () => {
   const { layer, put, frame } = await layerFor(false);
   const behind = put('behind', [0, 0, 10]);
