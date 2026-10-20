@@ -83,7 +83,11 @@ test('the page HTML carries the key first thing in <head>; no key leaves it unto
 
 test("P7d: the page HTML carries the world's clock for the phone's early poster; anything but an ISO time leaves it untouched", () => {
   const html = '<!doctype html><html><head><title>Sim</title></head><body></body></html>';
-  assert.ok(withWorldClock(html, '2026-03-04T21:15:00.000Z').includes('<head><script>window.__simWorldClock="2026-03-04T21:15:00.000Z"</script><title>'));
+  assert.ok(withWorldClock(html, '2026-03-04T21:15:00.000Z').includes('<head><script>window.__simWorldClock="2026-03-04T21:15:00.000Z";</script><title>'));
   for (const bad of [null, 12, '', 'now', '2026-03-04T21:15:00Z"</script><script>x()', '2026-03-04']) assert.equal(withWorldClock(html, bad), html);
   assert.equal(withWorldClock('<p>no head</p>', '2026-03-04T21:15:00Z'), '<p>no head</p>');
+  // and how many Souls live there (the poster's view): with the clock, alone, or not at all for anything but a count
+  assert.ok(withWorldClock(html, '2026-03-04T21:15:00.000Z', 7).includes('<head><script>window.__simWorldClock="2026-03-04T21:15:00.000Z";window.__simWorldSouls=7;</script><title>'));
+  assert.ok(withWorldClock(html, null, 0).includes('<head><script>window.__simWorldSouls=0;</script><title>'));
+  for (const bad of [null, -1, 1.5, '3', NaN]) assert.equal(withWorldClock(html, null, bad), html);
 });

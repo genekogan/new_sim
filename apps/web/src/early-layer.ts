@@ -42,7 +42,7 @@ export function peekEarlyLayer(): EarlyLayer | null { return claimed ? null : ea
 // arrival into a poster; LiveWorld adopts them (no second GL context, the programs already linked) and removes the
 // poster once it has drawn the world itself. Kept here (phase one, no imports) so LiveWorld never loads the renderer's code.
 /** What LiveWorld adopts. Typed loosely here (this module stays free of three's code); LiveWorld knows the types. */
-export type EarlyRenderHandOver = { renderer: unknown; scene: unknown; camera: unknown; light: unknown; atmosphere: unknown; standIns: { removeFromParent(): unknown }[]; target?: [number, number, number]; eye?: [number, number, number]; clock?: string | null };
+export type EarlyRenderHandOver = { renderer: unknown; scene: unknown; camera: unknown; light: unknown; atmosphere: unknown; standIns: { removeFromParent(): unknown }[]; target?: [number, number, number]; eye?: [number, number, number]; opening?: string | null; clock?: string | null };
 let hand: EarlyRenderHandOver | null = null, renderClaimed = false, poster: HTMLElement | null = null;
 /** early-render.ts: offer the made renderer (false when LiveWorld already made its own). */
 export function offerEarlyRender(h: EarlyRenderHandOver): boolean { if (renderClaimed) return false; hand = h; return true; }

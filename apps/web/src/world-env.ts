@@ -29,6 +29,12 @@ export function entryWorldClock(): string | null {
   const c = typeof window === 'undefined' ? null : (window as unknown as { __simWorldClock?: unknown }).__simWorldClock;
   return typeof c === 'string' ? c.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?/)?.[0] ?? null : null;
 }
+/** P7d: how many Souls the world had when the server sent this page (edge-snapshot.ts withWorldClock), or null when the page
+ *  does not say. With Souls, LiveWorld stays in broadcast, which opens on the world's first landmark (WorldDirector's opening). */
+export function entryWorldSouls(): number | null {
+  const n = typeof window === 'undefined' ? null : (window as unknown as { __simWorldSouls?: unknown }).__simWorldSouls;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 0 ? n : null;
+}
 export function shotClockAt(clock: string | null, hour: number | null): string | null {
   if (hour === null || !clock || !Number.isInteger(hour) || hour < 0 || hour >= 1440 || !/^\d{4}-\d{2}-\d{2}T/.test(clock)) return clock;
   return `${clock.slice(0, 10)}T${String(Math.floor(hour / 60)).padStart(2, '0')}:${String(hour % 60).padStart(2, '0')}:00`;

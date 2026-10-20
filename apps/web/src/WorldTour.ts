@@ -72,6 +72,10 @@ export function makeMove(view: TourView, type: MoveType, seconds: number, side: 
   return { view, type, seconds, at };
 }
 
+/** P7f: the broadcast's first move on a view while the page is arriving (and the phone's arrival poster, arrival-shot.ts):
+ *  the authored view's gentle push (its sightline is clear by authoring). Its pose at k = 0 is the view itself. */
+export const openingMove = (view: TourView): TourMove => makeMove(view, 'push', 14, 1);
+
 const PANORAMA = /panorama|all of eden|overview/i, NIGHT = /night|town|street|plaza|canal|homes|courtyard|market|fountain|tea|tower|kiosk|bandstand/i;
 const SKYLINE = /panorama|lookout|hillside|cliff|seaside|harbour|vineyard|observatory|castle|alpine|festival|lake|river/i;
 
@@ -131,7 +135,7 @@ export class WorldTour {
   }
   private choose(ctx: TourContext): TourMove {
     const prefer = ctx.prefer && (this.count === 0 || this.count % 3 === 2) && this.recentViews.at(-1) !== ctx.prefer.id ? ctx.prefer : null;
-    if (ctx.quick) return makeMove(prefer ?? this.pick(this.views, v => this.weight(v, ctx.daylight)), 'push', 14, 1);
+    if (ctx.quick) return openingMove(prefer ?? this.pick(this.views, v => this.weight(v, ctx.daylight)));
     for (let attempt = 0; attempt < 6; attempt++) {
       const view = prefer && attempt === 0 ? prefer : this.pick(this.views, v => this.weight(v, ctx.daylight));
       const options = this.types(view, ctx.daylight);

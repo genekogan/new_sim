@@ -10,7 +10,7 @@ import { installNightLighting } from './WorldNightLights.ts';
 import { createWorldAtmosphere } from './WorldAtmosphere.ts';
 import { installLookToneCurve, installMaterialDetail, lookExposure, lookSettings, setMaterialDetail } from './rendering/WorldLook.ts';
 import { browserQuality } from './quality-tier.ts';
-import { entityArrivalPose } from './entity-arrival.ts';
+import { worldArrivalPose } from './arrival-shot.ts';
 import { calendarClock, entityWorldState, entryWorldClock, setWeatherOf, shotClockAt } from './world-env.ts';
 import { visitorPreviewHour } from './visitor-hour.ts';
 import { arrivalGate } from './gen-mesh/lazy-assets.ts';
@@ -69,8 +69,10 @@ function setUp(early: EarlyLayer) {
 function arrive(early: EarlyLayer, made: NonNullable<Made>, done: () => void) {
   const layer = early.layer, { renderer, scene, camera, light, atmosphere, look, quality, hand, h } = made;
   if (!layer.active) return done();
-  const pose = entityArrivalPose(layer.viewBounds(), layer.entityCount, layer.groundAt, camera.fov, camera.aspect, 1, layer.arrivalAt());
-  hand.target = [...pose.target]; hand.eye = [...pose.eye];   // LiveWorld frames the same view, whoever draws first
+  // P7f: the world's arrival camera (arrival-shot.ts): with Souls, the broadcast's opening view, which the broadcast's first
+  // shot then starts from (hand.opening); LiveWorld frames the same view, whoever draws first
+  const pose = worldArrivalPose(layer, camera.aspect);
+  hand.target = [...pose.target]; hand.eye = [...pose.eye]; hand.opening = pose.opening;
   if (earlyRenderClaimed() || early.abort.signal.aborted) return done();
   arrivalMark('early-render-built');
   const target = new THREE.Vector3().fromArray(pose.target);

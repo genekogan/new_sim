@@ -64,10 +64,15 @@ export function withSnapshotKey(html: string, key: string | null, parts?: { defs
 /** P7b/P7d: the window property with the world's clock (its engine's env.datetime) when the page was sent. A phone's new world
  *  can be drawn before its first take (lever D, the early poster); its sky then starts at this time instead of the no-clock midday. */
 export const WORLD_CLOCK_GLOBAL = '__simWorldClock';
-export function withWorldClock(html: string, datetime: unknown): string {
-  if (typeof datetime !== 'string' || !/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z?$/.test(datetime)) return html;
+/** P7d: and how many Souls live in it: with Souls, a phone's arrival stays in broadcast, which opens on the world's first
+ *  landmark, so the poster is drawn from there (apps/web/src/early-render.ts); without, from the built-world framing. */
+export const WORLD_SOULS_GLOBAL = '__simWorldSouls';
+export function withWorldClock(html: string, datetime: unknown, souls?: unknown): string {
+  const clock = typeof datetime === 'string' && /^\d{4}-\d{2}-\d{2}T[0-9:.]+Z?$/.test(datetime) ? `window.${WORLD_CLOCK_GLOBAL}=${JSON.stringify(datetime)};` : '';
+  const count = typeof souls === 'number' && Number.isInteger(souls) && souls >= 0 ? `window.${WORLD_SOULS_GLOBAL}=${souls};` : '';
+  if (!clock && !count) return html;
   const at = html.search(/<head[^>]*>/i);
   if (at < 0) return html;
   const end = html.indexOf('>', at) + 1;
-  return html.slice(0, end) + `<script>window.${WORLD_CLOCK_GLOBAL}=${JSON.stringify(datetime)}</script>` + html.slice(end);
+  return html.slice(0, end) + `<script>${clock}${count}</script>` + html.slice(end);
 }

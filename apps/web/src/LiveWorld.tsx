@@ -83,7 +83,7 @@ import { visitorPreviewHour } from './visitor-hour.ts';
 import { GodWorldLiving, calendarClock, entityWorldState, godRoomViews, godTourViews, parseShotHour, shotClockAt, whenShotClock } from './world-env.ts';
 import { setFleeSources } from './gen-mesh/motion.ts';
 import { WorldLightning } from './WorldLightning.ts';
-import { entityArrivalPose } from './entity-arrival.ts';
+import { worldArrivalPose } from './arrival-shot.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { worldResolution } from './adaptive-resolution.ts';import { browserQuality } from './quality-tier.ts';import { WorldDistanceDetail } from './WorldDistanceDetail.ts';import { WorldMeshLod, PHONE_MESH_LOD, DESKTOP_MESH_LOD, workerSimplifier, type Simplifier } from './WorldMeshLod.ts';import { WorldFarStandIns, PHONE_STAND_INS, rendererSnapshotter } from './WorldFarStandIns.ts';import { compileSceneAsync, setTextureRenderer } from './gen-mesh/texture-budget.ts';
 // P1 phones: the god panel and the constitution card are lazy chunks, mounted once the arrival card has gone (20 s cap), or
 // at once when the landing URL carries something for the panel (#join, #approve/…, an offer or pairing link, a preview)
@@ -353,7 +353,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}}  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
-        const pose=adopted?.target&&adopted.eye?{target:adopted.target,eye:adopted.eye}:entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1,entityLayer.arrivalAt());controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
+        const pose=adopted?.target&&adopted.eye?{target:adopted.target,eye:adopted.eye,opening:adopted.opening??null}:worldArrivalPose(entityLayer,camera.aspect);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);broadcast.opening=pose.opening;  // P7f: one arrival camera (arrival-shot.ts): the poster's, and with Souls the broadcast's first shot starts from it
         camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
       camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');};  // lane W1: at once, not at React's next render: the socket's takes now arrive during the build, and a broadcast frame in between moved a ?shot's eye/at camera
     let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
@@ -934,7 +934,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const area = visibleViewport(host.clientWidth, host.clientHeight, context.current.viewportInsets);
       // P7 lever D: an early arrival stays on the near world it drew until the rest is built (a cut to a Soul before that
       // showed hollow ground)
-      if (context.current.cameraMode === 'broadcast' && !(earlyWanted && entityLayer.filling)) {
+      // P7f: nor before it knows whether Souls live here (a world without them stays on its arrival view; the welcome decides)
+      if (context.current.cameraMode === 'broadcast' && !(earlyWanted && entityLayer.filling) && !(arrivalPending && !s.conn.replica.souls.size)) {
         const shot = broadcast.sample(at.entities, records, base, at.tick, dt, area?.aspect ?? camera.aspect, now / 1000, step,visualObstructionRoots());
         if (shot?.pose) {
           camera.position.fromArray(shot.pose.position);

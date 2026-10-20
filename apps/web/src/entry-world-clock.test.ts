@@ -14,3 +14,13 @@ test('the entry clock is the naive local time of the HTML clock, or null', () =>
     assert.equal(calendarClock(entryWorldClock(), { time: { calendar: '06-05' } }), '2026-06-05T07:20:18.000');
   } finally { w.window = had; }
 });
+
+test('P7d: the entry Soul count is a whole number from the page\'s HTML, or null', async () => {
+  const { entryWorldSouls } = await import('./world-env.ts');
+  const w = globalThis as unknown as { window?: { __simWorldSouls?: unknown } };
+  const had = w.window; w.window = {};
+  try {
+    assert.equal(entryWorldSouls(), null);
+    for (const [v, want] of [[0, 0], [12, 12], [-1, null], [1.5, null], ['3', null]] as const) { w.window.__simWorldSouls = v; assert.equal(entryWorldSouls(), want, String(v)); }
+  } finally { w.window = had; }
+});

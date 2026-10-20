@@ -94,6 +94,11 @@ export class WorldBroadcast {
   private lastPick = -Infinity;
   private emptySince: number | null = null;
   private ride: { azimuth: number; checked: number } | null = null;
+  /** P7f: the view the arrival camera already shows (arrival-shot.ts: the phone's poster, LiveWorld's first frames), or null.
+   *  The first tour shot is then that view's opening push from k = 0 (WorldTour.openingMove), even when the arrival is
+   *  already over (the phone holds the broadcast until its world is filled in), so it starts exactly where the camera is.
+   *  Cleared by the first shot of any kind. */
+  opening: string | null = null;
   /** Set by the viewer: Soul → entity (for who is speaking) and whether Eden's town views apply. */
   hints?: () => { soulEntity(soulId: string): string | null; eden: boolean; daylight?: number | null;
     /** R4-LIVE: a god world's own establishing views (its named buildings, plazas, landmarks); Eden's when `eden`. */
@@ -132,7 +137,7 @@ export class WorldBroadcast {
     const people = Object.keys(frame).filter(id => records[id]?.kind === 'human').sort();
     if (!people.length) { // nobody here at all: the town tour (Eden), else nothing to direct
       const hints = this.hints?.(), v = this.viewsOf(hints);this.lastTick = tick;
-      return v ? this.tourShot(wallSeconds, hints?.daylight ?? null, null, renderRoots, v.tour) : null;
+      return v ? this.tourShot(wallSeconds, hints?.daylight ?? null, v.views.find(x => x.id === this.opening) ?? null, renderRoots, v.tour) : null;
     }
     // VF1: WorldDirector decides what is worth watching and for how long (4x a second; cheap, no rays).
     if (wallSeconds - this.lastPick >= .25 || !this.choice) {
@@ -152,6 +157,7 @@ export class WorldBroadcast {
       const prefer = v.views.find(x => x.id === choice.landmark.id) ?? null;
       return this.tourShot(wallSeconds, hints?.daylight ?? null, prefer, renderRoots, v.tour);
     }
+    this.opening = null;
     const { focus, phase } = choice, members = choice.members.filter(id => frame[id]);
     const ridden = frame[focus] && records[focus]?.body?.family !== 'floater' ? ridingCarrier(frame[focus].p, this.hints?.().carriers ?? []) : null;
     if (ridden) { this.lastTick = tick; this.signature = ''; return { pose: this.riderShot(ridden, frame[focus].p, wallSeconds, movementDt, renderRoots), shot: `${choice.label}:ride-side` }; }
@@ -230,7 +236,8 @@ export class WorldBroadcast {
   private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[], tour: WorldTour = this.tour) {
     let prepared = false;
     const ready = () => { if (!prepared) { this.rendered.prepare(renderRoots); prepared = true; } };
-    const pose = tour.pose(wallSeconds, { daylight, prefer, quick: !arrivalOver(),
+    const opening = this.opening !== null && prefer?.id === this.opening; this.opening = null;
+    const pose = tour.pose(wallSeconds, { daylight, prefer, quick: opening || !arrivalOver(),
       clear: p => { ready(); return this.rendered.evaluate(() => this.rendered.clear(p, .8)); },
       sight: (a, b) => { ready(); const length = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); return this.rendered.evaluate(() => this.rendered.reach(a, b)) >= Math.min(length * .6, 25); },
       open: p => { ready(); return this.rendered.evaluate(() => this.rendered.reach(p, [p[0], p[1] + 40, p[2]])) >= 39; } });
