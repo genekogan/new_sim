@@ -24,6 +24,24 @@ async function accept<T>(f:ReturnType<typeof fixture>,promise:Promise<T>) {
   for(let i=0;i<100&&!done;i++){await setImmediate();f.host.drainInputs();}
   assert.ok(done,'actual sequencer settled request');return promise;
 }
+// Over a real socket the bytes travel outside the event loop (Modal's gVisor loopback delivers them from its own netstack),
+// so no count of turns bounds a TCP round trip. Drain on every turn, as a running host's frame loop would, until the
+// response actually arrives; a request that needs a tick or never settles still fails, at the deadline.
+async function acceptOverTcp<T>(f:ReturnType<typeof fixture>,promise:Promise<T>,ms=10_000) {
+  let done=false;promise.then(()=>done=true,()=>done=true);
+  for(const until=Date.now()+ms;!done&&Date.now()<until;){await setImmediate();f.host.drainInputs();}
+  assert.ok(done,'actual sequencer settled request over TCP');return promise;
+}
+/** Resolves once a message of type `type` has arrived on the actual socket (or already has). */
+function arrived(socket:WebSocket,messages:string[],type:string,ms=10_000) {
+  const has=()=>messages.some(m=>JSON.parse(m).t===type);
+  return new Promise<void>((resolve,reject)=>{
+    if(has())return resolve();
+    const check=()=>{if(has()){clearTimeout(timer);socket.off('message',check);resolve();}};
+    const timer=setTimeout(()=>{socket.off('message',check);reject(new assert.AssertionError({message:'no '+type+' message arrived over the actual socket'}));},ms);
+    socket.on('message',check);
+  });
+}
 async function settled(f:ReturnType<typeof fixture>) {await accept(f,f.service.settled());}
 async function ticks(f:ReturnType<typeof fixture>,n:number,stop=()=>false) {
   for(let i=0;i<n&&!stop();i++){f.host.tickOnce();if(i%10===0)await setImmediate();}
@@ -214,7 +232,7 @@ test('actual TCP owner/agent adapters and anonymous Hub join/batches exclude pri
   await new Promise<void>(resolve=>server.listen(4957,'127.0.0.1',resolve));
   let socket:WebSocket|undefined;t.after(async()=>{socket?.terminate();for(const client of hub.clients)client.ws.terminate();hub.wss.close();await new Promise<void>(r=>server.close(()=>r()));});
   const credential=token(f),pending=fetch('http://127.0.0.1:4957/v1/agent/intent-v2',{method:'POST',headers:{authorization:'Bearer '+credential,'content-type':'application/json'},body:JSON.stringify(request('PRIVATE_REQUEST_ID','PRIVATE_OWNER_WORDS make friends if you feel like it'))});
-  await receipt(await accept(f,pending));await settled(f);
+  await receipt(await acceptOverTcp(f,pending));await settled(f);
   const generation=f.db.soul('s_A')!.token_generation!;
   for(const path of ['/v1/log','/v1/kernel','/v1/debug/world','/v1/take','/v1/takes','/v1/world','/v1/scene']) {
     const response=await fetch('http://127.0.0.1:4957'+path);assert.equal(response.status,200);
@@ -223,10 +241,10 @@ test('actual TCP owner/agent adapters and anonymous Hub join/batches exclude pri
   socket=new WebSocket('ws://127.0.0.1:4957/ws');const messages:string[]=[];
   socket.on('message',data=>messages.push(String(data)));
   await new Promise<void>((resolve,reject)=>{socket!.once('open',resolve);socket!.once('error',reject);});socket.send(JSON.stringify({t:'hello',proto:PROTO}));
-  for(let i=0;i<100&&!messages.some(m=>JSON.parse(m).t==='takes');i++)await delay(2);
+  await arrived(socket,messages,'takes');
   assert.ok(messages.some(m=>JSON.parse(m).t==='snapshot'));
-  await receipt(await accept(f,fetch('http://127.0.0.1:4957/v1/souls/s_A/intent-v2',{method:'POST',headers:{authorization:'Bearer dev:alice','content-type':'application/json'},body:JSON.stringify(request('PRIVATE_LIVE_ID','PRIVATE_OWNER_WORDS make friends if you feel like it'))})));await settled(f);await ticks(f,40);await delay(10);
-  assert.ok(messages.some(m=>JSON.parse(m).t==='batch'));
+  await receipt(await acceptOverTcp(f,fetch('http://127.0.0.1:4957/v1/souls/s_A/intent-v2',{method:'POST',headers:{authorization:'Bearer dev:alice','content-type':'application/json'},body:JSON.stringify(request('PRIVATE_LIVE_ID','PRIVATE_OWNER_WORDS make friends if you feel like it'))})));await settled(f);await ticks(f,40);
+  await arrived(socket,messages,'batch');
   for(const marker of ['PRIVATE_OWNER_WORDS','PRIVATE_REQUEST_ID','PRIVATE_LIVE_ID','PRIVATE_STANDING_SUMMARY',generation,credential,hashToken(credential)])assert.ok(!messages.join('\n').includes(marker));
   assert.equal(f.db.paidCost(),0);
 });
