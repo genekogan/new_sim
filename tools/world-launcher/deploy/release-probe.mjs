@@ -3,11 +3,16 @@
 //
 //   node tools/world-launcher/deploy/release-probe.mjs --origin https://sim.eden.art \
 //        --pages /worlds/w/eden-2026/,/w/eden/ [--phone-pages /worlds/w/eden-2026/,/w/eden/] --out <dir> \
-//        [--cli <god dir>[,<god dir>…]] [--cli-every 1] [--arrive-every 6] [--max-min 20] [--lease <team>/ops/chrome-lease.mjs]
-//   … wait for <dir>/ready, release, wait ~20 s, then: touch <dir>/stop   (or Ctrl-C) → <dir>/report.json + a summary
+//        [--cli <god dir>[,<god dir>…]] [--cli-every 1] [--arrive-every 6] [--after-s 60] [--expect-build we-<sha12>] [--max-min 20]
+//   … wait for <dir>/ready, release, then: touch <dir>/released → the probe watches --after-s more seconds (default 60),
+//   stops by itself and writes <dir>/report.json + a summary. (touch <dir>/stop or Ctrl-C aborts early: the bar then fails.)
 //
-// Watchers: real Chrome (headless, Playwright from mars/viewer) with one desktop context at dpr 1 holding every --pages
-// world open, and one phone context (Pixel 7: 412x915, dpr 2.625, touch, mobile) holding --phone-pages. Each page is
+// Watchers: real Chrome (headless, Playwright from mars/viewer), one browser per watched page — a desktop page at dpr 1
+// for every --pages world, a phone page (Pixel 7: 412x915, dpr 2.625, touch, mobile) for every --phone-pages world —
+// and one more browser for the fresh arrivals. One browser each, as every visitor has their own machine: in one shared
+// browser a heavy arrival held the shared GPU process and froze every page's socket events for 13-20 s (run m3). Each
+// page also records its own main-thread stalls (> 1 s without a 100 ms timer firing); a drop reports the stall time
+// inside it, so a slow reconnect caused by the probe's machine is told apart from the release. Each page is
 // marked once it has arrived; at the end a page still carrying its mark was never reloaded. Every world socket (…/ws)
 // is recorded in the page (open, first message, close code), so a socket that drops during the release gives its
 // reconnect time: close → first message on the next socket. Every 500 ms the page text is read for an error page
@@ -20,7 +25,13 @@
 // placed that is missing, duplicate = a name placed twice. Every placed barrel is then removed (`clear` by name) unless
 // --keep-edits. Unclean = a CLI failure whose output is not the CLI's own sentence (an HTML page, a stack trace).
 //
-// Bar (G9): errorPages 0, every arrival loaded (document 2xx/3xx within 30 s), lost 0, unclean 0, every reconnect <= 5000 ms, no page reloaded.
+// Builds: every world socket records the build its welcome names. --expect-build (the release id; a legacy root's
+// -root suffix matches too) checks every page ends on it; without it, a page whose build did not change is reported.
+// A release that rolled back (activate.sh put the previous build back) is flagged ROLLED BACK even when visitors were
+// fine: the visitor bar can pass while the release did not land (exit 3).
+//
+// Bar (G9): errorPages 0, every arrival loaded (document 2xx/3xx within 30 s), lost 0, unclean 0, every reconnect <= 5000 ms,
+// no page reloaded, watched >= --after-s after the release ended.
 import { createRequire } from 'node:module';
 import { execFile } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -39,12 +50,14 @@ const cliBin = resolve(flag('cli-bin', join(ROOT, 'tools/god-skill/eden-god.mjs'
 const arriveEvery = Number(flag('arrive-every', 6)) * 1000;
 const maxMs = Number(flag('max-min', 20)) * 60_000;
 const settleMs = Number(flag('settle-s', 20)) * 1000;
+const afterMs = Number(flag('after-s', 60)) * 1000;   // watch this long after <dir>/released: late drops show up here
+const expectBuild = flag('expect-build', null);
 const keepEdits = argv.includes('--keep-edits');
 const cliEvery = Number(flag('cli-every', 1)) * 1000;   // one edit per second per god, under the world's edit rate limit
 const leasePath = flag('lease', existsSync('<team>/ops/chrome-lease.mjs') ? '<team>/ops/chrome-lease.mjs' : null);
 if (!origin || !pages.length || !out) { console.error('usage: release-probe.mjs --origin <url> --pages <path,…> --out <dir> [--phone-pages …] [--cli <dir,…>]'); process.exit(2); }
 mkdirSync(out, { recursive: true });
-const STOP = join(out, 'stop');
+const STOP = join(out, 'stop'), RELEASED = join(out, 'released');
 const t0 = Date.now(), at = () => Date.now() - t0, iso = () => new Date().toISOString();
 const say = (s) => console.log(`[probe +${(at() / 1000).toFixed(1)}s] ${s}`);
 const ERROR_TEXT = /Bad Gateway|Service Unavailable|Gateway Time-?out|"code":\s*"world\.|world\.unavailable|Internal Server Error|This site can.t be reached|ERR_CONNECTION|No world called|Application error/i;
@@ -57,29 +70,35 @@ const RECORDER = () => {
     const rec = { url: String(url), made: Date.now(), open: null, first: null, last: null, close: null, code: null };
     log.push(rec);
     ws.addEventListener('open', () => { rec.open = Date.now(); });
-    ws.addEventListener('message', () => { const n = Date.now(); rec.first ??= n; rec.last = n; });
+    ws.addEventListener('message', (e) => {
+      const n = Date.now(); rec.first ??= n; rec.last = n;
+      if (rec.build === undefined && typeof e.data === 'string' && e.data.startsWith('{"t":"welcome"')) rec.build = e.data.match(/"build":"([^"]*)"/)?.[1] ?? null;
+    });
     ws.addEventListener('close', (e) => { rec.close = Date.now(); rec.code = e.code; });
     return ws;
   };
   Z.prototype = W.prototype; Object.assign(Z, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
   window.WebSocket = Z;
+  // main-thread stalls: a 100 ms timer that fired more than 1 s late
+  if (window === window.top) { const st = (window.__z1stalls = []); let last = Date.now(); setInterval(() => { const n = Date.now(); if (n - last > 1000) st.push([last, n]); last = n; }, 100); }
 };
 const isWorldSocket = (u) => /\/ws(\?|$)/.test(u);
 
 const report = { origin, startedAt: iso(), pages, phonePages, watchers: [], arrivals: [], cli: [], bar: null };
-let browser = null, release = () => {};
+const browsers = []; let release = () => {};
 async function openBrowser() {
-  if (leasePath) { const { chromeLease } = await import(leasePath); release = await chromeLease('release-probe'); }
+  if (leasePath && !browsers.length) { const { chromeLease } = await import(leasePath); release = await chromeLease('release-probe'); }   // one lease for the run
   const chromium = createRequire(join(ROOT, 'mars/viewer/package.json'))('@playwright/test').chromium;
-  browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+  const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--enable-unsafe-swiftshader'] });
+  browsers.push(b); return b;
 }
 const DEVICES = {
   desktop: { viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 },
   phone: { viewport: { width: 412, height: 915 }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true,
     userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Mobile Safari/537.36' },
 };
-async function context(device) {
-  const ctx = await browser.newContext(DEVICES[device]);
+async function context(device, browser) {
+  const ctx = await (browser ?? await openBrowser()).newContext(DEVICES[device]);
   await ctx.addInitScript(RECORDER);
   return ctx;
 }
@@ -111,14 +130,21 @@ async function finish(w) {
   w.reloaded = (await w.page.evaluate(() => window.__z1mark).catch(() => null)) !== 'arrived' || w.navigations !== w.navigationsAtMark;
   w.canvas = await w.page.evaluate(() => [...document.querySelectorAll('canvas')].some((c) => c.width > 0 && c.height > 0)).catch(() => false);
   const socks = (await w.page.evaluate(() => window.__z1ws).catch(() => [])).filter((s) => isWorldSocketIn(s.url));
+  w.stalls = ((await w.page.evaluate(() => window.__z1stalls).catch(() => null)) ?? []).map(([a, b]) => [a - t0, b - t0]);
+  const stallIn = (a, b) => w.stalls.reduce((n, [x, y]) => n + Math.max(0, Math.min(b, y) - Math.max(a, x)), 0);
   // a drop during the watch: close → first message on the next socket of the same world
   w.sockets = socks.map((s) => ({ ...s, made: s.made - t0, open: s.open && s.open - t0, first: s.first && s.first - t0, last: s.last && s.last - t0, close: s.close && s.close - t0 }));
   w.drops = [];
   for (let i = 0; i < w.sockets.length; i++) {
-    const s = w.sockets[i]; if (s.close === null || s.close < w.markAt) continue;
+    const s = w.sockets[i]; if (s.close === null || s.close < w.markAt || s.close > stoppedAt) continue;   // a close while collecting is not watched
     const next = w.sockets.slice(i + 1).find((n) => n.first !== null && n.first >= s.close);
-    w.drops.push({ closeAt: s.close, code: s.code, resumedAt: next?.first ?? null, reconnectMs: next ? next.first - s.close : null });
+    w.drops.push({ closeAt: s.close, code: s.code, resumedAt: next?.first ?? null, reconnectMs: next ? next.first - s.close : null,
+      pageStallMs: stallIn(s.close - 1000, next?.first ?? at()) });
   }
+  // the build each page saw when it was marked, and at the end (the welcome of its last socket that had one)
+  const built = w.sockets.filter((s) => s.build != null);
+  w.buildAtMark = built.filter((s) => s.first !== null && s.first <= w.markAt).at(-1)?.build ?? null;
+  w.buildAtEnd = built.at(-1)?.build ?? null;
   await w.page.screenshot({ path: join(out, `${w.device}-${slugOf(w.path)}-2-after.png`) }).catch(() => {});
   delete w.page;
 }
@@ -186,21 +212,27 @@ async function cliLoop(dir, runId, stopped) {
 
 // ---------- main
 let stopping = false;
-const stopped = () => stopping || existsSync(STOP) || at() > maxMs;
+let releasedAt = null, stoppedAt = null;
+const stopped = () => {
+  if (stoppedAt !== null) return true;
+  if (releasedAt === null && existsSync(RELEASED)) { releasedAt = at(); say(`released: watching ${afterMs / 1000} s more`); }
+  if (stopping || existsSync(STOP) || at() > maxMs || (releasedAt !== null && at() - releasedAt >= afterMs)) stoppedAt = at();
+  return stoppedAt !== null;
+};
 process.on('SIGINT', () => { stopping = true; });
 process.on('SIGTERM', () => { stopping = true; });
 try {
-  await openBrowser();
-  const ctxs = { desktop: await context('desktop'), phone: phonePages.length ? await context('phone') : null };
-  for (const p of pages) report.watchers.push(await watch(ctxs.desktop, 'desktop', p));
-  if (ctxs.phone) for (const p of phonePages) report.watchers.push(await watch(ctxs.phone, 'phone', p));
+  const arrivals = await openBrowser();   // fresh arrivals get their own browser; each watcher gets one too
+  const ctxs = { desktop: await context('desktop', arrivals), phone: phonePages.length ? await context('phone', arrivals) : null };
+  for (const p of pages) report.watchers.push(await watch(await context('desktop'), 'desktop', p));
+  for (const p of phonePages) report.watchers.push(await watch(await context('phone'), 'phone', p));
   say(`${report.watchers.length} watchers open; arriving for ${settleMs / 1000} s`);
   await new Promise((r) => setTimeout(r, settleMs));
   for (const w of report.watchers) { await mark(w); w.markAt = at(); }
   const runId = Date.now().toString(36);
   const clis = cliDirs.map((d) => cliLoop(resolve(d), runId, stopped));
   writeFileSync(join(out, 'ready'), iso());
-  say(`READY (${join(out, 'ready')}): release now; then touch ${STOP}`);
+  say(`READY (${join(out, 'ready')}): release now; when it has ended: touch ${RELEASED}`);
   const targets = [...pages.map((p) => ['desktop', p]), ...(ctxs.phone ? phonePages.map((p) => ['phone', p]) : [])];
   let k = 0, nextArrive = Date.now(); const inflight = [];
   while (!stopped()) {
@@ -213,7 +245,7 @@ try {
   for (const w of report.watchers) await finish(w);
   report.cli = await Promise.all(clis);
 } finally {
-  await browser?.close().catch(() => {}); release();
+  await Promise.all(browsers.map((b) => b.close().catch(() => {}))); release();
 }
 
 // ---------- verdict
@@ -234,12 +266,24 @@ report.bar = {
   cliFailures: report.cli.reduce((n, c) => n + c.failures.length, 0), cliRetries: report.cli.reduce((n, c) => n + c.retries, 0),
   lost: report.cli.reduce((n, c) => n + (c.lost?.length ?? 0), 0), duplicates: report.cli.reduce((n, c) => n + (c.duplicates?.length ?? 0), 0),
   unclean: report.cli.reduce((n, c) => n + c.unclean, 0), cliSlowestMs: Math.max(0, ...report.cli.map((c) => c.slowestMs)),
+  pageStallMaxMs: Math.max(0, ...report.watchers.flatMap((w) => (w.stalls ?? []).map(([x, y]) => y - x))),
+  watchedAfterReleaseMs: releasedAt === null ? null : stoppedAt - releasedAt,
+  builds: Object.fromEntries(report.watchers.map((w) => [`${w.device} ${w.path}`, `${w.buildAtMark} -> ${w.buildAtEnd}`])),
 };
 const b = report.bar;
-b.pass = b.errorPages === 0 && b.arrivalsNotLoaded.length === 0 && b.lost === 0 && b.unclean === 0 && b.notResumed === 0 && b.reconnectMaxMs <= 5000 && b.reloaded.length === 0;
+// the release landed only if every page ends on the expected build (or, without --expect-build, on a new one)
+const landed = (w) => (expectBuild ? !!w.buildAtEnd?.startsWith(expectBuild) : !!w.buildAtEnd && w.buildAtEnd !== w.buildAtMark);
+b.rolledBack = report.watchers.filter((w) => !landed(w)).map((w) => `${w.device} ${w.path}: serves ${w.buildAtEnd}${expectBuild ? `, not ${expectBuild}` : ' (unchanged)'}`);
+b.pass = b.errorPages === 0 && b.arrivalsNotLoaded.length === 0 && b.lost === 0 && b.unclean === 0 && b.notResumed === 0 && b.reconnectMaxMs <= 5000 && b.reloaded.length === 0
+  && b.watchedAfterReleaseMs !== null && b.watchedAfterReleaseMs >= afterMs;
 report.endedAt = iso();
 writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(b, null, 1));
-for (const d of drops) console.log(`  ${d.device} ${d.path}: socket closed (${d.code}) at +${(d.closeAt / 1000).toFixed(1)}s, ${d.reconnectMs === null ? 'NOT resumed' : `resumed in ${d.reconnectMs} ms`}`);
-say(b.pass ? 'PASS' : 'FAIL');
-process.exit(b.pass ? 0 : 1);
+for (const d of drops) console.log(`  ${d.device} ${d.path}: socket closed (${d.code}) at +${(d.closeAt / 1000).toFixed(1)}s, ${d.reconnectMs === null ? 'NOT resumed' : `resumed in ${d.reconnectMs} ms`}${d.pageStallMs ? ` (page main thread stalled ${d.pageStallMs} ms of it)` : ''}`);
+for (const w of report.watchers) { const [x, y] = (w.stalls ?? []).reduce((m, s) => (s[1] - s[0] > m[1] - m[0] ? s : m), [0, 0]);
+  if (y - x > 5000) console.log(`  ${w.device} ${w.path}: page main thread stalled ${y - x} ms (+${(x / 1000).toFixed(1)}s..+${(y / 1000).toFixed(1)}s); its socket events are late by as much`); }
+if (b.watchedAfterReleaseMs === null) console.log(`  never told the release ended (touch ${RELEASED}): late drops unwatched`);
+else if (b.watchedAfterReleaseMs < afterMs) console.log(`  watched only ${b.watchedAfterReleaseMs} ms after the release (need ${afterMs})`);
+if (b.rolledBack.length) { console.log('  ROLLED BACK: the release did not land on every page'); for (const r of b.rolledBack) console.log(`    ${r}`); }
+say(`${b.pass ? 'PASS' : 'FAIL'}${b.rolledBack.length ? ' (visitors), but the release ROLLED BACK' : ''}`);
+process.exit(!b.pass ? 1 : b.rolledBack.length ? 3 : 0);
