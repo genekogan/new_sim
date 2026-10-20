@@ -3,7 +3,8 @@
 #   tools/test-harness/v7-walks.sh <outDir>      (run from the candidate checkout; builds web into <outDir>, ~10 min)
 # Old worlds (eden/mars/littlemartians, root path) 5870-5872; launcher + new-world walk 5873 (children 5874-5876);
 # the God modal e2e (tools/god-skill/e2e/launcher.mjs: Connect, pairing, a command acked, undo/redo, weather, Forsake) runs
-# its own launcher on 5877 (children 5878-5879).
+# its own launcher on 5877 (children 5878-5879); then the approval-link walk (tools/god-skill/e2e/approve-on-top.mjs, Clerk mode)
+# reuses 5873-5876.
 # Writes <outDir>/v7-receipt.json (status pass|fail, per-check results, source sha) and prints one RELEASE_GATE_V7 line.
 # Only processes this script starts are ever stopped. Never touches 4930-4970 / 4986 / 4987.
 set -u
@@ -36,4 +37,7 @@ for i in $(seq 1 30); do curl -s -m 2 http://127.0.0.1:5873/worlds/__sim/worlds.
 perl -e 'alarm 1800; exec @ARGV' node tools/test-harness/walk-new.mjs http://127.0.0.1:5873 "$OUT/new" > "$OUT/walk-new.log" 2>&1; RC_NEW=$?
 cleanup; PIDS=()
 perl -e 'alarm 1200; exec @ARGV' node tools/god-skill/e2e/launcher.mjs --port 5877 --range 5878-5879 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/god" > "$OUT/god-modal.log" 2>&1; RC_GOD=$?
-node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_GOD"
+# lane HF: the god opens an agent's approval link (#approve/<id>) in Clerk mode; it must stay on top through the whole
+# load (own launcher on 5873, children 5874-5876, free again after walk-new)
+perl -e 'alarm 900; exec @ARGV' node tools/god-skill/e2e/approve-on-top.mjs --port 5873 --range 5874-5876 --web "$OUT/web-worlds" --mars-web "$MARS_WEB" --out "$OUT/approve" > "$OUT/approve-on-top.log" 2>&1; RC_APPROVE=$?
+node tools/test-harness/v7-receipt.mjs "$OUT" "$ROOT" "$RC_OLD" "$RC_NEW" "$RC_GOD" "$RC_APPROVE"

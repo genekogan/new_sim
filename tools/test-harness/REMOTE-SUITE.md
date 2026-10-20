@@ -22,6 +22,8 @@ V4 all tracked web unit tests including TSX, V5 recursive server tests, and V6 f
 Other standalone tools/browser/scientific experiments are outside this frozen CPU contract.
 V7 real-Chrome GPU checks (including optional V6 screenshots/S8 browser flag-drop) and V8 local production-history
 checks remain separate release proofs. The launcher e2e left the CPU gate (Z3); rewritten against the one-view God modal (GT, B8), it runs in V7 as `god-modal`.
+V7 also runs `approve-on-top` (lane HF hotfix, tools/god-skill/e2e/approve-on-top.mjs): in Clerk mode the god opens an agent's
+approval link (#approve/<id>) at desktop dpr 1/2 and phone, and the approval must stay on top through the whole load.
 
 Every retained test failure, skip and TODO has one exact entry, reason and owner in **quarantine.json**.
 The gate rejects new failures even if pre-added to that list; missing steps/logs, cancellations, timeouts,
