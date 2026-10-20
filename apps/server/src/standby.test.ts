@@ -43,3 +43,33 @@ test('SIGTERM in standby exits without opening anything', async () => {
   assert.equal(await p.exited, 0);
   assert.doesNotMatch(p.out(), /opened/);
 });
+
+// G9 (lane Z1): the pre-warm rehearses the snapshot restore on a read-only connection while the previous process still
+// writes: it reads the latest snapshot, never writes (the writer's next commit and the file are unaffected), never throws.
+test('the restore rehearsal reads the latest snapshot read-only beside a live writer', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { mkdtempSync, statSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { rehearseRestore } = await import('./standby.ts');
+  const path = join(mkdtempSync(join(tmpdir(), 'standby-')), 'sim.db');
+  const writer = new DatabaseSync(path);
+  writer.exec('PRAGMA journal_mode = WAL; CREATE TABLE snapshots (world_id TEXT, tick INTEGER, rules_version TEXT, snapshot TEXT)');
+  const put = writer.prepare('INSERT INTO snapshots VALUES (?,?,?,?)');
+  put.run('w-1', 10, 'r/1', JSON.stringify({ runtime: { tick: 10 } }));
+  put.run('w-1', 20, 'r/1', JSON.stringify({ runtime: { tick: 20 } }));
+  put.run('w-2', 99, 'r/1', JSON.stringify({ runtime: { tick: 99 } }));
+  const restored: unknown[] = [];
+  const factory = { rulesVersion: 'r/1', restore: (rt: never) => { restored.push(rt); return {}; } };
+  const size = statSync(path).size;
+  rehearseRestore(path, 'w-1', factory);
+  assert.deepEqual(restored, [{ tick: 20 }], 'the latest snapshot of this world, once');
+  assert.equal(statSync(path).size, size, 'the database file is unchanged');
+  put.run('w-1', 30, 'r/1', '{}');   // the writer is not blocked by the rehearsal
+  rehearseRestore(path, 'w-1', { rulesVersion: 'r/2', restore: () => { throw new Error('not for another rules version'); } });
+  rehearseRestore(path, 'w-1', { rulesVersion: 'r/1', restore: () => { throw new Error('a failed rehearsal is only logged'); } });
+  rehearseRestore(join(path, '..', 'missing.db'), 'w-1', factory);
+  assert.equal(restored.length, 1);
+  assert.throws(() => statSync(join(path, '..', 'missing.db')), 'a missing database is not created');
+  writer.close();
+});
